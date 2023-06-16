@@ -148,7 +148,9 @@ def fake_context(
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
         forge_namespace="forge-potato",
-        forge_cluster=ForgeCluster(name="tomato", kubeconf="kubeconf", is_multiregion=multiregion),
+        forge_cluster=ForgeCluster(
+            name="tomato", kubeconf="kubeconf", is_multiregion=multiregion
+        ),
         forge_test_suite="banana",
         forge_blocking=True,
         github_actions="false",

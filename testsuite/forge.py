@@ -61,6 +61,7 @@ MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig"
 MULTIREGION_KUBECONFIG_PATH = f"{MULTIREGION_KUBECONFIG_DIR}/kubeconfig"
 GAR_REPO_NAME = "us-west1-docker.pkg.dev/aptos-global/aptos-internal"
 
+
 @dataclass
 class RunResult:
     exit_code: int
