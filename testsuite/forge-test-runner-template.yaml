@@ -75,3 +75,4 @@ spec:
     - name: multiregion-kubeconfig
       secret:
         secretName: multiregion-kubeconfig
+        optional: true

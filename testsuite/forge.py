@@ -57,7 +57,7 @@ DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
 
 FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
 
-MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig/"
+MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig"
 MULTIREGION_KUBECONFIG_PATH = f"{MULTIREGION_KUBECONFIG_DIR}/kubeconfig"
 GAR_REPO_NAME = "us-west1-docker.pkg.dev/aptos-global/aptos-internal"
 
@@ -643,6 +643,7 @@ class K8sForgeRunner(ForgeRunner):
                 "kubectl",
                 "--kubeconfig",
                 context.forge_cluster.kubeconf,
+                *context.forge_cluster.kubectl_create_context_arg,
                 "delete",
                 "pod",
                 "-n",
@@ -650,7 +651,6 @@ class K8sForgeRunner(ForgeRunner):
                 "-l",
                 f"forge-namespace={context.forge_namespace}",
                 "--force",
-                context.forge_cluster.kubectl_create_context_arg,
             ]
         )
         context.shell.run(
@@ -711,9 +711,7 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
-            KUBECONFIG=MULTIREGION_KUBECONFIG_PATH
-            if context.forge_cluster.is_multiregion
-            else "",
+            KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
         )
 
@@ -725,12 +723,12 @@ class K8sForgeRunner(ForgeRunner):
                     "kubectl",
                     "--kubeconfig",
                     context.forge_cluster.kubeconf,
+                    *context.forge_cluster.kubectl_create_context_arg,
                     "apply",
                     "-n",
                     "default",
                     "-f",
                     specfile,
-                    context.forge_cluster.kubectl_create_context_arg,
                 ]
             ).unwrap()
             context.shell.run(
