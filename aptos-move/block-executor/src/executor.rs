@@ -9,7 +9,7 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
-    scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave},
+    scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
@@ -432,11 +432,11 @@ where
 
             // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
             // will be properly handled by the threads. For instance, it is possible that the committing
-            // thread holds an execution task from the last iteration, and then early halts the BlockSTM
-            // due to a txn execution abort. In this case, we cannot reset the scheduler_task of the
-            // committing thread (to be Done), otherwise some other pending thread waiting for the execution
-            // will be pending on read forever (since the halt logic let the execution task to wake up such
-            // pending task).
+            // thread holds an execution task of ExecutionTaskType::Wakeup(DependencyCondvar) for some
+            // other thread pending on the dependency conditional variable from the last iteration. If
+            // the committing thread early halts BlockSTM and resets its scheduler_task to be Done, the
+            // pending thread will be pending on read forever. In other words, we rely on the committing
+            // thread to wake up the pending execution thread, if the committing thread holds the Wakeup task.
         }
     }
 
@@ -539,16 +539,18 @@ where
                     versioned_cache,
                     scheduler,
                 ),
-                SchedulerTask::ExecutionTask(version_to_execute, None) => self.execute(
-                    version_to_execute,
-                    block,
-                    last_input_output,
-                    versioned_cache,
-                    scheduler,
-                    &executor,
-                    base_view,
-                ),
-                SchedulerTask::ExecutionTask(_, Some(condvar)) => {
+                SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
+                    self.execute(
+                        version_to_execute,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        scheduler,
+                        &executor,
+                        base_view,
+                    )
+                },
+                SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
                     *lock.lock() = DependencyStatus::Resolved;
