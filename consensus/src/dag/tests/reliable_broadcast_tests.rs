@@ -10,6 +10,10 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
+use futures::{
+    future::{AbortHandle, Abortable},
+    FutureExt,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
@@ -122,32 +126,47 @@ async fn test_reliable_broadcast() {
     let sender = Arc::new(TestDAGSender::new(failures));
     let rb = ReliableBroadcast::new(validators.clone(), sender);
     let message = TestMessage(vec![1, 2, 3]);
-    let (tx, rx) = oneshot::channel();
-    let (_cancel_tx, cancel_rx) = oneshot::channel();
-    tokio::spawn(rb.broadcast::<TestBroadcastStatus>(message, tx, cancel_rx));
-    assert_eq!(rx.await.unwrap(), validators.into_iter().collect());
+    let fut = rb.broadcast::<TestBroadcastStatus>(message);
+    assert_eq!(fut.await, validators.into_iter().collect());
 }
 
 #[tokio::test]
-async fn test_reliable_broadcast_cancel() {
+async fn test_chaining_reliable_broadcast() {
     let (_, validator_verifier) = random_validator_verifier(5, None, false);
     let validators = validator_verifier.get_ordered_account_addresses();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestDAGSender::new(failures));
     let rb = ReliableBroadcast::new(validators.clone(), sender);
     let message = TestMessage(vec![1, 2, 3]);
+    let expected = validators.iter().cloned().collect();
+    let fut = rb
+        .broadcast::<TestBroadcastStatus>(message.clone())
+        .then(|aggregated| async move {
+            assert_eq!(aggregated, expected);
+            rb.broadcast::<TestBroadcastStatus>(message).await
+        });
+    assert_eq!(fut.await, validators.into_iter().collect());
+}
 
-    // explicit send cancel
+#[tokio::test]
+async fn test_abort_reliable_broadcast() {
+    let (_, validator_verifier) = random_validator_verifier(5, None, false);
+    let validators = validator_verifier.get_ordered_account_addresses();
+    let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
+    let sender = Arc::new(TestDAGSender::new(failures));
+    let rb = ReliableBroadcast::new(validators.clone(), sender);
+    let message = TestMessage(vec![1, 2, 3]);
     let (tx, rx) = oneshot::channel();
-    let (cancel_tx, cancel_rx) = oneshot::channel();
-    cancel_tx.send(()).unwrap();
-    tokio::spawn(rb.broadcast::<TestBroadcastStatus>(message.clone(), tx, cancel_rx));
-    assert!(rx.await.is_err());
-
-    // implicit drop cancel
-    let (tx, rx) = oneshot::channel();
-    let (cancel_tx, cancel_rx) = oneshot::channel();
-    drop(cancel_tx);
-    tokio::spawn(rb.broadcast::<TestBroadcastStatus>(message, tx, cancel_rx));
+    let (abort_handle, abort_registration) = AbortHandle::new_pair();
+    let fut = Abortable::new(
+        rb.broadcast::<TestBroadcastStatus>(message.clone())
+            .then(|_| async move {
+                let ret = rb.broadcast::<TestBroadcastStatus>(message).await;
+                tx.send(ret)
+            }),
+        abort_registration,
+    );
+    tokio::spawn(fut);
+    abort_handle.abort();
     assert!(rx.await.is_err());
 }
