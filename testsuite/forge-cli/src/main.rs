@@ -228,8 +228,14 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(5 * 300); // args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
+
+    let suite_name = if suite_name == "land_blocking" {
+        "realistic_env_load_sweep"
+    } else {
+        panic!()
+    };
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
