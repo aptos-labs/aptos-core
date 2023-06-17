@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::block_executor::BlockAptosVM;
+use crate::block_executor::BlockAptosExecutor;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{BlockExecutorTransactions, SubBlocksForShard},
@@ -27,13 +27,13 @@ impl BlockExecutorClient for LocalExecutorClient {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block(
-            self.executor_thread_pool.clone(),
-            BlockExecutorTransactions::Sharded(sub_blocks),
-            state_view,
+        let executor = BlockAptosExecutor::new(
             concurrency_level,
+            sub_blocks.num_txns(),
+            self.executor_thread_pool.clone(),
             maybe_block_gas_limit,
-        )
+        );
+        executor.execute_block(BlockExecutorTransactions::Sharded(sub_blocks), state_view)
     }
 }
 

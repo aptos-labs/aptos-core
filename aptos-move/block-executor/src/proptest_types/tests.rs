@@ -68,6 +68,7 @@ fn run_transactions<K, V>(
             ExecutableTestType,
         >::new(
             num_cpus::get(),
+            transactions.len(),
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
@@ -203,6 +204,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             ExecutableTestType,
         >::new(
             num_cpus::get(),
+            transactions.len(),
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
@@ -254,6 +256,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             ExecutableTestType,
         >::new(
             num_cpus::get(),
+            transactions.len(),
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
@@ -426,7 +429,12 @@ fn publishing_fixed_params_with_block_gas_limit(
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         ExecutableTestType,
-    >::new(num_cpus::get(), executor_thread_pool, maybe_block_gas_limit)
+    >::new(
+        num_cpus::get(),
+        transactions.len(),
+        executor_thread_pool,
+        maybe_block_gas_limit,
+    )
     .execute_transactions_parallel((), &transactions, &data_view);
     assert_ok!(output);
 
@@ -472,6 +480,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             ExecutableTestType,
         >::new(
             num_cpus::get(),
+            transactions.len(),
             executor_thread_pool.clone(),
             Some(max(w_index, r_index) as u64 + 1),
         ) // Ensure enough gas limit to commit the module txns
