@@ -74,7 +74,7 @@ impl MetricsProvider {
                 )
             })
             .map_err(|e| ProviderError::ParseError(anyhow!(e)))?;
-        Scrape::parse(body.lines().into_iter().map(|l| Ok(l.to_string())))
+        Scrape::parse(body.lines().map(|l| Ok(l.to_string())))
             .with_context(|| {
                 format!(
                     "Failed to parse response text from {} as a Prometheus scrape",

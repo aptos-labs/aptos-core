@@ -141,7 +141,7 @@ impl LoadVsPerfBenchmark {
 }
 
 impl NetworkTest for LoadVsPerfBenchmark {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         assert!(
             self.criteria.is_empty() || self.criteria.len() == self.workloads.len(),
             "Invalid config, {} criteria and {} workloads given",
