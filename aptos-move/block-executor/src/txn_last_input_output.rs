@@ -122,10 +122,12 @@ impl<K: ModulePath> ReadDescriptor<K> {
 }
 
 pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
+    /// The mapping between the in-block index and the in-shard index of a transaction.
+    /// `TxnLastInputOutput` APIs use in-block indices but its internal states use in-shard indices for memory efficiency.
     index_mapping: Arc<IndexMapping>,
-    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<K>>>>, // txn_idx -> input.
+    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<K>>>>, // in-shard txn_idx -> input.
 
-    outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<T, E>>>>, // txn_idx -> output.
+    outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<T, E>>>>, // in-shard txn_idx -> output.
 
     // Record all writes and reads to access paths corresponding to modules (code) in any
     // (speculative) executions. Used to avoid a potential race with module publishing and

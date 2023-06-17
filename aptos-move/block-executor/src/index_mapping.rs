@@ -2,16 +2,16 @@
 
 use aptos_mvhashmap::types::TxnIndex;
 
-/// In standard BlockSTM, the internal states assume contiguous transactions indices.
-/// To also support sharded execution (where each shard gets non-contiguous transaction indices
-/// and possibly waits for transaction results from other shards),
-/// an index mapping is need as an additional input to our existing BlockSTM implementation.
+/// In unsharded execution, transactions are numbered from 0 to n-1 where n is the block size.
+/// In sharded execution, each shard gets a subset of all the transactions (whose in-block indices are likely non-contiguous),
+// invokes the current BlockSTM with them and waits for transaction results from other shards.
+/// With an `IndexMapping` to convert between the in-block indices and the in-shard indices,
+/// the current BlockSTM implementation can support sharded execution with minimum changes.
 #[derive(Clone)]
 pub struct IndexMapping {
-    /// A sorted list of transaction indices.
+    /// An in-shard index to in-block index mapping.
     indices: Vec<usize>,
-    /// A TxnIndex -> local position mapping.
-    /// Currently implemented as a `Vec` of size equal to the block size, assuming it's not too large.
+    /// An in-block index to in-shard index mapping.
     positions_by_index: Vec<usize>,
 }
 

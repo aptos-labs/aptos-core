@@ -199,12 +199,14 @@ impl ValidationStatus {
 }
 
 pub struct Scheduler {
-    /// Number of txns to execute, immutable.
+    /// The mapping between the in-block index and the in-shard index of a transaction.
+    /// `Scheduler` APIs use in-block indices but its internal states use in-shard indices for memory efficiency.
     index_mapping: Arc<IndexMapping>,
-    /// An index i maps to indices of other transactions that depend on transaction i, i.e. they
-    /// should be re-executed once transaction i's next incarnation finishes.
+    /// An index i maps to indices of other transactions that depend on transaction `index_mapping.index(i)`,
+    /// i.e. they should be re-executed once transaction `index_mapping.index(i)`'s next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
-    /// An index i maps to the most up-to-date status of transaction i.
+
+    /// An index i maps to the most up-to-date status of transaction `index_mapping.index(i)`.
     txn_status: Vec<CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)>>,
 
     /// Next transaction to commit, and sweeping lower bound on the wave of a validation that must
