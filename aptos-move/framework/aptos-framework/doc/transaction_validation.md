@@ -630,7 +630,8 @@ Aborts if length of public key hashed vector
 not equal the number of singers.
 
 
-<pre><code><b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
+<pre><code><b>pragma</b> timeout = 100;
+<b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
     txn_authentication_key: txn_sender_public_key
 };
 <b>let</b> num_secondary_signers = len(secondary_signer_addresses);

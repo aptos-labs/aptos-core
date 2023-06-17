@@ -106,6 +106,7 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
+        pragma timeout = 100;
         include PrologueCommonAbortsIf {
             txn_authentication_key: txn_sender_public_key
         };
