@@ -130,7 +130,7 @@ where
         >::new(num_cpus::get(), executor_thread_pool, None)
         .execute_transactions_parallel(
             (),
-            IndexMapping::new_unsharded(self.transactions.len()),
+            Arc::new(IndexMapping::new_unsharded(self.transactions.len())),
             &self.transactions,
             &data_view,
         );

@@ -200,7 +200,7 @@ impl ValidationStatus {
 
 pub struct Scheduler {
     /// Number of txns to execute, immutable.
-    index_mapping: IndexMapping,
+    index_mapping: Arc<IndexMapping>,
     /// An index i maps to indices of other transactions that depend on transaction i, i.e. they
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
@@ -241,7 +241,7 @@ pub struct Scheduler {
 
 /// Public Interfaces for the Scheduler
 impl Scheduler {
-    pub fn new(index_mapping: IndexMapping) -> Self {
+    pub fn new(index_mapping: Arc<IndexMapping>) -> Self {
         let num_txns = index_mapping.num_txns();
         // Empty block should early return and not create a scheduler.
         assert!(num_txns > 0, "No scheduler needed for 0 transactions");

@@ -586,7 +586,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        index_mapping: IndexMapping,
+        index_mapping: Arc<IndexMapping>,
         signature_verified_block: &Vec<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
@@ -606,6 +606,7 @@ where
         let num_txns = signature_verified_block.len();
         let last_input_output = TxnLastInputOutput::new(num_txns, index_mapping.clone());
         let scheduler = Scheduler::new(index_mapping.clone());
+        let index_mapping_ref = index_mapping.as_ref();
 
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
@@ -634,7 +635,7 @@ where
                         &scheduler,
                         base_view,
                         role,
-                        &index_mapping,
+                        index_mapping_ref,
                     );
                 });
             }
@@ -649,7 +650,7 @@ where
             Some(Error::ModulePathReadWrite)
         } else {
             let mut ret = None;
-            for idx in index_mapping.iter_txn_indices() {
+            for idx in index_mapping_ref.iter_txn_indices() {
                 match last_input_output.take_output(idx) {
                     ExecutionStatus::Success(t) => final_results.push(t),
                     ExecutionStatus::SkipRest(t) => {
@@ -763,7 +764,7 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        index_mapping: IndexMapping,
+        index_mapping: Arc<IndexMapping>,
         signature_verified_block: BlockExecutorTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {

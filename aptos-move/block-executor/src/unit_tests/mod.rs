@@ -49,7 +49,7 @@ where
     >::new(num_cpus::get(), executor_thread_pool, None)
     .execute_transactions_parallel(
         (),
-        IndexMapping::new_unsharded(transactions.len()),
+        Arc::new(IndexMapping::new_unsharded(transactions.len())),
         &transactions,
         &data_view,
     );
@@ -179,9 +179,9 @@ fn make_non_contiguous_indices(num: usize) -> Vec<usize> {
 
 /// Make an IndexMapping of a sub-block, assuming there are `num_txns*10` txns in the block,
 /// and the global indices of the txns in the sub-block is `[5, 15, ..., num_txns*10-5]`.
-fn make_non_contiguous_index_mapping(num_txns: usize) -> IndexMapping {
+fn make_non_contiguous_index_mapping(num_txns: usize) -> Arc<IndexMapping> {
     let indices = make_non_contiguous_indices(num_txns);
-    IndexMapping::new(indices, num_txns * 10)
+    Arc::new(IndexMapping::new(indices, num_txns * 10))
 }
 
 #[test]
@@ -281,7 +281,7 @@ fn early_skips() {
 
 #[test]
 fn scheduler_tasks() {
-    scheduler_tasks_main(IndexMapping::new_unsharded(5));
+    scheduler_tasks_main(Arc::new(IndexMapping::new_unsharded(5)));
 }
 
 #[test]
@@ -290,7 +290,7 @@ fn scheduler_tasks_with_non_contiguous_indices() {
     scheduler_tasks_main(index_mapping);
 }
 
-fn scheduler_tasks_main(index_mapping: IndexMapping) {
+fn scheduler_tasks_main(index_mapping: Arc<IndexMapping>) {
     let s = Scheduler::new(index_mapping.clone());
 
     for i in index_mapping.iter_txn_indices() {
@@ -382,7 +382,7 @@ fn scheduler_tasks_main(index_mapping: IndexMapping) {
 
 #[test]
 fn scheduler_first_wave() {
-    scheduler_first_wave_main(IndexMapping::new_unsharded(6));
+    scheduler_first_wave_main(Arc::new(IndexMapping::new_unsharded(6)));
 }
 
 #[test]
@@ -391,7 +391,7 @@ fn scheduler_first_wave_with_non_contiguous_indices() {
     scheduler_first_wave_main(index_mapping);
 }
 
-fn scheduler_first_wave_main(index_mapping: IndexMapping) {
+fn scheduler_first_wave_main(index_mapping: Arc<IndexMapping>) {
     let s = Scheduler::new(index_mapping.clone());
 
     for i in index_mapping
@@ -450,7 +450,7 @@ fn scheduler_first_wave_main(index_mapping: IndexMapping) {
 
 #[test]
 fn scheduler_dependency() {
-    scheduler_dependency_main(IndexMapping::new_unsharded(10));
+    scheduler_dependency_main(Arc::new(IndexMapping::new_unsharded(10)));
 }
 
 #[test]
@@ -459,7 +459,7 @@ fn scheduler_dependency_with_non_contiguous_indices() {
     scheduler_dependency_main(index_mapping);
 }
 
-fn scheduler_dependency_main(index_mapping: IndexMapping) {
+fn scheduler_dependency_main(index_mapping: Arc<IndexMapping>) {
     let s = Scheduler::new(index_mapping.clone());
 
     for i in index_mapping.iter_txn_indices() {
@@ -506,7 +506,7 @@ fn scheduler_dependency_main(index_mapping: IndexMapping) {
 
 // Will return a scheduler in a state where all transactions are scheduled for
 // for execution, validation index = num_txns, and wave = 0.
-fn incarnation_one_scheduler(index_mapping: &IndexMapping) -> Scheduler {
+fn incarnation_one_scheduler(index_mapping: Arc<IndexMapping>) -> Scheduler {
     let s = Scheduler::new(index_mapping.clone());
 
     for i in index_mapping.iter_txn_indices() {
@@ -535,7 +535,7 @@ fn incarnation_one_scheduler(index_mapping: &IndexMapping) -> Scheduler {
 
 #[test]
 fn scheduler_incarnation() {
-    scheduler_incarnation_main(IndexMapping::new_unsharded(5));
+    scheduler_incarnation_main(Arc::new(IndexMapping::new_unsharded(5)));
 }
 
 #[test]
@@ -543,8 +543,8 @@ fn scheduler_incarnation_with_non_contiguous_indices() {
     scheduler_incarnation_main(make_non_contiguous_index_mapping(5));
 }
 
-fn scheduler_incarnation_main(index_mapping: IndexMapping) {
-    let s = incarnation_one_scheduler(&index_mapping);
+fn scheduler_incarnation_main(index_mapping: Arc<IndexMapping>) {
+    let s = incarnation_one_scheduler(index_mapping.clone());
 
     // execution/validation index = 5, wave = 0.
     assert!(matches!(
@@ -634,7 +634,7 @@ fn scheduler_incarnation_main(index_mapping: IndexMapping) {
 
 #[test]
 fn scheduler_basic() {
-    scheduler_basic_main(IndexMapping::new_unsharded(3));
+    scheduler_basic_main(Arc::new(IndexMapping::new_unsharded(3)));
 }
 
 #[test]
@@ -642,7 +642,7 @@ fn scheduler_basic_with_non_contiguous_indices() {
     scheduler_basic_main(make_non_contiguous_index_mapping(3));
 }
 
-fn scheduler_basic_main(index_mapping: IndexMapping) {
+fn scheduler_basic_main(index_mapping: Arc<IndexMapping>) {
     let s = Scheduler::new(index_mapping.clone());
 
     for i in index_mapping.iter_txn_indices() {
@@ -693,7 +693,7 @@ fn scheduler_basic_main(index_mapping: IndexMapping) {
 
 #[test]
 fn scheduler_drain_idx() {
-    scheduler_drain_idx_main(IndexMapping::new_unsharded(3));
+    scheduler_drain_idx_main(Arc::new(IndexMapping::new_unsharded(3)));
 }
 
 #[test]
@@ -701,7 +701,7 @@ fn scheduler_drain_idx_with_non_contiguous_indices() {
     scheduler_drain_idx_main(make_non_contiguous_index_mapping(3));
 }
 
-fn scheduler_drain_idx_main(index_mapping: IndexMapping) {
+fn scheduler_drain_idx_main(index_mapping: Arc<IndexMapping>) {
     let s = Scheduler::new(index_mapping.clone());
 
     for i in index_mapping.iter_txn_indices() {
@@ -754,24 +754,24 @@ fn scheduler_drain_idx_main(index_mapping: IndexMapping) {
 fn finish_execution_wave() {
     // Wave won't be increased, because validation index is already 2, and finish_execution
     // tries to reduce it to 2.
-    let index_mapping = IndexMapping::new_unsharded(2);
-    let s = incarnation_one_scheduler(&index_mapping);
+    let index_mapping = Arc::new(IndexMapping::new_unsharded(2));
+    let s = incarnation_one_scheduler(index_mapping);
     assert!(matches!(
         s.finish_execution(1, 1, true),
         SchedulerTask::ValidationTask((1, 1), 0),
     ));
 
     // Here wave will increase, because validation index is reduced from 3 to 2.
-    let index_mapping = IndexMapping::new_unsharded(3);
-    let s = incarnation_one_scheduler(&index_mapping);
+    let index_mapping = Arc::new(IndexMapping::new_unsharded(3));
+    let s = incarnation_one_scheduler(index_mapping);
     assert!(matches!(
         s.finish_execution(1, 1, true),
         SchedulerTask::ValidationTask((1, 1), 1),
     ));
 
     // Here wave won't be increased, because we pass revalidate_suffix = false.
-    let index_mapping = IndexMapping::new_unsharded(3);
-    let s = incarnation_one_scheduler(&index_mapping);
+    let index_mapping = Arc::new(IndexMapping::new_unsharded(3));
+    let s = incarnation_one_scheduler(index_mapping);
     assert!(matches!(
         s.finish_execution(1, 1, false),
         SchedulerTask::ValidationTask((1, 1), 0),
@@ -783,7 +783,7 @@ fn finish_execution_wave_with_non_contiguous_indices() {
     // Wave won't be increased, because validation index is already 2, and finish_execution
     // tries to reduce it to 2.
     let index_mapping = make_non_contiguous_index_mapping(2);
-    let s = incarnation_one_scheduler(&index_mapping);
+    let s = incarnation_one_scheduler(index_mapping.clone());
     assert!(matches!(
         s.finish_execution(index_mapping.index(1), 1, true),
         SchedulerTask::ValidationTask((i, 1), 0) if i == index_mapping.index(1),
@@ -791,7 +791,7 @@ fn finish_execution_wave_with_non_contiguous_indices() {
 
     // Here wave will increase, because validation index is reduced from 3 to 2.
     let index_mapping = make_non_contiguous_index_mapping(3);
-    let s = incarnation_one_scheduler(&index_mapping);
+    let s = incarnation_one_scheduler(index_mapping.clone());
     assert!(matches!(
         s.finish_execution(index_mapping.index(1), 1, true),
         SchedulerTask::ValidationTask((i, 1), 1) if i == index_mapping.index(1),
@@ -799,7 +799,7 @@ fn finish_execution_wave_with_non_contiguous_indices() {
 
     // Here wave won't be increased, because we pass revalidate_suffix = false.
     let index_mapping = make_non_contiguous_index_mapping(3);
-    let s = incarnation_one_scheduler(&index_mapping);
+    let s = incarnation_one_scheduler(index_mapping.clone());
     assert!(matches!(
         s.finish_execution(index_mapping.index(1), 1, false),
         SchedulerTask::ValidationTask((i, 1), 0) if i == index_mapping.index(1),
@@ -808,7 +808,7 @@ fn finish_execution_wave_with_non_contiguous_indices() {
 
 #[test]
 fn rolling_commit_wave() {
-    rolling_commit_wave_main(IndexMapping::new_unsharded(3));
+    rolling_commit_wave_main(Arc::new(IndexMapping::new_unsharded(3)));
 }
 
 #[test]
@@ -816,8 +816,8 @@ fn rolling_commit_wave_with_non_contiguous_indices() {
     rolling_commit_wave_main(make_non_contiguous_index_mapping(3));
 }
 
-fn rolling_commit_wave_main(index_mapping: IndexMapping) {
-    let s = incarnation_one_scheduler(&index_mapping);
+fn rolling_commit_wave_main(index_mapping: Arc<IndexMapping>) {
+    let s = incarnation_one_scheduler(index_mapping.clone());
 
     // Finish execution for txn 0 without validate_suffix and because
     // validation index is higher will return validation task to the caller.
@@ -886,7 +886,7 @@ fn no_conflict_task_count() {
     let num_txns = 1000;
     for num_concurrent_tasks in [1, 5, 10, 20] {
         let index_mappings = [
-            IndexMapping::new_unsharded(num_txns),
+            Arc::new(IndexMapping::new_unsharded(num_txns)),
             make_non_contiguous_index_mapping(num_txns),
         ];
         for index_mapping in index_mappings {

@@ -122,7 +122,7 @@ impl<K: ModulePath> ReadDescriptor<K> {
 }
 
 pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
-    index_mapping: IndexMapping,
+    index_mapping: Arc<IndexMapping>,
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<K>>>>, // txn_idx -> input.
 
     outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<T, E>>>>, // txn_idx -> output.
@@ -137,7 +137,7 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
 }
 
 impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
-    pub fn new(num_txns: usize, index_mapping: IndexMapping) -> Self {
+    pub fn new(num_txns: usize, index_mapping: Arc<IndexMapping>) -> Self {
         Self {
             index_mapping,
             inputs: (0..num_txns)

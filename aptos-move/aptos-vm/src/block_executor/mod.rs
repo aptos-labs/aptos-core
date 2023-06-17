@@ -236,7 +236,7 @@ impl BlockAptosVM {
 
         let ret = executor.execute_block(
             state_view,
-            IndexMapping::new_unsharded(num_txns),
+            Arc::new(IndexMapping::new_unsharded(num_txns)),
             signature_verified_block,
             state_view,
         );
