@@ -17,6 +17,7 @@ use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_block_executor::{
     errors::Error,
     executor::BlockExecutor,
+    index_mapping::IndexMapping,
     task::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
@@ -25,8 +26,11 @@ use aptos_block_executor::{
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
-    block_executor::partitioner::{ExecutableTransactions, SubBlock, TransactionWithDependencies},
+    block_executor::partitioner::{
+        BlockExecutorTransactions, SubBlock, SubBlocksForShard, TransactionWithDependencies,
+    },
     executable::ExecutableTestType,
+    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::WriteOp,
@@ -128,25 +132,39 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .get()
             .map_or(0, |output| output.gas_used())
     }
+
+    // Return the fee statement of the transaction.
+    // Should never be called after vm_output is consumed.
+    fn fee_statement(&self) -> FeeStatement {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get fee statement")
+            .fee_statement()
+            .clone()
+    }
 }
 
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
     fn verify_transactions(
-        transactions: ExecutableTransactions<Transaction>,
-    ) -> ExecutableTransactions<PreprocessedTransaction> {
+        transactions: BlockExecutorTransactions<Transaction>,
+    ) -> BlockExecutorTransactions<PreprocessedTransaction> {
         match transactions {
-            ExecutableTransactions::Unsharded(transactions) => {
+            BlockExecutorTransactions::Unsharded(transactions) => {
                 let signature_verified_txns = transactions
                     .into_par_iter()
                     .with_min_len(25)
                     .map(preprocess_transaction::<AptosVM>)
                     .collect();
-                ExecutableTransactions::Unsharded(signature_verified_txns)
+                BlockExecutorTransactions::Unsharded(signature_verified_txns)
             },
-            ExecutableTransactions::Sharded(block_size, sub_blocks) => {
-                let signature_verified_block = sub_blocks
+            BlockExecutorTransactions::Sharded(sub_blocks) => {
+                let shard_id = sub_blocks.shard_id;
+                let block_size = sub_blocks.block_size;
+                let signature_verified_sub_blocks = sub_blocks
+                    .into_sub_blocks()
                     .into_par_iter()
                     .map(|sub_block| {
                         let start_index = sub_block.start_index;
@@ -169,14 +187,19 @@ impl BlockAptosVM {
                         SubBlock::new(start_index, verified_txns)
                     })
                     .collect();
-                ExecutableTransactions::Sharded(block_size, signature_verified_block)
+
+                BlockExecutorTransactions::Sharded(SubBlocksForShard::new(
+                    block_size,
+                    shard_id,
+                    signature_verified_sub_blocks,
+                ))
             },
         }
     }
 
     pub fn execute_block<S: StateView + Sync>(
         executor_thread_pool: Arc<ThreadPool>,
-        transactions: ExecutableTransactions<Transaction>,
+        transactions: BlockExecutorTransactions<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
@@ -192,7 +215,7 @@ impl BlockAptosVM {
             executor_thread_pool.install(|| Self::verify_transactions(transactions));
         drop(signature_verification_timer);
 
-        let num_txns = signature_verified_block.num_transactions();
+        let num_txns = signature_verified_block.num_txns();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
@@ -211,7 +234,12 @@ impl BlockAptosVM {
             maybe_block_gas_limit,
         );
 
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
+        let ret = executor.execute_block(
+            state_view,
+            IndexMapping::new_unsharded(num_txns),
+            signature_verified_block,
+            state_view,
+        );
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs

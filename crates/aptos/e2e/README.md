@@ -19,9 +19,14 @@ To learn how to use the CLI testing framework, run this:
 poetry run python main.py -h
 ```
 
-For example:
+For example, using the CLI from an image:
 ```
-poetry run python main.py --base-network mainnet --test-cli-tag mainnet
+poetry run python main.py --base-network mainnet --test-cli-tag nightly
+```
+
+Using the CLI from a local path:
+```
+poetry run python main.py -d --base-network mainnet --test-cli-path ~/aptos-core/target/debug/aptos
 ```
 
 ## Debugging
