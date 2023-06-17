@@ -45,7 +45,12 @@ where
         Task<K, V>,
         DeltaDataView<K, V>,
         ExecutableTestType,
-    >::new(num_cpus::get(), executor_thread_pool, None)
+    >::new(
+        num_cpus::get(),
+        transactions.len(),
+        executor_thread_pool,
+        None,
+    )
     .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);

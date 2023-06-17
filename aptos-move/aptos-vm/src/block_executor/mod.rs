@@ -144,9 +144,32 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 }
 
-pub struct BlockAptosVM();
+pub struct BlockAptosExecutor<'a, S: StateView + Sync> {
+    executor_thread_pool: Arc<ThreadPool>,
+    concurrency_level: usize,
+    block_executor:
+        BlockExecutor<PreprocessedTransaction, AptosExecutorTask<'a, S>, S, ExecutableTestType>,
+}
 
-impl BlockAptosVM {
+impl<'a, S: StateView + Sync + 'a> BlockAptosExecutor<'a, S> {
+    pub fn new(
+        concurrency_level: usize,
+        num_txns: usize,
+        executor_thread_pool: Arc<ThreadPool>,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> Self {
+        Self {
+            executor_thread_pool: executor_thread_pool.clone(),
+            concurrency_level,
+            block_executor: BlockExecutor::new(
+                concurrency_level,
+                num_txns,
+                executor_thread_pool,
+                maybe_block_gas_limit,
+            ),
+        }
+    }
+
     fn verify_transactions(
         transactions: BlockExecutorTransactions<Transaction>,
     ) -> BlockExecutorTransactions<PreprocessedTransaction> {
@@ -194,12 +217,10 @@ impl BlockAptosVM {
         }
     }
 
-    pub fn execute_block<S: StateView + Sync>(
-        executor_thread_pool: Arc<ThreadPool>,
+    pub fn execute_block(
+        &self,
         transactions: BlockExecutorTransactions<Transaction>,
-        state_view: &S,
-        concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        state_view: &'a S,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -208,8 +229,9 @@ impl BlockAptosVM {
         // TODO: state sync runs this code but doesn't need to verify signatures
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
-        let signature_verified_block =
-            executor_thread_pool.install(|| Self::verify_transactions(transactions));
+        let signature_verified_block = self
+            .executor_thread_pool
+            .install(|| Self::verify_transactions(transactions));
         drop(signature_verification_timer);
 
         let is_sharded_execution = matches!(
