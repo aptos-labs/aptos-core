@@ -27,6 +27,13 @@ module aptos_std::simple_map {
         vector::length(&map.data)
     }
 
+    /// Create an empty SimpleMap.
+    public fun new<Key: store, Value: store>(): SimpleMap<Key, Value> {
+        create()
+    }
+
+    #[deprecated]
+    /// Create an empty SimpleMap.
     public fun create<Key: store, Value: store>(): SimpleMap<Key, Value> {
         SimpleMap {
             data: vector::empty(),
