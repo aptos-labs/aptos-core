@@ -7,7 +7,7 @@ use crate::{
         discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
-    block_executor::BlockAptosVM,
+    block_executor::BlockAptosExecutor,
     counters::*,
     data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
@@ -1517,13 +1517,17 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
-        let ret = BlockAptosVM::execute_block(
-            Arc::clone(&RAYON_EXEC_POOL),
-            BlockExecutorTransactions::Unsharded(transactions),
-            state_view,
+        let executor = BlockAptosExecutor::new(
             Self::get_concurrency_level(),
+            transactions.len(),
+            Arc::clone(&RAYON_EXEC_POOL),
             maybe_block_gas_limit,
         );
+        let ret = executor.execute_block(
+            BlockExecutorTransactions::Unsharded(transactions),
+            state_view,
+        );
+
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
             BLOCK_TRANSACTION_COUNT.observe(count as f64);
