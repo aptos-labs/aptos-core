@@ -15,6 +15,7 @@ This module provides a solution for sorted maps, that is it has the properties t
 -  [Struct `Element`](#0x1_simple_map_Element)
 -  [Constants](#@Constants_0)
 -  [Function `length`](#0x1_simple_map_length)
+-  [Function `new`](#0x1_simple_map_new)
 -  [Function `create`](#0x1_simple_map_create)
 -  [Function `borrow`](#0x1_simple_map_borrow)
 -  [Function `borrow_mut`](#0x1_simple_map_borrow_mut)
@@ -161,13 +162,40 @@ Map key is not found
 
 </details>
 
+<a name="0x1_simple_map_new"></a>
+
+## Function `new`
+
+Create an empty SimpleMap.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_new">new</a>&lt;Key: store, Value: store&gt;(): <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_new">new</a>&lt;Key: store, Value: store&gt;(): <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt; {
+    <a href="simple_map.md#0x1_simple_map_create">create</a>()
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_simple_map_create"></a>
 
 ## Function `create`
 
+Create an empty SimpleMap.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_create">create</a>&lt;Key: store, Value: store&gt;(): <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_create">create</a>&lt;Key: store, Value: store&gt;(): <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;
 </code></pre>
 
 
@@ -625,7 +653,8 @@ using lambdas to destroy the individual keys and values.
 ### Function `create`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_create">create</a>&lt;Key: store, Value: store&gt;(): <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_create">create</a>&lt;Key: store, Value: store&gt;(): <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;
 </code></pre>
 
 
