@@ -243,9 +243,6 @@ pub struct Scheduler {
 /// Public Interfaces for the Scheduler
 impl Scheduler {
     pub fn new(num_txns: TxnIndex) -> Self {
-        // Empty block should early return and not create a scheduler.
-        assert!(num_txns > 0, "No scheduler needed for 0 transactions");
-
         Self {
             num_txns,
             txn_dependency: (0..num_txns)
