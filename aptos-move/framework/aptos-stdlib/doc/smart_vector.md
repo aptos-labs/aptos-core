@@ -7,6 +7,7 @@
 
 -  [Struct `SmartVector`](#0x1_smart_vector_SmartVector)
 -  [Constants](#@Constants_0)
+-  [Function `new`](#0x1_smart_vector_new)
 -  [Function `empty`](#0x1_smart_vector_empty)
 -  [Function `empty_with_config`](#0x1_smart_vector_empty_with_config)
 -  [Function `singleton`](#0x1_smart_vector_singleton)
@@ -141,16 +142,44 @@ bucket_size cannot be 0
 
 
 
-<a name="0x1_smart_vector_empty"></a>
+<a name="0x1_smart_vector_new"></a>
 
-## Function `empty`
+## Function `new`
 
 Regular Vector API
 Create an empty vector using default logic to estimate <code>inline_capacity</code> and <code>bucket_size</code>, which may be
 inaccurate.
+This is exactly the same as empty() but is more standardized as all other data structures have new().
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_new">new</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_new">new</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt; {
+    <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_empty"></a>
+
+## Function `empty`
+
+Create an empty vector using default logic to estimate <code>inline_capacity</code> and <code>bucket_size</code>, which may be
+inaccurate.
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
 </code></pre>
 
 
@@ -817,7 +846,8 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 ### Function `empty`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
 </code></pre>
 
 
