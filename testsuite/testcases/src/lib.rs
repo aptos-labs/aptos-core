@@ -236,6 +236,7 @@ impl dyn NetworkLoadTest {
             stats_tracking_phases = 3;
         }
 
+        info!("Starting emitting txns for {}s", duration.as_secs());
         let mut job = rt
             .block_on(emitter.start_job(
                 ctx.swarm().chain_info().root_account,
@@ -248,9 +249,8 @@ impl dyn NetworkLoadTest {
         let cooldown_duration = duration.mul_f32(cooldown_duration_fraction);
         let test_duration = duration - warmup_duration - cooldown_duration;
         let phase_duration = test_duration.div_f32((stats_tracking_phases - 2) as f32);
-        info!("Starting emitting txns for {}s", duration.as_secs());
 
-        std::thread::sleep(warmup_duration);
+        job = rt.block_on(job.periodic_stat_forward(warmup_duration, 60));
         info!("{}s warmup finished", warmup_duration.as_secs());
 
         let max_start_ledger_transactions = rt
@@ -277,8 +277,10 @@ impl dyn NetworkLoadTest {
             }
             let phase_start = Instant::now();
 
+            let join_stats = rt.spawn(job.periodic_stat_forward(phase_duration, 60));
             self.test(ctx.swarm, ctx.report, phase_duration)
                 .context("test NetworkLoadTest")?;
+            job = rt.block_on(join_stats).context("join stats")?;
             actual_phase_durations.push(phase_start.elapsed());
         }
         let actual_test_duration = test_start.elapsed();
@@ -302,7 +304,7 @@ impl dyn NetworkLoadTest {
 
         let cooldown_used = cooldown_start.elapsed();
         if cooldown_used < cooldown_duration {
-            std::thread::sleep(cooldown_duration - cooldown_used);
+            job = rt.block_on(job.periodic_stat_forward(cooldown_duration - cooldown_used, 60));
         }
         info!("{}s cooldown finished", cooldown_duration.as_secs());
 
@@ -310,7 +312,7 @@ impl dyn NetworkLoadTest {
             "Emitting txns ran for {} secs, stopping job...",
             duration.as_secs()
         );
-        let stats_by_phase = rt.block_on(emitter.stop_job(job));
+        let stats_by_phase = rt.block_on(job.stop_job());
 
         info!("Stopped job");
         info!("Warmup stats: {}", stats_by_phase[0].rate());

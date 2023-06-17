@@ -1532,7 +1532,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 ["dynamic_max_txn_per_s"] = 6000.into();
 
             // Experimental storage optimizations
-            helm_values["validator"]["config"]["storage"]["rocksdb_configs"]["use_state_kv_db"] =
+            helm_values["validator"]["config"]["storage"]["rocksdb_configs"]["split_ledger_db"] =
                 true.into();
             helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
                 ["use_sharded_state_merkle_db"] = true.into();
