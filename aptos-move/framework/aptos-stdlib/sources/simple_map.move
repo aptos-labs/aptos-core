@@ -31,7 +31,9 @@ module aptos_std::simple_map {
 
     /// Create an empty SimpleMap.
     public fun new<Key: store, Value: store>(): SimpleMap<Key, Value> {
-        create()
+        SimpleMap {
+            data: vector::empty(),
+        }
     }
 
     /// Create a SimpleMap from a vector of keys and values. The keys must be unique.
@@ -39,9 +41,7 @@ module aptos_std::simple_map {
         keys: vector<Key>,
         values: vector<Value>,
     ): SimpleMap<Key, Value> {
-        let map = SimpleMap {
-            data: vector::empty(),
-        };
+        let map = new();
         add_all(&mut map, keys, values);
         map
     }
@@ -50,9 +50,7 @@ module aptos_std::simple_map {
     /// Create an empty SimpleMap.
     /// This function is deprecated, use `new` instead.
     public fun create<Key: store, Value: store>(): SimpleMap<Key, Value> {
-        SimpleMap {
-            data: vector::empty(),
-        }
+        new()
     }
 
     public fun borrow<Key: store, Value: store>(
