@@ -91,9 +91,13 @@ impl VMOutput {
         }
 
         // Try to materialize deltas and add them to the write set.
-        let (change_set, gas_used, status) = self.unpack_with_fee_statement();
+        let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
         let materialized_change_set = change_set.try_materialize(state_view)?;
-        Ok(VMOutput::new(materialized_change_set, gas_used, status))
+        Ok(VMOutput::new(
+            materialized_change_set,
+            fee_statement,
+            status,
+        ))
     }
 
     /// Converts VMOutput into TransactionOutput which can be used by storage

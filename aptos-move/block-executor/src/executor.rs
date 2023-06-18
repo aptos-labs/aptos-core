@@ -9,7 +9,7 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
-    scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave},
+    scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
@@ -23,7 +23,7 @@ use aptos_mvhashmap::{
 };
 use aptos_state_view::TStateView;
 use aptos_types::{
-    block_executor::partitioner::ExecutableTransactions, executable::Executable,
+    block_executor::partitioner::BlockExecutorTransactions, executable::Executable,
     fee_statement::FeeStatement, write_set::WriteOp,
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
@@ -432,11 +432,11 @@ where
 
             // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
             // will be properly handled by the threads. For instance, it is possible that the committing
-            // thread holds an execution task from the last iteration, and then early halts the BlockSTM
-            // due to a txn execution abort. In this case, we cannot reset the scheduler_task of the
-            // committing thread (to be Done), otherwise some other pending thread waiting for the execution
-            // will be pending on read forever (since the halt logic let the execution task to wake up such
-            // pending task).
+            // thread holds an execution task of ExecutionTaskType::Wakeup(DependencyCondvar) for some
+            // other thread pending on the dependency conditional variable from the last iteration. If
+            // the committing thread early halts BlockSTM and resets its scheduler_task to be Done, the
+            // pending thread will be pending on read forever. In other words, we rely on the committing
+            // thread to wake up the pending execution thread, if the committing thread holds the Wakeup task.
         }
     }
 
@@ -539,16 +539,18 @@ where
                     versioned_cache,
                     scheduler,
                 ),
-                SchedulerTask::ExecutionTask(version_to_execute, None) => self.execute(
-                    version_to_execute,
-                    block,
-                    last_input_output,
-                    versioned_cache,
-                    scheduler,
-                    &executor,
-                    base_view,
-                ),
-                SchedulerTask::ExecutionTask(_, Some(condvar)) => {
+                SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
+                    self.execute(
+                        version_to_execute,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        scheduler,
+                        &executor,
+                        base_view,
+                    )
+                },
+                SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
                     *lock.lock() = DependencyStatus::Resolved;
@@ -580,7 +582,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &ExecutableTransactions<T>,
+        signature_verified_block: &Vec<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -589,13 +591,6 @@ where
         // Need to special case no roles (commit hook by thread itself) to run
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
-
-        let signature_verified_block = match signature_verified_block {
-            ExecutableTransactions::Unsharded(txns) => txns,
-            ExecutableTransactions::Sharded(_) => {
-                unimplemented!("Sharded execution is not supported yet")
-            },
-        };
 
         let versioned_cache = MVHashMap::new();
 
@@ -685,16 +680,9 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &ExecutableTransactions<T>,
+        signature_verified_block: &Vec<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
-        let signature_verified_block = match signature_verified_block {
-            ExecutableTransactions::Unsharded(txns) => txns,
-            ExecutableTransactions::Sharded(_) => {
-                unimplemented!("Sharded execution is not supported yet")
-            },
-        };
-
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let data_map = UnsyncMap::new();
@@ -769,19 +757,20 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: ExecutableTransactions<T>,
+        signature_verified_block: BlockExecutorTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
+        let signature_verified_txns = signature_verified_block.into_txns();
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
-                &signature_verified_block,
+                &signature_verified_txns,
                 base_view,
             )
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_block,
+                &signature_verified_txns,
                 base_view,
             )
         };
@@ -791,18 +780,18 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.num_transactions());
+            init_speculative_logs(signature_verified_txns.len());
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_block,
+                &signature_verified_txns,
                 base_view,
             )
         }
 
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
-            drop(signature_verified_block);
+            drop(signature_verified_txns);
         });
 
         ret

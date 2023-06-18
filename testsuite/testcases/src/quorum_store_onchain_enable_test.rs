@@ -108,7 +108,7 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
 }
 
 impl NetworkTest for QuorumStoreOnChainEnableTest {
-    fn run<'t>(&self, ctx: &mut aptos_forge::NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut aptos_forge::NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

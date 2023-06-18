@@ -80,7 +80,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             .collect()
     }
 
-    pub fn try_into_resource<'b>(&self, typ: &StructTag, bytes: &'b [u8]) -> Result<MoveResource> {
+    pub fn try_into_resource(&self, typ: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {
         self.inner.view_resource(typ, bytes)?.try_into()
     }
 
@@ -101,10 +101,10 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             .collect::<Result<Vec<_>>>()
     }
 
-    pub fn move_struct_fields<'b>(
+    pub fn move_struct_fields(
         &self,
         typ: &StructTag,
-        bytes: &'b [u8],
+        bytes: &'_ [u8],
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>> {
         self.inner.move_struct_fields(typ, bytes)
     }
