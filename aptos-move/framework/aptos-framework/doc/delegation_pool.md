@@ -1223,7 +1223,8 @@ Return whether a delegation pool exists at supplied address <code>addr</code>.
 Return whether a delegation pool has already enabled partial govnernance voting.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address: <b>address</b>): bool
 </code></pre>
 
 
@@ -1566,7 +1567,8 @@ Return the total voting power of a delegator in a delegation pool. This function
 latest state.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voter_total_voting_power">calculate_and_update_voter_total_voting_power</a>(pool_address: <b>address</b>, voter: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voter_total_voting_power">calculate_and_update_voter_total_voting_power</a>(pool_address: <b>address</b>, voter: <b>address</b>): u64
 </code></pre>
 
 
@@ -1600,7 +1602,8 @@ Return the remaining voting power of a delegator in a delegation pool on a propo
 latest state.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_remaining_voting_power">calculate_and_update_remaining_voting_power</a>(pool_address: <b>address</b>, voter_address: <b>address</b>, proposal_id: u64): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_remaining_voting_power">calculate_and_update_remaining_voting_power</a>(pool_address: <b>address</b>, voter_address: <b>address</b>, proposal_id: u64): u64
 </code></pre>
 
 
@@ -1635,7 +1638,8 @@ Return the latest delegated voter of a delegator in a delegation pool. This func
 latest state.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter">calculate_and_update_delegator_voter</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter">calculate_and_update_delegator_voter</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1757,6 +1761,7 @@ THe existing voter will be replaced. The function is permissionless.
 <pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(
     pool_address: <b>address</b>,
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>));
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>));
     <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation.

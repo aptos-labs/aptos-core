@@ -17,7 +17,7 @@ module aptos_framework::aptos_governance {
     use std::vector;
     use std::features;
 
-    use aptos_std::math64::max;
+    use aptos_std::math64::min;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::table::{Self, Table};
 
@@ -424,7 +424,7 @@ module aptos_framework::aptos_governance {
         // If a stake pool has already voted on a proposal before partial governance voting is enabled,
         // `get_remaining_voting_power` returns 0.
         let staking_pool_voting_power = get_remaining_voting_power(stake_pool, proposal_id);
-        voting_power= max(voting_power, staking_pool_voting_power);
+        voting_power= min(voting_power, staking_pool_voting_power);
 
         // Short-circuit if the voter has no voting power.
         assert!(voting_power > 0, error::invalid_argument(ENO_VOTING_POWER));
