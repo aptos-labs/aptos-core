@@ -5,7 +5,7 @@ spec aptos_std::simple_map {
 
     spec SimpleMap {
         pragma intrinsic = map,
-            map_new = new,
+            map_new = create,
             map_len = length,
             map_destroy_empty = destroy_empty,
             map_has_key = contains_key,
