@@ -265,7 +265,7 @@ module aptos_framework::delegation_pool {
     struct DelegatedVotes has copy, drop, store {
         // The total number of active shares delegated to this voter by all delegators.
         active_shares: u128,
-        // The total number of pending active shares delegated to this voter by all delegators
+        // The total number of pending inactive shares delegated to this voter by all delegators
         pending_inactive_shares: u128,
         // Total active shares delegated to this voter in the next lockup cycle.
         // `active_shares_next_lockup` might be different `active_shares` when some delegators change their voter.
@@ -635,6 +635,7 @@ module aptos_framework::delegation_pool {
     public entry fun enable_partial_governance_voting(
         pool_address: address,
     ) acquires DelegationPool, GovernanceRecords {
+        assert!(features::partial_governance_voting_enabled(), error::invalid_state(EDISABLED_FUNCTION));
         assert!(features::delegation_pool_partial_governance_voting_enabled(), error::invalid_state(EDISABLED_FUNCTION));
         assert_delegation_pool_exists(pool_address);
         // synchronize delegation and stake pools before any user operation.
