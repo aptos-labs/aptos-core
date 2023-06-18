@@ -20,6 +20,7 @@ This module supports functionality related to code management.
 -  [Function `initialize`](#0x1_code_initialize)
 -  [Function `publish_package`](#0x1_code_publish_package)
 -  [Function `publish_package_txn`](#0x1_code_publish_package_txn)
+-  [Function `publish_package_with_address_remapping_txn`](#0x1_code_publish_package_with_address_remapping_txn)
 -  [Function `check_upgradability`](#0x1_code_check_upgradability)
 -  [Function `check_coexistence`](#0x1_code_check_coexistence)
 -  [Function `check_dependencies`](#0x1_code_check_dependencies)
@@ -27,6 +28,7 @@ This module supports functionality related to code management.
 -  [Function `get_module_names`](#0x1_code_get_module_names)
 -  [Function `request_publish`](#0x1_code_request_publish)
 -  [Function `request_publish_with_allowed_deps`](#0x1_code_request_publish_with_allowed_deps)
+-  [Function `remap_module_addresses`](#0x1_code_remap_module_addresses)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `publish_package`](#@Specification_1_publish_package)
@@ -351,6 +353,15 @@ Package contains duplicate module names with existing modules publised in other 
 
 
 
+<a name="0x1_code_ENATIVE_FUN_NOT_AVAILABLE"></a>
+
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_ENATIVE_FUN_NOT_AVAILABLE">ENATIVE_FUN_NOT_AVAILABLE</a>: u64 = 1;
+</code></pre>
+
+
+
 <a name="0x1_code_EPACKAGE_DEP_MISSING"></a>
 
 Dependency could not be resolved to any published package.
@@ -535,7 +546,11 @@ package.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_publish_package">publish_package</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pack: <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_publish_package">publish_package</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pack: <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>,
+    <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
+) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
     // Disallow incompatible upgrade mode. Governance can decide later <b>if</b> this should be reconsidered.
     <b>assert</b>!(
         pack.upgrade_policy.policy &gt; <a href="code.md#0x1_code_upgrade_policy_arbitrary">upgrade_policy_arbitrary</a>().policy,
@@ -612,6 +627,51 @@ of current restrictions for txn parameters, the metadata needs to be passed in s
 <pre><code><b>public</b> entry <b>fun</b> <a href="code.md#0x1_code_publish_package_txn">publish_package_txn</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
 <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
     <a href="code.md#0x1_code_publish_package">publish_package</a>(owner, <a href="util.md#0x1_util_from_bytes">util::from_bytes</a>&lt;<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>&gt;(metadata_serialized), <a href="code.md#0x1_code">code</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_code_publish_package_with_address_remapping_txn"></a>
+
+## Function `publish_package_with_address_remapping_txn`
+
+Same as <code>publish_package_txn</code> but can dynamically replace addresses in the package with new ones.
+The <code>address_mapping</code> must have even number of addresses, such as [A, B, C, D], and A and C in original package
+would be replaced by B and D, respectively. If the same address is replaced more than once, the last mapping
+would overwrite the previous ones.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="code.md#0x1_code_publish_package_with_address_remapping_txn">publish_package_with_address_remapping_txn</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, old_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, new_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="code.md#0x1_code_publish_package_with_address_remapping_txn">publish_package_with_address_remapping_txn</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    old_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    new_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+)
+<b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_address_remapping_enabled">features::module_address_remapping_enabled</a>()) {
+        <b>let</b> (remapped_package_metadata, remapped_code) = <a href="code.md#0x1_code_remap_module_addresses">remap_module_addresses</a>(
+            metadata_serialized,
+            <a href="code.md#0x1_code">code</a>,
+            old_addresses,
+            new_addresses
+        );
+        <a href="code.md#0x1_code_publish_package">publish_package</a>(owner, <a href="util.md#0x1_util_from_bytes">util::from_bytes</a>&lt;<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>&gt;(remapped_package_metadata), remapped_code);
+    } <b>else</b> {
+        <b>abort</b> (std::error::invalid_state(<a href="code.md#0x1_code_ENATIVE_FUN_NOT_AVAILABLE">ENATIVE_FUN_NOT_AVAILABLE</a>))
+    }
 }
 </code></pre>
 
@@ -870,6 +930,35 @@ Native function to initiate module loading, including a list of allowed dependen
     bundle: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
     policy: u8
 );
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_code_remap_module_addresses"></a>
+
+## Function `remap_module_addresses`
+
+Native function to remap addresses both in package metadata and code in binary where the length of
+<code>old_addresses</code> must equal to that of <code>new_addresses</code>.
+
+
+<pre><code><b>fun</b> <a href="code.md#0x1_code_remap_module_addresses">remap_module_addresses</a>(package_metadata: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, old_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, new_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;): (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="code.md#0x1_code_remap_module_addresses">remap_module_addresses</a>(
+    package_metadata: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    old_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    new_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+): (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;);
 </code></pre>
 
 

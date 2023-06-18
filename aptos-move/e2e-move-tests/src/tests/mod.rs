@@ -5,6 +5,7 @@ mod access_path_test;
 mod aggregator;
 mod attributes;
 mod chain_id;
+mod code_address_remapping;
 mod code_publishing;
 mod common;
 mod constructor_args;

@@ -61,6 +61,8 @@ return true.
 -  [Function `partial_governance_voting_enabled`](#0x1_features_partial_governance_voting_enabled)
 -  [Function `get_delegation_pool_partial_governance_voting`](#0x1_features_get_delegation_pool_partial_governance_voting)
 -  [Function `delegation_pool_partial_governance_voting_enabled`](#0x1_features_delegation_pool_partial_governance_voting_enabled)
+-  [Function `get_module_address_remapping_feature`](#0x1_features_get_module_address_remapping_feature)
+-  [Function `module_address_remapping_enabled`](#0x1_features_module_address_remapping_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -221,7 +223,7 @@ Lifetime: transient
 <a name="0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH"></a>
 
 Whether native_public_key_validate aborts when a public key of the wrong length is given
-Lifetime: ephemeral
+Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH">ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH</a>: u64 = 14;
@@ -235,6 +237,17 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_features_MODULE_ADDRESS_REMAPPING"></a>
+
+Whether enable paritial governance voting.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_ADDRESS_REMAPPING">MODULE_ADDRESS_REMAPPING</a>: u64 = 22;
 </code></pre>
 
 
@@ -1033,6 +1046,52 @@ Lifetime: transient
 
 </details>
 
+<a name="0x1_features_get_module_address_remapping_feature"></a>
+
+## Function `get_module_address_remapping_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_address_remapping_feature">get_module_address_remapping_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_address_remapping_feature">get_module_address_remapping_feature</a>(): u64 { <a href="features.md#0x1_features_MODULE_ADDRESS_REMAPPING">MODULE_ADDRESS_REMAPPING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_module_address_remapping_enabled"></a>
+
+## Function `module_address_remapping_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_address_remapping_enabled">module_address_remapping_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_address_remapping_enabled">module_address_remapping_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MODULE_ADDRESS_REMAPPING">MODULE_ADDRESS_REMAPPING</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -1053,7 +1112,7 @@ Function to enable and disable features. Can only be called by a signer of @std.
 <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
     <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
-        <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a>{<a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[]})
+        <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
     };
     <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
     <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
@@ -1087,7 +1146,7 @@ Check whether the feature is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std) &&
-    <a href="features.md#0x1_features_contains">contains</a>(&<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>, feature)
+        <a href="features.md#0x1_features_contains">contains</a>(&<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>, feature)
 }
 </code></pre>
 

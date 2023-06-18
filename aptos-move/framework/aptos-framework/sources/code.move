@@ -12,6 +12,8 @@ module aptos_framework::code {
     use std::option::Option;
     use std::string;
 
+    const ENATIVE_FUN_NOT_AVAILABLE: u64 = 1;
+
     // ----------------------------------------------------------------------
     // Code Publishing
 
@@ -129,7 +131,11 @@ module aptos_framework::code {
 
     /// Publishes a package at the given signer's address. The caller must provide package metadata describing the
     /// package.
-    public fun publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) acquires PackageRegistry {
+    public fun publish_package(
+        owner: &signer,
+        pack: PackageMetadata,
+        code: vector<vector<u8>>
+    ) acquires PackageRegistry {
         // Disallow incompatible upgrade mode. Governance can decide later if this should be reconsidered.
         assert!(
             pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy,
@@ -186,6 +192,31 @@ module aptos_framework::code {
     public entry fun publish_package_txn(owner: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>)
     acquires PackageRegistry {
         publish_package(owner, util::from_bytes<PackageMetadata>(metadata_serialized), code)
+    }
+
+    /// Same as `publish_package_txn` but can dynamically replace addresses in the package with new ones.
+    /// The `address_mapping` must have even number of addresses, such as [A, B, C, D], and A and C in original package
+    /// would be replaced by B and D, respectively. If the same address is replaced more than once, the last mapping
+    /// would overwrite the previous ones.
+    public entry fun publish_package_with_address_remapping_txn(
+        owner: &signer,
+        metadata_serialized: vector<u8>,
+        code: vector<vector<u8>>,
+        old_addresses: vector<address>,
+        new_addresses: vector<address>,
+    )
+    acquires PackageRegistry {
+        if (features::module_address_remapping_enabled()) {
+            let (remapped_package_metadata, remapped_code) = remap_module_addresses(
+                metadata_serialized,
+                code,
+                old_addresses,
+                new_addresses
+            );
+            publish_package(owner, util::from_bytes<PackageMetadata>(remapped_package_metadata), remapped_code);
+        } else {
+            abort (std::error::invalid_state(ENATIVE_FUN_NOT_AVAILABLE))
+        }
     }
 
     // Helpers
@@ -317,4 +348,13 @@ module aptos_framework::code {
         bundle: vector<vector<u8>>,
         policy: u8
     );
+
+    /// Native function to remap addresses both in package metadata and code in binary where the length of
+    /// `old_addresses` must equal to that of `new_addresses`.
+    native fun remap_module_addresses(
+        package_metadata: vector<u8>,
+        code: vector<vector<u8>>,
+        old_addresses: vector<address>,
+        new_addresses: vector<address>,
+    ): (vector<u8>, vector<vector<u8>>);
 }

@@ -328,9 +328,47 @@ impl MoveHarness {
         )
     }
 
+    pub fn create_publish_remapped_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: Option<BuildOptions>,
+        old_addresses: Vec<AccountAddress>,
+        new_addresses: Vec<AccountAddress>,
+    ) -> SignedTransaction {
+        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
+            .expect("building package must succeed");
+        let code = package.extract_code();
+        let metadata = package
+            .extract_metadata()
+            .expect("extracting package metadata must succeed");
+        self.create_transaction_payload(
+            account,
+            aptos_stdlib::code_publish_package_with_address_remapping_txn(
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+                code,
+                old_addresses,
+                new_addresses,
+            ),
+        )
+    }
+
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, None, |_| {});
+        self.run(txn)
+    }
+
+    /// Runs transaction which publishes the Move Package with addresses remapped.
+    pub fn publish_remapped_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        old_addresses: Vec<AccountAddress>,
+        new_addresses: Vec<AccountAddress>,
+    ) -> TransactionStatus {
+        let txn =
+            self.create_publish_remapped_package(account, path, None, old_addresses, new_addresses);
         self.run(txn)
     }
 

@@ -233,6 +233,10 @@ impl GasParameters {
                     base: 0.into(),
                     per_byte: 0.into(),
                 },
+                remap_module_addresses: code::RemapModuleAddressesGasParameters {
+                    base: 0.into(),
+                    per_byte: 0.into(),
+                },
             },
             event: event::GasParameters {
                 write_to_event_store: event::WriteToEventStoreGasParameters {

@@ -6,7 +6,7 @@ use crate::{
         any::Any,
         helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
-    safely_pop_arg,
+    safely_assert_eq, safely_pop_arg,
 };
 use anyhow::bail;
 use aptos_types::{
@@ -15,7 +15,11 @@ use aptos_types::{
     vm_status::StatusCode,
 };
 use better_any::{Tid, TidAble};
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use itertools::zip_eq;
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
@@ -23,12 +27,12 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    values::{Struct, Value},
+    values::{Struct, Value, Vector},
 };
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::{
-    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap, VecDeque},
     fmt,
     str::FromStr,
     sync::Arc,
@@ -196,27 +200,43 @@ fn unpack_allowed_dep(v: Value) -> PartialVMResult<(AccountAddress, String)> {
 }
 
 /***************************************************************************************************
- * native fun request_publish(
- *     destination: address,
- *     expected_modules: vector<String>,
- *     code: vector<vector<u8>>,
- *     policy: u8
- * )
- *
- * _and_
- *
- *  native fun request_publish_with_allowed_deps(
- *      owner: address,
- *      expected_modules: vector<String>,
- *      allowed_deps: vector<AllowedDep>,
- *      bundle: vector<vector<u8>>,
- *      policy: u8
- *  );
- *   gas cost: base_cost + unit_cost * bytes_len
- *
- **************************************************************************************************/
+* native fun request_publish(
+*     destination: address,
+*     expected_modules: vector<String>,
+*     code: vector<vector<u8>>,
+*     policy: u8
+* )
+*
+* _and_
+*
+*  native fun request_publish_with_allowed_deps(
+*      owner: address,
+*      expected_modules: vector<String>,
+*      allowed_deps: vector<AllowedDep>,
+*      bundle: vector<vector<u8>>,
+*      policy: u8
+*  );
+*
+* _and_
+*
+*  native fun remap_module_addresses(
+*      package_metadata: vector<u8>,
+*      code: vector<vector<u8>>,
+*      old_addresses: vector<address>,
+*      new_addresses: vector<address>,
+*  ): (vector<u8>, vector<vector<u8>>);
+*
+*   gas cost: base_cost + unit_cost * bytes_len
+*
+**************************************************************************************************/
 #[derive(Clone, Debug)]
 pub struct RequestPublishGasParameters {
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
+}
+
+#[derive(Clone, Debug)]
+pub struct RemapModuleAddressesGasParameters {
     pub base: InternalGas,
     pub per_byte: InternalGasPerByte,
 }
@@ -236,7 +256,6 @@ fn native_request_publish(
     let mut code = vec![];
     for module in safely_pop_arg!(args, Vec<Value>) {
         let module_code = module.value_as::<Vec<u8>>()?;
-
         context.charge(gas_params.per_byte * NumBytes::new(module_code.len() as u64))?;
         code.push(module_code);
     }
@@ -301,6 +320,120 @@ fn native_request_publish(
     Ok(smallvec![])
 }
 
+fn native_remap_module_addresses(
+    gas_params: &RemapModuleAddressesGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(matches!(args.len(), 4));
+    context.charge(gas_params.base)?;
+
+    let dst_address_vec = safely_pop_arg!(args, Vector).unpack_unchecked()?;
+    let src_address_vec = safely_pop_arg!(args, Vector).unpack_unchecked()?;
+    let num_addresses = src_address_vec.len();
+    safely_assert_eq!(dst_address_vec.len(), num_addresses);
+
+    context.charge(
+        gas_params.per_byte * NumBytes::new((AccountAddress::LENGTH * num_addresses * 2) as u64),
+    )?;
+    let address_mapping: HashMap<AccountAddress, AccountAddress> =
+        zip_eq(src_address_vec, dst_address_vec)
+            .map(|(a, b)| {
+                Ok((
+                    a.value_as::<AccountAddress>()?,
+                    b.value_as::<AccountAddress>()?,
+                ))
+            })
+            .collect::<SafeNativeResult<_>>()?;
+
+    // 1. Module address remapping in code.
+    let original_code = safely_pop_arg!(args, Vec<Value>);
+    let code = original_code
+        .into_iter()
+        .map(|module| {
+            let module_code = module.value_as::<Vec<u8>>()?;
+            context.charge(gas_params.per_byte * NumBytes::new(module_code.len() as u64))?;
+            let mut module =
+                CompiledModule::deserialize_no_check_bounds(&module_code).map_err(|_err| {
+                    partial_extension_error(
+                        "module code deserialization failure",
+                        StatusCode::CODE_DESERIALIZATION_ERROR,
+                    )
+                })?;
+            let bytecode_version = module.version;
+            let mut module_code = vec![];
+            // Charge for address identifier bytes.
+            context.charge(
+                gas_params.per_byte
+                    * NumBytes::new(
+                        (module.address_identifiers.len() * AccountAddress::LENGTH) as u64,
+                    ),
+            )?;
+            // Charge for constant pool bytes.
+            context.charge(
+                gas_params.per_byte
+                    * NumBytes::new(
+                        module
+                            .constant_pool
+                            .iter()
+                            .map(|c| c.data.len() as u64)
+                            .sum::<u64>(),
+                    ),
+            )?;
+            module.remap_addresses(&address_mapping)?;
+            module
+                .serialize_for_version(Some(bytecode_version), &mut module_code)
+                .map_err(|_err| {
+                    partial_extension_error(
+                        "module code serialization failure",
+                        StatusCode::VALUE_SERIALIZATION_ERROR,
+                    )
+                })?;
+            context.charge(gas_params.per_byte * NumBytes::new(module_code.len() as u64))?;
+            Ok(Value::vector_u8(module_code))
+        })
+        .collect::<SafeNativeResult<_>>()?;
+
+    // 2. Clear package metadata manifest/source/source_map because it is much more complicated to
+    // remap addresses in those places.
+    let metadata_bytes = safely_pop_arg!(args, Vec<u8>);
+    context.charge(gas_params.per_byte * NumBytes::new(metadata_bytes.len() as u64))?;
+    let mut package_metadata: PackageMetadata = bcs::from_bytes(metadata_bytes.as_slice())
+        .map_err(|_err| {
+            partial_extension_error(
+                "package metadata deserialization failure",
+                StatusCode::VALUE_DESERIALIZATION_ERROR,
+            )
+        })?;
+    package_metadata.manifest.clear();
+    package_metadata.modules.iter_mut().try_for_each(|module| {
+        module.source.clear();
+        module.source_map.clear();
+        Ok::<(), SafeNativeError>(())
+    })?;
+
+    // 3. Deps account remapping.
+    package_metadata.deps.iter_mut().try_for_each(|dep| {
+        if let Some(new_addr) = address_mapping.get(&dep.account) {
+            dep.account = *new_addr;
+        }
+        Ok::<(), SafeNativeError>(())
+    })?;
+
+    let metadata_bytes = bcs::to_bytes(&package_metadata).map_err(|_err| {
+        partial_extension_error(
+            "package metadata serialization failure",
+            StatusCode::VALUE_DESERIALIZATION_ERROR,
+        )
+    })?;
+    context.charge(gas_params.per_byte * NumBytes::new(metadata_bytes.len() as u64))?;
+    Ok(smallvec![
+        Value::vector_u8(metadata_bytes),
+        Vector::pack(&Type::Vector(Box::new(Type::U8)), code)?
+    ])
+}
+
 /***************************************************************************************************
  * module
  *
@@ -308,6 +441,7 @@ fn native_request_publish(
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub request_publish: RequestPublishGasParameters,
+    pub remap_module_addresses: RemapModuleAddressesGasParameters,
 }
 
 pub fn make_all(
@@ -329,12 +463,25 @@ pub fn make_all(
             "request_publish_with_allowed_deps",
             make_safe_native(
                 gas_params.request_publish,
+                timed_features.clone(),
+                features.clone(),
+                native_request_publish,
+            ),
+        ),
+        (
+            "remap_module_addresses",
+            make_safe_native(
+                gas_params.remap_module_addresses,
                 timed_features,
                 features,
-                native_request_publish,
+                native_remap_module_addresses,
             ),
         ),
     ];
 
     crate::natives::helpers::make_module_natives(natives)
+}
+
+fn partial_extension_error(msg: impl ToString, status: StatusCode) -> PartialVMError {
+    PartialVMError::new(status).with_message(msg.to_string())
 }

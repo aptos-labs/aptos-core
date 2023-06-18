@@ -34,6 +34,7 @@ module std::features {
     /// available. This is needed because of introduction of a new native function.
     /// Lifetime: transient
     const CODE_DEPENDENCY_CHECK: u64 = 1;
+
     public fun code_dependency_check_enabled(): bool acquires Features {
         is_enabled(CODE_DEPENDENCY_CHECK)
     }
@@ -42,6 +43,7 @@ module std::features {
     /// private functions.
     /// Lifetime: permanent
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
+
     public fun treat_friend_as_private(): bool acquires Features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
@@ -143,7 +145,9 @@ module std::features {
     ///
     /// Lifetime: transient
     const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
+
     public fun get_cryptography_algebra_natives_feature(): u64 { CRYPTOGRAPHY_ALGEBRA_NATIVES }
+
     public fun cryptography_algebra_enabled(): bool acquires Features {
         is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
     }
@@ -152,13 +156,15 @@ module std::features {
     ///
     /// Lifetime: transient
     const BLS12_381_STRUCTURES: u64 = 13;
+
     public fun get_bls12_381_strutures_feature(): u64 { BLS12_381_STRUCTURES }
+
     public fun bls12_381_structures_enabled(): bool acquires Features {
         is_enabled(BLS12_381_STRUCTURES)
     }
 
     /// Whether native_public_key_validate aborts when a public key of the wrong length is given
-    /// Lifetime: ephemeral
+    /// Lifetime: permanent
     const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
 
     /// Whether struct constructors are enabled
@@ -169,7 +175,9 @@ module std::features {
     /// Whether reward rate decreases periodically.
     /// Lifetime: transient
     const PERIODICAL_REWARD_RATE_DECREASE: u64 = 16;
+
     public fun get_periodical_reward_rate_decrease_feature(): u64 { PERIODICAL_REWARD_RATE_DECREASE }
+
     public fun periodical_reward_rate_decrease_enabled(): bool acquires Features {
         is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
     }
@@ -177,7 +185,9 @@ module std::features {
     /// Whether enable paritial governance voting on aptos_governance.
     /// Lifetime: transient
     const PARTIAL_GOVERNANCE_VOTING: u64 = 17;
+
     public fun get_partial_governance_voting(): u64 { PARTIAL_GOVERNANCE_VOTING }
+
     public fun partial_governance_voting_enabled(): bool acquires Features {
         is_enabled(PARTIAL_GOVERNANCE_VOTING)
     }
@@ -189,11 +199,22 @@ module std::features {
     /// Whether enable paritial governance voting on delegation_pool.
     /// Lifetime: transient
     const DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING: u64 = 21;
+
     public fun get_delegation_pool_partial_governance_voting(): u64 { DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING }
+
     public fun delegation_pool_partial_governance_voting_enabled(): bool acquires Features {
         is_enabled(DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING)
     }
 
+    /// Whether enable paritial governance voting.
+    /// Lifetime: transient
+    const MODULE_ADDRESS_REMAPPING: u64 = 22;
+
+    public fun get_module_address_remapping_feature(): u64 { MODULE_ADDRESS_REMAPPING }
+
+    public fun module_address_remapping_enabled(): bool acquires Features {
+        is_enabled(MODULE_ADDRESS_REMAPPING)
+    }
     // ============================================================================================
     // Feature Flag Implementation
 
@@ -210,7 +231,7 @@ module std::features {
     acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
         if (!exists<Features>(@std)) {
-            move_to<Features>(framework, Features{features: vector[]})
+            move_to<Features>(framework, Features { features: vector[] })
         };
         let features = &mut borrow_global_mut<Features>(@std).features;
         vector::for_each_ref(&enable, |feature| {
@@ -224,7 +245,7 @@ module std::features {
     /// Check whether the feature is enabled.
     fun is_enabled(feature: u64): bool acquires Features {
         exists<Features>(@std) &&
-        contains(&borrow_global<Features>(@std).features, feature)
+            contains(&borrow_global<Features>(@std).features, feature)
     }
 
     /// Helper to include or exclude a feature flag.

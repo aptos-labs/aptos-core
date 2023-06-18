@@ -167,6 +167,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
 
     [.code.request_publish.base, "code.request_publish.base", 500 * MUL],
     [.code.request_publish.per_byte, "code.request_publish.per_byte", 2 * MUL],
+    [.code.remap_module_addresses.base, { 10.. => "code.remap_module_addresses.base"}, 300 * MUL],
+    [.code.remap_module_addresses.per_byte, { 10.. => "code.remap_module_addresses.per_byte"}, 5 * MUL],
 
     // Note(Gas): These are storage operations so the values should not be multiplied.
     [.event.write_to_event_store.base, "event.write_to_event_store.base", 300_000],

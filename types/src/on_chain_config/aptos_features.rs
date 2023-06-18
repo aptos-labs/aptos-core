@@ -29,6 +29,7 @@ pub enum FeatureFlag {
     STORAGE_SLOT_METADATA = 19,
     CHARGE_INVARIANT_VIOLATION = 20,
     DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING = 21,
+    MODULE_ADDRESS_REMAPPING = 22,
 }
 
 /// Representation of features on chain as a bitset.

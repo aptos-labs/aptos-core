@@ -238,6 +238,17 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    /// Same as `publish_package_txn` but can dynamically replace addresses in the package with new ones.
+    /// The `address_mapping` must have even number of addresses, such as [A, B, C, D], and A and C in original package
+    /// would be replaced by B and D, respectively. If the same address is replaced more than once, the last mapping
+    /// would overwrite the previous ones.
+    CodePublishPackageWithAddressRemappingTxn {
+        metadata_serialized: Vec<u8>,
+        code: Vec<Vec<u8>>,
+        old_addresses: Vec<AccountAddress>,
+        new_addresses: Vec<AccountAddress>,
+    },
+
     /// Transfers `amount` of coins `CoinType` from `from` to `to`.
     CoinTransfer {
         coin_type: TypeTag,
@@ -991,6 +1002,17 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => code_publish_package_txn(metadata_serialized, code),
+            CodePublishPackageWithAddressRemappingTxn {
+                metadata_serialized,
+                code,
+                old_addresses,
+                new_addresses,
+            } => code_publish_package_with_address_remapping_txn(
+                metadata_serialized,
+                code,
+                old_addresses,
+                new_addresses,
+            ),
             CoinTransfer {
                 coin_type,
                 to,
@@ -1943,6 +1965,35 @@ pub fn code_publish_package_txn(
         vec![
             bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
+        ],
+    ))
+}
+
+/// Same as `publish_package_txn` but can dynamically replace addresses in the package with new ones.
+/// The `address_mapping` must have even number of addresses, such as [A, B, C, D], and A and C in original package
+/// would be replaced by B and D, respectively. If the same address is replaced more than once, the last mapping
+/// would overwrite the previous ones.
+pub fn code_publish_package_with_address_remapping_txn(
+    metadata_serialized: Vec<u8>,
+    code: Vec<Vec<u8>>,
+    old_addresses: Vec<AccountAddress>,
+    new_addresses: Vec<AccountAddress>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("code").to_owned(),
+        ),
+        ident_str!("publish_package_with_address_remapping_txn").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&metadata_serialized).unwrap(),
+            bcs::to_bytes(&code).unwrap(),
+            bcs::to_bytes(&old_addresses).unwrap(),
+            bcs::to_bytes(&new_addresses).unwrap(),
         ],
     ))
 }
@@ -4182,6 +4233,23 @@ mod decoder {
         }
     }
 
+    pub fn code_publish_package_with_address_remapping_txn(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::CodePublishPackageWithAddressRemappingTxn {
+                    metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    code: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    old_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    new_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn coin_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinTransfer {
@@ -5418,6 +5486,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "code_publish_package_txn".to_string(),
             Box::new(decoder::code_publish_package_txn),
+        );
+        map.insert(
+            "code_publish_package_with_address_remapping_txn".to_string(),
+            Box::new(decoder::code_publish_package_with_address_remapping_txn),
         );
         map.insert(
             "coin_transfer".to_string(),

@@ -1372,6 +1372,7 @@ dependencies = [
  "libsecp256k1",
  "log",
  "move-binary-format",
+ "move-bytecode-source-map",
  "move-cli",
  "move-command-line-common",
  "move-compiler",

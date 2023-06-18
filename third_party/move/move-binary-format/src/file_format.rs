@@ -39,13 +39,14 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     metadata::Metadata,
+    value::MoveValue,
     vm_status::StatusCode,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::ops::BitOr;
+use std::{collections::HashMap, ops::BitOr};
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -2053,6 +2054,49 @@ impl CompiledModule {
     /// Returns the code key of `self`
     pub fn self_id(&self) -> ModuleId {
         self.module_id_for_handle(self.self_handle())
+    }
+
+    pub fn remap_addresses(
+        &mut self,
+        address_mapping: &HashMap<AccountAddress, AccountAddress>,
+    ) -> PartialVMResult<()> {
+        // replace addresses in address identifiers.
+        for addr in self.address_identifiers.iter_mut() {
+            if let Some(new_addr) = address_mapping.get(addr) {
+                *addr = *new_addr;
+            }
+        }
+        // replace addresses in constant.
+        for constant in self.constant_pool.iter_mut() {
+            let mut constant_value = constant.deserialize_constant().ok_or_else(|| {
+                PartialVMError::new(StatusCode::VALUE_DESERIALIZATION_ERROR)
+                    .with_message("cannot deserialize constant".to_string())
+            })?;
+
+            Self::remap_constant_addresses(&mut constant_value, &|addr| {
+                if let Some(new_addr) = address_mapping.get(addr) {
+                    *addr = *new_addr;
+                }
+            });
+
+            let bytes = constant_value.simple_serialize().ok_or_else(|| {
+                PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                    .with_message("cannot serialize constant".to_string())
+            })?;
+            constant.data = bytes;
+        }
+        Ok(())
+    }
+
+    fn remap_constant_addresses(value: &mut MoveValue, f: &dyn Fn(&mut AccountAddress)) {
+        match value {
+            MoveValue::Address(addr) => f(addr),
+            MoveValue::Vector(vals) => {
+                vals.iter_mut()
+                    .for_each(|val| Self::remap_constant_addresses(val, f));
+            },
+            _ => {},
+        }
     }
 }
 
