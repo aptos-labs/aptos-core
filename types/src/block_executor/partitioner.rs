@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
+use crate::transaction::{analyzed_transaction::StorageLocation, Transaction};
+use aptos_crypto::HashValue;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct TxnIdxWithShardId {
     pub txn_index: TxnIndex,
     pub shard_id: ShardId,
@@ -22,7 +23,7 @@ impl TxnIdxWithShardId {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 /// Denotes a set of cross shard edges, which contains the set (required or dependent) transaction
 /// indices and the relevant storage locations that are conflicting.
 pub struct CrossShardEdges {
@@ -73,7 +74,7 @@ impl IntoIterator for CrossShardEdges {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 /// Represents the dependencies of a transaction on other transactions across shards. Two types
 /// of dependencies are supported:
 /// 1. `required_edges`: The transaction depends on the execution of the transactions in the set. In this
@@ -138,7 +139,6 @@ impl CrossShardDependencies {
     }
 }
 
-#[derive(Debug, Clone)]
 /// A contiguous chunk of transactions (along with their dependencies) in a block.
 ///
 /// Each `SubBlock` represents a sequential section of transactions within a block.
@@ -156,17 +156,25 @@ impl CrossShardDependencies {
 ///  | Transaction 3  | Transaction 6    | Transaction 9    |
 ///  +----------------+------------------+------------------+
 /// ```
-pub struct SubBlock {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubBlock<T> {
     // This is the index of first transaction relative to the block.
     pub start_index: TxnIndex,
-    pub transactions: Vec<TransactionWithDependencies>,
+    pub transactions: Vec<TransactionWithDependencies<T>>,
 }
 
-impl SubBlock {
-    pub fn new(start_index: TxnIndex, transactions: Vec<TransactionWithDependencies>) -> Self {
+impl<T: Clone> SubBlock<T> {
+    pub fn new(start_index: TxnIndex, transactions: Vec<TransactionWithDependencies<T>>) -> Self {
         Self {
             start_index,
             transactions,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            start_index: 0,
+            transactions: vec![],
         }
     }
 
@@ -182,8 +190,19 @@ impl SubBlock {
         self.start_index + self.num_txns()
     }
 
-    pub fn transactions_with_deps(&self) -> &Vec<TransactionWithDependencies> {
+    pub fn transactions_with_deps(&self) -> &Vec<TransactionWithDependencies<T>> {
         &self.transactions
+    }
+
+    pub fn into_transactions_with_deps(self) -> Vec<TransactionWithDependencies<T>> {
+        self.transactions
+    }
+
+    pub fn into_txns(self) -> Vec<T> {
+        self.transactions
+            .into_iter()
+            .map(|txn_with_deps| txn_with_deps.into_txn())
+            .collect()
     }
 
     pub fn add_dependent_edge(
@@ -199,19 +218,35 @@ impl SubBlock {
         source_txn.add_dependent_edge(txn_idx, storage_locations);
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &TransactionWithDependencies> {
+    pub fn iter(&self) -> impl Iterator<Item = &TransactionWithDependencies<T>> {
         self.transactions.iter()
     }
 }
 
-// A set of sub blocks assigned to a shard.
-#[derive(Default)]
-pub struct SubBlocksForShard {
-    pub shard_id: ShardId,
-    pub sub_blocks: Vec<SubBlock>,
+impl<T: Clone> IntoIterator for SubBlock<T> {
+    type IntoIter = std::vec::IntoIter<TransactionWithDependencies<T>>;
+    type Item = TransactionWithDependencies<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.transactions.into_iter()
+    }
 }
 
-impl SubBlocksForShard {
+// A set of sub blocks assigned to a shard.
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+pub struct SubBlocksForShard<T> {
+    pub shard_id: ShardId,
+    pub sub_blocks: Vec<SubBlock<T>>,
+}
+
+impl<T: Clone> SubBlocksForShard<T> {
+    pub fn new(shard_id: ShardId, sub_blocks: Vec<SubBlock<T>>) -> Self {
+        Self {
+            shard_id,
+            sub_blocks,
+        }
+    }
+
     pub fn empty(shard_id: ShardId) -> Self {
         Self {
             shard_id,
@@ -219,7 +254,7 @@ impl SubBlocksForShard {
         }
     }
 
-    pub fn add_sub_block(&mut self, sub_block: SubBlock) {
+    pub fn add_sub_block(&mut self, sub_block: SubBlock<T>) {
         self.sub_blocks.push(sub_block);
     }
 
@@ -234,51 +269,84 @@ impl SubBlocksForShard {
         self.sub_blocks.len()
     }
 
+    pub fn into_sub_blocks(self) -> Vec<SubBlock<T>> {
+        self.sub_blocks
+    }
+
+    pub fn into_txns(self) -> Vec<T> {
+        self.sub_blocks
+            .into_iter()
+            .flat_map(|sub_block| sub_block.into_txns())
+            .collect()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.sub_blocks.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &TransactionWithDependencies> {
+    pub fn iter(&self) -> impl Iterator<Item = &TransactionWithDependencies<T>> {
         self.sub_blocks
             .iter()
             .flat_map(|sub_block| sub_block.iter())
     }
 
-    pub fn sub_block_iter(&self) -> impl Iterator<Item = &SubBlock> {
+    pub fn sub_block_iter(&self) -> impl Iterator<Item = &SubBlock<T>> {
         self.sub_blocks.iter()
     }
 
-    pub fn get_sub_block(&self, round: usize) -> Option<&SubBlock> {
+    pub fn get_sub_block(&self, round: usize) -> Option<&SubBlock<T>> {
         self.sub_blocks.get(round)
     }
 
-    pub fn get_sub_block_mut(&mut self, round: usize) -> Option<&mut SubBlock> {
+    pub fn get_sub_block_mut(&mut self, round: usize) -> Option<&mut SubBlock<T>> {
         self.sub_blocks.get_mut(round)
+    }
+
+    // Flattens a vector of `SubBlocksForShard` into a vector of transactions in the order they
+    // appear in the block.
+    pub fn flatten(block: Vec<SubBlocksForShard<T>>) -> Vec<T> {
+        let num_shards = block.len();
+        let mut flattened_txns = Vec::new();
+        let num_rounds = block[0].num_sub_blocks();
+        let mut ordered_blocks = vec![SubBlock::empty(); num_shards * num_rounds];
+        for (shard_id, sub_blocks) in block.into_iter().enumerate() {
+            for (round, sub_block) in sub_blocks.into_sub_blocks().into_iter().enumerate() {
+                ordered_blocks[round * num_shards + shard_id] = sub_block;
+            }
+        }
+
+        for sub_block in ordered_blocks.into_iter() {
+            flattened_txns.extend(sub_block.into_txns());
+        }
+
+        flattened_txns
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct TransactionWithDependencies {
-    pub txn: AnalyzedTransaction,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionWithDependencies<T> {
+    pub txn: T,
     pub cross_shard_dependencies: CrossShardDependencies,
 }
 
-impl TransactionWithDependencies {
-    pub fn new(txn: AnalyzedTransaction, cross_shard_dependencies: CrossShardDependencies) -> Self {
+impl<T: Clone> TransactionWithDependencies<T> {
+    pub fn new(txn: T, cross_shard_dependencies: CrossShardDependencies) -> Self {
         Self {
             txn,
             cross_shard_dependencies,
         }
     }
 
-    #[cfg(test)]
-    pub fn txn(&self) -> &AnalyzedTransaction {
+    pub fn txn(&self) -> &T {
         &self.txn
     }
 
-    #[cfg(test)]
     pub fn cross_shard_dependencies(&self) -> &CrossShardDependencies {
         &self.cross_shard_dependencies
+    }
+
+    pub fn into_txn(self) -> T {
+        self.txn
     }
 
     pub fn add_dependent_edge(
@@ -288,5 +356,80 @@ impl TransactionWithDependencies {
     ) {
         self.cross_shard_dependencies
             .add_dependent_edge(txn_idx, storage_locations);
+    }
+}
+
+pub struct ExecutableBlock<T> {
+    pub block_id: HashValue,
+    pub transactions: ExecutableTransactions<T>,
+}
+
+impl<T: Clone> ExecutableBlock<T> {
+    pub fn new(block_id: HashValue, transactions: ExecutableTransactions<T>) -> Self {
+        Self {
+            block_id,
+            transactions,
+        }
+    }
+}
+
+impl<T: Clone> From<(HashValue, Vec<T>)> for ExecutableBlock<T> {
+    fn from((block_id, transactions): (HashValue, Vec<T>)) -> Self {
+        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
+    }
+}
+
+// Represents the transactions in a block that are ready to be executed.
+pub enum ExecutableTransactions<T> {
+    Unsharded(Vec<T>),
+    Sharded(Vec<SubBlocksForShard<T>>),
+}
+
+impl<T: Clone> ExecutableTransactions<T> {
+    pub fn num_transactions(&self) -> usize {
+        match self {
+            ExecutableTransactions::Unsharded(transactions) => transactions.len(),
+            ExecutableTransactions::Sharded(sub_blocks) => sub_blocks
+                .iter()
+                .map(|sub_block| sub_block.num_txns())
+                .sum(),
+        }
+    }
+}
+
+impl From<Vec<Transaction>> for ExecutableTransactions<Transaction> {
+    fn from(txns: Vec<Transaction>) -> Self {
+        Self::Unsharded(txns)
+    }
+}
+
+// Represents the transactions that are executed on a particular block executor shard. Unsharded
+// transactions represents the entire block. Sharded transactions represents the transactions
+// that are assigned to this shard.
+pub enum BlockExecutorTransactions<T> {
+    Unsharded(Vec<T>),
+    Sharded(SubBlocksForShard<T>),
+}
+
+impl<T: Clone> BlockExecutorTransactions<T> {
+    pub fn num_txns(&self) -> usize {
+        match self {
+            BlockExecutorTransactions::Unsharded(transactions) => transactions.len(),
+            BlockExecutorTransactions::Sharded(sub_blocks) => sub_blocks.num_txns(),
+        }
+    }
+
+    pub fn get_unsharded_transactions(&self) -> Option<&Vec<T>> {
+        match self {
+            BlockExecutorTransactions::Unsharded(transactions) => Some(transactions),
+            BlockExecutorTransactions::Sharded(_) => None,
+        }
+    }
+
+    pub fn into_txns(self) -> Vec<T> {
+        match self {
+            BlockExecutorTransactions::Unsharded(transactions) => transactions,
+            BlockExecutorTransactions::Sharded(sub_blocks) => sub_blocks.into_txns(),
+        }
     }
 }

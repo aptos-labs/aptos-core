@@ -39,6 +39,7 @@ from forge import (
     main,
     sanitize_forge_resource_name,
     validate_forge_config,
+    GAR_REPO_NAME,
 )
 
 from click.testing import CliRunner, Result
@@ -56,6 +57,7 @@ from test_framework.cluster import (
 
 from test_framework.shell import SpyShell, FakeShell, FakeCommand, RunResult
 from test_framework.time import FakeTime
+from test_framework.cluster import Cloud
 
 # Show the entire diff when unittest fails assertion
 unittest.util._MAX_LENGTH = 2000  # type: ignore
@@ -117,6 +119,7 @@ def fake_context(
     processes=None,
     time=None,
     mode=None,
+    multiregion=False,
 ) -> ForgeContext:
     return ForgeContext(
         shell=shell if shell else FakeShell(),
@@ -145,7 +148,9 @@ def fake_context(
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
         forge_namespace="forge-potato",
-        forge_cluster=ForgeCluster(name="tomato", kubeconf="kubeconf"),
+        forge_cluster=ForgeCluster(
+            name="tomato", kubeconf="kubeconf", is_multiregion=multiregion
+        ),
         forge_test_suite="banana",
         forge_blocking=True,
         github_actions="false",
@@ -239,6 +244,14 @@ class ForgeRunnerTests(unittest.TestCase):
                     "kubectl --kubeconfig kubeconf get pods -n forge-potato",
                     RunResult(0, b"Pods"),
                 ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
             ]
         )
         forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
@@ -253,6 +266,67 @@ class ForgeRunnerTests(unittest.TestCase):
             },
         )
         context = fake_context(shell, filesystem, mode="k8s")
+        runner = K8sForgeRunner()
+        result = runner.run(context)
+        shell.assert_commands(self)
+        filesystem.assert_writes(self)
+        filesystem.assert_reads(self)
+        self.assertEqual(result.state, ForgeState.PASS, result.output)
+
+    def testK8sRunnerWithMultiregionCluster(self) -> None:
+        self.maxDiff = None
+        shell = SpyShell(
+            [
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver apply -n default -f temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --timeout=5m --for=condition=Ready pod/forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf logs -n default -f forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pod -n default forge-potato-1659078000-asdf -o jsonpath='{.status.phase}'",
+                    RunResult(0, b"Succeeded"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pods -n forge-potato",
+                    RunResult(0, b"Pods"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
+            ]
+        )
+        forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
+        template_fixture = get_fixture_path("forge-test-runner-template.fixture")
+        filesystem = SpyFilesystem(
+            {
+                "temp1": template_fixture.read_bytes(),
+            },
+            {
+                "forge-test-runner-template.yaml": FILE_NOT_FOUND,
+                "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(),
+            },
+        )
+        context = fake_context(shell, filesystem, mode="k8s", multiregion=True)
         runner = K8sForgeRunner()
         result = runner.run(context)
         shell.assert_commands(self)
@@ -278,7 +352,31 @@ class TestFindRecentImage(unittest.TestCase):
             ]
         )
         git = Git(shell)
-        image_tags = find_recent_images(shell, git, 1, "aptos/validator-testing")
+        image_tags = find_recent_images(
+            shell, git, 1, "validator-testing", cloud=Cloud.AWS
+        )
+        self.assertEqual(list(image_tags), ["lychee"])
+        shell.assert_commands(self)
+
+    def testFindRecentImageGcp(self) -> None:
+        shell = SpyShell(
+            [
+                FakeCommand("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
+                FakeCommand(
+                    f"crane manifest {GAR_REPO_NAME}/validator-testing:potato",
+                    RunResult(1, b""),
+                ),
+                FakeCommand("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
+                FakeCommand(
+                    f"crane manifest {GAR_REPO_NAME}/validator-testing:lychee",
+                    RunResult(0, b""),
+                ),
+            ]
+        )
+        git = Git(shell)
+        image_tags = find_recent_images(
+            shell, git, 1, "validator-testing", cloud=Cloud.GCP
+        )
         self.assertEqual(list(image_tags), ["lychee"])
         shell.assert_commands(self)
 
@@ -294,7 +392,12 @@ class TestFindRecentImage(unittest.TestCase):
         )
         git = Git(shell)
         image_tags = find_recent_images_by_profile_or_features(
-            shell, git, 1, enable_performance_profile=False, enable_failpoints=True
+            shell,
+            git,
+            1,
+            enable_performance_profile=False,
+            enable_failpoints=True,
+            cloud=Cloud.AWS,
         )
         self.assertEqual(list(image_tags), ["failpoints_tomato"])
         shell.assert_commands(self)
@@ -316,6 +419,7 @@ class TestFindRecentImage(unittest.TestCase):
             1,
             enable_performance_profile=True,
             enable_failpoints=False,
+            cloud=Cloud.AWS,
         )
         self.assertEqual(list(image_tags), ["performance_potato"])
         shell.assert_commands(self)
@@ -368,7 +472,7 @@ class TestFindRecentImage(unittest.TestCase):
             ]
         )
         git = Git(shell)
-        images = find_recent_images(shell, git, 2, "aptos/validator")
+        images = find_recent_images(shell, git, 2, "validator", cloud=Cloud.AWS)
         self.assertEqual(list(images), ["crab", "shrimp"])
 
     def testFailpointsProvidedImageTag(self) -> None:
@@ -595,6 +699,16 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 ),
                 FakeCommand(
                     "kubectl --kubeconfig temp1 get pods -n forge-perry-1659078000",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 delete pod -n default -l forge-namespace=forge-perry-1659078000 "
+                    "--force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 wait -n default --for=delete pod -l "
+                    "forge-namespace=forge-perry-1659078000",
                     RunResult(0, b""),
                 ),
             ]
