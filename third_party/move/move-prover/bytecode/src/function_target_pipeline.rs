@@ -225,9 +225,6 @@ impl FunctionTargetsHolder {
         &'env self,
         func_env: &'env FunctionEnv<'env>,
     ) -> Vec<(FunctionVariant, FunctionTarget<'env>)> {
-        if func_env.is_inline() {
-            return vec![];
-        }
         assert!(
             !func_env.is_inline(),
             "attempt to get bytecode function target for inline function"
