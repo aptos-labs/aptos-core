@@ -24,11 +24,15 @@ spec aptos_framework::code {
 
     spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
         // TODO: Can't verify `check_upgradability` in while loop.
-        pragma verify = false;
+
+        pragma aborts_if_is_partial;
+        let addr = signer::address_of(owner);
+
+        aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
     }
 
     spec publish_package_txn {
-        // TODO: Calls `publish_package`.`
+        // TODO: Calls `publish_package`.`a
         pragma verify = false;
     }
 
