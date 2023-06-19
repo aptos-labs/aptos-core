@@ -8,7 +8,7 @@ use crate::{
     },
     EmitModeParams,
 };
-use aptos_logger::{sample, sample::SampleRate, warn};
+use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -69,21 +69,22 @@ impl SubmissionWorker {
     }
 
     #[allow(clippy::collapsible_if)]
-    pub(crate) async fn run(mut self) -> Vec<LocalAccount> {
-        let start_time = Instant::now() + self.start_sleep_duration;
+    pub(crate) async fn run(mut self, start_instant: Instant) -> Vec<LocalAccount> {
+        let mut wait_until = start_instant + self.start_sleep_duration;
 
-        self.sleep_check_done(self.start_sleep_duration).await;
-
+        let now = Instant::now();
+        if wait_until > now {
+            self.sleep_check_done(wait_until - now).await;
+        }
         let wait_duration = Duration::from_millis(self.params.wait_millis);
-        let mut wait_until = start_time;
 
         while !self.stop.load(Ordering::Relaxed) {
             let stats_clone = self.stats.clone();
             let loop_stats = stats_clone.get_cur();
 
-            let loop_start_time = Arc::new(Instant::now());
+            let loop_start_time = Instant::now();
             if wait_duration.as_secs() > 0
-                && loop_start_time.duration_since(wait_until) > wait_duration
+                && loop_start_time.duration_since(wait_until) > Duration::from_secs(5)
             {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(120)),
@@ -114,6 +115,17 @@ impl SubmissionWorker {
                         })
                         .or_insert((cur, cur + 1));
                 }
+                // Some transaction generators use burner accounts, and will have different
+                // number of accounts per transaction, so useful to very rarely log.
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(300)),
+                    info!(
+                        "[{:?}] txn_emitter worker: handling {} accounts, generated txns for: {}",
+                        self.client.path_prefix_string(),
+                        self.accounts.len(),
+                        account_to_start_and_end_seq_num.len(),
+                    )
+                );
 
                 let txn_expiration_time = requests
                     .iter()
@@ -130,13 +142,25 @@ impl SubmissionWorker {
                             submit_transactions(
                                 &self.client,
                                 reqs,
-                                loop_start_time.clone(),
+                                loop_start_time,
                                 txn_offset_time.clone(),
                                 loop_stats,
                             )
                         }),
                 )
                 .await;
+
+                let submitted_after = loop_start_time.elapsed();
+                if submitted_after.as_secs() > 5 {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(120)),
+                        warn!(
+                            "[{:?}] txn_emitter worker waited for more than 5s to submit transactions: {}s after loop start",
+                            self.client.path_prefix_string(),
+                            submitted_after.as_secs(),
+                        )
+                    );
+                }
 
                 if self.skip_latency_stats {
                     // we also don't want to be stuck waiting for txn_expiration_time_secs
@@ -148,7 +172,7 @@ impl SubmissionWorker {
                 }
 
                 self.wait_and_update_stats(
-                    *loop_start_time,
+                    loop_start_time,
                     txn_offset_time.load(Ordering::Relaxed) / (requests.len() as u64),
                     account_to_start_and_end_seq_num,
                     // skip latency if asked to check seq_num only once
@@ -159,8 +183,11 @@ impl SubmissionWorker {
                     // generally, we should never need to recheck, as we wait enough time
                     // before calling here, but in case of shutdown/or client we are talking
                     // to being stale (having stale transaction_version), we might need to wait.
-                    if self.skip_latency_stats { 10 } else { 1 }
-                        * self.params.check_account_sequence_sleep,
+                    if self.skip_latency_stats {
+                        (10 * self.params.check_account_sequence_sleep).max(Duration::from_secs(3))
+                    } else {
+                        self.params.check_account_sequence_sleep
+                    },
                     loop_stats,
                 )
                 .await;
@@ -288,12 +315,12 @@ impl SubmissionWorker {
 pub async fn submit_transactions(
     client: &RestClient,
     txns: &[SignedTransaction],
-    loop_start_time: Arc<Instant>,
+    loop_start_time: Instant,
     txn_offset_time: Arc<AtomicU64>,
     stats: &StatsAccumulator,
 ) {
     let cur_time = Instant::now();
-    let offset = cur_time - *loop_start_time;
+    let offset = cur_time - loop_start_time;
     txn_offset_time.fetch_add(
         txns.len() as u64 * offset.as_millis() as u64,
         Ordering::Relaxed,

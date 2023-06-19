@@ -2,9 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-///! This is a copy of `futures::try_stream::try_buffered` from `futures 0.3.16`, except that it uses
-///! `FuturesOrderedX` which provides concurrency control. So we can buffer more results without
-///! too many futures driven at the same time.
+//! This is a copy of `futures::try_stream::try_buffered` from `futures 0.3.16`, except that it uses
+//! `FuturesOrderedX` which provides concurrency control. So we can buffer more results without
+//! too many futures driven at the same time.
 use crate::utils::stream::futures_ordered_x::FuturesOrderedX;
 use core::pin::Pin;
 use futures::{

@@ -493,8 +493,40 @@ impl EmitJob {
         self.stats.accumulate(&self.phase_starts)
     }
 
-    pub fn accumulate(&self) -> Vec<TxnStats> {
+    pub fn peek_and_accumulate(&self) -> Vec<TxnStats> {
         self.stats.accumulate(&self.phase_starts)
+    }
+
+    pub async fn stop_job(self) -> Vec<TxnStats> {
+        self.stop_and_accumulate().await
+    }
+
+    pub async fn periodic_stat(&self, duration: Duration, interval_secs: u64) {
+        let deadline = Instant::now() + duration;
+        let mut prev_stats: Option<Vec<TxnStats>> = None;
+        let default_stats = TxnStats::default();
+        let window = Duration::from_secs(max(interval_secs, 1));
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                break;
+            }
+            tokio::time::sleep(window.min(left)).await;
+            let cur_phase = self.stats.get_cur_phase();
+            let stats = self.peek_and_accumulate();
+            let delta = &stats[cur_phase]
+                - prev_stats
+                    .as_ref()
+                    .map(|p| &p[cur_phase])
+                    .unwrap_or(&default_stats);
+            prev_stats = Some(stats);
+            info!("phase {}: {}", cur_phase, delta.rate());
+        }
+    }
+
+    pub async fn periodic_stat_forward(self, duration: Duration, interval_secs: u64) -> Self {
+        self.periodic_stat(duration, interval_secs).await;
+        self
     }
 }
 
@@ -615,17 +647,23 @@ impl TxnEmitter {
         );
 
         let all_start_sleep_durations = mode_params.get_all_start_sleep_durations(self.from_rng());
-        let mut all_accounts_iter = all_accounts.into_iter();
-        let mut workers = vec![];
+
+        // Creating workers is slow with many workers (TODO check why)
+        // so we create them all first, before starting them - so they start at the right time for
+        // traffic pattern to be correct.
+        info!("Tx emitter creating workers");
+        let mut submission_workers =
+            Vec::with_capacity(workers_per_endpoint * req.rest_clients.len());
         for _ in 0..workers_per_endpoint {
             for client in &req.rest_clients {
-                let accounts = (&mut all_accounts_iter)
-                    .take(mode_params.accounts_per_worker)
-                    .collect::<Vec<_>>();
+                let accounts =
+                    all_accounts.split_off(all_accounts.len() - mode_params.accounts_per_worker);
+                assert!(accounts.len() == mode_params.accounts_per_worker);
+
                 let stop = stop.clone();
                 let stats = Arc::clone(&stats);
                 let txn_generator = txn_generator_creator.create_transaction_generator();
-                let worker_index = workers.len();
+                let worker_index = submission_workers.len();
 
                 let worker = SubmissionWorker::new(
                     accounts,
@@ -638,45 +676,26 @@ impl TxnEmitter {
                     check_account_sequence_only_once_for.contains(&worker_index),
                     self.from_rng(),
                 );
-                let join_handle = tokio_handle.spawn(worker.run().boxed());
-                workers.push(Worker { join_handle });
+                submission_workers.push(worker);
             }
         }
+
+        info!("Tx emitter workers created");
+        let phase_start = Instant::now();
+        let workers = submission_workers
+            .into_iter()
+            .map(|worker| Worker {
+                join_handle: tokio_handle.spawn(worker.run(phase_start).boxed()),
+            })
+            .collect();
         info!("Tx emitter workers started");
 
         Ok(EmitJob {
             workers,
             stop,
             stats,
-            phase_starts: vec![Instant::now()],
+            phase_starts: vec![phase_start],
         })
-    }
-
-    pub async fn stop_job(self, job: EmitJob) -> Vec<TxnStats> {
-        job.stop_and_accumulate().await
-    }
-
-    pub fn peek_job_stats(&self, job: &EmitJob) -> Vec<TxnStats> {
-        job.accumulate()
-    }
-
-    pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
-        let deadline = Instant::now() + duration;
-        let mut prev_stats: Option<Vec<TxnStats>> = None;
-        let default_stats = TxnStats::default();
-        let window = Duration::from_secs(max(interval_secs, 1));
-        while Instant::now() < deadline {
-            tokio::time::sleep(window).await;
-            let cur_phase = job.stats.get_cur_phase();
-            let stats = self.peek_job_stats(job);
-            let delta = &stats[cur_phase]
-                - prev_stats
-                    .as_ref()
-                    .map(|p| &p[cur_phase])
-                    .unwrap_or(&default_stats);
-            prev_stats = Some(stats);
-            info!("phase {}: {}", cur_phase, delta.rate());
-        }
     }
 
     async fn emit_txn_for_impl(
@@ -704,14 +723,13 @@ impl TxnEmitter {
                 job.start_next_phase();
             }
             if let Some(interval_secs) = print_stats_interval {
-                self.periodic_stat(&job, per_phase_duration, interval_secs)
-                    .await;
+                job.periodic_stat(per_phase_duration, interval_secs).await;
             } else {
                 time::sleep(per_phase_duration).await;
             }
         }
         info!("Ran for {} secs, stopping job...", duration.as_secs());
-        let stats = self.stop_job(job).await;
+        let stats = job.stop_job().await;
         info!("Stopped job");
         Ok(stats.into_iter().next().unwrap())
     }

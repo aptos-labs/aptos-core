@@ -412,7 +412,6 @@ impl TransactionGenerator {
         for _ in 0..num_blocks {
             // TODO: handle when block_size isn't divisible by transactions_per_sender
             let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
-                .into_iter()
                 .flat_map(|_| {
                     let (sender, receivers) = self
                         .main_signer_accounts
