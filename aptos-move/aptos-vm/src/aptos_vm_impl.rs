@@ -614,10 +614,10 @@ impl AptosVMImpl {
             .new_session(resolver, session_id, aggregator_enabled)
     }
 
-    pub fn load_module<'r>(
+    pub fn load_module(
         &self,
         module_id: &ModuleId,
-        resolver: &'r impl MoveResolverExt,
+        resolver: &impl MoveResolverExt,
     ) -> VMResult<Arc<CompiledModule>> {
         self.move_vm.load_module(module_id, resolver)
     }

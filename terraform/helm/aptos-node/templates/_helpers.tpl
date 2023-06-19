@@ -50,6 +50,8 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Multicluster labels. `multiclusterLabels` takes in a tuple of context and index as arguments.
 It should be invoked as `aptos-validator.multiclusterLabels (tuple $ $i)` where $i is the index
 of the statefulset.
+
+The logic below assigns a target cluster to each statefulset replica in a round-robin fashion.
 */}}
 {{- define "aptos-validator.multiclusterLabels" -}}
 {{- $ctx := index $ 0 -}}
