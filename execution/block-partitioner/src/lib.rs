@@ -4,7 +4,6 @@
 
 pub mod sharded_block_partitioner;
 pub mod test_utils;
-pub mod types;
 
 use aptos_types::transaction::Transaction;
 

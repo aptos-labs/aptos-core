@@ -82,7 +82,6 @@ impl InMemoryStateCalculator {
         let state_cache = sharded_state_cache
             .iter()
             .flatten()
-            .into_iter()
             .map(|entry| (entry.key().clone(), entry.value().1.clone()))
             .collect();
 

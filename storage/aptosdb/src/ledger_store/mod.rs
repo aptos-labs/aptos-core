@@ -29,11 +29,11 @@ use aptos_types::{
         definition::LeafCount, position::Position, AccumulatorConsistencyProof,
         TransactionAccumulatorProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof,
     },
-    transaction::{TransactionInfo, Version},
+    transaction::{TransactionInfo, TransactionToCommit, Version},
 };
 use arc_swap::ArcSwap;
 use itertools::Itertools;
-use std::{ops::Deref, sync::Arc};
+use std::{borrow::Borrow, ops::Deref, sync::Arc};
 
 #[derive(Debug)]
 pub struct LedgerStore {
@@ -288,7 +288,8 @@ impl LedgerStore {
         &self,
         first_version: u64,
         txn_infos: &[TransactionInfo],
-        // TODO(grao): Consider split this function to two functions.
+        // TODO(grao): Consider remove this function and migrate all callers to use the two functions
+        // below.
         transaction_info_batch: &SchemaBatch,
         transaction_accumulator_batch: &SchemaBatch,
     ) -> Result<HashValue> {
@@ -310,6 +311,38 @@ impl LedgerStore {
             transaction_accumulator_batch.put::<TransactionAccumulatorSchema>(pos, hash)
         })?;
         Ok(root_hash)
+    }
+
+    pub fn put_transaction_accumulator(
+        &self,
+        first_version: Version,
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
+        transaction_accumulator_batch: &SchemaBatch,
+    ) -> Result<HashValue> {
+        let txn_hashes: Vec<_> = txns_to_commit
+            .iter()
+            .map(|t| t.borrow().transaction_info().hash())
+            .collect();
+
+        let (root_hash, writes) = Accumulator::append(
+            self,
+            first_version, /* num_existing_leaves */
+            &txn_hashes,
+        )?;
+        writes.iter().try_for_each(|(pos, hash)| {
+            transaction_accumulator_batch.put::<TransactionAccumulatorSchema>(pos, hash)
+        })?;
+
+        Ok(root_hash)
+    }
+
+    pub fn put_transaction_info(
+        &self,
+        version: Version,
+        transaction_info: &TransactionInfo,
+        transaction_info_batch: &SchemaBatch,
+    ) -> Result<()> {
+        transaction_info_batch.put::<TransactionInfoSchema>(&version, transaction_info)
     }
 
     /// Write `ledger_info_with_sigs` to `batch`.

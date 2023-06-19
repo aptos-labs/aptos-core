@@ -8,12 +8,13 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::{BlockExecutorTrait, ExecutableTransactions};
+use aptos_executor_types::BlockExecutorTrait;
 use aptos_state_view::StateView;
 use aptos_storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter,
 };
 use aptos_types::{
+    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
     transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
@@ -52,7 +53,7 @@ pub struct FakeVM;
 
 impl TransactionBlockExecutor for FakeVM {
     fn execute_transaction_block(
-        transactions: ExecutableTransactions,
+        transactions: ExecutableTransactions<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
@@ -67,7 +68,7 @@ impl TransactionBlockExecutor for FakeVM {
 impl VMExecutor for FakeVM {
     fn execute_block_sharded<S: StateView + Send + Sync>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _transactions: Vec<Transaction>,
+        _block: Vec<SubBlocksForShard<Transaction>>,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

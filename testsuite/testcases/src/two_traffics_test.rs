@@ -77,7 +77,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
 }
 
 impl NetworkTest for TwoTrafficsTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

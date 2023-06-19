@@ -28,6 +28,7 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
+    block_executor::partitioner::BlockExecutorTransactions,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     on_chain_config::{
@@ -416,7 +417,7 @@ impl FakeExecutor {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block(
             self.executor_thread_pool.clone(),
-            txn_block,
+            BlockExecutorTransactions::Unsharded(txn_block),
             &self.data_store,
             usize::min(4, num_cpus::get()),
             None,

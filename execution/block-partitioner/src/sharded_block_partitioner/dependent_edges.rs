@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    sharded_block_partitioner::cross_shard_messages::{
-        CrossShardClientInterface, CrossShardDependentEdges,
-    },
-    types::{
+use crate::sharded_block_partitioner::cross_shard_messages::{
+    CrossShardClientInterface, CrossShardDependentEdges,
+};
+use aptos_types::{
+    block_executor::partitioner::{
         CrossShardDependencies, CrossShardEdges, ShardId, SubBlocksForShard, TxnIdxWithShardId,
         TxnIndex,
     },
+    transaction::Transaction,
 };
 use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
@@ -16,7 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 pub struct DependentEdgeCreator {
     shard_id: ShardId,
     cross_shard_client: Arc<dyn CrossShardClientInterface>,
-    froze_sub_blocks: SubBlocksForShard,
+    froze_sub_blocks: SubBlocksForShard<Transaction>,
     num_shards: usize,
 }
 
@@ -32,7 +33,7 @@ impl DependentEdgeCreator {
     pub fn new(
         shard_id: ShardId,
         cross_shard_client: Arc<dyn CrossShardClientInterface>,
-        froze_sub_blocks: SubBlocksForShard,
+        froze_sub_blocks: SubBlocksForShard<Transaction>,
         num_shards: usize,
     ) -> Self {
         Self {
@@ -155,7 +156,7 @@ impl DependentEdgeCreator {
         }
     }
 
-    pub fn into_frozen_sub_blocks(self) -> SubBlocksForShard {
+    pub fn into_frozen_sub_blocks(self) -> SubBlocksForShard<Transaction> {
         self.froze_sub_blocks
     }
 }
@@ -168,12 +169,15 @@ mod tests {
             dependent_edges::DependentEdgeCreator,
         },
         test_utils::create_non_conflicting_p2p_transaction,
-        types::{
+    };
+    use aptos_types::{
+        block_executor::partitioner::{
             CrossShardDependencies, CrossShardEdges, SubBlock, SubBlocksForShard,
             TransactionWithDependencies, TxnIdxWithShardId,
         },
+        transaction::analyzed_transaction::StorageLocation,
     };
-    use aptos_types::transaction::analyzed_transaction::StorageLocation;
+    use itertools::Itertools;
     use std::sync::Arc;
 
     #[test]
@@ -241,7 +245,18 @@ mod tests {
         });
 
         let mut sub_blocks = SubBlocksForShard::empty(shard_id);
-        let sub_block = SubBlock::new(start_index, transactions_with_deps.clone());
+        let sub_block = SubBlock::new(
+            start_index,
+            transactions_with_deps
+                .iter()
+                .map(|txn_with_deps| {
+                    TransactionWithDependencies::new(
+                        txn_with_deps.txn.transaction().clone(),
+                        txn_with_deps.cross_shard_dependencies.clone(),
+                    )
+                })
+                .collect_vec(),
+        );
         sub_blocks.add_sub_block(sub_block);
 
         let mut dependent_edge_creator =
