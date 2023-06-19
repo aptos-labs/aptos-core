@@ -9,7 +9,6 @@ use crate::{
         TransactionGenParams, ValueType, EventType
     },
 };
-use aptos_logger::Event;
 use aptos_types::executable::ExecutableTestType;
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
@@ -44,7 +43,7 @@ impl<K, V, E> Bencher<K, V, E>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + Arbitrary + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + 'static,
+    E: Send + Sync + Debug + 'static,
     Vec<u8>: From<V>,
 {
     pub fn new(transaction_size: usize, universe_size: usize) -> Self {
