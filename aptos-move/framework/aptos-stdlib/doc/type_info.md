@@ -193,6 +193,7 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 
 ## Function `type_of`
 
+Return the <code><a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a></code> struct containing  for the type <code>T</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;(): <a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>
@@ -215,6 +216,9 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 
 ## Function `type_name`
 
+Return the human readable string for the type, including the address, module name, and any type arguments.
+Example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
+Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
@@ -226,7 +230,7 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): String;
 </code></pre>
 
 
