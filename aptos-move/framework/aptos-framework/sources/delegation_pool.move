@@ -625,7 +625,7 @@ module aptos_framework::delegation_pool {
         move_to(owner, DelegationPoolOwnership { pool_address });
 
         // All delegation pool enable partial governace voting by default once the feature flag is enabled.
-        if (features::delegation_pool_partial_governance_voting_enabled()) {
+        if (features::partial_governance_voting_enabled() && features::delegation_pool_partial_governance_voting_enabled()) {
             enable_partial_governance_voting(pool_address);
         }
     }
