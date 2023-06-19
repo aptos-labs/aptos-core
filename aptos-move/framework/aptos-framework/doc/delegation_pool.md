@@ -1731,7 +1731,7 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     <b>move_to</b>(owner, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a> { pool_address });
 
     // All delegation pool enable partial governace <a href="voting.md#0x1_voting">voting</a> by default once the feature flag is enabled.
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>() && <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>()) {
         <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address);
     }
 }
