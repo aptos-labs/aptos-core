@@ -447,26 +447,9 @@ impl Scheduler {
         );
     }
 
-    /// After txn is executed, schedule its dependencies for re-execution.
-    /// If revalidate_suffix is true, decrease validation_idx to schedule all higher transactions
-    /// for (re-)validation. Otherwise, in some cases (if validation_idx not already lower),
-    /// return a validation task of the transaction to the caller (otherwise NoTask).
-    pub fn finish_execution(
-        &self,
-        txn_idx: TxnIndex,
-        incarnation: Incarnation,
-        revalidate_suffix: bool,
-    ) -> SchedulerTask {
-        // Note: It is preferable to hold the validation lock throughout the finish_execution,
-        // in particular before updating execution status. The point was that we don't want
-        // any validation to come before the validation status is correspondingly updated.
-        // It may be possible to make work more granular, but shouldn't make performance
-        // difference and like this correctness argument is much easier to see, in fact also
-        // the reason why we grab write lock directly, and never release it during the whole function.
-        // So even validation status readers have to wait if they somehow end up at the same index.
-        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
-        self.set_executed_status(txn_idx, incarnation);
-
+    /// After a txn is executed, we need to schedule all its dependency for re-execution.
+    pub fn mark_dependency_resolve(&self, txn_idx: TxnIndex) {
+        // Mark dependencies as resolved and find the minimum index among them.
         let txn_deps: Vec<TxnIndex> = {
             let mut stored_deps = self.txn_dependency[txn_idx as usize].lock();
             // Holding the lock, take dependency vector.
@@ -490,6 +473,29 @@ impl Scheduler {
             self.execution_idx
                 .fetch_min(execution_target_idx, Ordering::SeqCst);
         }
+    }
+
+    /// After txn is executed, schedule its dependencies for re-execution.
+    /// If revalidate_suffix is true, decrease validation_idx to schedule all higher transactions
+    /// for (re-)validation. Otherwise, in some cases (if validation_idx not already lower),
+    /// return a validation task of the transaction to the caller (otherwise NoTask).
+    pub fn finish_execution(
+        &self,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        revalidate_suffix: bool,
+    ) -> SchedulerTask {
+        // Note: It is preferable to hold the validation lock throughout the finish_execution,
+        // in particular before updating execution status. The point was that we don't want
+        // any validation to come before the validation status is correspondingly updated.
+        // It may be possible to make work more granular, but shouldn't make performance
+        // difference and like this correctness argument is much easier to see, in fact also
+        // the reason why we grab write lock directly, and never release it during the whole function.
+        // So even validation status readers have to wait if they somehow end up at the same index.
+        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
+        self.set_executed_status(txn_idx, incarnation);
+
+        self.mark_dependency_resolve(txn_idx);
 
         let (cur_val_idx, mut cur_wave) =
             Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));

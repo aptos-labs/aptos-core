@@ -11,6 +11,7 @@ use crate::{
     errors::*,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    txn_commit_listener::TransactionCommitListener,
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
@@ -69,11 +70,12 @@ enum CommitRole {
     Worker(Receiver<TxnIndex>),
 }
 
-pub struct BlockExecutor<T, E, S, X>
+pub struct BlockExecutor<T, E, S, L, X>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     X: Executable + 'static,
+    L: TransactionCommitListener<TransactionWrites = Vec<(T::Key, WriteOp)>>,
 {
     // number of active concurrent tasks, corresponding
     // to the maximum number of rayon
@@ -84,14 +86,16 @@ where
     scheduler: Scheduler,
     versioned_cache: MVHashMap<T::Key, T::Value, X>,
     last_input_output: TxnLastInputOutput<T::Key, E::Output, E::Error>,
-    phantom: PhantomData<(T, E, S, X)>,
+    txn_commit_listener: L,
+    phantom: PhantomData<S>,
 }
 
-impl<T, E, S, X> BlockExecutor<T, E, S, X>
+impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
+    L: TransactionCommitListener<TransactionWrites = Vec<(T::Key, WriteOp)>>,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
@@ -101,6 +105,7 @@ where
         num_txns: usize,
         executor_thread_pool: Arc<ThreadPool>,
         maybe_block_gas_limit: Option<u64>,
+        txn_commit_listener: L,
     ) -> Self {
         let versioned_cache = MVHashMap::new();
         let scheduler = Scheduler::new(num_txns as TxnIndex);
@@ -117,8 +122,21 @@ where
             scheduler,
             versioned_cache,
             last_input_output,
+            txn_commit_listener,
             phantom: PhantomData,
         }
+    }
+
+    pub fn mark_estimate(&self, key: &T::Key, txn_idx: TxnIndex) {
+        self.versioned_cache.mark_estimate(key, txn_idx);
+    }
+
+    pub fn add_txn_write(&self, key: T::Key, version: Version, value: T::Value) {
+        self.versioned_cache.write(key, version, value);
+    }
+
+    pub fn mark_dependency_resolve(&self, txn_idx: TxnIndex) {
+        self.scheduler.mark_dependency_resolve(txn_idx);
     }
 
     fn update_parallel_block_gas_counters(
@@ -484,6 +502,8 @@ where
                 WriteOp::Modification(serialize(&committed_delta)),
             ));
         }
+        self.txn_commit_listener
+            .on_transaction_committed(txn_idx, &delta_writes);
         self.last_input_output
             .record_delta_writes(txn_idx, delta_writes);
     }

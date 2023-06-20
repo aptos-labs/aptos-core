@@ -8,6 +8,7 @@ use crate::{
         EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
         TransactionGenParams, ValueType,
     },
+    txn_commit_listener::NoOpTransactionCommitListener,
 };
 use aptos_types::executable::ExecutableTestType;
 use criterion::{BatchSize, Bencher as CBencher};
@@ -125,12 +126,14 @@ where
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
+            NoOpTransactionCommitListener<Transaction<KeyType<K>, ValueType<V>>>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
             self.transactions.len(),
             executor_thread_pool,
             None,
+            NoOpTransactionCommitListener::default(),
         )
         .execute_transactions_parallel((), &self.transactions, &data_view);
 

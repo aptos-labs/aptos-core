@@ -8,20 +8,20 @@ use crate::{
 use aptos_logger::{error, info};
 use aptos_secure_net::NetworkServer;
 use aptos_vm::sharded_block_executor::block_executor_client::{
-    BlockExecutorClient, LocalExecutorClient,
+    BlockExecutorClient, VMExecutorClient,
 };
 use std::net::SocketAddr;
 
 /// A service that provides support for remote execution. Essentially, it reads a request from
 /// the remote executor client and executes the block locally and returns the result.
 pub struct ExecutorService {
-    client: LocalExecutorClient,
+    client: VMExecutorClient,
 }
 
 impl ExecutorService {
     pub fn new(num_executor_threads: usize) -> Self {
         Self {
-            client: LocalExecutorClient::new(num_executor_threads),
+            client: VMExecutorClient::new(num_executor_threads),
         }
     }
 

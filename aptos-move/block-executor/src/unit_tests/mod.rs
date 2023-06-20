@@ -6,6 +6,7 @@ use crate::{
     executor::BlockExecutor,
     proptest_types::types::{DeltaDataView, ExpectedOutput, KeyType, Task, Transaction, ValueType},
     scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
+    txn_commit_listener::NoOpTransactionCommitListener,
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
@@ -44,12 +45,14 @@ where
         Transaction<K, V>,
         Task<K, V>,
         DeltaDataView<K, V>,
+        NoOpTransactionCommitListener<Transaction<K, V>>,
         ExecutableTestType,
     >::new(
         num_cpus::get(),
         transactions.len(),
         executor_thread_pool,
         None,
+        NoOpTransactionCommitListener::default(),
     )
     .execute_transactions_parallel((), &transactions, &data_view);
 

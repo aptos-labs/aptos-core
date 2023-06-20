@@ -19,6 +19,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
+use aptos_block_executor::txn_commit_listener::NoOpTransactionCommitListener;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::{
@@ -1525,6 +1526,7 @@ impl VMExecutor for AptosVM {
             transactions.len(),
             Arc::clone(&RAYON_EXEC_POOL),
             maybe_block_gas_limit,
+            NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
         );
         let ret = executor.execute_block(
             BlockExecutorTransactions::Unsharded(transactions),

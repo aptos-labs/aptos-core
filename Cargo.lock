@@ -2005,6 +2005,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
@@ -3481,6 +3482,7 @@ dependencies = [
  "bcs 0.1.4",
  "dashmap",
  "fail 0.5.0",
+ "futures",
  "move-binary-format",
  "move-bytecode-utils",
  "move-bytecode-verifier",

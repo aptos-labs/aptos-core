@@ -14,6 +14,7 @@ use crate::{
 };
 use anyhow::Error;
 use aptos_bitvec::BitVec;
+use aptos_block_executor::txn_commit_listener::NoOpTransactionCommitListener;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas::{
@@ -415,7 +416,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let executor = BlockAptosExecutor::new(
+        let executor = BlockAptosExecutor::new_with_no_op_listener(
             usize::min(4, num_cpus::get()),
             txn_block.len(),
             self.executor_thread_pool.clone(),
