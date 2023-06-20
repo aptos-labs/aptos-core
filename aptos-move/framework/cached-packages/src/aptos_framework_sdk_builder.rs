@@ -375,7 +375,27 @@ pub enum EntryFunctionCall {
     /// This offers a migration path for an existing account with a multi-ed25519 auth key (native multisig account).
     /// In order to ensure a malicious module cannot obtain backdoor control over an existing account, a signed message
     /// with a valid signature from the account's auth key is required.
+    ///
+    /// Note that this does not revoke auth key-based control over the account. Owners should separately rotate the auth
+    /// key after they are fully migrated to the new multisig account. Alternatively, they can call
+    /// create_with_existing_account_and_revoke_auth_key instead.
     MultisigAccountCreateWithExistingAccount {
+        multisig_address: AccountAddress,
+        owners: Vec<AccountAddress>,
+        num_signatures_required: u64,
+        account_scheme: u8,
+        account_public_key: Vec<u8>,
+        create_multisig_account_signed_message: Vec<u8>,
+        metadata_keys: Vec<Vec<u8>>,
+        metadata_values: Vec<Vec<u8>>,
+    },
+
+    /// Creates a new multisig account on top of an existing account and immediately rotate the origin auth key to 0x0.
+    ///
+    /// Note: If the original account is a resource account, this does not revoke all control over it as if any
+    /// SignerCapability of the resource account still exists, it can still be used to generate the signer for the
+    /// account.
+    MultisigAccountCreateWithExistingAccountAndRevokeAuthKey {
         multisig_address: AccountAddress,
         owners: Vec<AccountAddress>,
         num_signatures_required: u64,
@@ -1009,6 +1029,25 @@ impl EntryFunctionCall {
                 metadata_keys,
                 metadata_values,
             } => multisig_account_create_with_existing_account(
+                multisig_address,
+                owners,
+                num_signatures_required,
+                account_scheme,
+                account_public_key,
+                create_multisig_account_signed_message,
+                metadata_keys,
+                metadata_values,
+            ),
+            MultisigAccountCreateWithExistingAccountAndRevokeAuthKey {
+                multisig_address,
+                owners,
+                num_signatures_required,
+                account_scheme,
+                account_public_key,
+                create_multisig_account_signed_message,
+                metadata_keys,
+                metadata_values,
+            } => multisig_account_create_with_existing_account_and_revoke_auth_key(
                 multisig_address,
                 owners,
                 num_signatures_required,
@@ -2235,6 +2274,10 @@ pub fn multisig_account_create_transaction_with_hash(
 /// This offers a migration path for an existing account with a multi-ed25519 auth key (native multisig account).
 /// In order to ensure a malicious module cannot obtain backdoor control over an existing account, a signed message
 /// with a valid signature from the account's auth key is required.
+///
+/// Note that this does not revoke auth key-based control over the account. Owners should separately rotate the auth
+/// key after they are fully migrated to the new multisig account. Alternatively, they can call
+/// create_with_existing_account_and_revoke_auth_key instead.
 pub fn multisig_account_create_with_existing_account(
     multisig_address: AccountAddress,
     owners: Vec<AccountAddress>,
@@ -2254,6 +2297,44 @@ pub fn multisig_account_create_with_existing_account(
             ident_str!("multisig_account").to_owned(),
         ),
         ident_str!("create_with_existing_account").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_address).unwrap(),
+            bcs::to_bytes(&owners).unwrap(),
+            bcs::to_bytes(&num_signatures_required).unwrap(),
+            bcs::to_bytes(&account_scheme).unwrap(),
+            bcs::to_bytes(&account_public_key).unwrap(),
+            bcs::to_bytes(&create_multisig_account_signed_message).unwrap(),
+            bcs::to_bytes(&metadata_keys).unwrap(),
+            bcs::to_bytes(&metadata_values).unwrap(),
+        ],
+    ))
+}
+
+/// Creates a new multisig account on top of an existing account and immediately rotate the origin auth key to 0x0.
+///
+/// Note: If the original account is a resource account, this does not revoke all control over it as if any
+/// SignerCapability of the resource account still exists, it can still be used to generate the signer for the
+/// account.
+pub fn multisig_account_create_with_existing_account_and_revoke_auth_key(
+    multisig_address: AccountAddress,
+    owners: Vec<AccountAddress>,
+    num_signatures_required: u64,
+    account_scheme: u8,
+    account_public_key: Vec<u8>,
+    create_multisig_account_signed_message: Vec<u8>,
+    metadata_keys: Vec<Vec<u8>>,
+    metadata_values: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("create_with_existing_account_and_revoke_auth_key").to_owned(),
         vec![],
         vec![
             bcs::to_bytes(&multisig_address).unwrap(),
@@ -4154,6 +4235,28 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_create_with_existing_account_and_revoke_auth_key(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountCreateWithExistingAccountAndRevokeAuthKey {
+                    multisig_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    owners: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    num_signatures_required: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    account_scheme: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    account_public_key: bcs::from_bytes(script.args().get(4)?).ok()?,
+                    create_multisig_account_signed_message: bcs::from_bytes(script.args().get(5)?)
+                        .ok()?,
+                    metadata_keys: bcs::from_bytes(script.args().get(6)?).ok()?,
+                    metadata_values: bcs::from_bytes(script.args().get(7)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_create_with_owners(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5124,6 +5227,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_create_with_existing_account".to_string(),
             Box::new(decoder::multisig_account_create_with_existing_account),
+        );
+        map.insert(
+            "multisig_account_create_with_existing_account_and_revoke_auth_key".to_string(),
+            Box::new(decoder::multisig_account_create_with_existing_account_and_revoke_auth_key),
         );
         map.insert(
             "multisig_account_create_with_owners".to_string(),
