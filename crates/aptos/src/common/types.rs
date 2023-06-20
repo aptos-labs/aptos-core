@@ -431,9 +431,9 @@ impl ProfileOptions {
         ))
     }
 
-    pub fn derivative_path(&self) -> CliTypedResult<Option<String>> {
+    pub fn derivation_path(&self) -> CliTypedResult<Option<String>> {
         let profile = self.profile()?;
-        Ok(profile.derivative_path)
+        Ok(profile.derivation_path)
     }
 
     pub fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
@@ -1639,7 +1639,6 @@ impl TransactionOptions {
 
         match self.get_transaction_account_type() {
             Ok(AccountType::Local) => {
-                println!("Local account");
                 let (private_key, _) = self.get_key_and_address()?;
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
@@ -1657,8 +1656,8 @@ impl TransactionOptions {
                     sender_address,
                     sender_public_key,
                     self.profile_options
-                        .derivative_path()
-                        .expect("derivative path is required")
+                        .derivation_path()
+                        .expect("derivative path is missing from profile")
                         .unwrap(),
                     HardwareWalletType::Ledger,
                     sequence_number,
