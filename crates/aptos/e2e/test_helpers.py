@@ -1,6 +1,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import logging
 import os
 import pathlib
@@ -175,6 +176,19 @@ class RunHelper:
         else:
             if not os.path.isfile(self.cli_path):
                 raise RuntimeError(f"CLI not found at path: {self.cli_path}")
+
+            # If we're testing a CLI in the host system, i.e. from the --test-cli-path flag,
+            # make sure we're using "workspace" configuration and not "global" configuration.
+            response = self.run_command(
+                "check_workspace_config",
+                ["aptos", "config", "show-global-config"],
+            )
+            response = json.loads(response.stdout)
+            if response["Result"]["config_type"].lower() != "workspace":
+                raise RuntimeError(
+                    "When using --test-cli-path you must use workspace configuration, "
+                    "try running `aptos config set-global-config --config-type workspace`"
+                )
 
     # Get the account info of the account created by test_init.
     def get_account_info(self):
