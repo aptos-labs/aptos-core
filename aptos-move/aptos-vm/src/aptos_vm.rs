@@ -1695,15 +1695,31 @@ impl VMAdapter for AptosVM {
                 let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
 
                 if let StatusType::InvariantViolation = vm_status.status_type() {
-                    // Only log down the non-storage error case as storage error can be resulted from speculative execution.
-                    if vm_status.status_code() != StatusCode::STORAGE_ERROR {
-                        error!(
-                            *log_context,
-                            "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
-                            bcs::to_bytes::<SignedTransaction>(&**txn),
-                            vm_status,
-                        );
-                        TRANSACTIONS_INVARIANT_VIOLATION.inc();
+                    match vm_status.status_code() {
+                        // The known Move function could be a result of speculative execution and should thus use speculative logger.
+                        StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION => {
+                            speculative_error!(
+                                log_context,
+                                format!(
+                                    "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
+                                    bcs::to_bytes::<SignedTransaction>(&**txn),
+                                    vm_status
+                                ),
+                            );
+                        }
+                        // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
+                        //
+                        // TODO: Add different counters for the error categories here.
+                        _ => {
+                            error!(
+                                log_context,
+                                format!(
+                                    "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
+                                    bcs::to_bytes::<SignedTransaction>(&**txn),
+                                    vm_status
+                                ),
+                            );
+                        }
                     }
                 }
 
