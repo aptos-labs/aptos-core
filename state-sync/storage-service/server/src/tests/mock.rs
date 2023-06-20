@@ -92,6 +92,7 @@ impl MockClient {
             let network_events = NetworkEvents::new(
                 peer_manager_notification_receiver,
                 connection_notification_receiver,
+                None,
             );
             network_and_events.insert(network_id, network_events);
             peer_manager_notifiers.insert(network_id, peer_manager_notifier);

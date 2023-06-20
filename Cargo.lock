@@ -636,6 +636,7 @@ dependencies = [
  "cfg_block",
  "get_if_addrs",
  "mirai-annotations",
+ "num_cpus",
  "poem-openapi",
  "rand 0.7.3",
  "serde 1.0.149",
