@@ -9,6 +9,7 @@ use crate::{
         TransactionGenParams, ValueType, EventType
     },
 };
+use aptos_logger::Event;
 use aptos_types::executable::ExecutableTestType;
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;

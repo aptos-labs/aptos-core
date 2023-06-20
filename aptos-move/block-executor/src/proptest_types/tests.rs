@@ -10,6 +10,8 @@ use crate::{
         TransactionGenParams, ValueType, EventType
     },
 };
+use anyhow::Context;
+use aptos_logger::Event;
 use aptos_types::{executable::ExecutableTestType, contract_event::ContractEvent};
 use claims::assert_ok;
 use num_cpus;
