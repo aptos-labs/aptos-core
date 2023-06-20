@@ -777,6 +777,50 @@ impl PrivateKeyInputOptions {
         }
     }
 
+    /// Extract public key from CLI args with fallback to config
+    /// This will first try to extract public key from private_key from CLI args
+    /// With fallback to profile
+    /// NOTE: Use this function instead of 'extract_private_key_and_address' if this is HardwareWallet profile
+    /// HardwareWallet profile does not have private key in config
+    pub fn extract_public_key_and_address(
+        &self,
+        encoding: EncodingType,
+        profile: &ProfileOptions,
+        maybe_address: Option<AccountAddress>,
+    ) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
+        // Order of operations
+        // 1. CLI inputs
+        // 2. Profile
+        // 3. Derived
+        if let Some(private_key) = self.extract_private_key_cli(encoding)? {
+            // If we use the CLI inputs, then we should derive or use the address from the input
+            if let Some(address) = maybe_address {
+                Ok((private_key.public_key(), address))
+            } else {
+                let address = account_address_from_public_key(&private_key.public_key());
+                Ok((private_key.public_key(), address))
+            }
+        } else if let Some((Some(public_key), maybe_config_address)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| (p.public_key, p.account))
+        {
+            match (maybe_address, maybe_config_address) {
+                (Some(address), _) => Ok((public_key, address)),
+                (_, Some(address)) => Ok((public_key, address)),
+                (None, None) => {
+                    let address = account_address_from_public_key(&public_key);
+                    Ok((public_key, address))
+                },
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'], or ['public_key'] must present in profile".to_string(),
+            ))
+        }
+    }
+
     /// Extract private key from CLI args with fallback to config
     pub fn extract_private_key_and_address(
         &self,
@@ -852,14 +896,47 @@ impl PrivateKeyInputOptions {
     }
 }
 
+// Extract the public key by derivating private key, fall back to public key from profile
+// Order of operations
+// 1. Get the private key (either from CLI input or profile), and derive the public key problem private key
+// 2. Else get the public key directly from the config profile
+// 3. Else error
 impl ExtractPublicKey for PrivateKeyInputOptions {
     fn extract_public_key(
         &self,
         encoding: EncodingType,
         profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey> {
-        self.extract_private_key(encoding, profile)
-            .map(|private_key| private_key.public_key())
+        // 1. Get the private key, and derive the public key
+        let private_key = if let Some(key) = self.extract_private_key_cli(encoding)? {
+            Some(key)
+        } else if let Some(Some(private_key)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.private_key)
+        {
+            Some(private_key)
+        } else {
+            None
+        };
+
+        // 2. Get the public key from the config profile
+        // 3. Else error
+        if private_key.is_some() {
+            Ok(private_key.unwrap().public_key())
+        } else if let Some(Some(public_key)) = CliConfig::load_profile(
+            profile.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.public_key)
+        {
+            Ok(public_key)
+        } else {
+            Err(CliError::CommandArgumentError(
+                "Unable to extract public key from Private Key input nor Profile".to_string(),
+            ))
+        }
     }
 }
 
@@ -1374,7 +1451,7 @@ impl TransactionOptions {
         self.rest_options.client(&self.profile_options)
     }
 
-    /// Retrieves the public key and the associated address
+    /// Retrieves the private key and the associated address
     /// TODO: Cache this information
     pub fn get_key_and_address(&self) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
         self.private_key_options.extract_private_key_and_address(
@@ -1384,8 +1461,18 @@ impl TransactionOptions {
         )
     }
 
+    pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
+        let (private_key, address) = self.get_key_and_address()?;
+        Ok((private_key.public_key(), address))
+    }
+
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
         Ok(self.get_key_and_address()?.1)
+    }
+
+    pub fn get_public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
+        self.private_key_options
+            .extract_public_key(self.encoding_options.encoding, &self.profile_options)
     }
 
     /// Gets the auth key by account address. We need to fetch the auth key from Rest API rather than creating an
@@ -1415,6 +1502,10 @@ impl TransactionOptions {
     ) -> CliTypedResult<Transaction> {
         let client = self.rest_client()?;
         let (sender_key, sender_address) = self.get_key_and_address()?;
+        let sender_public_key = self
+            .private_key_options
+            .extract_public_key(self.encoding_options.encoding, &self.profile_options)?;
+        let sender_address = account_address_from_public_key(&sender_public_key);
 
         // Ask to confirm price if the gas unit price is estimated above the lowest value when
         // it is automatically estimated
