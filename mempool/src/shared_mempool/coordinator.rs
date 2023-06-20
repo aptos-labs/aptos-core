@@ -12,7 +12,7 @@ use crate::{
     shared_mempool::{
         tasks,
         tasks::process_committed_transactions,
-        types::{notify_subscribers, SharedMempool, SharedMempoolNotification},
+        types::{notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification},
     },
     MempoolEventsReceiver, QuorumStoreRequest,
 };
@@ -113,22 +113,7 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
                 handle_network_event(&bounded_executor, &mut smp, network_id, event).await;
             },
             _ = update_peers_interval.tick().fuse() => {
-                if let Ok(connected_peers) = peers_and_metadata.get_connected_peers_and_metadata() {
-                    let (newly_added_upstream, disabled) = smp.network_interface.update_peers(&connected_peers);
-                    if !newly_added_upstream.is_empty() || !disabled.is_empty() {
-                        counters::shared_mempool_event_inc("peer_update");
-                        notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
-                    }
-                    for peer in &newly_added_upstream {
-                        debug!(LogSchema::new(LogEntry::NewPeer)
-                            .peer(peer));
-                        tasks::execute_broadcast(*peer, false, &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
-                    }
-                    for peer in &disabled {
-                        debug!(LogSchema::new(LogEntry::LostPeer)
-                            .peer(peer));
-                    }
-                }
+                handle_update_peers(peers_and_metadata.clone(), &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
             },
             complete => break,
         }
@@ -351,6 +336,32 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                     .peer(&PeerNetworkId::new(network_id, peer_id)))
             );
         },
+    }
+}
+
+async fn handle_update_peers<NetworkClient, TransactionValidator>(
+    peers_and_metadata: Arc<PeersAndMetadata>,
+    smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
+    scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
+    executor: Handle,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    TransactionValidator: TransactionValidation + 'static,
+{
+    if let Ok(connected_peers) = peers_and_metadata.get_connected_peers_and_metadata() {
+        let (newly_added_upstream, disabled) = smp.network_interface.update_peers(&connected_peers);
+        if !newly_added_upstream.is_empty() || !disabled.is_empty() {
+            counters::shared_mempool_event_inc("peer_update");
+            notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
+        }
+        for peer in &newly_added_upstream {
+            debug!(LogSchema::new(LogEntry::NewPeer).peer(peer));
+            tasks::execute_broadcast(*peer, false, smp, scheduled_broadcasts, executor.clone())
+                .await;
+        }
+        for peer in &disabled {
+            debug!(LogSchema::new(LogEntry::LostPeer).peer(peer));
+        }
     }
 }
 
