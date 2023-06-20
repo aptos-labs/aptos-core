@@ -38,8 +38,13 @@ def run_node(network: Network, image_repo_with_project: str):
         stderr=subprocess.DEVNULL,
     )
 
+    # If debug logging is enabled show the output of the command to run the container.
+    kwargs = {"check": True}
+    if LOG.getEffectiveLevel() > 10:
+        kwargs = {**kwargs, **{"stdout": subprocess.PIPE, "stderr": subprocess.PIPE}}
+
     # Run the container.
-    subprocess.check_output(
+    subprocess.run(
         [
             "docker",
             "run",
@@ -60,7 +65,9 @@ def run_node(network: Network, image_repo_with_project: str):
             "run-local-testnet",
             "--with-faucet",
         ],
+        **kwargs,
     )
+
     LOG.info(f"Running aptos CLI local testnet from image: {image_name}")
     return container_name
 
