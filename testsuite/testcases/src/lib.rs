@@ -216,6 +216,21 @@ impl dyn NetworkLoadTest {
         cooldown_duration_fraction: f32,
         rng: StdRng,
     ) -> Result<(TxnStats, Duration, u64, Vec<(TxnStats, Duration)>)> {
+        // Create a set of PFNs
+        let swarm = ctx.swarm();
+        let mut pfn_peer_ids = Vec::new();
+        for _ in 0..5 {
+            // Create the PFN
+            let pfn_version = swarm.versions().max().unwrap();
+            let pfn_node_config = swarm.get_default_pfn_node_config();
+            let pfn_peer_id = Runtime::new()
+                .unwrap()
+                .block_on(swarm.add_full_node(&pfn_version, pfn_node_config))?;
+
+            let _pfn = swarm.full_node(pfn_peer_id).context("PFN not found")?;
+            pfn_peer_ids.push(pfn_peer_id);
+        }
+
         let destination = self.setup(ctx).context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm());
 
