@@ -168,6 +168,12 @@ variable "enable_prometheus_node_exporter" {
   default     = false
 }
 
+variable "testnet_addons_helm_values" {
+  description = "Map of values to pass to testnet-addons helm chart"
+  type        = any
+  default     = {}
+}
+
 ### Autoscaling
 
 variable "gke_enable_node_autoprovisioning" {
@@ -211,5 +217,11 @@ variable "gke_maintenance_policy" {
       recurrence = string
     })
   })
-  default = null
+  default = {
+    recurring_window = {
+      start_time = "2023-06-15T00:00:00Z"
+      end_time   = "2023-06-15T23:59:00Z"
+      recurrence = "FREQ=DAILY"
+    }
+  }
 }

@@ -28,7 +28,7 @@ impl Test for StateSyncFullnodePerformance {
 }
 
 impl NetworkTest for StateSyncFullnodePerformance {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
 
         // Emit a lot of traffic and ensure the fullnodes can all sync
@@ -54,7 +54,7 @@ impl Test for StateSyncFullnodeFastSyncPerformance {
 }
 
 impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let all_fullnodes = get_fullnodes_and_check_setup(ctx, self.name())?;
 
         // Emit a lot of traffic and ensure the fullnodes can all sync
@@ -130,7 +130,7 @@ impl Test for StateSyncValidatorPerformance {
 }
 
 impl NetworkTest for StateSyncValidatorPerformance {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         // Verify we have at least 7 validators (i.e., 3f+1, where f is 2)
         // so we can kill 2 validators but still make progress.
         let all_validators = ctx
@@ -361,7 +361,7 @@ fn ensure_state_sync_transaction_throughput(
     // TODO: we fetch the TPS requirement from the given success criteria.
     // But, we should probably make it more generic to avoid this.
     // Ensure we meet the success criteria.
-    let min_expected_tps = ctx.success_criteria.avg_tps as u64;
+    let min_expected_tps = ctx.success_criteria.min_avg_tps as u64;
     if state_sync_throughput < min_expected_tps {
         let error_message = format!(
             "State sync TPS requirement failed. Average TPS: {}, minimum required TPS: {}",

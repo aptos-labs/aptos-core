@@ -102,7 +102,7 @@ impl NetworkLoadTest for ExecutionDelayTest {
 }
 
 impl NetworkTest for ExecutionDelayTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
@@ -187,7 +187,7 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
 }
 
 impl NetworkTest for NetworkUnreliabilityTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
@@ -217,6 +217,16 @@ pub struct CpuChaosTest {
     pub override_config: Option<CpuChaosConfig>,
 }
 
+impl CpuChaosTest {
+    fn create_cpu_chaos(&self, swarm: &mut dyn Swarm) -> SwarmCpuStress {
+        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+
+        let config = self.override_config.as_ref().cloned().unwrap_or_default();
+
+        create_cpu_stress_template(all_validators, &config)
+    }
+}
+
 impl Test for CpuChaosTest {
     fn name(&self) -> &'static str {
         "CpuChaosWrapper"
@@ -244,15 +254,8 @@ fn create_cpu_stress_template(
 
 impl NetworkLoadTest for CpuChaosTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
+        let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm());
 
-        let config = self.override_config.as_ref().cloned().unwrap_or_default();
-
-        let swarm_cpu_stress = create_cpu_stress_template(all_validators, &config);
         ctx.swarm()
             .inject_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))?;
 
@@ -260,17 +263,14 @@ impl NetworkLoadTest for CpuChaosTest {
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+        let swarm_cpu_stress = self.create_cpu_chaos(swarm);
 
-        let config = self.override_config.as_ref().cloned().unwrap_or_default();
-
-        let swarm_cpu_stress = create_cpu_stress_template(all_validators, &config);
         swarm.remove_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))
     }
 }
 
 impl NetworkTest for CpuChaosTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

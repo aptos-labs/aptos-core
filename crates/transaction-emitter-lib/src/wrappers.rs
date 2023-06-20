@@ -22,8 +22,7 @@ pub async fn emit_transactions(
         let cluster = Cluster::try_from_cluster_args(cluster_args)
             .await
             .context("Failed to build cluster")?;
-        return emit_transactions_with_cluster(&cluster, emit_args, cluster_args.reuse_accounts)
-            .await;
+        emit_transactions_with_cluster(&cluster, emit_args, cluster_args.reuse_accounts).await
     } else {
         let initial_delay_after_minting = emit_args.coordination_delay_between_instances.unwrap();
         let start_time = Instant::now();

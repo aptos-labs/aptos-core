@@ -24,6 +24,14 @@ spec aptos_std::simple_map {
         pragma intrinsic;
     }
 
+    spec new {
+        pragma intrinsic;
+    }
+
+    spec new_from {
+        pragma intrinsic;
+    }
+
     spec create {
         pragma intrinsic;
     }
@@ -45,6 +53,10 @@ spec aptos_std::simple_map {
     }
 
     spec add {
+        pragma intrinsic;
+    }
+
+    spec add_all {
         pragma intrinsic;
     }
 

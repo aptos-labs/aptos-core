@@ -7,7 +7,7 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutableTransactions, ExecutedBlock, ExecutedChunk};
+use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
 use aptos_infallible::Mutex;
 use aptos_logger::{sample, sample::SampleRate, trace, warn};
 use aptos_storage_interface::{
@@ -16,9 +16,13 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
+    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
-use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, AptosVM, VMExecutor};
+use aptos_vm::{
+    sharded_block_executor::{block_executor_client::LocalExecutorClient, ShardedBlockExecutor},
+    AptosVM, VMExecutor,
+};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use once_cell::sync::Lazy;
@@ -26,10 +30,9 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 
 pub static SHARDED_BLOCK_EXECUTOR: Lazy<Arc<Mutex<ShardedBlockExecutor<CachedStateView>>>> =
     Lazy::new(|| {
-        Arc::new(Mutex::new(ShardedBlockExecutor::new(
-            AptosVM::get_num_shards(),
-            None, // Defaults to num_cpus / num_shards
-        )))
+        let executor_clients =
+            LocalExecutorClient::create_local_clients(AptosVM::get_num_shards(), None);
+        Arc::new(Mutex::new(ShardedBlockExecutor::new(executor_clients)))
     });
 
 pub struct ChunkOutput {
@@ -45,7 +48,7 @@ pub struct ChunkOutput {
 
 impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
-        transactions: ExecutableTransactions,
+        transactions: ExecutableTransactions<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
@@ -86,13 +89,13 @@ impl ChunkOutput {
     }
 
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        block: Vec<SubBlocksForShard<Transaction>>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs = Self::execute_block_sharded::<V>(
-            transactions.clone(),
+            block.clone(),
             state_view_arc.clone(),
             maybe_block_gas_limit,
         )?;
@@ -104,7 +107,7 @@ impl ChunkOutput {
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
 
         Ok(Self {
-            transactions,
+            transactions: SubBlocksForShard::flatten(block),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })
@@ -173,13 +176,13 @@ impl ChunkOutput {
     }
 
     fn execute_block_sharded<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        block: Vec<SubBlocksForShard<Transaction>>,
         state_view: Arc<CachedStateView>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block_sharded(
             SHARDED_BLOCK_EXECUTOR.lock().deref(),
-            transactions,
+            block,
             state_view,
             maybe_block_gas_limit,
         )?)

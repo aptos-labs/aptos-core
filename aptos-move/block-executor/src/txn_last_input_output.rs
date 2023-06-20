@@ -6,9 +6,11 @@ use crate::{
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
 use anyhow::anyhow;
-use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
-use aptos_types::{access_path::AccessPath, executable::ModulePath, write_set::WriteOp};
+use aptos_types::{
+    access_path::AccessPath, executable::ModulePath, fee_statement::FeeStatement,
+    write_set::WriteOp,
+};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -130,8 +132,6 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
     module_reads: DashSet<AccessPath>,
 
     module_read_write_intersection: AtomicBool,
-
-    commit_locks: Vec<Mutex<()>>, // Shared locks to prevent race during commit
 }
 
 impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
@@ -146,7 +146,6 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             module_writes: DashSet::new(),
             module_reads: DashSet::new(),
             module_read_write_intersection: AtomicBool::new(false),
-            commit_locks: (0..num_txns).map(|_| Mutex::new(())).collect(),
         }
     }
 
@@ -222,19 +221,19 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.inputs[txn_idx as usize].load_full()
     }
 
-    pub fn gas_used(&self, txn_idx: TxnIndex) -> Option<u64> {
+    /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
+    pub fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
         {
-            ExecutionStatus::Success(output) => Some(output.gas_used()),
+            ExecutionStatus::Success(output) => Some(output.fee_statement()),
             _ => None,
         }
     }
 
     pub fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
-        let _lock = self.commit_locks[txn_idx as usize].lock();
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
@@ -268,7 +267,6 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         usize,
         Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
     ) {
-        let _lock = self.commit_locks[txn_idx as usize].lock();
         let ret: (
             usize,
             Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
@@ -298,7 +296,6 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         txn_idx: TxnIndex,
         delta_writes: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
     ) {
-        let _lock = self.commit_locks[txn_idx as usize].lock();
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
