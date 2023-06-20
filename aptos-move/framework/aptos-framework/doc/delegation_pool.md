@@ -1585,8 +1585,7 @@ latest state.
     <b>let</b> pool = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
     <b>let</b> latest_delegated_votes = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegated_votes">update_and_borrow_mut_delegated_votes</a>(pool, governance_records, voter);
-    <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
-    <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, latest_delegated_votes)
+    <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(pool, latest_delegated_votes)
 }
 </code></pre>
 
