@@ -19,6 +19,7 @@ module aptos_framework::aptos_governance {
 
     use aptos_std::math64::min;
     use aptos_std::simple_map::{Self, SimpleMap};
+    use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account::{Self, SignerCapability, create_signer_with_capability};
@@ -94,7 +95,7 @@ module aptos_framework::aptos_governance {
 
     /// Records to track the voting power usage of each stake pool on each proposal.
     struct VotingRecordsV2 has key {
-        votes: Table<RecordKey, u64>
+        votes: SmartTable<RecordKey, u64>
     }
 
     /// Used to track which execution script hashes have been approved by governance.
@@ -217,7 +218,7 @@ module aptos_framework::aptos_governance {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         move_to(aptos_framework, VotingRecordsV2 {
-            votes: table::new(),
+            votes: smart_table::new(),
         });
     }
 
@@ -275,7 +276,7 @@ module aptos_framework::aptos_governance {
         let used_voting_power = 0u64;
         if (features::partial_governance_voting_enabled()) {
             let voting_records_v2 = borrow_global<VotingRecordsV2>(@aptos_framework);
-            used_voting_power = *table::borrow_with_default(&voting_records_v2.votes, record_key, &0);
+            used_voting_power = *smart_table::borrow_with_default(&voting_records_v2.votes, record_key, &0);
         };
         get_voting_power(stake_pool) - used_voting_power
     }
@@ -443,7 +444,7 @@ module aptos_framework::aptos_governance {
         };
         if (features::partial_governance_voting_enabled()) {
             let voting_records_v2 = borrow_global_mut<VotingRecordsV2>(@aptos_framework);
-            let used_voting_power = table::borrow_mut_with_default(&mut voting_records_v2.votes, record_key, 0);
+            let used_voting_power = smart_table::borrow_mut_with_default(&mut voting_records_v2.votes, record_key, 0);
             // This calculation should never overflow because the used voting cannot exceed the total voting power of this stake pool.
             *used_voting_power = *used_voting_power + voting_power;
         } else {
