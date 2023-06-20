@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
@@ -10,8 +11,10 @@ use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
+use aptos_types::block_executor::partitioner::{ExecutableBlock, ExecutableTransactions};
 
 pub struct TransactionExecutor<V> {
+    block_partitioner: Option<ShardedBlockPartitioner>,
     executor: Arc<BlockExecutor<V>>,
     parent_block_id: HashValue,
     start_time: Option<Instant>,
@@ -28,6 +31,7 @@ where
     V: TransactionBlockExecutor,
 {
     pub fn new(
+        maybe_block_partitioner: Option<ShardedBlockPartitioner>,
         executor: Arc<BlockExecutor<V>>,
         parent_block_id: HashValue,
         version: Version,
@@ -38,6 +42,7 @@ where
         allow_aborts: bool,
     ) -> Self {
         Self {
+            block_partitioner: maybe_block_partitioner,
             executor,
             parent_block_id,
             version,
@@ -59,9 +64,19 @@ where
         let execution_start = Instant::now();
 
         let block_id = HashValue::random();
+        let executable_block = match &self.block_partitioner {
+            Some(partitioner) => {
+                let analyzed_transactions = transactions.into_iter().map(|t|t.into()).collect();
+                let sub_blocks = partitioner.partition(analyzed_transactions, 2);
+                ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
+            },
+            None => {
+                (block_id, transactions).into()
+            },
+        };
         let output = self
             .executor
-            .execute_block((block_id, transactions).into(), self.parent_block_id, None)
+            .execute_block(executable_block, self.parent_block_id, None)
             .unwrap();
 
         assert_eq!(output.compute_status().len(), num_txns);

@@ -16,6 +16,7 @@ use std::{
     thread::JoinHandle,
     time::Instant,
 };
+use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 
 #[derive(Clone, Debug)]
 pub struct PipelineConfig {
@@ -24,6 +25,7 @@ pub struct PipelineConfig {
     pub skip_commit: bool,
     pub allow_discards: bool,
     pub allow_aborts: bool,
+    pub num_executor_shards: usize,
 }
 
 pub struct Pipeline<V> {
@@ -76,12 +78,19 @@ where
             (None, None)
         };
 
+        let maybe_block_partitioner = if config.num_executor_shards == 1 {
+            None
+        } else {
+            Some(ShardedBlockPartitioner::new(config.num_executor_shards))
+        };
+
         let exe_thread = std::thread::Builder::new()
             .name("txn_executor".to_string())
             .spawn(move || {
                 start_execution_rx.map(|rx| rx.recv());
 
                 let mut exe = TransactionExecutor::new(
+                    maybe_block_partitioner,
                     executor_1,
                     parent_block_id,
                     version,

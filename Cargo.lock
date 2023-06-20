@@ -1060,6 +1060,7 @@ name = "aptos-executor-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-partitioner",
  "aptos-config",
  "aptos-crypto",
  "aptos-db",

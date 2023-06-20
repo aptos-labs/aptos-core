@@ -166,7 +166,7 @@ impl ShardedBlockPartitioner {
         let mut sender_to_txns = HashMap::new();
         let mut sender_order = Vec::new(); // Track sender ordering
 
-        for txn in txns {
+        for (i, txn) in txns.into_iter().enumerate() {
             let sender = txn.sender().unwrap();
             let entry = sender_to_txns.entry(sender).or_insert_with(Vec::new);
             entry.push(txn);
