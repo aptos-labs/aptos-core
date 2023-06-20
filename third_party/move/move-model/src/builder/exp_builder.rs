@@ -2318,18 +2318,33 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 // calls to built-in functions might have additional requirements on the types
                 let oper = cand.get_operation();
                 match oper {
-                    Operation::Exists(_)
-                    | Operation::Global(_)
                     | Operation::BorrowGlobal(_)
                     | Operation::MoveFrom
-                    | Operation::MoveTo => {
-                        let ty_inst = self.subs.specialize(&instantiation[0]);
+                    | Operation::MoveTo
+                    | Operation::Global(_) => {
+                        let ty_inst = &instantiation[0];
                         if !matches!(ty_inst, Type::Struct(..)) {
                             self.error(
                                 loc,
                                 &format!(
-                                    "The type argument to `exists` and `global` must be a struct \
+                                    "The type argument to `global` must be a struct \
                                     type but `{}` is not",
+                                    ty_inst.display(&self.type_display_context())
+                                ),
+                            );
+                            return self.new_error_exp();
+                        }
+                    },
+                    Operation::Exists(_) => {
+                        let ty_inst = &instantiation[0];
+                        if !(matches!(ty_inst, Type::Struct(..))
+                            || matches!(ty_inst, Type::TypeParameter(..)))
+                        {
+                            self.error(
+                                loc,
+                                &format!(
+                                    "The type argument to `exists` must be a struct \
+                                    or TypeParameter type but `{}` is not either of them.",
                                     ty_inst.display(&self.type_display_context())
                                 ),
                             );

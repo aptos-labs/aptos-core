@@ -704,14 +704,13 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                 )
                 .into_exp(),
             ),
-            Exists(None) if self.in_old => Some(
-                Call(
-                    id,
-                    Exists(Some(self.save_memory(self.builder.get_memory_of_node(id)))),
-                    args.to_owned(),
-                )
-                .into_exp(),
-            ),
+            Exists(None) if self.in_old => {
+                if let Some(mem) = self.builder.get_memory_of_node_opt(id) {
+                    Some(Call(id, Exists(Some(self.save_memory(mem))), args.to_owned()).into_exp())
+                } else {
+                    Some(Call(id, Exists(None), args.to_owned()).into_exp())
+                }
+            },
             SpecFunction(mid, fid, None) if self.in_old => {
                 let used_memory = {
                     let module_env = self.builder.global_env().get_module(*mid);

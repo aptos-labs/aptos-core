@@ -394,9 +394,17 @@ pub trait ExpGenerator<'env> {
     /// Get's the memory associated with a Call(Global,..) or Call(Exists, ..) node. Crashes
     /// if the the node is not typed as expected.
     fn get_memory_of_node(&self, node_id: NodeId) -> QualifiedInstId<StructId> {
+        self.get_memory_of_node_opt(node_id)
+            .expect("expected `Type::Struct`")
+    }
+
+    fn get_memory_of_node_opt(&self, node_id: NodeId) -> Option<QualifiedInstId<StructId>> {
         // We do have a call `f<R<..>>` so extract the type from the function instantiation.
         let rty = &self.global_env().get_node_instantiation(node_id)[0];
-        let (mid, sid, inst) = rty.require_struct();
-        mid.qualified_inst(sid, inst.to_owned())
+        if let Some((mid, sid, inst)) = rty.require_struct_opt() {
+            Some(mid.qualified_inst(sid, inst.to_owned()))
+        } else {
+            None
+        }
     }
 }

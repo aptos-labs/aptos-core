@@ -391,10 +391,18 @@ impl Type {
 
     /// Require this to be a struct, if so extracts its content.
     pub fn require_struct(&self) -> (ModuleId, StructId, &[Type]) {
-        if let Type::Struct(mid, sid, targs) = self {
-            (*mid, *sid, targs.as_slice())
+        if let Some(v) = self.require_struct_opt() {
+            v
         } else {
             panic!("expected `Type::Struct`, found: `{:?}`", self)
+        }
+    }
+
+    pub fn require_struct_opt(&self) -> Option<(ModuleId, StructId, &[Type])> {
+        if let Type::Struct(mid, sid, targs) = self {
+            Some((*mid, *sid, targs.as_slice()))
+        } else {
+            None
         }
     }
 

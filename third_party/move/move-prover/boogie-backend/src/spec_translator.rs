@@ -1154,9 +1154,17 @@ impl<'env> SpecTranslator<'env> {
     }
 
     fn get_memory_inst_from_node(&self, node_id: NodeId) -> QualifiedInstId<StructId> {
+        self.get_memory_inst_from_node_opt(node_id)
+            .expect("expected `Type::Struct`")
+    }
+
+    fn get_memory_inst_from_node_opt(&self, node_id: NodeId) -> Option<QualifiedInstId<StructId>> {
         let mem_ty = &self.get_node_instantiation(node_id)[0];
-        let (mid, sid, inst) = mem_ty.require_struct();
-        mid.qualified_inst(sid, inst.to_owned())
+        if let Some((mid, sid, inst)) = mem_ty.require_struct_opt() {
+            Some(mid.qualified_inst(sid, inst.to_owned()))
+        } else {
+            None
+        }
     }
 
     fn translate_resource_exists(
@@ -1165,12 +1173,19 @@ impl<'env> SpecTranslator<'env> {
         args: &[Exp],
         memory_label: &Option<MemoryLabel>,
     ) {
-        let memory = &self.get_memory_inst_from_node(node_id);
-        emit!(
-            self.writer,
-            "$ResourceExists({}, ",
-            boogie_resource_memory_name(self.env, memory, memory_label),
-        );
+        let memory_opt = &self.get_memory_inst_from_node_opt(node_id);
+        let mut resource_name = "".to_string();
+        if let Some(memory) = memory_opt {
+            resource_name = boogie_resource_memory_name(self.env, memory, memory_label);
+        } else {
+            let mem_ty = &self.get_node_instantiation(node_id)[0];
+            if let Type::TypeParameter(arg) = mem_ty {
+                resource_name = format!("#{}_$memory", arg)
+            } else {
+                self.error(&self.env.get_node_loc(node_id), "incorrect type for exists");
+            }
+        }
+        emit!(self.writer, "$ResourceExists({}, ", resource_name);
         self.translate_exp(&args[0]);
         emit!(self.writer, ")");
     }

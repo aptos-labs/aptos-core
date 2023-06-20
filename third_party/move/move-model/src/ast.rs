@@ -600,8 +600,10 @@ impl ExpData {
             match e {
                 Call(id, Exists(label), _) | Call(id, Global(label), _) => {
                     let inst = &env.get_node_instantiation(*id);
-                    let (mid, sid, sinst) = inst[0].require_struct();
-                    result.insert((mid.qualified_inst(sid, sinst.to_owned()), label.to_owned()));
+                    if let Some((mid, sid, sinst)) = inst[0].require_struct_opt() {
+                        result
+                            .insert((mid.qualified_inst(sid, sinst.to_owned()), label.to_owned()));
+                    }
                 },
                 Call(id, SpecFunction(mid, fid, labels), _) => {
                     let inst = &env.get_node_instantiation(*id);
