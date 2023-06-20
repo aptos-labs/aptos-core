@@ -539,8 +539,7 @@ module aptos_framework::delegation_pool {
         let pool = borrow_global<DelegationPool>(pool_address);
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
         let latest_delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, voter);
-        let delegation_pool = borrow_global<DelegationPool>(pool_address);
-        calculate_total_voting_power(delegation_pool, latest_delegated_votes)
+        calculate_total_voting_power(pool, latest_delegated_votes)
     }
 
     #[view]
