@@ -375,9 +375,10 @@ pub struct PreprocessMetadata {
 }
 
 /// A gas price priority for what gas price to use
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub enum GasPricePriority {
     Low,
+    #[default]
     Normal,
     High,
 }
@@ -389,12 +390,6 @@ impl GasPricePriority {
             GasPricePriority::Normal => "normal",
             GasPricePriority::High => "high",
         }
-    }
-}
-
-impl Default for GasPricePriority {
-    fn default() -> Self {
-        GasPricePriority::Normal
     }
 }
 

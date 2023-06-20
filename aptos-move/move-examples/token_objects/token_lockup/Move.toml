@@ -1,0 +1,10 @@
+[package]
+name = 'Token Lockup'
+version = '1.0.0'
+
+[addresses]
+token_objects = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }

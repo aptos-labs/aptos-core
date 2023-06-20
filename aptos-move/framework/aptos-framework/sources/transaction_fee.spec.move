@@ -12,13 +12,41 @@ spec aptos_framework::transaction_fee {
     }
 
     spec initialize_fee_collection_and_distribution(aptos_framework: &signer, burn_percentage: u8) {
-        // TODO: monomorphization issue. duplicated boogie procedures.
-        pragma verify=false;
+        use std::signer;
+        use aptos_framework::stake::ValidatorFees;
+        use aptos_framework::aggregator_factory;
+        use aptos_framework::system_addresses;
+
+        aborts_if exists<CollectedFeesPerBlock>(@aptos_framework);
+        aborts_if burn_percentage > 100;
+
+        let aptos_addr = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
+        aborts_if exists<ValidatorFees>(aptos_addr);
+
+        include system_addresses::AbortsIfNotAptosFramework {account: aptos_framework};
+        include aggregator_factory::CreateAggregatorInternalAbortsIf;
+
+        ensures exists<ValidatorFees>(aptos_addr);
     }
 
     spec upgrade_burn_percentage(aptos_framework: &signer, new_burn_percentage: u8) {
-        // TODO: missing aborts_if spec
-        pragma verify=false;
+        use std::signer;
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
+        // Percentage validation
+        aborts_if new_burn_percentage > 100;
+        // Signer validation
+        let aptos_addr = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
+        // Requirements of `process_collected_fees`
+        requires exists<AptosCoinCapabilities>(@aptos_framework);
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+        include RequiresCollectedFeesPerValueLeqBlockAptosSupply;
+        // The effect of upgrading the burn percentage
+        ensures exists<CollectedFeesPerBlock>(@aptos_framework) ==>
+            global<CollectedFeesPerBlock>(@aptos_framework).burn_percentage == new_burn_percentage;
     }
 
     spec register_proposer_for_fee_collection(proposer_addr: address) {

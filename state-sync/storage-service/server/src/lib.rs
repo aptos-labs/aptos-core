@@ -265,6 +265,14 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     pub(crate) fn get_request_moderator(&self) -> Arc<RequestModerator> {
         self.request_moderator.clone()
     }
+
+    #[cfg(test)]
+    /// Returns a copy of the active optimistic fetches for test purposes
+    pub(crate) fn get_optimistic_fetches(
+        &self,
+    ) -> Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>> {
+        self.optimistic_fetches.clone()
+    }
 }
 
 /// Refreshes the cached storage server summary

@@ -264,7 +264,7 @@ impl NetworkLoadTest for MultiRegionNetworkEmulationTest {
 }
 
 impl NetworkTest for MultiRegionNetworkEmulationTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

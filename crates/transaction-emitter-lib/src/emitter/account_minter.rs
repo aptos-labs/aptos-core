@@ -196,8 +196,10 @@ impl<'t> AccountMinter<'t> {
             request_counters.show_simple(),
         );
         info!(
-            "Creating additional {} accounts with {} coins each",
-            num_accounts, coins_per_account
+            "Creating additional {} accounts with {} coins each (txn {} gas price)",
+            num_accounts,
+            coins_per_account,
+            txn_factory.get_gas_unit_price(),
         );
 
         let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
@@ -281,7 +283,10 @@ impl<'t> AccountMinter<'t> {
         max_submit_batch_size: usize,
         counters: &CounterState,
     ) -> Result<Vec<LocalAccount>> {
-        info!("Creating and funding seeds accounts");
+        info!(
+            "Creating and funding seeds accounts (txn {} gas price)",
+            self.txn_factory.get_gas_unit_price()
+        );
         let mut i = 0;
         let mut seed_accounts = vec![];
         while i < seed_account_num {
