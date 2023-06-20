@@ -21,8 +21,10 @@ use aptos_block_executor::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
+    txn_commit_listener::{NoOpTransactionCommitListener, TransactionCommitListener},
 };
 use aptos_infallible::Mutex;
+use aptos_mvhashmap::types::{TxnIndex, Version};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     block_executor::partitioner::{
@@ -144,15 +146,44 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 }
 
-pub struct BlockAptosExecutor<'a, S: StateView + Sync> {
+pub struct BlockAptosExecutor<
+    'a,
+    S: StateView + Sync,
+    L: TransactionCommitListener<TransactionWrites = Vec<(StateKey, WriteOp)>>,
+> {
     executor_thread_pool: Arc<ThreadPool>,
     concurrency_level: usize,
     block_executor:
-        BlockExecutor<PreprocessedTransaction, AptosExecutorTask<'a, S>, S, ExecutableTestType>,
+        BlockExecutor<PreprocessedTransaction, AptosExecutorTask<'a, S>, S, L, ExecutableTestType>,
 }
 
-impl<'a, S: StateView + Sync + 'a> BlockAptosExecutor<'a, S> {
+impl<
+        'a,
+        S: StateView + Sync + 'a,
+        L: TransactionCommitListener<TransactionWrites = Vec<(StateKey, WriteOp)>>,
+    > BlockAptosExecutor<'a, S, L>
+{
     pub fn new(
+        concurrency_level: usize,
+        num_txns: usize,
+        executor_thread_pool: Arc<ThreadPool>,
+        maybe_block_gas_limit: Option<u64>,
+        commit_listener: L,
+    ) -> Self {
+        Self {
+            executor_thread_pool: executor_thread_pool.clone(),
+            concurrency_level,
+            block_executor: BlockExecutor::new(
+                concurrency_level,
+                num_txns,
+                executor_thread_pool,
+                maybe_block_gas_limit,
+                commit_listener,
+            ),
+        }
+    }
+
+    pub fn new_with_no_op_listener(
         concurrency_level: usize,
         num_txns: usize,
         executor_thread_pool: Arc<ThreadPool>,
@@ -166,8 +197,21 @@ impl<'a, S: StateView + Sync + 'a> BlockAptosExecutor<'a, S> {
                 num_txns,
                 executor_thread_pool,
                 maybe_block_gas_limit,
+                NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
             ),
         }
+    }
+
+    pub fn mark_estimate(&self, key: &StateKey, txn_idx: TxnIndex) {
+        self.block_executor.mark_estimate(key, txn_idx);
+    }
+
+    pub fn add_txn_write(&self, key: StateKey, version: Version, value: WriteOp) {
+        self.block_executor.add_txn_write(key, version, value);
+    }
+
+    pub fn mark_dependency_resolve(&self, txn_idx: TxnIndex) {
+        self.block_executor.mark_dependency_resolve(txn_idx);
     }
 
     fn verify_transactions(
@@ -285,5 +329,9 @@ impl<'a, S: StateView + Sync + 'a> BlockAptosExecutor<'a, S> {
             },
             Err(Error::UserError(err)) => Err(err),
         }
+    }
+
+    pub fn handle_remote_txn_commit(&self) {
+        // TODO: implement
     }
 }

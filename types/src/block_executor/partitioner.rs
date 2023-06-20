@@ -89,6 +89,10 @@ pub struct CrossShardDependencies {
 }
 
 impl CrossShardDependencies {
+    pub fn required_edges(&self) -> &CrossShardEdges {
+        &self.required_edges
+    }
+
     pub fn num_required_edges(&self) -> usize {
         self.required_edges.len()
     }
@@ -288,6 +292,18 @@ impl<T: Clone> SubBlocksForShard<T> {
         self.sub_blocks
             .iter()
             .flat_map(|sub_block| sub_block.iter())
+    }
+
+    pub fn txn_with_index_iter(
+        &self,
+    ) -> impl Iterator<Item = (TxnIndex, &TransactionWithDependencies<T>)> {
+        self.sub_blocks.iter().flat_map(|sub_block| {
+            let start_index = sub_block.start_index;
+            sub_block
+                .iter()
+                .enumerate()
+                .map(move |(i, txn)| (start_index + i, txn))
+        })
     }
 
     pub fn sub_block_iter(&self) -> impl Iterator<Item = &SubBlock<T>> {

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::{
-    block_executor_client::BlockExecutorClient, ExecutorShardCommand,
+    block_executor_client::BlockExecutorClient, messages::CrossShardMsg, ExecutorShardCommand,
 };
 use aptos_logger::trace;
 use aptos_state_view::StateView;
@@ -19,6 +19,8 @@ pub struct ExecutorShard<S, E> {
     executor_client: E,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+    _message_rxs: Vec<Receiver<CrossShardMsg>>,
+    _messages_txs: Vec<Sender<CrossShardMsg>>,
 }
 
 impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard<S, E> {
@@ -28,6 +30,8 @@ impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard
         shard_id: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
         result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+        message_rxs: Vec<Receiver<CrossShardMsg>>,
+        messages_txs: Vec<Sender<CrossShardMsg>>,
     ) -> Self {
         Self {
             num_shards,
@@ -35,6 +39,8 @@ impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard
             executor_client,
             command_rx,
             result_tx,
+            _message_rxs: message_rxs,
+            _messages_txs: messages_txs,
         }
     }
 

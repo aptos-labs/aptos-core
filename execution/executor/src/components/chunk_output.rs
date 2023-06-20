@@ -20,7 +20,10 @@ use aptos_types::{
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{
-    sharded_block_executor::{block_executor_client::LocalExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{
+        block_executor_client::VMExecutorClient, sharded_executor_client::ShardedExecutorClient,
+        ShardedBlockExecutor,
+    },
     AptosVM, VMExecutor,
 };
 use fail::fail_point;
@@ -31,7 +34,7 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 pub static SHARDED_BLOCK_EXECUTOR: Lazy<Arc<Mutex<ShardedBlockExecutor<CachedStateView>>>> =
     Lazy::new(|| {
         let executor_clients =
-            LocalExecutorClient::create_local_clients(AptosVM::get_num_shards(), None);
+            ShardedExecutorClient::create_sharded_executor_clients(AptosVM::get_num_shards(), None);
         Arc::new(Mutex::new(ShardedBlockExecutor::new(executor_clients)))
     });
 

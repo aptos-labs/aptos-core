@@ -21,7 +21,7 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::BlockAptosExecutor,
     data_cache::AsMoveResolver,
-    sharded_block_executor::{block_executor_client::LocalExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{block_executor_client::VMExecutorClient, ShardedBlockExecutor},
 };
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use once_cell::sync::Lazy;
@@ -254,7 +254,7 @@ where
                     Arc::new(ShardedBlockExecutor::new(remote_executor_clients))
                 } else {
                     let local_executor_client =
-                        LocalExecutorClient::create_local_clients(num_executor_shards, None);
+                        VMExecutorClient::create_vm_clients(num_executor_shards, None);
                     Arc::new(ShardedBlockExecutor::new(local_executor_client))
                 };
             (
@@ -347,6 +347,7 @@ where
             transactions.len(),
             Arc::clone(&RAYON_EXEC_POOL),
             maybe_block_gas_limit,
+            NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
         );
         executor
             .execute_block(
@@ -391,6 +392,7 @@ where
                 transactions.len(),
                 Arc::clone(&RAYON_EXEC_POOL),
                 maybe_block_gas_limit,
+                NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
             );
             executor
                 .execute_block(
