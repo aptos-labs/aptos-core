@@ -17,6 +17,7 @@ NOTE:
 * This script supports building different profiles and features into the docker images, but does not yet support using non-release images in Forge.
 """
 
+from email.policy import default
 import json
 from typing import List, Tuple
 import click
@@ -26,6 +27,7 @@ import time
 from test_framework.shell import LocalShell, Shell
 from test_framework.git import Git
 from test_framework.logging import log, init_logging
+from forge import image_exists
 
 APTOS_CORE_REPO = "https://github.com/aptos-labs/aptos-core.git"
 DOCKER_RUST_BUILD_WORKFLOW_NAME = "workflow-run-docker-rust-build.yaml"
@@ -33,6 +35,8 @@ FORGE_WORKFLOW_NAME = "adhoc-forge.yaml"
 EXP_GIT_BRANCH_PREFIX = "exp/"
 WORKFLOW_WATCH_INTERVAL_SECS = 10  # refresh every 10s
 WORKFLOW_WATCH_TIMEOUT_SECS = 30 * 60  # 30 min build timeout
+
+VALIDATOR_TESTING_IMAGE_NAME = "validator-testing"
 
 
 def cleanup_and_exit(git: Git, exit_code: int, cleanup_branch: str = None) -> None:
@@ -68,9 +72,7 @@ def get_gh_username(shell: Shell) -> str:
         return ""
 
 
-def wait_for_workflow(
-    shell: Shell, branch: str, workflow_name: str, wait: bool
-) -> bool:
+def wait_for_workflow(shell: Shell, branch: str, workflow_name: str) -> bool:
     """Get the latest workflow run ID and wait for it to complete."""
     # get the workflow run ID
     gh_run_list_cmd = [
@@ -92,39 +94,35 @@ def wait_for_workflow(
     # get the URL
     if not gh_run_list_cmd_ret.succeeded():
         log.info("Failed to get workflow run ID")
-        log.info(
-            f"All workflow runs: https://github.com/aptos-labs/aptos-core/actions/workflows/{DOCKER_RUST_BUILD_WORKFLOW_NAME}"
-        )
         return False
     workflow_run_id = gh_run_list_cmd_ret.unwrap().decode().strip()
     log.info(
         f"Workflow URL: https://github.com/aptos-labs/aptos-core/actions/runs/{workflow_run_id}"
     )
 
-    workflow_success = not wait # assume success if we're not waiting
-    if wait:
-        iterations = WORKFLOW_WATCH_TIMEOUT_SECS // WORKFLOW_WATCH_INTERVAL_SECS
-        for i in range(iterations):
-            secs_remaining = (iterations - i) * WORKFLOW_WATCH_INTERVAL_SECS
-            log.info(
-                f"Checking workflow status: https://github.com/aptos-labs/aptos-core/actions/runs/{workflow_run_id} ({secs_remaining}s remaining)"
-            )
-            gh_run_view_cmd = [
-                "gh",
-                "run",
-                "view",
-                workflow_run_id,
-                "--log",  # Exit with non-zero status if run fails
-            ]
-            gh_run_view_cmd_ret = shell.run(gh_run_view_cmd)
-            if gh_run_view_cmd_ret.succeeded():
-                workflow_success = True
-                log.info("Successfully ran workflow")
-                log.info(f"To view the logs, run:\n\t$ {' '.join(gh_run_view_cmd)}")
-                break
-            else:
-                log.info(f"Waiting for workflow {workflow_name} to complete...")
-                time.sleep(WORKFLOW_WATCH_INTERVAL_SECS)
+    workflow_success = False
+    iterations = WORKFLOW_WATCH_TIMEOUT_SECS // WORKFLOW_WATCH_INTERVAL_SECS
+    for i in range(iterations):
+        secs_remaining = (iterations - i) * WORKFLOW_WATCH_INTERVAL_SECS
+        log.info(
+            f"Checking workflow status: https://github.com/aptos-labs/aptos-core/actions/runs/{workflow_run_id} ({secs_remaining}s remaining)"
+        )
+        gh_run_view_cmd = [
+            "gh",
+            "run",
+            "view",
+            workflow_run_id,
+            "--log",  # Exit with non-zero status if run fails
+        ]
+        gh_run_view_cmd_ret = shell.run(gh_run_view_cmd)
+        if gh_run_view_cmd_ret.succeeded():
+            workflow_success = True
+            log.info("Successfully ran workflow")
+            log.info(f"To view the logs, run:\n\t$ {' '.join(gh_run_view_cmd)}")
+            break
+        else:
+            log.info(f"Waiting for workflow {workflow_name} to complete...")
+            time.sleep(WORKFLOW_WATCH_INTERVAL_SECS)
 
     return workflow_success
 
@@ -135,14 +133,15 @@ def workflow_dispatch_docker_build(
     git_sha: str,
     features: str,
     profile: str,
-    build_addl_testing_images: bool,
     dry_run: bool = False,
+    wait: bool = False,
 ) -> bool:
-    build_addl_testing_images = (  # make it a lower case string
-        str(build_addl_testing_images).lower()
-        if type(build_addl_testing_images) is bool
-        else build_addl_testing_images
-    )
+    build_addl_testing_images = "true"  # always build additional testing images
+
+    log.info("GIT_SHA: %s", git_sha)
+    log.info("FEATURES: %s", features)
+    log.info("PROFILE: %s", profile)
+    log.info(f"BUILD_ADDL_TESTING_IMAGES: {build_addl_testing_images}")
 
     gh_workflow_run_cmd = [
         "gh",
@@ -160,14 +159,29 @@ def workflow_dispatch_docker_build(
         "--field",
         f"BUILD_ADDL_TESTING_IMAGES={build_addl_testing_images}",
     ]
-    log.info("Running command: %s", " ".join(gh_workflow_run_cmd))
+    log.info(
+        "%s: $ %s",
+        "Running command" if not dry_run else "Will run command",
+        " ".join(gh_workflow_run_cmd),
+    )
     if dry_run:
-        log.info("Dry run. Exiting before running gh commands")
+        log.info("Dry run. Exiting before running gh commands to trigger workflow")
         return True
     gh_workflow_run_cmd_ret = shell.run(gh_workflow_run_cmd, stream_output=True)
+    log.info(
+        f"All workflow runs: https://github.com/aptos-labs/aptos-core/actions/workflows/{DOCKER_RUST_BUILD_WORKFLOW_NAME}"
+    )
     # XXX: wait a while for GH API to update
     time.sleep(10)
-    return gh_workflow_run_cmd_ret.succeeded()
+    dispatch_status = gh_workflow_run_cmd_ret.succeeded()
+    if dispatch_status:
+        log.info("Successfully triggered docker build workflow")
+    else:
+        log.error("Failed to trigger docker build workflow")
+        return False
+    if wait:
+        return wait_for_workflow(shell, branch, DOCKER_RUST_BUILD_WORKFLOW_NAME)
+    return True
 
 
 def workflow_dispatch_forge(
@@ -177,9 +191,9 @@ def workflow_dispatch_forge(
     duration: int = 480,
     test_suite: str = "land_blocking",
     dry_run: bool = False,
+    wait: bool = False,
 ) -> bool:
     """Run Forge via workflow_dispatch and return the success status."""
-    # FORGE_WORKFLOW_NAME
     gh_workflow_run_cmd = [
         "gh",
         "workflow",
@@ -196,14 +210,29 @@ def workflow_dispatch_forge(
         "--field",
         f"FORGE_TEST_SUITE={test_suite}",
     ]
-    log.info("Running command: %s", " ".join(gh_workflow_run_cmd))
+    log.info(
+        "%s: $ %s",
+        "Running command" if not dry_run else "Will run command",
+        " ".join(gh_workflow_run_cmd),
+    )
     if dry_run:
-        log.info("Dry run. Exiting before running gh commands")
+        log.info("Dry run. Exiting before running gh commands to trigger workflow")
         return True
     gh_workflow_run_cmd_ret = shell.run(gh_workflow_run_cmd, stream_output=True)
+    log.info(
+        f"All workflow runs: https://github.com/aptos-labs/aptos-core/actions/workflows/{FORGE_WORKFLOW_NAME}"
+    )
     # XXX: wait a while for GH API to update
     time.sleep(10)
-    return gh_workflow_run_cmd_ret.succeeded()
+    dispatch_status = gh_workflow_run_cmd_ret.succeeded()
+    if dispatch_status:
+        log.info("Successfully triggered Forge test workflow")
+    else:
+        log.error("Failed to trigger Forge test workflow")
+        return False
+    if wait:
+        return wait_for_workflow(shell, branch, FORGE_WORKFLOW_NAME)
+    return True
 
 
 def ensure_git_status(git: Git) -> Tuple[str, str]:
@@ -262,11 +291,6 @@ def main(log_metadata: bool) -> None:
     help="Cargo profile to build",
 )
 @click.option(
-    "--build-addl-testing-images",
-    is_flag=True,
-    help="Build additional testing images",
-)
-@click.option(
     "--wait",
     is_flag=True,
     help="Wait for all scheduled workflows to finish",
@@ -294,7 +318,6 @@ def main(log_metadata: bool) -> None:
 def run(
     features: List[str],
     profile: str,
-    build_addl_testing_images: bool,
     wait: bool,
     dry_run: bool,
     with_forge: bool,
@@ -308,44 +331,29 @@ def run(
     features = ",".join(features)
     profile = profile
 
-    log.info("GIT_SHA: %s", git_sha)
-    log.info("FEATURES: %s", features)
-    log.info("PROFILE: %s", profile)
-    log.info(f"BUILD_ADDL_TESTING_IMAGES: {build_addl_testing_images}")
-
-    docker_build_workflow_dispatch_status = workflow_dispatch_docker_build(
-        shell,
-        new_exp_git_branch,
-        git_sha,
-        features,
-        profile,
-        build_addl_testing_images,
-        dry_run,
-    )
-
-    # print URL to find the jobs
-    if docker_build_workflow_dispatch_status:
-        log.info("Successfully triggered workflow")
+    prev_built_image_exists = image_exists(shell, VALIDATOR_TESTING_IMAGE_NAME, git_sha)
+    if prev_built_image_exists:
+        log.info(f"!!!Image validator-testing:{git_sha} already exists, using it...")
     else:
-        log.info("Failed to trigger workflow")
-        cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
-
-    # wait for the workflow to finish
-    if dry_run:
-        docker_build_workflow_success = True  # just pass
-    else:
-        docker_build_workflow_success = wait_for_workflow(
+        log.info(
+            f"!!!Image validator-testing:{git_sha} does not exist, will build it first..."
+        )
+        docker_build_workflow_dispatch_status = workflow_dispatch_docker_build(
             shell,
             new_exp_git_branch,
-            DOCKER_RUST_BUILD_WORKFLOW_NAME,
-            wait or with_forge,
+            git_sha,
+            features,
+            profile,
+            dry_run=dry_run,
+            wait=wait,
         )
-
-    if not docker_build_workflow_success:
+        if not docker_build_workflow_dispatch_status:
+            log.error("Docker build workflow failed")
+            cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
+        log.info(f"!!!Image validator-testing:{git_sha} built successfully")
         log.info(
-            f"Failed to run docker build workflow {DOCKER_RUST_BUILD_WORKFLOW_NAME}"
+            f"!!!To trigger Forge tests with the same image, run: $ poetry run ./forge.py --image-tag {git_sha} --forge-image-tag {git_sha}"
         )
-        cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
 
     if with_forge:
         log.info("Running forge!!!")
@@ -358,19 +366,7 @@ def run(
             dry_run,
         )
         if not forge_workflow_dispatch_status:
-            log.info("Failed to trigger forge workflow")
-            cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
-        if dry_run:
-            forge_workflow_success = True  # just pass
-        else:
-            forge_workflow_success = wait_for_workflow(
-                shell,
-                new_exp_git_branch,
-                FORGE_WORKFLOW_NAME,
-                wait,
-            )
-        if not forge_workflow_success:
-            log.info(f"Failed to run forge workflow: {FORGE_WORKFLOW_NAME}")
+            log.error("Forge test workflow failed")
             cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
 
 
@@ -389,7 +385,6 @@ def list_exp():
         "--user",
         username,
     ]
-    log.info("Running command: %s", " ".join(gh_workflow_list_cmd))
     gh_workflow_list_cmd_ret = shell.run(gh_workflow_list_cmd)
     list_out = json.dumps(
         json.loads(gh_workflow_list_cmd_ret.unwrap().decode()), indent=2
