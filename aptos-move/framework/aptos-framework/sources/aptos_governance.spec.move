@@ -112,7 +112,7 @@ spec aptos_framework::aptos_governance {
         metadata_hash: vector<u8>,
     ) {
         use aptos_framework::chain_status;
-
+        pragma verify_duration_estimate = 120;
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
     }
@@ -126,7 +126,7 @@ spec aptos_framework::aptos_governance {
         is_multi_step_proposal: bool,
     ) {
         use aptos_framework::chain_status;
-
+        pragma verify_duration_estimate = 120;
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
     }
