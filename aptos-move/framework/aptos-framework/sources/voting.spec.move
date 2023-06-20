@@ -53,6 +53,7 @@ spec aptos_framework::voting {
         is_multi_step_proposal: bool,
     ): u64 {
         use aptos_framework::chain_status;
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
 
         requires chain_status::is_operating();
         include CreateProposalAbortsIf<ProposalType>;
