@@ -13,6 +13,9 @@ use serde::{Deserialize, Serialize};
 pub struct GasEstimationConfig {
     /// A gate for computing GasEstimation. If false, just returns the default.
     pub enabled: bool,
+    /// Provide static values to override, e.g., Some((100, 100, 150)). If set, just returns these
+    /// values instead of computing the actual GasEstimation.
+    pub static_override: Option<(u64, u64, u64)>,
     /// Number of transactions for blocks to be classified as full for gas estimation
     pub full_block_txns: usize,
     /// Maximum number of blocks read for low gas estimation
@@ -29,6 +32,7 @@ impl Default for GasEstimationConfig {
     fn default() -> GasEstimationConfig {
         GasEstimationConfig {
             enabled: false,
+            static_override: None,
             full_block_txns: 250,
             low_block_history: 10,
             market_block_history: 30,
