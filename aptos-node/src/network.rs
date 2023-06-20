@@ -200,6 +200,7 @@ pub fn setup_networks_and_get_interfaces(
                 consensus_network_handle = Some(register_client_and_service_with_network(
                     &mut network_builder,
                     network_id,
+                    &network_config,
                     consensus_network_configuration(node_config),
                 ));
             }
@@ -209,6 +210,7 @@ pub fn setup_networks_and_get_interfaces(
         let mempool_network_handle = register_client_and_service_with_network(
             &mut network_builder,
             network_id,
+            &network_config,
             mempool_network_configuration(node_config),
         );
         mempool_network_handles.push(mempool_network_handle);
@@ -217,6 +219,7 @@ pub fn setup_networks_and_get_interfaces(
         let peer_monitoring_service_network_handle = register_client_and_service_with_network(
             &mut network_builder,
             network_id,
+            &network_config,
             peer_monitoring_network_configuration(node_config),
         );
         peer_monitoring_service_network_handles.push(peer_monitoring_service_network_handle);
@@ -225,6 +228,7 @@ pub fn setup_networks_and_get_interfaces(
         let storage_service_network_handle = register_client_and_service_with_network(
             &mut network_builder,
             network_id,
+            &network_config,
             storage_service_network_configuration(node_config),
         );
         storage_service_network_handles.push(storage_service_network_handle);
@@ -277,13 +281,18 @@ fn create_network_runtime(network_config: &NetworkConfig) -> Runtime {
 }
 
 /// Registers a new application client and service with the network
-fn register_client_and_service_with_network<T: Serialize + for<'de> Deserialize<'de>>(
+fn register_client_and_service_with_network<
+    T: Serialize + for<'de> Deserialize<'de> + Send + 'static,
+>(
     network_builder: &mut NetworkBuilder,
     network_id: NetworkId,
+    network_config: &NetworkConfig,
     application_config: NetworkApplicationConfig,
 ) -> ApplicationNetworkHandle<T> {
-    let (network_sender, network_events) =
-        network_builder.add_client_and_service(&application_config);
+    let (network_sender, network_events) = network_builder.add_client_and_service(
+        &application_config,
+        network_config.max_parallel_deserialization_tasks,
+    );
     ApplicationNetworkHandle {
         network_id,
         network_sender,
