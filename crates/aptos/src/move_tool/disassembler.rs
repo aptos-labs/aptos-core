@@ -23,7 +23,7 @@ use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use std::{fs, path::PathBuf};
 
-const DISASSEMBLED_CODE_FILE: &str = "disassembled-code.yaml";
+const DISASSEMBLED_CODE_FILE: &str = "disassembled-code.move";
 
 /// Disassemble the Move bytecode pointed to
 ///
