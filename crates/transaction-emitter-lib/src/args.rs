@@ -107,7 +107,7 @@ impl ClusterArgs {
 #[clap(group(
     ArgGroup::new("mode")
         .required(true)
-        .args(&["mempool-backlog", "target-tps"]),
+        .args(&["mempool_backlog", "target_tps"]),
 ))]
 pub struct EmitArgs {
     #[clap(long)]
