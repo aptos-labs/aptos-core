@@ -56,6 +56,7 @@ where
                 50
             }, /* bound */
         );
+
         let (commit_sender, commit_receiver) = mpsc::sync_channel(
             if config.split_stages || config.skip_commit {
                 (num_blocks.unwrap() + 1).max(3)

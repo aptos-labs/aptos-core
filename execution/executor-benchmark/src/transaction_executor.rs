@@ -7,11 +7,14 @@ use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_types::transaction::{Transaction, Version};
-use std::{
-    sync::{mpsc, Arc},
-    time::{Duration, Instant},
-};
-use aptos_types::block_executor::partitioner::{ExecutableBlock, ExecutableTransactions};
+use std::{sync::{mpsc, Arc}, thread, time::{Duration, Instant}};
+use aptos_types::block_executor::partitioner::{CrossShardDependencies, ExecutableBlock, ExecutableTransactions, TransactionWithDependencies};
+
+pub enum PartitionMode {
+    NoPartition,
+    Sync,
+    Async,
+}
 
 pub struct TransactionExecutor<V> {
     block_partitioner: Option<ShardedBlockPartitioner>,
@@ -41,6 +44,13 @@ where
         allow_discards: bool,
         allow_aborts: bool,
     ) -> Self {
+        let (tx, rx) = mpsc::channel::<ExecutableBlock<Transaction>>();
+        let exe_thread = thread::Builder::new().spawn(move||{
+            while let Ok(b) = rx.recv() {
+
+            }
+        });
+
         Self {
             block_partitioner: maybe_block_partitioner,
             executor,
@@ -53,7 +63,7 @@ where
         }
     }
 
-    pub fn execute_block(&mut self, transactions: Vec<Transaction>) {
+    pub fn execute_block(&mut self, mut transactions: Vec<Transaction>) {
         if self.start_time.is_none() {
             self.start_time = Some(Instant::now())
         }
@@ -66,14 +76,24 @@ where
         let block_id = HashValue::random();
         let executable_block = match &self.block_partitioner {
             Some(partitioner) => {
+                let last_txn = transactions.pop().unwrap();
+                assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
                 let analyzed_transactions = transactions.into_iter().map(|t|t.into()).collect();
-                let sub_blocks = partitioner.partition(analyzed_transactions, 2);
+                let mut sub_blocks = partitioner.partition(analyzed_transactions, 2);
+                sub_blocks.last_mut().unwrap().sub_blocks.last_mut().unwrap().transactions.push(TransactionWithDependencies::new(last_txn, CrossShardDependencies::default()));
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
             },
             None => {
                 (block_id, transactions).into()
             },
         };
+
+        self.process_executable_block(execution_start, executable_block);
+    }
+
+    fn process_executable_block(&mut self, execution_start: Instant, executable_block: ExecutableBlock<Transaction>) {
+        let block_id = executable_block.block_id;
+        let num_txns = executable_block.transactions.num_transactions();
         let output = self
             .executor
             .execute_block(executable_block, self.parent_block_id, None)
