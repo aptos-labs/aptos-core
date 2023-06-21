@@ -1461,22 +1461,19 @@ impl AptosVM {
         match payload {
             TransactionPayload::Script(_) => {
                 self.0.check_gas(resolver, txn_data, log_context)?;
-                self.0
-                    .run_script_prologue(session, txn_data, log_context)
+                self.0.run_script_prologue(session, txn_data, log_context)
             },
             TransactionPayload::EntryFunction(_) => {
                 // NOTE: Script and EntryFunction shares the same prologue
                 self.0.check_gas(resolver, txn_data, log_context)?;
-                self.0
-                    .run_script_prologue(session, txn_data, log_context)
+                self.0.run_script_prologue(session, txn_data, log_context)
             },
             TransactionPayload::Multisig(multisig_payload) => {
                 self.0.check_gas(resolver, txn_data, log_context)?;
                 // Still run script prologue for multisig transaction to ensure the same tx
                 // validations are still run for this multisig execution tx, which is submitted by
                 // one of the owners.
-                self.0
-                    .run_script_prologue(session, txn_data, log_context, false)?;
+                self.0.run_script_prologue(session, txn_data, log_context)?;
                 // Skip validation if this is part of tx simulation.
                 // This allows simulating multisig txs without having to first create the multisig
                 // tx.
