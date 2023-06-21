@@ -1794,14 +1794,14 @@ impl VMAdapter for AptosVM {
                     return Ok((vm_status, vm_output, sender));
                 },
                 Err(vm_status) => {
-                    if matches!(vm_status, VMStatus::MoveAbort(_, code) if code == EADD_OVERFLOW || code == ESUB_UNDERFLOW)
+                    if !matches!(vm_status, VMStatus::MoveAbort(_, code) if code == EADD_OVERFLOW || code == ESUB_UNDERFLOW)
                     {
                         return Err(vm_status);
                     }
                 },
             },
             Err(vm_status) => {
-                if matches!(vm_status, VMStatus::MoveAbort(_, code) if code == EADD_OVERFLOW || code == ESUB_UNDERFLOW)
+                if !matches!(vm_status, VMStatus::MoveAbort(_, code) if code == EADD_OVERFLOW || code == ESUB_UNDERFLOW)
                 {
                     return Err(vm_status);
                 }
