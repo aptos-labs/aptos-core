@@ -3,7 +3,7 @@
 
 use super::{
     publishing::{module_simple::EntryPoints, publish_util::Package},
-    TransactionExecutor,
+    ReliableTransactionSubmitter,
 };
 use crate::{
     call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator},
@@ -47,7 +47,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
         &self,
         init_accounts: &mut [LocalAccount],
         txn_factory: &TransactionFactory,
-        txn_executor: &dyn TransactionExecutor,
+        txn_executor: &dyn ReliableTransactionSubmitter,
         rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let entry_point = self.entry_point;
@@ -56,7 +56,6 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
             MultiSigConfig::Random(num) => {
                 let new_accounts = Arc::new(
                     (0..num)
-                        .into_iter()
                         .map(|_| LocalAccount::generate(rng))
                         .collect::<Vec<_>>(),
                 );

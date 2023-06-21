@@ -24,7 +24,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+        with:
+          ref: ${{ inputs.GIT_SHA }}
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
@@ -35,16 +36,9 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      # Install Poetry.
-      - uses: snok/install-poetry@v1
+      - uses: ./.github/actions/python-setup
         with:
-          version: 1.2.2
-
-      # Install the dependencies for the CLI testing framework.
-      - name: Install CLI testing framework dependencies
-        run: |
-          cd ./crates/aptos/e2e
-          poetry install
+          pyproject_directory: crates/aptos/e2e
 
       # Run CLI tests against local testnet built from devnet branch.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2

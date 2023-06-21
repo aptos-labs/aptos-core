@@ -1614,6 +1614,7 @@ async fn parse_operations(
                     {
                         let actual_pool_address: AccountAddress =
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+
                         let pool_address = operation
                             .metadata
                             .as_ref()
@@ -1644,6 +1645,60 @@ async fn parse_operations(
                     }
                 } else {
                     panic!("Not a user transaction");
+                }
+            },
+            OperationType::WithdrawUndelegatedFunds => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful distribute operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed distribute operation"
+                    );
+                }
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_pool_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+
+                        let pool_address = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .pool_address
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+
+                        assert_eq!(actual_pool_address, pool_address);
+
+                        let actual_amount: u64 =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+
+                        let amount = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .amount
+                            .as_ref()
+                            .unwrap()
+                            .0;
+
+                        assert_eq!(actual_amount, amount);
+                    } else {
+                        panic!("Not an entry function");
+                    }
                 }
             },
         }
@@ -2300,6 +2355,39 @@ async fn unlock_delegated_stake_and_wait(
         .map_err(ErrorWrapper::AfterSubmission)
 }
 
+async fn withdraw_undelegated_stake_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    pool_address: AccountAddress,
+    amount: Option<u64>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .withdraw_undelegated_stake(
+            network_identifier,
+            sender_key,
+            pool_address,
+            amount,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
 #[tokio::test]
 async fn test_delegation_pool_operations() {
     const NUM_TXNS_PER_PAGE: u16 = 2;
@@ -2386,7 +2474,7 @@ async fn test_delegation_pool_operations() {
     .await
     .expect("Should successfully add delegated stake");
 
-    let final_txn = unlock_delegated_stake_and_wait(
+    unlock_delegated_stake_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
@@ -2400,6 +2488,21 @@ async fn test_delegation_pool_operations() {
     )
     .await
     .expect("Should successfully unlock delegated stake");
+
+    let final_txn = withdraw_undelegated_stake_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        delegate_account_private_key,
+        pool_address,
+        Some(staked_amount),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully withdraw undelegated");
 
     let final_block_to_check = rest_client
         .get_block_by_version(final_txn.info.version.0, false)

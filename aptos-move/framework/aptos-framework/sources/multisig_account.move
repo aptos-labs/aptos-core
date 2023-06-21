@@ -91,6 +91,10 @@ module aptos_framework::multisig_account {
     const EDUPLICATE_METADATA_KEY: u64 = 16;
     /// The sequence number provided is invalid. It must be between [1, next pending transaction - 1].
     const EINVALID_SEQUENCE_NUMBER: u64 = 17;
+    /// Provided owners to remove and new owners overlap.
+    const EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP: u64 = 18;
+
+    const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 
     /// Represents a multisig account's configurations and transactions.
     /// This will be stored in the multisig account (created as a resource account separate from any owner accounts).
@@ -160,6 +164,21 @@ module aptos_framework::multisig_account {
 
     /// Used only for verifying multisig account creation on top of existing accounts.
     struct MultisigAccountCreationMessage has copy, drop {
+        // Chain id is included to prevent cross-chain replay.
+        chain_id: u8,
+        // Account address is included to prevent cross-account replay (when multiple accounts share the same auth key).
+        account_address: address,
+        // Sequence number is not needed for replay protection as the multisig account can only be created once.
+        // But it's included to ensure timely execution of account creation.
+        sequence_number: u64,
+        // The list of owners for the multisig account.
+        owners: vector<address>,
+        // The number of signatures required (signature threshold).
+        num_signatures_required: u64,
+    }
+
+    /// Used only for verifying multisig account creation on top of existing accounts and rotating the auth key to 0x0.
+    struct MultisigAccountCreationWithAuthKeyRevocationMessage has copy, drop {
         // Chain id is included to prevent cross-chain replay.
         chain_id: u8,
         // Account address is included to prevent cross-account replay (when multiple accounts share the same auth key).
@@ -372,6 +391,10 @@ module aptos_framework::multisig_account {
     /// This offers a migration path for an existing account with a multi-ed25519 auth key (native multisig account).
     /// In order to ensure a malicious module cannot obtain backdoor control over an existing account, a signed message
     /// with a valid signature from the account's auth key is required.
+    ///
+    /// Note that this does not revoke auth key-based control over the account. Owners should separately rotate the auth
+    /// key after they are fully migrated to the new multisig account. Alternatively, they can call
+    /// create_with_existing_account_and_revoke_auth_key instead.
     public entry fun create_with_existing_account(
         multisig_address: address,
         owners: vector<address>,
@@ -413,6 +436,64 @@ module aptos_framework::multisig_account {
         );
     }
 
+    /// Creates a new multisig account on top of an existing account and immediately rotate the origin auth key to 0x0.
+    ///
+    /// Note: If the original account is a resource account, this does not revoke all control over it as if any
+    /// SignerCapability of the resource account still exists, it can still be used to generate the signer for the
+    /// account.
+    public entry fun create_with_existing_account_and_revoke_auth_key(
+        multisig_address: address,
+        owners: vector<address>,
+        num_signatures_required: u64,
+        account_scheme: u8,
+        account_public_key: vector<u8>,
+        create_multisig_account_signed_message: vector<u8>,
+        metadata_keys: vector<String>,
+        metadata_values: vector<vector<u8>>,
+    ) acquires MultisigAccount {
+        // Verify that the `MultisigAccountCreationMessage` has the right information and is signed by the account
+        // owner's key.
+        let proof_challenge = MultisigAccountCreationWithAuthKeyRevocationMessage {
+            chain_id: chain_id::get(),
+            account_address: multisig_address,
+            sequence_number: account::get_sequence_number(multisig_address),
+            owners,
+            num_signatures_required,
+        };
+        account::verify_signed_message(
+            multisig_address,
+            account_scheme,
+            account_public_key,
+            create_multisig_account_signed_message,
+            proof_challenge,
+        );
+
+        // We create the signer for the multisig account here since this is required to add the MultisigAccount resource
+        // This should be safe and authorized because we have verified the signed message from the existing account
+        // that authorizes creating a multisig account with the specified owners and signature threshold.
+        let multisig_account = &create_signer(multisig_address);
+        create_with_owners_internal(
+            multisig_account,
+            owners,
+            num_signatures_required,
+            option::none<SignerCapability>(),
+            metadata_keys,
+            metadata_values,
+        );
+
+        // Rotate the account's auth key to 0x0, which effectively revokes control via auth key.
+        let multisig_address = address_of(multisig_account);
+        account::rotate_authentication_key_internal(multisig_account, ZERO_AUTH_KEY);
+        // This also needs to revoke any signer capability or rotation capability that exists for the account to
+        // completely remove all access to the account.
+        if (account::is_signer_capability_offered(multisig_address)) {
+            account::revoke_any_signer_capability(multisig_account);
+        };
+        if (account::is_rotation_capability_offered(multisig_address)) {
+            account::revoke_any_rotation_capability(multisig_account);
+        };
+    }
+
     /// Creates a new multisig account and add the signer as a single owner.
     public entry fun create(
         owner: &signer,
@@ -445,6 +526,33 @@ module aptos_framework::multisig_account {
             option::some(multisig_signer_cap),
             metadata_keys,
             metadata_values,
+        );
+    }
+
+    /// Like `create_with_owners`, but removes the calling account after creation.
+    ///
+    /// This is for creating a vanity multisig account from a bootstrapping account that should not
+    /// be an owner after the vanity multisig address has been secured.
+    public entry fun create_with_owners_then_remove_bootstrapper(
+        bootstrapper: &signer,
+        owners: vector<address>,
+        num_signatures_required: u64,
+        metadata_keys: vector<String>,
+        metadata_values: vector<vector<u8>>,
+    ) acquires MultisigAccount {
+        let bootstrapper_address = address_of(bootstrapper);
+        create_with_owners(
+            bootstrapper,
+            owners,
+            num_signatures_required,
+            metadata_keys,
+            metadata_values
+        );
+        update_owner_schema(
+            get_next_multisig_account_address(bootstrapper_address),
+            vector[],
+            vector[bootstrapper_address],
+            option::none()
         );
     }
 
@@ -502,22 +610,26 @@ module aptos_framework::multisig_account {
     /// maliciously alter the owners list.
     entry fun add_owners(
         multisig_account: &signer, new_owners: vector<address>) acquires MultisigAccount {
-        // Short circuit if new owners list is empty.
-        // This avoids emitting an event if no changes happen, which is confusing to off-chain components.
-        if (vector::length(&new_owners) == 0) {
-            return
-        };
+        update_owner_schema(
+            address_of(multisig_account),
+            new_owners,
+            vector[],
+            option::none()
+        );
+    }
 
-        let multisig_address = address_of(multisig_account);
-        assert_multisig_account_exists(multisig_address);
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_address);
-
-        vector::append(&mut multisig_account_resource.owners, new_owners);
-        // This will fail if an existing owner is added again.
-        validate_owners(&multisig_account_resource.owners, multisig_address);
-        emit_event(&mut multisig_account_resource.add_owners_events, AddOwnersEvent {
-            owners_added: new_owners,
-        });
+    /// Add owners then update number of signatures required, in a single operation.
+    entry fun add_owners_and_update_signatures_required(
+        multisig_account: &signer,
+        new_owners: vector<address>,
+        new_num_signatures_required: u64
+    ) acquires MultisigAccount {
+        update_owner_schema(
+            address_of(multisig_account),
+            new_owners,
+            vector[],
+            option::some(new_num_signatures_required)
+        );
     }
 
     /// Similar to remove_owners, but only allow removing one owner.
@@ -535,36 +647,55 @@ module aptos_framework::multisig_account {
     /// maliciously alter the owners list.
     entry fun remove_owners(
         multisig_account: &signer, owners_to_remove: vector<address>) acquires MultisigAccount {
-        // Short circuit if the list of owners to remove is empty.
-        // This avoids emitting an event if no changes happen, which is confusing to off-chain components.
-        if (vector::length(&owners_to_remove) == 0) {
-            return
-        };
-
-        let multisig_address = address_of(multisig_account);
-        assert_multisig_account_exists(multisig_address);
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_address);
-
-        let owners = &mut multisig_account_resource.owners;
-        let owners_removed = vector::empty<address>();
-        vector::for_each_ref(&owners_to_remove, |owner_to_remove| {
-            let owner_to_remove = *owner_to_remove;
-            let (found, index) = vector::index_of(owners, &owner_to_remove);
-            // Only remove an owner if they're present in the owners list.
-            if (found) {
-                vector::push_back(&mut owners_removed, owner_to_remove);
-                vector::swap_remove(owners, index);
-            };
-        });
-
-        // Make sure there's still at least as many owners as the number of signatures required.
-        // This also ensures that there's at least one owner left as signature threshold must be > 0.
-        assert!(
-            vector::length(owners) >= multisig_account_resource.num_signatures_required,
-            error::invalid_state(ENOT_ENOUGH_OWNERS),
+        update_owner_schema(
+            address_of(multisig_account),
+            vector[],
+            owners_to_remove,
+            option::none()
         );
+    }
 
-        emit_event(&mut multisig_account_resource.remove_owners_events, RemoveOwnersEvent { owners_removed });
+    /// Swap an owner in for an old one, without changing required signatures.
+    entry fun swap_owner(
+        multisig_account: &signer,
+        to_swap_in: address,
+        to_swap_out: address
+    ) acquires MultisigAccount {
+        update_owner_schema(
+            address_of(multisig_account),
+            vector[to_swap_in],
+            vector[to_swap_out],
+            option::none()
+        );
+    }
+
+    /// Swap owners in and out, without changing required signatures.
+    entry fun swap_owners(
+        multisig_account: &signer,
+        to_swap_in: vector<address>,
+        to_swap_out: vector<address>
+    ) acquires MultisigAccount {
+        update_owner_schema(
+            address_of(multisig_account),
+            to_swap_in,
+            to_swap_out,
+            option::none()
+        );
+    }
+
+    /// Swap owners in and out, updating number of required signatures.
+    entry fun swap_owners_and_update_signatures_required(
+        multisig_account: &signer,
+        new_owners: vector<address>,
+        owners_to_remove: vector<address>,
+        new_num_signatures_required: u64
+    ) acquires MultisigAccount {
+        update_owner_schema(
+            address_of(multisig_account),
+            new_owners,
+            owners_to_remove,
+            option::some(new_num_signatures_required)
+        );
     }
 
     /// Update the number of signatures required to execute transaction in the specified multisig account.
@@ -575,28 +706,11 @@ module aptos_framework::multisig_account {
     /// maliciously alter the number of signatures required.
     entry fun update_signatures_required(
         multisig_account: &signer, new_num_signatures_required: u64) acquires MultisigAccount {
-        let multisig_address = address_of(multisig_account);
-        assert_multisig_account_exists(multisig_address);
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_address);
-        // Short-circuit if the new number of signatures required is the same as before.
-        // This avoids emitting an event.
-        if (multisig_account_resource.num_signatures_required == new_num_signatures_required) {
-            return
-        };
-        let num_owners = vector::length(&multisig_account_resource.owners);
-        assert!(
-            new_num_signatures_required > 0 && new_num_signatures_required <= num_owners,
-            error::invalid_argument(EINVALID_SIGNATURES_REQUIRED),
-        );
-
-        let old_num_signatures_required = multisig_account_resource.num_signatures_required;
-        multisig_account_resource.num_signatures_required = new_num_signatures_required;
-        emit_event(
-            &mut multisig_account_resource.update_signature_required_events,
-            UpdateSignaturesRequiredEvent {
-                old_num_signatures_required,
-                new_num_signatures_required,
-            }
+        update_owner_schema(
+            address_of(multisig_account),
+            vector[],
+            vector[],
+            option::some(new_num_signatures_required)
         );
     }
 
@@ -657,9 +771,6 @@ module aptos_framework::multisig_account {
     ////////////////////////// Multisig transaction flow ///////////////////////////////
 
     /// Create a multisig transaction, which will have one approval initially (from the creator).
-    ///
-    /// @param target_function The target function to call such as 0x123::module_to_call::function_to_call.
-    /// @param args Vector of BCS-encoded argument values to invoke the target function with.
     public entry fun create_transaction(
         owner: &signer,
         multisig_account: address,
@@ -685,10 +796,6 @@ module aptos_framework::multisig_account {
     /// Create a multisig transaction with a transaction hash instead of the full payload.
     /// This means the payload will be stored off chain for gas saving. Later, during execution, the executor will need
     /// to provide the full payload, which will be validated against the hash stored on-chain.
-    ///
-    /// @param function_hash The sha-256 hash of the function to invoke, e.g. 0x123::module_to_call::function_to_call.
-    /// @param args_hash The sha-256 hash of the function arguments - a concatenated vector of the bcs-encoded
-    /// function arguments.
     public entry fun create_transaction_with_hash(
         owner: &signer,
         multisig_account: address,
@@ -945,6 +1052,88 @@ module aptos_framework::multisig_account {
         assert!(exists<MultisigAccount>(multisig_account), error::invalid_state(EACCOUNT_NOT_MULTISIG));
     }
 
+    /// Add new owners, remove owners to remove, update signatures required.
+    fun update_owner_schema(
+        multisig_address: address,
+        new_owners: vector<address>,
+        owners_to_remove: vector<address>,
+        optional_new_num_signatures_required: Option<u64>,
+    ) acquires MultisigAccount {
+        assert_multisig_account_exists(multisig_address);
+        let multisig_account_ref_mut =
+            borrow_global_mut<MultisigAccount>(multisig_address);
+        // Verify no overlap between new owners and owners to remove.
+        vector::for_each_ref(&new_owners, |new_owner_ref| {
+            assert!(
+                !vector::contains(&owners_to_remove, new_owner_ref),
+                error::invalid_argument(EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP)
+            )
+        });
+        // If new owners provided, try to add them and emit an event.
+        if (vector::length(&new_owners) > 0) {
+            vector::append(&mut multisig_account_ref_mut.owners, new_owners);
+            validate_owners(
+                &multisig_account_ref_mut.owners,
+                multisig_address
+            );
+            emit_event(
+                &mut multisig_account_ref_mut.add_owners_events,
+                AddOwnersEvent { owners_added: new_owners }
+            );
+        };
+        // If owners to remove provided, try to remove them.
+        if (vector::length(&owners_to_remove) > 0) {
+            let owners_ref_mut = &mut multisig_account_ref_mut.owners;
+            let owners_removed = vector[];
+            vector::for_each_ref(&owners_to_remove, |owner_to_remove_ref| {
+                let (found, index) =
+                    vector::index_of(owners_ref_mut, owner_to_remove_ref);
+                if (found) {
+                    vector::push_back(
+                        &mut owners_removed,
+                        vector::swap_remove(owners_ref_mut, index)
+                    );
+                }
+            });
+            // Only emit event if owner(s) actually removed.
+            if (vector::length(&owners_removed) > 0) {
+                emit_event(
+                    &mut multisig_account_ref_mut.remove_owners_events,
+                    RemoveOwnersEvent { owners_removed }
+                );
+            }
+        };
+        // If new signature count provided, try to update count.
+        if (option::is_some(&optional_new_num_signatures_required)) {
+            let new_num_signatures_required =
+                option::extract(&mut optional_new_num_signatures_required);
+            assert!(
+                new_num_signatures_required > 0,
+                error::invalid_argument(EINVALID_SIGNATURES_REQUIRED)
+            );
+            let old_num_signatures_required =
+                multisig_account_ref_mut.num_signatures_required;
+            // Only apply update and emit event if a change indicated.
+            if (new_num_signatures_required != old_num_signatures_required) {
+                multisig_account_ref_mut.num_signatures_required =
+                    new_num_signatures_required;
+                emit_event(
+                    &mut multisig_account_ref_mut.update_signature_required_events,
+                    UpdateSignaturesRequiredEvent {
+                        old_num_signatures_required,
+                        new_num_signatures_required,
+                    }
+                );
+            }
+        };
+        // Verify number of owners.
+        let num_owners = vector::length(&multisig_account_ref_mut.owners);
+        assert!(
+            num_owners >= multisig_account_ref_mut.num_signatures_required,
+            error::invalid_state(ENOT_ENOUGH_OWNERS)
+        );
+    }
+
     ////////////////////////// Tests ///////////////////////////////
 
     #[test_only]
@@ -1154,6 +1343,47 @@ module aptos_framework::multisig_account {
         assert!(owners(multisig_address) == expected_owners, 0);
     }
 
+    #[test]
+    public entry fun test_create_multisig_account_on_top_of_existing_multi_ed25519_account_and_revoke_auth_key()
+    acquires MultisigAccount {
+        setup();
+        let (curr_sk, curr_pk) = multi_ed25519::generate_keys(2, 3);
+        let pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&curr_pk);
+        let auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pk_unvalidated);
+        let multisig_address = from_bcs::to_address(auth_key);
+        create_account(multisig_address);
+
+        // Create both a signer capability and rotation capability offers
+        account::set_rotation_capability_offer(multisig_address, @0x123);
+        account::set_signer_capability_offer(multisig_address, @0x123);
+
+        let expected_owners = vector[@0x123, @0x124, @0x125];
+        let proof = MultisigAccountCreationWithAuthKeyRevocationMessage {
+            chain_id: chain_id::get(),
+            account_address: multisig_address,
+            sequence_number: account::get_sequence_number(multisig_address),
+            owners: expected_owners,
+            num_signatures_required: 2,
+        };
+        let signed_proof = multi_ed25519::sign_struct(&curr_sk, proof);
+        create_with_existing_account_and_revoke_auth_key(
+            multisig_address,
+            expected_owners,
+            2,
+            1, // MULTI_ED25519_SCHEME
+            multi_ed25519::unvalidated_public_key_to_bytes(&pk_unvalidated),
+            multi_ed25519::signature_to_bytes(&signed_proof),
+            vector[],
+            vector[],
+        );
+        assert_multisig_account_exists(multisig_address);
+        assert!(owners(multisig_address) == expected_owners, 0);
+        assert!(account::get_authentication_key(multisig_address) == ZERO_AUTH_KEY, 1);
+        // Verify that all capability offers have been wiped.
+        assert!(!account::is_rotation_capability_offered(multisig_address), 2);
+        assert!(!account::is_signer_capability_offered(multisig_address), 3);
+    }
+
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]
     public entry fun test_update_signatures_required(
         owner_1: &signer, owner_2: &signer, owner_3: &signer) acquires MultisigAccount {
@@ -1200,7 +1430,7 @@ module aptos_framework::multisig_account {
     }
 
     #[test(owner = @0x123)]
-    #[expected_failure(abort_code = 0x1000B, location = Self)]
+    #[expected_failure(abort_code = 0x30005, location = Self)]
     public entry fun test_update_with_too_many_signatures_required_should_fail(
         owner: &signer) acquires MultisigAccount {
         setup();
@@ -1615,5 +1845,37 @@ module aptos_framework::multisig_account {
         create_transaction(owner_1, multisig_account, PAYLOAD);
         reject_transaction(owner_2, multisig_account, 1);
         execute_rejected_transaction(owner_3, multisig_account);
+    }
+
+    #[test(
+        owner_1 = @0x123,
+        owner_2 = @0x124,
+        owner_3 = @0x125
+    )]
+    #[expected_failure(abort_code = 0x10012, location = Self)]
+    fun test_update_owner_schema_overlap_should_fail(
+        owner_1: &signer,
+        owner_2: &signer,
+        owner_3: &signer
+    ) acquires MultisigAccount {
+        setup();
+        let owner_1_addr = address_of(owner_1);
+        let owner_2_addr = address_of(owner_2);
+        let owner_3_addr = address_of(owner_3);
+        create_account(owner_1_addr);
+        let multisig_address = get_next_multisig_account_address(owner_1_addr);
+        create_with_owners(
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[]
+        );
+        update_owner_schema(
+            multisig_address,
+            vector[owner_1_addr],
+            vector[owner_1_addr],
+            option::none()
+        );
     }
 }

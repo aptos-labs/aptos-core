@@ -71,6 +71,8 @@ impl TransferFunderConfig {
             self.transaction_submission_config.max_gas_amount,
             self.transaction_submission_config
                 .transaction_expiration_secs,
+            self.transaction_submission_config
+                .wait_for_outstanding_txns_secs,
             self.transaction_submission_config.wait_for_transactions,
         );
 
@@ -103,6 +105,9 @@ pub struct TransferFunder {
     /// requests in the order they came in.
     outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
 
+    /// Amount of time we'll wait for the seqnum to catch up before resetting it.
+    wait_for_outstanding_txns_secs: u64,
+
     /// If set, we won't return responses until the transaction is processed.
     wait_for_transactions: bool,
 }
@@ -118,6 +123,7 @@ impl TransferFunder {
         gas_unit_price_override: Option<u64>,
         max_gas_amount: u64,
         transaction_expiration_secs: u64,
+        wait_for_outstanding_txns_secs: u64,
         wait_for_transactions: bool,
     ) -> Self {
         let gas_unit_price_manager =
@@ -134,6 +140,7 @@ impl TransferFunder {
             gas_unit_price_manager,
             gas_unit_price_override,
             outstanding_requests: RwLock::new(vec![]),
+            wait_for_outstanding_txns_secs,
             wait_for_transactions,
         }
     }
@@ -246,6 +253,7 @@ impl FunderTrait for TransferFunder {
             &self.outstanding_requests,
             receiver_address,
             amount,
+            self.wait_for_outstanding_txns_secs,
         )
         .await?;
 

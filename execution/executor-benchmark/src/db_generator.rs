@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{add_accounts_impl, benchmark_transaction::BenchmarkTransaction, PipelineConfig};
+use crate::{add_accounts_impl, PipelineConfig};
 use aptos_config::{
     config::{
         PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
@@ -26,11 +26,11 @@ pub fn create_db_with_accounts<V>(
     db_dir: impl AsRef<Path>,
     storage_pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
     pipeline_config: PipelineConfig,
 ) where
-    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     println!("Initializing...");
 
@@ -40,7 +40,7 @@ pub fn create_db_with_accounts<V>(
     // create if not exists
     fs::create_dir_all(db_dir.as_ref()).unwrap();
 
-    bootstrap_with_genesis(&db_dir, use_state_kv_db);
+    bootstrap_with_genesis(&db_dir, split_ledger_db, use_sharded_state_merkle_db);
 
     println!(
         "Finished empty DB creation, DB dir: {}. Creating accounts now...",
@@ -55,18 +55,23 @@ pub fn create_db_with_accounts<V>(
         &db_dir,
         storage_pruner_config,
         verify_sequence_numbers,
-        use_state_kv_db,
+        split_ledger_db,
         use_sharded_state_merkle_db,
         pipeline_config,
     );
 }
 
-fn bootstrap_with_genesis(db_dir: impl AsRef<Path>, use_state_kv_db: bool) {
+fn bootstrap_with_genesis(
+    db_dir: impl AsRef<Path>,
+    split_ledger_db: bool,
+    use_sharded_state_merkle_db: bool,
+) {
     let (config, _genesis_key) = aptos_genesis::test_utils::test_config();
 
     let mut rocksdb_configs = RocksdbConfigs::default();
     rocksdb_configs.state_merkle_db_config.max_open_files = -1;
-    rocksdb_configs.use_state_kv_db = use_state_kv_db;
+    rocksdb_configs.split_ledger_db = split_ledger_db;
+    rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
     let (_db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(
             &db_dir,

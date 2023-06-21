@@ -14,7 +14,6 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_schemadb::DB;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -29,7 +28,6 @@ use std::sync::Arc;
 /// Provides functionalities for AptosDB data restore.
 #[derive(Clone)]
 pub struct RestoreHandler {
-    ledger_db: Arc<DB>,
     pub aptosdb: Arc<AptosDB>,
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
@@ -39,7 +37,6 @@ pub struct RestoreHandler {
 
 impl RestoreHandler {
     pub(crate) fn new(
-        ledger_db: Arc<DB>,
         aptosdb: Arc<AptosDB>,
         ledger_store: Arc<LedgerStore>,
         transaction_store: Arc<TransactionStore>,
@@ -47,7 +44,6 @@ impl RestoreHandler {
         event_store: Arc<EventStore>,
     ) -> Self {
         Self {
-            ledger_db,
             aptosdb,
             ledger_store,
             transaction_store,
@@ -78,7 +74,7 @@ impl RestoreHandler {
 
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
         restore_utils::save_ledger_infos(
-            self.ledger_db.clone(),
+            self.aptosdb.ledger_db.metadata_db(),
             self.ledger_store.clone(),
             ledger_infos,
             None,
@@ -91,7 +87,7 @@ impl RestoreHandler {
         frozen_subtrees: &[HashValue],
     ) -> Result<()> {
         restore_utils::confirm_or_save_frozen_subtrees(
-            self.ledger_db.clone(),
+            self.aptosdb.ledger_db.transaction_accumulator_db(),
             num_leaves,
             frozen_subtrees,
             None,
@@ -107,7 +103,6 @@ impl RestoreHandler {
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
         restore_utils::save_transactions(
-            self.ledger_db.clone(),
             self.ledger_store.clone(),
             self.transaction_store.clone(),
             self.event_store.clone(),
@@ -131,7 +126,6 @@ impl RestoreHandler {
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
         restore_utils::save_transactions(
-            self.ledger_db.clone(),
             self.ledger_store.clone(),
             self.transaction_store.clone(),
             self.event_store.clone(),
@@ -164,6 +158,7 @@ impl RestoreHandler {
         let mut iter = self
             .aptosdb
             .ledger_db
+            .metadata_db()
             .iter::<DbMetadataSchema>(Default::default())?;
         iter.seek_to_first();
         while let Some((k, _v)) = iter.next().transpose()? {

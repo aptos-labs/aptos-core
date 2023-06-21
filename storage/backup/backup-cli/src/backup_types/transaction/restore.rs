@@ -482,9 +482,7 @@ impl TransactionRestoreBatchController {
 
                     // create iterator of txn and its outputs to be replayed after the snapshot.
                     Ok(stream::iter(
-                        izip!(txns, txn_infos, write_sets, event_vecs)
-                            .into_iter()
-                            .map(Result::<_>::Ok),
+                        izip!(txns, txn_infos, write_sets, event_vecs).map(Result::<_>::Ok),
                     ))
                 })
             })

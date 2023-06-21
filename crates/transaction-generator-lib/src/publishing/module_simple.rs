@@ -146,6 +146,14 @@ pub enum EntryPoints {
     EmitEvents {
         count: u64,
     },
+    MakeOrChangeTable {
+        offset: u64,
+        count: u64,
+    },
+    MakeOrChangeTableRandom {
+        max_offset: u64,
+        max_count: u64,
+    },
     /// Increment destination resource - COUNTER_STEP
     StepDst,
 
@@ -182,6 +190,8 @@ impl EntryPoints {
             | EntryPoints::MakeOrChange { .. }
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
+            | EntryPoints::MakeOrChangeTable { .. }
+            | EntryPoints::MakeOrChangeTableRandom { .. }
             | EntryPoints::StepDst => "simple",
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
@@ -213,6 +223,8 @@ impl EntryPoints {
             | EntryPoints::MakeOrChange { .. }
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
+            | EntryPoints::MakeOrChangeTable { .. }
+            | EntryPoints::MakeOrChangeTableRandom { .. }
             | EntryPoints::StepDst => "simple",
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
@@ -286,6 +298,32 @@ impl EntryPoints {
                 get_payload(module_id, ident_str!("emit_events").to_owned(), vec![
                     bcs::to_bytes(count).unwrap(),
                 ])
+            },
+            EntryPoints::MakeOrChangeTable { offset, count } => get_payload(
+                module_id,
+                ident_str!("make_or_change_table").to_owned(),
+                vec![
+                    bcs::to_bytes(offset).unwrap(),
+                    bcs::to_bytes(count).unwrap(),
+                ],
+            ),
+            EntryPoints::MakeOrChangeTableRandom {
+                max_offset,
+                max_count,
+            } => {
+                let rng = rng.expect("Must provide RNG");
+                let mut offset: u64 = rng.gen();
+                offset %= max_offset;
+                let mut count: u64 = rng.gen();
+                count %= max_count;
+                get_payload(
+                    module_id,
+                    ident_str!("make_or_change_table").to_owned(),
+                    vec![
+                        bcs::to_bytes(&offset).unwrap(),
+                        bcs::to_bytes(&count).unwrap(),
+                    ],
+                )
             },
             EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
             EntryPoints::TokenV1InitializeCollection => get_payload_void(

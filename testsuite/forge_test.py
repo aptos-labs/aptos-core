@@ -3,20 +3,12 @@ import json
 import os
 import unittest
 import tempfile
-from collections import OrderedDict
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
     Dict,
-    Generator,
-    List,
-    Optional,
     Protocol,
-    Sequence,
-    Union,
 )
 from unittest.mock import patch
 
@@ -31,7 +23,6 @@ from forge import (
     ForgeState,
     K8sForgeRunner,
     LocalForgeRunner,
-    RunResult,
     SystemContext,
     ensure_provided_image_tags_has_profile_or_features,
     create_forge_command,
@@ -48,13 +39,14 @@ from forge import (
     main,
     sanitize_forge_resource_name,
     validate_forge_config,
+    GAR_REPO_NAME,
 )
 
 from click.testing import CliRunner, Result
-from forge_wrapper_core.filesystem import Filesystem
-from forge_wrapper_core.git import Git
-from forge_wrapper_core.process import Process, Processes
-from forge_wrapper_core.cluster import (
+from test_framework.filesystem import FakeFilesystem, SpyFilesystem, FILE_NOT_FOUND
+from test_framework.git import Git
+from test_framework.process import FakeProcesses, SpyProcesses
+from test_framework.cluster import (
     GetPodsItem,
     GetPodsItemMetadata,
     GetPodsItemStatus,
@@ -63,8 +55,9 @@ from forge_wrapper_core.cluster import (
     AwsListClusterResult,
 )
 
-from forge_wrapper_core.shell import Shell
-from forge_wrapper_core.time import Time
+from test_framework.shell import SpyShell, FakeShell, FakeCommand, RunResult
+from test_framework.time import FakeTime
+from test_framework.cluster import Cloud
 
 # Show the entire diff when unittest fails assertion
 unittest.util._MAX_LENGTH = 2000  # type: ignore
@@ -106,75 +99,6 @@ class AssertFixtureMixin:
         )
 
 
-class FakeShell(Shell):
-    def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
-        return RunResult(0, b"output")
-
-    async def gen_run(
-        self, command: Sequence[str], stream_output: bool = False
-    ) -> RunResult:
-        return RunResult(0, b"async output")
-
-
-class FakeFilesystem(Filesystem):
-    def write(self, filename: str, contents: bytes) -> None:
-        print(f"Wrote {contents} to {filename}")
-
-    def read(self, filename: str) -> bytes:
-        return b"fake"
-
-    def mkstemp(self) -> str:
-        return "temp"
-
-    def rlimit(self, resource_type: int, soft: int, hard: int) -> None:
-        return
-
-    def unlink(self, filename: str) -> None:
-        return
-
-
-@dataclass
-class FakeProcess(Process):
-    _name: str
-    _ppid: int
-
-    def name(self) -> str:
-        return self._name
-
-    def ppid(self) -> int:
-        return self._ppid
-
-
-class FakeProcesses(Processes):
-    def __init__(self) -> None:
-        self.exit_callbacks = []
-
-    def processes(self) -> Generator[Process, None, None]:
-        yield FakeProcess("concensus", 1)
-
-    def get_pid(self) -> int:
-        return 2
-
-    def spawn(self, target: Callable[[], None]) -> Process:
-        return FakeProcess("child", 2)
-
-    def atexit(self, callback: Callable[[], None]) -> None:
-        return self.exit_callbacks.append(callback)
-
-    def user(self) -> str:
-        return "perry"
-
-
-class FakeTime(Time):
-    _now: int = 1659078000
-
-    def now(self) -> datetime:
-        return datetime.fromtimestamp(self._now, timezone.utc)
-
-    def epoch(self) -> str:
-        return str(self._now)
-
-
 class FakeConfigBackend(ForgeConfigBackend):
     def __init__(self, store: object) -> None:
         self.store = store
@@ -189,150 +113,13 @@ class FakeConfigBackend(ForgeConfigBackend):
         return self.store
 
 
-class FakeCommand:
-    def __init__(
-        self, command: str, result_or_exception: Union[RunResult, Exception]
-    ) -> None:
-        self.command = command
-        self.result_or_exception = result_or_exception
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, FakeCommand):
-            return False
-        return self.command == other.command
-
-    def __hash__(self) -> int:
-        return hash(self.command)
-
-    def __repr__(self) -> str:
-        return f"FakeCommand({self.command})"
-
-    def __str__(self) -> str:
-        return self.command
-
-
-class SpyShell(FakeShell):
-    def __init__(
-        self,
-        expected_command_list: Sequence[FakeCommand],
-        strict: bool = False,
-    ) -> None:
-        self.expected_command_list = expected_command_list
-        self.commands = []
-        self.strict = strict
-
-    def get_fake_commands(self) -> Sequence[str]:
-        """Get the list of commands that are expected to be run"""
-        return [fakecommand.command for fakecommand in self.expected_command_list]
-
-    def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
-        """Mock a command run by adding it to a list of commands and returning the result"""
-        rendered_command = " ".join(command)
-        default = (
-            Exception(f"Command not mocked: {rendered_command}")
-            if self.strict
-            else super().run(command)
-        )
-        # get how many times it's been called before, and use that to index into the expected command list
-        # XXX: could be optimized, since it does N^2 scans of the command list
-        times_called_before = self.commands.count(rendered_command)
-        if rendered_command in self.get_fake_commands():
-            try:
-                command_index = [
-                    i
-                    for i, fakecommand in enumerate(self.expected_command_list)
-                    if fakecommand.command == rendered_command
-                ][times_called_before - 1]
-            except IndexError:
-                pretty_fake_cmds = "\n".join(self.get_fake_commands())
-                raise Exception(
-                    f"Did not find command {times_called_before} times in expected command list: {rendered_command}\n{pretty_fake_cmds}"
-                )
-            result = self.expected_command_list[command_index].result_or_exception
-        else:
-            raise Exception(
-                f"Did not find command '{rendered_command}' in expected command list: {self.get_fake_commands()}"
-            )
-        self.commands.append(rendered_command)
-        if isinstance(result, Exception):
-            raise result
-        return result
-
-    async def gen_run(
-        self, command: Sequence[str], stream_output: bool = False
-    ) -> RunResult:
-        return self.run(command, stream_output)
-
-    def assert_commands(self, testcase) -> None:
-        """Compare the list of commands that were run to the list of expected commands"""
-        testcase.assertEqual(self.get_fake_commands(), self.commands)
-
-
-class SpyFilesystem(FakeFilesystem):
-    def __init__(
-        self,
-        expected_writes: Dict[str, bytes],
-        expected_reads: Dict[str, bytes],
-        expected_unlinks: Optional[List[str]] = None,
-    ) -> None:
-        self.expected_writes = expected_writes
-        self.expected_reads = expected_reads
-        self.expected_unlinks = expected_unlinks or []
-        self.writes = {}
-        self.reads = []
-        self.temp_count = 1
-        self.unlinks = []
-
-    def write(self, filename: str, contents: bytes) -> None:
-        self.writes[filename] = contents
-
-    def get_write(self, filename: str) -> bytes:
-        return self.writes[filename]
-
-    def read(self, filename: str) -> bytes:
-        self.reads.append(filename)
-        return self.expected_reads.get(filename, b"")
-
-    def assert_writes(self, testcase) -> None:
-        for filename, contents in self.expected_writes.items():
-            testcase.assertIn(
-                filename, self.writes, f"{filename} was not written: {self.writes}"
-            )
-            testcase.assertMultiLineEqual(
-                self.writes[filename].decode(),
-                contents.decode(),
-                f"{filename} did not match expected contents",
-            )
-
-    def assert_reads(self, testcase) -> None:
-        for filename in self.expected_reads.keys():
-            testcase.assertIn(filename, self.reads, f"{filename} was not read")
-
-    def mkstemp(self) -> str:
-        filename = f"temp{self.temp_count}"
-        self.temp_count += 1
-        return filename
-
-    def unlink(self, filename: str) -> None:
-        self.unlinks.append(filename)
-
-    def assert_unlinks(self, testcase) -> None:
-        for filename in self.expected_unlinks:
-            testcase.assertIn(filename, self.unlinks, f"{filename} was not unlinked")
-
-
-class SpyProcesses(FakeProcesses):
-    def run_atexit(self) -> None:
-        for callback in self.exit_callbacks:
-            callback()
-
-
 def fake_context(
     shell=None,
     filesystem=None,
     processes=None,
     time=None,
     mode=None,
+    multiregion=False,
 ) -> ForgeContext:
     return ForgeContext(
         shell=shell if shell else FakeShell(),
@@ -361,31 +148,14 @@ def fake_context(
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
         forge_namespace="forge-potato",
-        forge_cluster=ForgeCluster(name="tomato", kubeconf="kubeconf"),
+        forge_cluster=ForgeCluster(
+            name="tomato", kubeconf="kubeconf", is_multiregion=multiregion
+        ),
         forge_test_suite="banana",
         forge_blocking=True,
         github_actions="false",
         github_job_url="https://banana",
     )
-
-
-class SpyTests(unittest.TestCase):
-    def testSpyShell(self) -> None:
-        shell = SpyShell(
-            [
-                FakeCommand(
-                    "echo hello",
-                    RunResult(0, b""),
-                ),
-                FakeCommand(
-                    "echo hello_banana",
-                    RunResult(0, b""),
-                ),
-            ]
-        )
-        shell.run(["echo", "hello"])
-        shell.run(["echo", "hello_banana"])
-        shell.assert_commands(self)
 
 
 class ForgeRunnerTests(unittest.TestCase):
@@ -474,6 +244,14 @@ class ForgeRunnerTests(unittest.TestCase):
                     "kubectl --kubeconfig kubeconf get pods -n forge-potato",
                     RunResult(0, b"Pods"),
                 ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
             ]
         )
         forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
@@ -483,10 +261,72 @@ class ForgeRunnerTests(unittest.TestCase):
                 "temp1": template_fixture.read_bytes(),
             },
             {
+                "forge-test-runner-template.yaml": FILE_NOT_FOUND,
                 "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(),
             },
         )
         context = fake_context(shell, filesystem, mode="k8s")
+        runner = K8sForgeRunner()
+        result = runner.run(context)
+        shell.assert_commands(self)
+        filesystem.assert_writes(self)
+        filesystem.assert_reads(self)
+        self.assertEqual(result.state, ForgeState.PASS, result.output)
+
+    def testK8sRunnerWithMultiregionCluster(self) -> None:
+        self.maxDiff = None
+        shell = SpyShell(
+            [
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver apply -n default -f temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --timeout=5m --for=condition=Ready pod/forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf logs -n default -f forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pod -n default forge-potato-1659078000-asdf -o jsonpath='{.status.phase}'",
+                    RunResult(0, b"Succeeded"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pods -n forge-potato",
+                    RunResult(0, b"Pods"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
+            ]
+        )
+        forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
+        template_fixture = get_fixture_path("forge-test-runner-template.fixture")
+        filesystem = SpyFilesystem(
+            {
+                "temp1": template_fixture.read_bytes(),
+            },
+            {
+                "forge-test-runner-template.yaml": FILE_NOT_FOUND,
+                "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(),
+            },
+        )
+        context = fake_context(shell, filesystem, mode="k8s", multiregion=True)
         runner = K8sForgeRunner()
         result = runner.run(context)
         shell.assert_commands(self)
@@ -512,7 +352,31 @@ class TestFindRecentImage(unittest.TestCase):
             ]
         )
         git = Git(shell)
-        image_tags = find_recent_images(shell, git, 1, "aptos/validator-testing")
+        image_tags = find_recent_images(
+            shell, git, 1, "validator-testing", cloud=Cloud.AWS
+        )
+        self.assertEqual(list(image_tags), ["lychee"])
+        shell.assert_commands(self)
+
+    def testFindRecentImageGcp(self) -> None:
+        shell = SpyShell(
+            [
+                FakeCommand("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
+                FakeCommand(
+                    f"crane manifest {GAR_REPO_NAME}/validator-testing:potato",
+                    RunResult(1, b""),
+                ),
+                FakeCommand("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
+                FakeCommand(
+                    f"crane manifest {GAR_REPO_NAME}/validator-testing:lychee",
+                    RunResult(0, b""),
+                ),
+            ]
+        )
+        git = Git(shell)
+        image_tags = find_recent_images(
+            shell, git, 1, "validator-testing", cloud=Cloud.GCP
+        )
         self.assertEqual(list(image_tags), ["lychee"])
         shell.assert_commands(self)
 
@@ -528,7 +392,12 @@ class TestFindRecentImage(unittest.TestCase):
         )
         git = Git(shell)
         image_tags = find_recent_images_by_profile_or_features(
-            shell, git, 1, enable_performance_profile=False, enable_failpoints=True
+            shell,
+            git,
+            1,
+            enable_performance_profile=False,
+            enable_failpoints=True,
+            cloud=Cloud.AWS,
         )
         self.assertEqual(list(image_tags), ["failpoints_tomato"])
         shell.assert_commands(self)
@@ -550,6 +419,7 @@ class TestFindRecentImage(unittest.TestCase):
             1,
             enable_performance_profile=True,
             enable_failpoints=False,
+            cloud=Cloud.AWS,
         )
         self.assertEqual(list(image_tags), ["performance_potato"])
         shell.assert_commands(self)
@@ -602,7 +472,7 @@ class TestFindRecentImage(unittest.TestCase):
             ]
         )
         git = Git(shell)
-        images = find_recent_images(shell, git, 2, "aptos/validator")
+        images = find_recent_images(shell, git, 2, "validator", cloud=Cloud.AWS)
         self.assertEqual(list(images), ["crab", "shrimp"])
 
     def testFailpointsProvidedImageTag(self) -> None:
@@ -829,6 +699,16 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 ),
                 FakeCommand(
                     "kubectl --kubeconfig temp1 get pods -n forge-perry-1659078000",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 delete pod -n default -l forge-namespace=forge-perry-1659078000 "
+                    "--force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 wait -n default --for=delete pod -l "
+                    "forge-namespace=forge-perry-1659078000",
                     RunResult(0, b""),
                 ),
             ]

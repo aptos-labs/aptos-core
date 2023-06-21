@@ -25,6 +25,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/forge-stable.yaml"
+      - "testsuite/find_latest_image.py"
   push:
     branches:
       - aptos-release-v* # the aptos release branches
@@ -75,15 +76,28 @@ jobs:
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
-      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+      # find_latest_images.py requires docker utilities and having authenticated to internal docker image registries
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        id: docker-setup
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - name: Install python deps
-        run: pip3 install click==8.1.3 psutil==5.9.1
+      - uses: ./.github/actions/python-setup
+        with:
+          pyproject_directory: testsuite
 
       - name: Determine image tag
         id: determine-test-image-tag
         # forge relies on the default and failpoints variants
-        run: python3 testsuite/find_latest_image.py --variant failpoints --variant performance
+        run: ./testrun find_latest_image.py --variant failpoints --variant performance
+        shell: bash
+        working-directory: testsuite
 
       - name: Write summary
         run: |
@@ -94,7 +108,60 @@ jobs:
           fi
           echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
 
-  ### Performance Forge tests
+
+  ### Real-world-network tests.
+
+  run-forge-realistic-env-max-load-long:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-realistic-env-max-load-long-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 7200
+      FORGE_TEST_SUITE: realistic_env_max_load
+      POST_TO_SLACK: true
+
+  run-forge-realistic-env-load-sweep:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-realistic-env-load-sweep-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # 5 tests, each 300s
+      FORGE_RUNNER_DURATION_SECS: 1500
+      FORGE_TEST_SUITE: realistic_env_load_sweep
+      POST_TO_SLACK: true
+
+  run-forge-realistic-env-graceful-overload:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-realistic-env-graceful-overload-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 1200
+      FORGE_TEST_SUITE: realistic_env_graceful_overload
+      POST_TO_SLACK: true
+
+  run-forge-realistic-network-tuned-for-throughput:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-realistic-network-tuned-for-throughput-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: realistic_network_tuned_for_throughput
+      FORGE_ENABLE_PERFORMANCE: true
+      POST_TO_SLACK: true
+
+  ### Forge Correctness/Componenet/Stress tests
 
   run-forge-consensus-stress-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -106,32 +173,19 @@ jobs:
       FORGE_NAMESPACE: forge-consensus-stress-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: consensus_stress_test
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      POST_TO_SLACK: true
 
-  run-forge-account-creation-test:
+  run-forge-workload-mix-test:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-account-creation-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-workload-mix-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: account_creation
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-
-  run-forge-performance-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-performance-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 7200
-      FORGE_TEST_SUITE: land_blocking
-      FORGE_ENABLE_PERFORMANCE: true
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      FORGE_TEST_SUITE: workload_mix
+      POST_TO_SLACK: true
 
   run-forge-single-vfn-perf:
     if: ${{ github.event_name != 'pull_request' }}
@@ -144,7 +198,7 @@ jobs:
       # Run for 8 minutes
       FORGE_RUNNER_DURATION_SECS: 480
       FORGE_TEST_SUITE: single_vfn_perf
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      POST_TO_SLACK: true
 
   run-forge-haproxy:
     if: ${{ github.event_name != 'pull_request' }}
@@ -157,7 +211,19 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 600
       FORGE_ENABLE_HAPROXY: true
       FORGE_TEST_SUITE: land_blocking
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      POST_TO_SLACK: true
+
+  run-forge-fullnode-reboot-stress-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-fullnode-reboot-stress-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_TEST_SUITE: fullnode_reboot_stress_test
+      POST_TO_SLACK: true
 
   ### Compatibility Forge tests
 
@@ -174,33 +240,7 @@ jobs:
       FORGE_TEST_SUITE: compat
       IMAGE_TAG: testnet
       GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-
-  ### Chaos Forge tests
-
-  run-forge-three-region:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-three-region-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800
-      FORGE_TEST_SUITE: three_region_simulation
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-
-  run-forge-fullnode-reboot-stress-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-fullnode-reboot-stress-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800
-      FORGE_TEST_SUITE: fullnode_reboot_stress_test
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      POST_TO_SLACK: true
 
   ### Changing working quorum Forge tests
 
@@ -214,20 +254,7 @@ jobs:
       FORGE_NAMESPACE: forge-changing-working-quorum-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1200
       FORGE_TEST_SUITE: changing_working_quorum_test
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-      FORGE_ENABLE_FAILPOINTS: true
-
-  run-forge-different-node-speed-and-reliability-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-different-node-speed-and-reliability-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: different_node_speed_and_reliability_test
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      POST_TO_SLACK: true
       FORGE_ENABLE_FAILPOINTS: true
 
   run-forge-changing-working-quorum-test-high-load:
@@ -240,7 +267,7 @@ jobs:
       FORGE_NAMESPACE: forge-changing-working-quorum-test-high-load-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: changing_working_quorum_test_high_load
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      POST_TO_SLACK: true
       FORGE_ENABLE_FAILPOINTS: true
 
   ### State sync Forge tests
@@ -269,7 +296,7 @@ jobs:
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: state_sync_perf_fullnodes_execute_transactions
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      POST_TO_SLACK: true
 
   run-forge-state-sync-perf-fullnode-fast-sync-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -282,7 +309,7 @@ jobs:
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: state_sync_perf_fullnodes_fast_sync
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      POST_TO_SLACK: true
 
   run-forge-state-sync-perf-fullnode-apply-test:
     if: ${{ github.event_name != 'pull_request' }}
@@ -294,30 +321,4 @@ jobs:
       FORGE_NAMESPACE: forge-state-sync-perf-fullnode-apply-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: state_sync_perf_fullnodes_apply_outputs
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-
-### Additional three-region tests. Eventually all consensus-related tests should migrate to three-regions.
-
-  run-forge-land-blocking-three-region:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-land-blocking-three-region-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800
-      FORGE_TEST_SUITE: land_blocking_three_region
-      POST_TO_SLACK: true
-
-  run-forge-three-region-graceful-overload:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-three-region-graceful-overload-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800
-      FORGE_TEST_SUITE: three_region_simulation_graceful_overload
       POST_TO_SLACK: true

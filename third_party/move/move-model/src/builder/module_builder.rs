@@ -22,8 +22,8 @@ use crate::{
     options::ModelBuilderOptions,
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_ABSTRACT_PROP,
-        CONDITION_CONCRETE_PROP, CONDITION_DEACTIVATED_PROP, CONDITION_INJECTED_PROP,
-        OPAQUE_PRAGMA, VERIFY_PRAGMA,
+        CONDITION_CONCRETE_PROP, CONDITION_DEACTIVATED_PROP, CONDITION_EXPORT_PROP,
+        CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, Type, BOOL_TYPE},
@@ -1122,7 +1122,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         let spec_fun_idx = spec_fun_id.as_usize();
         let body = if self.spec_funs[spec_fun_idx].body.is_some() {
-            std::mem::replace(&mut self.spec_funs[spec_fun_idx].body, None).unwrap()
+            self.spec_funs[spec_fun_idx].body.take().unwrap()
         } else {
             // If the function is native and contains no mutable references
             // as parameters, consider it pure.
@@ -2951,8 +2951,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     et.get_type_params()
                 };
                 // Create a property marking this as injected.
-                let context_properties =
+                let mut context_properties =
                     self.add_bool_property(PropertyBag::default(), CONDITION_INJECTED_PROP, true);
+                context_properties =
+                    self.add_bool_property(context_properties, CONDITION_EXPORT_PROP, true);
                 self.def_ana_schema_inclusion_outside_schema(
                     loc,
                     &SpecBlockContext::Function(fun_name),
@@ -3078,7 +3080,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         // the full self. Rust requires us to do so (at least the author doesn't know better yet),
         // but moving it should be not too expensive.
         let body = if self.spec_funs[fun_idx].body.is_some() {
-            std::mem::replace(&mut self.spec_funs[fun_idx].body, None).unwrap()
+            self.spec_funs[fun_idx].body.take().unwrap()
         } else {
             // No body: assume it is pure.
             return;

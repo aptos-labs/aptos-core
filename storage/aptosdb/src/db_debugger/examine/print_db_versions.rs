@@ -33,13 +33,13 @@ pub struct Cmd {
     db_dir: PathBuf,
 
     #[clap(long)]
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
 }
 
 impl Cmd {
     pub fn run(self) -> Result<()> {
         let rocksdb_config = RocksdbConfigs {
-            use_state_kv_db: self.use_state_kv_db,
+            split_ledger_db: self.split_ledger_db,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
@@ -51,12 +51,12 @@ impl Cmd {
 
         println!(
             "Overall Progress: {:?}",
-            get_overall_commit_progress(&ledger_db)?
+            get_overall_commit_progress(ledger_db.metadata_db())?
         );
 
         println!(
             "Ledger Progress: {:?}",
-            get_ledger_commit_progress(&ledger_db)?
+            get_ledger_commit_progress(ledger_db.metadata_db())?
         );
 
         println!(
@@ -72,6 +72,7 @@ impl Cmd {
         println!(
             "LedgerPruner Progress: {:?}",
             ledger_db
+                .metadata_db()
                 .get::<DbMetadataSchema>(&DbMetadataKey::LedgerPrunerProgress)?
                 .map_or(0, |v| v.expect_version())
         );
@@ -101,7 +102,9 @@ impl Cmd {
         );
 
         {
-            let mut iter = ledger_db.iter::<LedgerInfoSchema>(ReadOptions::default())?;
+            let mut iter = ledger_db
+                .metadata_db()
+                .iter::<LedgerInfoSchema>(ReadOptions::default())?;
             iter.seek_to_last();
             println!("Current ledger info: {:?}", iter.next().transpose()?);
         }
@@ -113,26 +116,30 @@ impl Cmd {
 
         println!(
             "Max TransactionInfo version: {:?}",
-            Self::get_latest_version_for_schema::<TransactionInfoSchema>(&ledger_db)?,
+            Self::get_latest_version_for_schema::<TransactionInfoSchema>(
+                ledger_db.transaction_info_db()
+            )?,
         );
 
         println!(
             "Max Transaction version: {:?}",
-            Self::get_latest_version_for_schema::<TransactionSchema>(&ledger_db)?,
+            Self::get_latest_version_for_schema::<TransactionSchema>(ledger_db.transaction_db())?,
         );
 
         println!(
             "Max VersionData version: {:?}",
-            Self::get_latest_version_for_schema::<VersionDataSchema>(&ledger_db)?,
+            Self::get_latest_version_for_schema::<VersionDataSchema>(ledger_db.metadata_db())?,
         );
 
         println!(
             "Max WriteSet version: {:?}",
-            Self::get_latest_version_for_schema::<WriteSetSchema>(&ledger_db)?,
+            Self::get_latest_version_for_schema::<WriteSetSchema>(ledger_db.write_set_db())?,
         );
 
         {
-            let mut iter = ledger_db.iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
+            let mut iter = ledger_db
+                .transaction_accumulator_db()
+                .iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
             iter.seek_to_last();
             let position = iter.next().transpose()?.map(|kv| kv.0);
             let num_frozen_nodes = position.map(|p| p.to_postorder_index() + 1);
@@ -143,7 +150,9 @@ impl Cmd {
         }
 
         {
-            let mut iter = ledger_db.iter::<EventAccumulatorSchema>(ReadOptions::default())?;
+            let mut iter = ledger_db
+                .event_db()
+                .iter::<EventAccumulatorSchema>(ReadOptions::default())?;
             iter.seek_to_last();
             let key = iter.next().transpose()?.map(|kv| kv.0);
             let version = key.map(|k| k.0);

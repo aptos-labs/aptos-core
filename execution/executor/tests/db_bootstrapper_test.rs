@@ -15,7 +15,6 @@ use aptos_executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_gas::{ChangeSetConfigs, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_temppath::TempPath;
@@ -31,7 +30,7 @@ use aptos_types::{
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::state_key::StateKey,
-    test_helpers::transaction_test_helpers::block,
+    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
@@ -85,11 +84,12 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
     let target_version = version + txns.len() as u64 + 1; // Due to StateCheckpoint txn
-    let executor = BlockExecutor::<AptosVM, Transaction>::new(db.clone());
+    let executor = BlockExecutor::<AptosVM>::new(db.clone());
     let output = executor
         .execute_block(
-            (block_id, block(txns, executor.get_block_gas_limit())),
+            (block_id, block(txns, BLOCK_GAS_LIMIT)).into(),
             executor.committed_block_id(),
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);
@@ -221,63 +221,56 @@ fn test_new_genesis() {
 
     // New genesis transaction: set validator set, bump epoch and overwrite account1 balance.
     let configuration = get_configuration(&db);
-    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(
-        ChangeSet::new(
-            WriteSetMut::new(vec![
-                (
-                    StateKey::access_path(
-                        access_path_for_config(ValidatorSet::CONFIG_ID)
-                            .expect("access path in test"),
-                    ),
-                    WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
+        WriteSetMut::new(vec![
+            (
+                StateKey::access_path(
+                    access_path_for_config(ValidatorSet::CONFIG_ID).expect("access path in test"),
                 ),
-                (
-                    StateKey::access_path(AccessPath::new(
-                        CORE_CODE_ADDRESS,
-                        ConfigurationResource::resource_path(),
-                    )),
-                    WriteOp::Modification(
-                        bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap(),
-                    ),
+                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+            ),
+            (
+                StateKey::access_path(AccessPath::new(
+                    CORE_CODE_ADDRESS,
+                    ConfigurationResource::resource_path(),
+                )),
+                WriteOp::Modification(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
+            ),
+            (
+                StateKey::access_path(AccessPath::new(
+                    account1,
+                    CoinStoreResource::resource_path(),
+                )),
+                WriteOp::Modification(
+                    bcs::to_bytes(&CoinStoreResource::new(
+                        100_000_000,
+                        false,
+                        EventHandle::random(0),
+                        EventHandle::random(0),
+                    ))
+                    .unwrap(),
                 ),
-                (
-                    StateKey::access_path(AccessPath::new(
-                        account1,
-                        CoinStoreResource::resource_path(),
-                    )),
-                    WriteOp::Modification(
-                        bcs::to_bytes(&CoinStoreResource::new(
-                            100_000_000,
-                            false,
-                            EventHandle::random(0),
-                            EventHandle::random(0),
-                        ))
-                        .unwrap(),
-                    ),
-                ),
-            ])
-            .freeze()
-            .unwrap(),
-            vec![
-                ContractEvent::new(
-                    *configuration.events().key(),
-                    0,
-                    TypeTag::Struct(Box::new(
-                        <ConfigurationResource as MoveStructType>::struct_tag(),
-                    )),
-                    vec![],
-                ),
-                ContractEvent::new(
-                    new_block_event_key(),
-                    0,
-                    TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
-                    vec![],
-                ),
-            ],
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
+            ),
+        ])
+        .freeze()
         .unwrap(),
-    ));
+        vec![
+            ContractEvent::new(
+                *configuration.events().key(),
+                0,
+                TypeTag::Struct(Box::new(
+                    <ConfigurationResource as MoveStructType>::struct_tag(),
+                )),
+                vec![],
+            ),
+            ContractEvent::new(
+                new_block_event_key(),
+                0,
+                TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
+                vec![],
+            ),
+        ],
+    )));
 
     // Bootstrap DB into new genesis.
     let waypoint = generate_waypoint::<AptosVM>(&db, &genesis_txn).unwrap();

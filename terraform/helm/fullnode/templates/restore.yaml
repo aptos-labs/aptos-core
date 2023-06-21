@@ -1,7 +1,9 @@
+{{ $restore_job_suffix := randAlpha 4 | lower }}
+{{ $backup_restore_job := lookup "batch/v1" "Job" $.Release.Namespace (print (include "backup.fullname" .) "-restore-" $restore_job_suffix) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "backup.fullname" . }}-restore-{{ randAlpha 4 | lower }}
+  name: {{ include "backup.fullname" . }}-restore-{{ $restore_job_suffix }}
   labels:
     {{- include "backup.labels" . | nindent 4 }}
     app.kubernetes.io/name: restore
@@ -20,7 +22,11 @@ spec:
       {{- with .Values.restore }}
       containers:
       - name: restore
+        {{- if and $backup_restore_job (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
+        image: {{ (first $backup_restore_job.spec.template.spec.containers).image }}
+        {{- else }}
         image: {{ .image.repo }}:{{ .image.tag | default $.Values.imageTag }}
+        {{- end }}
         imagePullPolicy: {{ .image.pullPolicy }}
         resources:
           {{- toYaml .resources | nindent 10 }}

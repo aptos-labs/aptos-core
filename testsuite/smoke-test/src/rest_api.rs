@@ -8,13 +8,14 @@ use crate::{
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::ed25519::Ed25519Signature;
-use aptos_forge::{NodeExt, Swarm, TransactionType};
+use aptos_forge::{LocalSwarm, NodeExt, Swarm, TransactionType};
 use aptos_global_constants::{DEFAULT_BUCKETS, GAS_UNIT_PRICE};
 use aptos_rest_client::aptos_api_types::{MoveModuleId, TransactionData};
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CORE_CODE_ADDRESS},
+    on_chain_config::{ExecutionConfigV2, OnChainExecutionConfig},
     transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
 };
 use std::{convert::TryFrom, str::FromStr, sync::Arc, time::Duration};
@@ -79,32 +80,7 @@ fn next_bucket(gas_unit_price: u64) -> u64 {
         .unwrap()
 }
 
-#[tokio::test]
-async fn test_gas_estimation() {
-    let mut swarm = SwarmBuilder::new_local(1)
-        .with_init_config(Arc::new(|_, conf, _| {
-            let max_block_txns = 3;
-            conf.api.gas_estimation.enabled = true;
-            // Use a small full block threshold to make gas estimates update sooner.
-            conf.api.gas_estimation.full_block_txns = max_block_txns as usize;
-            // Wait for full blocks with small block size to advance consensus at a fast rate.
-            conf.consensus.quorum_store_poll_time_ms = 200;
-            conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;
-            conf.consensus.max_sending_block_txns = max_block_txns;
-            conf.consensus.max_sending_block_txns_quorum_store_override = max_block_txns;
-            conf.consensus.quorum_store.sender_max_batch_txns = conf
-                .consensus
-                .quorum_store
-                .sender_max_batch_txns
-                .min(max_block_txns as usize);
-            conf.consensus.quorum_store.receiver_max_batch_txns = conf
-                .consensus
-                .quorum_store
-                .receiver_max_batch_txns
-                .min(max_block_txns as usize);
-        }))
-        .build()
-        .await;
+async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
     let client = swarm.validators().next().unwrap().rest_client();
     let estimation = match client.estimate_gas_price().await {
         Ok(res) => res.into_inner(),
@@ -122,7 +98,7 @@ async fn test_gas_estimation() {
     let txn_gas_price = 100;
     let all_validators: Vec<_> = swarm.validators().map(|v| v.peer_id()).collect();
     let txn_stat = generate_traffic(
-        &mut swarm,
+        swarm,
         &all_validators,
         Duration::from_secs(20),
         txn_gas_price,
@@ -167,6 +143,72 @@ async fn test_gas_estimation() {
             estimation.prioritized_gas_estimate
         );
     }
+}
+
+#[tokio::test]
+async fn test_gas_estimation_txns_limit() {
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_init_config(Arc::new(|_, conf, _| {
+            let max_block_txns = 3;
+            conf.api.gas_estimation.enabled = true;
+            // Use a small full block threshold to make gas estimates update sooner.
+            conf.api.gas_estimation.full_block_txns = max_block_txns as usize;
+            // Wait for full blocks with small block size to advance consensus at a fast rate.
+            conf.consensus.quorum_store_poll_time_ms = 200;
+            conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;
+            conf.consensus.max_sending_block_txns = max_block_txns;
+            conf.consensus.max_sending_block_txns_quorum_store_override = max_block_txns;
+            conf.consensus.quorum_store.sender_max_batch_txns = conf
+                .consensus
+                .quorum_store
+                .sender_max_batch_txns
+                .min(max_block_txns as usize);
+            conf.consensus.quorum_store.receiver_max_batch_txns = conf
+                .consensus
+                .quorum_store
+                .receiver_max_batch_txns
+                .min(max_block_txns as usize);
+        }))
+        .build()
+        .await;
+
+    test_gas_estimation_inner(&mut swarm).await;
+}
+
+#[tokio::test]
+async fn test_gas_estimation_gas_used_limit() {
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_init_genesis_config(Arc::new(|conf| {
+            conf.execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
+                block_gas_limit: Some(1),
+                ..Default::default()
+            });
+        }))
+        .with_init_config(Arc::new(|_, conf, _| {
+            let max_block_txns = 3;
+            conf.api.gas_estimation.enabled = true;
+            // The full block threshold will never be hit
+            conf.api.gas_estimation.full_block_txns = (max_block_txns * 2) as usize;
+            // Wait for full blocks with small block size to advance consensus at a fast rate.
+            conf.consensus.quorum_store_poll_time_ms = 200;
+            conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;
+            conf.consensus.max_sending_block_txns = max_block_txns;
+            conf.consensus.max_sending_block_txns_quorum_store_override = max_block_txns;
+            conf.consensus.quorum_store.sender_max_batch_txns = conf
+                .consensus
+                .quorum_store
+                .sender_max_batch_txns
+                .min(max_block_txns as usize);
+            conf.consensus.quorum_store.receiver_max_batch_txns = conf
+                .consensus
+                .quorum_store
+                .receiver_max_batch_txns
+                .min(max_block_txns as usize);
+        }))
+        .build()
+        .await;
+
+    test_gas_estimation_inner(&mut swarm).await;
 }
 
 #[tokio::test]

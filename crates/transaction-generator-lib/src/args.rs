@@ -6,13 +6,15 @@ use clap::{ArgEnum, Parser};
 use serde::{Deserialize, Serialize};
 
 /// Utility class for specifying transaction type with predefined configurations through CLI
-#[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
+#[derive(Debug, Copy, Clone, ArgEnum, Default, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
     NoOp,
     NoOp2Signers,
     NoOp5Signers,
+    #[default]
     CoinTransfer,
     CoinTransferWithInvalid,
+    NonConflictingCoinTransfer,
     AccountGeneration,
     AccountGenerationLargePool,
     PublishPackage,
@@ -30,12 +32,6 @@ pub enum TransactionTypeArg {
     TokenV2AmbassadorMint,
 }
 
-impl Default for TransactionTypeArg {
-    fn default() -> Self {
-        TransactionTypeArg::CoinTransfer
-    }
-}
-
 impl TransactionTypeArg {
     pub fn materialize_default(&self) -> TransactionType {
         self.materialize(1, false)
@@ -50,6 +46,12 @@ impl TransactionTypeArg {
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,
+            },
+            TransactionTypeArg::NonConflictingCoinTransfer => {
+                TransactionType::NonConflictingCoinTransfer {
+                    invalid_transaction_ratio: 0,
+                    sender_use_account_pool,
+                }
             },
             TransactionTypeArg::CoinTransferWithInvalid => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 10,

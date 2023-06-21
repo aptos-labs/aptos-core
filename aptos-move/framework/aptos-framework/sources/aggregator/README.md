@@ -2,7 +2,7 @@
 
 ## Aggregators
 
-Aggregator is a parellizable integer that supports addition and subtraction.
+Aggregator is a parallelizable integer that supports addition and subtraction.
 Unlike integer, aggregator has a user-defined `limit` which specifies when
 the value of aggregator overflows. Similarly to unsigned integers, the value
 of an aggregator underflows when going below zero.
@@ -19,7 +19,7 @@ as rarely as possible.
 ## Aggregator factory
 
 Unfortunately, aggregators cannot be part of a resource. At the moment, Move
-does not allow fine-grained access to resource fields, which ruins perfromance
+does not allow fine-grained access to resource fields, which ruins performance
 benefits aggregators can provide. In addition, getting the value of the field of
 a resource from storage is not possible without hardcoding the struct layout.
 For example, given a struct

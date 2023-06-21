@@ -69,15 +69,28 @@ jobs:
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
-      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+      # find_latest_images.py requires docker utilities and having authenticated to internal docker image registries
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        id: docker-setup
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - name: Install python deps
-        run: pip3 install click==8.1.3 psutil==5.9.1
+      - uses: ./.github/actions/python-setup
+        with:
+          pyproject_directory: testsuite
 
       - name: Determine image tag
         id: determine-test-image-tag
         # forge relies on the default and failpoints variants
-        run: python3 testsuite/find_latest_image.py --variant failpoints --variant performance
+        run: ./testrun find_latest_image.py --variant failpoints --variant performance
+        shell: bash
+        working-directory: testsuite
 
       - name: Write summary
         run: |
@@ -172,6 +185,19 @@ jobs:
       FORGE_TEST_SUITE: three_region_simulation_with_different_node_speed
       FORGE_ENABLE_FAILPOINTS: true
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+
+  run-forge-different-node-speed-and-reliability-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-different-node-speed-and-reliability-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_TEST_SUITE: different_node_speed_and_reliability_test
+      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      FORGE_ENABLE_FAILPOINTS: true
 
   run-forge-state-sync-failures-catching-up-test:
     if: ${{ github.event_name != 'pull_request' }}

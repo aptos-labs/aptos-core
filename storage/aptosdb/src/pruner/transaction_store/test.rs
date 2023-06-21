@@ -64,7 +64,11 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
             .put_write_set(ver as Version, ws, &batch)
             .unwrap();
     }
-    aptos_db.ledger_db.write_schemas(batch).unwrap();
+    aptos_db
+        .ledger_db
+        .write_set_db()
+        .write_schemas(batch)
+        .unwrap();
     // start pruning write sets in batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_write_sets).step_by(2) {
         pruner
@@ -107,7 +111,11 @@ fn verify_txn_store_pruner(
         let usage = StateStorageUsage::zero();
         batch.put::<VersionDataSchema>(&i, &usage.into()).unwrap();
     }
-    aptos_db.ledger_db.write_schemas(batch).unwrap();
+    aptos_db
+        .ledger_db
+        .metadata_db()
+        .write_schemas(batch)
+        .unwrap();
 
     // start pruning transactions batches of size step_size and verify transactions have been pruned
     // from DB
@@ -125,10 +133,6 @@ fn verify_txn_store_pruner(
             .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
         // ensure that all transaction up to i * 2 has been pruned
-        assert_eq!(
-            *pruner.last_version_sent_to_pruner.as_ref().lock(),
-            i as u64
-        );
         for j in 0..i {
             verify_txn_not_in_store(transaction_store, &txns, j as u64, ledger_version);
             // Ensure that transaction accumulator is pruned in DB. This can be done by trying to
@@ -230,16 +234,37 @@ fn put_txn_in_store(
     txn_infos: &[TransactionInfo],
     txns: &[Transaction],
 ) {
-    let batch = SchemaBatch::new();
+    let transaction_batch = SchemaBatch::new();
     for i in 0..txns.len() {
         transaction_store
-            .put_transaction(i as u64, txns.get(i).unwrap(), &batch)
+            .put_transaction(i as u64, txns.get(i).unwrap(), &transaction_batch)
             .unwrap();
     }
-    ledger_store
-        .put_transaction_infos(0, txn_infos, &batch)
+    aptos_db
+        .ledger_db
+        .transaction_db()
+        .write_schemas(transaction_batch)
         .unwrap();
-    aptos_db.ledger_db.write_schemas(batch).unwrap();
+    let transaction_info_batch = SchemaBatch::new();
+    let transaction_accumulator_batch = SchemaBatch::new();
+    ledger_store
+        .put_transaction_infos(
+            0,
+            txn_infos,
+            &transaction_info_batch,
+            &transaction_accumulator_batch,
+        )
+        .unwrap();
+    aptos_db
+        .ledger_db
+        .transaction_info_db()
+        .write_schemas(transaction_info_batch)
+        .unwrap();
+    aptos_db
+        .ledger_db
+        .transaction_accumulator_db()
+        .write_schemas(transaction_accumulator_batch)
+        .unwrap();
 }
 
 fn verify_transaction_in_transaction_store(

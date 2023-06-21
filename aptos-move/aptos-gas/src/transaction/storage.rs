@@ -3,11 +3,11 @@
 
 use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
-    on_chain_config::StorageGasSchedule,
+    on_chain_config::{ConfigStorage, OnChainConfig, StorageGasSchedule},
     state_store::state_key::StateKey,
-    transaction::{ChangeSet, CheckChangeSet},
     write_set::WriteOp,
 };
+use aptos_vm_types::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
     vm_status::{StatusCode, VMStatus},
@@ -28,12 +28,12 @@ pub struct StoragePricingV1 {
 impl StoragePricingV1 {
     fn new(gas_params: &AptosGasParameters) -> Self {
         Self {
-            write_data_per_op: gas_params.txn.write_data_per_op,
+            write_data_per_op: gas_params.txn.storage_io_per_state_slot_write,
             write_data_per_new_item: gas_params.txn.write_data_per_new_item,
-            write_data_per_byte_in_key: gas_params.txn.write_data_per_byte_in_key,
+            write_data_per_byte_in_key: gas_params.txn.storage_io_per_state_byte_write,
             write_data_per_byte_in_val: gas_params.txn.write_data_per_byte_in_val,
-            load_data_base: gas_params.txn.load_data_base,
-            load_data_per_byte: gas_params.txn.load_data_per_byte,
+            load_data_base: gas_params.txn.storage_io_per_state_slot_read * NumArgs::new(1),
+            load_data_per_byte: gas_params.txn.storage_io_per_state_byte_read,
             load_data_failure: gas_params.txn.load_data_failure,
         }
     }
@@ -91,39 +91,51 @@ pub struct StoragePricingV2 {
 
 impl StoragePricingV2 {
     pub fn zeros() -> Self {
-        Self::new(
-            LATEST_GAS_FEATURE_VERSION,
-            &StorageGasSchedule::zeros(),
-            &AptosGasParameters::zeros(),
-        )
+        Self::new_without_storage_curves(LATEST_GAS_FEATURE_VERSION, &AptosGasParameters::zeros())
     }
 
-    pub fn new(
+    pub fn new_with_storage_curves(
         feature_version: u64,
         storage_gas_schedule: &StorageGasSchedule,
         gas_params: &AptosGasParameters,
     ) -> Self {
-        assert!(feature_version > 0);
-
-        let free_write_bytes_quota = if feature_version >= 5 {
-            gas_params.txn.free_write_bytes_quota
-        } else if feature_version >= 3 {
-            1024.into()
-        } else {
-            // for feature_version 2 and below `free_write_bytes_quota` won't be used anyway
-            // but let's set it properly to reduce confusion.
-            0.into()
-        };
-
         Self {
             feature_version,
-            free_write_bytes_quota,
+            free_write_bytes_quota: Self::get_free_write_bytes_quota(feature_version, gas_params),
             per_item_read: storage_gas_schedule.per_item_read.into(),
             per_item_create: storage_gas_schedule.per_item_create.into(),
             per_item_write: storage_gas_schedule.per_item_write.into(),
             per_byte_read: storage_gas_schedule.per_byte_read.into(),
             per_byte_create: storage_gas_schedule.per_byte_create.into(),
             per_byte_write: storage_gas_schedule.per_byte_write.into(),
+        }
+    }
+
+    pub fn new_without_storage_curves(
+        feature_version: u64,
+        gas_params: &AptosGasParameters,
+    ) -> Self {
+        Self {
+            feature_version,
+            free_write_bytes_quota: Self::get_free_write_bytes_quota(feature_version, gas_params),
+            per_item_read: gas_params.txn.storage_io_per_state_slot_read,
+            per_item_create: gas_params.txn.storage_io_per_state_slot_write,
+            per_item_write: gas_params.txn.storage_io_per_state_slot_write,
+            per_byte_read: gas_params.txn.storage_io_per_state_byte_read,
+            per_byte_create: gas_params.txn.storage_io_per_state_byte_write,
+            per_byte_write: gas_params.txn.storage_io_per_state_byte_write,
+        }
+    }
+
+    fn get_free_write_bytes_quota(
+        feature_version: u64,
+        gas_params: &AptosGasParameters,
+    ) -> NumBytes {
+        match feature_version {
+            0 => unreachable!("PricingV2 not applicable for feature version 0"),
+            1..=2 => 0.into(),
+            3..=4 => 1024.into(),
+            5.. => gas_params.txn.free_write_bytes_quota,
         }
     }
 
@@ -145,12 +157,8 @@ impl StoragePricingV2 {
         }
     }
 
-    fn calculate_read_gas(&self, loaded: Option<NumBytes>) -> InternalGas {
-        self.per_item_read * (NumArgs::from(1))
-            + match loaded {
-                Some(num_bytes) => self.per_byte_read * num_bytes,
-                None => 0.into(),
-            }
+    fn calculate_read_gas(&self, loaded: NumBytes) -> InternalGas {
+        self.per_item_read * (NumArgs::from(1)) + self.per_byte_read * loaded
     }
 
     fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
@@ -177,12 +185,42 @@ pub enum StoragePricing {
 }
 
 impl StoragePricing {
-    pub fn calculate_read_gas(&self, loaded: Option<NumBytes>) -> InternalGas {
+    pub fn new(
+        feature_version: u64,
+        gas_params: &AptosGasParameters,
+        config_storage: &impl ConfigStorage,
+    ) -> StoragePricing {
+        use StoragePricing::*;
+
+        match feature_version {
+            0 => V1(StoragePricingV1::new(gas_params)),
+            1..=9 => match StorageGasSchedule::fetch_config(config_storage) {
+                None => V1(StoragePricingV1::new(gas_params)),
+                Some(schedule) => V2(StoragePricingV2::new_with_storage_curves(
+                    feature_version,
+                    &schedule,
+                    gas_params,
+                )),
+            },
+            10.. => V2(StoragePricingV2::new_without_storage_curves(
+                feature_version,
+                gas_params,
+            )),
+        }
+    }
+
+    pub fn calculate_read_gas(&self, resource_exists: bool, bytes_loaded: NumBytes) -> InternalGas {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => v1.calculate_read_gas(loaded),
-            V2(v2) => v2.calculate_read_gas(loaded),
+            V1(v1) => v1.calculate_read_gas(
+                if resource_exists {
+                    Some(bytes_loaded)
+                } else {
+                    None
+                },
+            ),
+            V2(v2) => v2.calculate_read_gas(bytes_loaded),
         }
     }
 
@@ -266,7 +304,7 @@ impl ChangeSetConfigs {
 }
 
 impl CheckChangeSet for ChangeSetConfigs {
-    fn check_change_set(&self, change_set: &ChangeSet) -> Result<(), VMStatus> {
+    fn check_change_set(&self, change_set: &VMChangeSet) -> Result<(), VMStatus> {
         const ERR: StatusCode = StatusCode::STORAGE_WRITE_LIMIT_REACHED;
 
         let mut write_set_size = 0;
@@ -308,27 +346,16 @@ pub struct StorageGasParameters {
 impl StorageGasParameters {
     pub fn new(
         feature_version: u64,
-        gas_params: Option<&AptosGasParameters>,
-        storage_gas_schedule: Option<&StorageGasSchedule>,
-    ) -> Option<Self> {
-        if feature_version == 0 || gas_params.is_none() {
-            return None;
-        }
-        let gas_params = gas_params.unwrap();
-
-        let pricing = match storage_gas_schedule {
-            Some(schedule) => {
-                StoragePricing::V2(StoragePricingV2::new(feature_version, schedule, gas_params))
-            },
-            None => StoragePricing::V1(StoragePricingV1::new(gas_params)),
-        };
-
+        gas_params: &AptosGasParameters,
+        config_storage: &impl ConfigStorage,
+    ) -> Self {
+        let pricing = StoragePricing::new(feature_version, gas_params, config_storage);
         let change_set_configs = ChangeSetConfigs::new(feature_version, gas_params);
 
-        Some(Self {
+        Self {
             pricing,
             change_set_configs,
-        })
+        }
     }
 
     pub fn free_and_unlimited() -> Self {

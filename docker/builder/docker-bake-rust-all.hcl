@@ -27,7 +27,7 @@ variable "GCP_DOCKER_ARTIFACT_REPO_US" {}
 variable "AWS_ECR_ACCOUNT_NUM" {}
 
 variable "TARGET_REGISTRY" {
-  // must be "aws" | "remote" | "local", informs which docker tags are being generated
+  // must be "gcp" | "local" | "remote-all" | "remote" (deprecated, but kept for backwards compatibility. Same as "gcp"), informs which docker tags are being generated
   default = CI == "true" ? "remote" : "local"
 }
 
@@ -68,14 +68,14 @@ group "forge-images" {
 target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
-    debian = "docker-image://debian:bullseye-20230502@sha256:32888a3c745e38e72a5f49161afc7bb52a263b8f5ea1b3b4a6af537678f29491"
+    debian = "docker-image://debian:bullseye@sha256:1bf0e24813ee8306c3fba1fe074793eb91c15ee580b61fff7f3f41662bc0031d"
   }
 }
 
 target "builder-base" {
   dockerfile = "docker/builder/builder.Dockerfile"
-  target = "builder-base"
-  context = "."
+  target     = "builder-base"
+  context    = "."
   contexts = {
     rust = "docker-image://rust:1.66.1-bullseye@sha256:f72949bcf1daf8954c0e0ed8b7e10ac4c641608f6aa5f0ef7c172c49f35bd9b5"
   }
@@ -92,7 +92,7 @@ target "builder-base" {
 
 target "aptos-node-builder" {
   dockerfile = "docker/builder/builder.Dockerfile"
-  target = "aptos-node-builder"
+  target     = "aptos-node-builder"
   contexts = {
     builder-base = "target:builder-base"
   }
@@ -103,9 +103,9 @@ target "aptos-node-builder" {
 
 target "tools-builder" {
   dockerfile = "docker/builder/builder.Dockerfile"
-  target = "tools-builder"
+  target     = "tools-builder"
   contexts = {
-    builder-base =  "target:builder-base"
+    builder-base = "target:builder-base"
   }
   secret = [
     "id=GIT_CREDENTIALS"
@@ -114,8 +114,8 @@ target "tools-builder" {
 
 target "_common" {
   contexts = {
-    debian-base = "target:debian-base"
-    node-builder = "target:aptos-node-builder"
+    debian-base   = "target:debian-base"
+    node-builder  = "target:aptos-node-builder"
     tools-builder = "target:tools-builder"
   }
   labels = {
@@ -124,12 +124,12 @@ target "_common" {
     "org.label-schema.git-sha"        = "${GIT_SHA}"
   }
   args = {
-    PROFILE            = "${PROFILE}"
-    FEATURES           = "${FEATURES}"
-    GIT_SHA            = "${GIT_SHA}"
-    GIT_BRANCH         = "${GIT_BRANCH}"
-    GIT_TAG            = "${GIT_TAG}"
-    BUILD_DATE         = "${BUILD_DATE}"
+    PROFILE    = "${PROFILE}"
+    FEATURES   = "${FEATURES}"
+    GIT_SHA    = "${GIT_SHA}"
+    GIT_BRANCH = "${GIT_BRANCH}"
+    GIT_TAG    = "${GIT_TAG}"
+    BUILD_DATE = "${BUILD_DATE}"
   }
 }
 
@@ -137,7 +137,7 @@ target "validator-testing" {
   inherits   = ["_common"]
   dockerfile = "docker/builder/validator-testing.Dockerfile"
   target     = "validator-testing"
-  cache-from = generate_cache_from("validator-testing") 
+  cache-from = generate_cache_from("validator-testing")
   cache-to   = generate_cache_to("validator-testing")
   tags       = generate_tags("validator-testing")
 }
@@ -146,7 +146,7 @@ target "tools" {
   inherits   = ["_common"]
   dockerfile = "docker/builder/tools.Dockerfile"
   target     = "tools"
-  cache-from = generate_cache_from("tools") 
+  cache-from = generate_cache_from("tools")
   cache-to   = generate_cache_to("tools")
   tags       = generate_tags("tools")
 }
@@ -155,7 +155,7 @@ target "forge" {
   inherits   = ["_common"]
   dockerfile = "docker/builder/forge.Dockerfile"
   target     = "forge"
-  cache-from = generate_cache_from("forge") 
+  cache-from = generate_cache_from("forge")
   cache-to   = generate_cache_to("forge")
   tags       = generate_tags("forge")
 }
@@ -164,7 +164,7 @@ target "validator" {
   inherits   = ["_common"]
   dockerfile = "docker/builder/validator.Dockerfile"
   target     = "validator"
-  cache-from = generate_cache_from("validator") 
+  cache-from = generate_cache_from("validator")
   cache-to   = generate_cache_to("validator")
   tags       = generate_tags("validator")
 }
@@ -173,7 +173,7 @@ target "tools" {
   inherits   = ["_common"]
   dockerfile = "docker/builder/tools.Dockerfile"
   target     = "tools"
-  cache-from = generate_cache_from("tools") 
+  cache-from = generate_cache_from("tools")
   cache-to   = generate_cache_to("tools")
   tags       = generate_tags("tools")
 }
@@ -182,7 +182,7 @@ target "node-checker" {
   inherits   = ["_common"]
   dockerfile = "docker/builder/node-checker.Dockerfile"
   target     = "node-checker"
-  cache-from = generate_cache_from("node-checker") 
+  cache-from = generate_cache_from("node-checker")
   cache-to   = generate_cache_to("node-checker")
   tags       = generate_tags("node-checker")
 }
@@ -191,8 +191,8 @@ target "faucet" {
   inherits   = ["_common"]
   dockerfile = "docker/builder/faucet.Dockerfile"
   target     = "faucet"
-  cache-from = generate_cache_from("faucet") 
-  cache-to   = generate_cache_to("faucet")  
+  cache-from = generate_cache_from("faucet")
+  cache-to   = generate_cache_to("faucet")
   tags       = generate_tags("faucet")
 }
 
@@ -200,17 +200,17 @@ target "telemetry-service" {
   inherits   = ["_common"]
   dockerfile = "docker/builder/telemetry-service.Dockerfile"
   target     = "telemetry-service"
-  cache-from = generate_cache_from("telemetry-service") 
-  cache-to   = generate_cache_to("telemetry-service")  
-  tags       = generate_tags("telemetry-service")  
+  cache-from = generate_cache_from("telemetry-service")
+  cache-to   = generate_cache_to("telemetry-service")
+  tags       = generate_tags("telemetry-service")
 }
 
 target "indexer-grpc" {
-  inherits = ["_common"]
+  inherits   = ["_common"]
   dockerfile = "docker/builder/indexer-grpc.Dockerfile"
-  target   = "indexer-grpc"
-  cache-to = generate_cache_to("indexer-grpc")
-  tags     = generate_tags("indexer-grpc")
+  target     = "indexer-grpc"
+  cache-to   = generate_cache_to("indexer-grpc")
+  tags       = generate_tags("indexer-grpc")
 }
 
 function "generate_cache_from" {
@@ -224,7 +224,7 @@ function "generate_cache_from" {
 
 function "generate_cache_to" {
   params = [target]
-  result = TARGET_REGISTRY == "remote" ? [
+  result = TARGET_REGISTRY != "local" ? [
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}${GIT_SHA}"
   ] : []
@@ -232,15 +232,22 @@ function "generate_cache_to" {
 
 function "generate_tags" {
   params = [target]
-  result = TARGET_REGISTRY == "remote" ? [
+  result = TARGET_REGISTRY == "remote-all" ? [
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+    "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
+    "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+    "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
+    "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+    ] : (
+    TARGET_REGISTRY == "gcp" || TARGET_REGISTRY == "remote" ? [
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
       "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
       "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
-      "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
-      "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
-    ] : [
-    "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
-    "aptos-core/${target}:${IMAGE_TAG_PREFIX}from-local",
-  ]
+      ] : [ // "local" or any other value
+      "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
+      "aptos-core/${target}:${IMAGE_TAG_PREFIX}from-local",
+    ]
+  )
 }

@@ -5,7 +5,7 @@ use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::ConfigStorage;
 use aptos_utils::aptos_try;
-use move_binary_format::errors::VMError;
+use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, resolver::MoveResolver,
 };
@@ -19,19 +19,17 @@ pub trait MoveResolverExt:
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError>;
+    ) -> VMResult<Option<Vec<u8>>>;
 
     fn get_standard_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError>;
+    ) -> VMResult<Option<Vec<u8>>>;
 
     fn release_resource_group_cache(
         &self,
-        address: &AccountAddress,
-        resource_group: &StructTag,
-    ) -> Option<BTreeMap<StructTag, Vec<u8>>>;
+    ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>;
 
     // Move to API does not belong here
     fn is_resource_group(&self, struct_tag: &StructTag) -> bool {

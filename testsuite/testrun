@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+
+# A simple test harness for all Aptos python test utilities
+# By default, just run a test file with poetry
+
+import argparse
+import os
+import sys
+from test_framework.logging import init_logging, log
+from test_framework.shell import LocalShell, Shell
+from test_framework.filesystem import Filesystem, LocalFilesystem
+
+# the relative path of the testsuite directory from the root of the repo
+TESTSUITE_DIR = "testsuite"
+FORGE_ENTRYPOINT = "forge.py"
+
+
+def run_test(
+    shell: Shell,
+    filesystem: Filesystem,
+    test_file_path: str,
+    extra_args: list[str] = [],
+) -> int:
+    """Run a test and return the exit code"""
+    init_logging(logger=log)
+
+    real_test_file_path = test_file_path
+    if not filesystem.exists(test_file_path):
+        log.info(
+            f"Test file {test_file_path} not found, trying to find it in {TESTSUITE_DIR}/"
+        )
+        real_test_file_path = os.path.join(TESTSUITE_DIR, test_file_path)
+        if not filesystem.exists(real_test_file_path):
+            log.error(f"Test file {real_test_file_path} not found")
+            return 1
+
+    # Run the test
+    log.info(f"Running test in {real_test_file_path}...")
+    poetry_path = os.path.dirname(real_test_file_path)
+    poetry_path_args = ["-C", poetry_path] if poetry_path != "" else []
+    cmd = [
+        "poetry",
+        *poetry_path_args,
+        "run",
+        "python3",
+        "-u",
+        real_test_file_path,
+        *extra_args,
+    ]
+    log.info(f"Running poetry command: $ {' '.join(cmd)}")
+    result = shell.run(
+        cmd,
+        stream_output=True,
+    )
+    return result.exit_code
+
+
+if __name__ == "__main__":
+    local_shell = LocalShell()
+    local_filesystem = LocalFilesystem()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("test", help="The test to run")
+    args, extra_args = parser.parse_known_args()
+
+    run_ret = run_test(local_shell, local_filesystem, args.test, extra_args)
+    sys.exit(run_ret)

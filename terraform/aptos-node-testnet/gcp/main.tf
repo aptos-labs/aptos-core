@@ -26,12 +26,15 @@ module "validator" {
   region  = var.region
 
   # DNS
-  zone_name    = var.zone_name # keep empty if you don't want a DNS name
-  zone_project = var.zone_project
-  record_name  = var.record_name
+  zone_name     = var.zone_name # keep empty if you don't want a DNS name
+  zone_project  = var.zone_project
+  record_name   = var.record_name
+  workspace_dns = var.workspace_dns
+  # dns_prefix_name = var.dns_prefix_name
   # do not create the main fullnode and validator DNS records
   # instead, rely on external-dns from the testnet-addons
-  create_dns_records = false
+  create_dns_records = var.create_dns_records
+  dns_ttl            = var.dns_ttl
 
   # General chain config
   era            = var.era
@@ -43,10 +46,6 @@ module "validator" {
   # K8s config
   k8s_api_sources         = var.k8s_api_sources
   cluster_ipv4_cidr_block = var.cluster_ipv4_cidr_block
-
-  # node config
-  gke_cluster_enable_gcfs  = var.gke_cluster_enable_gcfs
-  gke_cluster_enable_gvnic = var.gke_cluster_enable_gvnic
 
   # autoscaling
   gke_enable_node_autoprovisioning     = var.gke_enable_node_autoprovisioning
@@ -71,6 +70,8 @@ module "validator" {
   enable_monitoring      = var.enable_monitoring
   enable_node_exporter   = var.enable_prometheus_node_exporter
   monitoring_helm_values = var.monitoring_helm_values
+
+  gke_maintenance_policy = var.gke_maintenance_policy
 }
 
 locals {
@@ -103,6 +104,7 @@ resource "helm_release" "genesis" {
       genesis = {
         numValidators   = var.num_validators
         username_prefix = local.aptos_node_helm_prefix
+        domain          = local.domain
         validator = {
           enable_onchain_discovery = false
         }

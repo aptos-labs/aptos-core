@@ -251,7 +251,7 @@ query UserTransactions($limit: Int) {
 
 The following rate limit applies for this Aptos-provided indexing service:
 
-- For a web application that calls this Aptos-provided indexer API directly from the client (for example, wallet or explorer), the rate limit is currently 1000 requests per five minutes by IP address. **Note that this limit can change with or without prior notice.** 
+- For a web application that calls this Aptos-provided indexer API directly from the client (for example, wallet or explorer), the rate limit is currently 5000 requests per five minutes by IP address. **Note that this limit can change with or without prior notice.** 
 
 If you are running a backend (server-side) application and want to call the indexer programmatically then you should run an indexer-enabled fullnode. 
 

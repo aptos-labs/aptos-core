@@ -1,13 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    benchmark_transaction::BenchmarkTransaction, TransactionCommitter, TransactionExecutor,
-};
+use crate::{TransactionCommitter, TransactionExecutor};
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::transaction::Version;
+use aptos_types::transaction::{Transaction, Version};
 use aptos_vm::counters::TXN_GAS_USAGE;
 use std::{
     marker::PhantomData,
@@ -36,20 +34,20 @@ pub struct Pipeline<V> {
 
 impl<V> Pipeline<V>
 where
-    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     pub fn new(
-        executor: BlockExecutor<V, BenchmarkTransaction>,
+        executor: BlockExecutor<V>,
         version: Version,
         config: PipelineConfig,
         // Need to specify num blocks, to size queues correctly, when delay_execution_start, split_stages or skip_commit are used
         num_blocks: Option<usize>,
-    ) -> (Self, mpsc::SyncSender<Vec<BenchmarkTransaction>>) {
+    ) -> (Self, mpsc::SyncSender<Vec<Transaction>>) {
         let parent_block_id = executor.committed_block_id();
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
 
-        let (block_sender, block_receiver) = mpsc::sync_channel::<Vec<BenchmarkTransaction>>(
+        let (block_sender, block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
             if config.delay_execution_start {
                 (num_blocks.unwrap() + 1).max(50)
             } else {
