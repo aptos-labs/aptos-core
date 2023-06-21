@@ -13,22 +13,17 @@ pub struct Options {
     /// Directories where to lookup dependencies.
     #[clap(
         short,
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub dependencies: Vec<String>,
     /// Named address mapping.
     #[clap(
         short,
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub named_address_mapping: Vec<String>,
     /// Output file name.
-    #[clap(short)]
-    #[clap(long, default_value = "output.yul")]
+    #[clap(short, long, default_value = "output.yul")]
     pub output: String,
     /// Solc executable
     #[clap(long, env = "SOLC_EXE", default_value = "solc")]
@@ -40,12 +35,10 @@ pub struct Options {
     #[clap(long)]
     pub testing: bool,
     /// Active experiments.
-    #[clap(short)]
     #[clap(
+        short,
         long = "experiment",
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub experiments: Vec<String>,
     /// Sources to compile (positional arg)
