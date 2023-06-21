@@ -234,7 +234,7 @@ mod test {
                 version += txns_to_commit.len() as u64;
             }
 
-            let db_version = db.get_latest_transaction_info_option().unwrap().unwrap().0;
+            let db_version = db.get_latest_version().unwrap();
             prop_assert_eq!(db_version, version - 1);
 
             drop(db);
@@ -253,7 +253,7 @@ mod test {
             cmd.run().unwrap();
 
             let db = AptosDB::new_for_test(&tmp_dir);
-            let db_version = db.get_latest_transaction_info_option().unwrap().unwrap().0;
+            let db_version = db.get_latest_version().unwrap();
             prop_assert_eq!(db_version, target_version);
 
             let txn_list_with_proof = db.get_transactions(0, db_version + 1, db_version, true).unwrap();
