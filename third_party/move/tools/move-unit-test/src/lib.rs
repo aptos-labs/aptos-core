@@ -48,7 +48,7 @@ pub struct UnitTestingConfig {
     /// Number of threads to use for running tests.
     #[clap(
         name = "num_threads",
-        default_value = "8",
+        default_value_t = 8,
         short = 't',
         long = "threads"
     )]

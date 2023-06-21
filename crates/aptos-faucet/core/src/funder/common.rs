@@ -69,7 +69,7 @@ pub struct ApiConnectionConfig {
     /// Chain ID of the network this client is connecting to. For example, for mainnet:
     /// "MAINNET" or 1, testnet: "TESTNET" or 2. If there is no predefined string
     /// alias (e.g. "MAINNET"), just use the number. Note: Chain ID of 0 is not allowed.
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value_t = ChainId::testnet())]
     pub chain_id: ChainId,
 }
 

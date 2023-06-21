@@ -50,7 +50,7 @@ pub struct GlobalBackupOpt {
     // Defaults to 128MB, so concurrent chunk downloads won't take up too much memory.
     #[clap(
         long = "max-chunk-size",
-        default_value = "134217728",
+        default_value_t = 134217728,
         help = "Maximum chunk file size in bytes."
     )]
     pub max_chunk_size: usize,
@@ -58,27 +58,27 @@ pub struct GlobalBackupOpt {
 
 #[derive(Clone, Parser)]
 pub struct RocksdbOpt {
-    #[clap(long, hide(true), default_value = "5000")]
+    #[clap(long, hide(true), default_value_t = 5000)]
     ledger_db_max_open_files: i32,
-    #[clap(long, hide(true), default_value = "1073741824")] // 1GB
+    #[clap(long, hide(true), default_value_t = 1073741824)] // 1GB
     ledger_db_max_total_wal_size: u64,
-    #[clap(long, hide(true), default_value = "5000")]
+    #[clap(long, hide(true), default_value_t = 5000)]
     state_merkle_db_max_open_files: i32,
-    #[clap(long, hide(true), default_value = "1073741824")] // 1GB
+    #[clap(long, hide(true), default_value_t = 1073741824)] // 1GB
     state_merkle_db_max_total_wal_size: u64,
     #[clap(long, hide(true))]
     split_ledger_db: bool,
     #[clap(long, hide(true))]
     use_sharded_state_merkle_db: bool,
-    #[clap(long, hide(true), default_value = "5000")]
+    #[clap(long, hide(true), default_value_t = 5000)]
     state_kv_db_max_open_files: i32,
-    #[clap(long, hide(true), default_value = "1073741824")] // 1GB
+    #[clap(long, hide(true), default_value_t = 1073741824)] // 1GB
     state_kv_db_max_total_wal_size: u64,
-    #[clap(long, hide(true), default_value = "1000")]
+    #[clap(long, hide(true), default_value_t = 1000)]
     index_db_max_open_files: i32,
-    #[clap(long, hide(true), default_value = "1073741824")] // 1GB
+    #[clap(long, hide(true), default_value_t = 1073741824)] // 1GB
     index_db_max_total_wal_size: u64,
-    #[clap(long, hide(true), default_value = "16")]
+    #[clap(long, hide(true), default_value_t = 16)]
     max_background_jobs: i32,
 }
 

@@ -1351,7 +1351,7 @@ pub struct AnalyzeValidatorPerformance {
     /// First epoch to analyze
     ///
     /// Defaults to the first epoch
-    #[clap(long, default_value = "-2")]
+    #[clap(long, default_value_t = -2)]
     pub start_epoch: i64,
 
     /// Last epoch to analyze

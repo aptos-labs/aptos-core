@@ -37,7 +37,7 @@ pub struct Cmd {
     #[clap(long)]
     target_version: u64,
 
-    #[clap(long, default_value = "1000")]
+    #[clap(long, default_value_t = 1000)]
     ledger_db_batch_size: usize,
 
     #[clap(long, value_parser, group = "backup")]

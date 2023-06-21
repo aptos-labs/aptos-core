@@ -12,7 +12,7 @@ use std::{fs::File, io::Write};
     about = "Trace serde (de)serialization to generate format descriptions for Aptos types"
 )]
 struct Options {
-    #[clap(long, value_enum, default_value = "Aptos", ignore_case = true)]
+    #[clap(long, value_enum, default_value_t = Corpus::Aptos, ignore_case = true)]
     corpus: Corpus,
 
     #[clap(long)]

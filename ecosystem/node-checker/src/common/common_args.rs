@@ -19,7 +19,7 @@ pub struct OutputArgs {
     pub output_path: Option<PathBuf>,
 
     /// What format to output the spec in.
-    #[clap(short, long, value_enum, ignore_case = true, default_value = "yaml")]
+    #[clap(short, long, value_enum, ignore_case = true, default_value_t = OutputFormat::Yaml)]
     pub format: OutputFormat,
 }
 
