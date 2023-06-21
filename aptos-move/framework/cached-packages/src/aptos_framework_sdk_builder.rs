@@ -216,7 +216,15 @@ pub enum EntryFunctionCall {
         is_multi_step_proposal: bool,
     },
 
-    /// Vote on proposal with `proposal_id` and voting power from `stake_pool`.
+    /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
+    AptosGovernancePartialVote {
+        stake_pool: AccountAddress,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    },
+
+    /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
     AptosGovernanceVote {
         stake_pool: AccountAddress,
         proposal_id: u64,
@@ -247,6 +255,30 @@ pub enum EntryFunctionCall {
     DelegationPoolAddStake {
         pool_address: AccountAddress,
         amount: u64,
+    },
+
+    /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
+    /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
+    /// `aptos_governance.move`.
+    DelegationPoolCreateProposal {
+        pool_address: AccountAddress,
+        execution_hash: Vec<u8>,
+        metadata_location: Vec<u8>,
+        metadata_hash: Vec<u8>,
+        is_multi_step_proposal: bool,
+    },
+
+    /// Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,
+    /// this change won't take effects until the next lockup period.
+    DelegationPoolDelegateVotingPower {
+        pool_address: AccountAddress,
+        new_voter: AccountAddress,
+    },
+
+    /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
+    /// THe existing voter will be replaced. The function is permissionless.
+    DelegationPoolEnablePartialGovernanceVoting {
+        pool_address: AccountAddress,
     },
 
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
@@ -285,6 +317,18 @@ pub enum EntryFunctionCall {
     DelegationPoolUnlock {
         pool_address: AccountAddress,
         amount: u64,
+    },
+
+    /// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
+    /// 1. The voting period of the proposal hasn't ended.
+    /// 2. The delegation pool's lockup period ends after the voting period of the proposal.
+    /// 3. The voter still has spare voting power on this proposal.
+    /// 4. The delegation pool never votes on the proposal before enabling partial governance voting.
+    DelegationPoolVote {
+        pool_address: AccountAddress,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
     },
 
     /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
@@ -932,6 +976,12 @@ impl EntryFunctionCall {
                 metadata_hash,
                 is_multi_step_proposal,
             ),
+            AptosGovernancePartialVote {
+                stake_pool,
+                proposal_id,
+                voting_power,
+                should_pass,
+            } => aptos_governance_partial_vote(stake_pool, proposal_id, voting_power, should_pass),
             AptosGovernanceVote {
                 stake_pool,
                 proposal_id,
@@ -951,6 +1001,26 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_add_stake(pool_address, amount),
+            DelegationPoolCreateProposal {
+                pool_address,
+                execution_hash,
+                metadata_location,
+                metadata_hash,
+                is_multi_step_proposal,
+            } => delegation_pool_create_proposal(
+                pool_address,
+                execution_hash,
+                metadata_location,
+                metadata_hash,
+                is_multi_step_proposal,
+            ),
+            DelegationPoolDelegateVotingPower {
+                pool_address,
+                new_voter,
+            } => delegation_pool_delegate_voting_power(pool_address, new_voter),
+            DelegationPoolEnablePartialGovernanceVoting { pool_address } => {
+                delegation_pool_enable_partial_governance_voting(pool_address)
+            },
             DelegationPoolInitializeDelegationPool {
                 operator_commission_percentage,
                 delegation_pool_creation_seed,
@@ -975,6 +1045,12 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_unlock(pool_address, amount),
+            DelegationPoolVote {
+                pool_address,
+                proposal_id,
+                voting_power,
+                should_pass,
+            } => delegation_pool_vote(pool_address, proposal_id, voting_power, should_pass),
             DelegationPoolWithdraw {
                 pool_address,
                 amount,
@@ -1798,7 +1874,33 @@ pub fn aptos_governance_create_proposal_v2(
     ))
 }
 
-/// Vote on proposal with `proposal_id` and voting power from `stake_pool`.
+/// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
+pub fn aptos_governance_partial_vote(
+    stake_pool: AccountAddress,
+    proposal_id: u64,
+    voting_power: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("partial_vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&stake_pool).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&voting_power).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+/// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
 pub fn aptos_governance_vote(
     stake_pool: AccountAddress,
     proposal_id: u64,
@@ -1894,6 +1996,78 @@ pub fn delegation_pool_add_stake(pool_address: AccountAddress, amount: u64) -> T
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+/// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
+/// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
+/// `aptos_governance.move`.
+pub fn delegation_pool_create_proposal(
+    pool_address: AccountAddress,
+    execution_hash: Vec<u8>,
+    metadata_location: Vec<u8>,
+    metadata_hash: Vec<u8>,
+    is_multi_step_proposal: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("create_proposal").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&execution_hash).unwrap(),
+            bcs::to_bytes(&metadata_location).unwrap(),
+            bcs::to_bytes(&metadata_hash).unwrap(),
+            bcs::to_bytes(&is_multi_step_proposal).unwrap(),
+        ],
+    ))
+}
+
+/// Allows a delegator to delegate its voting power to a voter. If this delegator already has a delegated voter,
+/// this change won't take effects until the next lockup period.
+pub fn delegation_pool_delegate_voting_power(
+    pool_address: AccountAddress,
+    new_voter: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("delegate_voting_power").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&new_voter).unwrap(),
+        ],
+    ))
+}
+
+/// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
+/// THe existing voter will be replaced. The function is permissionless.
+pub fn delegation_pool_enable_partial_governance_voting(
+    pool_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("enable_partial_governance_voting").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&pool_address).unwrap()],
     ))
 }
 
@@ -2011,6 +2185,36 @@ pub fn delegation_pool_unlock(pool_address: AccountAddress, amount: u64) -> Tran
         vec![
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
+/// 1. The voting period of the proposal hasn't ended.
+/// 2. The delegation pool's lockup period ends after the voting period of the proposal.
+/// 3. The voter still has spare voting power on this proposal.
+/// 4. The delegation pool never votes on the proposal before enabling partial governance voting.
+pub fn delegation_pool_vote(
+    pool_address: AccountAddress,
+    proposal_id: u64,
+    voting_power: u64,
+    should_pass: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("vote").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&proposal_id).unwrap(),
+            bcs::to_bytes(&voting_power).unwrap(),
+            bcs::to_bytes(&should_pass).unwrap(),
         ],
     ))
 }
@@ -3940,6 +4144,21 @@ mod decoder {
         }
     }
 
+    pub fn aptos_governance_partial_vote(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosGovernancePartialVote {
+                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_governance_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceVote {
@@ -3991,6 +4210,49 @@ mod decoder {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_create_proposal(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolCreateProposal {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
+                metadata_location: bcs::from_bytes(script.args().get(2)?).ok()?,
+                metadata_hash: bcs::from_bytes(script.args().get(3)?).ok()?,
+                is_multi_step_proposal: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_delegate_voting_power(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolDelegateVotingPower {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_enable_partial_governance_voting(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::DelegationPoolEnablePartialGovernanceVoting {
+                    pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
         } else {
             None
         }
@@ -4061,6 +4323,19 @@ mod decoder {
             Some(EntryFunctionCall::DelegationPoolUnlock {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolVote {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
+                voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
+                should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
@@ -5133,6 +5408,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::aptos_governance_create_proposal_v2),
         );
         map.insert(
+            "aptos_governance_partial_vote".to_string(),
+            Box::new(decoder::aptos_governance_partial_vote),
+        );
+        map.insert(
             "aptos_governance_vote".to_string(),
             Box::new(decoder::aptos_governance_vote),
         );
@@ -5151,6 +5430,18 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_add_stake".to_string(),
             Box::new(decoder::delegation_pool_add_stake),
+        );
+        map.insert(
+            "delegation_pool_create_proposal".to_string(),
+            Box::new(decoder::delegation_pool_create_proposal),
+        );
+        map.insert(
+            "delegation_pool_delegate_voting_power".to_string(),
+            Box::new(decoder::delegation_pool_delegate_voting_power),
+        );
+        map.insert(
+            "delegation_pool_enable_partial_governance_voting".to_string(),
+            Box::new(decoder::delegation_pool_enable_partial_governance_voting),
         );
         map.insert(
             "delegation_pool_initialize_delegation_pool".to_string(),
@@ -5175,6 +5466,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_unlock".to_string(),
             Box::new(decoder::delegation_pool_unlock),
+        );
+        map.insert(
+            "delegation_pool_vote".to_string(),
+            Box::new(decoder::delegation_pool_vote),
         );
         map.insert(
             "delegation_pool_withdraw".to_string(),
