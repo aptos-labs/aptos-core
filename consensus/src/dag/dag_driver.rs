@@ -19,7 +19,7 @@ use futures::{
 };
 use std::sync::Arc;
 
-struct DagDriver {
+pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,

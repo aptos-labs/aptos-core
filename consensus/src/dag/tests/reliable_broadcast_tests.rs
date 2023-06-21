@@ -1,47 +1,30 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    dag::{
-        reliable_broadcast::{BroadcastStatus, DAGNetworkSender, ReliableBroadcast},
-        types::DAGMessage,
-    },
-    network_interface::ConsensusMsg,
+use crate::dag::{
+    dag_network::DAGNetworkSender,
+    reliable_broadcast::{BroadcastStatus, NodeBroadcastHandler, ReliableBroadcast},
+    types::{DAGMessage, Node, NodeDigestSignature, TestAck, TestMessage},
+    RpcHandler,
 };
 use anyhow::bail;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_infallible::Mutex;
-use aptos_types::validator_verifier::random_validator_verifier;
+use aptos_types::{
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
+};
 use async_trait::async_trait;
+use claims::assert_ok_eq;
 use futures::{
     future::{AbortHandle, Abortable},
     FutureExt,
 };
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     sync::Arc,
     time::Duration,
 };
 use tokio::sync::oneshot;
-
-#[derive(Serialize, Deserialize, Clone)]
-struct TestMessage(Vec<u8>);
-
-impl DAGMessage for TestMessage {
-    fn epoch(&self) -> u64 {
-        1
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct TestAck;
-
-impl DAGMessage for TestAck {
-    fn epoch(&self) -> u64 {
-        1
-    }
-}
 
 struct TestBroadcastStatus {
     threshold: usize,
@@ -82,9 +65,9 @@ impl DAGNetworkSender for TestDAGSender {
     async fn send_rpc(
         &self,
         receiver: Author,
-        message: ConsensusMsg,
+        message: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<ConsensusMsg> {
+    ) -> anyhow::Result<DAGMessage> {
         match self.failures.lock().entry(receiver) {
             Entry::Occupied(mut entry) => {
                 let count = entry.get_mut();
@@ -96,10 +79,9 @@ impl DAGNetworkSender for TestDAGSender {
             },
             Entry::Vacant(_) => (),
         };
-        self.received
-            .lock()
-            .insert(receiver, TestMessage::from_network_message(message)?);
-        Ok(TestAck.into_network_message())
+        let message = TestMessage::try_from(message)?;
+        self.received.lock().insert(receiver, message.clone());
+        Ok(TestAck(message.0).into())
     }
 }
 
@@ -177,4 +159,28 @@ async fn test_abort_reliable_broadcast() {
     tokio::spawn(fut);
     abort_handle.abort();
     assert!(rx.await.is_err());
+}
+
+#[tokio::test]
+async fn test_node_broadcast_receiver() {
+    let signer = ValidatorSigner::from_int(10);
+    let validators = vec![Author::random(); 5];
+
+    let message1 = create_test_node(1, 10, validators[1]);
+    let message2 = create_test_node(1, 20, validators[1]);
+
+    assert_ne!(message1.digest(), message2.digest());
+
+    let mut rb_receiver = NodeBroadcastHandler::new(signer.clone());
+
+    let expected_result =
+        NodeDigestSignature::new(0, message1.digest(), message1.sign(&signer).unwrap());
+    // expect an ack for a valid message
+    assert_ok_eq!(rb_receiver.process(message1), expected_result);
+    // expect the original ack for any future message from same author
+    assert_ok_eq!(rb_receiver.process(message2), expected_result);
+}
+
+fn create_test_node(round: Round, timestamp: u64, author: Author) -> Node {
+    Node::new(0, round, author, timestamp, Payload::empty(false), vec![])
 }
