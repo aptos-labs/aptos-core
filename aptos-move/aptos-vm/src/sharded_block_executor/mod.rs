@@ -26,9 +26,12 @@ pub mod block_executor_client;
 mod counters;
 mod cross_shard_client;
 mod cross_shard_commit_listener;
+mod cross_shard_state_view;
 mod executor_shard;
 mod messages;
 pub mod sharded_executor_client;
+#[cfg(test)]
+mod tests;
 
 /// A wrapper around sharded block executors that manages multiple shards and aggregates the results.
 pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {

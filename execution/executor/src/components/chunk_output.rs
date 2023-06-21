@@ -21,8 +21,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     sharded_block_executor::{
-        block_executor_client::VMExecutorClient, sharded_executor_client::ShardedExecutorClient,
-        ShardedBlockExecutor,
+        sharded_executor_client::ShardedExecutorClient, ShardedBlockExecutor,
     },
     AptosVM, VMExecutor,
 };

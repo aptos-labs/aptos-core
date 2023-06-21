@@ -25,7 +25,7 @@ pub struct ShardedExecutorClient {
     executor_thread_pool: Arc<rayon::ThreadPool>,
     message_rx: Arc<Mutex<Receiver<CrossShardMsg>>>,
     // The senders of cross-shard messages to other shards.
-    message_txs: Arc<Vec<Sender<CrossShardMsg>>>,
+    message_txs: Arc<Vec<Mutex<Sender<CrossShardMsg>>>>,
 }
 
 impl ShardedExecutorClient {
@@ -47,7 +47,7 @@ impl ShardedExecutorClient {
             shard_id,
             executor_thread_pool,
             message_rx: Arc::new(Mutex::new(message_rx)),
-            message_txs: Arc::new(message_txs),
+            message_txs: Arc::new(message_txs.into_iter().map(Mutex::new).collect()),
         }
     }
 
@@ -92,7 +92,13 @@ impl BlockExecutorClient for ShardedExecutorClient {
             transactions.num_txns(),
             self.executor_thread_pool.clone(),
             maybe_block_gas_limit,
-            CrossShardCommitListener::new(self.message_txs.as_ref(), &transactions),
+            CrossShardCommitListener::new(
+                self.message_txs
+                    .iter()
+                    .map(|t| t.lock().unwrap().clone())
+                    .collect(),
+                &transactions,
+            ),
         ));
 
         for (txn_index, txn) in transactions.txn_with_index_iter() {
@@ -114,7 +120,9 @@ impl BlockExecutorClient for ShardedExecutorClient {
         let (callback, callback_receiver) = oneshot::channel();
 
         let message_rxs = self.message_rx.clone();
-        let self_message_tx = Arc::new(Mutex::new(self.message_txs[self.shard_id].clone()));
+        let self_message_tx = Arc::new(Mutex::new(
+            self.message_txs[self.shard_id].lock().unwrap().clone(),
+        ));
         self.executor_thread_pool.scope(|s| {
             s.spawn(move |_| {
                 CrossShardCommitReceiver::start(executor_clone, &message_rxs.lock().unwrap());

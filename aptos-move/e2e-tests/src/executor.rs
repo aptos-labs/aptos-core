@@ -45,6 +45,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
+    adapter_common::PreprocessedTransaction,
     block_executor::BlockAptosExecutor,
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
@@ -418,11 +419,12 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let executor = BlockAptosExecutor::new_with_no_op_listener(
+        let executor = BlockAptosExecutor::new(
             usize::min(4, num_cpus::get()),
             txn_block.len(),
             self.executor_thread_pool.clone(),
             None,
+            NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
         );
         executor.execute_block(
             BlockExecutorTransactions::Unsharded(txn_block),

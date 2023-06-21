@@ -3270,6 +3270,7 @@ name = "aptos-transaction-benchmarks"
 version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
+ "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-executor-service",

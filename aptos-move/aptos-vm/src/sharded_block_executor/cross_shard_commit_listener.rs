@@ -4,7 +4,6 @@ use crate::sharded_block_executor::messages::{
     CrossShardMsg, CrossShardMsg::RemoteTxnCommitMsg, RemoteTxnCommit,
 };
 use aptos_block_executor::txn_commit_listener::TransactionCommitListener;
-use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::partitioner::{CrossShardEdges, SubBlocksForShard},
@@ -12,7 +11,10 @@ use aptos_types::{
     transaction::Transaction,
     write_set::WriteOp,
 };
-use std::{collections::HashMap, sync::mpsc::Sender};
+use std::{
+    collections::HashMap,
+    sync::{mpsc::Sender, Mutex},
+};
 
 pub struct CrossShardCommitListener {
     // The senders of cross-shard messages to other shards.
@@ -23,7 +25,7 @@ pub struct CrossShardCommitListener {
 
 impl CrossShardCommitListener {
     pub fn new(
-        message_txs: &[Sender<CrossShardMsg>],
+        message_txs: Vec<Sender<CrossShardMsg>>,
         transactions: &SubBlocksForShard<Transaction>,
     ) -> Self {
         let mut dependent_edges = HashMap::new();
@@ -38,10 +40,7 @@ impl CrossShardCommitListener {
         }
 
         Self {
-            message_txs: message_txs
-                .iter()
-                .map(|sender| Mutex::new(sender.clone()))
-                .collect(),
+            message_txs: message_txs.into_iter().map(Mutex::new).collect(),
             dependent_edges,
         }
     }
@@ -59,7 +58,7 @@ impl TransactionCommitListener for CrossShardCommitListener {
                     // from the transaction but we send them all anyway.
                     txn_writes.to_vec(),
                 ));
-                let sender = self.message_txs[txn_id_with_shard.shard_id].lock();
+                let sender = self.message_txs[txn_id_with_shard.shard_id].lock().unwrap();
                 sender.send(message).unwrap();
             }
         }
