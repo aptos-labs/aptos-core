@@ -26,7 +26,7 @@ A wrapper denoting universally unique identifer (UUID)
 for storing an address
 
 
-<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_UUID">UUID</a>
+<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_UUID">UUID</a> <b>has</b> drop, store
 </code></pre>
 
 
