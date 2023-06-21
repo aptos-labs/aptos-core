@@ -182,7 +182,7 @@ jobs:
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
-  sdk-release:
+  node-api-compatibility-tests:
     needs: [permission-check, rust-images, determine-docker-build-metadata] # runs with the default release docker build variant "rust-images"
     if: |
       (github.event_name == 'push' && github.ref_name != 'main') ||
@@ -190,7 +190,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
       github.event.pull_request.auto_merge != null ||
       contains(github.event.pull_request.body, '#e2e')
-    uses: aptos-labs/aptos-core/.github/workflows/sdk-release.yaml@main
+    uses: ./.github/workflows/node-api-compatibility-tests.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -351,6 +351,6 @@ jobs:
       FORGE_TEST_SUITE: multiregion_benchmark_test
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 300
-      COMMENT_HEADER: forge-multiregion-test 
+      COMMENT_HEADER: forge-multiregion-test
       FORGE_NAMESPACE: forge-multiregion-test-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       FORGE_CLUSTER_NAME: forge-multiregion
