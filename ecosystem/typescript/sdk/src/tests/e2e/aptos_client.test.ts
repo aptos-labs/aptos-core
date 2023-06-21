@@ -22,8 +22,6 @@ const account = "0x1::account::Account";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
-const coinTransferFunction = "0x1::aptos_account::transfer";
-
 test("call should include x-aptos-client header", async () => {
   const client = new AptosClient(NODE_URL, { HEADERS: { my: "header" } });
   const heders = client.client.request.config.HEADERS;
