@@ -32,6 +32,21 @@ impl<T> Op<T> {
         }
     }
 
+    /// Applies `f` on the op and returns the result. If function
+    /// application fails, an error is returned.
+    pub fn and_then<U, E, F>(self, f: F) -> Result<Op<U>, E>
+    where
+        F: FnOnce(T) -> Result<U, E>,
+    {
+        use Op::*;
+
+        match self {
+            New(data) => Ok(New(f(data)?)),
+            Modify(data) => Ok(Modify(f(data)?)),
+            Delete => Ok(Delete),
+        }
+    }
+
     pub fn map<F, U>(self, f: F) -> Op<U>
     where
         F: FnOnce(T) -> U,
@@ -57,9 +72,9 @@ impl<T> Op<T> {
 
 /// A collection of resource and module operations on a Move account.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct AccountChangeSet {
-    modules: BTreeMap<Identifier, Op<Vec<u8>>>,
-    resources: BTreeMap<StructTag, Op<Vec<u8>>>,
+pub struct AccountChanges<Module, Resource> {
+    modules: BTreeMap<Identifier, Op<Module>>,
+    resources: BTreeMap<StructTag, Op<Resource>>,
 }
 
 /// This implements an algorithm to squash two change sets together by merging pairs of operations
@@ -111,10 +126,10 @@ where
     Ok(())
 }
 
-impl AccountChangeSet {
+impl<Module, Resource> AccountChanges<Module, Resource> {
     pub fn from_modules_resources(
-        modules: BTreeMap<Identifier, Op<Vec<u8>>>,
-        resources: BTreeMap<StructTag, Op<Vec<u8>>>,
+        modules: BTreeMap<Identifier, Op<Module>>,
+        resources: BTreeMap<StructTag, Op<Resource>>,
     ) -> Self {
         Self { modules, resources }
     }
@@ -127,7 +142,7 @@ impl AccountChangeSet {
         }
     }
 
-    pub fn add_module_op(&mut self, name: Identifier, op: Op<Vec<u8>>) -> Result<()> {
+    pub fn add_module_op(&mut self, name: Identifier, op: Op<Module>) -> Result<()> {
         use btree_map::Entry::*;
 
         match self.modules.entry(name) {
@@ -140,7 +155,7 @@ impl AccountChangeSet {
         Ok(())
     }
 
-    pub fn add_resource_op(&mut self, struct_tag: StructTag, op: Op<Vec<u8>>) -> Result<()> {
+    pub fn add_resource_op(&mut self, struct_tag: StructTag, op: Op<Resource>) -> Result<()> {
         use btree_map::Entry::*;
 
         match self.resources.entry(struct_tag) {
@@ -156,25 +171,25 @@ impl AccountChangeSet {
     pub fn into_inner(
         self,
     ) -> (
-        BTreeMap<Identifier, Op<Vec<u8>>>,
-        BTreeMap<StructTag, Op<Vec<u8>>>,
+        BTreeMap<Identifier, Op<Module>>,
+        BTreeMap<StructTag, Op<Resource>>,
     ) {
         (self.modules, self.resources)
     }
 
-    pub fn into_resources(self) -> BTreeMap<StructTag, Op<Vec<u8>>> {
+    pub fn into_resources(self) -> BTreeMap<StructTag, Op<Resource>> {
         self.resources
     }
 
-    pub fn into_modules(self) -> BTreeMap<Identifier, Op<Vec<u8>>> {
+    pub fn into_modules(self) -> BTreeMap<Identifier, Op<Module>> {
         self.modules
     }
 
-    pub fn modules(&self) -> &BTreeMap<Identifier, Op<Vec<u8>>> {
+    pub fn modules(&self) -> &BTreeMap<Identifier, Op<Module>> {
         &self.modules
     }
 
-    pub fn resources(&self) -> &BTreeMap<StructTag, Op<Vec<u8>>> {
+    pub fn resources(&self) -> &BTreeMap<StructTag, Op<Resource>> {
         &self.resources
     }
 
@@ -188,16 +203,16 @@ impl AccountChangeSet {
     }
 }
 
-// TODO: ChangeSet does not have a canonical representation so the derived Ord is not sound.
+// TODO: Changes does not have a canonical representation so the derived Ord is not sound.
 
 /// A collection of changes to a Move state. Each AccountChangeSet in the domain of `accounts`
 /// is guaranteed to be nonempty
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ChangeSet {
-    accounts: BTreeMap<AccountAddress, AccountChangeSet>,
+pub struct Changes<Module, Resource> {
+    accounts: BTreeMap<AccountAddress, AccountChanges<Module, Resource>>,
 }
 
-impl ChangeSet {
+impl<Module, Resource> Changes<Module, Resource> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
@@ -208,7 +223,7 @@ impl ChangeSet {
     pub fn add_account_changeset(
         &mut self,
         addr: AccountAddress,
-        account_changeset: AccountChangeSet,
+        account_changeset: AccountChanges<Module, Resource>,
     ) -> Result<()> {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(_) => bail!(
@@ -223,22 +238,25 @@ impl ChangeSet {
         Ok(())
     }
 
-    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChangeSet> {
+    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChanges<Module, Resource>> {
         &self.accounts
     }
 
-    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChangeSet> {
+    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChanges<Module, Resource>> {
         self.accounts
     }
 
-    fn get_or_insert_account_changeset(&mut self, addr: AccountAddress) -> &mut AccountChangeSet {
+    fn get_or_insert_account_changeset(
+        &mut self,
+        addr: AccountAddress,
+    ) -> &mut AccountChanges<Module, Resource> {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(entry) => entry.into_mut(),
-            btree_map::Entry::Vacant(entry) => entry.insert(AccountChangeSet::new()),
+            btree_map::Entry::Vacant(entry) => entry.insert(AccountChanges::new()),
         }
     }
 
-    pub fn add_module_op(&mut self, module_id: ModuleId, op: Op<Vec<u8>>) -> Result<()> {
+    pub fn add_module_op(&mut self, module_id: ModuleId, op: Op<Module>) -> Result<()> {
         let account = self.get_or_insert_account_changeset(*module_id.address());
         account.add_module_op(module_id.name().to_owned(), op)
     }
@@ -247,7 +265,7 @@ impl ChangeSet {
         &mut self,
         addr: AccountAddress,
         struct_tag: StructTag,
-        op: Op<Vec<u8>>,
+        op: Op<Resource>,
     ) -> Result<()> {
         let account = self.get_or_insert_account_changeset(addr);
         account.add_resource_op(struct_tag, op)
@@ -267,7 +285,7 @@ impl ChangeSet {
         Ok(())
     }
 
-    pub fn into_modules(self) -> impl Iterator<Item = (ModuleId, Op<Vec<u8>>)> {
+    pub fn into_modules(self) -> impl Iterator<Item = (ModuleId, Op<Module>)> {
         self.accounts.into_iter().flat_map(|(addr, account)| {
             account
                 .modules
@@ -276,25 +294,31 @@ impl ChangeSet {
         })
     }
 
-    pub fn modules(&self) -> impl Iterator<Item = (AccountAddress, &Identifier, Op<&[u8]>)> {
+    pub fn modules(&self) -> impl Iterator<Item = (AccountAddress, &Identifier, Op<&Module>)> {
         self.accounts.iter().flat_map(|(addr, account)| {
             let addr = *addr;
             account
                 .modules
                 .iter()
-                .map(move |(module_name, op)| (addr, module_name, op.as_ref().map(|v| v.as_ref())))
+                .map(move |(module_name, op)| (addr, module_name, op.as_ref()))
         })
     }
 
-    pub fn resources(&self) -> impl Iterator<Item = (AccountAddress, &StructTag, Op<&[u8]>)> {
+    pub fn resources(&self) -> impl Iterator<Item = (AccountAddress, &StructTag, Op<&Resource>)> {
         self.accounts.iter().flat_map(|(addr, account)| {
             let addr = *addr;
             account
                 .resources
                 .iter()
-                .map(move |(struct_tag, op)| (addr, struct_tag, op.as_ref().map(|v| v.as_ref())))
+                .map(move |(struct_tag, op)| (addr, struct_tag, op.as_ref()))
         })
     }
 }
+
+// These aliases are necessary because AccountChangeSet and ChangeSet were not
+// generic before. In order to minimise the code changes we alias new generic
+// types.
+pub type AccountChangeSet = AccountChanges<Vec<u8>, Vec<u8>>;
+pub type ChangeSet = Changes<Vec<u8>, Vec<u8>>;
 
 pub type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);

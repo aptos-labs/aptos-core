@@ -22,8 +22,7 @@ pub async fn emit_transactions(
         let cluster = Cluster::try_from_cluster_args(cluster_args)
             .await
             .context("Failed to build cluster")?;
-        return emit_transactions_with_cluster(&cluster, emit_args, cluster_args.reuse_accounts)
-            .await;
+        emit_transactions_with_cluster(&cluster, emit_args, cluster_args.reuse_accounts).await
     } else {
         let initial_delay_after_minting = emit_args.coordination_delay_between_instances.unwrap();
         let start_time = Instant::now();
@@ -173,6 +172,7 @@ pub async fn emit_transactions_with_cluster(
     if !cluster.coin_source_is_root {
         emit_job_request = emit_job_request.prompt_before_spending();
     }
+
     let stats = emitter
         .emit_txn_for_with_stats(
             &mut coin_source_account,

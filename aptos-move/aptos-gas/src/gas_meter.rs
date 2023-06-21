@@ -33,6 +33,10 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V10
+//   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
+// - V9
+//   - Accurate tracking of the cost of loading resource groups
 // - V8
 //   - Added BLS12-381 operations.
 // - V7
@@ -52,14 +56,14 @@ use std::collections::BTreeMap;
 //   - Storage charges:
 //     - Distinguish between new and existing resources
 //     - One item write comes with 1K free bytes
-//     - abort with STORATGE_WRITE_LIMIT_REACHED if WriteOps or Events are too large
+//     - abort with STORAGE_WRITE_LIMIT_REACHED if WriteOps or Events are too large
 // - V2
 //   - Table
 //     - Fix the gas formula for loading resources so that they are consistent with other
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 8;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 10;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -330,6 +334,18 @@ pub trait AptosGasMeter: MoveGasMeter {
 
         Ok(())
     }
+
+    /// Return the total gas used for execution.
+    fn execution_gas_used(&self) -> Gas;
+
+    /// Return the total gas used for io.
+    fn io_gas_used(&self) -> Gas;
+
+    /// Return the total gas used for storage.
+    fn storage_fee_used_in_gas_units(&self) -> Gas;
+
+    /// Return the total fee used for storage.
+    fn storage_fee_used(&self) -> Fee;
 }
 
 /// The official gas meter used inside the Aptos VM.
@@ -344,6 +360,9 @@ pub struct StandardGasMeter {
 
     execution_gas_used: InternalGas,
     io_gas_used: InternalGas,
+    // The gas consumed by the storage operations.
+    storage_fee_in_internal_units: InternalGas,
+    // The storage fee consumed by the storage operations.
     storage_fee_used: Fee,
 
     should_leak_memory_for_native: bool,
@@ -366,6 +385,7 @@ impl StandardGasMeter {
             balance,
             execution_gas_used: 0.into(),
             io_gas_used: 0.into(),
+            storage_fee_in_internal_units: 0.into(),
             storage_fee_used: 0.into(),
             memory_quota,
             should_leak_memory_for_native: false,
@@ -489,11 +509,12 @@ impl MoveGasMeter for StandardGasMeter {
         &mut self,
         _addr: AccountAddress,
         _ty: impl TypeView,
-        loaded: Option<(NumBytes, impl ValueView)>,
+        val: Option<impl ValueView>,
+        bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         if self.feature_version != 0 {
             // TODO(Gas): Rewrite this in a better way.
-            if let Some((_, val)) = &loaded {
+            if let Some(val) = &val {
                 self.use_heap_memory(
                     self.gas_params
                         .misc
@@ -502,10 +523,13 @@ impl MoveGasMeter for StandardGasMeter {
                 )?;
             }
         }
+        if self.feature_version <= 8 && val.is_none() && bytes_loaded != 0.into() {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message("in legacy versions, number of bytes loaded must be zero when the resource does not exist ".to_string()));
+        }
         let cost = self
             .storage_gas_params
             .pricing
-            .calculate_read_gas(loaded.map(|(num_bytes, _)| num_bytes));
+            .calculate_read_gas(val.is_some(), bytes_loaded);
         self.charge_io(cost)
     }
 
@@ -992,6 +1016,7 @@ impl AptosGasMeter for StandardGasMeter {
 
         self.charge(gas_consumed_internal)?;
 
+        self.storage_fee_in_internal_units += gas_consumed_internal;
         self.storage_fee_used += amount;
         if self.feature_version >= 7 && self.storage_fee_used > self.gas_params.txn.max_storage_fee
         {
@@ -1027,5 +1052,24 @@ impl AptosGasMeter for StandardGasMeter {
         let cost = self.gas_params.txn.calculate_intrinsic_gas(txn_size);
         self.charge_execution(cost)
             .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn execution_gas_used(&self) -> Gas {
+        self.execution_gas_used
+            .to_unit_round_up_with_params(&self.gas_params.txn)
+    }
+
+    fn io_gas_used(&self) -> Gas {
+        self.io_gas_used
+            .to_unit_round_up_with_params(&self.gas_params.txn)
+    }
+
+    fn storage_fee_used_in_gas_units(&self) -> Gas {
+        self.storage_fee_in_internal_units
+            .to_unit_round_up_with_params(&self.gas_params.txn)
+    }
+
+    fn storage_fee_used(&self) -> Fee {
+        self.storage_fee_used
     }
 }

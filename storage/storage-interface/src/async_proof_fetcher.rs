@@ -122,6 +122,9 @@ impl AsyncProofFetcher {
             let proof = reader
                 .get_state_proof_by_version_ext(&state_key, version)
                 .expect("Proof reading should succeed.");
+            // NOTE: Drop the reader here to make sure reader has shorter lifetime than the async
+            // proof fetcher.
+            drop(reader);
             if let Some(root_hash) = root_hash {
                 proof
                     .verify_by_hash(root_hash, state_key.hash(), value_hash)

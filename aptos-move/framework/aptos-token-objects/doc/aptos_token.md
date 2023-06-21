@@ -77,7 +77,8 @@ The key features are:
 Storage state for managing the no-code Collection.
 
 
-<pre><code><b>struct</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a> <b>has</b> key
+<pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a> <b>has</b> key
 </code></pre>
 
 
@@ -159,7 +160,8 @@ Storage state for managing the no-code Collection.
 Storage state for managing the no-code Token.
 
 
-<pre><code><b>struct</b> <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> <b>has</b> key
+<pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="aptos_token.md#0x4_aptos_token_AptosToken">AptosToken</a> <b>has</b> key
 </code></pre>
 
 
@@ -553,7 +555,8 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_are_properties_mutable">are_properties_mutable</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_are_properties_mutable">are_properties_mutable</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -578,7 +581,8 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_burnable">is_burnable</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_burnable">is_burnable</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -602,7 +606,8 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_freezable_by_creator">is_freezable_by_creator</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_freezable_by_creator">is_freezable_by_creator</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -626,7 +631,8 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_mutable_description">is_mutable_description</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_mutable_description">is_mutable_description</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -650,7 +656,8 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_mutable_name">is_mutable_name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_mutable_name">is_mutable_name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -674,7 +681,8 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_mutable_uri">is_mutable_uri</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="aptos_token.md#0x4_aptos_token_is_mutable_uri">is_mutable_uri</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 

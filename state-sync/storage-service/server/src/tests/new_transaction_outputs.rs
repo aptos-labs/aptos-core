@@ -37,7 +37,7 @@ async fn test_get_new_transaction_outputs() {
 
         // Create the mock db reader
         let mut db_reader =
-            mock::create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+            mock::create_mock_db_for_optimistic_fetch(highest_ledger_info.clone(), lowest_version);
         utils::expect_get_transaction_outputs(
             &mut db_reader,
             peer_version + 1,
@@ -48,17 +48,21 @@ async fn test_get_new_transaction_outputs() {
 
         // Create the storage client and server
         let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
+        let active_optimistic_fetches = service.get_optimistic_fetches();
         tokio::spawn(service.start());
 
-        // Send a request to subscribe to new transaction outputs
+        // Send a request to optimistically fetch new transaction outputs
         let mut response_receiver =
             get_new_outputs_with_proof(&mut mock_client, peer_version, highest_epoch).await;
 
-        // Verify no subscription response has been received yet
+        // Wait until the optimistic fetch is active
+        utils::wait_for_active_optimistic_fetches(active_optimistic_fetches.clone(), 1).await;
+
+        // Verify no optimistic fetch response has been received yet
         assert_none!(response_receiver.try_recv().unwrap());
 
-        // Elapse enough time to force the subscription thread to work
-        utils::wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+        // Elapse enough time to force the optimistic fetch thread to work
+        utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
 
         // Verify a response is received and that it contains the correct data
         verify_new_transaction_outputs_with_proof(
@@ -97,7 +101,7 @@ async fn test_get_new_transaction_outputs_different_networks() {
 
         // Create the mock db reader
         let mut db_reader =
-            mock::create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+            mock::create_mock_db_for_optimistic_fetch(highest_ledger_info.clone(), lowest_version);
         utils::expect_get_transaction_outputs(
             &mut db_reader,
             peer_version_1 + 1,
@@ -115,9 +119,10 @@ async fn test_get_new_transaction_outputs_different_networks() {
 
         // Create the storage client and server
         let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
+        let active_optimistic_fetches = service.get_optimistic_fetches();
         tokio::spawn(service.start());
 
-        // Send a request to subscribe to new transaction outputs for peer 1
+        // Send a request to optimistically fetch new transaction outputs for peer 1
         let peer_id = PeerId::random();
         let peer_network_1 = PeerNetworkId::new(NetworkId::Validator, peer_id);
         let mut response_receiver_1 = get_new_outputs_with_proof_for_peer(
@@ -128,7 +133,7 @@ async fn test_get_new_transaction_outputs_different_networks() {
         )
         .await;
 
-        // Send a request to subscribe to new transaction outputs for peer 2
+        // Send a request to optimistically fetch new transaction outputs for peer 2
         let peer_network_2 = PeerNetworkId::new(NetworkId::Vfn, peer_id);
         let mut response_receiver_2 = get_new_outputs_with_proof_for_peer(
             &mut mock_client,
@@ -138,12 +143,15 @@ async fn test_get_new_transaction_outputs_different_networks() {
         )
         .await;
 
-        // Verify no subscription response has been received yet
+        // Wait until the optimistic fetches are active
+        utils::wait_for_active_optimistic_fetches(active_optimistic_fetches.clone(), 2).await;
+
+        // Verify no optimistic fetch response has been received yet
         assert_none!(response_receiver_1.try_recv().unwrap());
         assert_none!(response_receiver_2.try_recv().unwrap());
 
-        // Elapse enough time to force the subscription thread to work
-        utils::wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+        // Elapse enough time to force the optimistic fetch thread to work
+        utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
 
         // Verify a response is received and that it contains the correct data
         verify_new_transaction_outputs_with_proof(
@@ -186,7 +194,7 @@ async fn test_get_new_transaction_outputs_epoch_change() {
     );
 
     // Create the mock db reader
-    let mut db_reader = mock::create_mock_db_for_subscription(
+    let mut db_reader = mock::create_mock_db_for_optimistic_fetch(
         utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version),
         lowest_version,
     );
@@ -206,14 +214,18 @@ async fn test_get_new_transaction_outputs_epoch_change() {
 
     // Create the storage client and server
     let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
+    let active_optimistic_fetches = service.get_optimistic_fetches();
     tokio::spawn(service.start());
 
-    // Send a request to subscribe to new transaction outputs
+    // Send a request to optimistically fetch new transaction outputs
     let response_receiver =
         get_new_outputs_with_proof(&mut mock_client, peer_version, peer_epoch).await;
 
-    // Elapse enough time to force the subscription thread to work
-    utils::wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+    // Wait until the optimistic fetch is active
+    utils::wait_for_active_optimistic_fetches(active_optimistic_fetches.clone(), 1).await;
+
+    // Elapse enough time to force the optimistic fetch thread to work
+    utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
 
     // Verify a response is received and that it contains the correct data
     verify_new_transaction_outputs_with_proof(
@@ -244,7 +256,7 @@ async fn test_get_new_transaction_outputs_max_chunk() {
 
     // Create the mock db reader
     let mut db_reader =
-        mock::create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+        mock::create_mock_db_for_optimistic_fetch(highest_ledger_info.clone(), lowest_version);
     utils::expect_get_transaction_outputs(
         &mut db_reader,
         peer_version + 1,
@@ -255,14 +267,18 @@ async fn test_get_new_transaction_outputs_max_chunk() {
 
     // Create the storage client and server
     let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
+    let active_optimistic_fetches = service.get_optimistic_fetches();
     tokio::spawn(service.start());
 
-    // Send a request to subscribe to new transaction outputs
+    // Send a request to optimistically fetch new transaction outputs
     let response_receiver =
         get_new_outputs_with_proof(&mut mock_client, peer_version, highest_epoch).await;
 
-    // Elapse enough time to force the subscription thread to work
-    utils::wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+    // Wait until the optimistic fetch is active
+    utils::wait_for_active_optimistic_fetches(active_optimistic_fetches.clone(), 1).await;
+
+    // Elapse enough time to force the optimistic fetch thread to work
+    utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
 
     // Verify a response is received and that it contains the correct data
     verify_new_transaction_outputs_with_proof(

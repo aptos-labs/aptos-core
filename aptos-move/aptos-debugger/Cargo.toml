@@ -22,6 +22,7 @@ aptos-types = { workspace = true }
 aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-logging = { workspace = true }
+aptos-vm-types = { workspace = true }
 clap = { workspace = true }
 move-binary-format = { workspace = true }
 move-cli = { workspace = true }

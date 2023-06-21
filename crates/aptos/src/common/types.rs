@@ -29,7 +29,7 @@ use aptos_logger::Level;
 use aptos_rest_client::{
     aptos_api_types::{EntryFunctionId, HashValue, MoveType, ViewRequest},
     error::RestError,
-    Client, Transaction,
+    AptosBaseUrl, Client, Transaction,
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
@@ -62,6 +62,9 @@ const US_IN_SECS: u64 = 1_000_000;
 const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
+
+// Custom header value to identify the client
+const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
 
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
@@ -449,11 +452,12 @@ impl ProfileOptions {
 }
 
 /// Types of encodings used by the blockchain
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ArgEnum, Clone, Copy, Debug, Default)]
 pub enum EncodingType {
     /// Binary Canonical Serialization
     BCS,
     /// Hex encoded e.g. 0xABCDE12345
+    #[default]
     Hex,
     /// Base 64 encoded
     Base64,
@@ -553,12 +557,6 @@ impl RngArgs {
     }
 }
 
-impl Default for EncodingType {
-    fn default() -> Self {
-        EncodingType::Hex
-    }
-}
-
 impl Display for EncodingType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {
@@ -616,6 +614,41 @@ pub struct EncodingOptions {
     /// Encoding of data as one of [base64, bcs, hex]
     #[clap(long, default_value_t = EncodingType::Hex)]
     pub encoding: EncodingType,
+}
+
+#[derive(Debug, Parser)]
+pub struct AuthenticationKeyInputOptions {
+    /// Authentication Key file input
+    #[clap(long, group = "authentication_key_input", parse(from_os_str))]
+    auth_key_file: Option<PathBuf>,
+
+    /// Authentication key input
+    #[clap(long, group = "authentication_key_input")]
+    auth_key: Option<String>,
+}
+
+impl AuthenticationKeyInputOptions {
+    pub fn extract_auth_key(
+        &self,
+        encoding: EncodingType,
+    ) -> CliTypedResult<Option<AuthenticationKey>> {
+        if let Some(ref file) = self.auth_key_file {
+            Ok(Some(encoding.load_key("--auth-key-file", file.as_path())?))
+        } else if let Some(ref key) = self.auth_key {
+            let key = key.as_bytes().to_vec();
+            Ok(Some(encoding.decode_key("--auth-key", key)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn from_public_key(key: &Ed25519PublicKey) -> AuthenticationKeyInputOptions {
+        let auth_key = AuthenticationKey::ed25519(key);
+        AuthenticationKeyInputOptions {
+            auth_key: Some(auth_key.to_encoded_string().unwrap()),
+            auth_key_file: None,
+        }
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -832,6 +865,10 @@ pub trait ExtractPublicKey {
 
 pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
     let auth_key = AuthenticationKey::ed25519(public_key);
+    account_address_from_auth_key(&auth_key)
+}
+
+pub fn account_address_from_auth_key(auth_key: &AuthenticationKey) -> AccountAddress {
     AccountAddress::new(*auth_key.derived_address())
 }
 
@@ -905,11 +942,10 @@ impl RestOptions {
     }
 
     pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
-        Ok(Client::new_with_timeout_and_user_agent(
-            self.url(profile)?,
-            Duration::from_secs(self.connection_timeout_secs),
-            USER_AGENT,
-        ))
+        Ok(Client::builder(AptosBaseUrl::Custom(self.url(profile)?))
+            .timeout(Duration::from_secs(self.connection_timeout_secs))
+            .header(aptos_api_types::X_APTOS_CLIENT, X_APTOS_CLIENT_VALUE)?
+            .build())
     }
 }
 

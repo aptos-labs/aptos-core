@@ -13,6 +13,10 @@ resource "google_container_cluster" "aptos" {
     channel = "REGULAR"
   }
 
+  pod_security_policy_config {
+    enabled = false
+  }
+
   master_auth {
     client_certificate_config {
       issue_client_certificate = false
@@ -65,6 +69,17 @@ resource "google_container_cluster" "aptos" {
         resource_type = resource_limits.key
         minimum       = 1
         maximum       = resource_limits.value
+      }
+    }
+  }
+
+  maintenance_policy {
+    dynamic "recurring_window" {
+      for_each = var.gke_maintenance_policy.recurring_window != null ? [1] : []
+      content {
+        start_time = var.gke_maintenance_policy.recurring_window.start_time
+        end_time   = var.gke_maintenance_policy.recurring_window.end_time
+        recurrence = var.gke_maintenance_policy.recurring_window.recurrence
       }
     }
   }

@@ -2,18 +2,17 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::benchmark_transaction::BenchmarkTransaction;
 use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_types::transaction::Version;
+use aptos_types::transaction::{Transaction, Version};
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
 
 pub struct TransactionExecutor<V> {
-    executor: Arc<BlockExecutor<V, BenchmarkTransaction>>,
+    executor: Arc<BlockExecutor<V>>,
     parent_block_id: HashValue,
     start_time: Option<Instant>,
     version: Version,
@@ -26,10 +25,10 @@ pub struct TransactionExecutor<V> {
 
 impl<V> TransactionExecutor<V>
 where
-    V: TransactionBlockExecutor<BenchmarkTransaction>,
+    V: TransactionBlockExecutor,
 {
     pub fn new(
-        executor: Arc<BlockExecutor<V, BenchmarkTransaction>>,
+        executor: Arc<BlockExecutor<V>>,
         parent_block_id: HashValue,
         version: Version,
         commit_sender: Option<
@@ -49,7 +48,7 @@ where
         }
     }
 
-    pub fn execute_block(&mut self, transactions: Vec<BenchmarkTransaction>) {
+    pub fn execute_block(&mut self, transactions: Vec<Transaction>) {
         if self.start_time.is_none() {
             self.start_time = Some(Instant::now())
         }
@@ -62,7 +61,7 @@ where
         let block_id = HashValue::random();
         let output = self
             .executor
-            .execute_block((block_id, transactions), self.parent_block_id)
+            .execute_block((block_id, transactions).into(), self.parent_block_id, None)
             .unwrap();
 
         assert_eq!(output.compute_status().len(), num_txns);

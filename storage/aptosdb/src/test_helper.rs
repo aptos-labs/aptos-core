@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-///! This module provides reusable helpers in tests.
+//! This module provides reusable helpers in tests.
 use super::*;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
@@ -868,7 +868,7 @@ pub fn verify_committed_transactions(
 pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
     let batch = SchemaBatch::new();
     db.ledger_store
-        .put_transaction_infos(version, &[txn_info.clone()], &batch)
+        .put_transaction_infos(version, &[txn_info.clone()], &batch, &batch)
         .unwrap();
     db.ledger_db.transaction_db().write_schemas(batch).unwrap();
 }

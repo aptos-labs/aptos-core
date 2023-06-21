@@ -29,8 +29,13 @@ import pathlib
 import shutil
 import sys
 
-from cases.account import test_account_create, test_account_fund_with_faucet
-from cases.init import test_init
+from cases.account import (
+    test_account_create,
+    test_account_fund_with_faucet,
+    test_account_lookup_address,
+)
+from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
+from cases.move import test_move_publish
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -96,12 +101,22 @@ def parse_args():
 
 
 def run_tests(run_helper):
+    # Make sure the metrics port is accessible.
+    test_metrics_accessible(run_helper)
+
     # Run init tests. We run these first to set up the CLI.
     test_init(run_helper)
 
     # Run account tests.
     test_account_fund_with_faucet(run_helper)
     test_account_create(run_helper)
+    test_account_lookup_address(run_helper)
+
+    # Make sure the aptos-cli header is included on the original request
+    test_aptos_header_included(run_helper)
+
+    # Run move subcommand group tests.
+    test_move_publish(run_helper)
 
 
 def main():
@@ -113,30 +128,36 @@ def main():
     else:
         logging.getLogger().setLevel(logging.INFO)
 
-    # Run a node + faucet and wait for them to start up.
-    container_name = run_node(args.base_network, args.image_repo_with_project)
-    wait_for_startup(container_name, args.base_startup_timeout)
-
     # Create the dir the test CLI will run from.
     shutil.rmtree(args.working_directory, ignore_errors=True)
     pathlib.Path(args.working_directory).mkdir(parents=True, exist_ok=True)
 
-    # Build the RunHelper object.
-    run_helper = RunHelper(
-        host_working_directory=args.working_directory,
-        image_repo_with_project=args.image_repo_with_project,
-        image_tag=args.test_cli_tag,
-        cli_path=args.test_cli_path,
-    )
+    # Run a node + faucet and wait for them to start up.
+    container_name = run_node(args.base_network, args.image_repo_with_project)
 
-    # Prepare the run helper. This ensures in advance that everything needed is there.
-    run_helper.prepare()
+    # We run these in a try finally so that if something goes wrong, such as the
+    # local testnet not starting up correctly or some unexpected error in the
+    # test framework, we still stop the node + faucet.
+    try:
+        wait_for_startup(container_name, args.base_startup_timeout)
 
-    # Run tests.
-    run_tests(run_helper)
+        # Build the RunHelper object.
+        run_helper = RunHelper(
+            host_working_directory=args.working_directory,
+            image_repo_with_project=args.image_repo_with_project,
+            image_tag=args.test_cli_tag,
+            cli_path=args.test_cli_path,
+            base_network=args.base_network,
+        )
 
-    # Stop the node + faucet.
-    stop_node(container_name)
+        # Prepare the run helper. This ensures in advance that everything needed is there.
+        run_helper.prepare()
+
+        # Run tests.
+        run_tests(run_helper)
+    finally:
+        # Stop the node + faucet.
+        stop_node(container_name)
 
     # Print out the results.
     if test_results.passed:
