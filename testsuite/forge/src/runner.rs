@@ -62,7 +62,7 @@ pub struct Options {
     ///   pretty = Print verbose output;
     ///   terse = Display one character per test;
     ///   (json is unsupported, exists for compatibility with the default test harness)
-    #[clap(long, value_enum, ignore_case = true)]
+    #[clap(long, value_enum, ignore_case = true, default_value_t = Format::Pretty)]
     format: Format,
     #[allow(dead_code)]
     #[clap(short = 'Z')]
