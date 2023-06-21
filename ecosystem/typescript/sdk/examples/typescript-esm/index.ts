@@ -35,26 +35,17 @@ const {
   console.log(`account1 coins: ${balance}. Should be 100_000_000!`);
 
   const account2 = new AptosAccount();
-  // Creates the second account and fund the account with 0 AptosCoin
-  await faucetClient.fundAccount(account2.address(), 0);
-  resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r: any) => r.type === aptosCoinStore);
-  balance = parseInt((accountResource?.data as any).coin.value);
-  assert(balance === 0);
-  console.log(`account2 coins: ${balance}. Should be 0!`);
-
-  const token = new TypeTagStruct(StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
   // TS SDK support 3 types of transaction payloads: `EntryFunction`, `Script` and `Module`.
   // See https://aptos-labs.github.io/ts-sdk-doc/ for the details.
   const entryFunctionPayload = new TransactionPayloadEntryFunction(
     EntryFunction.natural(
       // Fully qualified module name, `AccountAddress::ModuleName`
-      "0x1::coin",
+      "0x1::aptos_account",
       // Module function
       "transfer",
       // The coin type to transfer
-      [token],
+      [],
       // Arguments for function `transfer`: receiver account address and amount to transfer
       [BCS.bcsToBytes(AccountAddress.fromHex(account2.address())), BCS.bcsSerializeUint64(717)],
     ),
@@ -99,7 +90,9 @@ const {
   const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
   const fullNodeChainId = await provider.getChainId();
 
-  console.log(`\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo}`);
+  console.log(
+    `\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
+  );
   if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
     console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
     return;
