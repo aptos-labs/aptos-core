@@ -60,9 +60,11 @@ impl ChunkOutput {
                     maybe_block_gas_limit,
                 )
             },
-            ExecutableTransactions::Sharded(block) => {
-                Self::by_transaction_execution_sharded::<V>(block, state_view, maybe_block_gas_limit)
-            }
+            ExecutableTransactions::Sharded(block) => Self::by_transaction_execution_sharded::<V>(
+                block,
+                state_view,
+                maybe_block_gas_limit,
+            ),
         }
     }
 

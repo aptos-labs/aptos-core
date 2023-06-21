@@ -495,7 +495,7 @@ mod tests {
             100, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000, /* init_account_balance */
-            5, /* block_size */
+            5,           /* block_size */
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             verify_sequence_numbers,
@@ -514,15 +514,29 @@ mod tests {
 
         println!("run_benchmark");
 
-        super::run_benchmark::<E>(6, 5, transaction_type.map(|t| t.materialize(2, false)), 2, 25, 30, storage_dir.as_ref(), checkpoint_dir, verify_sequence_numbers, NO_OP_STORAGE_PRUNER_CONFIG, false, false, PipelineConfig {
-            delay_execution_start: false,
-            split_stages: true,
-            skip_commit: false,
-            allow_discards: false,
-            allow_aborts: false,
-            num_executor_shards: 1,
-            pipelined_block_partitioning: false,
-        });
+        super::run_benchmark::<E>(
+            6,
+            5,
+            transaction_type.map(|t| t.materialize(2, false)),
+            2,
+            25,
+            30,
+            storage_dir.as_ref(),
+            checkpoint_dir,
+            verify_sequence_numbers,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            false,
+            false,
+            PipelineConfig {
+                delay_execution_start: false,
+                split_stages: true,
+                skip_commit: false,
+                allow_discards: false,
+                allow_aborts: false,
+                num_executor_shards: 1,
+                pipelined_block_partitioning: false,
+            },
+        );
     }
 
     #[test]

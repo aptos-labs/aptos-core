@@ -150,8 +150,8 @@ impl Opt {
     fn concurrency_level(&self) -> usize {
         match self.concurrency_level {
             None => {
-                let level =
-                    (num_cpus::get() as f64 / self.pipeline_opt.num_executor_shards as f64).ceil() as usize;
+                let level = (num_cpus::get() as f64 / self.pipeline_opt.num_executor_shards as f64)
+                    .ceil() as usize;
                 println!(
                     "\nVM concurrency level defaults to {} for number of shards {} \n",
                     level, self.pipeline_opt.num_executor_shards

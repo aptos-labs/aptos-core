@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{TransactionCommitter, TransactionExecutor};
+use crate::{
+    transaction_executor::PartitionExecutionMode, TransactionCommitter, TransactionExecutor,
+};
+use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
@@ -16,8 +19,6 @@ use std::{
     thread::JoinHandle,
     time::Instant,
 };
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
-use crate::transaction_executor::PartitionExecutionMode;
 
 #[derive(Clone, Debug)]
 pub struct PipelineConfig {
