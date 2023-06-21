@@ -62,6 +62,7 @@ pub struct StateMerkleDb {
     state_merkle_metadata_db: Arc<DB>,
     // Stores sharded part of tree nodes.
     state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    enable_sharding: bool,
     enable_cache: bool,
     version_cache: VersionedNodeCache,
     lru_cache: LruNodeCache,
@@ -94,6 +95,7 @@ impl StateMerkleDb {
             return Ok(Self {
                 state_merkle_metadata_db: Arc::clone(&db),
                 state_merkle_db_shards: arr![Arc::clone(&db); 16],
+                enable_sharding: false,
                 enable_cache,
                 version_cache,
                 lru_cache,
@@ -178,8 +180,16 @@ impl StateMerkleDb {
         &self.state_merkle_metadata_db
     }
 
+    pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.state_merkle_metadata_db)
+    }
+
     pub(crate) fn db_shard(&self, shard_id: u8) -> &DB {
         &self.state_merkle_db_shards[shard_id as usize]
+    }
+
+    pub(crate) fn db_shard_arc(&self, shard_id: u8) -> Arc<DB> {
+        Arc::clone(&self.state_merkle_db_shards[shard_id as usize])
     }
 
     pub(crate) fn commit_top_levels(&self, version: Version, batch: SchemaBatch) -> Result<()> {
@@ -359,6 +369,10 @@ impl StateMerkleDb {
         Ok((top_levels_batch, sharded_batch, new_root_hash))
     }
 
+    pub(crate) fn sharding_enabled(&self) -> bool {
+        self.enable_sharding
+    }
+
     pub(crate) fn cache_enabled(&self) -> bool {
         self.enable_cache
     }
@@ -376,6 +390,10 @@ impl StateMerkleDb {
             &DbMetadataKey::StateMerklePrunerProgress,
             &DbMetadataValue::Version(version),
         )
+    }
+
+    pub(crate) fn num_shards(&self) -> u8 {
+        NUM_STATE_SHARDS as u8
     }
 
     fn db_by_key(&self, node_key: &NodeKey) -> &DB {
@@ -419,6 +437,7 @@ impl StateMerkleDb {
         let state_merkle_db = Self {
             state_merkle_metadata_db,
             state_merkle_db_shards,
+            enable_sharding: true,
             enable_cache,
             version_cache,
             lru_cache,
