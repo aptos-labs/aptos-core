@@ -264,7 +264,8 @@ fn take_unique_ownership<T: Debug>(r: Rc<RefCell<T>>) -> PartialVMResult<T> {
         Ok(cell) => Ok(cell.into_inner()),
         Err(r) => Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message(format!("moving value {:?} with dangling references", r)),
+                .with_message(format!("moving value {:?} with dangling references", r))
+                .with_sub_status(crate::errors::EREFERENCE_COUNTING_FAILURE),
         ),
     }
 }
@@ -739,7 +740,8 @@ impl ContainerRef {
                                 )
                                 .with_message(
                                     "failed to write_ref: container type mismatch".to_string(),
-                                ))
+                                )
+                                .with_sub_status(crate::errors::EPARANOID_FAILURE))
                             },
                         };
                         *$r1.borrow_mut() = take_unique_ownership(r)?;
@@ -1005,9 +1007,8 @@ impl Locals {
                             return Err(PartialVMError::new(
                                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                             )
-                            .with_message(
-                                "moving container with dangling references".to_string(),
-                            ));
+                            .with_message("moving container with dangling references".to_string())
+                            .with_sub_status(crate::errors::EREFERENCE_COUNTING_FAILURE));
                         }
                     }
                 }
@@ -2486,7 +2487,8 @@ impl GlobalValueImpl {
         if Rc::strong_count(&fields) != 1 {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("moving global resource with dangling reference".to_string()),
+                    .with_message("moving global resource with dangling reference".to_string())
+                    .with_sub_status(crate::errors::EREFERENCE_COUNTING_FAILURE),
             );
         }
         Ok(ValueImpl::Container(Container::Struct(fields)))

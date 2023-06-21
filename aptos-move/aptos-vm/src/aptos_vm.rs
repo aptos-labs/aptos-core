@@ -1706,7 +1706,40 @@ impl VMAdapter for AptosVM {
                                     vm_status
                                 ),
                             );
-                        }
+                        },
+                        // Type resolution failure could be a result of user input error so need to filter that out.
+                        StatusCode::TYPE_RESOLUTION_FAILURE
+                            if vm_status.sub_status()
+                                == Some(move_vm_types::errors::EUSER_TYPE_LOADING_FAILURE) =>
+                        {
+                            ()
+                        },
+                        // Paranoid mode failure. We need to be alerted about this ASAP.
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+                            if vm_status.sub_status()
+                                == Some(move_vm_types::errors::EPARANOID_FAILURE) =>
+                        {
+                            error!(
+                                *log_context,
+                                "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
+                                bcs::to_bytes::<SignedTransaction>(&**txn),
+                                vm_status,
+                            );
+                        },
+                        // Paranoid mode failure but with reference counting
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+                            if vm_status.sub_status()
+                                == Some(move_vm_types::errors::EREFERENCE_COUNTING_FAILURE) =>
+                        {
+                            error!(
+                                *log_context,
+                                "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
+                                bcs::to_bytes::<SignedTransaction>(&**txn),
+                                vm_status,
+                            );
+                        },
+                        // Ignore Storage Error as it can be triggered by paranoid execution.
+                        StatusCode::STORAGE_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //
                         // TODO: Add different counters for the error categories here.
@@ -1717,7 +1750,7 @@ impl VMAdapter for AptosVM {
                                 bcs::to_bytes::<SignedTransaction>(&**txn),
                                 vm_status,
                             );
-                        }
+                        },
                     }
                 }
 

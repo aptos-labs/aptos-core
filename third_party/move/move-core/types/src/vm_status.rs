@@ -66,6 +66,7 @@ pub enum VMStatus {
     /// dividing by zero or a missing resource
     ExecutionFailure {
         status_code: StatusCode,
+        sub_status: Option<u64>,
         location: AbortLocation,
         function: u16,
         code_offset: u16,
@@ -138,6 +139,13 @@ impl VMStatus {
                 debug_assert!(code != StatusCode::ABORTED);
                 code
             },
+        }
+    }
+
+    pub fn sub_status(&self) -> Option<u64> {
+        match self {
+            Self::Error(..) | Self::Executed | Self::MoveAbort(..) => None,
+            Self::ExecutionFailure { sub_status, .. } => *sub_status,
         }
     }
 
@@ -297,9 +305,11 @@ impl fmt::Debug for VMStatus {
                 function,
                 code_offset,
                 message,
+                sub_status,
             } => f
                 .debug_struct("EXECUTION_FAILURE")
                 .field("status_code", status_code)
+                .field("sub_status", sub_status)
                 .field("location", location)
                 .field("function_definition", function)
                 .field("code_offset", code_offset)

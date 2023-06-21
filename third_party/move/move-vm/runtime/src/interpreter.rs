@@ -1110,7 +1110,8 @@ fn check_ability(has_ability: bool) -> PartialVMResult<()> {
     } else {
         Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Paranoid Mode: Expected ability mismatch".to_string()),
+                .with_message("Paranoid Mode: Expected ability mismatch".to_string())
+                .with_sub_status(move_vm_types::errors::EPARANOID_FAILURE),
         )
     }
 }
