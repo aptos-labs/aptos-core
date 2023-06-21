@@ -997,8 +997,9 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(120)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 40),
+                    // overload test uses more CPUs than others, so increase the limit
+                    // Check that we don't use more than 18 CPU cores for 30% of the time.
+                    MetricsThreshold::new(18, 40),
                     // Check that we don't use more than 5 GB of memory for 30% of the time.
                     MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
                 ))
