@@ -1458,18 +1458,17 @@ impl AptosVM {
         // Whether the prologue is run as part of tx simulation.
         is_simulation: bool,
     ) -> Result<(), VMStatus> {
-        let has_gas_payer = false;
         match payload {
             TransactionPayload::Script(_) => {
                 self.0.check_gas(resolver, txn_data, log_context)?;
                 self.0
-                    .run_script_prologue(session, txn_data, log_context, has_gas_payer)
+                    .run_script_prologue(session, txn_data, log_context)
             },
             TransactionPayload::EntryFunction(_) => {
                 // NOTE: Script and EntryFunction shares the same prologue
                 self.0.check_gas(resolver, txn_data, log_context)?;
                 self.0
-                    .run_script_prologue(session, txn_data, log_context, has_gas_payer)
+                    .run_script_prologue(session, txn_data, log_context)
             },
             TransactionPayload::Multisig(multisig_payload) => {
                 self.0.check_gas(resolver, txn_data, log_context)?;
