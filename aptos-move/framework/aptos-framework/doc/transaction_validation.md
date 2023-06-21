@@ -120,6 +120,16 @@ Transaction exceeded its allocated max gas
 
 
 
+<a name="0x1_transaction_validation_GAS_PAYER_FLAG_BIT"></a>
+
+MSB is used to indicate a gas payer tx
+
+
+<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>: u64 = 9223372036854775808;
+</code></pre>
+
+
+
 <a name="0x1_transaction_validation_PROLOGUE_EACCOUNT_DOES_NOT_EXIST"></a>
 
 
@@ -283,7 +293,7 @@ Only called during genesis to initialize system resources for this module.
     );
 
     <b>assert</b>!(
-        txn_sequence_number &lt; 1u64 &lt;&lt; 63,  // MSB is used <b>to</b> indicate a gas payer tx
+        txn_sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>)
     );
 
@@ -408,10 +418,11 @@ Only called during genesis to initialize system resources for this module.
     <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
 ) {
     <b>let</b> gas_payer = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender);
-    <b>if</b> (txn_sequence_number & (1u64 &lt;&lt; 63) != 0) {
+    <b>if</b> ((txn_sequence_number & <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>) != 0) {
         <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_gas_payer_enabled">features::gas_payer_enabled</a>(), <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>);
         gas_payer = *std::vector::borrow(&secondary_signer_addresses, std::vector::length(&secondary_signer_addresses) - 1);
-        txn_sequence_number = txn_sequence_number & ((1u64 &lt;&lt; 63) - 1);
+        // Clear the high bit <b>as</b> it's not part of the sequence number
+        txn_sequence_number = txn_sequence_number & (<a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a> - 1);
     };
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender, gas_payer, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, <a href="chain_id.md#0x1_chain_id">chain_id</a>);
 

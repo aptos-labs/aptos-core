@@ -46,8 +46,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
-pub const GAS_PAYER_FLAG_BIT: u64 = 1u64 << 63;  // MSB of sequence number is used to flag a gas payer tx
-
+pub const GAS_PAYER_FLAG_BIT: u64 = 1u64 << 63; // MSB of sequence number is used to flag a gas payer tx
 
 /// A wrapper to make VMRuntime standalone
 pub struct AptosVMImpl {

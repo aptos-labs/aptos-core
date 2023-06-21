@@ -25,6 +25,7 @@ module aptos_framework::transaction_validation {
         user_epilogue_name: vector<u8>,
     }
 
+    /// MSB is used to indicate a gas payer tx
     const GAS_PAYER_FLAG_BIT: u64 = 1u64 << 63;
     const MAX_U64: u128 = 18446744073709551615;
 
@@ -88,7 +89,7 @@ module aptos_framework::transaction_validation {
         );
 
         assert!(
-            txn_sequence_number < GAS_PAYER_FLAG_BIT,  // MSB is used to indicate a gas payer tx
+            txn_sequence_number < GAS_PAYER_FLAG_BIT,
             error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
         );
 

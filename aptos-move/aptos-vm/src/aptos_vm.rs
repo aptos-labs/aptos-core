@@ -6,7 +6,7 @@ use crate::{
     adapter_common::{
         discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
     },
-    aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
+    aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals, GAS_PAYER_FLAG_BIT},
     block_executor::BlockAptosVM,
     counters::*,
     data_cache::StorageAdapter,
@@ -76,7 +76,6 @@ use std::{
         Arc,
     },
 };
-use crate::aptos_vm_impl::GAS_PAYER_FLAG_BIT;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
