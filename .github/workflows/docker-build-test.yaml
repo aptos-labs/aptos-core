@@ -185,11 +185,13 @@ jobs:
   node-api-compatibility-tests:
     needs: [permission-check, rust-images, determine-docker-build-metadata] # runs with the default release docker build variant "rust-images"
     if: |
-      (github.event_name == 'push' && github.ref_name != 'main') ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      github.event.pull_request.auto_merge != null ||
-      contains(github.event.pull_request.body, '#e2e')
+      (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null) ||
+        contains(github.event.pull_request.body, '#e2e'
+      )
     uses: ./.github/workflows/node-api-compatibility-tests.yaml
     secrets: inherit
     with:
