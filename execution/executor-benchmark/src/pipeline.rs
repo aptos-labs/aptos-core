@@ -67,7 +67,7 @@ where
             }, /* bound */
         );
 
-        let (executable_block_sender, executable_block_receiver) = mpsc::channel::<ParToExeMsg>();
+        let (executable_block_sender, executable_block_receiver) = mpsc::sync_channel::<ParToExeMsg>(3);
 
         // Assume the distributed executor and the distributed partitioner share the same worker set.
         let num_partitioner_shards = config.num_executor_shards;

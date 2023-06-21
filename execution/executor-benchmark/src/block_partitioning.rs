@@ -12,20 +12,21 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::{
-    sync::mpsc::{Receiver, Sender},
+    sync::mpsc::Receiver,
     time::Instant,
 };
+use std::sync::mpsc::SyncSender;
 
 pub(crate) struct BlockPartitioningStage {
     num_iterations: usize,
-    executable_block_sender: Sender<ParToExeMsg>,
+    executable_block_sender: SyncSender<ParToExeMsg>,
     maybe_exe_fin_receiver: Option<Receiver<()>>,
     maybe_partitioner: Option<ShardedBlockPartitioner>,
 }
 
 impl BlockPartitioningStage {
     pub fn new(
-        executable_block_sender: Sender<ParToExeMsg>,
+        executable_block_sender: SyncSender<ParToExeMsg>,
         maybe_exe_fin_receiver: Option<Receiver<()>>,
         num_shards: usize,
     ) -> Self {
