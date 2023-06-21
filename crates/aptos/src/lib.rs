@@ -27,7 +27,7 @@ use std::collections::BTreeMap;
 
 /// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
-#[clap(name = "aptos", author, version, propagate_version = true)]
+#[clap(name = "aptos", author, version, propagate_version = true, styles = aptos_cli_common::aptos_cli_style())]
 pub enum Tool {
     #[clap(subcommand)]
     Account(account::AccountTool),

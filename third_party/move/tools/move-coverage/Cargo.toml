@@ -11,7 +11,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.52"
-clap = { version = "4.3.4", features = ["derive"] }
+clap = { version = "4.3.5", features = ["derive"] }
 codespan = { version = "0.11.1", features = ["serialization"] }
 colored = "2.0.0"
 once_cell = "1.7.2"
