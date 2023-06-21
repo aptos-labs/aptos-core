@@ -127,12 +127,12 @@ where
         }
     }
 
-    pub fn mark_estimate(&self, key: &T::Key, txn_idx: TxnIndex) {
-        self.versioned_cache.mark_estimate(key, txn_idx);
-    }
-
     pub fn add_txn_write(&self, key: T::Key, version: Version, value: T::Value) {
         self.versioned_cache.write(key, version, value);
+    }
+
+    pub fn mark_estimate(&self, key: &T::Key, txn_idx: TxnIndex) {
+        self.versioned_cache.mark_estimate(key, txn_idx);
     }
 
     pub fn mark_dependency_resolve(&self, txn_idx: TxnIndex) {

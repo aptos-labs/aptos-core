@@ -21,7 +21,7 @@ use aptos_block_executor::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
-    txn_commit_listener::{NoOpTransactionCommitListener, TransactionCommitListener},
+    txn_commit_listener::TransactionCommitListener,
 };
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{TxnIndex, Version};
@@ -179,25 +179,6 @@ impl<
                 executor_thread_pool,
                 maybe_block_gas_limit,
                 commit_listener,
-            ),
-        }
-    }
-
-    pub fn new_with_no_op_listener(
-        concurrency_level: usize,
-        num_txns: usize,
-        executor_thread_pool: Arc<ThreadPool>,
-        maybe_block_gas_limit: Option<u64>,
-    ) -> Self {
-        Self {
-            executor_thread_pool: executor_thread_pool.clone(),
-            concurrency_level,
-            block_executor: BlockExecutor::new(
-                concurrency_level,
-                num_txns,
-                executor_thread_pool,
-                maybe_block_gas_limit,
-                NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
             ),
         }
     }

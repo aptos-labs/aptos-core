@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_bitvec::BitVec;
+use aptos_block_executor::txn_commit_listener::NoOpTransactionCommitListener;
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
 use aptos_executor_service::remote_executor_client::RemoteExecutorClient;
@@ -19,6 +20,7 @@ use aptos_types::{
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
 use aptos_vm::{
+    adapter_common::PreprocessedTransaction,
     block_executor::BlockAptosExecutor,
     data_cache::AsMoveResolver,
     sharded_block_executor::{block_executor_client::VMExecutorClient, ShardedBlockExecutor},
