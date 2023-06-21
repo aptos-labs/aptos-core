@@ -170,6 +170,7 @@ members = [
     "third_party/move/move-bytecode-verifier/transactional-tests",
     "third_party/move/move-command-line-common",
     "third_party/move/move-compiler",
+    "third_party/move/move-compiler-v2",
     "third_party/move/move-compiler/transactional-tests",
     "third_party/move/move-core/types",
     "third_party/move/move-ir-compiler",
@@ -615,6 +616,7 @@ move-cli = { path = "third_party/move/tools/move-cli" }
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
 move-compiler = { path = "third_party/move/move-compiler" }
+move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
 move-docgen = { path = "third_party/move/move-prover/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }

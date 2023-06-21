@@ -1,0 +1,44 @@
+[package]
+name = "move-compiler-v2"
+version = "0.1.0"
+authors = ["Aptos Labs"]
+description = "Move compiler based on stackless bytecode"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptosfoundation.org/"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+move-binary-format = { path = "../move-binary-format" }
+#move-borrow-graph = { path = "../../move-borrow-graph" }
+#move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
+#move-command-line-common = { path = "../../move-command-line-common" }
+#move-compiler = { path = "../../move-compiler" }
+move-core-types = { path = "../move-core/types" }
+move-ir-to-bytecode = { path = "../move-ir-compiler/move-ir-to-bytecode" }
+move-model = { path = "../move-model" }
+
+anyhow = "1.0.62"
+clap = { version = "3.2.23", features = ["derive", "env"] }
+codespan = "0.11.1"
+codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
+#ethnum = "1.0.4"
+#im = "15.0.0"
+itertools = "0.10.0"
+#log = "0.4.14"
+num = "0.4.0"
+once_cell = "1.7.2"
+#paste = "1.0.5"
+#petgraph = "0.5.1"
+serde = { version = "1.0.124", features = ["derive"] }
+
+[dev-dependencies]
+anyhow = "1.0.52"
+datatest-stable = "0.1.1"
+move-prover-test-utils = { path = "../move-prover/test-utils" }
+move-stdlib = { path = "../move-stdlib" }
+
+[[test]]
+name = "testsuite"
+harness = false

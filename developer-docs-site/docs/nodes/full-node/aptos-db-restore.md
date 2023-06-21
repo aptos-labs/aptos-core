@@ -77,3 +77,24 @@ aptos node bootstrap-db \
     --command-adapter-config /path/to/s3-public.yaml \
     --target-db-dir /path/to/local/db
 ```
+
+### Restore a fullnode with full history from genesis
+To restore a fullnode with full history from genesis, set `ledger-history-start-version` to 0 and disable the pruner by [disabling the ledger pruner](../../guides/data-pruning.md).
+
+Example command: 
+
+```bash
+aptos node bootstrap-db \
+--ledger-history-start-version 0 \
+--target-version use_the_largest_version_in_backup \
+--command-adapter-config /path/to/s3-public.yaml \
+--target-db-dir /path/to/local/db
+```
+Disable the pruner in the node config to prevent the early history from being pruned when you start the node.
+```Yaml
+storage:
+ storage_pruner_config:
+  ledger_pruner_config:
+   enable: false
+
+```
