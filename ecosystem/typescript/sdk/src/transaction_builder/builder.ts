@@ -367,7 +367,8 @@ export class TransactionBuilderRemoteABI {
   /**
    * Builds a raw transaction. Only support script function a.k.a entry function payloads
    *
-   * @param func fully qualified function name in format <address>::<module>::<function>, e.g. 0x1::aptos_account::transfer
+   * @param func fully qualified function name in format <address>::<module>::<function>,
+   * e.g. 0x1::aptos_account::transfer
    * @param ty_tags
    * @param args
    * @returns RawTransaction
