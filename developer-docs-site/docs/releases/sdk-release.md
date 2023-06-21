@@ -6,13 +6,13 @@ slug: "sdk-release"
 ## Aptos SDK
 We actively support the following SDKs:
 
-* Typescript
-  * For instructions on how to get started with Aptos Typescript SDK, [click here.](hhttps://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk)
+* TypeScript
+  * For instructions on how to get started with Aptos TypeScript SDK, [click here.](hhttps://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk)
 * Python - by request and feedback
   * For instructions on how to get started with Aptos Python SDK, [click here.](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk)
 
-### Typescript
-Release Notes for Typescript SDK are available [here.](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/CHANGELOG.md)
+### TypeScript
+Release Notes for TypeScript SDK are available [here.](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/CHANGELOG.md)
 
 |Release | Date Released | 
 |---|---|
