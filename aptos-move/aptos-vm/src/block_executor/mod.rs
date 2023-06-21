@@ -34,7 +34,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::WriteOp,
 };
-use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
+use aptos_vm_logging::{disable_speculative_logging, flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::output::VMOutput;
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
@@ -200,6 +200,7 @@ impl BlockAptosVM {
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
+        disable_speculative_logging: bool,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -213,10 +214,14 @@ impl BlockAptosVM {
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.num_txns();
-        if state_view.id() != StateViewId::Miscellaneous {
+        if !disable_speculative_logging && state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
             init_speculative_logs(num_txns);
+        }
+
+        if disable_speculative_logging {
+            aptos_vm_logging::disable_speculative_logging();
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
@@ -242,7 +247,7 @@ impl BlockAptosVM {
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());
 
-                if state_view.id() != StateViewId::Miscellaneous {
+                if !disable_speculative_logging && state_view.id() != StateViewId::Miscellaneous {
                     // Speculation is disabled in Miscellaneous context, which is used by testing and
                     // can even lead to concurrent execute_block invocations, leading to errors on flush.
                     flush_speculative_logs(pos);

@@ -17,6 +17,7 @@ use std::{
     time::Instant,
 };
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use crate::transaction_executor::PartitionExecutionMode;
 
 #[derive(Clone, Debug)]
 pub struct PipelineConfig {
@@ -26,6 +27,7 @@ pub struct PipelineConfig {
     pub allow_discards: bool,
     pub allow_aborts: bool,
     pub num_executor_shards: usize,
+    pub pipelined_block_partitioning: bool,
 }
 
 pub struct Pipeline<V> {
@@ -79,10 +81,15 @@ where
             (None, None)
         };
 
-        let maybe_block_partitioner = if config.num_executor_shards == 1 {
-            None
+        let partition_mode = if config.num_executor_shards == 1 {
+            PartitionExecutionMode::Unsharded
         } else {
-            Some(ShardedBlockPartitioner::new(config.num_executor_shards))
+            let partitioner = ShardedBlockPartitioner::new(config.num_executor_shards);
+            if config.pipelined_block_partitioning {
+                PartitionExecutionMode::ShardedPipelined(partitioner)
+            } else {
+                PartitionExecutionMode::ShardedPartitionThenExecute(partitioner)
+            }
         };
 
         let exe_thread = std::thread::Builder::new()
@@ -91,7 +98,7 @@ where
                 start_execution_rx.map(|rx| rx.recv());
 
                 let mut exe = TransactionExecutor::new(
-                    maybe_block_partitioner,
+                    partition_mode,
                     executor_1,
                     parent_block_id,
                     version,
@@ -99,6 +106,7 @@ where
                     config.allow_discards,
                     config.allow_aborts,
                 );
+                exe.start();
                 let start_time = Instant::now();
                 let mut executed = 0;
                 let start_gas = TXN_GAS_USAGE.get_sample_sum();

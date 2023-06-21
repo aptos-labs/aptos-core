@@ -161,6 +161,7 @@ pub fn run_benchmark<V>(
                 allow_discards: false,
                 allow_aborts: false,
                 num_executor_shards: 1,
+                pipelined_block_partitioning: false,
             },
         )
     });
@@ -506,7 +507,8 @@ mod tests {
                 skip_commit: false,
                 allow_discards: false,
                 allow_aborts: false,
-                num_executor_shards: None,
+                num_executor_shards: 1,
+                pipelined_block_partitioning: false,
             },
         );
 
@@ -518,7 +520,8 @@ mod tests {
             skip_commit: false,
             allow_discards: false,
             allow_aborts: false,
-            num_executor_shards: None,
+            num_executor_shards: 1,
+            pipelined_block_partitioning: false,
         });
     }
 

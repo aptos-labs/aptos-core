@@ -421,6 +421,7 @@ impl FakeExecutor {
             &self.data_store,
             usize::min(4, num_cpus::get()),
             None,
+            false,
         )
     }
 
