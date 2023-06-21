@@ -14,7 +14,7 @@
 # 3 ${HOME}/bin/, or ${INSTALL_DIR} is expected to be on the path - hashicorp tools/etc.  will be installed there on linux systems.
 
 # fast fail.
-set -eox pipefail
+set -eo pipefail
 
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
@@ -505,9 +505,7 @@ function install_z3 {
     Z3_PKG="z3-$Z3_VERSION-x64-glibc-2.31"
   elif [[ "$(uname)" == "Darwin" ]]; then
     if [[ "$(uname -m)" == "arm64" ]]; then
-      # brew has a newer, arm64-native version
-      brew install z3
-      return
+      Z3_PKG="z3-$Z3_VERSION-arm64-osx-11.0"
     else
       Z3_PKG="z3-$Z3_VERSION-x64-osx-10.16"
     fi
@@ -542,11 +540,7 @@ function install_cvc5 {
   if [[ "$(uname)" == "Linux" ]]; then
     CVC5_PKG="cvc5-Linux"
   elif [[ "$(uname)" == "Darwin" ]]; then
-    if [[ "$(uname -m)" == "arm64" ]]; then
-      CVC5_PKG="cvc5-macOS-arm64"
-    else
-      CVC5_PKG="cvc5-macOS"
-    fi
+    CVC5_PKG="cvc5-macOS"
   else
     echo "cvc5 support not configured for this platform (uname=$(uname))"
     return
@@ -766,7 +760,12 @@ EOF
 }
 
 BATCH_MODE=false;
+# set verbose if not interactive.
+if [[ ! ( -t 2 ) ]]; then
+    VERBOSE=true;
+else
 VERBOSE=false;
+fi
 INSTALL_BUILD_TOOLS=false;
 OPERATIONS=false;
 INSTALL_PROFILE=false;
