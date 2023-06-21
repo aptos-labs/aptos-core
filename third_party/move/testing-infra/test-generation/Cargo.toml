@@ -10,7 +10,7 @@ publish = false
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.3.4", features = ["derive"] }
+clap = { version = "4.3.5", features = ["derive"] }
 crossbeam-channel = "0.5.0"
 getrandom = "0.2.2"
 hex = "0.4.3"

@@ -9,7 +9,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.52"
-clap = { version = "4.3.4", features = ["derive"] }
+clap = { version = "4.3.5", features = ["derive"] }
 colored = "2.0.0"
 dirs-next = "2.0.0"
 itertools = "0.10.0"
