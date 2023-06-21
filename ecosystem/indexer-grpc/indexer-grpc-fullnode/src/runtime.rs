@@ -70,6 +70,8 @@ pub fn bootstrap(
         };
 
         Server::builder()
+            .http2_keepalive_interval(Some(std::time::Duration::from_secs(60)))
+            .http2_keepalive_timeout(Some(std::time::Duration::from_secs(5)))
             .add_service(FullnodeDataServer::new(server))
             // Make port into a config
             .serve(address.to_socket_addrs().unwrap().next().unwrap())

@@ -48,6 +48,8 @@ pub struct Worker {
     pub processor_name: String,
     pub postgres_connection_string: String,
     pub indexer_grpc_data_service_addresss: String,
+    pub indexer_grpc_http2_ping_interval: std::time::Duration,
+    pub indexer_grpc_http2_ping_timeout: std::time::Duration,
     pub auth_token: String,
     pub starting_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
@@ -59,6 +61,8 @@ impl Worker {
         processor_name: String,
         postgres_connection_string: String,
         indexer_grpc_data_service_addresss: String,
+        indexer_grpc_http2_ping_interval: std::time::Duration,
+        indexer_grpc_http2_ping_timeout: std::time::Duration,
         auth_token: String,
         starting_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
@@ -82,6 +86,8 @@ impl Worker {
             processor_name,
             postgres_connection_string,
             indexer_grpc_data_service_addresss,
+            indexer_grpc_http2_ping_interval,
+            indexer_grpc_http2_ping_timeout,
             starting_version,
             auth_token,
             number_concurrent_processing_tasks,
@@ -98,12 +104,15 @@ impl Worker {
             "[Parser] Connecting to GRPC endpoint",
         );
 
-        let mut rpc_client = match RawDataClient::connect(format!(
+        let channel = tonic::transport::Channel::from_shared(format!(
             "http://{}",
             self.indexer_grpc_data_service_addresss.clone()
         ))
-        .await
-        {
+        .expect("[indexer grpc] Endpoint is not a valid URI")
+        .http2_keep_alive_interval(self.indexer_grpc_http2_ping_interval)
+        .keep_alive_timeout(self.indexer_grpc_http2_ping_timeout);
+
+        let mut rpc_client = match RawDataClient::connect(channel).await {
             Ok(client) => client,
             Err(e) => {
                 error!(
