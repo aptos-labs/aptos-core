@@ -1523,7 +1523,6 @@ impl VMExecutor for AptosVM {
             state_view,
             Self::get_concurrency_level(),
             maybe_block_gas_limit,
-            false,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

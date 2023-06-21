@@ -6,11 +6,18 @@ use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_types::transaction::{Transaction, Version};
-use std::{sync::{mpsc, Arc}, thread, time::{Duration, Instant}};
-use std::hash::Hash;
-use std::sync::mpsc::Sender;
-use aptos_types::block_executor::partitioner::{CrossShardDependencies, ExecutableBlock, ExecutableTransactions, TransactionWithDependencies};
+use aptos_types::{
+    block_executor::partitioner::{
+        CrossShardDependencies, ExecutableBlock, ExecutableTransactions,
+        TransactionWithDependencies,
+    },
+    transaction::{Transaction, Version},
+};
+use std::{
+    sync::{mpsc, mpsc::Sender, Arc},
+    thread,
+    time::{Duration, Instant},
+};
 
 pub enum PartitionExecutionMode {
     Unsharded,
@@ -66,7 +73,10 @@ where
         assert!(!self.started);
         self.started = true;
 
-        if matches!(self.partition_mode, PartitionExecutionMode::ShardedPipelined(_)) {
+        if matches!(
+            self.partition_mode,
+            PartitionExecutionMode::ShardedPipelined(_)
+        ) {
             let (tx, rx) = mpsc::channel();
             self.maybe_pipelined_execution_tx = Some(tx);
             let mut parent_block_id = self.parent_block_id;
@@ -75,9 +85,14 @@ where
             let allow_aborts = self.allow_aborts;
             let allow_discards = self.allow_discards;
 
-            let exe_thread = thread::Builder::new().spawn(move||{
+            let _exe_thread = thread::Builder::new().spawn(move || {
                 while let Ok(msg) = rx.recv() {
-                    let BlockProcessingParams { first_block_start_time, latest_version, current_block_start_time: start_time, block } = msg;
+                    let BlockProcessingParams {
+                        first_block_start_time,
+                        latest_version,
+                        current_block_start_time: start_time,
+                        block,
+                    } = msg;
                     parent_block_id = Self::process_executable_block(
                         allow_aborts,
                         allow_discards,
@@ -87,23 +102,37 @@ where
                         start_time,
                         parent_block_id,
                         block,
-                        latest_version
+                        latest_version,
                     );
                 }
             });
         }
     }
 
-    pub fn partition_block(block_id: HashValue, partitioner: &ShardedBlockPartitioner, mut transactions: Vec<Transaction>) -> ExecutableBlock<Transaction> {
+    pub fn partition_block(
+        block_id: HashValue,
+        partitioner: &ShardedBlockPartitioner,
+        mut transactions: Vec<Transaction>,
+    ) -> ExecutableBlock<Transaction> {
         let last_txn = transactions.pop().unwrap();
         assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
-        let analyzed_transactions = transactions.into_iter().map(|t|t.into()).collect();
+        let analyzed_transactions = transactions.into_iter().map(|t| t.into()).collect();
         let mut sub_blocks = partitioner.partition(analyzed_transactions, 2);
-        sub_blocks.last_mut().unwrap().sub_blocks.last_mut().unwrap().transactions.push(TransactionWithDependencies::new(last_txn, CrossShardDependencies::default()));
+        sub_blocks
+            .last_mut()
+            .unwrap()
+            .sub_blocks
+            .last_mut()
+            .unwrap()
+            .transactions
+            .push(TransactionWithDependencies::new(
+                last_txn,
+                CrossShardDependencies::default(),
+            ));
         ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
     }
 
-    pub fn execute_block(&mut self, mut transactions: Vec<Transaction>) {
+    pub fn execute_block(&mut self, transactions: Vec<Transaction>) {
         assert!(self.started);
 
         let execution_start = Instant::now();
@@ -114,7 +143,6 @@ where
 
         let num_txns = transactions.len();
         self.version += num_txns as Version;
-
 
         let block_id = HashValue::random();
         let first_block_start_time = *self.maybe_first_block_start_time.as_ref().unwrap();
@@ -130,9 +158,9 @@ where
                     execution_start,
                     self.parent_block_id,
                     executable_block,
-                    self.version
+                    self.version,
                 );
-            }
+            },
             PartitionExecutionMode::ShardedPartitionThenExecute(partitioner) => {
                 let executable_block = Self::partition_block(block_id, partitioner, transactions);
                 self.parent_block_id = Self::process_executable_block(
@@ -144,9 +172,9 @@ where
                     execution_start,
                     self.parent_block_id,
                     executable_block,
-                    self.version
+                    self.version,
                 );
-            }
+            },
             PartitionExecutionMode::ShardedPipelined(partitioner) => {
                 let executable_block = Self::partition_block(block_id, partitioner, transactions);
                 let msg = BlockProcessingParams {
@@ -155,8 +183,12 @@ where
                     current_block_start_time: execution_start,
                     block: executable_block,
                 };
-                self.maybe_pipelined_execution_tx.as_ref().unwrap().send(msg).unwrap();
-            }
+                self.maybe_pipelined_execution_tx
+                    .as_ref()
+                    .unwrap()
+                    .send(msg)
+                    .unwrap();
+            },
         }
     }
 
@@ -165,7 +197,9 @@ where
         allow_discards: bool,
         first_block_start_time: Instant,
         executor: Arc<BlockExecutor<V>>,
-        maybe_commit_sender: &Option<mpsc::SyncSender<(HashValue, HashValue, Instant, Instant, Duration, usize)>>,
+        maybe_commit_sender: &Option<
+            mpsc::SyncSender<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
+        >,
         current_block_start_time: Instant,
         parent_block_id: HashValue,
         executable_block: ExecutableBlock<Transaction>,

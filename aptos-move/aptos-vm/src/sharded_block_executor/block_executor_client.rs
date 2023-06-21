@@ -33,7 +33,6 @@ impl BlockExecutorClient for LocalExecutorClient {
             state_view,
             concurrency_level,
             maybe_block_gas_limit,
-            true,
         )
     }
 }
