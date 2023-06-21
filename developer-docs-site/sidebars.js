@@ -42,11 +42,7 @@ const sidebars = {
           link: { type: "doc", id: "concepts/blockchain" },
           collapsible: true,
           collapsed: true,
-          items: [
-            "concepts/validator-nodes",
-            "concepts/fullnodes",
-            "concepts/node-networks-sync",
-          ],
+          items: ["concepts/validator-nodes", "concepts/fullnodes", "concepts/node-networks-sync"],
         },
         "concepts/accounts",
         "concepts/resources",
@@ -79,6 +75,7 @@ const sidebars = {
           label: "Node and Framework Release",
           collapsible: true,
           collapsed: true,
+          link: { type: "doc", id: "releases/mainnet-release" },
           items: [
             "releases/mainnet-release",
             "releases/testnet-release",
@@ -145,10 +142,7 @@ const sidebars = {
               label: "Getting Started",
               collapsible: true,
               collapsed: true,
-              items: [
-                "move/book/introduction",
-                "move/book/modules-and-scripts",
-              ],
+              items: ["move/book/introduction", "move/book/modules-and-scripts"],
             },
             {
               type: "category",
@@ -194,20 +188,14 @@ const sidebars = {
               label: "Global Storage",
               collapsible: true,
               collapsed: true,
-              items: [
-                "move/book/global-storage-structure",
-                "move/book/global-storage-operators",
-              ],
+              items: ["move/book/global-storage-structure", "move/book/global-storage-operators"],
             },
             {
               type: "category",
               label: "Reference",
               collapsible: true,
               collapsed: true,
-              items: [
-                "move/book/standard-library",
-                "move/book/coding-conventions",
-              ],
+              items: ["move/book/standard-library", "move/book/coding-conventions"],
             },
           ],
         },
@@ -217,11 +205,7 @@ const sidebars = {
           link: { type: "doc", id: "move/prover/index" },
           collapsible: true,
           collapsed: true,
-          items: [
-            "move/prover/prover-guide",
-            "move/prover/spec-lang",
-            "move/prover/supporting-resources",
-          ],
+          items: ["move/prover/prover-guide", "move/prover/spec-lang", "move/prover/supporting-resources"],
         },
       ],
     },
@@ -255,10 +239,7 @@ const sidebars = {
           link: { type: "doc", id: "integration/wallet-adapter-concept" },
           collapsible: true,
           collapsed: true,
-          items: [
-            "integration/wallet-adapter-for-dapp",
-            "integration/wallet-adapter-for-wallets",
-          ],
+          items: ["integration/wallet-adapter-for-dapp", "integration/wallet-adapter-for-wallets"],
         },
         "integration/sign-a-transaction",
         "integration/aptos-names-service-package",
@@ -312,10 +293,7 @@ const sidebars = {
                   link: { type: "doc", id: "sdks/ts-sdk/sdk-client-layer" },
                   collapsible: true,
                   collapsed: true,
-                  items: [
-                    "sdks/ts-sdk/aptos-client",
-                    "sdks/ts-sdk/indexer-client",
-                  ],
+                  items: ["sdks/ts-sdk/aptos-client", "sdks/ts-sdk/indexer-client"],
                 },
                 "sdks/ts-sdk/sdk-core-layer",
                 "sdks/ts-sdk/sdk-plugins-layer",
@@ -373,8 +351,7 @@ const sidebars = {
       link: {
         type: "generated-index",
         title: "Advanced Builder Guides",
-        description:
-          "Take the next step into building complex applications on Aptos.",
+        description: "Take the next step into building complex applications on Aptos.",
         slug: "/category/advanced-builders",
       },
       items: [
@@ -415,10 +392,7 @@ const sidebars = {
           label: "Running Validator Node",
           collapsible: true,
           collapsed: true,
-          link: {
-            type: "doc",
-            id: "nodes/validator-node/operator/running-validator-node/index",
-          },
+          link: { type: "doc", id: "nodes/validator-node/operator/running-validator-node/index" },
           items: [
             "nodes/validator-node/operator/running-validator-node/using-aws",
             "nodes/validator-node/operator/running-validator-node/using-azure",
