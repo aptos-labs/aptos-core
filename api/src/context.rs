@@ -1053,7 +1053,7 @@ impl Context {
                 );
                 return Ok(self.default_gas_estimation(min_gas_unit_price));
             },
-            Some(price) => *price,
+            Some(price) => low_price.max(*price),
         };
 
         // (3) aggressive
@@ -1069,7 +1069,7 @@ impl Context {
                 );
                 return Ok(self.default_gas_estimation(min_gas_unit_price));
             },
-            Some(price) => *price,
+            Some(price) => market_price.max(*price),
         };
         // round up to next bucket
         let aggressive_price = self.next_bucket(p90_price);
