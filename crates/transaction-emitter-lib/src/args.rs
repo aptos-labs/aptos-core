@@ -22,14 +22,14 @@ const DEFAULT_API_PORT: u16 = 8080;
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 pub struct CoinSourceArgs {
     /// Ed25519PrivateKey for minting coins
-    #[clap(long, parse(try_from_str = ConfigKey::from_encoded_string))]
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string)]
     pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
 
     #[clap(long, conflicts_with = "mint-key")]
     pub mint_file: Option<String>,
 
     /// Ed25519PrivateKey for minting coins
-    #[clap(long, parse(try_from_str = ConfigKey::from_encoded_string), conflicts_with_all = &["mint-key", "mint-file"])]
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, conflicts_with_all = &["mint-key", "mint-file"])]
     pub coin_source_key: Option<ConfigKey<Ed25519PrivateKey>>,
 
     #[clap(long, conflicts_with_all = &["mint-key", "mint-file", "coin-source-key"])]
@@ -65,7 +65,7 @@ impl CoinSourceArgs {
 pub struct ClusterArgs {
     /// Nodes the cluster should connect to, e.g. `http://node.mysite.com:8080`
     /// If the port is not provided, it is assumed to be 8080.
-    #[clap(short, long, required = true, min_values = 1, parse(try_from_str = parse_target))]
+    #[clap(short, long, required = true, num_args = 1.., value_parser = parse_target)]
     pub targets: Option<Vec<Url>>,
 
     #[clap(long, conflicts_with = "targets")]
@@ -130,9 +130,9 @@ pub struct EmitArgs {
 
     #[clap(
         long,
-        arg_enum,
+        value_enum,
         default_value = "coin-transfer",
-        min_values = 1,
+        num_args = 1..,
         ignore_case = true
     )]
     pub transaction_type: Vec<TransactionTypeArg>,
@@ -152,10 +152,10 @@ pub struct EmitArgs {
     #[clap(long)]
     pub sender_use_account_pool: Option<bool>,
 
-    #[clap(long, min_values = 0)]
+    #[clap(long, num_args = 0..)]
     pub transaction_weights: Vec<usize>,
 
-    #[clap(long, min_values = 0)]
+    #[clap(long, num_args = 0..)]
     pub transaction_phases: Vec<usize>,
 
     #[clap(long)]

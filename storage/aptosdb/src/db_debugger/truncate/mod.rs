@@ -31,7 +31,7 @@ use std::{fs, path::PathBuf, sync::Arc};
         .args(&["backup-checkpoint-dir", "opt-out-backup-checkpoint"]),
 ))]
 pub struct Cmd {
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     db_dir: PathBuf,
 
     #[clap(long)]
@@ -40,7 +40,7 @@ pub struct Cmd {
     #[clap(long, default_value = "1000")]
     ledger_db_batch_size: usize,
 
-    #[clap(long, parse(from_os_str), group = "backup")]
+    #[clap(long, value_parser, group = "backup")]
     backup_checkpoint_dir: Option<PathBuf>,
 
     #[clap(long, group = "backup")]

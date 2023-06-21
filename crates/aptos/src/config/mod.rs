@@ -13,7 +13,7 @@ use crate::{
     Tool,
 };
 use async_trait::async_trait;
-use clap::{ArgEnum, CommandFactory, Parser};
+use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate, Shell};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf, str::FromStr};
@@ -54,7 +54,7 @@ pub struct GenerateShellCompletions {
     shell: Shell,
 
     /// File to output shell completions to
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     output_file: PathBuf,
 }
 
@@ -272,7 +272,7 @@ const WORKSPACE: &str = "workspace";
 ///
 /// Workspace allows for multiple configs based on location, where
 /// Global allows for one config for every part of the code
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, ArgEnum)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, ValueEnum)]
 pub enum ConfigType {
     /// Per system user configuration put in `<HOME>/.aptos`
     Global,
@@ -318,7 +318,7 @@ const ASSUME_NO: &str = "no";
 ///
 /// Option can be one of ["yes", "no", "prompt"], "yes" runs cli with "--assume-yes", where
 /// "no" runs cli with "--assume-no", default: "prompt"
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, ArgEnum)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, ValueEnum)]
 pub enum PromptResponseType {
     /// normal prompt
     Prompt,

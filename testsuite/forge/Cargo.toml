@@ -35,6 +35,7 @@ aptos-transaction-emitter-lib = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true }
 either = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
@@ -60,7 +61,6 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-structopt = { workspace = true }
 tempfile = { workspace = true }
 termcolor = { workspace = true }
 thiserror = { workspace = true }

@@ -141,6 +141,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "anstream"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ca84f3628370c59db74ee214b3263d58f9aadd9b4fe7e711fd87dc452b7f163"
+dependencies = [
+ "anstyle",
+ "anstyle-parse",
+ "anstyle-query",
+ "anstyle-wincon",
+ "colorchoice",
+ "is-terminal",
+ "utf8parse",
+]
+
+[[package]]
+name = "anstyle"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41ed9a86bf92ae6580e0a31281f65a1b1d867c0cc68d5346e2ae128dddfa6a7d"
+
+[[package]]
+name = "anstyle-parse"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e765fd216e48e067936442276d1d57399e37bce53c264d6fefbe298080cb57ee"
+dependencies = [
+ "utf8parse",
+]
+
+[[package]]
+name = "anstyle-query"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ca11d4be1bab0c8bc8734a9aa7bf4ee8316d462a08c6ac5052f888fef5b494b"
+dependencies = [
+ "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "anstyle-wincon"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "180abfa45703aebe0093f79badacc01b8fd4ea2e35118747e5811127f926e188"
+dependencies = [
+ "anstyle",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.62"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -187,7 +236,7 @@ dependencies = [
  "base64 0.13.0",
  "bcs 0.1.4",
  "chrono",
- "clap 3.2.23",
+ "clap 4.3.5",
  "clap_complete",
  "codespan-reporting",
  "dirs",
@@ -402,7 +451,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
- "clap 3.2.23",
+ "clap 4.3.5",
  "csv",
  "futures",
  "itertools",
@@ -500,7 +549,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-types",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "dashmap",
  "itertools",
  "move-core-types",
@@ -855,7 +904,7 @@ dependencies = [
  "bcs 0.1.4",
  "byteorder",
  "claims",
- "clap 3.2.23",
+ "clap 4.3.5",
  "dashmap",
  "itertools",
  "lru 0.7.8",
@@ -889,7 +938,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
- "structopt",
+ "clap 4.3.5",
 ]
 
 [[package]]
@@ -940,7 +989,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "async-trait",
- "clap 3.2.23",
+ "clap 4.3.5",
  "itertools",
  "owo-colors",
  "tokio",
@@ -963,7 +1012,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-logging",
  "aptos-vm-types",
- "clap 3.2.23",
+ "clap 4.3.5",
  "move-binary-format",
  "move-cli",
  "move-compiler",
@@ -1083,7 +1132,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "chrono",
- "clap 3.2.23",
+ "clap 4.3.5",
  "criterion",
  "indicatif 0.15.0",
  "itertools",
@@ -1114,7 +1163,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "itertools",
  "serde 1.0.149",
  "serde_json",
@@ -1179,7 +1228,7 @@ dependencies = [
  "aptos-faucet-core",
  "aptos-logger",
  "aptos-sdk",
- "clap 3.2.23",
+ "clap 4.3.5",
  "tokio",
 ]
 
@@ -1195,7 +1244,7 @@ dependencies = [
  "aptos-sdk",
  "async-trait",
  "captcha",
- "clap 3.2.23",
+ "clap 4.3.5",
  "deadpool-redis",
  "enum_dispatch",
  "futures",
@@ -1237,7 +1286,7 @@ dependencies = [
  "anyhow",
  "aptos-faucet-core",
  "aptos-logger",
- "clap 3.2.23",
+ "clap 4.3.5",
  "tokio",
 ]
 
@@ -1249,7 +1298,7 @@ dependencies = [
  "aptos-logger",
  "aptos-node-checker",
  "aptos-sdk",
- "clap 3.2.23",
+ "clap 4.3.5",
  "env_logger 0.9.0",
  "futures",
  "gcp-bigquery-client",
@@ -1285,6 +1334,7 @@ dependencies = [
  "aptos-transaction-generator-lib",
  "async-trait",
  "chrono",
+ "clap 4.3.5",
  "either",
  "futures",
  "hex",
@@ -1304,7 +1354,6 @@ dependencies = [
  "serde 1.0.149",
  "serde_json",
  "serde_yaml 0.8.26",
- "structopt",
  "tempfile",
  "termcolor",
  "thiserror",
@@ -1327,11 +1376,11 @@ dependencies = [
  "aptos-sdk",
  "aptos-testcases",
  "async-trait",
+ "clap 4.3.5",
  "jemallocator",
  "rand 0.7.3",
  "random_word",
  "serde_yaml 0.8.26",
- "structopt",
  "tokio",
  "url",
 ]
@@ -1362,7 +1411,7 @@ dependencies = [
  "blake2-rfc",
  "blst",
  "claims",
- "clap 3.2.23",
+ "clap 4.3.5",
  "codespan-reporting",
  "curve25519-dalek",
  "flate2",
@@ -1441,6 +1490,7 @@ dependencies = [
  "aptos-vault-client",
  "bcs 0.1.4",
  "byteorder",
+ "clap 4.3.5",
  "datatest-stable",
  "hex",
  "move-binary-format",
@@ -1453,7 +1503,6 @@ dependencies = [
  "rusty-fork",
  "sha-1",
  "stats_alloc",
- "structopt",
 ]
 
 [[package]]
@@ -1470,7 +1519,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm-types",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "move-binary-format",
  "move-core-types",
  "move-model",
@@ -1568,7 +1617,7 @@ dependencies = [
  "bcs 0.1.4",
  "bigdecimal",
  "chrono",
- "clap 3.2.23",
+ "clap 4.3.5",
  "diesel",
  "diesel_migrations",
  "field_count",
@@ -1601,7 +1650,7 @@ dependencies = [
  "async-trait",
  "backoff",
  "base64 0.13.0",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "futures-core",
  "once_cell",
@@ -1630,7 +1679,7 @@ dependencies = [
  "aptos-runtimes",
  "async-trait",
  "base64 0.13.0",
- "clap 3.2.23",
+ "clap 4.3.5",
  "cloud-storage",
  "futures",
  "once_cell",
@@ -1657,7 +1706,7 @@ dependencies = [
  "aptos-moving-average",
  "aptos-runtimes",
  "async-trait",
- "clap 3.2.23",
+ "clap 4.3.5",
  "cloud-storage",
  "futures-util",
  "once_cell",
@@ -1742,7 +1791,7 @@ dependencies = [
  "async-trait",
  "backoff",
  "base64 0.13.0",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "futures-core",
  "futures-util",
@@ -1779,7 +1828,7 @@ dependencies = [
  "bcs 0.1.4",
  "bigdecimal",
  "chrono",
- "clap 3.2.23",
+ "clap 4.3.5",
  "diesel",
  "diesel_migrations",
  "field_count",
@@ -1807,7 +1856,7 @@ dependencies = [
  "async-trait",
  "backtrace",
  "chrono",
- "clap 3.2.23",
+ "clap 4.3.5",
  "hostname",
  "once_cell",
  "reqwest",
@@ -1828,7 +1877,7 @@ dependencies = [
  "aptos-runtimes",
  "async-trait",
  "backtrace",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "prometheus",
  "serde 1.0.149",
@@ -1852,7 +1901,7 @@ dependencies = [
  "backoff",
  "backtrace",
  "base64 0.13.0",
- "clap 3.2.23",
+ "clap 4.3.5",
  "cloud-storage",
  "futures",
  "futures-core",
@@ -2105,7 +2154,7 @@ dependencies = [
  "aptos-gas",
  "aptos-types",
  "aptos-vm",
- "clap 3.2.23",
+ "clap 4.3.5",
  "move-cli",
  "move-package",
  "move-prover",
@@ -2265,7 +2314,7 @@ dependencies = [
  "aptos-logger",
  "aptos-network",
  "aptos-types",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "serde 1.0.149",
  "tokio",
@@ -2349,7 +2398,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "fail 0.5.0",
  "futures",
  "hex",
@@ -2379,7 +2428,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-transaction-emitter-lib",
  "async-trait",
- "clap 3.2.23",
+ "clap 4.3.5",
  "const_format",
  "env_logger 0.9.0",
  "futures",
@@ -2453,7 +2502,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-storage-interface",
  "aptos-types",
- "clap 3.2.23",
+ "clap 4.3.5",
 ]
 
 [[package]]
@@ -2609,7 +2658,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm-genesis",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "git2 0.16.1",
  "handlebars",
@@ -2650,7 +2699,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "hex",
  "move-binary-format",
@@ -2697,7 +2746,7 @@ dependencies = [
  "aptos-types",
  "aptos-warp-webserver",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "hex",
  "itertools",
@@ -2722,7 +2771,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rosetta",
  "aptos-types",
- "clap 3.2.23",
+ "clap 4.3.5",
  "serde 1.0.149",
  "serde_json",
  "tokio",
@@ -2830,6 +2879,7 @@ dependencies = [
  "aptos-framework",
  "aptos-types",
  "bcs 0.1.4",
+ "clap 4.3.5",
  "heck 0.3.3",
  "move-core-types",
  "once_cell",
@@ -2837,7 +2887,6 @@ dependencies = [
  "serde-generate",
  "serde-reflection",
  "serde_yaml 0.8.26",
- "structopt",
  "tempfile",
  "textwrap 0.15.0",
  "which",
@@ -3111,7 +3160,7 @@ dependencies = [
  "base64 0.13.0",
  "bcs 0.1.4",
  "chrono",
- "clap 3.2.23",
+ "clap 4.3.5",
  "debug-ignore",
  "flate2",
  "futures",
@@ -3203,7 +3252,7 @@ dependencies = [
  "aptos-push-metrics",
  "aptos-types",
  "aptos-vm",
- "clap 3.2.23",
+ "clap 4.3.5",
  "criterion",
  "criterion-cpu-time",
  "num_cpus",
@@ -3221,7 +3270,7 @@ dependencies = [
  "aptos-logger",
  "aptos-sdk",
  "aptos-transaction-emitter-lib",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "itertools",
  "rand 0.7.3",
@@ -3246,7 +3295,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-transaction-generator-lib",
  "async-trait",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "itertools",
  "move-binary-format",
@@ -3275,7 +3324,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "async-trait",
- "clap 3.2.23",
+ "clap 4.3.5",
  "futures",
  "itertools",
  "move-binary-format",
@@ -3305,7 +3354,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-genesis",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "datatest-stable",
  "hex",
  "move-binary-format",
@@ -3492,7 +3541,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-genesis",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "glob",
  "move-binary-format",
  "move-core-types",
@@ -4665,26 +4714,35 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.1.11"
+version = "4.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42dfd32784433290c51d92c438bb72ea5063797fc3cc9a21a8c4346bebbb2098"
+checksum = "2686c4115cb0810d9a984776e197823d08ec94f176549a89a9efded477c456dc"
 dependencies = [
- "bitflags 2.0.2",
- "clap_derive 4.1.9",
- "clap_lex 0.3.3",
- "is-terminal",
+ "clap_builder",
+ "clap_derive 4.3.2",
  "once_cell",
+]
+
+[[package]]
+name = "clap_builder"
+version = "4.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e53afce1efce6ed1f633cf0e57612fe51db54a1ee4fd8f8503d078fe02d69ae"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "bitflags 1.3.2",
+ "clap_lex 0.5.0",
  "strsim 0.10.0",
- "termcolor",
 ]
 
 [[package]]
 name = "clap_complete"
-version = "3.2.4"
+version = "4.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4179da71abd56c26b54dd0c248cc081c1f43b0a1a7e8448e28e57a29baa993d"
+checksum = "7f6b5c519bab3ea61843a7923d074b04245624bb84a64a8c150f5deb014e388b"
 dependencies = [
- "clap 3.2.23",
+ "clap 4.3.5",
 ]
 
 [[package]]
@@ -4702,15 +4760,14 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.1.9"
+version = "4.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fddf67631444a3a3e3e5ac51c36a5e01335302de677bd78759eaa90ab1f46644"
+checksum = "b8cd2b2a819ad6eec39e8f1d6b53001af1e5469f8c177579cdaeb313115b825f"
 dependencies = [
  "heck 0.4.0",
- "proc-macro-error",
  "proc-macro2 1.0.59",
  "quote 1.0.28",
- "syn 1.0.105",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -4724,12 +4781,9 @@ dependencies = [
 
 [[package]]
 name = "clap_lex"
-version = "0.3.3"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "033f6b7a4acb1f358c742aaca805c939ee73b4c6209ae4318ec7aca81c42e646"
-dependencies = [
- "os_str_bytes",
-]
+checksum = "2da6da31387c7e4ef160ffab6d5e7f00c42626fe39aea70a7b0f1773f7dd6c1b"
 
 [[package]]
 name = "cloud-storage"
@@ -4780,6 +4834,12 @@ name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
+
+[[package]]
+name = "colorchoice"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
 name = "colored"
@@ -6282,12 +6342,12 @@ dependencies = [
  "aptos-network",
  "aptos-types",
  "bcs 0.1.4",
+ "clap 4.3.5",
  "move-core-types",
  "rand 0.7.3",
  "serde 1.0.149",
  "serde-reflection",
  "serde_yaml 0.8.26",
- "structopt",
 ]
 
 [[package]]
@@ -7059,7 +7119,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fb7c1b80a1dfa604bb4a649a5c5aeef3d913f7c520cb42b40e534e8a61bcdfc"
 dependencies = [
  "ahash 0.8.3",
- "clap 4.1.11",
+ "clap 4.3.5",
  "crossbeam-channel",
  "crossbeam-utils",
  "dashmap",
@@ -7705,7 +7765,7 @@ name = "listener"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "clap 3.2.23",
+ "clap 4.3.5",
  "tokio",
 ]
 
@@ -8026,8 +8086,8 @@ dependencies = [
  "anyhow",
  "aptos-framework",
  "bcs 0.1.4",
+ "clap 4.3.5",
  "move-binary-format",
- "structopt",
 ]
 
 [[package]]
@@ -8786,7 +8846,7 @@ name = "move-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 3.2.23",
+ "clap 4.3.5",
  "colored",
  "datatest-stable",
  "difference",
@@ -11026,7 +11086,7 @@ name = "sender"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "clap 3.2.23",
+ "clap 4.3.5",
  "event-listener",
  "quanta",
  "tokio",
@@ -12794,6 +12854,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
 
 [[package]]
+name = "utf8parse"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
+
+[[package]]
 name = "uuid"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13149,7 +13215,16 @@ version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75283be5efb2831d37ea142365f009c02ec203cd29a3ebecbc093d52315b66d0"
 dependencies = [
- "windows-targets",
+ "windows-targets 0.42.2",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "677d2418bec65e3338edb076e806bc1ec15693c5d0104683f2efe857f61056a9"
+dependencies = [
+ "windows-targets 0.48.0",
 ]
 
 [[package]]
@@ -13158,13 +13233,28 @@ version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e5180c00cd44c9b1c88adb3693291f1cd93605ded80c250a75d472756b4d071"
 dependencies = [
- "windows_aarch64_gnullvm",
+ "windows_aarch64_gnullvm 0.42.2",
  "windows_aarch64_msvc 0.42.2",
  "windows_i686_gnu 0.42.2",
  "windows_i686_msvc 0.42.2",
  "windows_x86_64_gnu 0.42.2",
- "windows_x86_64_gnullvm",
+ "windows_x86_64_gnullvm 0.42.2",
  "windows_x86_64_msvc 0.42.2",
+]
+
+[[package]]
+name = "windows-targets"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b1eb6f0cd7c80c79759c929114ef071b87354ce476d9d94271031c0497adfd5"
+dependencies = [
+ "windows_aarch64_gnullvm 0.48.0",
+ "windows_aarch64_msvc 0.48.0",
+ "windows_i686_gnu 0.48.0",
+ "windows_i686_msvc 0.48.0",
+ "windows_x86_64_gnu 0.48.0",
+ "windows_x86_64_gnullvm 0.48.0",
+ "windows_x86_64_msvc 0.48.0",
 ]
 
 [[package]]
@@ -13172,6 +13262,12 @@ name = "windows_aarch64_gnullvm"
 version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "597a5118570b68bc08d8d59125332c54f1ba9d9adeedeef5b99b02ba2b0698f8"
+
+[[package]]
+name = "windows_aarch64_gnullvm"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91ae572e1b79dba883e0d315474df7305d12f569b400fcf90581b06062f7e1bc"
 
 [[package]]
 name = "windows_aarch64_msvc"
@@ -13186,6 +13282,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e08e8864a60f06ef0d0ff4ba04124db8b0fb3be5776a5cd47641e942e58c4d43"
 
 [[package]]
+name = "windows_aarch64_msvc"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2ef27e0d7bdfcfc7b868b317c1d32c641a6fe4629c171b8928c7b08d98d7cf3"
+
+[[package]]
 name = "windows_i686_gnu"
 version = "0.36.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13196,6 +13298,12 @@ name = "windows_i686_gnu"
 version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c61d927d8da41da96a81f029489353e68739737d3beca43145c8afec9a31a84f"
+
+[[package]]
+name = "windows_i686_gnu"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "622a1962a7db830d6fd0a69683c80a18fda201879f0f447f065a3b7467daa241"
 
 [[package]]
 name = "windows_i686_msvc"
@@ -13210,6 +13318,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44d840b6ec649f480a41c8d80f9c65108b92d89345dd94027bfe06ac444d1060"
 
 [[package]]
+name = "windows_i686_msvc"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4542c6e364ce21bf45d69fdd2a8e455fa38d316158cfd43b3ac1c5b1b19f8e00"
+
+[[package]]
 name = "windows_x86_64_gnu"
 version = "0.36.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13222,10 +13336,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8de912b8b8feb55c064867cf047dda097f92d51efad5b491dfb98f6bbb70cb36"
 
 [[package]]
+name = "windows_x86_64_gnu"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca2b8a661f7628cbd23440e50b05d705db3686f894fc9580820623656af974b1"
+
+[[package]]
 name = "windows_x86_64_gnullvm"
 version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26d41b46a36d453748aedef1486d5c7a85db22e56aff34643984ea85514e94a3"
+
+[[package]]
+name = "windows_x86_64_gnullvm"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7896dbc1f41e08872e9d5e8f8baa8fdd2677f29468c4e156210174edc7f7b953"
 
 [[package]]
 name = "windows_x86_64_msvc"
@@ -13238,6 +13364,12 @@ name = "windows_x86_64_msvc"
 version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9aec5da331524158c6d1a4ac0ab1541149c0b9505fde06423b02f5ef0106b9f0"
+
+[[package]]
+name = "windows_x86_64_msvc"
+version = "0.48.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a515f5799fe4961cb532f983ce2b23082366b898e52ffbce459c86f67c8378a"
 
 [[package]]
 name = "winnow"

@@ -3,18 +3,18 @@
 
 use anyhow::Result;
 use aptos_framework::{BuildOptions, BuiltPackage};
+use clap::Parser;
 use move_binary_format::CompiledModule;
 use std::{fs, fs::File, io::Write, path::PathBuf};
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
-#[structopt(
+#[derive(Parser, Debug)]
+#[clap(
     name = "module-publish",
     about = "Write Move packages binaries in a Rust file (raw_module_data.rs). Defaults to \n\
          aptos-core/crates/transaction-emitter-lib/src/transaction_generator/publishing/raw_module_data.rs"
 )]
 struct Args {
-    #[structopt(long, help = "Optional output directory for raw_module_data.rs")]
+    #[clap(long, help = "Optional output directory for raw_module_data.rs")]
     out_dir: Option<String>,
 }
 
@@ -44,7 +44,7 @@ fn additional_packages() -> Vec<(&'static str, &'static str)> {
 // `testsuite/simple/src/packages` given that it will likely require
 // changes in `crates/transaction-emitter-lib/src/transaction_generator/publishing`.
 fn main() -> Result<()> {
-    let args = Args::from_args();
+    let args = Args::parse();
 
     // build GenericModule
     let provided_dir = match &args.out_dir {

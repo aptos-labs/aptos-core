@@ -75,7 +75,7 @@ struct ExecuteOpt {
     #[clap(long, default_value = "1")]
     pub num_executor_shards: usize,
 
-    #[clap(long, min_values = 1, conflicts_with = "num_executor_shards")]
+    #[clap(long, num_args = 1.., conflicts_with = "num_executor_shards")]
     pub remote_executor_addresses: Option<Vec<SocketAddr>>,
 
     #[clap(long, default_value = "true")]

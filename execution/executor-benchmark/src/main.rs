@@ -163,7 +163,7 @@ impl Opt {
 #[derive(Subcommand, Debug)]
 enum Command {
     CreateDb {
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         data_dir: PathBuf,
 
         #[clap(long, default_value = "1000000")]
@@ -185,23 +185,23 @@ enum Command {
 
         /// Workload (transaction type). Uses raw coin transfer if not set,
         /// and if set uses transaction-generator-lib to generate it
-        #[clap(long, arg_enum, ignore_case = true)]
+        #[clap(long, value_enum, ignore_case = true)]
         transaction_type: Option<TransactionTypeArg>,
 
         #[clap(long, default_value = "1")]
         module_working_set_size: usize,
 
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         data_dir: PathBuf,
 
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         checkpoint_dir: PathBuf,
     },
     AddAccounts {
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         data_dir: PathBuf,
 
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         checkpoint_dir: PathBuf,
 
         #[clap(long, default_value = "1000000")]

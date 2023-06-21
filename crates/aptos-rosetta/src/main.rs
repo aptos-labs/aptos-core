@@ -222,7 +222,7 @@ pub struct OnlineRemoteArgs {
     #[clap(long, default_value = "http://localhost:8080")]
     rest_api_url: url::Url,
     /// Owner addresses file as a YAML file with a list
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     owner_address_file: Option<PathBuf>,
 }
 
