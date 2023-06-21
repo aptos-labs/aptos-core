@@ -69,7 +69,17 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "releases/index" },
-      items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
+      items: [
+        {
+          type: "category",
+          label: "Node and Framework Release",
+          collapsible: true,
+          collapsed: true,
+          items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
+        },
+        "releases/cli-release", 
+        "releases/sdk-release"
+      ],
     },
     "nodes/deployments",
     "guides/system-integrators-guide",
