@@ -851,7 +851,7 @@ never be regenerated with future txs.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_object">create_object</a>(creator_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
-    <b>let</b> uuid = aptos_framework::transaction_context::create_unique_address();
+    <b>let</b> uuid = aptos_framework::transaction_context::create_unique_addr();
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(creator_address, uuid, <b>true</b>)
 }
 </code></pre>

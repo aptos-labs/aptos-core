@@ -61,6 +61,8 @@ return true.
 -  [Function `partial_governance_voting_enabled`](#0x1_features_partial_governance_voting_enabled)
 -  [Function `get_delegation_pool_partial_governance_voting`](#0x1_features_get_delegation_pool_partial_governance_voting)
 -  [Function `delegation_pool_partial_governance_voting_enabled`](#0x1_features_delegation_pool_partial_governance_voting_enabled)
+-  [Function `get_uuids`](#0x1_features_get_uuids)
+-  [Function `uuids_enabled`](#0x1_features_uuids_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -326,6 +328,17 @@ Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TREAT_FRIEND_AS_PRIVATE">TREAT_FRIEND_AS_PRIVATE</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="0x1_features_UNIVERSALLY_UNIQUE_IDENTIFIERS"></a>
+
+Whether enable MOVE functions to call create_uuid method to create UUIDs.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_UNIVERSALLY_UNIQUE_IDENTIFIERS">UNIVERSALLY_UNIQUE_IDENTIFIERS</a>: u64 = 22;
 </code></pre>
 
 
@@ -1026,6 +1039,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">delegation_pool_partial_governance_voting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING">DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_uuids"></a>
+
+## Function `get_uuids`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_uuids">get_uuids</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_uuids">get_uuids</a>(): u64 { <a href="features.md#0x1_features_UNIVERSALLY_UNIQUE_IDENTIFIERS">UNIVERSALLY_UNIQUE_IDENTIFIERS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_uuids_enabled"></a>
+
+## Function `uuids_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_uuids_enabled">uuids_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_uuids_enabled">uuids_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_UNIVERSALLY_UNIQUE_IDENTIFIERS">UNIVERSALLY_UNIQUE_IDENTIFIERS</a>)
 }
 </code></pre>
 

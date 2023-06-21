@@ -194,6 +194,16 @@ module std::features {
         is_enabled(DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING)
     }
 
+
+    /// Whether enable MOVE functions to call create_uuid method to create UUIDs.
+    /// Lifetime: transient
+    const UNIVERSALLY_UNIQUE_IDENTIFIERS: u64 = 22;
+    public fun get_uuids(): u64 { UNIVERSALLY_UNIQUE_IDENTIFIERS }
+    public fun uuids_enabled(): bool acquires Features {
+        is_enabled(UNIVERSALLY_UNIQUE_IDENTIFIERS)
+    }
+
+
     // ============================================================================================
     // Feature Flag Implementation
 

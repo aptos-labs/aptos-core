@@ -6,15 +6,18 @@
 
 
 -  [Struct `UUID`](#0x1_transaction_context_UUID)
+-  [Constants](#@Constants_0)
 -  [Function `get_txn_hash`](#0x1_transaction_context_get_txn_hash)
 -  [Function `create_unique_address`](#0x1_transaction_context_create_unique_address)
+-  [Function `create_unique_addr`](#0x1_transaction_context_create_unique_addr)
 -  [Function `get_script_hash`](#0x1_transaction_context_get_script_hash)
 -  [Function `create_uuid`](#0x1_transaction_context_create_uuid)
--  [Specification](#@Specification_0)
-    -  [Function `get_script_hash`](#@Specification_0_get_script_hash)
+-  [Specification](#@Specification_1)
+    -  [Function `get_script_hash`](#@Specification_1_get_script_hash)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+</code></pre>
 
 
 
@@ -46,6 +49,21 @@ for storing an address
 
 
 </details>
+
+<a name="@Constants_0"></a>
+
+## Constants
+
+
+<a name="0x1_transaction_context_EUUID_NOT_SUPPORTED"></a>
+
+UUID feature is not supported.
+
+
+<pre><code><b>const</b> <a href="transaction_context.md#0x1_transaction_context_EUUID_NOT_SUPPORTED">EUUID_NOT_SUPPORTED</a>: u64 = 3;
+</code></pre>
+
+
 
 <a name="0x1_transaction_context_get_txn_hash"></a>
 
@@ -81,7 +99,7 @@ number of times inside a single transaction. Each such call increments
 the sequence number and generates a new unique address
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_unique_address">create_unique_address</a>(): <b>address</b>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_unique_address">create_unique_address</a>(): <b>address</b>
 </code></pre>
 
 
@@ -90,7 +108,35 @@ the sequence number and generates a new unique address
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_unique_address">create_unique_address</a>(): <b>address</b>;
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_unique_address">create_unique_address</a>(): <b>address</b>;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_context_create_unique_addr"></a>
+
+## Function `create_unique_addr`
+
+Return a universally unique identifier. Internally calls
+the private function <code>create_unique_address</code>. This function is
+created for to feature gate the <code>create_unique_address</code> function.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_unique_addr">create_unique_addr</a>(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_unique_addr">create_unique_addr</a>(): <b>address</b> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_uuids_enabled">features::uuids_enabled</a>(), <a href="transaction_context.md#0x1_transaction_context_EUUID_NOT_SUPPORTED">EUUID_NOT_SUPPORTED</a>);
+    <a href="transaction_context.md#0x1_transaction_context_create_unique_address">create_unique_address</a>()
+}
 </code></pre>
 
 
@@ -138,6 +184,7 @@ the generated unique address wrapped in the UUID class.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_uuid">create_uuid</a>(): <a href="transaction_context.md#0x1_transaction_context_UUID">UUID</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_uuids_enabled">features::uuids_enabled</a>(), <a href="transaction_context.md#0x1_transaction_context_EUUID_NOT_SUPPORTED">EUUID_NOT_SUPPORTED</a>);
     <b>return</b> <a href="transaction_context.md#0x1_transaction_context_UUID">UUID</a> {
         unique_address: <a href="transaction_context.md#0x1_transaction_context_create_unique_address">create_unique_address</a>()
     }
@@ -148,12 +195,12 @@ the generated unique address wrapped in the UUID class.
 
 </details>
 
-<a name="@Specification_0"></a>
+<a name="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_0_get_script_hash"></a>
+<a name="@Specification_1_get_script_hash"></a>
 
 ### Function `get_script_hash`
 
