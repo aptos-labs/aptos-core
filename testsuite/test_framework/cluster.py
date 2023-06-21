@@ -52,6 +52,7 @@ class ForgeCluster:
     cloud: Cloud = Cloud.AWS
     region: Optional[str] = "us-west-2"
     kubeconf: Optional[str] = None
+    is_multiregion: bool = False
 
     def __repr__(self) -> str:
         return f"{self.cloud}/{self.region}/{self.name}"
@@ -59,6 +60,10 @@ class ForgeCluster:
     def set_kubeconf(self, kubeconf: str) -> ForgeCluster:
         self.kubeconf = kubeconf
         return self
+
+    @property
+    def kubectl_create_context_arg(self) -> List[str]:
+        return ["--context=karmada-apiserver"] if self.is_multiregion else []
 
     async def write(self, shell: Shell) -> None:
         assert self.kubeconf is not None, "kubeconf must be set"
@@ -148,7 +153,7 @@ class ForgeCluster:
     async def write_cluster_config(
         self, shell: Shell, cluster_name: str, temp: str
     ) -> None:
-        if cluster_name == "multiregion":
+        if self.is_multiregion:
             cmd = [
                 "gcloud",
                 "secrets",

@@ -39,3 +39,4 @@ mod transaction_context;
 mod transaction_fee;
 mod type_too_large;
 mod vector_numeric_address;
+mod vote;

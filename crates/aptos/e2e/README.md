@@ -19,14 +19,20 @@ To learn how to use the CLI testing framework, run this:
 poetry run python main.py -h
 ```
 
-For example:
+For example, using the CLI from an image:
 ```
-poetry run python main.py --base-network mainnet --test-cli-tag mainnet
+poetry run python main.py --base-network mainnet --test-cli-tag nightly
+```
+
+Using the CLI from a local path:
+```
+poetry run python main.py -d --base-network mainnet --test-cli-path ~/aptos-core/target/debug/aptos
 ```
 
 ## Debugging
-
 If you are get an error message similar to this:
+
+### CPU architecture
 ```
 docker: no matching manifest for linux/arm64/v8 in the manifest list entries.
 ```
@@ -37,7 +43,22 @@ DOCKER_DEFAULT_PLATFORM=linux/amd64 poetry run python main.py --base-network tes
 ```
 This makes the docker commands use the x86_64 images since we don't publish images for ARM.
 
-When running the e2e test using poetry locally, make sure you set your aptos config type to `workspace`, otherwise it won't be able to find the test account after `aptos init`. You can change it back to `global` afterward:
+### CLI config type
+If you see an error like this:
+```
+Traceback (most recent call last):
+  File "/Users/dport/a/core/crates/aptos/e2e/main.py", line 194, in <module>
+    if main():
+  File "/Users/dport/a/core/crates/aptos/e2e/main.py", line 156, in main
+    run_helper.prepare()
+  File "/Users/dport/a/core/crates/aptos/e2e/test_helpers.py", line 155, in prepare
+    self.prepare_cli()
+  File "/Users/dport/a/core/crates/aptos/e2e/test_helpers.py", line 189, in prepare_cli
+    raise RuntimeError(
+RuntimeError: When using --test-cli-path you must use workspace configuration, try running `aptos config set-global-config --config-type workspace`
+```
+
+It is because you are using the `--test-cli-path` flag but have configured the CLI to use the `global` config type. This is not currently compatible, you must switch the config type to workspace prior to running the E2E tests:
 ```
 aptos config set-global-config --config-type workspace
 ```

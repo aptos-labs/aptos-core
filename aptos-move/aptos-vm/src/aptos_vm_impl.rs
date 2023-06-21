@@ -20,9 +20,10 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     chain_id::ChainId,
+    fee_statement::FeeStatement,
     on_chain_config::{
         ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
-        GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
+        GasScheduleV2, OnChainConfig, TimedFeatures, Version,
     },
     transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
@@ -84,16 +85,8 @@ impl AptosVMImpl {
             gas_config(&storage);
 
         let storage_gas_params = if let Some(gas_params) = &mut gas_params {
-            let storage_gas_schedule = match gas_feature_version {
-                0 => None,
-                _ => StorageGasSchedule::fetch_config(&storage),
-            };
-
-            let storage_gas_params = StorageGasParameters::new(
-                gas_feature_version,
-                gas_params,
-                storage_gas_schedule.as_ref(),
-            );
+            let storage_gas_params =
+                StorageGasParameters::new(gas_feature_version, gas_params, &storage);
 
             if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
                 // Overwrite table io gas parameters with global io pricing.
@@ -621,10 +614,10 @@ impl AptosVMImpl {
             .new_session(resolver, session_id, aggregator_enabled)
     }
 
-    pub fn load_module<'r>(
+    pub fn load_module(
         &self,
         module_id: &ModuleId,
-        resolver: &'r impl MoveResolverExt,
+        resolver: &impl MoveResolverExt,
     ) -> VMResult<Arc<CompiledModule>> {
         self.move_vm.load_module(module_id, resolver)
     }
@@ -661,21 +654,15 @@ impl<'a> AptosVMInternals<'a> {
 pub(crate) fn get_transaction_output<A: AccessPathCache>(
     ap_cache: &mut A,
     session: SessionExt,
-    gas_left: Gas,
-    txn_data: &TransactionMetadata,
+    fee_statement: FeeStatement,
     status: ExecutionStatus,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
-    let gas_used = txn_data
-        .max_gas_amount()
-        .checked_sub(gas_left)
-        .expect("Balance should always be less than or equal to max gas amount");
-
     let change_set = session.finish(ap_cache, change_set_configs)?;
 
     Ok(VMOutput::new(
         change_set,
-        gas_used.into(),
+        fee_statement,
         TransactionStatus::Keep(status),
     ))
 }
