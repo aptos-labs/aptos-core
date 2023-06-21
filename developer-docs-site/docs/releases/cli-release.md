@@ -11,7 +11,7 @@ Read [Install the Aptos CLI](../tools/install-cli/index.md) and follow the instr
 
 If you have already installed the CLI, you can upgrade to the latest version using a command:
 * With brew: `brew upgrade aptos`
-* With the prepackaged CLI: `aptos upgrade`
+* With the prepackaged CLI: `aptos update`
 
 [Read about different ways to install Aptos CLI here!](https://aptos.dev/tools/install-cli/)
 
