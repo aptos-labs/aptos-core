@@ -8282,6 +8282,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-compiler-v2"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 3.2.23",
+ "codespan",
+ "codespan-reporting",
+ "datatest-stable",
+ "itertools",
+ "move-binary-format",
+ "move-core-types",
+ "move-ir-to-bytecode",
+ "move-model",
+ "move-prover-test-utils",
+ "move-stdlib",
+ "num",
+ "once_cell",
+ "serde 1.0.149",
+]
+
+[[package]]
 name = "move-core-types"
 version = "0.0.4"
 dependencies = [
