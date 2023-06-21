@@ -8625,7 +8625,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atty",
- "clap 3.2.23",
+ "clap 4.3.5",
  "codespan",
  "codespan-reporting",
  "datatest-stable",
