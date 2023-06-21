@@ -14,7 +14,7 @@ use warp::{http::Response, Filter};
 /// the specific service.
 #[derive(Parser)]
 pub struct ServerArgs {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, value_parser)]
     pub config_path: PathBuf,
 }
 

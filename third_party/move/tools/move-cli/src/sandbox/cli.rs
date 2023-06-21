@@ -59,7 +59,7 @@ pub enum SandboxCommand {
     Run {
         /// Path to .mv file containing either script or module bytecodes. If the file is a module, the
         /// `script_name` parameter must be set.
-        #[clap(name = "script", parse(from_os_str))]
+        #[clap(name = "script", value_parser)]
         script_file: PathBuf,
         /// Name of the script function inside `script_file` to call. Should only be set if `script_file`
         /// points to a module.
@@ -84,7 +84,7 @@ pub enum SandboxCommand {
         /// ASCII strings (e.g., `'b"hi"` will parse as the `vector<u8>` value `[68, 69]`).
         #[clap(
             long = "args",
-            parse(try_from_str = parser::parse_transaction_argument),
+            value_parser = parser::parse_transaction_argument,
             takes_value(true),
             multiple_values(true),
             multiple_occurrences(true)
@@ -94,7 +94,7 @@ pub enum SandboxCommand {
         /// `main<T>()`). Must match the type arguments kinds expected by `script_file`.
         #[clap(
             long = "type-args",
-            parse(try_from_str = parser::parse_type_tag),
+            value_parser = parser::parse_type_tag,
             takes_value(true),
             multiple_values(true),
             multiple_occurrences(true)
@@ -126,7 +126,7 @@ pub enum SandboxCommand {
     #[clap(name = "view")]
     View {
         /// Path to a resource, events file, or module stored on disk.
-        #[clap(name = "file", parse(from_os_str))]
+        #[clap(name = "file", value_parser)]
         file: PathBuf,
     },
     /// Delete all resources, events, and modules stored on disk under `storage-dir`.
@@ -150,7 +150,7 @@ pub enum GenerateCommand {
     #[clap(name = "struct-layouts")]
     StructLayouts {
         /// Path to a module stored on disk.
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         module: PathBuf,
         /// If set, generate bindings for the specified struct and type arguments. If unset,
         /// generate bindings for all closed struct definitions.
@@ -166,7 +166,7 @@ pub struct StructLayoutOptions {
     /// Generate layout bindings for `struct` bound to these type arguments.
     #[clap(
         long = "type-args",
-        parse(try_from_str = parser::parse_type_tag),
+        value_parser = parser::parse_type_tag,
         requires="struct",
         takes_value(true),
         multiple_values(true),

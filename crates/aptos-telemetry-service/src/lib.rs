@@ -50,7 +50,7 @@ mod validator_cache;
 #[derive(Clone, Debug, Parser)]
 #[clap(name = "Aptos Telemetry Service", author, version)]
 pub struct AptosTelemetryServiceArgs {
-    #[clap(short = 'f', long, parse(from_os_str))]
+    #[clap(short = 'f', long, value_parser)]
     config_path: PathBuf,
 }
 

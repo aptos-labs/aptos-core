@@ -3,24 +3,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_fuzzer::FuzzTarget;
+use clap::Parser;
 use std::{fs, path::PathBuf};
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[clap(
     name = "Aptos-Fuzzer Investigator",
     author = "Aptos",
     about = "Utility tool to investigate fuzzing artifacts"
 )]
 struct Args {
     /// Admission Control port to connect to.
-    #[structopt(short = "i", long)]
+    #[clap(short = 'i', long)]
     pub input_file: Option<String>,
 }
 
 fn main() {
     // args
-    let args = Args::from_args();
+    let args = Args::parse();
 
     // check if it exists
     let input_file = PathBuf::from(args.input_file.expect("input file must be set via -i"));

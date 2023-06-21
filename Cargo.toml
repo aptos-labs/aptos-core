@@ -417,8 +417,8 @@ chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 claims = "0.7"
-clap = { version = "3.2.23", features = ["derive", "env", "suggestions"] }
-clap_complete = "3.2.3"
+clap = { version = "4.3.4", features = ["derive", "env", "suggestions"] }
+clap_complete = "4.3.1"
 cloud-storage = { version = "0.11.1", features = ["global-client"] }
 codespan-reporting = "0.11.1"
 console-subscriber = "0.1.8"

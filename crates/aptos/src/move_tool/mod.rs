@@ -47,7 +47,7 @@ use aptos_types::{
     transaction::{TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
-use clap::{ArgEnum, Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{ColorChoice, StandardStream},
@@ -142,7 +142,7 @@ pub struct FrameworkPackageArgs {
     /// Local framework directory for the Aptos framework
     ///
     /// This is mutually exclusive with `--framework-git-rev`
-    #[clap(long, parse(from_os_str), group = "framework_package_args")]
+    #[clap(long, value_parser, group = "framework_package_args")]
     pub(crate) framework_local_dir: Option<PathBuf>,
 
     /// Skip pulling the latest git dependencies
@@ -229,7 +229,7 @@ pub struct InitPackage {
     pub(crate) name: String,
 
     /// Directory to create the new Move package
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) package_dir: Option<PathBuf>,
 
     /// Named addresses for the move binary
@@ -239,7 +239,7 @@ pub struct InitPackage {
     /// Example: alice=0x1234,bob=0x5678,greg=_
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
-    #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
+    #[clap(long, value_parser = crate::common::utils::parse_map::<String, MoveManifestAccountWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
 
     #[clap(flatten)]
@@ -325,7 +325,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
 /// This can then be run with `aptos move run-script`
 #[derive(Parser)]
 pub struct CompileScript {
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub output_file: Option<PathBuf>,
     #[clap(flatten)]
     pub move_options: MovePackageDir,
@@ -644,7 +644,7 @@ pub struct BuildPublishPayload {
     #[clap(flatten)]
     publish_package: PublishPackage,
     /// JSON output file to write publication transaction to
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) json_output_file: PathBuf,
 }
 
@@ -688,7 +688,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
     }
 }
 
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum IncludedArtifacts {
     None,
     Sparse,
@@ -940,7 +940,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
 #[derive(Parser)]
 pub struct DownloadPackage {
     /// Address of the account containing the package
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     /// Name of the package
@@ -948,7 +948,7 @@ pub struct DownloadPackage {
     pub package: String,
 
     /// Directory to store downloaded package. Defaults to the current directory.
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub output_dir: Option<PathBuf>,
 
     #[clap(flatten)]
@@ -998,7 +998,7 @@ impl CliCommand<&'static str> for DownloadPackage {
 #[derive(Parser)]
 pub struct VerifyPackage {
     /// Address of the account containing the package
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     /// Artifacts to be generated when building this package.
@@ -1062,7 +1062,7 @@ impl CliCommand<&'static str> for VerifyPackage {
 #[derive(Parser)]
 pub struct ListPackage {
     /// Address of the account for which to list packages.
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     /// Type of items to query
@@ -1077,7 +1077,7 @@ pub struct ListPackage {
     pub(crate) profile_options: ProfileOptions,
 }
 
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum MoveListQuery {
     Packages,
 }
@@ -1442,7 +1442,7 @@ impl FromStr for FunctionArgType {
 }
 
 /// A parseable arg with a type separated by a colon
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ArgWithType {
     pub(crate) _ty: FunctionArgType,
     pub(crate) _vector_depth: u8,

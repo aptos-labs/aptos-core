@@ -41,6 +41,7 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
+use clap::{Parser, Subcommand};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
@@ -53,7 +54,6 @@ use std::{
     thread,
     time::Duration,
 };
-use structopt::StructOpt;
 use tokio::runtime::Runtime;
 use url::Url;
 
@@ -61,39 +61,41 @@ use url::Url;
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct Args {
-    #[structopt(long, default_value = "300")]
+    #[clap(long, default_value = "300")]
     duration_secs: usize,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     options: Options,
-    #[structopt(long)]
+    #[clap(long)]
     num_validators: Option<usize>,
-    #[structopt(long)]
+    #[clap(long)]
     num_validator_fullnodes: Option<usize>,
-    #[structopt(
+    #[clap(
         long,
         help = "Specify a test suite to run",
         default_value = "land_blocking"
     )]
     suite: String,
-    #[structopt(long, multiple = true)]
+    #[clap(long, num_args = 0..)]
     changelog: Option<Vec<String>>,
 
     // subcommand groups
-    #[structopt(flatten)]
+    #[clap(subcommand)]
     cli_cmd: CliCommand,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 enum CliCommand {
     /// Subcommands to run forge tests
+    #[clap(subcommand)]
     Test(TestCommand),
     /// Subcommands to set up or manage running forge networks
+    #[clap(subcommand)]
     Operator(OperatorCommand),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 enum TestCommand {
     /// Run tests using the local swarm backend
     LocalSwarm(LocalSwarm),
@@ -101,7 +103,7 @@ enum TestCommand {
     K8sSwarm(K8sSwarm),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 enum OperatorCommand {
     /// Set the image tag for a node in the cluster
     SetNodeImageTag(SetNodeImageTag),
@@ -111,104 +113,104 @@ enum OperatorCommand {
     Resize(Resize),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct LocalSwarm {
-    #[structopt(long, help = "directory to build local swarm under")]
+    #[clap(long, help = "directory to build local swarm under")]
     swarmdir: Option<String>,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct K8sSwarm {
-    #[structopt(long, help = "The kubernetes namespace to use for test")]
+    #[clap(long, help = "The kubernetes namespace to use for test")]
     namespace: Option<String>,
-    #[structopt(
+    #[clap(
         long,
         help = "The image tag currently is used for validators",
         default_value = "devnet"
     )]
     image_tag: String,
-    #[structopt(
+    #[clap(
         long,
         help = "For supported tests, the image tag for validators to upgrade to",
         default_value = "devnet"
     )]
     upgrade_image_tag: String,
-    #[structopt(
+    #[clap(
         long,
         help = "Path to flattened directory containing compiled Move modules"
     )]
     move_modules_dir: Option<String>,
-    #[structopt(
+    #[clap(
         long,
         help = "If set, uses kubectl port-forward instead of assuming k8s DNS access"
     )]
     port_forward: bool,
-    #[structopt(
+    #[clap(
         long,
         help = "If set, reuse the forge testnet active in the specified namespace"
     )]
     reuse: bool,
-    #[structopt(
+    #[clap(
         long,
         help = "If set, keeps the forge testnet active in the specified namespace"
     )]
     keep: bool,
-    #[structopt(long, help = "If set, enables HAProxy for each of the validators")]
+    #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct SetNodeImageTag {
-    #[structopt(long, help = "The name of the node StatefulSet to update")]
+    #[clap(long, help = "The name of the node StatefulSet to update")]
     stateful_set_name: String,
-    #[structopt(long, help = "The name of the container to update")]
+    #[clap(long, help = "The name of the container to update")]
     container_name: String,
-    #[structopt(long, help = "The docker image tag to use for the node")]
+    #[clap(long, help = "The docker image tag to use for the node")]
     image_tag: String,
-    #[structopt(long, help = "The kubernetes namespace to clean up")]
+    #[clap(long, help = "The kubernetes namespace to clean up")]
     namespace: String,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CleanUp {
-    #[structopt(
+    #[clap(
         long,
         help = "The kubernetes namespace to clean up. If unset, attemps to cleanup all by using forge-management configmaps"
     )]
     namespace: Option<String>,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct Resize {
-    #[structopt(long, help = "The kubernetes namespace to resize")]
+    #[clap(long, help = "The kubernetes namespace to resize")]
     namespace: String,
-    #[structopt(long, default_value = "30")]
+    #[clap(long, default_value = "30")]
     num_validators: usize,
-    #[structopt(long, default_value = "1")]
+    #[clap(long, default_value = "1")]
     num_fullnodes: usize,
-    #[structopt(
+    #[clap(
         long,
         help = "Override the image tag used for validators",
         default_value = "devnet"
     )]
     validator_image_tag: String,
-    #[structopt(
+    #[clap(
         long,
         help = "Override the image tag used for testnet-specific components",
         default_value = "devnet"
     )]
     testnet_image_tag: String,
-    #[structopt(
+    #[clap(
         long,
         help = "Path to flattened directory containing compiled Move modules"
     )]
     move_modules_dir: Option<String>,
-    #[structopt(
+    #[clap(
         long,
         help = "If set, dont use kubectl port forward to access the cluster"
     )]
     connect_directly: bool,
-    #[structopt(long, help = "If set, enables HAProxy for each of the validators")]
+    #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
 }
 
@@ -227,7 +229,7 @@ fn main() -> Result<()> {
     logger.channel_size(1000).is_async(false).level(Level::Info);
     logger.build();
 
-    let args = Args::from_args();
+    let args = Args::parse();
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 

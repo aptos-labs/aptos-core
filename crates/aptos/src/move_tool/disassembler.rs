@@ -50,7 +50,7 @@ pub struct Disassemble {
     pub code_coverage_path: Option<PathBuf>,
 
     /// Output directory for the key files
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) output_dir: Option<PathBuf>,
 
     #[clap(flatten)]

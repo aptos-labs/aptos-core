@@ -294,7 +294,7 @@ pub enum FunderKeyEnum {
 
 #[derive(Clone, Debug, Parser)]
 pub struct Run {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, value_parser)]
     config_path: PathBuf,
 }
 
