@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use hyper::{Body, StatusCode};
 use crate::{
     server::utils::CONTENT_TYPE_TEXT
@@ -11,7 +13,7 @@ pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
 
     unsafe {
         let mut prof_active: bool = true;
-    
+
         let result = jemalloc_sys::mallctl(
             b"prof.active\0".as_ptr() as *const _,
             std::ptr::null_mut(),
@@ -19,16 +21,16 @@ pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
             &mut prof_active as *mut _ as *mut _,
             std::mem::size_of::<bool>(),
         );
-    
+
         println!("{}", result);
         if result != 0 {
             panic!("Failed to activate jemalloc profiling");
         }
-    
+
         let handle = thread::spawn(move || {
             // Sleep for 15 seconds
-            thread::sleep(Duration::from_secs(15));
-    
+            thread::sleep(Duration::from_secs(30));
+
             // Disable the profiling
             let mut prof_active: bool = false;
             let result = jemalloc_sys::mallctl(
@@ -38,17 +40,17 @@ pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
                 &mut prof_active as *mut _ as *mut _,
                 std::mem::size_of::<bool>(),
             );
-    
+
             println!("{}", result);
             if result != 0 {
                 panic!("Failed to deactivate jemalloc profiling");
             }
         });
-    
+
         handle.join().unwrap();
     }
     let output = Command::new("python3")
-        .arg("/home/ubuntu/aptos-core/crates/aptos-inspection-service/src/server/memory_profile/jeprof.py")
+        .arg("/home/yunusozer/aptos-core/crates/aptos-inspection-service/src/server/memory_profile/jeprof.py")
         .output()
         .expect("Failed to execute command");
 
@@ -59,7 +61,7 @@ pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
         let stderr = String::from_utf8_lossy(&output.stderr);
         println!("Command failed. Error:\n{}", stderr);
     }
-    
+
     (
         StatusCode::OK,
         Body::from("555"),

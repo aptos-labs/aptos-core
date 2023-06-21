@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation 
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::server::utils::CONTENT_TYPE_TEXT;
@@ -27,6 +27,8 @@ mod memory_profiling;
 mod profiling;
 mod cpu_flamegraph;
 mod memory_svg;
+mod memory_text;
+
 pub mod utils;
 
 
@@ -46,6 +48,8 @@ pub const CPU_PROFILING_PATH: &str = "/cpu_profiling";
 pub const CPU_FLAMEGRAPH_PATH: &str = "/cpu_flamegraph";
 pub const PROFILING_DASHBOARD: &str = "/profiling";
 pub const MEMORY_SVG_PATH: &str = "/memory_svg";
+pub const MEMORY_TXT_PATH: &str = "/memory_txt";
+
 
 // Useful string constants
 pub const HEADER_CONTENT_TYPE: &str = "Content-Type";
@@ -164,6 +168,10 @@ async fn serve_requests(
         MEMORY_SVG_PATH => {
             //profiling dashboard
             memory_svg::handle_memory_svg_request()
+        },
+        MEMORY_TXT_PATH => {
+            //profiling dashboard
+            memory_text::handle_memory_txt_request()
         },
         _ => {
             // Handle the invalid path

@@ -33,8 +33,12 @@
             <option value="">--Select Profiling Type--</option>
             <option value="cpu">CPU Profiling</option>
             <option value="heap">Heap Profiling</option>
+            <option value="thread">Thread Dump</option>
         </select>
         <button id="startButton" disabled>Start Profiling</button>
+        <button id="saveButton">Save Rows</button>
+        <button id="clearButton">Clear Saved Rows</button>
+
 
         <table id="resultsTable">
             <tr>
@@ -44,17 +48,50 @@
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
-            <!-- Rows will be populated dynamically -->
         </table>
+
+        
+            <!-- Rows will be populated dynamically -->
 
     </div>
 
     <script>
+        document.getElementById('saveButton').onclick = function() {
+            var table = document.getElementById('resultsTable');
+            var rows = table.getElementsByTagName('tr');
+            var savedRows = '';
+            for(var i = 1; i < rows.length; i++) {
+                savedRows += rows[i].outerHTML;
+            }
+            localStorage.setItem('savedRows', savedRows);
+            document.getElementById('clearButton').disabled = false;
+
+        }
+
+        // handle clear saved rows
+        document.getElementById('clearButton').onclick = function() {
+            localStorage.removeItem('savedRows');
+            var table = document.getElementById('resultsTable');
+            var rows = table.getElementsByTagName('tr');
+            while (rows.length > 1) {
+                table.deleteRow(1);
+            }
+            this.disabled = true;
+            document.getElementById('saveButton').disabled = true;
+        }
+              
+
         // handle start button state
         document.getElementById('profilingType').onchange = function() {
             document.getElementById('startButton').disabled = this.value === "";
         }
-
+        window.addEventListener('DOMContentLoaded', function() {
+            var savedRows = localStorage.getItem('savedRows');
+            if (savedRows) {
+                var table = document.getElementById('resultsTable');
+                table.innerHTML += savedRows;
+            }
+        });
 
         // handle start profiling
         document.getElementById('startButton').onclick = function() {
@@ -75,40 +112,43 @@
                     endpoint = 'http://localhost:1234/memory_profiling';
                     break;
             }
-
             // make the API call
             fetch(endpoint)
                 .then(response => response.json())
+                .then(data => {
+                    // data is a JavaScript object representing the JSON response
+                    // you can access fields of the response object like so:
+                    var id = data.id; // Assign the value of the id field to the variable id
+                    var type = document.getElementById('profilingType').value;
+                    var dateTime = new Date().toLocaleString();
+                    var status = "In progress";
+
+                    var table = document.getElementById('resultsTable');
+                    var row = table.insertRow(1); // Insert a new row at position 1 (after the header)
+
+                    // Now insert the cells
+                    var cell1 = row.insertCell(0);
+                    var cell2 = row.insertCell(1);
+                    var cell3 = row.insertCell(2);
+                    var cell4 = row.insertCell(3);
+                    var cell5 = row.insertCell(4);
+
+                    // Fill the cells with data
+                    cell1.innerHTML = id;
+                    cell2.innerHTML = type;
+                    cell3.innerHTML = dateTime;
+                    cell4.innerHTML = status;
+                })
 
                 .catch(error => {
                     // Handle any errors
-                    console.error('Error:', error);
                 });
 
 
-            var id = Math.floor(Math.random() * 1000000);
-            var type = document.getElementById('profilingType').value;
-            var dateTime = new Date().toLocaleString();
-            var status = "In progress";
-
-            var table = document.getElementById('resultsTable');
-            var row = table.insertRow(1); // Insert a new row at position 1 (after the header)
-
-            // Now insert the cells
-            var cell1 = row.insertCell(0);
-            var cell2 = row.insertCell(1);
-            var cell3 = row.insertCell(2);
-            var cell4 = row.insertCell(3);
-            var cell5 = row.insertCell(4);
-
-            // Fill the cells with data
-            cell1.innerHTML = id;
-            cell2.innerHTML = type;
-            cell3.innerHTML = dateTime;
-            cell4.innerHTML = status;
+            
 
             var viewResultsButton = document.createElement('button');
-            viewResultsButton.textContent = 'View Results';
+            viewResultsButton.textContent = 'View Graph';
 
             var resultEndpoint;
             switch(type) {
@@ -125,9 +165,25 @@
 
             cell5.appendChild(viewResultsButton);
 
-            
-
+            var viewResultsTextButton = document.createElement('button');
+            viewResultsTextButton.textContent = 'View Text';
+            switch(type) {
+                case 'cpu':
+                    resultEndpoint1 = 'http://localhost:1234/cpu_flamegraph';
+                    break;
+                case 'heap':
+                    resultEndpoint1 = 'http://localhost:1234/memory_txt';
+                    break;
             }
+            viewResultsTextButton.addEventListener('click', function() {
+                window.open(resultEndpoint1, '_blank');
+            });
+
+            cell5.appendChild(viewResultsTextButton);
+            document.getElementById('saveButton').disabled = false;
+
+        }
+
                     
         </script>
 </body>
