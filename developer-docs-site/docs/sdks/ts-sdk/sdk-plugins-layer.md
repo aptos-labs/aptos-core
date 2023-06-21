@@ -16,8 +16,8 @@ The main write methods supported by the AptosToken class are:
 - Mint
 - Mint Soul Bound
 - Burn Token
-- Freeze Token Transafer
-- Unfreeze Token Transafer
+- Freeze Token Transfer
+- Unfreeze Token Transfer
 - Set Token Description
 - Set Token Name
 - Set Token URI
