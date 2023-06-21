@@ -283,7 +283,7 @@ Only called during genesis to initialize system resources for this module.
     );
 
     <b>assert</b>!(
-        (txn_sequence_number <b>as</b> u128) &lt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>,
+        txn_sequence_number &lt; 1u64 &lt;&lt; 63,  // MSB is used <b>to</b> indicate a gas payer tx
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>)
     );
 
