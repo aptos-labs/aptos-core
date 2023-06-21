@@ -28,7 +28,7 @@ use std::{fs, path::PathBuf, sync::Arc};
 #[clap(about = "Delete all data after the provided version.")]
 #[clap(group(clap::ArgGroup::new("backup")
         .required(true)
-        .args(&["backup-checkpoint-dir", "opt-out-backup-checkpoint"]),
+        .args(&["backup_checkpoint_dir", "opt_out_backup_checkpoint"]),
 ))]
 pub struct Cmd {
     #[clap(long, value_parser)]
