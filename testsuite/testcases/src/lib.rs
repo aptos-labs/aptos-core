@@ -15,6 +15,7 @@ pub mod network_loss_test;
 pub mod network_partition_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
+pub mod public_fullnode_performance;
 pub mod quorum_store_onchain_enable_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
@@ -138,6 +139,7 @@ pub trait NetworkLoadTest: Test {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
+
     // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
     // time to finish. How long this function takes will dictate how long the actual test lasts.

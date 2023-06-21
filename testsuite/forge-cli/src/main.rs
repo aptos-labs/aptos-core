@@ -27,6 +27,7 @@ use aptos_testcases::{
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
     performance_test::PerformanceBenchmark,
+    public_fullnode_performance::PFNPerformance,
     quorum_store_onchain_enable_test::QuorumStoreOnChainEnableTest,
     reconfiguration_test::ReconfigurationTest,
     state_sync_performance::{
@@ -538,6 +539,8 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig>
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
+        "pfn_const_tps" => pfn_const_tps(duration),
+        "pfn_performance" => pfn_performance(duration),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1837,6 +1840,59 @@ fn multiregion_benchmark_test() -> ForgeConfig {
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
                 ))
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
+}
+
+/// This test runs a constant-TPS benchmark where the network includes
+/// PFNs, and the transactions are submitted to the PFNs. This is useful
+/// for measuring latencies when the system is not saturated.
+fn pfn_const_tps(duration: Duration) -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(10)
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 500 }))
+        .add_network_test(PFNPerformance)
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Require frequent epoch changes
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(0)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(
+                    // Give at least 60s for catchup and at most 10% of the run
+                    (duration.as_secs() / 10).max(60),
+                )
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
+}
+
+/// This test runs a performance benchmark where the network includes
+/// PFNs, and the transactions are submitted to the PFNs. This is useful
+/// for measuring maximum throughput and latencies.
+fn pfn_performance(duration: Duration) -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(10)
+        .add_network_test(PFNPerformance)
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Require frequent epoch changes
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(4500)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(
+                    // Give at least 60s for catchup and at most 10% of the run
+                    (duration.as_secs() / 10).max(60),
+                )
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
