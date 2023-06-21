@@ -1,13 +1,20 @@
 // Copyright © Aptos Foundation
 
-use std::sync::mpsc::{Receiver, Sender};
-use std::time::Instant;
+use crate::pipeline::ParToExeMsg;
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
 use aptos_logger::info;
-use aptos_types::block_executor::partitioner::{CrossShardDependencies, ExecutableBlock, ExecutableTransactions, TransactionWithDependencies};
-use aptos_types::transaction::Transaction;
-use crate::pipeline::ParToExeMsg;
+use aptos_types::{
+    block_executor::partitioner::{
+        CrossShardDependencies, ExecutableBlock, ExecutableTransactions,
+        TransactionWithDependencies,
+    },
+    transaction::Transaction,
+};
+use std::{
+    sync::mpsc::{Receiver, Sender},
+    time::Instant,
+};
 
 pub(crate) struct BlockPartitioningStage {
     num_iterations: usize,
@@ -17,7 +24,11 @@ pub(crate) struct BlockPartitioningStage {
 }
 
 impl BlockPartitioningStage {
-    pub fn new(executable_block_sender: Sender<ParToExeMsg>, maybe_exe_fin_receiver: Option<Receiver<()>>, num_shards: usize) -> Self {
+    pub fn new(
+        executable_block_sender: Sender<ParToExeMsg>,
+        maybe_exe_fin_receiver: Option<Receiver<()>>,
+        num_shards: usize,
+    ) -> Self {
         let maybe_partitioner = if num_shards <= 1 {
             None
         } else {
@@ -35,12 +46,14 @@ impl BlockPartitioningStage {
 
     pub fn process(&mut self, mut txns: Vec<Transaction>) {
         let current_block_start_time = Instant::now();
-        info!("In iteration {}, received {:?} transactions.", self.num_iterations, txns.len());
+        info!(
+            "In iteration {}, received {:?} transactions.",
+            self.num_iterations,
+            txns.len()
+        );
         let block_id = HashValue::random();
         let block: ExecutableBlock<Transaction> = match &self.maybe_partitioner {
-            None => {
-                (block_id, txns).into()
-            }
+            None => (block_id, txns).into(),
             Some(partitioner) => {
                 let last_txn = txns.pop().unwrap();
                 assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
@@ -58,7 +71,7 @@ impl BlockPartitioningStage {
                         CrossShardDependencies::default(),
                     ));
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
-            }
+            },
         };
         let msg = ParToExeMsg {
             current_block_start_time,

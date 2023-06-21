@@ -10,7 +10,7 @@ use aptos_types::{
     transaction::{Transaction, Version},
 };
 use std::{
-    sync::{Arc, mpsc, mpsc::Sender},
+    sync::{mpsc, mpsc::Sender, Arc},
     time::{Duration, Instant},
 };
 
@@ -29,7 +29,7 @@ pub struct TransactionExecutor<V> {
 
 impl<V> TransactionExecutor<V>
 where
-    V: TransactionBlockExecutor + 'static,
+    V: TransactionBlockExecutor,
 {
     pub fn new(
         executor: Arc<BlockExecutor<V>>,
@@ -54,14 +54,19 @@ where
         }
     }
 
-    pub fn execute_block(&mut self, current_block_start_time: Instant, executable_block: ExecutableBlock<Transaction>) {
+    pub fn execute_block(
+        &mut self,
+        current_block_start_time: Instant,
+        executable_block: ExecutableBlock<Transaction>,
+    ) {
         if self.maybe_first_block_start_time.is_none() {
             self.maybe_first_block_start_time = Some(current_block_start_time);
         }
         let block_id = executable_block.block_id;
         let num_txns = executable_block.transactions.num_transactions();
         self.version += num_txns as Version;
-        let output = self.executor
+        let output = self
+            .executor
             .execute_block(executable_block, self.parent_block_id, None)
             .unwrap();
 

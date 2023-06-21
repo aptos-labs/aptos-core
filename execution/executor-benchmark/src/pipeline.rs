@@ -2,26 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    TransactionCommitter, TransactionExecutor,
+    block_partitioning::BlockPartitioningStage, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::transaction::{Transaction, Version};
+use aptos_types::{
+    block_executor::partitioner::{
+        CrossShardDependencies, ExecutableBlock, ExecutableTransactions,
+        TransactionWithDependencies,
+    },
+    transaction::{Transaction, Version},
+};
 use aptos_vm::counters::TXN_GAS_USAGE;
 use std::{
     marker::PhantomData,
     sync::{
-        Arc,
         mpsc::{self, SyncSender},
+        Arc,
     },
     thread::JoinHandle,
     time::Instant,
 };
-use aptos_crypto::HashValue;
-use aptos_types::block_executor::partitioner::{CrossShardDependencies, ExecutableBlock, ExecutableTransactions, TransactionWithDependencies};
-use crate::block_partitioning::BlockPartitioningStage;
 
 #[derive(Clone, Debug)]
 pub struct PipelineConfig {
@@ -97,12 +101,19 @@ where
             (None, None)
         };
 
-        let partitioning_thread = std::thread::Builder::new().name("block_partitioning".to_string()).spawn(move||{
-            let mut partitioning_stage = BlockPartitioningStage::new(executable_block_sender, maybe_exe_fin_receiver, num_partitioner_shards);
-            while let Ok(txns) = raw_block_receiver.recv() {
-                partitioning_stage.process(txns);
-            }
-        }).expect("Failed to spawn block partitioner thread.");
+        let partitioning_thread = std::thread::Builder::new()
+            .name("block_partitioning".to_string())
+            .spawn(move || {
+                let mut partitioning_stage = BlockPartitioningStage::new(
+                    executable_block_sender,
+                    maybe_exe_fin_receiver,
+                    num_partitioner_shards,
+                );
+                while let Ok(txns) = raw_block_receiver.recv() {
+                    partitioning_stage.process(txns);
+                }
+            })
+            .expect("Failed to spawn block partitioner thread.");
 
         let exe_thread = std::thread::Builder::new()
             .name("txn_executor".to_string())
@@ -122,7 +133,10 @@ where
                 let mut executed = 0;
                 let start_gas = TXN_GAS_USAGE.get_sample_sum();
                 while let Ok(msg) = executable_block_receiver.recv() {
-                    let ParToExeMsg { current_block_start_time, block } = msg;
+                    let ParToExeMsg {
+                        current_block_start_time,
+                        block,
+                    } = msg;
                     let block_size = block.transactions.num_transactions();
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
@@ -206,7 +220,6 @@ where
             ));
         ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
     }
-
 }
 
 /// Message from partitioning thread to execution thread.
