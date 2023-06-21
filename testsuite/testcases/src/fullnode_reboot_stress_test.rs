@@ -3,6 +3,7 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{NetworkContext, NetworkTest, Result, Swarm, Test, TestReport};
+use aptos_logger::info;
 use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
 use tokio::{runtime::Runtime, time::Instant};
@@ -37,8 +38,11 @@ impl NetworkLoadTest for FullNodeRebootStressTest {
             let fullnode_to_reboot = swarm
                 .full_node_mut(*all_fullnodes.choose(&mut rng).unwrap())
                 .unwrap();
+            info!("Stopping fullnode {}", fullnode_to_reboot.peer_id());
             runtime.block_on(async { fullnode_to_reboot.stop().await })?;
+            info!("Starting fullnode {}", fullnode_to_reboot.peer_id());
             runtime.block_on(async { fullnode_to_reboot.start().await })?;
+            info!("waiting on next round");
             std::thread::sleep(Duration::from_secs(10));
         }
 
