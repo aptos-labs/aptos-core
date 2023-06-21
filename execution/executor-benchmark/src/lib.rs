@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod account_generator;
+pub mod block_partitioning;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
@@ -161,7 +162,7 @@ pub fn run_benchmark<V>(
                 allow_discards: false,
                 allow_aborts: false,
                 num_executor_shards: 1,
-                pipelined_block_partitioning: false,
+                async_partitioning: false,
             },
         )
     });
@@ -508,7 +509,7 @@ mod tests {
                 allow_discards: false,
                 allow_aborts: false,
                 num_executor_shards: 1,
-                pipelined_block_partitioning: false,
+                async_partitioning: false,
             },
         );
 
@@ -534,7 +535,7 @@ mod tests {
                 allow_discards: false,
                 allow_aborts: false,
                 num_executor_shards: 1,
-                pipelined_block_partitioning: false,
+                async_partitioning: false,
             },
         );
     }

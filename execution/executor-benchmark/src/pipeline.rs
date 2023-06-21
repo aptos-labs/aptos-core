@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    transaction_executor::PartitionExecutionMode, TransactionCommitter, TransactionExecutor,
+    TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
@@ -13,12 +13,15 @@ use aptos_vm::counters::TXN_GAS_USAGE;
 use std::{
     marker::PhantomData,
     sync::{
-        mpsc::{self, SyncSender},
         Arc,
+        mpsc::{self, SyncSender},
     },
     thread::JoinHandle,
     time::Instant,
 };
+use aptos_crypto::HashValue;
+use aptos_types::block_executor::partitioner::{CrossShardDependencies, ExecutableBlock, ExecutableTransactions, TransactionWithDependencies};
+use crate::block_partitioning::BlockPartitioningStage;
 
 #[derive(Clone, Debug)]
 pub struct PipelineConfig {
@@ -28,7 +31,7 @@ pub struct PipelineConfig {
     pub allow_discards: bool,
     pub allow_aborts: bool,
     pub num_executor_shards: usize,
-    pub pipelined_block_partitioning: bool,
+    pub async_partitioning: bool,
 }
 
 pub struct Pipeline<V> {
@@ -52,13 +55,25 @@ where
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
 
-        let (block_sender, block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
+        let (raw_block_sender, raw_block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
             if config.delay_execution_start {
                 (num_blocks.unwrap() + 1).max(50)
             } else {
                 50
             }, /* bound */
         );
+
+        let (executable_block_sender, executable_block_receiver) = mpsc::channel::<ParToExeMsg>();
+
+        // Assume the distributed executor and the distributed partitioner share the same worker set.
+        let num_partitioner_shards = config.num_executor_shards;
+
+        let (maybe_exe_fin_sender, maybe_exe_fin_receiver) = if !config.async_partitioning {
+            let (tx, rx) = mpsc::channel::<()>();
+            (Some(tx), Some(rx))
+        } else {
+            (None, None)
+        };
 
         let (commit_sender, commit_receiver) = mpsc::sync_channel(
             if config.split_stages || config.skip_commit {
@@ -82,16 +97,12 @@ where
             (None, None)
         };
 
-        let partition_mode = if config.num_executor_shards == 1 {
-            PartitionExecutionMode::Unsharded
-        } else {
-            let partitioner = ShardedBlockPartitioner::new(config.num_executor_shards);
-            if config.pipelined_block_partitioning {
-                PartitionExecutionMode::ShardedPipelined(partitioner)
-            } else {
-                PartitionExecutionMode::ShardedPartitionThenExecute(partitioner)
+        let partitioning_thread = std::thread::Builder::new().name("block_partitioning".to_string()).spawn(move||{
+            let mut partitioning_stage = BlockPartitioningStage::new(executable_block_sender, maybe_exe_fin_receiver, num_partitioner_shards);
+            while let Ok(txns) = raw_block_receiver.recv() {
+                partitioning_stage.process(txns);
             }
-        };
+        }).expect("Failed to spawn block partitioner thread.");
 
         let exe_thread = std::thread::Builder::new()
             .name("txn_executor".to_string())
@@ -99,22 +110,23 @@ where
                 start_execution_rx.map(|rx| rx.recv());
 
                 let mut exe = TransactionExecutor::new(
-                    partition_mode,
                     executor_1,
                     parent_block_id,
                     version,
                     Some(commit_sender),
                     config.allow_discards,
                     config.allow_aborts,
+                    maybe_exe_fin_sender,
                 );
-                exe.start();
                 let start_time = Instant::now();
                 let mut executed = 0;
                 let start_gas = TXN_GAS_USAGE.get_sample_sum();
-                while let Ok(transactions) = block_receiver.recv() {
-                    info!("Received block of size {:?} to execute", transactions.len());
-                    executed += transactions.len();
-                    exe.execute_block(transactions);
+                while let Ok(msg) = executable_block_receiver.recv() {
+                    let ParToExeMsg { current_block_start_time, block } = msg;
+                    let block_size = block.transactions.num_transactions();
+                    info!("Received block of size {:?} to execute", block_size);
+                    executed += block_size;
+                    exe.execute_block(current_block_start_time, block);
                     info!("Finished executing block");
                 }
 
@@ -150,7 +162,7 @@ where
                 }
             })
             .expect("Failed to spawn transaction committer thread.");
-        let join_handles = vec![exe_thread, commit_thread];
+        let join_handles = vec![partitioning_thread, exe_thread, commit_thread];
 
         (
             Self {
@@ -158,7 +170,7 @@ where
                 phantom: PhantomData,
                 start_execution_tx,
             },
-            block_sender,
+            raw_block_sender,
         )
     }
 
@@ -171,4 +183,34 @@ where
             handle.join().unwrap()
         }
     }
+
+    pub fn partition_block(
+        block_id: HashValue,
+        partitioner: &ShardedBlockPartitioner,
+        mut transactions: Vec<Transaction>,
+    ) -> ExecutableBlock<Transaction> {
+        let last_txn = transactions.pop().unwrap();
+        assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
+        let analyzed_transactions = transactions.into_iter().map(|t| t.into()).collect();
+        let mut sub_blocks = partitioner.partition(analyzed_transactions, 2);
+        sub_blocks
+            .last_mut()
+            .unwrap()
+            .sub_blocks
+            .last_mut()
+            .unwrap()
+            .transactions
+            .push(TransactionWithDependencies::new(
+                last_txn,
+                CrossShardDependencies::default(),
+            ));
+        ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
+    }
+
+}
+
+/// Message from partitioning thread to execution thread.
+pub struct ParToExeMsg {
+    pub current_block_start_time: Instant,
+    pub block: ExecutableBlock<Transaction>,
 }
