@@ -39,11 +39,8 @@ pub enum FeatureFlag {
     SignatureCheckerV2,
     StorageSlotMetadata,
     ChargeInvariantViolation,
-<<<<<<< HEAD
-    GasPayerEnabled,
-=======
     DelegationPoolPartialGovernanceVoting,
->>>>>>> main
+    GasPayerEnabled,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
