@@ -186,6 +186,13 @@ module std::features {
     /// Lifetime: transient
     const CHARGE_INVARIANT_VIOLATION: u64 = 20;
 
+    /// Whether alternate gas payer is supported
+    /// Lifetime: transient
+    const GAS_PAYER_ENABLED: u64 = 21;
+    public fun gas_payer_enabled(): bool acquires Features {
+        is_enabled(GAS_PAYER_ENABLED)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

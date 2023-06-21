@@ -378,7 +378,7 @@ impl AptosVM {
             .0
             .get_features()
             .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
-        let (args, gas_payer) = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             senders,
             script_fn.args().to_vec(),
@@ -392,6 +392,15 @@ impl AptosVM {
             args,
             gas_meter,
         )?)
+    }
+
+    fn get_senders(txn_data: &TransactionMetadata) -> Vec<AccountAddress> {
+        let mut res = vec![txn_data.sender];
+        res.extend(txn_data.secondary_signers());
+        if txn_data.sequence_number & (1u64 << 63) != 0 {
+            res.pop();
+        }
+        res
     }
 
     fn execute_script_or_entry_function(
@@ -418,11 +427,10 @@ impl AptosVM {
 
             match payload {
                 TransactionPayload::Script(script) => {
-                    let mut senders = vec![txn_data.sender()];
-                    senders.extend(txn_data.secondary_signers());
+                    let senders = Self::get_senders(txn_data);
                     let loaded_func =
                         session.load_script(script.code(), script.ty_args().to_vec())?;
-                    let (args, gas_payer) =
+                    let args =
                         verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                             &mut session,
                             senders,
@@ -440,9 +448,7 @@ impl AptosVM {
                     )?;
                 },
                 TransactionPayload::EntryFunction(script_fn) => {
-                    let mut senders = vec![txn_data.sender()];
-
-                    senders.extend(txn_data.secondary_signers());
+                    let senders = Self::get_senders(txn_data);
                     self.validate_and_execute_entry_function(
                         &mut session,
                         gas_meter,
@@ -1216,7 +1222,7 @@ impl AptosVM {
 
                 let loaded_func =
                     tmp_session.load_script(script.code(), script.ty_args().to_vec())?;
-                let (args, gas_payer) =
+                let args =
                     verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                         &mut tmp_session,
                         senders,
@@ -1456,19 +1462,22 @@ impl AptosVM {
         match payload {
             TransactionPayload::Script(_) => {
                 self.0.check_gas(resolver, txn_data, log_context)?;
-                self.0.run_script_prologue(session, txn_data, log_context, has_gas_payer)
+                self.0
+                    .run_script_prologue(session, txn_data, log_context, has_gas_payer)
             },
             TransactionPayload::EntryFunction(_) => {
                 // NOTE: Script and EntryFunction shares the same prologue
                 self.0.check_gas(resolver, txn_data, log_context)?;
-                self.0.run_script_prologue(session, txn_data, log_context, has_gas_payer)
+                self.0
+                    .run_script_prologue(session, txn_data, log_context, has_gas_payer)
             },
             TransactionPayload::Multisig(multisig_payload) => {
                 self.0.check_gas(resolver, txn_data, log_context)?;
                 // Still run script prologue for multisig transaction to ensure the same tx
                 // validations are still run for this multisig execution tx, which is submitted by
                 // one of the owners.
-                self.0.run_script_prologue(session, txn_data, log_context, false)?;
+                self.0
+                    .run_script_prologue(session, txn_data, log_context, false)?;
                 // Skip validation if this is part of tx simulation.
                 // This allows simulating multisig txs without having to first create the multisig
                 // tx.

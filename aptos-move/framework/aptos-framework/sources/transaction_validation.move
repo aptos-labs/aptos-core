@@ -153,6 +153,7 @@ module aptos_framework::transaction_validation {
     ) {
         let gas_payer = signer::address_of(&sender);
         if (txn_sequence_number & (1u64 << 63) != 0) {
+            assert!(features::gas_payer_enabled(), PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG);
             gas_payer = *std::vector::borrow(&secondary_signer_addresses, std::vector::length(&secondary_signer_addresses) - 1);
             txn_sequence_number = txn_sequence_number & ((1u64 << 63) - 1);
         };
@@ -192,6 +193,20 @@ module aptos_framework::transaction_validation {
     /// Called by the Adapter
     fun epilogue(
         account: signer,
+        txn_sequence_number: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64
+    ) {
+        let addr = signer::address_of(&account);
+        epilogue_gas_payer(account, addr, txn_sequence_number, txn_gas_price, txn_max_gas_units, gas_units_remaining);
+    }
+
+    /// Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
+    /// Called by the Adapter
+    fun epilogue_gas_payer(
+        account: signer,
+        gas_payer: address,
         _txn_sequence_number: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
@@ -205,26 +220,26 @@ module aptos_framework::transaction_validation {
             error::out_of_range(EOUT_OF_GAS)
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
-        let addr = signer::address_of(&account);
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
         assert!(
-            coin::balance<AptosCoin>(addr) >= transaction_fee_amount,
+            coin::balance<AptosCoin>(gas_payer) >= transaction_fee_amount,
             error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
 
         if (features::collect_and_distribute_gas_fees()) {
             // If transaction fees are redistributed to validators, collect them here for
             // later redistribution.
-            transaction_fee::collect_fee(addr, transaction_fee_amount);
+            transaction_fee::collect_fee(gas_payer, transaction_fee_amount);
         } else {
             // Otherwise, just burn the fee.
             // TODO: this branch should be removed completely when transaction fee collection
             // is tested and is fully proven to work well.
-            transaction_fee::burn_fee(addr, transaction_fee_amount);
+            transaction_fee::burn_fee(gas_payer, transaction_fee_amount);
         };
 
         // Increment sequence number
+        let addr = signer::address_of(&account);
         account::increment_sequence_number(addr);
     }
 }

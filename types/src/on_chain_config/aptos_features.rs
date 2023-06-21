@@ -28,6 +28,7 @@ pub enum FeatureFlag {
     SIGNATURE_CHECKER_V2 = 18,
     STORAGE_SLOT_METADATA = 19,
     CHARGE_INVARIANT_VIOLATION = 20,
+    GAS_PAYER_ENABLED = 21,
 }
 
 /// Representation of features on chain as a bitset.

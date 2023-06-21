@@ -137,7 +137,7 @@ spec aptos_framework::transaction_validation {
     /// Skip transaction_fee::burn_fee verification.
     spec epilogue(
         account: signer,
-        _txn_sequence_number: u64,
+        txn_sequence_number: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         gas_units_remaining: u64

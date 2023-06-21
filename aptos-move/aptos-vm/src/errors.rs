@@ -61,6 +61,7 @@ pub fn convert_prologue_error(
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
+    println!("prologue {:?}", error);
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
@@ -83,10 +84,10 @@ pub fn convert_prologue_error(
                 },
                 (category, reason) => {
                     speculative_error!(
-			log_context,
-			format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-				location, code, category, reason),
-		    );
+                        log_context,
+                        format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+                            location, code, category, reason),
+                    );
                     return Err(VMStatus::Error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                         None,
@@ -152,6 +153,7 @@ pub fn convert_epilogue_error(
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
+    println!("epilogue {:?}", error);
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,

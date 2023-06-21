@@ -100,11 +100,11 @@ pub(crate) fn get_allowed_structs(
 /// after validation, add senders and non-signer arguments to generate the final args
 pub(crate) fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
-    mut senders: Vec<AccountAddress>,
+    senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
     func: &LoadedFunctionInstantiation,
     are_struct_constructors_enabled: bool,
-) -> Result<(Vec<Vec<u8>>, AccountAddress), VMStatus> {
+) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
     if !func.return_.is_empty() {
         return Err(VMStatus::Error(
@@ -182,7 +182,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
             .chain(args)
             .collect()
     };
-    Ok((combined_args, gas_payer))
+    Ok(combined_args)
 }
 
 // Return whether the argument is valid/allowed and whether it needs construction.

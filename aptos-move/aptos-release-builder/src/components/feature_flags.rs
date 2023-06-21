@@ -39,6 +39,7 @@ pub enum FeatureFlag {
     SignatureCheckerV2,
     StorageSlotMetadata,
     ChargeInvariantViolation,
+    GasPayerEnabled,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -156,6 +157,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::SignatureCheckerV2 => AptosFeatureFlag::SIGNATURE_CHECKER_V2,
             FeatureFlag::StorageSlotMetadata => AptosFeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::ChargeInvariantViolation => AptosFeatureFlag::CHARGE_INVARIANT_VIOLATION,
+            FeatureFlag::GasPayerEnabled => AptosFeatureFlag::GAS_PAYER_ENABLED,
         }
     }
 }
@@ -196,6 +198,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::SIGNATURE_CHECKER_V2 => FeatureFlag::SignatureCheckerV2,
             AptosFeatureFlag::STORAGE_SLOT_METADATA => FeatureFlag::StorageSlotMetadata,
             AptosFeatureFlag::CHARGE_INVARIANT_VIOLATION => FeatureFlag::ChargeInvariantViolation,
+            AptosFeatureFlag::GAS_PAYER_ENABLED => FeatureFlag::GasPayerEnabled,
         }
     }
 }
