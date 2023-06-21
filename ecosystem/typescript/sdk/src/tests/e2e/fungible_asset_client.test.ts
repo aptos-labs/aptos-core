@@ -15,13 +15,22 @@ const publisher = new AptosAccount(
 const alice = new AptosAccount();
 const bob = new AptosAccount();
 let fungibleAssetMetadataAddress = "";
+
+// Do not run these tests if the network is testnet / mainnet right now.
+let maybe;
+if (process.env.NETWORK?.toLowerCase() == "testnet" || process.env.NETWORK?.toLowerCase() == "mainnet") {
+  maybe = describe.skip;
+} else {
+  maybe = describe;
+}
+
 /**
  * Since there is no ready-to-use fungible asset contract/module on an aptos framework address
- * we pre compiled ../../../aptos-move/move-examples/fungible_token contract and publish
- * it here to local testnet so we can interact with it to mint a fungible asset and then
- * test FungibleAssetClient class
+ * we pre compiled the ../../../aptos-move/move-examples/fungible_asset/managed_fungible_token
+ * contract and publish it here to local testnet so we can interact with it to mint a fungible
+ * asset and then test FungibleAssetClient class
  */
-describe("fungible asset", () => {
+maybe("fungible asset", () => {
   /**
    * Publish the fungible_token module
    * Mint 5 amount of fungible assets to Alice account
@@ -48,7 +57,7 @@ describe("fungible asset", () => {
         ),
       ],
     );
-    await provider.waitForTransaction(txnHash);
+    await provider.waitForTransaction(txnHash, { checkSuccess: true });
 
     // Mint 5 fungible assets to Alice
     const payload: Gen.EntryFunctionPayload = {
@@ -59,7 +68,7 @@ describe("fungible asset", () => {
     const rawTxn = await provider.generateTransaction(publisher.address(), payload);
     const bcsTxn = AptosClient.generateBCSTransaction(publisher, rawTxn);
     const transactionRes = await provider.submitSignedBCSTransaction(bcsTxn);
-    await provider.waitForTransaction(transactionRes.hash);
+    await provider.waitForTransaction(transactionRes.hash, { checkSuccess: true });
 
     // Get the asset address
     const viewPayload: Gen.ViewRequest = {
@@ -84,7 +93,7 @@ describe("fungible asset", () => {
 
       // Alice transfers 2 amounts of the fungible asset to Bob
       const transactionHash = await fungibleAsset.transfer(alice, fungibleAssetMetadataAddress, bob.address(), 2);
-      await provider.waitForTransaction(transactionHash);
+      await provider.waitForTransaction(transactionHash, { checkSuccess: true });
 
       // Alice has 3 amounts of the fungible asset
       const aliceCurrentBalance = await fungibleAsset.getPrimaryBalance(alice.address(), fungibleAssetMetadataAddress);
