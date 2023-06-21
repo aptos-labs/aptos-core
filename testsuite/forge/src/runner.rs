@@ -28,7 +28,7 @@ const KUBERNETES_SERVICE_HOST: &str = "KUBERNETES_SERVICE_HOST";
 pub const FORGE_RUNNER_MODE: &str = "FORGE_RUNNER_MODE";
 
 #[derive(Debug, Parser)]
-#[clap(about = "Forged in Fire")]
+#[clap(about = "Forged in Fire", styles = aptos_cli_common::aptos_cli_style())]
 pub struct Options {
     /// The FILTER string is tested against the name of all tests, and only those tests whose names
     /// contain the filter are run.

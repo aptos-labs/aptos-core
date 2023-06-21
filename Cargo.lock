@@ -1326,6 +1326,7 @@ dependencies = [
  "anyhow",
  "aptos",
  "aptos-cached-packages",
+ "aptos-cli-common",
  "aptos-config",
  "aptos-db",
  "aptos-framework",
