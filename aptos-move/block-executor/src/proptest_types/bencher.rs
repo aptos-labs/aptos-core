@@ -9,7 +9,9 @@ use crate::{
         TransactionGenParams, ValueType, EventType
     },
 };
-use aptos_types::executable::ExecutableTestType;
+use aptos_types::{
+    block_executor::partitioner::ExecutableTransactions, executable::ExecutableTestType,
+};
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
 use proptest::{
@@ -35,7 +37,11 @@ pub(crate) struct BencherState<
 > where
     Vec<u8>: From<V>,
 {
+<<<<<<< HEAD
     transactions: Vec<Transaction<KeyType<K>, ValueType<V>, EventType<E>>>,
+=======
+    transactions: ExecutableTransactions<Transaction<KeyType<K>, ValueType<V>>>,
+>>>>>>> a52626960e (Sharded blockstm api (#8650))
     expected_output: ExpectedOutput<ValueType<V>>,
 }
 
@@ -107,7 +113,7 @@ where
         let expected_output = ExpectedOutput::generate_baseline(&transactions, None, None);
 
         Self {
-            transactions,
+            transactions: ExecutableTransactions::Unsharded(transactions),
             expected_output,
         }
     }

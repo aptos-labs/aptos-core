@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex},
-    types::{
+use crate::sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex};
+use aptos_types::{
+    block_executor::partitioner::{
         CrossShardDependencies, ShardId, SubBlock, TransactionWithDependencies, TxnIdxWithShardId,
         TxnIndex,
     },
+    transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };
-use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
@@ -114,7 +114,7 @@ impl CrossShardConflictDetector {
         current_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         prev_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         index_offset: TxnIndex,
-    ) -> (SubBlock, Vec<CrossShardDependencies>) {
+    ) -> (SubBlock<AnalyzedTransaction>, Vec<CrossShardDependencies>) {
         let mut frozen_txns = Vec::new();
         let mut cross_shard_dependencies = Vec::new();
         for txn in txns.into_iter() {
