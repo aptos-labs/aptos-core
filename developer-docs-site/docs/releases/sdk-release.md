@@ -4,7 +4,7 @@ slug: "sdk-release"
 ---
 
 ## Aptos SDK
-We actively support the following SDK's:
+We actively support the following SDKs:
 
 * Typescript
   * For instructions on how to get started with Aptos Typescript SDK, [click here.](hhttps://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk)
