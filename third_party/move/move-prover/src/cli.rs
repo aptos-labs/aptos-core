@@ -7,7 +7,7 @@
 //! Functionality related to the command line interface of the Move prover.
 
 use anyhow::anyhow;
-use clap::{Arg, Command};
+use clap::{builder::PossibleValuesParser, Arg, Command};
 use codespan_reporting::diagnostic::Severity;
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
@@ -124,7 +124,6 @@ impl Options {
         // Clap definition of the command line interface.
         let is_number = |s: &str| {
             s.parse::<usize>()
-                .map(|_| ())
                 .map_err(|_| "expected number".to_string())
         };
         let cli = Command::new("mvp")
@@ -135,7 +134,6 @@ impl Options {
                 Arg::new("config")
                     .short('c')
                     .long("config")
-                    .takes_value(true)
                     .value_name("TOML_FILE")
                     .help("path to a configuration file. \
                      Values in this file will be overridden by command line flags"),
@@ -145,9 +143,7 @@ impl Options {
                     .conflicts_with("config")
                     .short('C')
                     .long("config-str")
-                    .takes_value(true)
-                    .multiple_occurrences(true)
-                    .number_of_values(1)
+                    .num_args(0..)
                     .value_name("TOML_STRING")
                     .help("inlines configuration string in toml syntax. Can be repeated. \
                      Use as in `-C=prover.opt=value -C=backend.opt=value`"),
@@ -161,7 +157,6 @@ impl Options {
                 Arg::new("output")
                     .short('o')
                     .long("output")
-                    .takes_value(true)
                     .value_name("BOOGIE_FILE")
                     .help("path to the boogie output which represents the verification problem"),
             )
@@ -169,16 +164,14 @@ impl Options {
                 Arg::new("verbosity")
                     .short('v')
                     .long("verbose")
-                    .takes_value(true)
-                    .possible_values(["error", "warn", "info", "debug"])
+                    .value_parser(PossibleValuesParser::new(["error", "warn", "info", "debug"]))
                     .help("verbosity level"),
             )
             .arg(
                 Arg::new("vector-theory")
                     .long("vector-theory")
-                    .takes_value(true)
-                    .possible_values(["BoogieArray", "BoogieArrayIntern",
-                                              "SmtArray", "SmtArrayExt", "SmtSeq"])
+                    .value_parser(PossibleValuesParser::new(["BoogieArray", "BoogieArrayIntern",
+                                              "SmtArray", "SmtArrayExt", "SmtSeq"]))
                     .help("vector theory to use"),
             )
             .arg(
@@ -191,8 +184,7 @@ impl Options {
                 Arg::new("severity")
                     .long("severity")
                     .short('s')
-                    .takes_value(true)
-                    .possible_values(["bug", "error", "warn", "note"])
+                    .value_parser(PossibleValuesParser::new(["bug", "error", "warn", "note"]))
                     .help("The minimall level on which diagnostics are reported")
             )
             .arg(
@@ -225,17 +217,15 @@ impl Options {
                 Arg::new("seed")
                     .long("seed")
                     .short('S')
-                    .takes_value(true)
                     .value_name("NUMBER")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help("sets a random seed for the prover (default 0)")
             )
             .arg(
                 Arg::new("cores")
                     .long("cores")
-                    .takes_value(true)
                     .value_name("NUMBER")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help("sets the number of cores to use. \
                      NOTE: multiple cores may currently lead to scrambled model \
                      output from boogie (default 4)")
@@ -244,9 +234,8 @@ impl Options {
                 Arg::new("timeout")
                     .long("timeout")
                     .short('T')
-                    .takes_value(true)
                     .value_name("NUMBER")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help("sets a timeout (in seconds) for each \
                              individual verification condition (default 40)")
             )
@@ -265,9 +254,7 @@ impl Options {
             .arg(
                 Arg::new("simplification-pipeline")
                     .long("simplify")
-                    .takes_value(true)
-                    .multiple_occurrences(true)
-                    .number_of_values(1)
+                    .num_args(0..)
                     .help("Specify one simplification pass to run on the specifications. \
                     This option May be specified multiple times to compose a pipeline")
             )
@@ -280,7 +267,6 @@ impl Options {
             .arg(
                 Arg::new("docgen-template")
                     .long("docgen-template")
-                    .takes_value(true)
                     .value_name("FILE")
                     .help("a template for documentation generation."),
             )
@@ -314,8 +300,7 @@ impl Options {
             .arg(
                 Arg::new("verify")
                     .long("verify")
-                    .takes_value(true)
-                    .possible_values(["public", "all", "none"])
+                    .value_parser(PossibleValuesParser::new(["public", "all", "none"]))
                     .value_name("SCOPE")
                     .help("default scope of verification \
                     (can be overridden by `pragma verify=true|false`)"),
@@ -323,9 +308,8 @@ impl Options {
             .arg(
                 Arg::new("bench-repeat")
                     .long("bench-repeat")
-                    .takes_value(true)
                     .value_name("COUNT")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help(
                         "for benchmarking: how many times to call the backend on the verification problem",
                     ),
@@ -340,9 +324,8 @@ impl Options {
             .arg(
                 Arg::new("mutation-add-sub")
                     .long("mutation-add-sub")
-                    .takes_value(true)
                     .value_name("COUNT")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help(
                         "indicates that this program should mutate the indicated plus operation to a minus\
                         specifically by modifyig the \"nth\" such operation",
@@ -351,9 +334,8 @@ impl Options {
             .arg(
                 Arg::new("mutation-sub-add")
                     .long("mutation-sub-add")
-                    .takes_value(true)
                     .value_name("COUNT")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help(
                         "indicates that this program should mutate the indicated minus operation to a plus\
                         specifically by modifyig the \"nth\" such operation",
@@ -362,9 +344,8 @@ impl Options {
             .arg(
                 Arg::new("mutation-mul-div")
                     .long("mutation-mul-div")
-                    .takes_value(true)
                     .value_name("COUNT")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help(
                         "indicates that this program should mutate the indicated multiplication operation to a divide\
                         specifically by modifyig the \"nth\" such operation",
@@ -373,9 +354,8 @@ impl Options {
             .arg(
                 Arg::new("mutation-div-mul")
                     .long("mutation-div-mul")
-                    .takes_value(true)
                     .value_name("COUNT")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help(
                         "indicates that this program should mutate the indicated divide operation to a multiplication\
                         specifically by modifyig the \"nth\" such operation",
@@ -385,9 +365,7 @@ impl Options {
                 Arg::new("dependencies")
                     .long("dependency")
                     .short('d')
-                    .multiple_occurrences(true)
-                    .number_of_values(1)
-                    .takes_value(true)
+                    .num_args(0..)
                     .value_name("PATH_TO_DEPENDENCY")
                     .help("path to a Move file, or a directory which will be searched for \
                     Move files, containing dependencies which will not be verified")
@@ -396,31 +374,27 @@ impl Options {
                 Arg::new("named-addresses")
                 .long("named-addresses")
                 .short('a')
-                .multiple_occurrences(true)
-                .takes_value(true)
+                .num_args(0..)
                 .help("specifies the value(s) of named addresses used in Move files")
             )
             .arg(
                 Arg::new("sources")
-                    .multiple_occurrences(true)
+                    .num_args(1..)
                     .value_name("PATH_TO_SOURCE_FILE")
-                    .min_values(1)
                     .help("the source files to verify"),
             )
             .arg(
                 Arg::new("eager-threshold")
                     .long("eager-threshold")
-                    .takes_value(true)
                     .value_name("NUMBER")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help("sets the eager threshold for quantifier instantiation (default 100)")
             )
             .arg(
                 Arg::new("lazy-threshold")
                     .long("lazy-threshold")
-                    .takes_value(true)
                     .value_name("NUMBER")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help("sets the lazy threshold for quantifier instantiation (default 100)")
             )
             .arg(
@@ -437,9 +411,8 @@ impl Options {
             .arg(
                 Arg::new("num-instances")
                     .long("num-instances")
-                    .takes_value(true)
                     .value_name("NUMBER")
-                    .validator(is_number)
+                    .value_parser(is_number)
                     .help("sets the number of Boogie instances to run concurrently (default 1)")
             )
             .arg(
@@ -499,7 +472,6 @@ impl Options {
             .arg(
                 Arg::new("verify-only")
                     .long("verify-only")
-                    .takes_value(true)
                     .value_name("FUNCTION_NAME")
                     .help("only generate verification condition for one function. \
                     This overrides verification scope and can be overridden by the pragma verify=false")
@@ -507,7 +479,6 @@ impl Options {
             .arg(
                 Arg::new("z3-trace")
                     .long("z3-trace")
-                    .takes_value(true)
                     .value_name("FUNCTION_NAME")
                     .help("only generate verification condition for given function, \
                     and generate a z3 trace file for analysis. The file will be stored \
@@ -534,38 +505,38 @@ impl Options {
 
         // Initialize options.
         let get_vec = |s: &str| -> Vec<String> {
-            match matches.values_of(s) {
-                Some(vs) => vs.map(|v| v.to_string()).collect(),
+            match matches.get_many(s) {
+                Some(vs) => vs.map(|v: &&str| v.to_string()).collect(),
                 _ => vec![],
             }
         };
 
-        let mut options = if matches.is_present("config") {
-            if matches.is_present("config-str") {
+        let mut options = if matches.contains_id("config") {
+            if matches.contains_id("config-str") {
                 return Err(anyhow!(
                     "currently, if `--config` (including via $MOVE_PROVER_CONFIG) is given \
                        `--config-str` cannot be used. Consider editing your \
                        configuration file instead."
                 ));
             }
-            let value = matches.value_of("config").unwrap();
+            let value = matches.get_one::<&str>("config").unwrap();
             if value.is_empty() {
                 Self::default()
             } else {
-                Self::create_from_toml_file(matches.value_of("config").unwrap())?
+                Self::create_from_toml_file(value)?
             }
-        } else if matches.is_present("config-str") {
-            Self::create_from_toml(matches.value_of("config-str").unwrap())?
+        } else if matches.contains_id("config-str") {
+            Self::create_from_toml(matches.get_one::<&str>("config-str").unwrap())?
         } else {
             Options::default()
         };
 
         // Analyze arguments.
-        if matches.is_present("output") {
-            options.output_path = matches.value_of("output").unwrap().to_string();
+        if matches.contains_id("output") {
+            options.output_path = matches.get_one::<&str>("output").unwrap().to_string();
         }
-        if matches.is_present("verbosity") {
-            options.verbosity_level = match matches.value_of("verbosity").unwrap() {
+        if matches.contains_id("verbosity") {
+            options.verbosity_level = match matches.get_one::<&str>("verbosity").copied().unwrap() {
                 "error" => LevelFilter::Error,
                 "warn" => LevelFilter::Warn,
                 "info" => LevelFilter::Info,
@@ -573,181 +544,163 @@ impl Options {
                 _ => unreachable!("should not happen"),
             }
         }
-        if matches.is_present("vector-theory") {
-            options.backend.vector_theory = match matches.value_of("vector-theory").unwrap() {
-                "BoogieArray" => VectorTheory::BoogieArray,
-                "BoogieArrayIntern" => VectorTheory::BoogieArrayIntern,
-                "SmtArray" => VectorTheory::SmtArray,
-                "SmtArrayExt" => VectorTheory::SmtArrayExt,
-                "SmtSeq" => VectorTheory::SmtSeq,
-                _ => unreachable!("should not happen"),
-            }
+        if matches.contains_id("vector-theory") {
+            options.backend.vector_theory =
+                match matches.get_one::<&str>("vector-theory").copied().unwrap() {
+                    "BoogieArray" => VectorTheory::BoogieArray,
+                    "BoogieArrayIntern" => VectorTheory::BoogieArrayIntern,
+                    "SmtArray" => VectorTheory::SmtArray,
+                    "SmtArrayExt" => VectorTheory::SmtArrayExt,
+                    "SmtSeq" => VectorTheory::SmtSeq,
+                    _ => unreachable!("should not happen"),
+                }
         }
 
-        if matches.is_present("severity") {
-            options.prover.report_severity = match matches.value_of("severity").unwrap() {
-                "bug" => Severity::Bug,
-                "error" => Severity::Error,
-                "warn" => Severity::Warning,
-                "note" => Severity::Note,
-                _ => unreachable!("should not happen"),
-            }
+        if matches.contains_id("severity") {
+            options.prover.report_severity =
+                match matches.get_one::<&str>("severity").copied().unwrap() {
+                    "bug" => Severity::Bug,
+                    "error" => Severity::Error,
+                    "warn" => Severity::Warning,
+                    "note" => Severity::Note,
+                    _ => unreachable!("should not happen"),
+                }
         }
 
-        if matches.is_present("generate-only") {
+        if matches.contains_id("generate-only") {
             options.prover.generate_only = true;
         }
-        if matches.occurrences_of("sources") > 0 {
+        if matches.get_count("sources") > 0 {
             options.move_sources = get_vec("sources");
         }
-        if matches.occurrences_of("dependencies") > 0 {
+        if matches.get_count("dependencies") > 0 {
             options.move_deps = get_vec("dependencies");
         }
-        if matches.occurrences_of("named-addresses") > 0 {
+        if matches.get_count("named-addresses") > 0 {
             options.move_named_address_values = get_vec("named-addresses");
         }
-        if matches.is_present("mutation") {
+        if matches.contains_id("mutation") {
             options.prover.mutation = true;
         }
-        if matches.is_present("mutation-add-sub") {
-            options.prover.mutation_add_sub = matches
-                .value_of("mutation-add-sub")
-                .unwrap()
-                .parse::<usize>()?;
+        if matches.contains_id("mutation-add-sub") {
+            options.prover.mutation_add_sub = *matches.try_get_one("mutation-add-sub")?.unwrap();
         }
-        if matches.is_present("mutation-sub-add") {
-            options.prover.mutation_sub_add = matches
-                .value_of("mutation-sub-add")
-                .unwrap()
-                .parse::<usize>()?;
+        if matches.contains_id("mutation-sub-add") {
+            options.prover.mutation_sub_add = *matches.try_get_one("mutation-sub-add")?.unwrap();
         }
-        if matches.is_present("mutation-mul-div") {
-            options.prover.mutation_mul_div = matches
-                .value_of("mutation-mul-div")
-                .unwrap()
-                .parse::<usize>()?;
+        if matches.contains_id("mutation-mul-div") {
+            options.prover.mutation_mul_div = *matches.try_get_one("mutation-mul-div")?.unwrap();
         }
-        if matches.is_present("mutation-div-mul") {
-            options.prover.mutation_div_mul = matches
-                .value_of("mutation-div-mul")
-                .unwrap()
-                .parse::<usize>()?;
+        if matches.contains_id("mutation-div-mul") {
+            options.prover.mutation_div_mul = *matches.try_get_one("mutation-div-mul")?.unwrap();
         }
-        if matches.is_present("verify") {
-            options.prover.verify_scope = match matches.value_of("verify").unwrap() {
+        if matches.contains_id("verify") {
+            options.prover.verify_scope = match matches.get_one::<&str>("verify").copied().unwrap()
+            {
                 "public" => VerificationScope::Public,
                 "all" => VerificationScope::All,
                 "none" => VerificationScope::None,
                 _ => unreachable!("should not happen"),
             }
         }
-        if matches.is_present("bench-repeat") {
-            options.backend.bench_repeat =
-                matches.value_of("bench-repeat").unwrap().parse::<usize>()?;
+        if matches.contains_id("bench-repeat") {
+            options.backend.bench_repeat = *matches.try_get_one("bench-repeat")?.unwrap();
         }
-        if matches.is_present("ignore-pragma-opaque-when-possible") {
+        if matches.contains_id("ignore-pragma-opaque-when-possible") {
             options.model_builder.ignore_pragma_opaque_when_possible = true;
         }
-        if matches.is_present("ignore-pragma-opaque-internal-only") {
+        if matches.contains_id("ignore-pragma-opaque-internal-only") {
             options.model_builder.ignore_pragma_opaque_internal_only = true;
         }
-        if matches.is_present("docgen") {
+        if matches.contains_id("docgen") {
             options.run_docgen = true;
         }
-        if matches.is_present("docgen-template") {
+        if matches.contains_id("docgen-template") {
             options.run_docgen = true;
             options.docgen.root_doc_templates = vec![matches
-                .value_of("docgen-template")
-                .map(|s| s.to_string())
+                .get_one("docgen-template")
+                .map(|s: &&str| s.to_string())
                 .unwrap()]
         }
-        if matches.is_present("abigen") {
+        if matches.contains_id("abigen") {
             options.run_abigen = true;
         }
-        if matches.is_present("errmapgen") {
+        if matches.contains_id("errmapgen") {
             options.run_errmapgen = true;
         }
-        if matches.is_present("read-write-set") {
+        if matches.contains_id("read-write-set") {
             options.run_read_write_set = true;
         }
-        if matches.is_present("trace") {
+        if matches.contains_id("trace") {
             options.prover.auto_trace_level = AutoTraceLevel::VerifiedFunction;
         }
-        if matches.is_present("dump-bytecode") {
+        if matches.contains_id("dump-bytecode") {
             options.prover.dump_bytecode = true;
         }
-        if matches.is_present("dump-cfg") {
+        if matches.contains_id("dump-cfg") {
             options.prover.dump_cfg = true;
         }
-        if matches.is_present("num-instances") {
-            let num_instances = matches
-                .value_of("num-instances")
-                .unwrap()
-                .parse::<usize>()?;
+        if matches.contains_id("num-instances") {
+            let num_instances = *matches.try_get_one("num-instances")?.unwrap();
             options.backend.num_instances = std::cmp::max(num_instances, 1); // at least one instance
         }
-        if matches.is_present("sequential") {
+        if matches.contains_id("sequential") {
             options.prover.sequential_task = true;
             options.prover.sequential_task = true;
         }
-        if matches.is_present("stable-test-output") {
+        if matches.contains_id("stable-test-output") {
             //options.prover.stable_test_output = true;
             options.backend.stable_test_output = true;
         }
-        if matches.is_present("keep") {
+        if matches.contains_id("keep") {
             options.backend.keep_artifacts = true;
         }
-        if matches.is_present("boogie-poly") {
+        if matches.contains_id("boogie-poly") {
             options.prover.boogie_poly = true;
         }
-        if matches.is_present("seed") {
-            options.backend.random_seed = matches.value_of("seed").unwrap().parse::<usize>()?;
+        if matches.contains_id("seed") {
+            options.backend.random_seed = *matches.try_get_one("seed")?.unwrap();
         }
-        if matches.is_present("experimental-pipeline") {
+        if matches.contains_id("experimental-pipeline") {
             options.experimental_pipeline = true;
         }
-        if matches.is_present("timeout") {
-            options.backend.vc_timeout = matches.value_of("timeout").unwrap().parse::<usize>()?;
+        if matches.contains_id("timeout") {
+            options.backend.vc_timeout = *matches.try_get_one("timeout")?.unwrap();
         }
-        if matches.is_present("cores") {
-            options.backend.proc_cores = matches.value_of("cores").unwrap().parse::<usize>()?;
+        if matches.contains_id("cores") {
+            options.backend.proc_cores = *matches.try_get_one("cores")?.unwrap();
         }
-        if matches.is_present("eager-threshold") {
-            options.backend.eager_threshold = matches
-                .value_of("eager-threshold")
-                .unwrap()
-                .parse::<usize>()?;
+        if matches.contains_id("eager-threshold") {
+            options.backend.eager_threshold = *matches.try_get_one("eager-threshold")?.unwrap();
         }
-        if matches.is_present("lazy-threshold") {
-            options.backend.lazy_threshold = matches
-                .value_of("lazy-threshold")
-                .unwrap()
-                .parse::<usize>()?;
+        if matches.contains_id("lazy-threshold") {
+            options.backend.lazy_threshold = *matches.try_get_one("lazy-threshold")?.unwrap();
         }
-        if matches.is_present("use-cvc5") {
+        if matches.contains_id("use-cvc5") {
             options.backend.use_cvc5 = true;
         }
-        if matches.is_present("use-exp-boogie") {
+        if matches.contains_id("use-exp-boogie") {
             options.backend.use_exp_boogie = true;
         }
-        if matches.is_present("generate-smt") {
+        if matches.contains_id("generate-smt") {
             options.backend.generate_smt = true;
         }
 
-        if matches.is_present("check-inconsistency") {
+        if matches.contains_id("check-inconsistency") {
             options.prover.check_inconsistency = true;
         }
-        if matches.is_present("unconditional-abort-as-inconsistency") {
+        if matches.contains_id("unconditional-abort-as-inconsistency") {
             options.prover.unconditional_abort_as_inconsistency = true;
         }
 
-        if matches.is_present("verify-only") {
-            options.prover.verify_scope =
-                VerificationScope::Only(matches.value_of("verify-only").unwrap().to_string());
+        if matches.contains_id("verify-only") {
+            options.prover.verify_scope = VerificationScope::Only(
+                matches.get_one::<&str>("verify-only").unwrap().to_string(),
+            );
         }
 
-        if matches.is_present("z3-trace") {
-            let mut fun_name = matches.value_of("z3-trace").unwrap();
+        if matches.contains_id("z3-trace") {
+            let mut fun_name = matches.get_one::<&str>("z3-trace").copied().unwrap();
             options.prover.verify_scope = VerificationScope::Only(fun_name.to_string());
             if let Some(i) = fun_name.find("::") {
                 fun_name = &fun_name[i + 2..];
@@ -755,13 +708,13 @@ impl Options {
             options.backend.z3_trace_file = Some(format!("{}.z3log", fun_name));
         }
 
-        if matches.is_present("ban-int-2-bv") {
+        if matches.contains_id("ban-int-2-bv") {
             options.prover.ban_int_2_bv = true;
         }
 
         options.backend.derive_options();
 
-        if matches.is_present("print-config") {
+        if matches.contains_id("print-config") {
             println!("{}", toml::to_string(&options).unwrap());
             Err(anyhow!("exiting"))
         } else {
