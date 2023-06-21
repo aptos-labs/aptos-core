@@ -45,7 +45,7 @@ pub struct BuildOptions {
     pub with_abis: bool,
     #[clap(long)]
     pub with_source_maps: bool,
-    #[clap(long, default_value = "true")]
+    #[clap(long, default_value_t = true)]
     pub with_error_map: bool,
     #[clap(long)]
     pub with_docs: bool,

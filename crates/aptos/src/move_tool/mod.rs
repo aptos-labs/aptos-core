@@ -411,7 +411,7 @@ pub struct TestPackage {
     // TODO: Remove short, it's against the style guidelines, and update the name here
     #[clap(
         name = "instructions",
-        default_value = "100000",
+        default_value_t = 100000,
         short = 'i',
         long = "instructions"
     )]

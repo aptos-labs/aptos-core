@@ -25,7 +25,7 @@ struct Options {
     abi_directories: Vec<PathBuf>,
 
     /// Language for code generation.
-    #[clap(long, value_enum, ignore_case = true, default_value = "Rust")]
+    #[clap(long, value_enum, ignore_case = true, default_value_t = Language::Rust)]
     language: Language,
 
     /// Directory where to write generated modules (otherwise print code on stdout).

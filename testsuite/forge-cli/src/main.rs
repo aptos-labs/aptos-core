@@ -63,7 +63,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[clap(long, default_value = "300")]
+    #[clap(long, default_value_t = 300)]
     duration_secs: usize,
     #[clap(flatten)]
     options: Options,
@@ -184,9 +184,9 @@ struct CleanUp {
 struct Resize {
     #[clap(long, help = "The kubernetes namespace to resize")]
     namespace: String,
-    #[clap(long, default_value = "30")]
+    #[clap(long, default_value_t = 30)]
     num_validators: usize,
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     num_fullnodes: usize,
     #[clap(
         long,

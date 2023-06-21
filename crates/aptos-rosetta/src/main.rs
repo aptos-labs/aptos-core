@@ -179,7 +179,7 @@ pub struct OfflineArgs {
     #[clap(long)]
     content_length_limit: Option<u64>,
     /// ChainId to be used for the server e.g. TESTNET
-    #[clap(long, default_value = "TESTING")]
+    #[clap(long, default_value_t = ChainId::test())]
     chain_id: ChainId,
     /// Page size for transactions APIs, must match the downstream node
     ///

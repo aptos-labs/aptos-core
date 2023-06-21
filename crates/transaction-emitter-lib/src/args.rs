@@ -25,14 +25,14 @@ pub struct CoinSourceArgs {
     #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string)]
     pub mint_key: Option<ConfigKey<Ed25519PrivateKey>>,
 
-    #[clap(long, conflicts_with = "mint-key")]
+    #[clap(long, conflicts_with = "mint_key")]
     pub mint_file: Option<String>,
 
     /// Ed25519PrivateKey for minting coins
-    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, conflicts_with_all = &["mint-key", "mint-file"])]
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string, conflicts_with_all = &["mint_key", "mint_file"])]
     pub coin_source_key: Option<ConfigKey<Ed25519PrivateKey>>,
 
-    #[clap(long, conflicts_with_all = &["mint-key", "mint-file", "coin-source-key"])]
+    #[clap(long, conflicts_with_all = &["mint_key", "mint_file", "coin_source_key"])]
     pub coin_source_file: Option<String>,
 }
 
@@ -75,7 +75,7 @@ pub struct ClusterArgs {
     #[clap(long)]
     pub reuse_accounts: bool,
 
-    #[clap(long, default_value = "TESTING")]
+    #[clap(long, default_value_t = ChainId::test())]
     pub chain_id: ChainId,
 
     #[clap(flatten)]
@@ -121,11 +121,11 @@ pub struct EmitArgs {
     #[clap(long)]
     pub target_tps: Option<usize>,
 
-    #[clap(long, default_value = "30")]
+    #[clap(long, default_value_t = 30)]
     pub txn_expiration_time_secs: u64,
 
     /// Time to run --emit-tx for in seconds.
-    #[clap(long, default_value = "60")]
+    #[clap(long, default_value_t = 60)]
     pub duration: u64,
 
     #[clap(
