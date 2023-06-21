@@ -13,13 +13,6 @@ If you have already installed the CLI, you can upgrade to the latest version usi
 * With brew: `brew upgrade aptos`
 * With the prepackaged CLI: `aptos update`
 
-[Read about different ways to install Aptos CLI here!](https://aptos.dev/tools/install-cli/)
-
-Managed install:
-* macOS: [Install with brew](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/homebrew/README.md)
-* Linux / Windows: [install with a python script for other platforms](https://aptos.dev/tools/install-cli/automated-install)
-* [Build from source](https://aptos.dev/tools/install-cli/build-from-source)
-
 |Release | Git Tag | Commit Hash|
 |---|---|---|
 |[Aptos CLI Release v2.0.1](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v2.0.1)| `aptos-cli-v2.0.1` | `83250343e09f10e56f6ddbd8019f6d4634488349` |
