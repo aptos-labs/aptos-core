@@ -347,64 +347,65 @@ fn native_remap_module_addresses(
             })
             .collect::<SafeNativeResult<_>>()?;
 
+    let metadata_bytes = safely_pop_arg!(args, Vec<u8>);
+    context.charge(gas_params.per_byte * NumBytes::new(metadata_bytes.len() as u64))?;
+    let mut package_metadata: PackageMetadata = bcs::from_bytes(metadata_bytes.as_slice())
+        .map_err(|_err| SafeNativeError::Abort {
+            abort_code: 0x10004,
+        })?;
     // 1. Module address remapping in code.
     let original_code = safely_pop_arg!(args, Vec<Value>);
-    let code = original_code
-        .into_iter()
-        .map(|module| {
-            let module_code = module.value_as::<Vec<u8>>()?;
-            context.charge(gas_params.per_byte * NumBytes::new(module_code.len() as u64))?;
-            let mut module =
-                CompiledModule::deserialize_no_check_bounds(&module_code).map_err(|_err| {
-                    partial_extension_error(
-                        "module code deserialization failure",
-                        StatusCode::CODE_DESERIALIZATION_ERROR,
-                    )
-                })?;
-            let bytecode_version = module.version;
-            let mut module_code = vec![];
-            // Charge for address identifier bytes.
-            context.charge(
-                gas_params.per_byte
-                    * NumBytes::new(
-                        (module.address_identifiers.len() * AccountAddress::LENGTH) as u64,
-                    ),
-            )?;
-            // Charge for constant pool bytes.
-            context.charge(
-                gas_params.per_byte
-                    * NumBytes::new(
-                        module
-                            .constant_pool
-                            .iter()
-                            .map(|c| c.data.len() as u64)
-                            .sum::<u64>(),
-                    ),
-            )?;
-            module.remap_addresses(&address_mapping)?;
-            module
-                .serialize_for_version(Some(bytecode_version), &mut module_code)
-                .map_err(|_err| {
-                    partial_extension_error(
-                        "module code serialization failure",
-                        StatusCode::VALUE_SERIALIZATION_ERROR,
-                    )
-                })?;
-            context.charge(gas_params.per_byte * NumBytes::new(module_code.len() as u64))?;
-            Ok(Value::vector_u8(module_code))
-        })
-        .collect::<SafeNativeResult<_>>()?;
+    let code =
+        original_code
+            .into_iter()
+            .map(|module| {
+                let module_code = module.value_as::<Vec<u8>>()?;
+                context.charge(gas_params.per_byte * NumBytes::new(module_code.len() as u64))?;
+                let mut module = CompiledModule::deserialize_no_check_bounds(&module_code)
+                    .map_err(|_err| SafeNativeError::Abort {
+                        abort_code: 0x10002,
+                    })?;
+                let bytecode_version = module.version;
+                let mut module_code = vec![];
+                // Charge for address identifier bytes.
+                context.charge(
+                    gas_params.per_byte
+                        * NumBytes::new(
+                            (module.address_identifiers.len() * AccountAddress::LENGTH) as u64,
+                        ),
+                )?;
+                // Charge for constant pool bytes.
+                context.charge(
+                    gas_params.per_byte
+                        * NumBytes::new(
+                            module
+                                .constant_pool
+                                .iter()
+                                .map(|c| c.data.len() as u64)
+                                .sum::<u64>(),
+                        ),
+                )?;
+                module.remap_addresses(&address_mapping)?;
+                context.charge(gas_params.per_byte * NumBytes::new(module_code.len() as u64))?;
+                module
+                    .serialize_for_version(Some(bytecode_version), &mut module_code)
+                    .map_err(|_err| {
+                        SafeNativeError::InvariantViolation(
+                            PartialVMError::new(StatusCode::CODE_SERIALIZATION_ERROR)
+                                .with_message("module code deserialization failure".to_string()),
+                        )
+                    })?;
+                Ok(Value::vector_u8(module_code))
+            })
+            .collect::<SafeNativeResult<_>>()?;
 
     // 2. Clear package metadata manifest/source/source_map because it is much more complicated to
     // remap addresses in those places.
     let metadata_bytes = safely_pop_arg!(args, Vec<u8>);
     context.charge(gas_params.per_byte * NumBytes::new(metadata_bytes.len() as u64))?;
     let mut package_metadata: PackageMetadata = bcs::from_bytes(metadata_bytes.as_slice())
-        .map_err(|_err| {
-            partial_extension_error(
-                "package metadata deserialization failure",
-                StatusCode::VALUE_DESERIALIZATION_ERROR,
-            )
+        .map_err(|_err| SafeNativeError::Abort {
+            abort_code: 0x10003,
         })?;
     package_metadata.manifest.clear();
     package_metadata.modules.iter_mut().try_for_each(|module| {
@@ -422,12 +423,13 @@ fn native_remap_module_addresses(
     })?;
 
     let metadata_bytes = bcs::to_bytes(&package_metadata).map_err(|_err| {
-        partial_extension_error(
-            "package metadata serialization failure",
-            StatusCode::VALUE_DESERIALIZATION_ERROR,
+        SafeNativeError::InvariantViolation(
+            PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
+                "package {} metadata serialization failure",
+                package_metadata.name
+            )),
         )
     })?;
-    context.charge(gas_params.per_byte * NumBytes::new(metadata_bytes.len() as u64))?;
     Ok(smallvec![
         Value::vector_u8(metadata_bytes),
         Vector::pack(&Type::Vector(Box::new(Type::U8)), code)?
@@ -480,8 +482,4 @@ pub fn make_all(
     ];
 
     crate::natives::helpers::make_module_natives(natives)
-}
-
-fn partial_extension_error(msg: impl ToString, status: StatusCode) -> PartialVMError {
-    PartialVMError::new(status).with_message(msg.to_string())
 }

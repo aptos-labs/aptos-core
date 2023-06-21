@@ -13,6 +13,10 @@ module aptos_framework::code {
     use std::string;
 
     const ENATIVE_FUN_NOT_AVAILABLE: u64 = 1;
+    // Fail to deserialize module code. Used by native function. Do not delete.
+    const EFAIL_TO_DESERIALIZE_MODULE_CODE: u64 = 2;
+    // Fail to deserialize package metadata. Used by native function. Do not delete.
+    const EFAIL_TO_DESERIALIZE_PACKAGE_METADATA: u64 = 3;
 
     // ----------------------------------------------------------------------
     // Code Publishing
