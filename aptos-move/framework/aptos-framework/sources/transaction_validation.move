@@ -87,7 +87,7 @@ module aptos_framework::transaction_validation {
         );
 
         assert!(
-            (txn_sequence_number as u128) < MAX_U64,
+            txn_sequence_number < 1u64 << 63,  // MSB is used to indicate a gas payer tx
             error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
         );
 

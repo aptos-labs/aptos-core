@@ -61,7 +61,6 @@ pub fn convert_prologue_error(
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
-    println!("prologue {:?}", error);
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
@@ -153,7 +152,6 @@ pub fn convert_epilogue_error(
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
-    println!("epilogue {:?}", error);
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
