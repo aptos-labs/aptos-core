@@ -474,10 +474,9 @@ impl StateStore {
         let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
         let num_transactions = ledger_store.get_latest_version().map_or(0, |v| v + 1);
 
-        // The latest snapshot can be at exactly num_transactions or before it.
         let latest_snapshot_version = state_db
             .state_merkle_db
-            .get_state_snapshot_version_before(num_transactions + 1)
+            .get_state_snapshot_version_before(num_transactions)
             .expect("Failed to query latest node on initialization.");
 
         info!(
