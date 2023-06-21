@@ -25,6 +25,7 @@ module aptos_framework::transaction_validation {
         user_epilogue_name: vector<u8>,
     }
 
+    const GAS_PAYER_FLAG_BIT: u64 = 1u64 << 63;
     const MAX_U64: u128 = 18446744073709551615;
 
     /// Transaction exceeded its allocated max gas
@@ -87,7 +88,7 @@ module aptos_framework::transaction_validation {
         );
 
         assert!(
-            txn_sequence_number < 1u64 << 63,  // MSB is used to indicate a gas payer tx
+            txn_sequence_number < GAS_PAYER_FLAG_BIT,  // MSB is used to indicate a gas payer tx
             error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
         );
 
@@ -152,10 +153,11 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
     ) {
         let gas_payer = signer::address_of(&sender);
-        if (txn_sequence_number & (1u64 << 63) != 0) {
+        if ((txn_sequence_number & GAS_PAYER_FLAG_BIT) != 0) {
             assert!(features::gas_payer_enabled(), PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG);
             gas_payer = *std::vector::borrow(&secondary_signer_addresses, std::vector::length(&secondary_signer_addresses) - 1);
-            txn_sequence_number = txn_sequence_number & ((1u64 << 63) - 1);
+            // Clear the high bit as it's not part of the sequence number
+            txn_sequence_number = txn_sequence_number & (GAS_PAYER_FLAG_BIT - 1);
         };
         prologue_common(sender, gas_payer, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id);
 

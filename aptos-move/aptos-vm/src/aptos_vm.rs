@@ -76,6 +76,7 @@ use std::{
         Arc,
     },
 };
+use crate::aptos_vm_impl::GAS_PAYER_FLAG_BIT;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -397,7 +398,7 @@ impl AptosVM {
     fn get_senders(txn_data: &TransactionMetadata) -> Vec<AccountAddress> {
         let mut res = vec![txn_data.sender];
         res.extend(txn_data.secondary_signers());
-        if txn_data.sequence_number & (1u64 << 63) != 0 {
+        if txn_data.sequence_number & GAS_PAYER_FLAG_BIT != 0 {
             res.pop();
         }
         res
