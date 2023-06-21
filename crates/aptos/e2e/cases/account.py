@@ -1,6 +1,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import secrets
 
 from common import OTHER_ACCOUNT_ONE, TestError
 from test_helpers import RunHelper
@@ -79,4 +80,29 @@ def test_account_lookup_address(run_helper: RunHelper, test_name=None):
     if run_helper.get_account_info().account_address not in result_addr.stdout:
         raise TestError(
             f"lookup-address result does not match {run_helper.get_account_info().account_address}"
+        )
+
+
+@test_case
+def test_account_rotate_key(run_helper: RunHelper, test_name=None):
+    # Generate new private key
+    new_private_key = secrets.token_hex(32)
+
+    # Rotate the key.
+    result = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "account",
+            "rotate-key",
+            "--new-private-key",
+            new_private_key,
+            "--assume-yes",
+        ],
+        input="no\n",
+    )
+
+    if '"success": true' not in result.stdout:
+        raise TestError(
+            f"[aptos account rotate-key --new-private-key {new_private_key} --assume-yes] failed"
         )
