@@ -35,12 +35,11 @@ where
     StaleNodeIndex: KeyCodec<S>,
 {
     state_merkle_db: Arc<StateMerkleDb>,
-    /// DB version window, which dictates how many versions of state store
-    /// to keep.
+    /// DB version window, which dictates how many versions of state merkle data to keep.
     prune_window: Version,
     /// It is None iff the pruner is not enabled.
     pruner_worker: Option<PrunerWorker>,
-    /// The minimal readable version for the ledger data.
+    /// The minimal readable version for the state merkle data.
     min_readable_version: AtomicVersion,
 
     _phantom: PhantomData<S>,
