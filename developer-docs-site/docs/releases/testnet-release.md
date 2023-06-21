@@ -11,7 +11,7 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos Framework
 
-[Aptos Framework Release v1.5.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.5.0)
+[Aptos Framework Release v1.5.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.5.0)
 
 ## Aptos Node
 
