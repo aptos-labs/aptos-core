@@ -8122,7 +8122,7 @@ name = "move-analyzer"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "clap 3.2.23",
+ "clap 4.3.5",
  "codespan-reporting",
  "crossbeam",
  "derivative",
@@ -8231,7 +8231,7 @@ name = "move-bytecode-viewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 3.2.23",
+ "clap 4.3.5",
  "crossterm 0.21.0",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -8248,7 +8248,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "codespan-reporting",
  "colored",
  "datatest-stable",
@@ -8310,7 +8310,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "codespan-reporting",
  "datatest-stable",
  "difference",
@@ -8392,7 +8392,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "codespan",
  "colored",
  "move-binary-format",
@@ -8410,7 +8410,7 @@ name = "move-disassembler"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 3.2.23",
+ "clap 4.3.5",
  "colored",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -8477,7 +8477,7 @@ name = "move-explain"
 version = "0.1.0"
 dependencies = [
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "move-command-line-common",
  "move-core-types",
 ]
@@ -8488,7 +8488,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
@@ -8584,7 +8584,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs 0.1.4",
- "clap 3.2.23",
+ "clap 4.3.5",
  "colored",
  "datatest-stable",
  "dirs-next",
@@ -8804,7 +8804,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "atty",
- "clap 3.2.23",
+ "clap 4.3.5",
  "codespan",
  "codespan-reporting",
  "datatest-stable",
@@ -8879,7 +8879,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "better_any",
- "clap 3.2.23",
+ "clap 4.3.5",
  "codespan-reporting",
  "colored",
  "datatest-stable",
@@ -11929,7 +11929,7 @@ checksum = "507e9898683b6c43a9aa55b64259b721b52ba226e0f3779137e50ad114a4c90b"
 name = "test-generation"
 version = "0.1.0"
 dependencies = [
- "clap 3.2.23",
+ "clap 4.3.5",
  "crossbeam-channel",
  "getrandom 0.2.7",
  "hex",

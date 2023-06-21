@@ -19,7 +19,7 @@ z3tracer = "0.8.0"
 # external dependencies
 anyhow = "1.0.52"
 chrono = "0.4.19"
-clap = { version = "3.1.8", features = ["derive"] }
+clap = { version = "4.3.4", features = ["derive"] }
 codespan-reporting = "0.11.1"
 hex = "0.4.3"
 itertools = "0.10.0"
