@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    pruner::{
-        db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_ledger_subpruner_progress,
-    },
+    pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     EventStore,
 };
@@ -38,7 +36,7 @@ impl EventStorePruner {
         event_db: Arc<DB>,
         metadata_progress: Version,
     ) -> Result<Self> {
-        let progress = get_or_initialize_ledger_subpruner_progress(
+        let progress = get_or_initialize_subpruner_progress(
             &event_db,
             &DbMetadataKey::EventPrunerProgress,
             metadata_progress,

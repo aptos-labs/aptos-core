@@ -9,6 +9,7 @@ use crate::{
     state_kv_db::StateKvDb,
 };
 use anyhow::Result;
+use aptos_logger::info;
 use aptos_schemadb::SchemaBatch;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::sync::{atomic::Ordering, Arc};
@@ -43,47 +44,48 @@ impl DBPruner for StateKvPruner {
         Ok(current_target_version)
     }
 
-    fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
-        Ok(self
-            .state_kv_db
-            .metadata_db()
-            .get::<DbMetadataSchema>(&DbMetadataKey::StateKvPrunerProgress)?
-            .map_or(0, |v| v.expect_version()))
-    }
-
     fn progress(&self) -> Version {
         self.progress.load(Ordering::SeqCst)
     }
 
     fn set_target_version(&self, target_version: Version) {
-        self.target_version.store(target_version, Ordering::Relaxed);
+        self.target_version.store(target_version, Ordering::SeqCst);
         PRUNER_VERSIONS
             .with_label_values(&["state_kv_pruner", "target"])
             .set(target_version as i64);
     }
 
     fn target_version(&self) -> Version {
-        self.target_version.load(Ordering::Relaxed)
+        self.target_version.load(Ordering::SeqCst)
     }
 
-    fn record_progress(&self, min_readable_version: Version) {
-        self.progress.store(min_readable_version, Ordering::Relaxed);
+    fn record_progress(&self, progress: Version) {
+        self.progress.store(progress, Ordering::SeqCst);
         PRUNER_VERSIONS
             .with_label_values(&["state_kv_pruner", "progress"])
-            .set(min_readable_version as i64);
+            .set(progress as i64);
     }
 }
 
 impl StateKvPruner {
-    pub fn new(state_kv_db: Arc<StateKvDb>) -> Self {
+    pub fn new(state_kv_db: Arc<StateKvDb>) -> Result<Self> {
+        info!(name = STATE_KV_PRUNER_NAME, "Initializing...");
+
+        let progress = state_kv_db
+            .metadata_db()
+            .get::<DbMetadataSchema>(&DbMetadataKey::StateKvPrunerProgress)?
+            .map_or(0, |v| v.expect_version());
+
         let pruner = StateKvPruner {
             state_kv_db: Arc::clone(&state_kv_db),
-            target_version: AtomicVersion::new(0),
-            progress: AtomicVersion::new(0),
+            target_version: AtomicVersion::new(progress),
+            progress: AtomicVersion::new(progress),
             state_value_pruner: Arc::new(StateValuePruner::new(state_kv_db)),
         };
-        pruner.initialize();
-        pruner
+
+        info!(name = pruner.name(), progress = progress, "Initialized.");
+
+        Ok(pruner)
     }
 
     fn prune_inner(

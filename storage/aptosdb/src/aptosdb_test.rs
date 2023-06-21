@@ -288,6 +288,7 @@ proptest! {
 
     #[test]
     fn test_state_merkle_pruning(input in arb_blocks_to_commit()) {
+        aptos_logger::Logger::new().init();
         test_state_merkle_pruning_impl(input);
     }
 }

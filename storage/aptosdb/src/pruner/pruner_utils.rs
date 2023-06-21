@@ -31,7 +31,10 @@ pub fn create_state_merkle_pruner<S: StaleNodeIndexSchemaTrait>(
 where
     StaleNodeIndex: KeyCodec<S>,
 {
-    Arc::new(StateMerklePruner::<S>::new(Arc::clone(&state_merkle_db)))
+    Arc::new(
+        StateMerklePruner::<S>::new(Arc::clone(&state_merkle_db))
+            .expect("Failed to create state merkle pruner."),
+    )
 }
 
 /// A utility function to instantiate the ledger pruner
@@ -41,7 +44,7 @@ pub(crate) fn create_ledger_pruner(ledger_db: Arc<LedgerDb>) -> Arc<LedgerPruner
 
 /// A utility function to instantiate the state kv pruner.
 pub(crate) fn create_state_kv_pruner(state_kv_db: Arc<StateKvDb>) -> Arc<StateKvPruner> {
-    Arc::new(StateKvPruner::new(state_kv_db))
+    Arc::new(StateKvPruner::new(state_kv_db).expect("Failed to create state kv pruner."))
 }
 
 pub(crate) fn get_ledger_pruner_progress(ledger_db: &LedgerDb) -> Result<Version> {
@@ -78,10 +81,14 @@ pub(crate) fn get_state_merkle_pruner_progress<S: StaleNodeIndexSchemaTrait>(
 where
     StaleNodeIndex: KeyCodec<S>,
 {
-    Ok(get_progress(state_merkle_db.metadata_db(), &S::tag())?.unwrap_or(0))
+    Ok(get_progress(
+        state_merkle_db.metadata_db(),
+        &S::progress_metadata_key(None),
+    )?
+    .unwrap_or(0))
 }
 
-pub(crate) fn get_or_initialize_ledger_subpruner_progress(
+pub(crate) fn get_or_initialize_subpruner_progress(
     sub_db: &DB,
     progress_key: &DbMetadataKey,
     metadata_progress: Version,
