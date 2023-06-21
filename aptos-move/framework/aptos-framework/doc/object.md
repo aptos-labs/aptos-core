@@ -836,6 +836,7 @@ Derivde objects, similar to named objects, cannot be deleted.
 ## Function `create_object`
 
 Create a new object by generating a random UUID based on transaction hash.
+The UUID is computed sha3_256([transaction hash | uuid counter | 0xFB]).
 The created object is deletable as we can guarantee the same UUID can
 never be regenerated with future txs.
 

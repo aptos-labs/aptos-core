@@ -210,7 +210,8 @@ module aptos_framework::object {
     }
 
     /// Create a new object by generating a random UUID based on transaction hash.
-    /// The created object is deletable as we can guarantee the same UUID can 
+    /// The UUID is computed sha3_256([transaction hash | uuid counter | 0xFB]).
+    /// The created object is deletable as we can guarantee the same UUID can
     /// never be regenerated with future txs.
     public fun create_object(creator_address: address): ConstructorRef {
         let uuid = aptos_framework::transaction_context::create_unique_address();
