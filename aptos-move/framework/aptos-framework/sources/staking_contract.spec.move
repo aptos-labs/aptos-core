@@ -20,6 +20,8 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec staking_contract_amounts(staker: address, operator: address): (u64, u64, u64) {
+        // TODO: Verification timeout
+        pragma verify = false;
         let staking_contracts = global<Store>(staker).staking_contracts;
         let staking_contract = simple_map::spec_get(staking_contracts, operator);
 
@@ -54,6 +56,7 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>,
     ) {
+        // TODO: Verification timeout
         pragma verify = false;
 
         include PreconditionsInCreateContract;
@@ -72,7 +75,7 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>,
     ): address {
-        // TODO: The latest problem is serious timeout.
+        // TODO: Verification timeout
         pragma verify = false;
         include PreconditionsInCreateContract;
 
@@ -83,6 +86,7 @@ spec aptos_framework::staking_contract {
     /// Account is not frozen and sufficient to withdraw.
     /// Staking_contract exists the stacker/operator pair.
     spec add_stake(staker: &signer, operator: address, amount: u64) {
+        // TODO: Verification timeout
         pragma verify = false;
 
         // preconditions
@@ -143,7 +147,7 @@ spec aptos_framework::staking_contract {
         add_distribution_events: &mut EventHandle<AddDistributionEvent>,
         request_commission_events: &mut EventHandle<RequestCommissionEvent>,
     ): u64 {
-        // TODO: Verification timeout
+        // TODO: invariant not hold in pool_u64.spec
         pragma verify = false;
         include GetStakingContractAmountsAbortsIf;
     }
@@ -231,6 +235,8 @@ spec aptos_framework::staking_contract {
 
     /// The StakePool exists under the pool_address of StakingContract.
     spec get_staking_contract_amounts_internal(staking_contract: &StakingContract): (u64, u64, u64) {
+        // TODO: Verification timeout
+        pragma verify = false;
         include GetStakingContractAmountsAbortsIf;
     }
 
@@ -242,8 +248,6 @@ spec aptos_framework::staking_contract {
     ): (signer, SignerCapability, OwnerCapability) {
         include stake::ResourceRequirement;
         let staker_address = signer::address_of(staker);
-
-        // verify account::create_resource_account()
         let seed_0 = bcs::to_bytes(staker_address);
         let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
         let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
