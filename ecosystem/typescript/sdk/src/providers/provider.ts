@@ -50,7 +50,7 @@ export class Provider {
     }
 
     this.aptosClient = new AptosClient(fullNodeUrl, config, doNotFixNodeUrl);
-    this.indexerClient = new IndexerClient(indexerUrl);
+    this.indexerClient = new IndexerClient(indexerUrl, config);
   }
 }
 

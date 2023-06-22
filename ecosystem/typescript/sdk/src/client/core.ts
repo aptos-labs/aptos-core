@@ -1,13 +1,18 @@
 import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from "axios";
 import { AnyNumber } from "../bcs/types";
 import { VERSION } from "../version";
+import "./cookieJar";
 
 /**
- * Client config to override or pass more data to the request
+ * A configuration object we can pass with the request to the server.
+ * HEADERS - extra headers we want to send with the request
+ * TOKEN - an auth token to send with the request
+ * WITH_CREDENTIALS - whether to carry cookies. By default, it is set to true and cookies will be sent
  */
 export type ClientConfig = {
-  token?: string;
-  headers?: Record<string, string | number | boolean>;
+  TOKEN?: string;
+  HEADERS?: Record<string, string | number | boolean>;
+  WITH_CREDENTIALS?: boolean;
 };
 
 /**
@@ -25,7 +30,7 @@ const errors: Record<number, string> = {
 };
 
 /**
- * The request type returned from an api error
+ * The request type returned from an API error
  */
 type AptosApiErrorRequest = {
   url: string;
@@ -34,7 +39,7 @@ type AptosApiErrorRequest = {
 };
 
 /**
- * The response type returned from an api error
+ * The response type returned from an API error
  */
 type AptosApiErrorResponse = {
   status: number;
@@ -44,7 +49,7 @@ type AptosApiErrorResponse = {
 };
 
 /**
- * The type returned from an api error
+ * The type returned from an API error
  */
 export class AptosApiError extends Error {
   readonly url: string;
@@ -81,12 +86,12 @@ async function axiosRequest<Request, Response>(
   overrides?: ClientConfig,
 ): Promise<AxiosResponse<Response>> {
   const headers: Record<string, string | number | boolean> = {
-    ...overrides?.headers,
+    ...overrides?.HEADERS,
     "x-aptos-client": `aptos-ts-sdk/${VERSION}`,
   };
 
-  if (overrides?.token) {
-    headers.Authorization = `Bearer ${overrides?.token}`;
+  if (overrides?.TOKEN) {
+    headers.Authorization = `Bearer ${overrides?.TOKEN}`;
   }
 
   const requestConfig: AxiosRequestConfig = {
@@ -95,6 +100,8 @@ async function axiosRequest<Request, Response>(
     url,
     params,
     data: body,
+    // Do not carry cookies when `WITH_CREDENTIALS` is explicitly set to `false`. By default, cookies will be sent
+    withCredentials: overrides?.WITH_CREDENTIALS ?? true,
   };
 
   try {
@@ -119,14 +126,15 @@ export type AptosRequest<Req> = {
 };
 
 /**
- * The main function to use when doing an api request.
+ * The main function to use when doing an API request.
  * Wraps axios error response with AptosApiError
  *
- * @param url the base url for the request
- * @param method the request method - GET or POST
+ * @param options AptosRequest
  * @returns the response or AptosApiError
  */
-export async function aptosRequest<Req, Res>(options: AptosRequest<Req>): Promise<AxiosResponse<Res, any>> {
+export async function aptosRequest<Req, Res>(
+  options: AptosRequest<Req>,
+): Promise<AxiosResponse<Res, any> | AptosApiError> {
   const { url, endpoint, method, body, params, overrides, originMethod } = options;
   const fullEndpoint = `${url}/${endpoint ?? ""}`;
   const response = await axiosRequest<Req, Res>(fullEndpoint, method, body, params, overrides);

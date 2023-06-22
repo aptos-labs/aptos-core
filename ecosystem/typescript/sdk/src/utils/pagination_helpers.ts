@@ -1,5 +1,4 @@
-import { AxiosRequestConfig } from "axios";
-import { get } from "../client";
+import { ClientConfig, get } from "../client";
 
 /// This function is a helper for paginating using a function wrapping an API
 export async function paginateWithCursor<Req extends Record<string, any>, Res extends any[]>(options: {
@@ -8,7 +7,7 @@ export async function paginateWithCursor<Req extends Record<string, any>, Res ex
   body?: any;
   params?: Req;
   originMethod?: string;
-  overrides?: AxiosRequestConfig;
+  overrides?: ClientConfig;
 }): Promise<Res> {
   const out = [];
   let cursor: string | undefined;

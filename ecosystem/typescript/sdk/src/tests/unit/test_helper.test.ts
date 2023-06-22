@@ -20,7 +20,7 @@ export const ANS_OWNER_PK = "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a1
 export function getFaucetClient(): FaucetClient {
   const config: ClientConfig = {};
   if (process.env.FAUCET_AUTH_TOKEN) {
-    config.headers = { Authorization: `Bearer ${process.env.FAUCET_AUTH_TOKEN}` };
+    config.HEADERS = { Authorization: `Bearer ${process.env.FAUCET_AUTH_TOKEN}` };
   }
   return new FaucetClient(NODE_URL, FAUCET_URL, config);
 }

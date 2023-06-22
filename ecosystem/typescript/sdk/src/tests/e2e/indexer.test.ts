@@ -11,7 +11,7 @@ import { AptosToken } from "../../plugins";
 const provider = new Provider(Network.DEVNET);
 const aptosToken = new AptosToken(provider);
 const faucetClient = new FaucetClient("https://fullnode.devnet.aptoslabs.com", "https://faucet.devnet.aptoslabs.com", {
-  token: FAUCET_AUTH_TOKEN,
+  TOKEN: FAUCET_AUTH_TOKEN,
 });
 const tokenClient = new TokenClient(provider.aptosClient);
 const alice = new AptosAccount();
@@ -95,7 +95,7 @@ describe("Indexer", () => {
     beforeEach(async () => {
       await sleep(1000);
     });
-    console.log(alice);
+
     it(
       "gets account NFTs",
       async () => {
