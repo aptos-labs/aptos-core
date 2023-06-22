@@ -7,7 +7,7 @@
 //! Functionality related to the command line interface of the Move prover.
 
 use anyhow::anyhow;
-use clap::{builder::PossibleValuesParser, Arg, Command};
+use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Command};
 use codespan_reporting::diagnostic::Severity;
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
@@ -151,6 +151,7 @@ impl Options {
             .arg(
                 Arg::new("print-config")
                     .long("print-config")
+                    .action(SetTrue)
                     .help("prints the effective toml configuration, then exits")
             )
             .arg(
@@ -178,6 +179,7 @@ impl Options {
                 Arg::new("generate-only")
                     .long("generate-only")
                     .short('g')
+                    .action(SetTrue)
                     .help("only generates boogie file but does not call boogie"),
             )
             .arg(
@@ -190,6 +192,7 @@ impl Options {
             .arg(
                 Arg::new("trace")
                     .long("trace")
+                    .action(SetTrue)
                     .short('t')
                     .help("enables automatic tracing of expressions in prover errors")
             )
@@ -197,11 +200,13 @@ impl Options {
                 Arg::new("keep")
                     .long("keep")
                     .short('k')
+                    .action(SetTrue)
                     .help("keeps intermediate artifacts of the backend around")
             )
             .arg(
                 Arg::new("boogie-poly")
                     .long("boogie-poly")
+                    .action(SetTrue)
                     .help("whether to use the old polymorphic Boogie backend")
             )
             .arg(
@@ -242,12 +247,14 @@ impl Options {
             .arg(
                 Arg::new("ignore-pragma-opaque-when-possible")
                     .long("ignore-pragma-opaque-when-possible")
+                    .action(SetTrue)
                     .help("Ignore the \"opaque\" pragma on specs of \
                     all functions when possible"),
             )
             .arg(
                 Arg::new("ignore-pragma-opaque-internal-only")
                     .long("ignore-pragma-opaque-internal-only")
+                    .action(SetTrue)
                     .help("Ignore the \"opaque\" pragma on specs of \
                     internal functions when possible"),
             )
@@ -261,6 +268,7 @@ impl Options {
             .arg(
                 Arg::new("docgen")
                     .long("docgen")
+                    .action(SetTrue)
                     .help("runs the documentation generator instead of the prover. \
                     Generated docs will be written into the directory `./doc` unless configured otherwise via toml"),
             )
@@ -273,12 +281,14 @@ impl Options {
             .arg(
                 Arg::new("abigen")
                     .long("abigen")
+                    .action(SetTrue)
                     .help("runs the ABI generator instead of the prover. \
                     Generated ABIs will be written into the directory `./abi` unless configured otherwise via toml"),
             )
             .arg(
                 Arg::new("errmapgen")
                     .long("errmapgen")
+                    .action(SetTrue)
                     .help("runs the error map generator instead of the prover. \
                     The generated error map will be written to `errmap` unless configured otherwise"),
             )
@@ -295,6 +305,7 @@ impl Options {
             .arg(
                 Arg::new("read-write-set")
                     .long("read-write-set")
+                    .action(SetTrue)
                     .help("runs the read/write set analysis instead of the prover.")
             )
             .arg(
@@ -317,6 +328,7 @@ impl Options {
             .arg(
                 Arg::new("mutation")
                     .long("mutation")
+                    .action(SetTrue)
                     .help(
                         "Specifies to use the mutation pass",
                     ),
@@ -365,7 +377,7 @@ impl Options {
                 Arg::new("dependencies")
                     .long("dependency")
                     .short('d')
-                    .num_args(0..)
+                    .action(ArgAction::Append)
                     .value_name("PATH_TO_DEPENDENCY")
                     .help("path to a Move file, or a directory which will be searched for \
                     Move files, containing dependencies which will not be verified")
@@ -400,11 +412,13 @@ impl Options {
             .arg(
                 Arg::new("dump-bytecode")
                     .long("dump-bytecode")
+                    .action(SetTrue)
                     .help("whether to dump the transformed bytecode to a file")
             )
             .arg(
                 Arg::new("dump-cfg")
                     .long("dump-cfg")
+                    .action(SetTrue)
                     .requires("dump-bytecode")
                     .help("whether to dump the per-function control-flow graphs (in dot format) to files")
             )
@@ -418,11 +432,13 @@ impl Options {
             .arg(
                 Arg::new("sequential")
                     .long("sequential")
+                    .action(SetTrue)
                     .help("whether to run the Boogie instances sequentially")
             )
             .arg(
                 Arg::new("stable-test-output")
                     .long("stable-test-output")
+                    .action(SetTrue)
                     .help("instruct the prover to produce output in diagnosis which is stable \
                      and suitable for baseline tests. This redacts values in diagnosis which might\
                      be non-deterministic, and may do other things to keep output stable.")
@@ -430,22 +446,26 @@ impl Options {
             .arg(
                 Arg::new("use-cvc5")
                     .long("use-cvc5")
+                    .action(SetTrue)
                     .help("uses cvc5 solver instead of z3")
             )
             .arg(
                 Arg::new("use-exp-boogie")
                     .long("use-exp-boogie")
+                    .action(SetTrue)
                     .help("uses experimental boogie expected in EXP_BOOGIE_EXE")
             )
             .arg(
                 Arg::new("generate-smt")
                     .long("generate-smt")
+                    .action(SetTrue)
                     .help("instructs boogie to log smtlib files for verified functions")
             )
             .arg(
                 Arg::new("experimental-pipeline")
                     .long("experimental-pipeline")
                     .short('e')
+                    .action(SetTrue)
                     .help("whether to run experimental pipeline")
             )
             .arg(
@@ -461,11 +481,13 @@ impl Options {
             .arg(
                 Arg::new("check-inconsistency")
                     .long("check-inconsistency")
+                    .action(SetTrue)
                     .help("checks whether there is any inconsistency")
             )
             .arg(
                 Arg::new("unconditional-abort-as-inconsistency")
                     .long("unconditional-abort-as-inconsistency")
+                    .action(SetTrue)
                     .help("treat functions that do not return (i.e., abort unconditionally) \
                     as inconsistency violations")
             )
@@ -493,6 +515,7 @@ impl Options {
             .arg(
                 Arg::new("ban-int-2-bv")
                     .long("ban-int-2-bv")
+                    .action(SetTrue)
                     .long("whether allow converting int to bit vector when generating the boogie file")
             )
             .after_help("More options available via `--config file` or `--config-str str`. \
@@ -505,8 +528,8 @@ impl Options {
 
         // Initialize options.
         let get_vec = |s: &str| -> Vec<String> {
-            match matches.get_many(s) {
-                Some(vs) => vs.map(|v: &&str| v.to_string()).collect(),
+            match matches.get_many::<String>(s) {
+                Some(vs) => vs.map(|v| v.to_string()).collect(),
                 _ => vec![],
             }
         };
@@ -533,10 +556,11 @@ impl Options {
 
         // Analyze arguments.
         if matches.contains_id("output") {
-            options.output_path = matches.get_one::<&str>("output").unwrap().to_string();
+            options.output_path = matches.get_one::<String>("output").unwrap().to_string();
         }
         if matches.contains_id("verbosity") {
-            options.verbosity_level = match matches.get_one::<&str>("verbosity").copied().unwrap() {
+            options.verbosity_level = match matches.get_one::<String>("verbosity").unwrap().as_str()
+            {
                 "error" => LevelFilter::Error,
                 "warn" => LevelFilter::Warn,
                 "info" => LevelFilter::Info,
@@ -546,7 +570,7 @@ impl Options {
         }
         if matches.contains_id("vector-theory") {
             options.backend.vector_theory =
-                match matches.get_one::<&str>("vector-theory").copied().unwrap() {
+                match matches.get_one::<String>("vector-theory").unwrap().as_str() {
                     "BoogieArray" => VectorTheory::BoogieArray,
                     "BoogieArrayIntern" => VectorTheory::BoogieArrayIntern,
                     "SmtArray" => VectorTheory::SmtArray,
@@ -558,7 +582,7 @@ impl Options {
 
         if matches.contains_id("severity") {
             options.prover.report_severity =
-                match matches.get_one::<&str>("severity").copied().unwrap() {
+                match matches.get_one::<String>("severity").unwrap().as_str() {
                     "bug" => Severity::Bug,
                     "error" => Severity::Error,
                     "warn" => Severity::Warning,
@@ -567,19 +591,34 @@ impl Options {
                 }
         }
 
-        if matches.contains_id("generate-only") {
+        if matches.get_flag("generate-only") {
             options.prover.generate_only = true;
         }
-        if matches.get_count("sources") > 0 {
+        if matches
+            .get_many::<String>("sources")
+            .unwrap_or_default()
+            .len()
+            > 0
+        {
             options.move_sources = get_vec("sources");
         }
-        if matches.get_count("dependencies") > 0 {
+        if matches
+            .get_many::<String>("dependencies")
+            .unwrap_or_default()
+            .len()
+            > 0
+        {
             options.move_deps = get_vec("dependencies");
         }
-        if matches.get_count("named-addresses") > 0 {
+        if matches
+            .get_many::<String>("named-addresses")
+            .unwrap_or_default()
+            .len()
+            > 0
+        {
             options.move_named_address_values = get_vec("named-addresses");
         }
-        if matches.contains_id("mutation") {
+        if matches.get_flag("mutation") {
             options.prover.mutation = true;
         }
         if matches.contains_id("mutation-add-sub") {
@@ -595,24 +634,24 @@ impl Options {
             options.prover.mutation_div_mul = *matches.try_get_one("mutation-div-mul")?.unwrap();
         }
         if matches.contains_id("verify") {
-            options.prover.verify_scope = match matches.get_one::<&str>("verify").copied().unwrap()
-            {
-                "public" => VerificationScope::Public,
-                "all" => VerificationScope::All,
-                "none" => VerificationScope::None,
-                _ => unreachable!("should not happen"),
-            }
+            options.prover.verify_scope =
+                match matches.get_one::<String>("verify").unwrap().as_str() {
+                    "public" => VerificationScope::Public,
+                    "all" => VerificationScope::All,
+                    "none" => VerificationScope::None,
+                    _ => unreachable!("should not happen"),
+                }
         }
         if matches.contains_id("bench-repeat") {
             options.backend.bench_repeat = *matches.try_get_one("bench-repeat")?.unwrap();
         }
-        if matches.contains_id("ignore-pragma-opaque-when-possible") {
+        if matches.get_flag("ignore-pragma-opaque-when-possible") {
             options.model_builder.ignore_pragma_opaque_when_possible = true;
         }
-        if matches.contains_id("ignore-pragma-opaque-internal-only") {
+        if matches.get_flag("ignore-pragma-opaque-internal-only") {
             options.model_builder.ignore_pragma_opaque_internal_only = true;
         }
-        if matches.contains_id("docgen") {
+        if matches.get_flag("docgen") {
             options.run_docgen = true;
         }
         if matches.contains_id("docgen-template") {
@@ -622,46 +661,46 @@ impl Options {
                 .map(|s: &&str| s.to_string())
                 .unwrap()]
         }
-        if matches.contains_id("abigen") {
+        if matches.get_flag("abigen") {
             options.run_abigen = true;
         }
-        if matches.contains_id("errmapgen") {
+        if matches.get_flag("errmapgen") {
             options.run_errmapgen = true;
         }
-        if matches.contains_id("read-write-set") {
+        if matches.get_flag("read-write-set") {
             options.run_read_write_set = true;
         }
-        if matches.contains_id("trace") {
+        if matches.get_flag("trace") {
             options.prover.auto_trace_level = AutoTraceLevel::VerifiedFunction;
         }
-        if matches.contains_id("dump-bytecode") {
+        if matches.get_flag("dump-bytecode") {
             options.prover.dump_bytecode = true;
         }
-        if matches.contains_id("dump-cfg") {
+        if matches.get_flag("dump-cfg") {
             options.prover.dump_cfg = true;
         }
         if matches.contains_id("num-instances") {
             let num_instances = *matches.try_get_one("num-instances")?.unwrap();
             options.backend.num_instances = std::cmp::max(num_instances, 1); // at least one instance
         }
-        if matches.contains_id("sequential") {
+        if matches.get_flag("sequential") {
             options.prover.sequential_task = true;
             options.prover.sequential_task = true;
         }
-        if matches.contains_id("stable-test-output") {
+        if matches.get_flag("stable-test-output") {
             //options.prover.stable_test_output = true;
             options.backend.stable_test_output = true;
         }
-        if matches.contains_id("keep") {
+        if matches.get_flag("keep") {
             options.backend.keep_artifacts = true;
         }
-        if matches.contains_id("boogie-poly") {
+        if matches.get_flag("boogie-poly") {
             options.prover.boogie_poly = true;
         }
         if matches.contains_id("seed") {
             options.backend.random_seed = *matches.try_get_one("seed")?.unwrap();
         }
-        if matches.contains_id("experimental-pipeline") {
+        if matches.get_flag("experimental-pipeline") {
             options.experimental_pipeline = true;
         }
         if matches.contains_id("timeout") {
@@ -676,20 +715,20 @@ impl Options {
         if matches.contains_id("lazy-threshold") {
             options.backend.lazy_threshold = *matches.try_get_one("lazy-threshold")?.unwrap();
         }
-        if matches.contains_id("use-cvc5") {
+        if matches.get_flag("use-cvc5") {
             options.backend.use_cvc5 = true;
         }
-        if matches.contains_id("use-exp-boogie") {
+        if matches.get_flag("use-exp-boogie") {
             options.backend.use_exp_boogie = true;
         }
-        if matches.contains_id("generate-smt") {
+        if matches.get_flag("generate-smt") {
             options.backend.generate_smt = true;
         }
 
-        if matches.contains_id("check-inconsistency") {
+        if matches.get_flag("check-inconsistency") {
             options.prover.check_inconsistency = true;
         }
-        if matches.contains_id("unconditional-abort-as-inconsistency") {
+        if matches.get_flag("unconditional-abort-as-inconsistency") {
             options.prover.unconditional_abort_as_inconsistency = true;
         }
 
@@ -708,13 +747,13 @@ impl Options {
             options.backend.z3_trace_file = Some(format!("{}.z3log", fun_name));
         }
 
-        if matches.contains_id("ban-int-2-bv") {
+        if matches.get_flag("ban-int-2-bv") {
             options.prover.ban_int_2_bv = true;
         }
 
         options.backend.derive_options();
 
-        if matches.contains_id("print-config") {
+        if matches.get_flag("print-config") {
             println!("{}", toml::to_string(&options).unwrap());
             Err(anyhow!("exiting"))
         } else {
