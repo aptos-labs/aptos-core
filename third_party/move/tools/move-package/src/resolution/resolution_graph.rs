@@ -180,7 +180,7 @@ impl ResolvingGraph {
                 "Unresolved addresses found: [\n{}\n]\n\
                 To fix this, add an entry for each unresolved address to the [addresses] section of {}/Move.toml: \
                 e.g.,\n[addresses]\nStd = \"0x1\"\n\
-                Alternatively, you can also define [dev-addresses] and call with the -d flag",
+                Alternatively, you can also define [dev-addresses] and call with the --dev flag",
                 unresolved_addresses.join("\n"),
                 root_package_path.to_string_lossy()
             )

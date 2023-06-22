@@ -952,6 +952,9 @@ impl RestOptions {
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
+    /// Dev mode, uses [dev-addresses] rather than [addresses] for compilation
+    #[clap(long)]
+    pub dev: bool,
     /// Path to a move package (the folder with a Move.toml file)
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
@@ -984,6 +987,7 @@ pub struct MovePackageDir {
 impl MovePackageDir {
     pub fn new(package_dir: PathBuf) -> Self {
         Self {
+            dev: false,
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
