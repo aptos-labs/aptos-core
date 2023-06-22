@@ -116,9 +116,9 @@ def run_tests(run_helper):
     test_aptos_header_included(run_helper)
 
     # Run move subcommand group tests.
-    test_move_publish(run_helper)
     test_move_compile(run_helper)
     test_move_compile_script(run_helper)
+    test_move_publish(run_helper)
 
 
 def main():
@@ -171,9 +171,15 @@ def main():
         LOG.error("These tests failed:")
         for test_name, exception in test_results.failed:
             LOG.error(f"{test_name}: {exception}")
+        LOG.info("---")
+        LOG.info(
+            f"Debug these tests by checking the command, stdout, stderr, and any "
+            f"exception information if relevant in {args.working_directory}/out"
+        )
         return False
 
     LOG.info("All tests passed!")
+
     return True
 
 

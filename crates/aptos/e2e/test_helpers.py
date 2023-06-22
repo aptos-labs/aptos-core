@@ -159,7 +159,7 @@ class RunHelper:
     def prepare_move(self):
         shutil.copytree(
             "../../../aptos-move/move-examples/cli-e2e-tests",
-            os.path.join(self.host_working_directory, "move"),
+            os.path.join(self.host_working_directory, "move/cli-e2e-tests"),
             ignore=shutil.ignore_patterns("build"),
         )
         shutil.copytree(

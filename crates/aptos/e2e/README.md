@@ -63,6 +63,31 @@ It is because you are using the `--test-cli-path` flag but have configured the C
 aptos config set-global-config --config-type workspace
 ```
 
+### My test doesn't work
+You might be getting output like this:
+```
+2023-06-22 20:27:07,533 - ERROR - These tests failed:
+2023-06-22 20:27:07,533 - ERROR - test_move_compile_script ...
+```
+
+The best place to look is the test framework working directory, by default `/tmp/aptos-cli-tests`.
+
+In this directory you will find lots of useful output. For example, you can see the stdout of one of the commands in a test case like this:
+```
+$ cat /tmp/aptos-cli-tests/out/007_test_move_compile_script.stdout
+{
+  "Error": "Move compilation failed: Unable to resolve packages for package 'TwoByTwoTransfer': While resolving dependency 'AptosFramework' in package 'TwoByTwoTransfer': While processing dependency 'AptosFramework': Unable to find package manifest for 'AptosFramework' at \"Move.toml/move/scripts/two_by_two_transfer/../../../framework/aptos-framework\""
+}
+```
+
+For each test there are the following files:
+- test_name.command
+- test_name.stdout
+- test_name.stderr
+
+This file might also be present if the test threw an exception:
+- test_name.exception
+
 ## Writing new test cases
 To write a new test case, follow these steps:
 1. (Optional) Make a new file in [cases/](cases/) if none of the existing files seem appropriate.
