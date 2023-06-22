@@ -316,7 +316,7 @@ impl AptosVM {
                 (error_code, txn_output)
             },
             TransactionStatus::Discard(status) => {
-                (VMStatus::Error(status, None), discard_error_output(status))
+                (VMStatus::error(status, None), discard_error_output(status))
             },
             TransactionStatus::Retry => unreachable!(),
         }
@@ -401,10 +401,11 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_script_or_entry_function", |_| {
-            Err(VMStatus::Error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                None,
-            ))
+            Err(VMStatus::Error {
+                status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                sub_status: Some(move_vm_types::errors::EPARANOID_FAILURE),
+                message: None,
+            })
         });
 
         // Run the execution logic
@@ -449,7 +450,7 @@ impl AptosVM {
                 // Not reachable as this function should only be invoked for entry or script
                 // transaction payload.
                 _ => {
-                    return Err(VMStatus::Error(StatusCode::UNREACHABLE, None));
+                    return Err(VMStatus::error(StatusCode::UNREACHABLE, None));
                 },
             };
 
@@ -518,7 +519,7 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
-            Err(VMStatus::Error(
+            Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 None,
             ))
@@ -707,7 +708,7 @@ impl AptosVM {
         )?;
 
         let execution_error = ExecutionError::try_from(execution_error)
-            .map_err(|_| VMStatus::Error(StatusCode::UNREACHABLE, None))?;
+            .map_err(|_| VMStatus::error(StatusCode::UNREACHABLE, None))?;
         // Serialization is not expected to fail so we're using invariant_violation error here.
         cleanup_args.push(bcs::to_bytes(&execution_error).map_err(|_| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -835,10 +836,10 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
-            return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING, None));
+            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }
         fail_point!("move_adapter::execute_module", |_| {
-            Err(VMStatus::Error(
+            Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 None,
             ))
@@ -1107,13 +1108,6 @@ impl AptosVM {
                     self.0.mark_loader_cache_as_invalid();
                 };
 
-                if err.status_type() == StatusType::InvariantViolation {
-                    speculative_error!(
-                        log_context,
-                        format!("[VM] discarded txn with error {:?}", err)
-                    );
-                }
-
                 let txn_status = TransactionStatus::from_vm_status(
                     err.clone(),
                     self.0
@@ -1240,7 +1234,7 @@ impl AptosVM {
         for (state_key, _) in write_set.iter() {
             state_view
                 .get_state_value_bytes(state_key)
-                .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))?;
+                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         Ok(())
     }
@@ -1264,7 +1258,7 @@ impl AptosVM {
                 *log_context,
                 "[aptos_vm] waypoint txn needs to emit new epoch and block"
             );
-            Err(VMStatus::Error(StatusCode::INVALID_WRITE_SET, None))
+            Err(VMStatus::error(StatusCode::INVALID_WRITE_SET, None))
         }
     }
 
@@ -1303,7 +1297,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::process_block_prologue", |_| {
-            Err(VMStatus::Error(
+            Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 None,
             ))
@@ -1450,7 +1444,7 @@ impl AptosVM {
             // Deprecated. Will be removed in the future.
             TransactionPayload::ModuleBundle(_module) => {
                 if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
-                    return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING, None));
+                    return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
                 }
                 self.0.check_gas(resolver, txn_data, log_context)?;
                 self.0.run_module_prologue(session, txn_data, log_context)
@@ -1471,7 +1465,7 @@ impl VMExecutor for AptosVM {
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
-            Err(VMStatus::Error(
+            Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 None,
             ))
@@ -1630,7 +1624,7 @@ impl VMAdapter for AptosVM {
 
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
         if txn.contains_duplicate_signers() {
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::SIGNERS_CONTAIN_DUPLICATES,
                 None,
             ));
@@ -1763,7 +1757,7 @@ impl VMAdapter for AptosVM {
             },
             PreprocessedTransaction::InvalidSignature => {
                 let (vm_status, output) =
-                    discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE, None));
+                    discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
                 (vm_status, output, None)
             },
             PreprocessedTransaction::StateCheckpoint => {
@@ -1827,7 +1821,7 @@ impl AptosSimulationVM {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
         if txn.signature_is_valid() {
-            return discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE, None));
+            return discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
         }
 
         // Revalidate the transaction.
@@ -1906,7 +1900,7 @@ impl AptosSimulationVM {
                         },
                     }
                 } else {
-                    Err(VMStatus::Error(StatusCode::MISSING_DATA, None))
+                    Err(VMStatus::error(StatusCode::MISSING_DATA, None))
                 }
             },
 

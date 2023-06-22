@@ -69,7 +69,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         })?;
         let change_set = self.into_heads().state_view.change_set;
         change_set.squash(new_change_set).map_err(|_err| {
-            VMStatus::Error(
+            VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 err_msg("Failed to squash ChangeSetExt"),
             )
