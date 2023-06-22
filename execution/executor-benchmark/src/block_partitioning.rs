@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::pipeline::ParToExeMsg;
+use crate::pipeline::ExecuteBlockMsg;
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
 use aptos_logger::info;
@@ -18,15 +18,15 @@ use std::{
 use std::sync::mpsc::SyncSender;
 
 pub(crate) struct BlockPartitioningStage {
-    num_iterations: usize,
-    executable_block_sender: SyncSender<ParToExeMsg>,
+    num_blocks_processed: usize,
+    executable_block_sender: SyncSender<ExecuteBlockMsg>,
     maybe_exe_fin_receiver: Option<Receiver<()>>,
     maybe_partitioner: Option<ShardedBlockPartitioner>,
 }
 
 impl BlockPartitioningStage {
     pub fn new(
-        executable_block_sender: SyncSender<ParToExeMsg>,
+        executable_block_sender: SyncSender<ExecuteBlockMsg>,
         maybe_exe_fin_receiver: Option<Receiver<()>>,
         num_shards: usize,
     ) -> Self {
@@ -38,7 +38,7 @@ impl BlockPartitioningStage {
         };
 
         Self {
-            num_iterations: 0,
+            num_blocks_processed: 0,
             executable_block_sender,
             maybe_exe_fin_receiver,
             maybe_partitioner,
@@ -49,7 +49,7 @@ impl BlockPartitioningStage {
         let current_block_start_time = Instant::now();
         info!(
             "In iteration {}, received {:?} transactions.",
-            self.num_iterations,
+            self.num_blocks_processed,
             txns.len()
         );
         let block_id = HashValue::random();
@@ -74,14 +74,15 @@ impl BlockPartitioningStage {
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
             },
         };
-        let msg = ParToExeMsg {
+        let msg = ExecuteBlockMsg {
             current_block_start_time,
             block,
         };
         self.executable_block_sender.send(msg).unwrap();
         if let Some(rx) = &self.maybe_exe_fin_receiver {
+            // We are in partition-then-execute mode. Should not continue without the "execution finished" signal.
             rx.recv().unwrap();
         }
-        self.num_iterations += 1;
+        self.num_blocks_processed += 1;
     }
 }

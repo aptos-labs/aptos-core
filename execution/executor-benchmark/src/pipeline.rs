@@ -67,7 +67,7 @@ where
             }, /* bound */
         );
 
-        let (executable_block_sender, executable_block_receiver) = mpsc::sync_channel::<ParToExeMsg>(3);
+        let (executable_block_sender, executable_block_receiver) = mpsc::sync_channel::<ExecuteBlockMsg>(3);
 
         // Assume the distributed executor and the distributed partitioner share the same worker set.
         let num_partitioner_shards = config.num_executor_shards;
@@ -133,7 +133,7 @@ where
                 let mut executed = 0;
                 let start_gas = TXN_GAS_USAGE.get_sample_sum();
                 while let Ok(msg) = executable_block_receiver.recv() {
-                    let ParToExeMsg {
+                    let ExecuteBlockMsg {
                         current_block_start_time,
                         block,
                     } = msg;
@@ -197,33 +197,10 @@ where
             handle.join().unwrap()
         }
     }
-
-    pub fn partition_block(
-        block_id: HashValue,
-        partitioner: &ShardedBlockPartitioner,
-        mut transactions: Vec<Transaction>,
-    ) -> ExecutableBlock<Transaction> {
-        let last_txn = transactions.pop().unwrap();
-        assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
-        let analyzed_transactions = transactions.into_iter().map(|t| t.into()).collect();
-        let mut sub_blocks = partitioner.partition(analyzed_transactions, 2);
-        sub_blocks
-            .last_mut()
-            .unwrap()
-            .sub_blocks
-            .last_mut()
-            .unwrap()
-            .transactions
-            .push(TransactionWithDependencies::new(
-                last_txn,
-                CrossShardDependencies::default(),
-            ));
-        ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
-    }
 }
 
 /// Message from partitioning thread to execution thread.
-pub struct ParToExeMsg {
+pub struct ExecuteBlockMsg {
     pub current_block_start_time: Instant,
     pub block: ExecutableBlock<Transaction>,
 }
