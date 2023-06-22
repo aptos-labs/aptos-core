@@ -157,6 +157,15 @@ MSB is used to indicate a gas payer tx
 
 
 
+<a name="0x1_transaction_validation_PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING"></a>
+
+
+
+<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING">PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING</a>: u64 = 1010;
+</code></pre>
+
+
+
 <a name="0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY"></a>
 
 Prologue errors. These are separated out from the other errors in this
@@ -418,15 +427,15 @@ Only called during genesis to initialize system resources for this module.
     <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
 ) {
     <b>let</b> gas_payer = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender);
-    <b>if</b> ((txn_sequence_number & <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>) != 0) {
-        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_gas_payer_enabled">features::gas_payer_enabled</a>(), <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>);
+    <b>let</b> num_secondary_signers = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&secondary_signer_addresses);
+    <b>if</b> (txn_sequence_number &gt;= <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>) {
+        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_gas_payer_enabled">features::gas_payer_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>));
+        <b>assert</b>!(num_secondary_signers &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING">PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING</a>));
         gas_payer = *std::vector::borrow(&secondary_signer_addresses, std::vector::length(&secondary_signer_addresses) - 1);
         // Clear the high bit <b>as</b> it's not part of the sequence number
-        txn_sequence_number = txn_sequence_number & (<a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a> - 1);
+        txn_sequence_number = txn_sequence_number - <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>;
     };
     <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender, gas_payer, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, <a href="chain_id.md#0x1_chain_id">chain_id</a>);
-
-    <b>let</b> num_secondary_signers = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&secondary_signer_addresses);
 
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&secondary_signer_public_key_hashes) == num_secondary_signers,

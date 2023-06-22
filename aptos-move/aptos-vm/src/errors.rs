@@ -31,6 +31,9 @@ pub const EBAD_CHAIN_ID: u64 = 1007;
 pub const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
 // Counts of secondary keys and addresses don't match.
 pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
+// Gas payer account missing in gas payer tx
+pub const EGAS_PAYER_ACCOUNT_MISSING: u64 = 1010;
+
 // Specified account is not a multisig account.
 const EACCOUNT_NOT_MULTISIG: u64 = 2002;
 // Account executing this operation is not an owner of the multisig account.
@@ -50,6 +53,7 @@ const PERMISSION_DENIED: u8 = 0x5;
 fn error_split(code: u64) -> (u8, u64) {
     let reason = code & 0xFFFF;
     let category = ((code >> 16) & 0xFF) as u8;
+    println!("split {} {}\n", category, reason);
     (category, reason)
 }
 
@@ -117,6 +121,9 @@ pub fn convert_prologue_error(
                 (LIMIT_EXCEEDED, ESEQUENCE_NUMBER_TOO_BIG) => StatusCode::SEQUENCE_NUMBER_TOO_BIG,
                 (INVALID_ARGUMENT, ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH) => {
                     StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
+                },
+                (INVALID_ARGUMENT, EGAS_PAYER_ACCOUNT_MISSING) => {
+                    StatusCode::GAS_PAYER_ACCOUNT_MISSING
                 },
                 (category, reason) => {
                     speculative_error!(

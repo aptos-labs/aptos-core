@@ -44,6 +44,7 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
+    const PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING: u64 = 1010;
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(
@@ -154,15 +155,15 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
     ) {
         let gas_payer = signer::address_of(&sender);
-        if ((txn_sequence_number & GAS_PAYER_FLAG_BIT) != 0) {
-            assert!(features::gas_payer_enabled(), PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG);
+        let num_secondary_signers = vector::length(&secondary_signer_addresses);
+        if (txn_sequence_number >= GAS_PAYER_FLAG_BIT) {
+            assert!(features::gas_payer_enabled(), error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG));
+            assert!(num_secondary_signers > 0, error::invalid_argument(PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING));
             gas_payer = *std::vector::borrow(&secondary_signer_addresses, std::vector::length(&secondary_signer_addresses) - 1);
             // Clear the high bit as it's not part of the sequence number
-            txn_sequence_number = txn_sequence_number & (GAS_PAYER_FLAG_BIT - 1);
+            txn_sequence_number = txn_sequence_number - GAS_PAYER_FLAG_BIT;
         };
         prologue_common(sender, gas_payer, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id);
-
-        let num_secondary_signers = vector::length(&secondary_signer_addresses);
 
         assert!(
             vector::length(&secondary_signer_public_key_hashes) == num_secondary_signers,

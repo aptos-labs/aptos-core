@@ -517,7 +517,7 @@ impl AptosVMImpl {
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
         if txn_sequence_number & GAS_PAYER_FLAG_BIT == 0 {
-            // Regular tx
+            // Regular tx, run the normal epilogue
             session.execute_function_bypass_visibility(
                 &transaction_validation.module_id(),
                 &transaction_validation.user_epilogue_name,

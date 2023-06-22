@@ -398,6 +398,9 @@ impl AptosVM {
         let mut res = vec![txn_data.sender];
         res.extend(txn_data.secondary_signers());
         if txn_data.sequence_number & GAS_PAYER_FLAG_BIT != 0 {
+            // In a gas payer tx, the last multi-agent signer of the secondary signers is in
+            // fact the gas payer and not to be part of the tx parameters. So we remove the last
+            // signer.
             res.pop();
         }
         res
