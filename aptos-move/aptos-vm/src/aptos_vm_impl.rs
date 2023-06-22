@@ -516,6 +516,8 @@ impl AptosVMImpl {
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
+        // We can unconditionally do this as this condition can only be true if the prologue
+        // accepted it, in which case the gas payer feature is enabled.
         if txn_sequence_number & GAS_PAYER_FLAG_BIT == 0 {
             // Regular tx, run the normal epilogue
             session.execute_function_bypass_visibility(
