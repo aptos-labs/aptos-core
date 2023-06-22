@@ -415,6 +415,11 @@ function install_toolchain {
 }
 
 function install_rustup_components_and_nightly {
+    echo "Printing the rustup version and toolchain list"
+    rustup --version
+    rustup show
+    rustup toolchain list -v
+
     echo "Updating rustup and installing rustfmt & clippy"
     rustup update
     rustup component add rustfmt
@@ -422,12 +427,21 @@ function install_rustup_components_and_nightly {
 
     # We require nightly for strict rust formatting
     echo "Installing the nightly toolchain and rustfmt nightly"
-
-    # TODO: make the nightly error handling more robust
     if ! rustup toolchain install nightly
     then
-      echo "Failed to install the nightly toolchain using rustup."
+      if [[ "$(uname)" == "Linux" ]]; then
+        # TODO: remove this once we have an answer: https://github.com/rust-lang/rustup/issues/3390
+        echo "Failed to install the nightly toolchain using rustup! Falling back to an older linux build at 2023-06-01."
+        rustup toolchain install nightly-2023-06-01 # Fix the date to avoid flakiness
+
+        # Rename the toolchain to nightly (crazy... see: https://github.com/rust-lang/rustup/issues/1299).
+        # Note: this only works for linux. The primary purpose is to unblock CI/CD on flakes.
+        mv ~/.rustup/toolchains/nightly-2023-06-01-x86_64-unknown-linux-gnu ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu
+      else
+        echo "Failed to install the nightly toolchain using rustup! Manual installation is required!"
+      fi
     fi
+
     if ! rustup component add rustfmt --toolchain nightly
     then
       echo "Failed to install rustfmt nightly using rustup."
