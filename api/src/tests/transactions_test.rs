@@ -5,7 +5,7 @@
 use super::new_test_context;
 use crate::tests::new_test_context_with_config;
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{GasEstimationStaticOverride, NodeConfig};
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
@@ -1196,7 +1196,11 @@ async fn test_gas_estimation_disabled() {
 async fn test_gas_estimation_static_override() {
     let mut node_config = NodeConfig::default();
     node_config.api.gas_estimation.enabled = true;
-    node_config.api.gas_estimation.static_override = Some((500, 500, 1000));
+    node_config.api.gas_estimation.static_override = Some(GasEstimationStaticOverride {
+        low: 100,
+        market: 200,
+        aggressive: 300,
+    });
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
     let ctx = &mut context;

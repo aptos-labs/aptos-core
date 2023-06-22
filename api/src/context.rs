@@ -902,11 +902,11 @@ impl Context {
         if !config.enabled {
             return Ok(self.default_gas_estimation(min_gas_unit_price));
         }
-        if let Some((low, market, aggressive)) = config.static_override {
+        if let Some(static_override) = &config.static_override {
             return Ok(GasEstimation {
-                deprioritized_gas_estimate: Some(low),
-                gas_estimate: market,
-                prioritized_gas_estimate: Some(aggressive),
+                deprioritized_gas_estimate: Some(static_override.low),
+                gas_estimate: static_override.market,
+                prioritized_gas_estimate: Some(static_override.aggressive),
             });
         }
 

@@ -1,5 +1,5 @@
 {
-  "deprioritized_gas_estimate": 500,
-  "gas_estimate": 500,
-  "prioritized_gas_estimate": 1000
+  "deprioritized_gas_estimate": 100,
+  "gas_estimate": 200,
+  "prioritized_gas_estimate": 300
 }
