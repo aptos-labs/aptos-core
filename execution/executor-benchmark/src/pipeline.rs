@@ -4,6 +4,7 @@
 use crate::{
     block_partitioning::BlockPartitioningStage, TransactionCommitter, TransactionExecutor,
 };
+use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
@@ -19,7 +20,7 @@ use std::{
         Arc,
     },
     thread::JoinHandle,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 #[derive(Clone, Debug)]
@@ -63,7 +64,7 @@ where
         );
 
         let (executable_block_sender, executable_block_receiver) =
-            mpsc::sync_channel::<ExecuteBlockMsg>(3);
+            mpsc::sync_channel::<ExecuteBlockMessage>(3);
 
         // Assume the distributed executor and the distributed partitioner share the same worker set.
         let num_partitioner_shards = config.num_executor_shards;
@@ -75,7 +76,7 @@ where
             (None, None)
         };
 
-        let (commit_sender, commit_receiver) = mpsc::sync_channel(
+        let (commit_sender, commit_receiver) = mpsc::sync_channel::<CommitBlockMessage>(
             if config.split_stages || config.skip_commit {
                 (num_blocks.unwrap() + 1).max(3)
             } else {
@@ -129,14 +130,15 @@ where
                 let mut executed = 0;
                 let start_gas = TXN_GAS_USAGE.get_sample_sum();
                 while let Ok(msg) = executable_block_receiver.recv() {
-                    let ExecuteBlockMsg {
+                    let ExecuteBlockMessage {
                         current_block_start_time,
+                        partition_time,
                         block,
                     } = msg;
                     let block_size = block.transactions.num_transactions();
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
-                    exe.execute_block(current_block_start_time, block);
+                    exe.execute_block(current_block_start_time, partition_time, block);
                     info!("Finished executing block");
                 }
 
@@ -195,8 +197,20 @@ where
     }
 }
 
-/// Message from partitioning thread to execution thread.
-pub struct ExecuteBlockMsg {
+/// Message from partitioning stage to execution stage.
+pub struct ExecuteBlockMessage {
     pub current_block_start_time: Instant,
+    pub partition_time: Duration,
     pub block: ExecutableBlock<Transaction>,
+}
+
+/// Message from execution stage to commit stage.
+pub struct CommitBlockMessage {
+    pub(crate) block_id: HashValue,
+    pub(crate) root_hash: HashValue,
+    pub(crate) first_block_start_time: Instant,
+    pub(crate) current_block_start_time: Instant,
+    pub(crate) partition_time: Duration,
+    pub(crate) execution_time: Duration,
+    pub(crate) num_txns: usize,
 }

@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::pipeline::ExecuteBlockMsg;
+use crate::pipeline::ExecuteBlockMessage;
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
 use aptos_logger::info;
@@ -18,14 +18,14 @@ use std::{
 
 pub(crate) struct BlockPartitioningStage {
     num_blocks_processed: usize,
-    executable_block_sender: SyncSender<ExecuteBlockMsg>,
+    executable_block_sender: SyncSender<ExecuteBlockMessage>,
     maybe_exe_fin_receiver: Option<Receiver<()>>,
     maybe_partitioner: Option<ShardedBlockPartitioner>,
 }
 
 impl BlockPartitioningStage {
     pub fn new(
-        executable_block_sender: SyncSender<ExecuteBlockMsg>,
+        executable_block_sender: SyncSender<ExecuteBlockMessage>,
         maybe_exe_fin_receiver: Option<Receiver<()>>,
         num_shards: usize,
     ) -> Self {
@@ -73,8 +73,9 @@ impl BlockPartitioningStage {
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
             },
         };
-        let msg = ExecuteBlockMsg {
+        let msg = ExecuteBlockMessage {
             current_block_start_time,
+            partition_time: Instant::now().duration_since(current_block_start_time),
             block,
         };
         self.executable_block_sender.send(msg).unwrap();

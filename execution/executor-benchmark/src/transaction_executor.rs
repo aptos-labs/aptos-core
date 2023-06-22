@@ -2,9 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::pipeline::CommitBlockMessage;
 use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
+use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
     transaction::{Transaction, Version},
@@ -15,13 +17,13 @@ use std::{
 };
 
 pub struct TransactionExecutor<V> {
+    num_blocks_processed: usize,
     executor: Arc<BlockExecutor<V>>,
     parent_block_id: HashValue,
     maybe_first_block_start_time: Option<Instant>,
     version: Version,
     // If commit_sender is `None`, we will commit all the execution result immediately in this struct.
-    commit_sender:
-        Option<mpsc::SyncSender<(HashValue, HashValue, Instant, Instant, Duration, usize)>>,
+    commit_sender: Option<mpsc::SyncSender<CommitBlockMessage>>,
     allow_discards: bool,
     allow_aborts: bool,
     maybe_exe_fin_sender: Option<Sender<()>>,
@@ -35,14 +37,13 @@ where
         executor: Arc<BlockExecutor<V>>,
         parent_block_id: HashValue,
         version: Version,
-        commit_sender: Option<
-            mpsc::SyncSender<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
-        >,
+        commit_sender: Option<mpsc::SyncSender<CommitBlockMessage>>,
         allow_discards: bool,
         allow_aborts: bool,
         maybe_exe_fin_sender: Option<Sender<()>>,
     ) -> Self {
         Self {
+            num_blocks_processed: 0,
             executor,
             parent_block_id,
             version,
@@ -57,12 +58,18 @@ where
     pub fn execute_block(
         &mut self,
         current_block_start_time: Instant,
+        partition_time: Duration,
         executable_block: ExecutableBlock<Transaction>,
     ) {
+        let execution_start_time = Instant::now();
         if self.maybe_first_block_start_time.is_none() {
             self.maybe_first_block_start_time = Some(current_block_start_time);
         }
         let block_id = executable_block.block_id;
+        info!(
+            "In iteration {}, received block {}.",
+            self.num_blocks_processed, block_id
+        );
         let num_txns = executable_block.transactions.num_transactions();
         self.version += num_txns as Version;
         let output = self
@@ -119,16 +126,16 @@ where
         );
 
         if let Some(commit_sender) = &self.commit_sender {
-            commit_sender
-                .send((
-                    block_id,
-                    output.root_hash(),
-                    *self.maybe_first_block_start_time.as_ref().unwrap(),
-                    current_block_start_time,
-                    Instant::now().duration_since(current_block_start_time),
-                    num_txns - discards.len(),
-                ))
-                .unwrap();
+            let msg = CommitBlockMessage {
+                block_id,
+                root_hash: output.root_hash(),
+                first_block_start_time: *self.maybe_first_block_start_time.as_ref().unwrap(),
+                current_block_start_time,
+                partition_time,
+                execution_time: Instant::now().duration_since(execution_start_time),
+                num_txns: num_txns - discards.len(),
+            };
+            commit_sender.send(msg).unwrap();
         } else {
             let ledger_info_with_sigs = super::transaction_committer::gen_li_with_sigs(
                 block_id,
@@ -145,5 +152,7 @@ where
             // We are in partition-then-execute mode. Notify the partitioning stage to pick up the next batch.
             tx.send(()).unwrap();
         }
+
+        self.num_blocks_processed += 1;
     }
 }
