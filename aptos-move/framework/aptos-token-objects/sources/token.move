@@ -106,6 +106,23 @@ module aptos_token_objects::token {
         };
     }
 
+
+    /// Creates a new token object with a unique address and returns the ConstructorRef
+    /// for additional specialization.
+    public fun create_token(
+        creator: &signer,
+        collection_name: String,
+        description: String,
+        name: String,
+        royalty: Option<Royalty>,
+        uri: String,
+    ): ConstructorRef {
+        let creator_address = signer::address_of(creator);
+        let constructor_ref = object::create_object(creator_address);
+        create_common(&constructor_ref, creator_address, collection_name, description, name, royalty, uri);
+        constructor_ref
+    }
+
     /// Creates a new token object from a token name and returns the ConstructorRef for
     /// additional specialization.
     public fun create_named_token(
