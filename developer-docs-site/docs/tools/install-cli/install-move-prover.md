@@ -11,12 +11,11 @@ If you want to use the [Move Prover](../../move/prover/index.md), install the Mo
 1. Then, in the checked out aptos-core directory, install additional Move tools:
    <details>
    <summary>Linux / macOS</summary>
-   ```bash
-   ./scripts/dev_setup.sh -yp
+   `./scripts/dev_setup.sh -yp
    source ~/.profile
-   ```
+   `
 
-   :::info
+   :::tip
    `dev_setup.sh -p` updates your `~./profile` with environment variables to support the installed Move Prover tools. You may need to set `.bash_profile` or `.zprofile` or other setup files for your shell.
    :::
 
