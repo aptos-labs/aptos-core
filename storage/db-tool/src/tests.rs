@@ -436,7 +436,7 @@ mod compaction_tests {
         .unwrap();
 
         // verify the new DB has the same data as the original DB
-        let (ledger_db, tree_db, _) =
+        let (_ledger_db, tree_db, state_kv_db) =
             AptosDB::open_dbs(new_db_dir, RocksdbConfigs::default(), true, 0).unwrap();
 
         // assert the kv are the same in db and new_db
@@ -445,10 +445,11 @@ mod compaction_tests {
         // TODO(grao): Support state kv db sharding here.
         for ver in start..=end {
             let new_iter = PrefixedStateValueIterator::new(
-                ledger_db.metadata_db(),
+                &state_kv_db,
                 StateKeyPrefix::new(AccessPath, b"".to_vec()),
                 None,
                 ver,
+                false,
             )
             .unwrap();
             let old_iter = db
