@@ -1,4 +1,4 @@
-{{ $backup_verify_cronjob := lookup "batch/v1" "CronJob" $.Release.Namespace (print (include "backup.fullname" .) "-backup-compaction")}}
+{{ $backup_compaction_cronjob := lookup "batch/v1" "CronJob" $.Release.Namespace (print (include "backup.fullname" .) "-backup-compaction")}}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
