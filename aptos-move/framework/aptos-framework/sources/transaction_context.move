@@ -2,7 +2,7 @@ module aptos_framework::transaction_context {
 
     use std::features;
 
-    /// create_unique_address uses this for domain separation within it's native implementation
+    /// create_unique_address uses this for domain separation within its native implementation
     #[test_only]
     const DERIVE_UUID_ADDRESS_SCHEME: u8 = 0xFB;
 
@@ -22,7 +22,9 @@ module aptos_framework::transaction_context {
     /// by hashing the transaction hash of this transaction and a sequence number 
     /// specific to this transaction. This function can be called any
     /// number of times inside a single transaction. Each such call increments
-    /// the sequence number and generates a new unique address
+    /// the sequence number and generates a new unique address.
+    /// Uses Scheme in types/src/transaction/authenticator.rs for domain separation
+    /// from other ways of generating unique addresses.
     native fun create_unique_address(): address;
 
     /// Return a universally unique identifier. Internally calls

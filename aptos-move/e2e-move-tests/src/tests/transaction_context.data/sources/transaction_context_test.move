@@ -1,6 +1,6 @@
 module 0x1::transaction_context_test {
     use std::vector;
-    use aptos_framework::transaction_context::create_uuid;
+    use aptos_framework::transaction_context::create_unique_address;
     
     /// When checking the value of aggregator fails.
     const ENOT_UNIQUE: u64 = 20;
@@ -10,7 +10,7 @@ module 0x1::transaction_context_test {
         let i: u64 = 0;
         while (i < count) {
             i = i+1;
-            vector::push_back(&mut uuids, create_uuid());
+            vector::push_back(&mut uuids, create_unique_address());
         };
         i = 0;
         while (i < count - 1) {

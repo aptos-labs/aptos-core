@@ -98,7 +98,9 @@ Return a universally unique identifier (of type address) generated
 by hashing the transaction hash of this transaction and a sequence number
 specific to this transaction. This function can be called any
 number of times inside a single transaction. Each such call increments
-the sequence number and generates a new unique address
+the sequence number and generates a new unique address.
+Uses Scheme in types/src/transaction/authenticator.rs for domain separation
+from other ways of generating unique addresses.
 
 
 <pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_unique_address">create_unique_address</a>(): <b>address</b>
