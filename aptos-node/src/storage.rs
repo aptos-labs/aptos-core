@@ -109,7 +109,7 @@ pub fn initialize_database_and_checkpoints(
     let (aptos_db, db_rw, backup_service) =
         bootstrap_db(aptos_db, node_config.storage.backup_service_address);
 
-    // TODO: handle non-genesis waypoints for state sync!
+    // TODO(bowu): fully decouple genesis from fast sync
     // If there's a genesis txn and waypoint, commit it if the result matches.
     let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
     if let Some(genesis) = get_genesis_txn(node_config) {

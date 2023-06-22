@@ -276,6 +276,16 @@ impl Drop for RocksdbPropertyReporter {
     }
 }
 
+struct FastSyncDBs {
+    ledger_db: Arc<LedgerDb>,
+    state_merkle_db: Arc<StateMerkleDb>,
+    state_kv_db: Arc<StateKvDb>,
+    event_store: Arc<EventStore>,
+    ledger_store: Arc<LedgerStore>,
+    state_store: Arc<StateStore>,
+    transaction_store: Arc<TransactionStore>,
+    fast_sync_finished: bool,
+}
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
 pub struct AptosDB {
@@ -290,6 +300,8 @@ pub struct AptosDB {
     _rocksdb_property_reporter: RocksdbPropertyReporter,
     ledger_commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
+    //TODO(bowu): remove this hack when we have a better way to handle fast sync
+    fast_sync_dbs: Option<FastSyncDBs>,
 }
 
 impl AptosDB {
@@ -346,6 +358,7 @@ impl AptosDB {
             ),
             ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
+            fast_sync_dbs: None,
         }
     }
 
@@ -612,11 +625,19 @@ impl AptosDB {
         );
         // Note that the latest epoch can be the same with the current epoch (in most cases), or
         // current_epoch + 1 (when the latest ledger_info carries next validator set)
-        let latest_epoch = self
-            .ledger_store
-            .get_latest_ledger_info()?
-            .ledger_info()
-            .next_block_epoch();
+
+        let latest_epoch = if self.is_fast_sync_in_progress() {
+            self.fast_sync_dbs
+                .ledger_store
+                .get_latest_ledger_info()?
+                .ledger_info()
+                .epoch()
+        } else {
+            self.ledger_store
+                .get_latest_ledger_info()?
+                .ledger_info()
+                .next_block_epoch()
+        };
         ensure!(
             end_epoch <= latest_epoch,
             "Unable to provide epoch change ledger info for still open epoch. asked upper bound: {}, last sealed epoch: {}",
@@ -630,10 +651,17 @@ impl AptosDB {
             (end_epoch, false)
         };
 
-        let lis = self
-            .ledger_store
-            .get_epoch_ending_ledger_info_iter(start_epoch, paging_epoch)?
-            .collect::<Result<Vec<_>>>()?;
+        let lis = if self.is_fast_sync_in_progress() {
+            self.fast_sync_dbs
+                .unwrap()
+                .ledger_store
+                .get_epoch_ending_ledger_info()
+        } else {
+            self.ledger_store
+                .get_epoch_ending_ledger_info_iter(start_epoch, paging_epoch)?
+                .collect::<Result<Vec<_>>>()?
+        };
+
         ensure!(
             lis.len() == (paging_epoch - start_epoch) as usize,
             "DB corruption: missing epoch ending ledger info for epoch {}",
@@ -1296,6 +1324,26 @@ impl AptosDB {
             min_readable_version
         );
         Ok(())
+    }
+
+    fn is_fast_sync_in_progress(&self) -> bool {
+        if self.fast_sync_dbs.is_some() && !self.fast_sync_dbs.unwrap().fast_sync_finished {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn get_ledger_store(&self) -> Arc<LedgerStore> {
+        if let Some(ref fast_sync_dbs) = &self.fast_sync_dbs {
+            if !fast_sync_dbs.fast_sync_finished {
+                Arc::clone(&fast_sync_dbs.ledger_store)
+            } else {
+                Arc::clone(&self.ledger_store)
+            }
+        } else {
+            Arc::clone(&self.ledger_store)
+        }
     }
 }
 
@@ -2120,6 +2168,7 @@ impl DbWriter for AptosDB {
         })
     }
 
+    // TODO(bowu): populate the flag indicating the fast_sync is done.
     fn finalize_state_snapshot(
         &self,
         version: Version,

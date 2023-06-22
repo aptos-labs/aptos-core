@@ -108,6 +108,7 @@ pub trait DbReader: Send + Sync {
     ///
     /// [AptosDB::get_epoch_ending_ledger_infos]:
     /// ../aptosdb/struct.AptosDB.html#method.get_epoch_ending_ledger_infos
+    /// TODO(bowu): update the implementation of the two DB approaches
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,
