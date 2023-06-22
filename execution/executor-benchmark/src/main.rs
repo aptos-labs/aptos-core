@@ -129,6 +129,9 @@ struct Opt {
     #[clap(long)]
     use_sharded_state_merkle_db: bool,
 
+    #[clap(long)]
+    skip_index_and_usage: bool,
+
     #[clap(flatten)]
     pipeline_opt: PipelineOpt,
 
@@ -231,6 +234,7 @@ where
                 opt.verify_sequence_numbers,
                 opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
+                opt.skip_index_and_usage,
                 opt.pipeline_opt.pipeline_config(),
             );
         },
@@ -256,6 +260,7 @@ where
                 opt.pruner_opt.pruner_config(),
                 opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
+                opt.skip_index_and_usage,
                 opt.pipeline_opt.pipeline_config(),
             );
         },
@@ -275,6 +280,7 @@ where
                 opt.verify_sequence_numbers,
                 opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
+                opt.skip_index_and_usage,
                 opt.pipeline_opt.pipeline_config(),
             );
         },
