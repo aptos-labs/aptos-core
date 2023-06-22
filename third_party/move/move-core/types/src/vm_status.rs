@@ -880,13 +880,6 @@ impl From<StatusCode> for u64 {
     }
 }
 
-pub mod sub_status {
-    // Native Function Error sub-codes
-    pub const NFE_VECTOR_ERROR_BASE: u64 = 0;
-    // Failure in BCS deserialization
-    pub const NFE_BCS_SERIALIZATION_FAILURE: u64 = 0x1C5;
-}
-
 /// The `Arbitrary` impl only generates validation statuses since the full enum is too large.
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for StatusCode {
@@ -939,5 +932,25 @@ fn test_status_codes() {
         seen_statuses.insert(unwrapped_status);
         let to_major_status_code = u64::from(unwrapped_status);
         assert_eq!(*major_status_code, to_major_status_code);
+    }
+}
+
+pub mod sub_status {
+    // Native Function Error sub-codes
+    pub const NFE_VECTOR_ERROR_BASE: u64 = 0;
+    // Failure in BCS deserialization
+    pub const NFE_BCS_SERIALIZATION_FAILURE: u64 = 0x1C5;
+
+    pub mod unknown_invariant_violation {
+        // Paranoid Type checking returns an error
+        pub const EPARANOID_FAILURE: u64 = 0x1;
+
+        // Reference safety checks failure
+        pub const EREFERENCE_COUNTING_FAILURE: u64 = 0x2;
+    }
+
+    pub mod type_resolution_failure {
+        // User provided typetag failed to load.
+        pub const EUSER_TYPE_LOADING_FAILURE: u64 = 0x1;
     }
 }
