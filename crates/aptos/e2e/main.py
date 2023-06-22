@@ -29,13 +29,11 @@ import pathlib
 import shutil
 import sys
 
-from cases.account import (
-    test_account_create,
-    test_account_fund_with_faucet,
-    test_account_lookup_address,
-    test_account_rotate_key,
-)
-from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
+from cases.account import (test_account_create, test_account_fund_with_faucet,
+                           test_account_lookup_address,
+                           test_account_rotate_key)
+from cases.init import (test_aptos_header_included, test_init,
+                        test_metrics_accessible)
 from cases.move import test_move_publish
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup

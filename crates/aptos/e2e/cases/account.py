@@ -1,6 +1,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import secrets
 
 from common import OTHER_ACCOUNT_ONE, TestError
@@ -88,6 +89,9 @@ def test_account_rotate_key(run_helper: RunHelper, test_name=None):
     # Generate new private key
     new_private_key = secrets.token_hex(32)
 
+    # Current account info
+    old_profile = run_helper.get_account_info()
+
     # Rotate the key.
     result = run_helper.run_command(
         test_name,
@@ -105,4 +109,43 @@ def test_account_rotate_key(run_helper: RunHelper, test_name=None):
     if '"success": true' not in result.stdout:
         raise TestError(
             f"[aptos account rotate-key --new-private-key {new_private_key} --assume-yes] failed"
+        )
+
+    new_profile = run_helper.get_account_info()
+    # Make sure new and old account addresses match
+    if old_profile.account_address != new_profile.account_address:
+        raise TestError(
+            f"Error: Account address changed after rotate-key: {old_profile.account_address} -> {new_profile.account_address}"
+        )
+
+    # lookup-address from old public key
+    result = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "account",
+            "lookup-address",
+            f"--public-key={old_profile.public_key}",
+        ],
+    )
+    response = json.loads(result.stdout)
+    if response["Result"] != old_profile.account_address:
+        raise TestError(
+            f"lookup-address of old public key does not match original address: {old_profile.account_address}"
+        )
+
+    # lookup-address with new public key
+    result = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "account",
+            "lookup-address",
+            f"--public-key={new_profile.public_key}",
+        ],
+    )
+    response = json.loads(result.stdout)
+    if response["Result"] != old_profile.account_address:
+        raise TestError(
+            f"lookup-address of new public key does not match original address: {old_profile.account_address}"
         )
