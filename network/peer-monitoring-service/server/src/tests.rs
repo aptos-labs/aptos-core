@@ -53,8 +53,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionWithProof, Version,
+        AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
+        TransactionWithProof, Version,
     },
     PeerId,
 };
@@ -746,8 +746,6 @@ mock! {
         fn get_latest_executed_trees(&self) -> anyhow::Result<ExecutedTrees>;
 
         fn get_epoch_ending_ledger_info(&self, known_version: u64) -> anyhow::Result<LedgerInfoWithSignatures>;
-
-        fn get_latest_transaction_info_option(&self) -> anyhow::Result<Option<(Version, TransactionInfo)>>;
 
         fn get_accumulator_root_hash(&self, _version: Version) -> anyhow::Result<HashValue>;
 

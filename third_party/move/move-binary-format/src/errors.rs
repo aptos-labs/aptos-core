@@ -119,6 +119,7 @@ impl VMError {
                     location: abort_location,
                     function,
                     code_offset,
+                    sub_status,
                     message,
                 }
             },
@@ -133,6 +134,10 @@ impl VMError {
 
     pub fn sub_status(&self) -> Option<u64> {
         self.0.sub_status
+    }
+
+    pub fn set_sub_status(&mut self, status: u64) {
+        self.0.sub_status = Some(status);
     }
 
     pub fn message(&self) -> Option<&String> {

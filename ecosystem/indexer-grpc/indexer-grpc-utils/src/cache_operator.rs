@@ -507,4 +507,71 @@ mod tests {
 
         assert_eq!(cache_operator.get_chain_id().await.unwrap(), 123);
     }
+
+    // Cache latest version tests.
+    #[tokio::test]
+    async fn cache_latest_version_ok() {
+        let version = 123_u64;
+        let cmds = vec![MockCmd::new(
+            redis::cmd("GET").arg(CACHE_KEY_LATEST_VERSION),
+            Ok(version.to_string()),
+        )];
+        let mock_connection = MockRedisConnection::new(cmds);
+        let mut cache_operator: CacheOperator<MockRedisConnection> =
+            CacheOperator::new(mock_connection);
+
+        assert_eq!(cache_operator.get_latest_version().await.unwrap(), version);
+    }
+
+    // Cache update cache transactions tests.
+    #[tokio::test]
+    async fn cache_update_cache_transactions_ok() {
+        let mut transactions = vec![];
+        let version = 123_u64;
+        let encoded_proto_data = String::from("123");
+        let timestamp_in_seconds = 12_u64;
+        transactions.push((version, encoded_proto_data.clone(), timestamp_in_seconds));
+        let cmds = vec![MockCmd::new(
+            redis::cmd("SET")
+                .arg(version)
+                .arg(encoded_proto_data.clone())
+                .arg("EX")
+                .arg(get_ttl_in_seconds(timestamp_in_seconds)),
+            Ok("ok"),
+        )];
+        let mock_connection = MockRedisConnection::new(cmds);
+        let mut cache_operator: CacheOperator<MockRedisConnection> =
+            CacheOperator::new(mock_connection);
+        assert!(cache_operator
+            .update_cache_transactions(transactions)
+            .await
+            .is_ok());
+    }
+
+    #[tokio::test]
+    async fn cache_update_cache_transactions_with_large_version_ok() {
+        let mut transactions = vec![];
+        let version = CACHE_SIZE_EVICTION_LOWER_BOUND + 100;
+        let encoded_proto_data = String::from("123");
+        let timestamp_in_seconds = 12_u64;
+        transactions.push((version, encoded_proto_data.clone(), timestamp_in_seconds));
+        let mut redis_pipeline = redis::pipe();
+        redis_pipeline
+            .cmd("SET")
+            .arg(version)
+            .arg(encoded_proto_data.clone())
+            .arg("EX")
+            .arg(get_ttl_in_seconds(timestamp_in_seconds));
+        redis_pipeline
+            .cmd("DEL")
+            .arg(version - CACHE_SIZE_EVICTION_LOWER_BOUND);
+        let cmds = vec![MockCmd::new(redis_pipeline, Ok("ok"))];
+        let mock_connection = MockRedisConnection::new(cmds);
+        let mut cache_operator: CacheOperator<MockRedisConnection> =
+            CacheOperator::new(mock_connection);
+        assert!(cache_operator
+            .update_cache_transactions(transactions)
+            .await
+            .is_ok());
+    }
 }
