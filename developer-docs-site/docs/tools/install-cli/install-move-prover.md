@@ -23,9 +23,11 @@ If you want to use the [Move Prover](../../move/prover/index.md), install the Mo
    </details>
    <details>
    <summary>Windows</summary>
+
       1. Open a PowerShell terminal as an administrator.
       1. Run the dev setup script to prepare your environment: `PowerShell -ExecutionPolicy Bypass -File ./scripts/windows_dev_setup.ps1 -y`
-   </details>details>
+   
+   </details>
 1. You can now run the Move Prover to prove an example:
     ```bash
     aptos move prove --package-dir aptos-move/move-examples/hello_prover/
