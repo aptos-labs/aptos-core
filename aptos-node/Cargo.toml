@@ -62,6 +62,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
+either = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
