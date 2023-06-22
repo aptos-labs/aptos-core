@@ -82,3 +82,26 @@ def test_move_compile(run_helper: RunHelper, test_name=None):
 
     if f"{account_info.account_address}::cli_e2e_tests" not in response.stdout:
         raise TestError("Module did not compile successfully")
+
+
+@test_case
+def test_move_compile_script(run_helper: RunHelper, test_name=None):
+    package_dir = f"move/scripts/two_by_two_transfer"
+    account_info = run_helper.get_account_info()
+
+    # Compile the script.
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "compile-script",
+            "--package-dir",
+            package_dir,
+            "--named-addresses",
+            f"addr={account_info.account_address}",
+        ],
+    )
+
+    if "script_hash" not in response.stdout:
+        raise TestError("Script did not compile successfully")

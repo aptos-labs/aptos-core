@@ -35,7 +35,7 @@ from cases.account import (
     test_account_lookup_address,
 )
 from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
-from cases.move import test_move_compile, test_move_publish
+from cases.move import test_move_compile, test_move_publish, test_move_compile_script
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -118,6 +118,7 @@ def run_tests(run_helper):
     # Run move subcommand group tests.
     test_move_publish(run_helper)
     test_move_compile(run_helper)
+    test_move_compile_script(run_helper)
 
 
 def main():

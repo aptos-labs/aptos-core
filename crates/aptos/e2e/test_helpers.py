@@ -17,6 +17,7 @@ LOG = logging.getLogger(__name__)
 
 WORKING_DIR_IN_CONTAINER = "/tmp"
 
+
 # We pass this class into all test functions to help with calling the CLI,
 # collecting output, and accessing common info.
 @dataclass
@@ -159,6 +160,11 @@ class RunHelper:
         shutil.copytree(
             "../../../aptos-move/move-examples/cli-e2e-tests",
             os.path.join(self.host_working_directory, "move"),
+            ignore=shutil.ignore_patterns("build"),
+        )
+        shutil.copytree(
+            "../../../aptos-move/move-examples/scripts",
+            os.path.join(self.host_working_directory, "move/scripts"),
             ignore=shutil.ignore_patterns("build"),
         )
 
