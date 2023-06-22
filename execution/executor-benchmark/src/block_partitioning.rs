@@ -12,10 +12,9 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::{
-    sync::mpsc::Receiver,
+    sync::mpsc::{Receiver, SyncSender},
     time::Instant,
 };
-use std::sync::mpsc::SyncSender;
 
 pub(crate) struct BlockPartitioningStage {
     num_blocks_processed: usize,

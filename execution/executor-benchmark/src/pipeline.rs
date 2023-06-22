@@ -4,16 +4,11 @@
 use crate::{
     block_partitioning::BlockPartitioningStage, TransactionCommitter, TransactionExecutor,
 };
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
-use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
 use aptos_types::{
-    block_executor::partitioner::{
-        CrossShardDependencies, ExecutableBlock, ExecutableTransactions,
-        TransactionWithDependencies,
-    },
+    block_executor::partitioner::ExecutableBlock,
     transaction::{Transaction, Version},
 };
 use aptos_vm::counters::TXN_GAS_USAGE;
@@ -67,7 +62,8 @@ where
             }, /* bound */
         );
 
-        let (executable_block_sender, executable_block_receiver) = mpsc::sync_channel::<ExecuteBlockMsg>(3);
+        let (executable_block_sender, executable_block_receiver) =
+            mpsc::sync_channel::<ExecuteBlockMsg>(3);
 
         // Assume the distributed executor and the distributed partitioner share the same worker set.
         let num_partitioner_shards = config.num_executor_shards;
