@@ -162,11 +162,6 @@ class RunHelper:
             os.path.join(self.host_working_directory, "move/cli-e2e-tests"),
             ignore=shutil.ignore_patterns("build"),
         )
-        shutil.copytree(
-            "../../../aptos-move/move-examples/scripts",
-            os.path.join(self.host_working_directory, "move/scripts"),
-            ignore=shutil.ignore_patterns("build"),
-        )
 
     # If image_Tag is set, pull the test CLI image. We don't technically have to do
     # this separately but it makes the steps clearer. Otherwise, cli_path must be

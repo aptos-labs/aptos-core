@@ -35,7 +35,7 @@ from cases.account import (
     test_account_lookup_address,
 )
 from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
-from cases.move import test_move_compile, test_move_publish, test_move_compile_script
+from cases.move import test_move_compile, test_move_compile_script, test_move_publish
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper

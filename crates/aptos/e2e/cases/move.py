@@ -15,7 +15,7 @@ def test_move_publish(run_helper: RunHelper, test_name=None):
     # then run in this directory, meaning the move/ directory is in the same directory
     # as the CLI is run from. This is why we can just refer to the package dir starting
     # with move/ here.
-    package_dir = f"move/{run_helper.base_network}/cli-e2e-tests"
+    package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
 
     # Publish the module.
     run_helper.run_command(
@@ -63,7 +63,7 @@ def test_move_publish(run_helper: RunHelper, test_name=None):
 
 @test_case
 def test_move_compile(run_helper: RunHelper, test_name=None):
-    package_dir = f"move/{run_helper.base_network}/cli-e2e-tests"
+    package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
     account_info = run_helper.get_account_info()
 
     # Compile the module.
@@ -86,7 +86,7 @@ def test_move_compile(run_helper: RunHelper, test_name=None):
 
 @test_case
 def test_move_compile_script(run_helper: RunHelper, test_name=None):
-    package_dir = f"move/scripts/two_by_two_transfer"
+    package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
     account_info = run_helper.get_account_info()
 
     # Compile the script.
