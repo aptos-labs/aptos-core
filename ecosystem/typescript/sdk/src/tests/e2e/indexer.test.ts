@@ -179,7 +179,7 @@ describe("Indexer", () => {
         const tokenData = await indexerClient.getTokenData(
           accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
         );
-        expect(tokenData.current_token_datas[0].name).toEqual("Alice Token");
+        expect(tokenData.current_token_datas_v2[0].token_name).toEqual("Alice Token");
       },
       longTestTimeout,
     );
