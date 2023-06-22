@@ -37,3 +37,41 @@ proposals:
     - FeatureFlag:
         enabled:
           - charge_invariant_violation
+  - name: step_4_enable_transaction_dedup
+    metadata:
+      title: "Enable Transaction Dedup"
+      description: "AIP-37: Filter duplicate transactions within a block"
+      source_code_url: ""
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/160"
+    execution_mode: MultiStep
+    update_sequence:
+      - Execution:
+          V3:
+            transaction_shuffler_type:
+              sender_aware_v1: 32
+            block_gas_limit: ~
+            transaction_deduper_type: txn_hash_and_authenticator_v1
+  - name: step_5_enable_quorum_store
+    metadata:
+      title: "Enable Quorum Store"
+      description: "AIP-26: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/108"
+    execution_mode: MultiStep
+    update_sequence:
+      - Consensus:
+          V2:
+            decoupled_execution: true
+            back_pressure_limit: 10
+            exclude_round: 40
+            proposer_election_type:
+              leader_reputation:
+                proposer_and_voter_v2:
+                  active_weight: 1000
+                  inactive_weight: 10
+                  failed_weight: 1
+                  failure_threshold_percent: 10
+                  proposer_window_num_validators_multiplier: 10
+                  voter_window_num_validators_multiplier: 1
+                  weight_by_voting_power: true
+                  use_history_from_previous_epoch_max_count: 5
+            max_failed_authors_to_store: 10
