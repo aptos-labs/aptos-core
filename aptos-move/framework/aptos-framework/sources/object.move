@@ -22,6 +22,7 @@ module aptos_framework::object {
     use std::vector;
 
     use aptos_framework::account;
+    use aptos_framework::transaction_context;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event;
     use aptos_framework::from_bcs;
@@ -50,10 +51,6 @@ module aptos_framework::object {
     /// Maximum nesting from one object to another. That is objects can technically have infinte
     /// nesting, but any checks such as transfer will only be evaluated this deep.
     const MAXIMUM_OBJECT_NESTING: u8 = 8;
-
-    /// transaction_context::create_unique_address uses this for domain separation within it's native implementation
-    #[test_only]
-    const DERIVE_UUID_ADDRESS_SCHEME: u8 = 0xFB;
 
     /// Scheme identifier used to generate an object's address `obj_addr` as derived from another object.
     /// The object's address is generated as:
@@ -218,7 +215,7 @@ module aptos_framework::object {
     /// The created object is deletable as we can guarantee the same UUID can
     /// never be regenerated with future txs.
     public fun create_object(owner_address: address): ConstructorRef {
-        let uuid = aptos_framework::transaction_context::create_unique_addr();
+        let uuid = transaction_context::create_unique_addr();
         create_object_internal(owner_address, uuid, true)
     }
 
