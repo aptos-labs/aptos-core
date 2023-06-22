@@ -12,11 +12,13 @@ use crate::sharded_block_partitioner::{
     partitioning_shard::PartitioningShard,
 };
 use aptos_logger::{error, info};
+use aptos_metrics_core::{exponential_buckets, register_histogram, Histogram};
 use aptos_types::{
     block_executor::partitioner::{ShardId, SubBlocksForShard, TxnIndex},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
     sync::{
@@ -296,6 +298,7 @@ impl ShardedBlockPartitioner {
         transactions: Vec<AnalyzedTransaction>,
         num_partitioning_round: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
+        let _timer = APTOS_BLOCK_PARTITIONER_SECONDS.start_timer();
         let total_txns = transactions.len();
         if total_txns == 0 {
             return vec![];
@@ -768,3 +771,14 @@ mod tests {
         }
     }
 }
+
+pub static APTOS_BLOCK_PARTITIONER_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_block_partitioner_seconds",
+        // metric description
+        "The total time spent in seconds of block partitioning in the sharded block partitioner.",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
