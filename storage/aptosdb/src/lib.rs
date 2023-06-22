@@ -917,6 +917,7 @@ impl AptosDB {
 
         let ledger_metadata_batch = SchemaBatch::new();
         let sharded_state_kv_batches = new_sharded_kv_schema_batch();
+        let state_kv_metadata_batch = SchemaBatch::new();
 
         // TODO(grao): Make state_store take sharded state updates.
         self.state_store.put_value_sets(
@@ -926,6 +927,8 @@ impl AptosDB {
             sharded_state_cache,
             &ledger_metadata_batch,
             &sharded_state_kv_batches,
+            &state_kv_metadata_batch,
+            self.state_store.state_kv_db.enabled_sharding(),
         )?;
 
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
@@ -948,7 +951,11 @@ impl AptosDB {
             });
             s.spawn(|| {
                 self.state_kv_db
-                    .commit(last_version, sharded_state_kv_batches)
+                    .commit(
+                        last_version,
+                        state_kv_metadata_batch,
+                        sharded_state_kv_batches,
+                    )
                     .unwrap();
             });
         });
@@ -2154,6 +2161,7 @@ impl DbWriter for AptosDB {
             // Create a single change set for all further write operations
             let mut batch = SchemaBatch::new();
             let mut sharded_kv_batch = new_sharded_kv_schema_batch();
+            let state_kv_metadata_batch = SchemaBatch::new();
             // Save the target transactions, outputs, infos and events
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
                 output_with_proof
@@ -2181,7 +2189,7 @@ impl DbWriter for AptosDB {
                 &transaction_infos,
                 &events,
                 wsets,
-                Option::Some((&mut batch, &mut sharded_kv_batch)),
+                Option::Some((&mut batch, &mut sharded_kv_batch, &state_kv_metadata_batch)),
                 false,
             )?;
 

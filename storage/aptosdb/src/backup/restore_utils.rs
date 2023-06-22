@@ -118,12 +118,14 @@ pub(crate) fn save_transactions(
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
     write_sets: Vec<WriteSet>,
-    existing_batch: Option<(&mut SchemaBatch, &mut ShardedStateKvSchemaBatch)>,
+    existing_batch: Option<(
+        &mut SchemaBatch,
+        &mut ShardedStateKvSchemaBatch,
+        &SchemaBatch,
+    )>,
     kv_replay: bool,
 ) -> Result<()> {
-    if let Some(existing_batch) = existing_batch {
-        let batch = existing_batch.0;
-        let state_kv_batches = existing_batch.1;
+    if let Some((batch, state_kv_batches, state_kv_metadata_batch)) = existing_batch {
         save_transactions_impl(
             Arc::clone(&ledger_store),
             transaction_store,
@@ -136,11 +138,13 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             batch,
             state_kv_batches,
+            state_kv_metadata_batch,
             kv_replay,
         )?;
     } else {
         let mut batch = SchemaBatch::new();
         let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
+        let state_kv_metadata_batch = SchemaBatch::new();
         save_transactions_impl(
             Arc::clone(&ledger_store),
             transaction_store,
@@ -153,15 +157,17 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             &mut batch,
             &mut sharded_kv_schema_batch,
+            &state_kv_metadata_batch,
             kv_replay,
         )?;
         // get the last version and commit to the state kv db
         // commit the state kv before ledger in case of failure happens
         let last_version = first_version + txns.len() as u64 - 1;
-        state_store
-            .state_db
-            .state_kv_db
-            .commit(last_version, sharded_kv_schema_batch)?;
+        state_store.state_db.state_kv_db.commit(
+            last_version,
+            state_kv_metadata_batch,
+            sharded_kv_schema_batch,
+        )?;
 
         // TODO(grao): Support splitted ledger DBs here.
         ledger_store.ledger_db.metadata_db().write_schemas(batch)?;
@@ -227,6 +233,7 @@ pub(crate) fn save_transactions_impl(
     write_sets: &[WriteSet],
     batch: &mut SchemaBatch,
     state_kv_batches: &mut ShardedStateKvSchemaBatch,
+    state_kv_metadata_batch: &SchemaBatch,
     kv_replay: bool,
 ) -> Result<()> {
     // TODO(grao): Support splited ledger db here.
@@ -241,7 +248,14 @@ pub(crate) fn save_transactions_impl(
     }
 
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
-        state_store.put_write_sets(write_sets.to_vec(), first_version, batch, state_kv_batches)?;
+        state_store.put_write_sets(
+            write_sets.to_vec(),
+            first_version,
+            batch,
+            state_kv_batches,
+            state_kv_metadata_batch,
+            state_store.state_kv_db.enabled_sharding(),
+        )?;
     }
 
     let last_version = first_version + txns.len() as u64 - 1;

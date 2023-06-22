@@ -9,7 +9,7 @@ use crate::{
     epoch_by_version::EpochByVersionSchema,
     ledger_db::LedgerDb,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
-    schema::state_value::StateValueSchema,
+    schema::{state_value::StateValueSchema, state_value_index::StateValueIndexSchema},
     stale_state_value_index::StaleStateValueIndexSchema,
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
@@ -593,12 +593,12 @@ impl StateStore {
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
     ) -> Result<PrefixedStateValueIterator> {
-        // TODO(grao): Support sharding here.
         PrefixedStateValueIterator::new(
-            self.state_kv_db.metadata_db(),
+            &self.state_kv_db,
             key_prefix.clone(),
             first_key_opt.cloned(),
             desired_version,
+            self.state_kv_db.enabled_sharding(),
         )
     }
 
@@ -618,6 +618,8 @@ impl StateStore {
         first_version: Version,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        state_kv_metadata_batch: &SchemaBatch,
+        put_state_value_indices: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_writesets"])
@@ -651,6 +653,8 @@ impl StateStore {
             value_state_sets.to_vec(),
             first_version,
             sharded_state_kv_batches,
+            state_kv_metadata_batch,
+            put_state_value_indices,
         )?;
 
         Ok(())
@@ -665,6 +669,8 @@ impl StateStore {
         sharded_state_cache: Option<&ShardedStateCache>,
         ledger_batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        state_kv_metadata_batch: &SchemaBatch,
+        put_state_value_indices: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
@@ -683,7 +689,13 @@ impl StateStore {
             .with_label_values(&["add_state_kv_batch"])
             .start_timer();
 
-        self.put_state_values(value_state_sets, first_version, sharded_state_kv_batches)
+        self.put_state_values(
+            value_state_sets,
+            first_version,
+            sharded_state_kv_batches,
+            state_kv_metadata_batch,
+            put_state_value_indices,
+        )
     }
 
     pub fn put_state_values(
@@ -691,6 +703,8 @@ impl StateStore {
         value_state_sets: Vec<&ShardedStateUpdates>,
         first_version: Version,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        state_kv_metadata_batch: &SchemaBatch,
+        put_state_value_indices: bool,
     ) -> Result<()> {
         sharded_state_kv_batches
             .par_iter()
@@ -708,6 +722,22 @@ impl StateStore {
                     })
                     .collect::<Result<_>>()
             })?;
+
+        // Eventually this index will move to indexer side. For now we temporarily write this into
+        // metadata db to unblock the sharded DB migration.
+        // TODO(grao): Remove when we are ready.
+        if put_state_value_indices {
+            value_state_sets
+                .par_iter()
+                .enumerate()
+                .try_for_each(|(i, updates)| {
+                    let version = first_version + i as Version;
+                    updates.iter().flatten().try_for_each(|(k, _)| {
+                        state_kv_metadata_batch
+                            .put::<StateValueIndexSchema>(&(k.clone(), version), &())
+                    })
+                })?;
+        }
 
         Ok(())
     }
