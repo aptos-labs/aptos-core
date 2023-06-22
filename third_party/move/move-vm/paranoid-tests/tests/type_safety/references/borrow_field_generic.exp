@@ -12,7 +12,7 @@ Error: Script execution failed with VMError: {
 task 3 'run'. lines 47-58:
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
-    sub_status: None,
+    sub_status: Some(1001),
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 4)],
