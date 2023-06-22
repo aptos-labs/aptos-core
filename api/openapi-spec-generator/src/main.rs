@@ -54,3 +54,9 @@ pub fn main() -> Result<()> {
     };
     args.output_args.write(&spec)
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

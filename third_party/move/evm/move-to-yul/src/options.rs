@@ -74,3 +74,9 @@ impl Options {
         !self.testing || self.experiment_on(Experiment::CAPTURE_SOURCE_INFO)
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Options::command().debug_assert()
+}

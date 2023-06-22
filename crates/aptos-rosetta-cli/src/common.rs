@@ -108,3 +108,9 @@ impl From<BlockArgs> for Option<PartialBlockIdentifier> {
         }
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    RosettaCliArgs::command().debug_assert()
+}

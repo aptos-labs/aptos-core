@@ -110,3 +110,9 @@ fn load_genesis_txn(path: &Path) -> Result<Transaction> {
 
     Ok(bcs::from_bytes(&buffer)?)
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Opt::command().debug_assert()
+}

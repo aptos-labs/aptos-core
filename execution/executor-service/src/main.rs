@@ -23,3 +23,9 @@ fn main() {
         ProcessExecutorService::new(server_addr, 1000, args.num_executor_threads);
     executor_service.run();
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

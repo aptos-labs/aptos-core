@@ -64,3 +64,9 @@ impl StandardRelease {
         self.target.create_release(!self.without_source_code, None)
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Commands::command().debug_assert()
+}

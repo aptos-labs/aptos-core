@@ -89,3 +89,9 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
         Ok(cli_build_information())
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Tool::command().debug_assert()
+}

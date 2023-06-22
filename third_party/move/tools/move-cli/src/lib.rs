@@ -138,3 +138,9 @@ pub fn move_cli(
         args.cmd,
     )
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    MoveCLI::command().debug_assert()
+}

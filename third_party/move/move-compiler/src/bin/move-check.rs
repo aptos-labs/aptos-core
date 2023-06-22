@@ -71,3 +71,9 @@ pub fn main() -> anyhow::Result<()> {
         .check_and_report()?;
     Ok(())
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Options::command().debug_assert()
+}

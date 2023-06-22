@@ -47,3 +47,9 @@ fn main() {
     let data = fs::read(input_file).expect("failed to read artifact");
     target.fuzz(&data);
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}
