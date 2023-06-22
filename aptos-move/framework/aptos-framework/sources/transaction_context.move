@@ -50,9 +50,9 @@ module aptos_framework::transaction_context {
     #[test]
     fun test_correct_uuid() {
         let uuid1 = create_unique_addr();
-        let bytes = bcs::to_bytes(&guid::create(get_txn_hash(), 1));
+        let bytes = std::bcs::to_bytes(&aptos_framework::guid::create(get_txn_hash(), 1));
         vector::push_back(&mut bytes, DERIVE_UUID_ADDRESS_SCHEME);
-        let uuid2 = from_bcs::to_address(hash::sha3_256(bytes));
+        let uuid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
         assert!(uuid1 == uuid2, 0);
     }
 }
