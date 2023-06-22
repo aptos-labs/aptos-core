@@ -512,6 +512,8 @@ export class AptosToken {
    * If isFungibleToken param is not set, the function would query Indexer
    * for the token data and check whether it is a non-fungible or a fungible token.
    *
+   * Note: this function supports only token v2 standard (it does not support the token v1 standard)
+   *
    * @param data NonFungibleTokenParameters | FungibleTokenParameters type
    * @param isFungibleToken (optional) The token type, non-fungible or fungible token.
    * @returns The hash of the transaction submitted to the API
