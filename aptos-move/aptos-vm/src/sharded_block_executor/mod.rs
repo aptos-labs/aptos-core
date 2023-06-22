@@ -23,7 +23,6 @@ use std::{
 };
 
 pub mod block_executor_client;
-mod composite_state_view;
 mod counters;
 mod cross_shard_client;
 mod cross_shard_commit_sender;

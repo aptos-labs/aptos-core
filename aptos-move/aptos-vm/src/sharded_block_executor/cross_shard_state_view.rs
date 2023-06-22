@@ -7,15 +7,14 @@ use aptos_types::state_store::{
     state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
 };
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Condvar, Mutex},
 };
-use std::collections::HashSet;
 
 #[derive(Clone)]
 enum CrossShardValueStatus {
     /// The state value is available as a result of cross shard execution
-    Ready(StateValue),
+    Ready(Option<StateValue>),
     /// We are still waiting for remote shard to push the state value
     Waiting,
 }
@@ -32,14 +31,14 @@ impl CrossShardStateValue {
         }
     }
 
-    pub fn set_value(&self, value: StateValue) {
+    pub fn set_value(&self, value: Option<StateValue>) {
         let (lock, cvar) = &*self.value_condition;
         let mut status = lock.lock().unwrap();
         *status = CrossShardValueStatus::Ready(value);
         cvar.notify_all();
     }
 
-    pub fn get_value(&self) -> StateValue {
+    pub fn get_value(&self) -> Option<StateValue> {
         let (lock, cvar) = &*self.value_condition;
         let mut status = lock.lock().unwrap();
         while let CrossShardValueStatus::Waiting = *status {
@@ -56,34 +55,38 @@ impl CrossShardStateValue {
 /// and a hashmap of cross shard state keys. When a cross shard state value is not
 /// available in the hashmap, it will be fetched from the underlying base view.
 #[derive(Clone)]
-pub struct CrossShardStateView {
+pub struct CrossShardStateView<'a, S> {
     cross_shard_data: HashMap<StateKey, CrossShardStateValue>,
+    base_view: &'a S,
 }
 
-impl CrossShardStateView {
-    pub fn new(cross_shard_keys: HashSet<StateKey>) -> Self {
+impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
+    pub fn new(cross_shard_keys: HashSet<StateKey>, base_view: &'a S) -> Self {
         let mut cross_shard_data = HashMap::new();
         for key in cross_shard_keys {
             cross_shard_data.insert(key, CrossShardStateValue::waiting());
         }
-        Self { cross_shard_data }
+        Self {
+            cross_shard_data,
+            base_view,
+        }
     }
 
-    pub fn set_value(&self, state_key: &StateKey, state_value: StateValue) {
+    pub fn set_value(&self, state_key: &StateKey, state_value: Option<StateValue>) {
         if let Some(value) = self.cross_shard_data.get(state_key) {
             value.set_value(state_value);
         }
     }
 }
 
-impl TStateView for CrossShardStateView {
+impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         if let Some(value) = self.cross_shard_data.get(state_key) {
-            return Ok(Some(value.get_value()));
+            return Ok(value.get_value());
         }
-        Ok(None)
+        self.base_view.get_state_value(state_key)
     }
 
     fn is_genesis(&self) -> bool {
@@ -108,12 +111,17 @@ mod tests {
 
     #[test]
     fn test_cross_shard_state_view_get_state_value() {
+        // empty base view
+        let base_view = InMemoryStateView::new({ HashMap::new() });
         let state_key = StateKey::raw("key1".as_bytes().to_owned());
         let state_value = StateValue::from("value1".as_bytes().to_owned());
         let state_value_clone = state_value.clone();
         let state_key_clone = state_key.clone();
 
-        let cross_shard_state_view = Arc::new(CrossShardStateView::new(vec![state_key.clone()]));
+        let mut state_keys = HashSet::new();
+        state_keys.insert(state_key.clone());
+
+        let cross_shard_state_view = Arc::new(CrossShardStateView::new(state_keys, &base_view));
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
 
         let wait_thread = thread::spawn(move || {
@@ -124,7 +132,7 @@ mod tests {
         // Simulate some processing time before setting the value
         thread::sleep(Duration::from_millis(100));
 
-        cross_shard_state_view.set_value(&state_key, state_value);
+        cross_shard_state_view.set_value(&state_key, Some(state_value));
 
         wait_thread.join().unwrap();
     }
