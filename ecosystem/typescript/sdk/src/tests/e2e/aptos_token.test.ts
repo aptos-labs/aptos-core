@@ -19,6 +19,7 @@ describe("token objects", () => {
   beforeAll(async () => {
     // Fund Alice's Account
     await faucetClient.fundAccount(alice.address(), 100000000);
+    await faucetClient.fundAccount(bob.address(), 100000000);
   }, longTestTimeout);
 
   test(
@@ -189,6 +190,49 @@ describe("token objects", () => {
       await provider.waitForTransaction(await aptosToken.transferTokenOwnership(alice, tokenAddress, bob.address()), {
         checkSuccess: true,
       });
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "transfer non fungible token",
+    async () => {
+      const getTokenDataSpy = jest.spyOn(provider, "getTokenData");
+      const getTokenDataSpyResponse = { current_token_datas_v2: new Array() };
+      getTokenDataSpyResponse.current_token_datas_v2.push({ is_fungible_v2: undefined });
+      getTokenDataSpy.mockResolvedValue(getTokenDataSpyResponse);
+
+      await provider.waitForTransaction(
+        await aptosToken.transfer({ owner: bob, tokenAddress, recipient: alice.address() }),
+        {
+          checkSuccess: true,
+        },
+      );
+      getTokenDataSpy.mockRestore();
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "transfer non fungible token when isFungibleToken param set to false",
+    async () => {
+      await provider.waitForTransaction(
+        await aptosToken.transfer({ owner: alice, tokenAddress, recipient: bob.address() }, false),
+        {
+          checkSuccess: true,
+        },
+      );
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "getTokenData indexer query is not being called when isFungibleToken param is set",
+    async () => {
+      const getTokenDataSpy = jest.spyOn(provider, "getTokenData");
+      await aptosToken.transfer({ owner: bob, tokenAddress, recipient: alice.address() }, false);
+      expect(getTokenDataSpy).not.toBeCalled();
+      getTokenDataSpy.mockRestore();
     },
     longTestTimeout,
   );
