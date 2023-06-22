@@ -23,56 +23,56 @@ spec:
           restartPolicy: Never
           terminationGracePeriodSeconds: 0
           containers:
-            - name: backup-compaction
-              {{- if and $backup_compaction_cronjob (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
-              image: {{ (first $backup_compaction_cronjob.spec.jobTemplate.spec.template.spec.containers).image }}
-              {{ - else }}
-              image: {{ .Values.backup.image.repo }}:{{ .Values.backup.image.tag | default .Values.imageTag }}
-              {{- end }}
-              imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
-              command:
-                - /usr/local/bin/aptos-db-tool
-                - backup-maintenance
-                - compact
-                - --state-snapshot-file-compact-factor
-                - 100
-                - --transaction-file-compact-factor
-                - 100
-                - --epoch-ending-file-compact-factor
-                - 100
-                - --metadata-cache-dir
-                - /tmp/aptos-backup-compaction-metadata
-                - --command-adapter-config
-                # use the same config with the backup sts
-                - /opt/aptos/etc/{{ .Values.backup.config.location }}.yaml
-              env:
-              - name: RUST_LOG
-                value: "info"
-              - name: RUST_BACKTRACE
-                value: "1"
-              {{- if (include "backup.pushMetricsEndpoint" $) }}
-              - name: KUBERNETES_POD_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.name
-              - name: PUSH_METRICS_ENDPOINT
-                value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup_compaction" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)"
-              {{- end }}
-              {{- include "backup.backupEnvironment" (dict "config" $.Values.backup.config "era" $.Values.chain.era) | nindent 12 }}
-              {{- with .Values.backup_compaction }}
-              resources:
-              {{- toYaml .resources | nindent 14 }}
-              volumeMounts:
-                - name: backup-config
-                  mountPath: /opt/aptos/etc
-                - name: tmp
-                  mountPath: /tmp
-              securityContext:
-                readOnlyRootFilesystem: true
-                allowPrivilegeEscalation: false
-                capabilities:
-                  drop:
-                    - ALL
+          - name: backup-compaction
+            {{- if and $backup_compaction_cronjob (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
+            image: {{ (first $backup_compaction_cronjob.spec.jobTemplate.spec.template.spec.containers).image }}
+            {{- else }}
+            image: {{ .Values.backup.image.repo }}:{{ .Values.backup.image.tag | default .Values.imageTag }}
+            {{- end }}
+            imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
+            command:
+            - /usr/local/bin/aptos-db-tool
+            - backup-maintenance
+            - compact
+            - --state-snapshot-file-compact-factor
+            - "100"
+            - --transaction-file-compact-factor
+            - "100"
+            - --epoch-ending-file-compact-factor
+            - "100"
+            - --metadata-cache-dir
+            - /tmp/aptos-backup-compaction-metadata
+            - --command-adapter-config
+            # use the same config with the backup sts
+            - /opt/aptos/etc/{{ .Values.backup.config.location }}.yaml
+            env:
+            - name: RUST_LOG
+              value: "info"
+            - name: RUST_BACKTRACE
+              value: "1"
+            {{- if (include "backup.pushMetricsEndpoint" $) }}
+            - name: KUBERNETES_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: PUSH_METRICS_ENDPOINT
+              value: "{{- include "backup.pushMetricsEndpoint" $ }}/api/v1/import/prometheus?extra_label=role={{- .jobName | default "db_backup_compaction" }}&extra_label=kubernetes_pod_name=$(KUBERNETES_POD_NAME)"
+            {{- end }}
+            {{- include "backup.backupEnvironment" (dict "config" $.Values.backup.config "era" $.Values.chain.era) | nindent 12 }}
+            {{- with .Values.backup_compaction }}
+            resources:
+            {{- toYaml .resources | nindent 14 }}
+            volumeMounts:
+            - name: backup-config
+              mountPath: /opt/aptos/etc
+            - name: tmp
+              mountPath: /tmp
+            securityContext:
+              readOnlyRootFilesystem: true
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
           securityContext:
             runAsNonRoot: true
             runAsUser: 6180
@@ -92,9 +92,9 @@ spec:
           {{- end }}
           {{- end }}
           volumes:
-            - name: backup-config
-              configMap:
-                name: {{ include "backup.fullname" . }}-backup
+          - name: backup-config
+            configMap:
+              name: {{ include "backup.fullname" . }}-backup
           - name: tmp
             emptyDir: {}
           serviceAccountName: {{ include "backup.serviceAccount" . }}
