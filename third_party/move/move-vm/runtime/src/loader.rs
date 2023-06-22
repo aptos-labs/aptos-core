@@ -987,7 +987,14 @@ impl Loader {
         let type_arguments = ty_args
             .iter()
             .map(|ty| self.load_type(ty, data_store))
-            .collect::<VMResult<Vec<_>>>()?;
+            .collect::<VMResult<Vec<_>>>()
+            .map_err(|mut err| {
+                // User provided type arguement failed to load. Set extra sub status to distinguish from internal type loading error.
+                if StatusCode::TYPE_RESOLUTION_FAILURE == err.major_status() {
+                    err.set_sub_status(move_vm_types::errors::EUSER_TYPE_LOADING_FAILURE);
+                }
+                err
+            })?;
 
         // verify type arguments
         self.verify_ty_args(func.type_parameters(), &type_arguments)
