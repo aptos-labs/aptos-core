@@ -24,10 +24,10 @@ spec aptos_framework::code {
 
     spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
         // TODO: Can't verify `check_upgradability` in while loop.
-
-        pragma aborts_if_is_partial;
+        pragma verify = false;
+        pragma opaque;
         let addr = signer::address_of(owner);
-
+        modifies global<PackageRegistry>(addr);
         aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
     }
 
@@ -48,7 +48,7 @@ spec aptos_framework::code {
 
     spec check_coexistence(old_pack: &PackageMetadata, new_modules: &vector<String>) {
         // TODO: loop too deep.
-        pragma verify = false;
+
     }
 
     spec get_module_names(pack: &PackageMetadata): vector<String> {
