@@ -1,7 +1,7 @@
 module 0x1::transaction_context_test {
     use std::vector;
     use aptos_framework::transaction_context::create_unique_addr;
-    
+
     /// When checking the value of aggregator fails.
     const ENOT_UNIQUE: u64 = 20;
 

@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     assert_success,
     tests::common,
