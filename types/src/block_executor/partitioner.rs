@@ -93,6 +93,10 @@ impl CrossShardDependencies {
         &self.required_edges
     }
 
+    pub fn dependent_edges(&self) -> &CrossShardEdges {
+        &self.dependent_edges
+    }
+
     pub fn num_required_edges(&self) -> usize {
         self.required_edges.len()
     }
@@ -196,6 +200,15 @@ impl<T: Clone> SubBlock<T> {
 
     pub fn transactions_with_deps(&self) -> &Vec<TransactionWithDependencies<T>> {
         &self.transactions
+    }
+
+    pub fn txn_with_index_iter(
+        &self,
+    ) -> impl Iterator<Item = (TxnIndex, &TransactionWithDependencies<T>)> {
+        self.transactions
+            .iter()
+            .enumerate()
+            .map(move |(i, txn)| (self.start_index + i, txn))
     }
 
     pub fn into_transactions_with_deps(self) -> Vec<TransactionWithDependencies<T>> {

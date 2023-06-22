@@ -5,25 +5,27 @@ use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 
 #[derive(Clone, Debug)]
 pub enum CrossShardMsg {
-    RemoteTxnCommitMsg(RemoteTxnCommit),
+    RemoteTxnWriteMsg(RemoteTxnWrite),
     StopMsg,
 }
 
 #[derive(Clone, Debug)]
-pub struct RemoteTxnCommit {
+pub struct RemoteTxnWrite {
     txn_index: TxnIndex,
-    txn_writes: Vec<(StateKey, WriteOp)>,
+    state_key: StateKey,
+    write_op: WriteOp,
 }
 
-impl RemoteTxnCommit {
-    pub fn new(txn_index: TxnIndex, txn_writes: Vec<(StateKey, WriteOp)>) -> Self {
+impl RemoteTxnWrite {
+    pub fn new(txn_index: TxnIndex, state_key: StateKey, write_op: WriteOp) -> Self {
         Self {
             txn_index,
-            txn_writes,
+            state_key,
+            write_op,
         }
     }
 
-    pub fn take(self) -> (TxnIndex, Vec<(StateKey, WriteOp)>) {
-        (self.txn_index, self.txn_writes)
+    pub fn take(self) -> (TxnIndex, StateKey, WriteOp) {
+        (self.txn_index, self.state_key, self.write_op)
     }
 }
