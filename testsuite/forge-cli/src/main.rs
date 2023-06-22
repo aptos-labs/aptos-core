@@ -2080,4 +2080,10 @@ mod test {
         let namespace = random_namespace(words, &mut rng).unwrap();
         assert_eq!(namespace, "forge-durian-eggplant-fig-apple");
     }
+
+    #[test]
+    fn verify_tool() {
+        use clap::CommandFactory;
+        Args::command().debug_assert()
+    }
 }

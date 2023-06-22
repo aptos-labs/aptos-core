@@ -169,3 +169,9 @@ fn main() {
         write_output(&source_path.with_extension(mv_extension), &script);
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

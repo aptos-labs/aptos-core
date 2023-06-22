@@ -90,3 +90,9 @@ pub fn main() -> anyhow::Result<()> {
         &out_dir,
     )
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Options::command().debug_assert()
+}

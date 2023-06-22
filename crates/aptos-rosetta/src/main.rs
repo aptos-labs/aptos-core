@@ -278,3 +278,9 @@ impl ServerArgs for OnlineLocalArgs {
         self.online_args.owner_addresses()
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    CommandArgs::command().debug_assert()
+}

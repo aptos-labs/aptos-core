@@ -58,3 +58,9 @@ fn main() {
         println!("Time taken to partition: {:?}", elapsed);
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

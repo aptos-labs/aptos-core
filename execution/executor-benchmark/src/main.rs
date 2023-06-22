@@ -306,3 +306,9 @@ fn main() {
         run::<AptosVM>(opt);
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Opt::command().debug_assert()
+}

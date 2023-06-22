@@ -38,3 +38,9 @@ fn main() {
         println!("{}", content);
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Options::command().debug_assert()
+}

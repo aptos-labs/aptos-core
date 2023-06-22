@@ -574,3 +574,9 @@ pub fn setup_environment_and_start_node(
         _telemetry_runtime: telemetry_runtime,
     })
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    AptosNodeArgs::command().debug_assert()
+}

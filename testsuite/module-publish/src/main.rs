@@ -270,3 +270,9 @@ fn write_vector(file: &mut File, data: &[u8]) {
     }
     writeln!(file, "\t]").expect("Vector footer failed");
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

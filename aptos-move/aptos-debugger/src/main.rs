@@ -53,3 +53,9 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Argument::command().debug_assert()
+}

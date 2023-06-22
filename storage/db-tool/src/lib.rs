@@ -40,3 +40,9 @@ impl DBTool {
         }
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    DBTool::command().debug_assert()
+}

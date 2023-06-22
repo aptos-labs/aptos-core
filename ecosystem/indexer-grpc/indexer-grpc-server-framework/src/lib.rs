@@ -209,4 +209,10 @@ mod tests {
         assert_eq!(config.server_config.test, 123);
         assert_eq!(config.server_config.test_name, "test");
     }
+
+    #[test]
+    fn verify_tool() {
+        use clap::CommandFactory;
+        ServerArgs::command().debug_assert()
+    }
 }

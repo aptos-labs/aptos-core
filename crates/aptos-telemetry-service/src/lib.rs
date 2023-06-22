@@ -338,3 +338,9 @@ pub struct CustomEventConfig {
     pub dataset_id: String,
     pub table_id: String,
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    AptosTelemetryServiceArgs::command().debug_assert()
+}

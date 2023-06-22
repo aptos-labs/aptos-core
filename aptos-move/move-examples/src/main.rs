@@ -40,3 +40,9 @@ fn main() {
         .compile_package(&args.input_path, &mut std::io::stdout())
         .unwrap();
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}
