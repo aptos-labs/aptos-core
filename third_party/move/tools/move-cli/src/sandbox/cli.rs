@@ -159,7 +159,7 @@ pub struct StructLayoutOptions {
     #[clap(
         long = "type-args",
         value_parser = parser::parse_type_tag,
-        requires="struct",
+        requires = "struct_",
         num_args = 0..
     )]
     type_args: Option<Vec<TypeTag>>,
@@ -315,4 +315,10 @@ fn handle_generate_commands(cmd: &GenerateCommand, state: &OnDiskStateView) -> R
             )
         },
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    SandboxCommand::command().debug_assert()
 }

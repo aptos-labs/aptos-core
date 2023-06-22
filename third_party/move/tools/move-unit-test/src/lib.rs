@@ -107,10 +107,6 @@ pub struct UnitTestingConfig {
     #[clap(short = 'v', long = "verbose")]
     pub verbose: bool,
 
-    /// Whether the test output need to be printed out.
-    #[clap(short = 'v', long = "verbose")]
-    pub report_writeset: bool,
-
     /// Use the EVM-based execution backend.
     /// Does not work with --stackless.
     #[cfg(feature = "evm-backend")]
@@ -143,7 +139,6 @@ impl UnitTestingConfig {
             verbose: false,
             list: false,
             named_address_values: vec![],
-            report_writeset: false,
 
             #[cfg(feature = "evm-backend")]
             evm: false,
@@ -244,7 +239,7 @@ impl UnitTestingConfig {
             test_plan,
             native_function_table,
             cost_table,
-            self.report_writeset,
+            self.verbose,
             #[cfg(feature = "evm-backend")]
             self.evm,
         )
@@ -259,7 +254,7 @@ impl UnitTestingConfig {
             test_results.report_statistics(&shared_writer)?;
         }
 
-        if self.report_writeset {
+        if self.verbose {
             test_results.report_goldens(&shared_writer)?;
         }
 
@@ -268,4 +263,10 @@ impl UnitTestingConfig {
         let writer = shared_writer.into_inner().unwrap();
         Ok((writer, ok))
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    UnitTestingConfig::command().debug_assert()
 }
