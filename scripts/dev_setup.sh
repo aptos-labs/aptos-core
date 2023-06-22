@@ -422,8 +422,16 @@ function install_rustup_components_and_nightly {
 
     # We require nightly for strict rust formatting
     echo "Installing the nightly toolchain and rustfmt nightly"
-    rustup toolchain install nightly
-    rustup component add rustfmt --toolchain nightly
+
+    # TODO: make the nightly error handling more robust
+    if ! rustup toolchain install nightly
+    then
+      echo "Failed to install the nightly toolchain using rustup."
+    fi
+    if ! rustup component add rustfmt --toolchain nightly
+    then
+      echo "Failed to install rustfmt nightly using rustup."
+    fi
 }
 
 function install_cargo_sort {
