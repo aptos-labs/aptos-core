@@ -408,7 +408,7 @@ impl AptosVM {
         fail_point!("move_adapter::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error {
                 status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                sub_status: Some(move_vm_types::errors::EPARANOID_FAILURE),
+                sub_status: Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
                 message: None,
             })
         });
@@ -1693,7 +1693,7 @@ impl VMAdapter for AptosVM {
                         // Type resolution failure can be triggered by user input when providing a bad type argument, skip this case.
                         StatusCode::TYPE_RESOLUTION_FAILURE
                             if vm_status.sub_status()
-                                == Some(move_vm_types::errors::EUSER_TYPE_LOADING_FAILURE) => {},
+                                == Some(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE) => {},
                         // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
                         | StatusCode::TYPE_RESOLUTION_FAILURE => {
@@ -1709,7 +1709,7 @@ impl VMAdapter for AptosVM {
                         // Paranoid mode failure. We need to be alerted about this ASAP.
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                             if vm_status.sub_status()
-                                == Some(move_vm_types::errors::EPARANOID_FAILURE) =>
+                                == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE) =>
                         {
                             error!(
                                 *log_context,
@@ -1721,7 +1721,7 @@ impl VMAdapter for AptosVM {
                         // Paranoid mode failure but with reference counting
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                             if vm_status.sub_status()
-                                == Some(move_vm_types::errors::EREFERENCE_COUNTING_FAILURE) =>
+                                == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE) =>
                         {
                             error!(
                                 *log_context,
