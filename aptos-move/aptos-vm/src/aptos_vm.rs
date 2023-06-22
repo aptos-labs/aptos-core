@@ -1696,8 +1696,13 @@ impl VMAdapter for AptosVM {
 
                 if let StatusType::InvariantViolation = vm_status.status_type() {
                     match vm_status.status_code() {
-                        // The known Move function could be a result of speculative execution and should thus use speculative logger.
-                        StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION => {
+                        // Type resolution failure can be triggered by user input when providing a bad type argument, skip this case.
+                        StatusCode::TYPE_RESOLUTION_FAILURE
+                            if vm_status.sub_status()
+                                == Some(move_vm_types::errors::EUSER_TYPE_LOADING_FAILURE) => {},
+                        // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
+                        StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
+                        | StatusCode::TYPE_RESOLUTION_FAILURE => {
                             speculative_error!(
                                 log_context,
                                 format!(
@@ -1706,13 +1711,6 @@ impl VMAdapter for AptosVM {
                                     vm_status
                                 ),
                             );
-                        },
-                        // Type resolution failure could be a result of user input error so need to filter that out.
-                        StatusCode::TYPE_RESOLUTION_FAILURE
-                            if vm_status.sub_status()
-                                == Some(move_vm_types::errors::EUSER_TYPE_LOADING_FAILURE) =>
-                        {
-                            ()
                         },
                         // Paranoid mode failure. We need to be alerted about this ASAP.
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
@@ -1738,7 +1736,7 @@ impl VMAdapter for AptosVM {
                                 vm_status,
                             );
                         },
-                        // Ignore Storage Error as it can be triggered by paranoid execution.
+                        // Ignore Storage Error as it can be intentionally triggered by parallel execution.
                         StatusCode::STORAGE_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //
