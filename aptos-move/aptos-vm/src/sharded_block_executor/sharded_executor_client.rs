@@ -1,16 +1,19 @@
 // Copyright © Aptos Foundation
 
+use std::collections::HashSet;
 use crate::{
     block_executor::BlockAptosExecutor,
     sharded_block_executor::{
         block_executor_client::BlockExecutorClient, cross_shard_client::CrossShardCommitReceiver,
-        cross_shard_commit_listener::CrossShardCommitListener, messages::CrossShardMsg,
+        cross_shard_commit_sender::CrossShardCommitSender, messages::CrossShardMsg,
     },
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{BlockExecutorTransactions, ShardId, SubBlocksForShard},
+    block_executor::partitioner::{
+        BlockExecutorTransactions, ShardId, SubBlock, SubBlocksForShard,
+    },
     transaction::{analyzed_transaction::StorageLocation, Transaction, TransactionOutput},
 };
 use futures::{channel::oneshot, executor::block_on};
@@ -19,6 +22,8 @@ use std::sync::{
     mpsc::{Receiver, Sender},
     Arc, Mutex,
 };
+use crate::sharded_block_executor::composite_state_view::CompositeStateView;
+use crate::sharded_block_executor::cross_shard_state_view::CrossShardStateView;
 
 pub struct ShardedExecutorClient {
     shard_id: ShardId,
@@ -77,12 +82,25 @@ impl ShardedExecutorClient {
             })
             .collect()
     }
-}
 
-impl BlockExecutorClient for ShardedExecutorClient {
-    fn execute_block<S: StateView + Sync + Send>(
+    fn create_cross_shard_state_view(
         &self,
-        transactions: SubBlocksForShard<Transaction>,
+        sub_block: &SubBlock<Transaction>,
+    ) -> CrossShardStateView {
+        let mut cross_shard_state_key = HashSet::new();
+        for txn in sub_block.transactions {
+            for (txn_id, storage_locations) in txn.cross_shard_dependencies.required_edges_iter() {
+                for storage_location in storage_locations {
+                    cross_shard_state_key.insert(storage_location.clone().into_state_key());
+                }
+            }
+        }
+        CrossShardStateView::new(cross_shard_state_key)
+    }
+
+    fn execute_sub_block<S: StateView + Sync + Send>(
+        &self,
+        sub_block: SubBlock<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
@@ -92,29 +110,14 @@ impl BlockExecutorClient for ShardedExecutorClient {
             transactions.num_txns(),
             self.executor_thread_pool.clone(),
             maybe_block_gas_limit,
-            CrossShardCommitListener::new(
+            CrossShardCommitSender::new(
                 self.message_txs
                     .iter()
                     .map(|t| t.lock().unwrap().clone())
                     .collect(),
-                &transactions,
+                &sub_block,
             ),
         ));
-
-        for (txn_index, txn) in transactions.txn_with_index_iter() {
-            for (_, storage_locations) in txn.cross_shard_dependencies.required_edges_iter() {
-                for storage_location in storage_locations.iter() {
-                    match storage_location {
-                        StorageLocation::Specific(state_key) => {
-                            executor.mark_estimate(state_key, txn_index as TxnIndex);
-                        },
-                        _ => {
-                            panic!("Unsupported storage location")
-                        },
-                    }
-                }
-            }
-        }
 
         let executor_clone = executor.clone();
         let (callback, callback_receiver) = oneshot::channel();
@@ -123,13 +126,15 @@ impl BlockExecutorClient for ShardedExecutorClient {
         let self_message_tx = Arc::new(Mutex::new(
             self.message_txs[self.shard_id].lock().unwrap().clone(),
         ));
+        let cross_shard_state_view = self.create_cross_shard_state_view(&sub_block);
+        let composite_state_view = CompositeStateView::new(vec![&cross_shard_state_view, state_view]);
         self.executor_thread_pool.scope(|s| {
             s.spawn(move |_| {
                 CrossShardCommitReceiver::start(executor_clone, &message_rxs.lock().unwrap());
             });
             s.spawn(move |_| {
                 let ret = executor
-                    .execute_block(BlockExecutorTransactions::Sharded(transactions), state_view);
+                    .execute_block(BlockExecutorTransactions::Sharded(transactions), &composite_state_view);
                 // Send a stop command to the cross-shard commit receiver.
                 self_message_tx
                     .lock()
@@ -140,5 +145,70 @@ impl BlockExecutorClient for ShardedExecutorClient {
             });
         });
         block_on(callback_receiver).unwrap()
+    }
+}
+
+impl BlockExecutorClient for ShardedExecutorClient {
+    fn execute_block<S: StateView + Sync + Send>(
+        &self,
+        transactions: SubBlocksForShard<Transaction>,
+        state_view: &S,
+        concurrency_level: usize,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        todo!("Implement this")
+        // let executor = Arc::new(BlockAptosExecutor::new(
+        //     concurrency_level,
+        //     transactions.num_txns(),
+        //     self.executor_thread_pool.clone(),
+        //     maybe_block_gas_limit,
+        //     CrossShardCommitSender::new(
+        //         self.message_txs
+        //             .iter()
+        //             .map(|t| t.lock().unwrap().clone())
+        //             .collect(),
+        //         &transactions,
+        //     ),
+        // ));
+        //
+        // for (txn_index, txn) in transactions.txn_with_index_iter() {
+        //     for (_, storage_locations) in txn.cross_shard_dependencies.required_edges_iter() {
+        //         for storage_location in storage_locations.iter() {
+        //             match storage_location {
+        //                 StorageLocation::Specific(state_key) => {
+        //                     executor.mark_estimate(state_key, txn_index as TxnIndex);
+        //                 },
+        //                 _ => {
+        //                     panic!("Unsupported storage location")
+        //                 },
+        //             }
+        //         }
+        //     }
+        // }
+        //
+        // let executor_clone = executor.clone();
+        // let (callback, callback_receiver) = oneshot::channel();
+        //
+        // let message_rxs = self.message_rx.clone();
+        // let self_message_tx = Arc::new(Mutex::new(
+        //     self.message_txs[self.shard_id].lock().unwrap().clone(),
+        // ));
+        // self.executor_thread_pool.scope(|s| {
+        //     s.spawn(move |_| {
+        //         CrossShardCommitReceiver::start(executor_clone, &message_rxs.lock().unwrap());
+        //     });
+        //     s.spawn(move |_| {
+        //         let ret = executor
+        //             .execute_block(BlockExecutorTransactions::Sharded(transactions), state_view);
+        //         // Send a stop command to the cross-shard commit receiver.
+        //         self_message_tx
+        //             .lock()
+        //             .unwrap()
+        //             .send(CrossShardMsg::StopMsg)
+        //             .unwrap();
+        //         callback.send(ret).unwrap();
+        //     });
+        // });
+        // block_on(callback_receiver).unwrap()
     }
 }

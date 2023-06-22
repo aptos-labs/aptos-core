@@ -10,6 +10,7 @@ use std::{
     collections::HashMap,
     sync::{Arc, Condvar, Mutex},
 };
+use std::collections::HashSet;
 
 #[derive(Clone)]
 enum CrossShardValueStatus {
@@ -53,35 +54,36 @@ impl CrossShardStateValue {
 
 /// A state view for reading cross shard state values. It is backed by a state view
 /// and a hashmap of cross shard state keys. When a cross shard state value is not
-/// available in the hashmap, it will be fetched from the underlying state view.
+/// available in the hashmap, it will be fetched from the underlying base view.
 #[derive(Clone)]
-pub struct CrossShardStateView<'a, S: StateView + Sync + Send> {
+pub struct CrossShardStateView {
     cross_shard_data: HashMap<StateKey, CrossShardStateValue>,
-    state_view: &'a S,
 }
 
-impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
-    pub fn new(cross_shard_keys: Vec<StateKey>, state_view: &'a S) -> Self {
+impl CrossShardStateView {
+    pub fn new(cross_shard_keys: HashSet<StateKey>) -> Self {
         let mut cross_shard_data = HashMap::new();
         for key in cross_shard_keys {
             cross_shard_data.insert(key, CrossShardStateValue::waiting());
         }
-        Self {
-            cross_shard_data,
-            state_view,
+        Self { cross_shard_data }
+    }
+
+    pub fn set_value(&self, state_key: &StateKey, state_value: StateValue) {
+        if let Some(value) = self.cross_shard_data.get(state_key) {
+            value.set_value(state_value);
         }
     }
 }
 
-impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
+impl TStateView for CrossShardStateView {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        let may_be_value_cond = self.cross_shard_data.get(state_key);
-        if may_be_value_cond.is_none() {
-            return self.state_view.get_state_value(state_key);
+        if let Some(value) = self.cross_shard_data.get(state_key) {
+            return Ok(Some(value.get_value()));
         }
-        Ok(Some(may_be_value_cond.unwrap().get_value()))
+        Ok(None)
     }
 
     fn is_genesis(&self) -> bool {
@@ -90,5 +92,40 @@ impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::new_untracked())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::sharded_block_executor::cross_shard_state_view::CrossShardStateView;
+    use aptos_state_view::TStateView;
+    use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+    use std::{
+        sync::{Arc, Mutex},
+        thread,
+        time::Duration,
+    };
+
+    #[test]
+    fn test_cross_shard_state_view_get_state_value() {
+        let state_key = StateKey::raw("key1".as_bytes().to_owned());
+        let state_value = StateValue::from("value1".as_bytes().to_owned());
+        let state_value_clone = state_value.clone();
+        let state_key_clone = state_key.clone();
+
+        let cross_shard_state_view = Arc::new(CrossShardStateView::new(vec![state_key.clone()]));
+        let cross_shard_state_view_clone = cross_shard_state_view.clone();
+
+        let wait_thread = thread::spawn(move || {
+            let value = cross_shard_state_view_clone.get_state_value(&state_key_clone);
+            assert_eq!(value.unwrap(), Some(state_value_clone));
+        });
+
+        // Simulate some processing time before setting the value
+        thread::sleep(Duration::from_millis(100));
+
+        cross_shard_state_view.set_value(&state_key, state_value);
+
+        wait_thread.join().unwrap();
     }
 }

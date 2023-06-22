@@ -3,28 +3,29 @@
 use crate::{
     block_executor::BlockAptosExecutor,
     sharded_block_executor::{
-        cross_shard_commit_listener::CrossShardCommitListener, messages::CrossShardMsg,
+        cross_shard_commit_sender::CrossShardCommitSender, messages::CrossShardMsg,
     },
 };
 use aptos_state_view::StateView;
 use std::sync::{mpsc::Receiver, Arc};
+use crate::sharded_block_executor::cross_shard_state_view::CrossShardStateView;
 
 pub struct CrossShardCommitReceiver {}
 
 impl CrossShardCommitReceiver {
     pub fn start<S: StateView + Sync>(
-        block_executor: Arc<BlockAptosExecutor<S, CrossShardCommitListener>>,
+        cross_shard_state_view: Arc<CrossShardStateView>,
         message_rx: &Receiver<CrossShardMsg>,
     ) {
         loop {
             let msg = message_rx.recv().unwrap();
             match msg {
-                CrossShardMsg::RemoteTxnCommitMsg(txn_commit_msg) => {
-                    let (txn_index, txn_writes) = txn_commit_msg.take();
-                    for (state_key, write_op) in txn_writes {
-                        block_executor.add_txn_write(state_key, (txn_index, 0), write_op);
-                    }
-                    block_executor.mark_dependency_resolve(txn_index)
+                CrossShardMsg::RemoteTxnWriteMsg(txn_commit_msg) => {
+                    let (txn_index, state_key, write_op) = txn_commit_msg.take();
+                    // for (state_key, write_op) in txn_writes {
+                    //     block_executor.add_txn_write(state_key, (txn_index, 0), write_op);
+                    // }
+                    // block_executor.mark_dependency_resolve(txn_index)
                 },
                 CrossShardMsg::StopMsg => {
                     break;
