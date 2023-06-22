@@ -74,14 +74,14 @@ pub struct ApiConfig {
     pub gas_estimation: GasEstimationConfig,
 }
 
-pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
-pub const DEFAULT_PORT: u16 = 8080;
-pub const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 8 * 1024 * 1024; // 8 MB
+const DEFAULT_ADDRESS: &str = "127.0.0.1";
+const DEFAULT_PORT: u16 = 8080;
+const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 8 * 1024 * 1024; // 8 MB
 pub const DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE: usize = 10;
 pub const DEFAULT_MAX_PAGE_SIZE: u16 = 100;
-pub const DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE: u16 = 9999;
-pub const DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE: u16 = 9999;
-pub const DEFAULT_MAX_VIEW_GAS: u64 = 2_000_000; // We keep this value the same as the max number of gas allowed for one single transaction defined in aptos-gas.
+const DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE: u16 = 9999;
+const DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE: u16 = 9999;
+const DEFAULT_MAX_VIEW_GAS: u64 = 2_000_000; // We keep this value the same as the max number of gas allowed for one single transaction defined in aptos-gas.
 
 fn default_enabled() -> bool {
     true

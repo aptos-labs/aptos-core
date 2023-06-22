@@ -4,6 +4,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- export `bcsSerializeU256` from `bcs/helper.ts`
+- Add `examples` folder to `.npmignore`
+- use `0x1::aptos_account::transfer` in tests
+
 ## 1.10.0 (2023-06-07)
 
 - Add `x-aptos-client` header to `IndexerClient` requests

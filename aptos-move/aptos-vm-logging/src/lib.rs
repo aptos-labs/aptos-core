@@ -11,7 +11,10 @@ pub mod prelude {
     };
 }
 
-use crate::{counters::CRITICAL_ERRORS, log_schema::AdapterLogSchema};
+use crate::{
+    counters::{CRITICAL_ERRORS, SPECULATIVE_LOGGING_ERRORS},
+    log_schema::AdapterLogSchema,
+};
 use aptos_logger::{prelude::*, Level};
 use aptos_speculative_state_helper::{SpeculativeEvent, SpeculativeEvents};
 use arc_swap::ArcSwapOption;
@@ -98,11 +101,11 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
             Some(log_events) => {
                 let log_event = VMLogEntry::new(level, context.clone(), message);
                 if let Err(e) = log_events.record(txn_idx, log_event) {
-                    alert!("{:?}", e);
+                    speculative_alert!("{:?}", e);
                 };
             },
             None => {
-                alert!(
+                speculative_alert!(
                     "Speculative state not initialized to log message = {}",
                     message
                 );
@@ -120,14 +123,16 @@ pub fn flush_speculative_logs(num_to_flush: usize) {
             match Arc::try_unwrap(log_events_ptr) {
                 Ok(log_events) => log_events.flush(num_to_flush),
                 Err(_) => {
-                    alert!("Speculative log storage must be uniquely owned to flush");
+                    speculative_alert!("Speculative log storage must be uniquely owned to flush");
                 },
             };
         },
         None => {
             if !speculation_disabled() {
                 // Alert only if speculation is not disabled.
-                alert!("Clear all logs called on uninitialized speculative log storage");
+                speculative_alert!(
+                    "Clear all logs called on uninitialized speculative log storage"
+                );
             }
         },
     }
@@ -139,24 +144,34 @@ pub fn clear_speculative_txn_logs(txn_idx: usize) {
     match &*BUFFERED_LOG_EVENTS.load() {
         Some(log_events) => {
             if let Err(e) = log_events.clear_txn_events(txn_idx) {
-                alert!("{:?}", e);
+                speculative_alert!("{:?}", e);
             };
         },
         None => {
             if !speculation_disabled() {
                 // Alert only if speculation is not disabled.
-                alert!("Clear all logs called on uninitialized speculative log storage");
+                speculative_alert!(
+                    "Clear all logs called on uninitialized speculative log storage"
+                );
             }
         },
     }
 }
 
-/// Combine logging and error and incrementing critical errors counter for alerting.
+/// Alert for vm critical errors.
 #[macro_export]
 macro_rules! alert {
     ($($args:tt)+) => {
 	error!($($args)+);
 	CRITICAL_ERRORS.inc();
+    };
+}
+
+#[macro_export]
+macro_rules! speculative_alert {
+    ($($args:tt)+) => {
+	warn!($($args)+);
+	SPECULATIVE_LOGGING_ERRORS.inc();
     };
 }
 

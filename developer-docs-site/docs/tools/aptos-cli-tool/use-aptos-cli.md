@@ -49,10 +49,22 @@ OPTIONS:
     -V, --version    Print version information
 
 SUBCOMMANDS:
+    build-publish-payload
+            Build a publication transaction payload and store it in a JSON output file
     clean
             Cleans derived artifacts of a package
     compile
-            Compiles a package and returns the [`ModuleId`]s
+            Compiles a package and returns the associated ModuleIds
+    compile-script
+            Compiles a Move script into bytecode
+    coverage
+            Computes coverage for a package
+    create-resource-account-and-publish-package
+            Publishes the modules in a Move package to the Aptos blockchain under a resource account
+    disassemble
+            Disassemble the Move bytecode pointed to
+    document
+            Documents a Move package
     download
             Downloads a package and stores it in a directory named after the package
     help
@@ -60,17 +72,23 @@ SUBCOMMANDS:
     init
             Creates a new Move package at the given location
     list
-            Lists information about packages and modules on-chain
+            Lists information about packages and modules on-chain for an account
     prove
-            Proves the Move package
+            Proves a Move package
     publish
             Publishes the modules in a Move package to the Aptos blockchain
     run
             Run a Move function
+    run-script
+            Run a Move script
     test
             Runs Move unit tests for a package
     transactional-test
             Run Move transactional tests
+    verify-package
+            Downloads a package and verifies the bytecode
+    view
+            Run a view function
 ```
 ### Sub-command help
 
@@ -82,15 +100,30 @@ USAGE:
     aptos move compile [OPTIONS]
 
 OPTIONS:
+        --bytecode-version <BYTECODE_VERSION>
+            Specify the version of the bytecode the compiler is going to emit
+
     -h, --help
             Print help information
+
+        --included-artifacts <INCLUDED_ARTIFACTS>
+            Artifacts to be generated when building the package
+
+            Which artifacts to include in the package. This can be one of `none`, `sparse`, and
+            `all`. `none` is the most compact form and does not allow to reconstruct a source
+            package from chain; `sparse` is the minimal set of artifacts needed to reconstruct a
+            source package; `all` includes all available artifacts. The choice of included artifacts
+            heavily influences the size and therefore gas cost of publishing: `none` is the size of
+            bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4 as much.
+
+            [default: sparse]
 
         --named-addresses <NAMED_ADDRESSES>
             Named addresses for the move binary
 
-            Example: alice=0x1234,bob=0x5678
+            Example: alice=0x1234, bob=0x5678
 
-            Note: This will fail if there are duplicates in the Move.toml file remove those first. Also make sure there's no space in between named addresses if more than one is provided.
+            Note: This will fail if there are duplicates in the Move.toml file remove those first.
 
             [default: ]
 
@@ -101,6 +134,18 @@ OPTIONS:
 
         --package-dir <PACKAGE_DIR>
             Path to a move package (the folder with a Move.toml file)
+
+        --save-metadata
+            Save the package metadata in the package's build directory
+
+            If set, package metadata should be generated and stored in the package's build
+            directory. This metadata can be used to construct a transaction to publish a package.
+
+        --skip-fetch-latest-git-deps
+            Skip pulling the latest git dependencies
+
+            If you don't have a network connection, the compiler may fail due to no ability to pull
+            git dependencies.  This will allow overriding this for local development.
 
     -V, --version
             Print version information

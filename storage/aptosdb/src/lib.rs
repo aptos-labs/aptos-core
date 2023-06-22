@@ -459,9 +459,7 @@ impl AptosDB {
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
-        let ledger_next_version = self
-            .get_latest_transaction_info_option()?
-            .map_or(0, |(v, _)| v + 1);
+        let ledger_next_version = self.get_latest_version().map_or(0, |v| v + 1);
         info!(
             indexer_next_version = indexer.next_version(),
             ledger_next_version = ledger_next_version,
@@ -825,10 +823,7 @@ impl AptosDB {
             .current_version
             .map(|version| version + 1)
             .unwrap_or(0);
-        let num_transactions_in_db = self
-            .get_latest_transaction_info_option()?
-            .map(|(version, _)| version + 1)
-            .unwrap_or(0);
+        let num_transactions_in_db = self.get_latest_version().map_or(0, |v| v + 1);
         ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
             "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
             first_version,
@@ -922,6 +917,7 @@ impl AptosDB {
 
         let ledger_metadata_batch = SchemaBatch::new();
         let sharded_state_kv_batches = new_sharded_kv_schema_batch();
+        let state_kv_metadata_batch = SchemaBatch::new();
 
         // TODO(grao): Make state_store take sharded state updates.
         self.state_store.put_value_sets(
@@ -931,6 +927,8 @@ impl AptosDB {
             sharded_state_cache,
             &ledger_metadata_batch,
             &sharded_state_kv_batches,
+            &state_kv_metadata_batch,
+            self.state_store.state_kv_db.enabled_sharding(),
         )?;
 
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
@@ -953,7 +951,11 @@ impl AptosDB {
             });
             s.spawn(|| {
                 self.state_kv_db
-                    .commit(last_version, sharded_state_kv_batches)
+                    .commit(
+                        last_version,
+                        state_kv_metadata_batch,
+                        sharded_state_kv_batches,
+                    )
                     .unwrap();
             });
         });
@@ -1330,6 +1332,12 @@ impl DbReader for AptosDB {
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
         gauged_api("get_latest_ledger_info_option", || {
             Ok(self.ledger_store.get_latest_ledger_info_option())
+        })
+    }
+
+    fn get_latest_version(&self) -> Result<Version> {
+        gauged_api("get_latest_version", || {
+            self.ledger_store.get_latest_version()
         })
     }
 
@@ -1851,12 +1859,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>> {
-        gauged_api("get_latest_transaction_info_option", || {
-            self.ledger_store.get_latest_transaction_info_option()
-        })
-    }
-
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         gauged_api("get_latest_state_checkpoint_version", || {
             Ok(self
@@ -2159,6 +2161,7 @@ impl DbWriter for AptosDB {
             // Create a single change set for all further write operations
             let mut batch = SchemaBatch::new();
             let mut sharded_kv_batch = new_sharded_kv_schema_batch();
+            let state_kv_metadata_batch = SchemaBatch::new();
             // Save the target transactions, outputs, infos and events
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
                 output_with_proof
@@ -2186,7 +2189,7 @@ impl DbWriter for AptosDB {
                 &transaction_infos,
                 &events,
                 wsets,
-                Option::Some((&mut batch, &mut sharded_kv_batch)),
+                Option::Some((&mut batch, &mut sharded_kv_batch, &state_kv_metadata_batch)),
                 false,
             )?;
 
