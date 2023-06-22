@@ -7,7 +7,7 @@ slug: "move-tutorial"
 
 Welcome to the Aptos Move Tutorial! This is the original Move language and tools tutorial, independent of a particular network, adapted to use Aptos tooling. Here you will learn basic usage of the Move language and tools for compiling, testing, and verifying Move.
 
-This tutorial does not teach you how to use the existing [Aptos Move frameworks](../../../developer-docs-site/docs/reference/move.md) or how to run code on the Aptos network. See the [Aptos developer documentation](../../../developer-docs-site/docs/tutorials/index.md) for those instructions.
+This tutorial does not teach you how to use the existing [Aptos Move frameworks](https://aptos.dev/reference/move) or how to run code on the Aptos network. See the [Aptos developer documentation](../../../developer-docs-site/docs/tutorials/index.md) for those instructions.
 
 There are nine steps in total:
 
