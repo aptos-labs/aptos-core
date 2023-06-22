@@ -149,7 +149,8 @@ def test_account_rotate_key(run_helper: RunHelper, test_name=None):
         raise TestError(
             f"lookup-address of new public key does not match original address: {old_profile.account_address}"
         )
-        
+
+
 @test_case
 def test_account_resource_account(run_helper: RunHelper, test_name=None):
     # Seed for the resource account
