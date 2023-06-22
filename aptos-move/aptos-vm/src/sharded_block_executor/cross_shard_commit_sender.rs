@@ -6,11 +6,9 @@ use crate::sharded_block_executor::messages::{
 use aptos_block_executor::txn_commit_listener::TransactionCommitListener;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    block_executor::partitioner::{
-        CrossShardEdges, SubBlock, SubBlocksForShard, TxnIdxWithShardId,
-    },
+    block_executor::partitioner::{SubBlock, TxnIdxWithShardId},
     state_store::state_key::StateKey,
-    transaction::{analyzed_transaction::StorageLocation, Transaction},
+    transaction::Transaction,
     write_set::WriteOp,
 };
 use std::{
@@ -32,10 +30,7 @@ pub struct CrossShardCommitSender {
 }
 
 impl CrossShardCommitSender {
-    pub fn new(
-        message_txs: Vec<Sender<CrossShardMsg>>,
-        sub_block: &SubBlock<Transaction>,
-    ) -> Self {
+    pub fn new(message_txs: Vec<Sender<CrossShardMsg>>, sub_block: &SubBlock<Transaction>) -> Self {
         let mut dependent_edges = HashMap::new();
         for (txn_idx, txn_with_deps) in sub_block.txn_with_index_iter() {
             let mut storage_locations_to_target = HashMap::new();
