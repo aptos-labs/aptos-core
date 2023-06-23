@@ -7,6 +7,7 @@ use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use move_binary_format::CompiledModule;
+use std::fs::read_dir;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -60,59 +61,69 @@ fn sign_txn(
 }
 
 fn main() {
-    //// Compile test-package
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("samples")
-        .join("test-package");
+    //// Discover all top-level packages in samples directory
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples");
+    let dirs = read_dir(path.as_path()).unwrap();
 
-    //let build_options = BuildOptions::default();
-    let build_options = BuildOptions {
-        with_srcs: true,
-        with_abis: true,
-        with_source_maps: true,
-        with_error_map: true,
-        ..BuildOptions::default()
-    };
-    let package = BuiltPackage::build(path, build_options).expect("build package must succeed");
-
-    //// Setting up local execution environment
-    let start = Instant::now();
+    //// Setting up local execution environment once
     // disable parallel execution
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
-    let mut sequence_num_counter = 0;
 
-    let codes = package.extract_code();
-    for code in codes {
-        let compiled_module = CompiledModule::deserialize(&code).unwrap();
-        let mut module_bytes = vec![];
-        compiled_module.serialize(&mut module_bytes).unwrap();
-        let module_id = compiled_module.self_id();
-        let address = &module_id.address();
-        let identifier = &module_id.name().as_str();
+    //// Go over all Move projects
+    for dir in dirs {
+        let entry = dir.unwrap();
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let dir_path = entry.path();
 
-        //// publish test-package under module address
-        let creator = executor.new_account_at(**address);
+        let build_options = BuildOptions {
+            with_srcs: true,
+            with_abis: true,
+            with_source_maps: true,
+            with_error_map: true,
+            ..BuildOptions::default()
+        };
+        let package =
+            BuiltPackage::build(dir_path, build_options).expect("build package must succeed");
 
-        // publish package similar to create_publish_package in harness.rs
-        let module_payload = generate_module_payload(&package);
-        sign_txn(
-            &mut executor,
-            &creator,
-            module_payload,
-            sequence_num_counter,
-        );
-        sequence_num_counter = sequence_num_counter + 1;
+        //// Restart timer and sequence counter for each new package
+        let start = Instant::now();
+        let mut sequence_num_counter = 0;
 
-        //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
-        let entry_fun_payload = generate_entry_fun_payloads(&creator, *identifier);
-        sign_txn(
-            &mut executor,
-            &creator,
-            entry_fun_payload,
-            sequence_num_counter,
-        );
+        let codes = package.extract_code();
+        for code in codes {
+            let compiled_module = CompiledModule::deserialize(&code).unwrap();
+            let mut module_bytes = vec![];
+            compiled_module.serialize(&mut module_bytes).unwrap();
+            let module_id = compiled_module.self_id();
+            let address = &module_id.address();
+            let identifier = &module_id.name().as_str();
+
+            //// publish test-package under module address
+            let creator = executor.new_account_at(**address);
+
+            // publish package similar to create_publish_package in harness.rs
+            let module_payload = generate_module_payload(&package);
+            sign_txn(
+                &mut executor,
+                &creator,
+                module_payload,
+                sequence_num_counter,
+            );
+            sequence_num_counter = sequence_num_counter + 1;
+
+            //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
+            let entry_fun_payload = generate_entry_fun_payloads(&creator, *identifier);
+            sign_txn(
+                &mut executor,
+                &creator,
+                entry_fun_payload,
+                sequence_num_counter,
+            );
+        }
+
+        println!("running time (ms): {}", start.elapsed().as_millis());
     }
-
-    println!("running time (ms): {}", start.elapsed().as_millis());
 }
