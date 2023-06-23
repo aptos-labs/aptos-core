@@ -200,3 +200,26 @@ def test_move_view(run_helper: RunHelper, test_name=None):
     response = json.loads(response.stdout)
     if response["Result"] == None or response["Result"][0] != True:
         raise TestError("View function did not return correct result")
+
+
+@test_case
+def test_move_test(run_helper: RunHelper, test_name=None):
+    package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
+    account_info = run_helper.get_account_info()
+
+    # Run the test
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "test",
+            "--package-dir",
+            package_dir,
+            "--named-addresses",
+            f"addr={account_info.account_address}",
+        ],
+    )
+
+    if '"Result": "Success"' not in response.stdout:
+        raise TestError("Move test did not run successfully")

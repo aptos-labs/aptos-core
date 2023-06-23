@@ -41,6 +41,7 @@ from cases.move import (
     test_move_compile_script,
     test_move_publish,
     test_move_run,
+    test_move_test,
     test_move_view,
 )
 from common import Network
@@ -131,6 +132,7 @@ def run_tests(run_helper):
     test_move_compile_script(run_helper)
     test_move_publish(run_helper)
     test_move_run(run_helper)
+    test_move_test(run_helper)
 
 
 def main():
