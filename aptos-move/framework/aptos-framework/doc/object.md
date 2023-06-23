@@ -77,7 +77,11 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `is_owner`](#0x1_object_is_owner)
 -  [Function `owns`](#0x1_object_owns)
 -  [Specification](#@Specification_1)
+    -  [Function `address_to_object`](#@Specification_1_address_to_object)
     -  [Function `exists_at`](#@Specification_1_exists_at)
+    -  [Function `convert`](#@Specification_1_convert)
+    -  [Function `object_from_constructor_ref`](#@Specification_1_object_from_constructor_ref)
+    -  [Function `object_from_delete_ref`](#@Specification_1_object_from_delete_ref)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -1871,6 +1875,23 @@ Return true if the provided address has indirect or direct ownership of the prov
 ## Specification
 
 
+<a name="@Specification_1_address_to_object"></a>
+
+### Function `address_to_object`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;T&gt;(<a href="object.md#0x1_object">object</a>);
+</code></pre>
+
+
+
 <a name="@Specification_1_exists_at"></a>
 
 ### Function `exists_at`
@@ -1883,6 +1904,57 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a name="@Specification_1_convert"></a>
+
+### Function `convert`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_convert">convert</a>&lt;X: key, Y: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;X&gt;): <a href="object.md#0x1_object_Object">object::Object</a>&lt;Y&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);
+<b>aborts_if</b> !<b>exists</b>&lt;Y&gt;(<a href="object.md#0x1_object">object</a>.inner);
+</code></pre>
+
+
+
+<a name="@Specification_1_object_from_constructor_ref"></a>
+
+### Function `object_from_constructor_ref`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<b>aborts_if</b> !<b>exists</b>&lt;T&gt;(ref.self);
+</code></pre>
+
+
+
+<a name="@Specification_1_object_from_delete_ref"></a>
+
+### Function `object_from_delete_ref`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_ref">object_from_delete_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<b>aborts_if</b> !<b>exists</b>&lt;T&gt;(ref.self);
 </code></pre>
 
 

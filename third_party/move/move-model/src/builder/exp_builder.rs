@@ -2318,7 +2318,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 // calls to built-in functions might have additional requirements on the types
                 let oper = cand.get_operation();
                 match oper {
-                    | Operation::BorrowGlobal(_)
+                    Operation::BorrowGlobal(_)
                     | Operation::MoveFrom
                     | Operation::MoveTo
                     | Operation::Global(_) => {
