@@ -21,12 +21,6 @@ fn main() {
     let build_options = BuildOptions::default();
     let package = BuiltPackage::build(path, build_options).expect("build package must succeed");
 
-    /*let mut modules_iter = package.modules();
-    let module = modules_iter.next().expect("CompiledModule");
-    let mod_id = &module.self_id();
-    let mut bytes = vec![];
-    module.serialize(&mut bytes).unwrap();*/
-
     //// Setting up local execution environment
     let start = Instant::now();
     // disable parallel execution
@@ -34,9 +28,10 @@ fn main() {
     let mut executor = executor.set_not_parallel();
     let mut sequence_num_counter = 0;
 
-    // publish test-package under 0xbeef
+    //// publish test-package under 0xbeef
     let creator = executor.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
-    // executor.add_module(mod_id, bytes);
+
+    // publish package similar to create_publish_package in harness.rs
     let code = package.extract_code();
     let metadata = package
         .extract_metadata()
@@ -55,10 +50,11 @@ fn main() {
     let module_txn_output = executor.execute_transaction(module_signed_txn);
     let module_txn_status = module_txn_output.status().to_owned();
     println!("module publish status: {:?}", module_txn_status);
+    // apply write set to avoid LINKER_ERROR
     executor.apply_write_set(module_txn_output.write_set());
     sequence_num_counter = sequence_num_counter + 1;
 
-    // send a txn that invokes the entry function 0xbeef::test::benchmark
+    //// send a txn that invokes the entry function 0xbeef::test::benchmark
     let MemberId {
         module_id,
         member_id: function_id,
@@ -69,7 +65,6 @@ fn main() {
         vec![],
         vec![],
     ));
-
     let entry_fun_signed_txn = creator
         .transaction()
         .sequence_number(sequence_num_counter)
