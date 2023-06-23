@@ -87,11 +87,11 @@ impl TestConfig {
 
         // Putting the generated test baseline into a Refcell to avoid problems with mut borrow
         // in closures.
-        let baseline = RefCell::new(String::new());
+        let test_output = RefCell::new(String::new());
 
         // Run context checker
         let env = move_compiler_v2::run_checker(options)?;
-        let ok = Self::check_diags(&mut baseline.borrow_mut(), &env);
+        let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
         if ok && !self.check_only {
             // Run stackless bytecode generator
             let mut targets = move_compiler_v2::run_bytecode_gen(&env);
@@ -102,7 +102,7 @@ impl TestConfig {
                 // Hook which is run before steps in the pipeline. Prints out initial
                 // bytecode from the generator.
                 |targets_before| {
-                    let baseline = &mut baseline.borrow_mut();
+                    let baseline = &mut test_output.borrow_mut();
                     Self::check_diags(baseline, &env);
                     baseline.push_str(&move_stackless_bytecode::print_targets_for_test(
                         &env,
@@ -113,7 +113,7 @@ impl TestConfig {
                 // Hook which is run after every step in the pipeline. Prints out
                 // bytecode after the processor.
                 |_, processor, targets_after| {
-                    let baseline = &mut baseline.borrow_mut();
+                    let baseline = &mut test_output.borrow_mut();
                     Self::check_diags(baseline, &env);
                     baseline.push_str(&move_stackless_bytecode::print_targets_for_test(
                         &env,
@@ -126,7 +126,7 @@ impl TestConfig {
 
         // Generate/check baseline.
         let baseline_path = path.with_extension(exp_file_ext);
-        baseline_test::verify_or_update_baseline(baseline_path.as_path(), &baseline.borrow())?;
+        baseline_test::verify_or_update_baseline(baseline_path.as_path(), &test_output.borrow())?;
 
         Ok(())
     }

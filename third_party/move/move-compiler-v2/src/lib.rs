@@ -45,9 +45,9 @@ pub fn run_move_compiler(
             .and_then(|f| {
                 Path::new(f)
                     .file_name()
-                    .map(|f| f.to_string_lossy().to_string())
+                    .map(|f| f.to_string_lossy().as_ref().to_owned())
             })
-            .unwrap_or_else(|| "dump".to_string());
+            .unwrap_or_else(|| "dump".to_owned());
         pipeline.run_with_dump(&env, &mut targets, &dump_base_name, false)
     } else {
         pipeline.run(&env, &mut targets)
