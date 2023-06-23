@@ -55,7 +55,7 @@ impl DagHandler {
                     .to_bytes(&response_msg.into_network_message())
                     .map(Bytes::from)
             })
-            .map_err(RpcError::Error);
+            .map_err(RpcError::ApplicationError);
 
         rpc_request
             .response_sender

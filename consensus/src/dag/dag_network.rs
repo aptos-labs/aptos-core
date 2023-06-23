@@ -1,5 +1,6 @@
 use crate::dag::types::DAGMessage;
 use aptos_consensus_types::common::Author;
+use aptos_network::protocols::network::RpcError;
 use async_trait::async_trait;
 use std::time::Duration;
 
@@ -17,5 +18,5 @@ pub trait DAGNetworkSender: Send + Sync {
         receiver: Author,
         message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<DAGMessage>;
+    ) -> Result<DAGMessage, RpcError>;
 }

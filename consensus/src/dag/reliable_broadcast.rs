@@ -6,8 +6,11 @@ use crate::dag::{
     types::{DAGMessageTrait, Node, NodeDigestSignature},
 };
 use aptos_consensus_types::common::{Author, Round};
+use aptos_logger::warn;
+use aptos_network::protocols::network::RpcError;
 use aptos_types::validator_signer::ValidatorSigner;
 use futures::{stream::FuturesUnordered, StreamExt};
+use itertools::min;
 use std::{collections::BTreeMap, future::Future, sync::Arc, time::Duration};
 
 pub trait BroadcastStatus {
@@ -64,7 +67,17 @@ impl ReliableBroadcast {
                             }
                         }
                     },
-                    Err(_) => fut.push(send_message(receiver, network_message.clone())),
+                    Err(rpc_error) => match rpc_error {
+                        RpcError::TimedOut => {
+                            fut.push(send_message(receiver, network_message.clone()))
+                        },
+                        RpcError::ApplicationError(e) => {
+                            warn!("peer returned an error: {}", e)
+                        },
+                        _ => {
+                            todo!("handle other possible errors")
+                        },
+                    },
                 }
             }
             unreachable!("Should aggregate with all responses");
@@ -73,6 +86,7 @@ impl ReliableBroadcast {
 }
 
 pub struct NodeBroadcastHandler {
+    lowest_round: Round,
     signatures_by_round_peer: BTreeMap<Round, BTreeMap<Author, NodeDigestSignature>>,
     signer: ValidatorSigner,
 }
@@ -80,12 +94,15 @@ pub struct NodeBroadcastHandler {
 impl NodeBroadcastHandler {
     pub fn new(signer: ValidatorSigner) -> Self {
         Self {
+            // TODO(ibalajiarun): Initialize lowest round and signatures from storage
+            lowest_round: 0,
             signatures_by_round_peer: BTreeMap::new(),
             signer,
         }
     }
 
     pub fn gc_before_round(&mut self, min_round: Round) {
+        self.lowest_round = min_round;
         self.signatures_by_round_peer.retain(|r, _| r >= &min_round);
     }
 }
@@ -95,6 +112,14 @@ impl RpcHandler for NodeBroadcastHandler {
     type Message = Node;
 
     fn process(&mut self, message: Self::Message) -> anyhow::Result<Self::Ack> {
+        if message.metadata().round() < self.lowest_round {
+            return Err(anyhow::anyhow!(
+                "message round too low. min round: {}, message round: {}",
+                self.lowest_round,
+                message.metadata().round()
+            ));
+        }
+
         let signatures_by_peer = self
             .signatures_by_round_peer
             .entry(message.metadata().round())
