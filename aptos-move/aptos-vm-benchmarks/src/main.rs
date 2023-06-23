@@ -90,10 +90,12 @@ fn main() {
 
         //// Restart timer and sequence counter for each new package
         let start = Instant::now();
-        let mut sequence_num_counter = 0;
 
         let codes = package.extract_code();
         for code in codes {
+            // avoid SEQUENCE_NUMBER_TOO_NEW error
+            let mut sequence_num_counter = 0;
+
             let compiled_module = CompiledModule::deserialize(&code).unwrap();
             let mut module_bytes = vec![];
             compiled_module.serialize(&mut module_bytes).unwrap();
