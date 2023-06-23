@@ -69,28 +69,34 @@ You can configure the port settings on your node using the configuration YAML fi
 ### Port settings
 
 :::tip Default port settings
-The recommendations described below assume the default port settings used by validators, validator fullnodes and public fullnodes. If you have changed the default port settings, then you should adjust the recommendations accordingly.
+The recommendations described below assume the default port settings used by validators, validator fullnodes and public fullnodes. **We recommend that you do not expose any other ports while operating a node.** If you have changed the default port settings, then you should adjust the recommendations accordingly.
 :::
 
-For the Validator:
+#### For the validator:
 
-- Open the TCP port `6180` publicly, to enable the validator to connect to other validators in the network.
-- Open the TCP port `6181` to the validator fullnode. Note: this port should not be opened publicly, but rather only be accessible by your validator fullnode.
-- Close TCP ports `6182` (to prevent public fullnode connections), `9101` (to prevent unauthorized metric inspection) and `80/8080` (to prevent unauthorized REST API access).
-- Note: no other ports should be exposed when operating the validator.
+- Open the following TCP ports:
+  - `6180` – Open publicly to enable the validator to connect to other validators in the network.
+  - `6181` – Open privately to only be accessible by your validator fullnode.
+- Close the following TCP ports:
+  - `6182` – To prevent public fullnode connections
+  - `9101` – To prevent unauthorized metric inspection
+  - `80/8080` – To prevent unauthorized REST API access
 
-For the Validator Fullnode:
+#### For the validator fullnode:
 
-- Open the TCP port `6182` publicly, to enable public fullnodes to connect to your validator fullnode.
-- Open the TCP port `6181` to the validator. Note: this port should not be opened publicly, but rather only be accessible by your validator node.
-- Close TCP ports `9101` (to prevent unauthorized metric inspection) and `80/8080` (to prevent unauthorized REST API access).
-- Note: no other ports should be exposed when operating the validator fullnode.
+- Open the following TCP ports:
+  - `6182` – Open publicly to enable public fullnodes to connect to your validator fullnode.
+  - `6181` – Open privately to only be accessible by your validator.
+- Close the following TCP ports:
+  - `9101` – To prevent unauthorized metric inspection
+  - `80/8080` – To prevent unauthorized REST API access
 
-For a Public Fullnode:
-- If you wish for other public fullnodes to connect to your node, open the TCP port `6182` publicly.
-- Unless you wish to publicly expose your REST API and metrics inspection services, close TCP ports `9101` (to prevent unauthorized metric inspection) and ports `80/8080` (to prevent unauthorized REST API access).
-- No other ports should be required to operate a public fullnode.
+#### For a public fullnode:
+- Open the TCP port `6182` publicly to enable other public fullnodes to connect to your node. 
+- Close the following TCP ports:
+  - `9101` – To prevent unauthorized metric inspection
+  - `80/8080` – To prevent unauthorized REST API access
 
 :::caution Exposing services
-We note that the inspection port (`9101`) and the REST API port (`80` or `8080`) are likely useful for your internal network, e.g., application development and debugging. However, the inspection port should never be exposed publicly as it can be easily abused. Similarly, if you choose to expose the REST API endpoint publicly, you should deploy an additional authentication or rate limiting mechanism to prevent abuse.
+We note that the inspection port (`9101`) and the REST API port (`80` or `8080`) are likely useful for your internal network, e.g., application development and debugging. However, the inspection port should never be exposed publicly as it can be easily abused. Similarly, if you choose to expose the REST API endpoint publicly, you should deploy an additional authentication or rate-limiting mechanism to prevent abuse.
 :::
