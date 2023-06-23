@@ -1326,6 +1326,17 @@ Helper to check whether a feature flag is enabled.
 
 
 
+
+<a name="0x1_features_spec_gas_payer_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_gas_payer_enabled">spec_gas_payer_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>)
+}
+</code></pre>
+
+
+
 <a name="@Specification_1_set"></a>
 
 ### Function `set`

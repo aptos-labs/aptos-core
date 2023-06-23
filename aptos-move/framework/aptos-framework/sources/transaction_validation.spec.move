@@ -115,7 +115,8 @@ spec aptos_framework::transaction_validation {
         } else {
             secondary_signer_addresses[len(secondary_signer_addresses) - 1]
         };
-        aborts_if txn_sequence_number >= GAS_PAYER_FLAG_BIT && !features::gas_payer_enabled();
+        aborts_if txn_sequence_number >= GAS_PAYER_FLAG_BIT && !features::spec_gas_payer_enabled();
+        aborts_if txn_sequence_number >= GAS_PAYER_FLAG_BIT && len(secondary_signer_addresses) == 0;
         let adjusted_txn_sequence_number = if (txn_sequence_number >= GAS_PAYER_FLAG_BIT) {
             txn_sequence_number - GAS_PAYER_FLAG_BIT
         } else {

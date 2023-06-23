@@ -703,7 +703,8 @@ not equal the number of singers.
 } <b>else</b> {
     secondary_signer_addresses[len(secondary_signer_addresses) - 1]
 };
-<b>aborts_if</b> txn_sequence_number &gt;= <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a> && !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_gas_payer_enabled">features::gas_payer_enabled</a>();
+<b>aborts_if</b> txn_sequence_number &gt;= <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a> && !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_gas_payer_enabled">features::spec_gas_payer_enabled</a>();
+<b>aborts_if</b> txn_sequence_number &gt;= <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a> && len(secondary_signer_addresses) == 0;
 <b>let</b> adjusted_txn_sequence_number = <b>if</b> (txn_sequence_number &gt;= <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>) {
     txn_sequence_number - <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>
 } <b>else</b> {
