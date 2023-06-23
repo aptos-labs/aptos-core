@@ -37,7 +37,7 @@ pub struct GasEstimationConfig {
 impl Default for GasEstimationConfig {
     fn default() -> GasEstimationConfig {
         GasEstimationConfig {
-            enabled: false,
+            enabled: true,
             static_override: None,
             full_block_txns: 250,
             low_block_history: 10,
