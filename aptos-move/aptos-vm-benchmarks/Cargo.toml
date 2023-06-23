@@ -1,0 +1,14 @@
+[package]
+name = "aptos-vm-benchmarks"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aptos = { workspace = true }
+aptos-framework = { workspace = true }
+aptos-language-e2e-tests = { workspace = true }
+aptos-types = { workspace = true }
+aptos-cached-packages = { workspace = true }
+bcs = { workspace = true }
