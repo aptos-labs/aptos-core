@@ -9,6 +9,8 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload, TransactionStatus},
 };
+use move_binary_format::CompiledModule;
+use move_bytecode_source_map::source_map::SourceMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -67,7 +69,14 @@ fn main() {
         .join("samples")
         .join("test-package");
 
-    let build_options = BuildOptions::default();
+    //let build_options = BuildOptions::default();
+    let build_options = BuildOptions {
+        with_srcs: true,
+        with_abis: true,
+        with_source_maps: true,
+        with_error_map: true,
+        ..BuildOptions::default()
+    };
     let package = BuiltPackage::build(path, build_options).expect("build package must succeed");
 
     //// Setting up local execution environment
@@ -77,8 +86,27 @@ fn main() {
     let mut executor = executor.set_not_parallel();
     let mut sequence_num_counter = 0;
 
+    /*let pkg_md = package.extract_metadata().expect("work");
+    let modules = pkg_md.modules;
+    for mods in modules {
+        println!("{:?}", mods.source_map.len());
+        let vec_bytes = mods.source_map.as_slice();
+        let src_map = bcs::from_bytes::<SourceMap>(vec_bytes).expect("shouldwork");
+
+        //let (addr, _) = src_map.module_name_opt.unwrap();
+        //println!("{:?}", addr);
+    }*/
+
+    let codes = package.extract_code();
+    let compiled_module = CompiledModule::deserialize(&codes[0]).unwrap();
+    let mut module_bytes = vec![];
+    compiled_module.serialize(&mut module_bytes).unwrap();
+    let module_id = compiled_module.self_id();
+    let address = &module_id.address();
+
     //// publish test-package under 0xbeef
-    let creator = executor.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    // let creator = executor.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    let creator = executor.new_account_at(**address);
 
     // publish package similar to create_publish_package in harness.rs
     let module_payload = generate_module_payload(package);

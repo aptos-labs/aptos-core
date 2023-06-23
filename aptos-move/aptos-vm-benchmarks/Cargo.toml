@@ -12,3 +12,5 @@ aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
 bcs = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
