@@ -1,16 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::move_tool::MemberId;
 use crate::{assert_success, tests::common, MoveHarness};
+use aptos::move_tool::MemberId;
 use aptos_language_e2e_tests::{account::TransactionBuilder, transaction_status_eq};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CoinStoreResource,
     on_chain_config::FeatureFlag,
-    transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
+    transaction::{EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionStatus},
 };
-use aptos_types::transaction::EntryFunction;
 use move_core_types::{move_resource::MoveStructType, vm_status::StatusCode};
 
 #[test]
@@ -181,7 +180,7 @@ fn test_two_to_two_transfer_gas_payer_without_gas_bit_set_fails() {
         common::test_dir_path("../../../move-examples/scripts/two_by_two_transfer"),
         build_options,
     )
-        .expect("building package must succeed");
+    .expect("building package must succeed");
 
     let code = package.extract_script_code()[0].clone();
     let script = Script::new(code, vec![], vec![
@@ -204,7 +203,9 @@ fn test_two_to_two_transfer_gas_payer_without_gas_bit_set_fails() {
     println!("{:?}", output.status());
     assert!(transaction_status_eq(
         output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH)))
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
+        )))
     ));
 }
 
@@ -329,8 +330,11 @@ fn test_normal_tx_with_signer_with_gas_payer() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
 
-    let fun : MemberId = str::parse("0xcafe::test::hi").unwrap();
-    let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![bcs::to_bytes(&"Hi").unwrap()]);
+    let fun: MemberId = str::parse("0xcafe::test::hi").unwrap();
+    let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![bcs::to_bytes(
+        &"Hi",
+    )
+    .unwrap()]);
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])
         .entry_function(entry)
@@ -352,7 +356,6 @@ fn test_normal_tx_with_signer_with_gas_payer() {
     assert!(bob_start > bob_after);
 }
 
-
 #[test]
 fn test_normal_tx_without_signer_with_gas_payer() {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
@@ -367,7 +370,7 @@ fn test_normal_tx_without_signer_with_gas_payer() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
 
-    let fun : MemberId = str::parse("0xcafe::test::nothing").unwrap();
+    let fun: MemberId = str::parse("0xcafe::test::nothing").unwrap();
     let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![]);
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])
@@ -388,4 +391,32 @@ fn test_normal_tx_without_signer_with_gas_payer() {
 
     assert_eq!(alice_start, alice_after);
     assert!(bob_start > bob_after);
+}
+
+#[test]
+fn test_normal_tx_with_gas_payer_insufficient_funds() {
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
+
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let bob = h.new_account_with_balance_and_sequence_number(1, 0);
+
+    // Load the code
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
+
+    let fun: MemberId = str::parse("0xcafe::test::nothing").unwrap();
+    let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![]);
+    let transaction = TransactionBuilder::new(alice.clone())
+        .secondary_signers(vec![bob])
+        .entry_function(entry)
+        .sequence_number(h.sequence_number(alice.address()) | (1u64 << 63))
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign_multi_agent();
+
+    let output = h.executor.execute_transaction(transaction);
+    assert!(transaction_status_eq(
+        output.status(),
+        &TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE)
+    ));
 }
