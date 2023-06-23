@@ -14,10 +14,13 @@ impl CrossShardCommitReceiver {
         cross_shard_state_view: Arc<CrossShardStateView<S>>,
         message_rx: &Receiver<CrossShardMsg>,
     ) {
+        println!("CrossShardCommitReceiver::start");
         loop {
             let msg = message_rx.recv().unwrap();
             match msg {
                 CrossShardMsg::RemoteTxnWriteMsg(txn_commit_msg) => {
+                    println!("Received txn commit msg: {:?}", txn_commit_msg);
+
                     let (_, state_key, write_op) = txn_commit_msg.take();
                     cross_shard_state_view.set_value(&state_key, write_op.as_state_value());
                 },

@@ -47,14 +47,13 @@ where
         DeltaDataView<K, V>,
         NoOpTransactionCommitListener<Transaction<K, V>>,
         ExecutableTestType,
-    >::new(
-        num_cpus::get(),
-        transactions.len(),
-        executor_thread_pool,
-        None,
-        NoOpTransactionCommitListener::default(),
-    )
-    .execute_transactions_parallel((), &transactions, &data_view);
+    >::new(num_cpus::get(), executor_thread_pool, None)
+    .execute_transactions_parallel(
+        (),
+        &transactions,
+        &data_view,
+        &NoOpTransactionCommitListener::default(),
+    );
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);
     baseline.assert_output(&output);

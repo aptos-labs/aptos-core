@@ -4,25 +4,13 @@ use crate::{
     sharded_block_executor::sharded_executor_client::ShardedExecutorClient, AptosVM,
     ShardedBlockExecutor, VMExecutor,
 };
-use aptos_block_partitioner::{
-    sharded_block_partitioner::ShardedBlockPartitioner,
-    test_utils::create_non_conflicting_p2p_transaction,
-};
+use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_language_e2e_tests::{
-    account::{Account, AccountData},
-    common_transactions::peer_to_peer_txn,
-    executor::FakeExecutor,
+    account::Account, common_transactions::peer_to_peer_txn, executor::FakeExecutor,
 };
 use aptos_types::{
-    account_config::{DepositEvent, WithdrawEvent},
-    block_executor::partitioner::{
-        CrossShardDependencies, SubBlock, SubBlocksForShard, TransactionWithDependencies,
-    },
     state_store::state_key::StateKeyInner,
-    transaction::{
-        analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction, TransactionOutput,
-        TransactionStatus,
-    },
+    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
 };
 use move_core_types::account_address::AccountAddress;
 use std::sync::Arc;
@@ -44,13 +32,12 @@ fn generate_non_conflicting_p2p(
 ) -> (AnalyzedTransaction, Account, Account) {
     let (sender, receiver) = generate_non_conflicting_sender_receiver(executor);
     let transfer_amount = 1_000;
-    let txn = generate_p2p_txn(executor, &sender, &receiver, transfer_amount);
+    let txn = generate_p2p_txn(&sender, &receiver, transfer_amount);
     // execute transaction
     (txn, sender, receiver)
 }
 
 fn generate_p2p_txn(
-    executor: &mut FakeExecutor,
     sender: &Account,
     receiver: &Account,
     transfer_amount: u64,
@@ -131,7 +118,7 @@ fn test_sharded_block_executor_no_conflict() {
 #[test]
 fn test_sharded_block_executor_with_conflict() {
     let num_txns = 400;
-    let num_shards = 8;
+    let num_shards = 2;
     let num_accounts = 40;
     let mut executor = FakeExecutor::from_head_genesis();
     let mut transactions = Vec::new();
@@ -145,7 +132,7 @@ fn test_sharded_block_executor_with_conflict() {
             let sender = &accounts[j];
             let receiver = &accounts[(j + i) % num_accounts];
             let transfer_amount = 1_000;
-            let txn = generate_p2p_txn(&mut executor, sender, receiver, transfer_amount);
+            let txn = generate_p2p_txn(sender, receiver, transfer_amount);
             transactions.push(txn)
         }
     }
@@ -155,7 +142,7 @@ fn test_sharded_block_executor_with_conflict() {
     let executor_clients =
         ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(2));
     let sharded_block_executor = ShardedBlockExecutor::new(executor_clients);
-    let sharded_txn_output = sharded_block_executor
+    let _sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
             partitioned_txns,

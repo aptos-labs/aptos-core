@@ -1521,18 +1521,14 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
-        let executor = BlockAptosExecutor::new(
-            Self::get_concurrency_level(),
-            transactions.len(),
+        let ret = BlockAptosVM::execute_block(
             Arc::clone(&RAYON_EXEC_POOL),
+            BlockExecutorTransactions::Unsharded(transactions),
+            state_view,
+            Self::get_concurrency_level(),
             maybe_block_gas_limit,
             NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
         );
-        let ret = executor.execute_block(
-            BlockExecutorTransactions::Unsharded(transactions),
-            state_view,
-        );
-
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
             BLOCK_TRANSACTION_COUNT.observe(count as f64);

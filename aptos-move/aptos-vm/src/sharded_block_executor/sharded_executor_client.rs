@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    block_executor::BlockAptosExecutor,
+    block_executor::BlockAptosVM,
     sharded_block_executor::{
         block_executor_client::BlockExecutorClient, cross_shard_client::CrossShardCommitReceiver,
         cross_shard_commit_sender::CrossShardCommitSender,
@@ -102,23 +102,22 @@ impl ShardedExecutorClient {
     fn execute_sub_block<S: StateView + Sync + Send>(
         &self,
         sub_block: SubBlock<Transaction>,
+        round: usize,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let executor = Arc::new(BlockAptosExecutor::new(
-            concurrency_level,
-            sub_block.num_txns(),
-            self.executor_thread_pool.clone(),
-            maybe_block_gas_limit,
-            CrossShardCommitSender::new(
-                self.message_txs
-                    .iter()
-                    .map(|t| t.lock().unwrap().clone())
-                    .collect(),
-                &sub_block,
-            ),
-        ));
+        println!(
+            "executing sub block for shard {} and round {}",
+            self.shard_id, round
+        );
+        let cross_shard_commit_sender = CrossShardCommitSender::new(
+            self.message_txs
+                .iter()
+                .map(|t| t.lock().unwrap().clone())
+                .collect(),
+            &sub_block,
+        );
 
         let (callback, callback_receiver) = oneshot::channel();
 
@@ -129,29 +128,44 @@ impl ShardedExecutorClient {
         let cross_shard_state_view =
             Arc::new(self.create_cross_shard_state_view(state_view, &sub_block));
         let cross_shard_state_view_clone1 = cross_shard_state_view.clone();
-        let cross_shard_state_view_clone2 = cross_shard_state_view.clone();
         self.executor_thread_pool.scope(|s| {
             s.spawn(move |_| {
-                CrossShardCommitReceiver::start(
-                    cross_shard_state_view_clone1,
-                    &message_rxs.lock().unwrap(),
-                );
+                if round != 0 {
+                    // If this is not the first round, start the cross-shard commit receiver.
+                    // this is a bit ugly, we can get rid of this when we have round number
+                    // information in the cross shard dependencies.
+                    CrossShardCommitReceiver::start(
+                        cross_shard_state_view_clone1,
+                        &message_rxs.lock().unwrap(),
+                    );
+                }
             });
             s.spawn(move |_| {
-                let ret = executor.execute_block(
+                let ret = BlockAptosVM::execute_block(
+                    self.executor_thread_pool.clone(),
                     BlockExecutorTransactions::Unsharded(sub_block.into_txns()),
                     cross_shard_state_view.as_ref(),
+                    concurrency_level,
+                    maybe_block_gas_limit,
+                    cross_shard_commit_sender,
                 );
                 // Send a stop command to the cross-shard commit receiver.
-                self_message_tx
-                    .lock()
-                    .unwrap()
-                    .send(CrossShardMsg::StopMsg)
-                    .unwrap();
+                if round != 0 {
+                    self_message_tx
+                        .lock()
+                        .unwrap()
+                        .send(CrossShardMsg::StopMsg)
+                        .unwrap();
+                }
                 callback.send(ret).unwrap();
             });
         });
-        block_on(callback_receiver).unwrap()
+        let ret = block_on(callback_receiver).unwrap();
+        println!(
+            "finished executing sub block for shard {} and round {}",
+            self.shard_id, round
+        );
+        ret
     }
 }
 
@@ -164,9 +178,10 @@ impl BlockExecutorClient for ShardedExecutorClient {
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let mut result = vec![];
-        for sub_block in transactions.into_sub_blocks() {
+        for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
             result.extend(self.execute_sub_block(
                 sub_block,
+                round,
                 state_view,
                 concurrency_level,
                 maybe_block_gas_limit,

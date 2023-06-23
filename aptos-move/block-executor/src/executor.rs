@@ -70,24 +70,14 @@ enum CommitRole {
     Worker(Receiver<TxnIndex>),
 }
 
-pub struct BlockExecutor<T, E, S, L, X>
-where
-    T: Transaction,
-    E: ExecutorTask<Txn = T>,
-    X: Executable + 'static,
-    L: TransactionCommitListener<TransactionWrites = Vec<(T::Key, WriteOp)>>,
-{
+pub struct BlockExecutor<T, E, S, L, X> {
     // number of active concurrent tasks, corresponding
     // to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
     maybe_block_gas_limit: Option<u64>,
-    scheduler: Scheduler,
-    versioned_cache: MVHashMap<T::Key, T::Value, X>,
-    last_input_output: TxnLastInputOutput<T::Key, E::Output, E::Error>,
-    txn_commit_listener: L,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(T, E, S, L, X)>,
 }
 
 impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
@@ -102,14 +92,9 @@ where
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
         concurrency_level: usize,
-        num_txns: usize,
         executor_thread_pool: Arc<ThreadPool>,
         maybe_block_gas_limit: Option<u64>,
-        txn_commit_listener: L,
     ) -> Self {
-        let versioned_cache = MVHashMap::new();
-        let scheduler = Scheduler::new(num_txns as TxnIndex);
-        let last_input_output = TxnLastInputOutput::new(num_txns as TxnIndex);
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
@@ -119,24 +104,8 @@ where
             concurrency_level,
             executor_thread_pool,
             maybe_block_gas_limit,
-            scheduler,
-            versioned_cache,
-            last_input_output,
-            txn_commit_listener,
             phantom: PhantomData,
         }
-    }
-
-    pub fn add_txn_write(&self, key: T::Key, version: Version, value: T::Value) {
-        self.versioned_cache.write(key, version, value);
-    }
-
-    pub fn mark_estimate(&self, key: &T::Key, txn_idx: TxnIndex) {
-        self.versioned_cache.mark_estimate(key, txn_idx);
-    }
-
-    pub fn mark_dependency_resolve(&self, txn_idx: TxnIndex) {
-        self.scheduler.mark_dependency_resolve(txn_idx);
     }
 
     fn update_parallel_block_gas_counters(
@@ -257,6 +226,9 @@ where
         &self,
         version: Version,
         signature_verified_block: &[T],
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
     ) -> SchedulerTask {
@@ -264,7 +236,7 @@ where
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute as usize];
 
-        let speculative_view = MVHashMapView::new(&self.versioned_cache, &self.scheduler);
+        let speculative_view = MVHashMapView::new(versioned_cache, scheduler);
 
         // VM execution.
         let execute_result = executor.execute_transaction(
@@ -273,7 +245,7 @@ where
             idx_to_execute,
             false,
         );
-        let mut prev_modified_keys = self.last_input_output.modified_keys(idx_to_execute);
+        let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
@@ -284,7 +256,7 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                self.versioned_cache.write(k, write_version, v);
+                versioned_cache.write(k, write_version, v);
             }
 
             // Then, apply deltas.
@@ -292,7 +264,7 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                self.versioned_cache.add_delta(k, idx_to_execute, d);
+                versioned_cache.add_delta(k, idx_to_execute, d);
             }
         };
 
@@ -319,36 +291,40 @@ where
 
         // Remove entries from previous write/delta set that were not overwritten.
         for k in prev_modified_keys {
-            self.versioned_cache.delete(&k, idx_to_execute);
+            versioned_cache.delete(&k, idx_to_execute);
         }
 
-        if self
-            .last_input_output
+        if last_input_output
             .record(idx_to_execute, speculative_view.take_reads(), result)
             .is_err()
         {
             // When there is module publishing r/w intersection, can early halt BlockSTM to
             // fallback to sequential execution.
-            self.scheduler.halt();
+            scheduler.halt();
             return SchedulerTask::NoTask;
         }
-        self.scheduler
-            .finish_execution(idx_to_execute, incarnation, updates_outside)
+        scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
-    fn validate(&self, version_to_validate: Version, validation_wave: Wave) -> SchedulerTask {
+    fn validate(
+        &self,
+        version_to_validate: Version,
+        validation_wave: Wave,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        scheduler: &Scheduler,
+    ) -> SchedulerTask {
         use MVDataError::*;
         use MVDataOutput::*;
 
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let (idx_to_validate, incarnation) = version_to_validate;
-        let read_set = self
-            .last_input_output
+        let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
         let valid = read_set.iter().all(|r| {
-            match self.versioned_cache.fetch_data(r.path(), idx_to_validate) {
+            match versioned_cache.fetch_data(r.path(), idx_to_validate) {
                 Ok(Versioned(version, _)) => r.validate_version(version),
                 Ok(Resolved(value)) => r.validate_resolved(value),
                 // Dependency implies a validation failure, and if the original read were to
@@ -366,7 +342,7 @@ where
             }
         });
 
-        let aborted = !valid && self.scheduler.try_abort(idx_to_validate, incarnation);
+        let aborted = !valid && scheduler.try_abort(idx_to_validate, incarnation);
 
         if aborted {
             counters::SPECULATIVE_ABORT_COUNT.inc();
@@ -375,14 +351,13 @@ where
             clear_speculative_txn_logs(idx_to_validate as usize);
 
             // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
-            for k in self.last_input_output.modified_keys(idx_to_validate) {
-                self.versioned_cache.mark_estimate(&k, idx_to_validate);
+            for k in last_input_output.modified_keys(idx_to_validate) {
+                versioned_cache.mark_estimate(&k, idx_to_validate);
             }
 
-            self.scheduler.finish_abort(idx_to_validate, incarnation)
+            scheduler.finish_abort(idx_to_validate, incarnation)
         } else {
-            self.scheduler
-                .finish_validation(idx_to_validate, validation_wave);
+            scheduler.finish_validation(idx_to_validate, validation_wave);
             SchedulerTask::NoTask
         }
     }
@@ -390,12 +365,14 @@ where
     fn coordinator_commit_hook(
         &self,
         maybe_block_gas_limit: Option<u64>,
+        scheduler: &Scheduler,
         post_commit_txs: &Vec<Sender<u32>>,
         worker_idx: &mut usize,
         scheduler_task: &mut SchedulerTask,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         accumulated_fee_statement: &mut FeeStatement,
     ) {
-        while let Some(txn_idx) = self.scheduler.try_commit() {
+        while let Some(txn_idx) = scheduler.try_commit() {
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
             let _commit_guard: CommitGuard =
                 CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
@@ -403,7 +380,7 @@ where
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
             // Committed the last transaction, BlockSTM finishes execution.
-            if txn_idx as usize + 1 == self.scheduler.num_txns() as usize {
+            if txn_idx as usize + 1 == scheduler.num_txns() as usize {
                 *scheduler_task = SchedulerTask::Done;
 
                 self.update_parallel_block_gas_counters(
@@ -419,13 +396,13 @@ where
 
             // For committed txns with Success status, calculate the accumulated gas costs.
             // For committed txns with Abort or SkipRest status, early halt BlockSTM.
-            match self.last_input_output.fee_statement(txn_idx) {
+            match last_input_output.fee_statement(txn_idx) {
                 Some(fee_statement) => {
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
                     self.update_parallel_txn_gas_counters(&fee_statement);
                 },
                 None => {
-                    self.scheduler.halt();
+                    scheduler.halt();
 
                     self.update_parallel_block_gas_counters(
                         accumulated_fee_statement,
@@ -443,8 +420,8 @@ where
                     + accumulated_fee_statement.io_gas_used();
                 if accumulated_non_storage_gas >= per_block_gas_limit {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
-                    self.last_input_output.update_to_skip_rest(txn_idx);
-                    self.scheduler.halt();
+                    last_input_output.update_to_skip_rest(txn_idx);
+                    scheduler.halt();
 
                     self.update_parallel_block_gas_counters(
                         accumulated_fee_statement,
@@ -466,8 +443,15 @@ where
         }
     }
 
-    fn worker_commit_hook(&self, txn_idx: TxnIndex, base_view: &S) {
-        let (num_deltas, delta_keys) = self.last_input_output.delta_keys(txn_idx);
+    fn worker_commit_hook(
+        &self,
+        txn_idx: TxnIndex,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        base_view: &S,
+        txn_commit_listener: &L,
+    ) {
+        let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
         let mut delta_writes = Vec::with_capacity(num_deltas);
         for k in delta_keys {
             // Note that delta materialization happens concurrently, but under concurrent
@@ -480,8 +464,7 @@ where
             // an immediate bottleneck - confirmed by an experiment with 32 core and a
             // single materialized aggregator. If needed, the contention may be further
             // mitigated by batching consecutive commit_hooks.
-            let committed_delta = self
-                .versioned_cache
+            let committed_delta = versioned_cache
                 .materialize_delta(&k, txn_idx)
                 .unwrap_or_else(|op| {
                     let storage_value = base_view
@@ -490,8 +473,7 @@ where
                         .map(|bytes| deserialize(&bytes))
                         .expect("Cannot deserialize base value for committed delta");
 
-                    self.versioned_cache
-                        .set_aggregator_base_value(&k, storage_value);
+                    versioned_cache.set_aggregator_base_value(&k, storage_value);
                     op.apply_to(storage_value)
                         .expect("Materializing delta w. base value set must succeed")
                 });
@@ -502,18 +484,20 @@ where
                 WriteOp::Modification(serialize(&committed_delta)),
             ));
         }
-        self.txn_commit_listener
-            .on_transaction_committed(txn_idx, &delta_writes);
-        self.last_input_output
-            .record_delta_writes(txn_idx, delta_writes);
+        txn_commit_listener.on_transaction_committed(txn_idx, &delta_writes);
+        last_input_output.record_delta_writes(txn_idx, delta_writes);
     }
 
     fn work_task_with_scope(
         &self,
         executor_arguments: &E::Argument,
         block: &[T],
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
+        scheduler: &Scheduler,
         base_view: &S,
         role: CommitRole,
+        transaction_commit_listener: &L,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -533,25 +517,45 @@ where
                 CommitRole::Coordinator(post_commit_txs) => {
                     self.coordinator_commit_hook(
                         self.maybe_block_gas_limit,
+                        scheduler,
                         post_commit_txs,
                         &mut worker_idx,
                         &mut scheduler_task,
+                        last_input_output,
                         &mut accumulated_fee_statement,
                     );
                 },
                 CommitRole::Worker(rx) => {
                     while let Ok(txn_idx) = rx.try_recv() {
-                        self.worker_commit_hook(txn_idx, base_view);
+                        self.worker_commit_hook(
+                            txn_idx,
+                            versioned_cache,
+                            last_input_output,
+                            base_view,
+                            transaction_commit_listener,
+                        );
                     }
                 },
             }
 
             scheduler_task = match scheduler_task {
-                SchedulerTask::ValidationTask(version_to_validate, wave) => {
-                    self.validate(version_to_validate, wave)
-                },
+                SchedulerTask::ValidationTask(version_to_validate, wave) => self.validate(
+                    version_to_validate,
+                    wave,
+                    last_input_output,
+                    versioned_cache,
+                    scheduler,
+                ),
                 SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
-                    self.execute(version_to_execute, block, &executor, base_view)
+                    self.execute(
+                        version_to_execute,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        scheduler,
+                        &executor,
+                        base_view,
+                    )
                 },
                 SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
@@ -562,13 +566,19 @@ where
 
                     SchedulerTask::NoTask
                 },
-                SchedulerTask::NoTask => self.scheduler.next_task(committing),
+                SchedulerTask::NoTask => scheduler.next_task(committing),
                 SchedulerTask::Done => {
                     // Make sure to drain any remaining commit tasks assigned by the coordinator.
                     if let CommitRole::Worker(rx) = &role {
                         // Until the sender drops the tx, an index for commit_hook might be sent.
                         while let Ok(txn_idx) = rx.recv() {
-                            self.worker_commit_hook(txn_idx, base_view);
+                            self.worker_commit_hook(
+                                txn_idx,
+                                versioned_cache,
+                                last_input_output,
+                                base_view,
+                                transaction_commit_listener,
+                            );
                         }
                     }
                     break;
@@ -582,6 +592,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
+        transaction_commit_listener: &L,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -590,11 +601,16 @@ where
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
+        let versioned_cache = MVHashMap::new();
+
         if signature_verified_block.is_empty() {
             return Ok(vec![]);
         }
 
         let num_txns = signature_verified_block.len() as u32;
+        let last_input_output = TxnLastInputOutput::new(num_txns);
+        let scheduler = Scheduler::new(num_txns);
+
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
         for _ in 0..(self.concurrency_level - 1) {
@@ -617,8 +633,12 @@ where
                     self.work_task_with_scope(
                         &executor_initial_arguments,
                         signature_verified_block,
+                        &last_input_output,
+                        &versioned_cache,
+                        &scheduler,
                         base_view,
                         role,
+                        transaction_commit_listener,
                     );
                 });
             }
@@ -629,13 +649,13 @@ where
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_txns);
 
-        let maybe_err = if self.last_input_output.module_publishing_may_race() {
+        let maybe_err = if last_input_output.module_publishing_may_race() {
             counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
             Some(Error::ModulePathReadWrite)
         } else {
             let mut ret = None;
             for idx in 0..num_txns {
-                match self.last_input_output.take_output(idx as TxnIndex) {
+                match last_input_output.take_output(idx as TxnIndex) {
                     ExecutionStatus::Success(t) => final_results.push(t),
                     ExecutionStatus::SkipRest(t) => {
                         final_results.push(t);
@@ -649,6 +669,14 @@ where
             }
             ret
         };
+
+        self.executor_thread_pool.spawn(move || {
+            // Explicit async drops.
+            drop(last_input_output);
+            drop(scheduler);
+            // TODO: re-use the code cache.
+            drop(versioned_cache);
+        });
 
         match maybe_err {
             Some(err) => Err(err),
@@ -741,6 +769,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: BlockExecutorTransactions<T>,
         base_view: &S,
+        transaction_commit_listener: &L,
     ) -> Result<Vec<E::Output>, E::Error> {
         let signature_verified_txns = signature_verified_block.into_txns();
         let mut ret = if self.concurrency_level > 1 {
@@ -748,6 +777,7 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
+                transaction_commit_listener,
             )
         } else {
             self.execute_transactions_sequential(
@@ -770,6 +800,10 @@ where
                 base_view,
             )
         }
+        self.executor_thread_pool.spawn(move || {
+            // Explicit async drops.
+            drop(signature_verified_txns);
+        });
         ret
     }
 }

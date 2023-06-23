@@ -8,7 +8,7 @@ use aptos_types::write_set::WriteOp;
 pub trait TransactionCommitListener: Send + Sync {
     type TransactionWrites;
 
-    fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_writes: &Self::TransactionWrites);
+    fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_output: &Self::TransactionWrites);
 }
 
 pub struct NoOpTransactionCommitListener<T> {
