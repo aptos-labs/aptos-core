@@ -21,7 +21,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     adapter_common::PreprocessedTransaction,
-    block_executor::BlockAptosExecutor,
+    block_executor::BlockAptosVM,
     data_cache::AsMoveResolver,
     sharded_block_executor::{block_executor_client::VMExecutorClient, ShardedBlockExecutor},
 };
@@ -344,19 +344,15 @@ where
     ) -> usize {
         let block_size = transactions.len();
         let timer = Instant::now();
-        let executor = BlockAptosExecutor::new(
-            1,
-            transactions.len(),
+        BlockAptosVM::execute_block(
             Arc::clone(&RAYON_EXEC_POOL),
+            BlockExecutorTransactions::Unsharded(transactions),
+            self.state_view.as_ref(),
+            1,
             maybe_block_gas_limit,
             NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
-        );
-        executor
-            .execute_block(
-                BlockExecutorTransactions::Unsharded(transactions),
-                self.state_view.as_ref(),
-            )
-            .expect("VM should not fail to start");
+        )
+        .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
 
         block_size * 1000 / exec_time as usize
@@ -389,19 +385,15 @@ where
                 )
                 .expect("VM should not fail to start");
         } else {
-            let executor = BlockAptosExecutor::new(
-                concurrency_level_per_shard,
-                transactions.len(),
+            BlockAptosVM::execute_block(
                 Arc::clone(&RAYON_EXEC_POOL),
+                BlockExecutorTransactions::Unsharded(transactions),
+                self.state_view.as_ref(),
+                concurrency_level_per_shard,
                 maybe_block_gas_limit,
                 NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
-            );
-            executor
-                .execute_block(
-                    BlockExecutorTransactions::Unsharded(transactions),
-                    self.state_view.as_ref(),
-                )
-                .expect("VM should not fail to start");
+            )
+            .expect("VM should not fail to start");
         }
         let exec_time = timer.elapsed().as_millis();
 

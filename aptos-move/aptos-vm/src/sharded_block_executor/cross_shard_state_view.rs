@@ -101,18 +101,21 @@ impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
 #[cfg(test)]
 mod tests {
     use crate::sharded_block_executor::cross_shard_state_view::CrossShardStateView;
-    use aptos_state_view::TStateView;
+    use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
     use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+    use once_cell::sync::Lazy;
     use std::{
-        sync::{Arc, Mutex},
+        collections::{HashMap, HashSet},
+        sync::Arc,
         thread,
         time::Duration,
     };
 
+    pub static EMPTY_VIEW: Lazy<Arc<InMemoryStateView>> =
+        Lazy::new(|| Arc::new(InMemoryStateView::new(HashMap::new())));
+
     #[test]
     fn test_cross_shard_state_view_get_state_value() {
-        // empty base view
-        let base_view = InMemoryStateView::new({ HashMap::new() });
         let state_key = StateKey::raw("key1".as_bytes().to_owned());
         let state_value = StateValue::from("value1".as_bytes().to_owned());
         let state_value_clone = state_value.clone();
@@ -121,7 +124,7 @@ mod tests {
         let mut state_keys = HashSet::new();
         state_keys.insert(state_key.clone());
 
-        let cross_shard_state_view = Arc::new(CrossShardStateView::new(state_keys, &base_view));
+        let cross_shard_state_view = Arc::new(CrossShardStateView::new(state_keys, &EMPTY_VIEW));
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
 
         let wait_thread = thread::spawn(move || {

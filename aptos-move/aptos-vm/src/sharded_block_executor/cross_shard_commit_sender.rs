@@ -46,8 +46,15 @@ impl CrossShardCommitSender {
                         .push(txn_id_with_shard.clone());
                 }
             }
-            dependent_edges.insert(txn_idx as TxnIndex, storage_locations_to_target);
+            if !storage_locations_to_target.is_empty() {
+                dependent_edges.insert(txn_idx as TxnIndex, storage_locations_to_target);
+            }
         }
+
+        println!(
+            "CrossShardCommitSender::new: dependent_edges: {:?}",
+            dependent_edges
+        );
 
         Self {
             message_txs: message_txs.into_iter().map(Mutex::new).collect(),
@@ -63,6 +70,12 @@ impl TransactionCommitListener for CrossShardCommitSender {
     fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_writes: &Self::TransactionWrites) {
         let global_txn_idx = txn_idx + self.index_offset;
         if let Some(edges) = self.dependent_edges.get(&global_txn_idx) {
+            println!(
+                "CrossShardCommitSender::on_transaction_committed: global_txn_idx: {:?}",
+                global_txn_idx
+            );
+            println!("Edge is {:?}", edges);
+            println!("txn_writes size is {:?}", txn_writes.len());
             for (state_key, write_op) in txn_writes.iter() {
                 if let Some(dependent_txn_ids) = edges.get(state_key) {
                     for dependent_txn_id in dependent_txn_ids.iter() {

@@ -24,7 +24,6 @@ use aptos_block_executor::{
     txn_commit_listener::TransactionCommitListener,
 };
 use aptos_infallible::Mutex;
-use aptos_mvhashmap::types::{TxnIndex, Version};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     block_executor::partitioner::{
@@ -146,55 +145,9 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 }
 
-pub struct BlockAptosExecutor<
-    'a,
-    S: StateView + Sync,
-    L: TransactionCommitListener<TransactionWrites = Vec<(StateKey, WriteOp)>>,
-> {
-    executor_thread_pool: Arc<ThreadPool>,
-    concurrency_level: usize,
-    block_executor:
-        BlockExecutor<PreprocessedTransaction, AptosExecutorTask<'a, S>, S, L, ExecutableTestType>,
-}
+pub struct BlockAptosVM();
 
-impl<
-        'a,
-        S: StateView + Sync + 'a,
-        L: TransactionCommitListener<TransactionWrites = Vec<(StateKey, WriteOp)>>,
-    > BlockAptosExecutor<'a, S, L>
-{
-    pub fn new(
-        concurrency_level: usize,
-        num_txns: usize,
-        executor_thread_pool: Arc<ThreadPool>,
-        maybe_block_gas_limit: Option<u64>,
-        commit_listener: L,
-    ) -> Self {
-        Self {
-            executor_thread_pool: executor_thread_pool.clone(),
-            concurrency_level,
-            block_executor: BlockExecutor::new(
-                concurrency_level,
-                num_txns,
-                executor_thread_pool,
-                maybe_block_gas_limit,
-                commit_listener,
-            ),
-        }
-    }
-
-    pub fn mark_estimate(&self, key: &StateKey, txn_idx: TxnIndex) {
-        self.block_executor.mark_estimate(key, txn_idx);
-    }
-
-    pub fn add_txn_write(&self, key: StateKey, version: Version, value: WriteOp) {
-        self.block_executor.add_txn_write(key, version, value);
-    }
-
-    pub fn mark_dependency_resolve(&self, txn_idx: TxnIndex) {
-        self.block_executor.mark_dependency_resolve(txn_idx);
-    }
-
+impl BlockAptosVM {
     fn verify_transactions(
         transactions: BlockExecutorTransactions<Transaction>,
     ) -> BlockExecutorTransactions<PreprocessedTransaction> {
@@ -242,10 +195,16 @@ impl<
         }
     }
 
-    pub fn execute_block(
-        &self,
+    pub fn execute_block<
+        S: StateView + Sync,
+        L: TransactionCommitListener<TransactionWrites = Vec<(StateKey, WriteOp)>>,
+    >(
+        executor_thread_pool: Arc<ThreadPool>,
         transactions: BlockExecutorTransactions<Transaction>,
-        state_view: &'a S,
+        state_view: &S,
+        concurrency_level: usize,
+        maybe_block_gas_limit: Option<u64>,
+        transaction_commit_listener: L,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -254,9 +213,8 @@ impl<
         // TODO: state sync runs this code but doesn't need to verify signatures
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
-        let signature_verified_block = self
-            .executor_thread_pool
-            .install(|| Self::verify_transactions(transactions));
+        let signature_verified_block =
+            executor_thread_pool.install(|| Self::verify_transactions(transactions));
         drop(signature_verification_timer);
 
         let is_sharded_execution = matches!(
@@ -279,6 +237,7 @@ impl<
             PreprocessedTransaction,
             AptosExecutorTask<S>,
             S,
+            L,
             ExecutableTestType,
         >::new(
             concurrency_level,
@@ -286,7 +245,12 @@ impl<
             maybe_block_gas_limit,
         );
 
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
+        let ret = executor.execute_block(
+            state_view,
+            signature_verified_block,
+            state_view,
+            &transaction_commit_listener,
+        );
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs
@@ -310,9 +274,5 @@ impl<
             },
             Err(Error::UserError(err)) => Err(err),
         }
-    }
-
-    pub fn handle_remote_txn_commit(&self) {
-        // TODO: implement
     }
 }
