@@ -45,7 +45,7 @@ fn sign_txn(
     account: &Account,
     payload: TransactionPayload,
     sequence_number: u64,
-) -> TransactionStatus {
+) {
     let sign_tx = account
         .transaction()
         .sequence_number(sequence_number)
@@ -54,10 +54,11 @@ fn sign_txn(
         .payload(payload)
         .sign();
     let txn_output = executor.execute_transaction(sign_tx);
+    let txn_status = txn_output.status().to_owned();
     assert!(txn_output.status().status().unwrap().is_success());
+    println!("txn status: {:?}", txn_status);
     // apply write set to avoid LINKER_ERROR
     executor.apply_write_set(txn_output.write_set());
-    txn_output.status().to_owned()
 }
 
 fn main() {
@@ -81,24 +82,22 @@ fn main() {
 
     // publish package similar to create_publish_package in harness.rs
     let module_payload = generate_module_payload(package);
-    let module_txn_status = sign_txn(
+    sign_txn(
         &mut executor,
         &creator,
         module_payload,
         sequence_num_counter,
     );
-    println!("module publish status: {:?}", module_txn_status);
     sequence_num_counter = sequence_num_counter + 1;
 
     //// send a txn that invokes the entry function 0xbeef::test::benchmark
     let entry_fun_payload = generate_entry_fun_payloads(&creator, "test");
-    let entry_fun_txn_status = sign_txn(
+    sign_txn(
         &mut executor,
         &creator,
         entry_fun_payload,
         sequence_num_counter,
     );
-    println!("call entry function status: {:?}", entry_fun_txn_status);
 
     println!("running time (ms): {}", start.elapsed().as_millis());
 }
