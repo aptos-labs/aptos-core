@@ -5,17 +5,13 @@ use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_types::{
-    account_address::AccountAddress,
-    transaction::{EntryFunction, TransactionPayload, TransactionStatus},
-};
+use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use move_binary_format::CompiledModule;
-use move_bytecode_source_map::source_map::SourceMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
 //// generate a TransactionPayload for modules
-fn generate_module_payload(package: BuiltPackage) -> TransactionPayload {
+fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
     // publish package similar to create_publish_package in harness.rs
     let code = package.extract_code();
     let metadata = package
@@ -87,34 +83,36 @@ fn main() {
     let mut sequence_num_counter = 0;
 
     let codes = package.extract_code();
-    let compiled_module = CompiledModule::deserialize(&codes[0]).unwrap();
-    let mut module_bytes = vec![];
-    compiled_module.serialize(&mut module_bytes).unwrap();
-    let module_id = compiled_module.self_id();
-    let address = &module_id.address();
-    let identifier = &module_id.name().as_str();
+    for code in codes {
+        let compiled_module = CompiledModule::deserialize(&code).unwrap();
+        let mut module_bytes = vec![];
+        compiled_module.serialize(&mut module_bytes).unwrap();
+        let module_id = compiled_module.self_id();
+        let address = &module_id.address();
+        let identifier = &module_id.name().as_str();
 
-    //// publish test-package under module address
-    let creator = executor.new_account_at(**address);
+        //// publish test-package under module address
+        let creator = executor.new_account_at(**address);
 
-    // publish package similar to create_publish_package in harness.rs
-    let module_payload = generate_module_payload(package);
-    sign_txn(
-        &mut executor,
-        &creator,
-        module_payload,
-        sequence_num_counter,
-    );
-    sequence_num_counter = sequence_num_counter + 1;
+        // publish package similar to create_publish_package in harness.rs
+        let module_payload = generate_module_payload(&package);
+        sign_txn(
+            &mut executor,
+            &creator,
+            module_payload,
+            sequence_num_counter,
+        );
+        sequence_num_counter = sequence_num_counter + 1;
 
-    //// send a txn that invokes the entry function 0xbeef::test::benchmark
-    let entry_fun_payload = generate_entry_fun_payloads(&creator, *identifier);
-    sign_txn(
-        &mut executor,
-        &creator,
-        entry_fun_payload,
-        sequence_num_counter,
-    );
+        //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
+        let entry_fun_payload = generate_entry_fun_payloads(&creator, *identifier);
+        sign_txn(
+            &mut executor,
+            &creator,
+            entry_fun_payload,
+            sequence_num_counter,
+        );
+    }
 
     println!("running time (ms): {}", start.elapsed().as_millis());
 }
