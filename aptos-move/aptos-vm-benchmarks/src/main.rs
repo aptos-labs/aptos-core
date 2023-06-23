@@ -41,6 +41,7 @@ fn sign_txn(
         .sign();
     let txn_output = executor.execute_transaction(sign_tx);
     assert!(txn_output.status().status().unwrap().is_success());
+    // apply write set to avoid LINKER_ERROR
     executor.apply_write_set(txn_output.write_set());
     txn_output.status().to_owned()
 }
@@ -72,18 +73,7 @@ fn main() {
         module_payload,
         sequence_num_counter,
     );
-    /*let module_signed_txn = creator
-        .transaction()
-        .sequence_number(sequence_num_counter)
-        .max_gas_amount(2_000_000)
-        .gas_unit_price(200)
-        .payload(module_payload)
-        .sign();
-    let module_txn_output = executor.execute_transaction(module_signed_txn);
-    let module_txn_status = module_txn_output.status().to_owned();*/
     println!("module publish status: {:?}", module_txn_status);
-    // apply write set to avoid LINKER_ERROR
-    // executor.apply_write_set(module_txn_output.write_set());
     sequence_num_counter = sequence_num_counter + 1;
 
     //// send a txn that invokes the entry function 0xbeef::test::benchmark
