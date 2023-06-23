@@ -88,11 +88,11 @@ fn main() {
         let package =
             BuiltPackage::build(dir_path, build_options).expect("build package must succeed");
 
-        //// Restart timer and sequence counter for each new package
-        let start = Instant::now();
-
         let codes = package.extract_code();
         for code in codes {
+            // avoid SEQUENCE_NUMBER_TOO_NEW error
+            let mut sequence_num_counter = 0;
+
             let compiled_module = CompiledModule::deserialize(&code).unwrap();
             let mut module_bytes = vec![];
             compiled_module.serialize(&mut module_bytes).unwrap();
@@ -119,9 +119,9 @@ fn main() {
             );
             sequence_num_counter = sequence_num_counter + 1;
 
-            // avoid SEQUENCE_NUMBER_TOO_NEW error
-            // only count running time of entry function
-            let mut sequence_num_counter = 0;
+            //// Restart timer and sequence counter for each new package
+            //// only count running time of entry function
+            let start = Instant::now();
 
             //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
             let entry_fun_payload = generate_entry_fun_payloads(&creator, *identifier);
@@ -131,8 +131,8 @@ fn main() {
                 entry_fun_payload,
                 sequence_num_counter,
             );
-        }
 
-        println!("running time (ms): {}", start.elapsed().as_millis());
+            println!("running time (ms): {}", start.elapsed().as_millis());
+        }
     }
 }
