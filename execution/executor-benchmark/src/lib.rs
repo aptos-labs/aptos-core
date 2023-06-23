@@ -107,6 +107,7 @@ pub fn run_benchmark<V>(
     pruner_config: PrunerConfig,
     split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
+    skip_index_and_usage: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -123,6 +124,7 @@ pub fn run_benchmark<V>(
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
+    config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
     let transaction_generator_creator = transaction_type.map(|transaction_type| {
@@ -361,6 +363,7 @@ pub fn add_accounts<V>(
     verify_sequence_numbers: bool,
     split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
+    skip_index_and_usage: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -382,6 +385,7 @@ pub fn add_accounts<V>(
         verify_sequence_numbers,
         split_ledger_db,
         use_sharded_state_merkle_db,
+        skip_index_and_usage,
         pipeline_config,
     );
 }
@@ -396,6 +400,7 @@ fn add_accounts_impl<V>(
     verify_sequence_numbers: bool,
     split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
+    skip_index_and_usage: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -405,6 +410,7 @@ fn add_accounts_impl<V>(
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
+    config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
     let version = db.reader.get_latest_version().unwrap();
@@ -502,6 +508,7 @@ mod tests {
             verify_sequence_numbers,
             false,
             false,
+            false,
             PipelineConfig {
                 delay_execution_start: false,
                 split_stages: false,
@@ -526,6 +533,7 @@ mod tests {
             checkpoint_dir,
             verify_sequence_numbers,
             NO_OP_STORAGE_PRUNER_CONFIG,
+            false,
             false,
             false,
             PipelineConfig {

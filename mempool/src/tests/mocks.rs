@@ -133,7 +133,7 @@ impl MockSharedMempool {
             vec![MempoolDirectSend],
             vec![],
             network_senders,
-            peers_and_metadata,
+            peers_and_metadata.clone(),
         );
         let network_and_events = hashmap! {NetworkId::Validator => network_events};
         let network_service_events = NetworkServiceEvents::new(network_and_events);
@@ -151,6 +151,7 @@ impl MockSharedMempool {
             db.reader.clone(),
             Arc::new(RwLock::new(validator)),
             vec![],
+            peers_and_metadata,
         );
 
         (ac_client, mempool, quorum_store_sender, mempool_notifier)

@@ -24,7 +24,7 @@ pub struct Cmd {
     #[clap(long)]
     before_version: Version,
 
-    #[clap(long, parse(try_from_str=parse_nibble_path))]
+    #[clap(long, value_parser = parse_nibble_path)]
     nibble_path: NibblePath,
 }
 
