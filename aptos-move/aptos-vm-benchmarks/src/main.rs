@@ -106,6 +106,12 @@ fn main() {
             //// publish test-package under module address
             let creator = executor.new_account_at(**address);
 
+            println!(
+                "Executing {}::{}::benchmark",
+                address.to_string(),
+                identifier
+            );
+
             // publish package similar to create_publish_package in harness.rs
             let module_payload = generate_module_payload(&package);
             sign_txn(
