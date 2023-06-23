@@ -199,7 +199,7 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ): ConstructorRef acquires AptosCollection {
-        let constructor_ref = token::create_token(
+        let constructor_ref = token::create_from_account(
             creator,
             collection,
             description,
