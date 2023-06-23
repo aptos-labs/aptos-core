@@ -7,7 +7,7 @@ use crate::{
     docgen::DocgenOptions, path_in_crate, release_builder::RELEASE_BUNDLE_EXTENSION,
     release_bundle::ReleaseBundle, BuildOptions, ReleaseOptions,
 };
-use clap::ArgEnum;
+use clap::ValueEnum;
 use move_command_line_common::address::NumericalAddress;
 use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, fmt::Display, path::PathBuf, str::FromStr};
@@ -17,7 +17,7 @@ use std::{collections::BTreeMap, fmt::Display, path::PathBuf, str::FromStr};
 
 /// Represents the available release targets. `Current` is in sync with the current client branch,
 /// which is ensured by tests.
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum ReleaseTarget {
     Head,
     Devnet,

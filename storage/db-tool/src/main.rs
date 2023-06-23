@@ -12,6 +12,6 @@ async fn main() -> Result<()> {
     Logger::new().level(Level::Info).init();
     let _mp = MetricsPusher::start(vec![]);
 
-    DBTool::from_args().run().await?;
+    DBTool::parse().run().await?;
     Ok(())
 }

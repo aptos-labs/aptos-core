@@ -96,6 +96,7 @@ pub(crate) struct StateDb {
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
     pub state_kv_pruner: StateKvPrunerManager,
+    pub skip_usage: bool,
 }
 
 pub(crate) struct StateStore {
@@ -196,6 +197,9 @@ impl DbReader for StateDb {
     }
 
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+        if self.skip_usage {
+            return Ok(StateStorageUsage::new_untracked());
+        }
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
             Ok(self
                 .ledger_db
@@ -308,6 +312,7 @@ impl StateStore {
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
+        skip_usage: bool,
     ) -> Self {
         Self::sync_commit_progress(
             Arc::clone(&ledger_db),
@@ -321,6 +326,7 @@ impl StateStore {
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
+            skip_usage,
         });
         if empty_buffered_state_for_restore {
             let buffered_state = Mutex::new(BufferedState::new(
@@ -450,6 +456,7 @@ impl StateStore {
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
+            skip_usage: false,
         });
         let buffered_state = Self::create_buffered_state_from_latest_snapshot(
             &state_db, 0, /*hack_for_tests=*/ false,
@@ -647,6 +654,7 @@ impl StateStore {
             None,
             batch,
             sharded_state_kv_batches,
+            /*skip_usage=*/ false,
         )?;
 
         self.put_state_values(
@@ -671,6 +679,7 @@ impl StateStore {
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         state_kv_metadata_batch: &SchemaBatch,
         put_state_value_indices: bool,
+        skip_usage: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
@@ -683,6 +692,7 @@ impl StateStore {
             sharded_state_cache,
             ledger_batch,
             sharded_state_kv_batches,
+            skip_usage,
         )?;
 
         let _timer = OTHER_TIMERS_SECONDS
@@ -768,6 +778,7 @@ impl StateStore {
         sharded_state_cache: Option<&ShardedStateCache>,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        skip_usage: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -889,25 +900,26 @@ impl StateStore {
             })
             .collect();
 
-        for i in 0..num_versions {
-            let mut items_delta = 0;
-            let mut bytes_delta = 0;
-            for usage_delta in usage_deltas.iter() {
-                items_delta += usage_delta[i].0;
-                bytes_delta += usage_delta[i].1;
+        if !skip_usage {
+            for i in 0..num_versions {
+                let mut items_delta = 0;
+                let mut bytes_delta = 0;
+                for usage_delta in usage_deltas.iter() {
+                    items_delta += usage_delta[i].0;
+                    bytes_delta += usage_delta[i].1;
+                }
+                usage = StateStorageUsage::new(
+                    (usage.items() as i64 + items_delta) as usize,
+                    (usage.bytes() as i64 + bytes_delta) as usize,
+                );
+                let version = first_version + i as u64;
+                batch
+                    .put::<VersionDataSchema>(&version, &usage.into())
+                    .unwrap();
             }
-            usage = StateStorageUsage::new(
-                (usage.items() as i64 + items_delta) as usize,
-                (usage.bytes() as i64 + bytes_delta) as usize,
-            );
-            let version = first_version + i as u64;
-            batch
-                .put::<VersionDataSchema>(&version, &usage.into())
-                .unwrap();
-        }
 
-        if !expected_usage.is_untracked() {
-            ensure!(
+            if !expected_usage.is_untracked() {
+                ensure!(
                 expected_usage == usage,
                 "Calculated state db usage at version {} not expected. expected: {:?}, calculated: {:?}, base version: {:?}, base version usage: {:?}",
                 first_version + value_state_sets.len() as u64 - 1,
@@ -916,10 +928,11 @@ impl StateStore {
                 base_version,
                 base_version_usage,
             );
-        }
+            }
 
-        STATE_ITEMS.set(usage.items() as i64);
-        TOTAL_STATE_BYTES.set(usage.bytes() as i64);
+            STATE_ITEMS.set(usage.items() as i64);
+            TOTAL_STATE_BYTES.set(usage.bytes() as i64);
+        }
 
         Ok(())
     }

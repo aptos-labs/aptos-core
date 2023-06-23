@@ -38,3 +38,9 @@ impl Cmd {
         }
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Cmd::command().debug_assert()
+}

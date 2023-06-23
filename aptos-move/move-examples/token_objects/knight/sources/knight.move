@@ -83,25 +83,6 @@ module token_objects::knight {
         token::create_token_address(&@token_objects, &string::utf8(KNIGHT_COLLECTION_NAME), &knight_token_name)
     }
 
-    /// Creates the knight collection. This function creates a collection with unlimited supply using
-    /// the module constants for description, name, and URI, defined above. The royalty configuration
-    /// is skipped in this collection for simplicity.
-    fun create_knight_collection(creator: &signer) {
-        // Constructs the strings from the bytes.
-        let description = string::utf8(KNIGHT_COLLECTION_DESCRIPTION);
-        let name = string::utf8(KNIGHT_COLLECTION_NAME);
-        let uri = string::utf8(KNIGHT_COLLECTION_URI);
-
-        // Creates the collection with unlimited supply and without establishing any royalty configuration.
-        collection::create_unlimited_collection(
-            creator,
-            description,
-            name,
-            option::none(),
-            uri,
-        );
-    }
-
     /// Mints an knight token. This function mints a new knight token and transfers it to the
     /// `soul_bound_to` address. The token is minted with health point 0 and condition Hungry.
     public entry fun mint_knight(
@@ -176,12 +157,12 @@ module token_objects::knight {
         feed_food(from, meat_token, to, amount);
     }
 
-    public entry fun feed_food(from: &signer, food_token: Object<FoodToken>, to: Object<KnightToken>, amount: u64) acquires HealthPoint, KnightToken {
-        let knight_token_address = object::object_address(&to);
-        food::burn_food(from, food_token, amount);
+    public entry fun feed_food(from: &signer, food: Object<FoodToken>, to: Object<KnightToken>, amount: u64) acquires HealthPoint, KnightToken {
+        food::burn_food(from, food, amount);
 
-        let restoration_amount = food::restoration_value(food_token) * amount;
-        let health_point = borrow_global_mut<HealthPoint>(object::object_address(&to));
+        let restoration_amount = food::restoration_value(food) * amount;
+        let knight_token_address = object::object_address(&to);
+        let health_point = borrow_global_mut<HealthPoint>(knight_token_address);
         let old_health_point = health_point.value;
         let new_health_point = old_health_point + restoration_amount;
         health_point.value = new_health_point;
@@ -213,6 +194,25 @@ module token_objects::knight {
         let uri = knight.base_uri;
         string::append(&mut uri, string::utf8(new_condition));
         token::set_uri(&knight.mutator_ref, uri);
+    }
+
+    /// Creates the knight collection. This function creates a collection with unlimited supply using
+    /// the module constants for description, name, and URI, defined above. The royalty configuration
+    /// is skipped in this collection for simplicity.
+    fun create_knight_collection(creator: &signer) {
+        // Constructs the strings from the bytes.
+        let description = string::utf8(KNIGHT_COLLECTION_DESCRIPTION);
+        let name = string::utf8(KNIGHT_COLLECTION_NAME);
+        let uri = string::utf8(KNIGHT_COLLECTION_URI);
+
+        // Creates the collection with unlimited supply and without establishing any royalty configuration.
+        collection::create_unlimited_collection(
+            creator,
+            description,
+            name,
+            option::none(),
+            uri,
+        );
     }
 
     #[test_only]

@@ -60,3 +60,9 @@ impl BytecodeViewerConfig {
         start_viewer_in_memory(compiled_module, source_map, source_path)
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    BytecodeViewerConfig::command().debug_assert()
+}
