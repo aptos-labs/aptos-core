@@ -54,7 +54,7 @@ impl PartitioningShard {
             current_round_start_index,
             frozen_sub_blocks,
         } = partition_msg;
-        let conflict_detector = CrossShardConflictDetector::new(self.shard_id, self.num_shards, self.num_rounds_finished);
+        let mut conflict_detector = CrossShardConflictDetector::new(self.shard_id, self.num_shards, self.num_rounds_finished);
         // If transaction filtering is allowed, we need to prepare the dependency analysis and broadcast it to other shards
         // Based on the dependency analysis received from other shards, we will reject transactions that are conflicting with
         // transactions in other shards
