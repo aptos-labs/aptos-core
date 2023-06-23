@@ -2,10 +2,6 @@ module aptos_framework::transaction_context {
 
     use std::features;
 
-    #[test_only]
-    /// create_unique_address uses this for domain separation within its native implementation
-    const DERIVE_UUID_ADDRESS_SCHEME: u8 = 0xFB;
-
     /// UUID feature is not supported.
     const EUUID_NOT_SUPPORTED: u64 = 3;
 
@@ -47,13 +43,7 @@ module aptos_framework::transaction_context {
         }
     }
 
-    #[test]
-    fun test_correct_uuid() {
-        let uuid1 = create_unique_address();
-        let creation_num = 1;
-        let bytes = std::bcs::to_bytes(&aptos_framework::guid::create(get_txn_hash(), &mut creation_num));
-        std::vector::push_back(&mut bytes, DERIVE_UUID_ADDRESS_SCHEME);
-        let uuid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
-        assert!(uuid1 == uuid2, 0);
+    public fun get_unique_address(uuid: UUID): address {
+        uuid.unique_address
     }
 }

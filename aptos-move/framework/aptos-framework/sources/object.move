@@ -48,6 +48,10 @@ module aptos_framework::object {
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
 
+    #[test_only]
+    /// create_unique_address uses this for domain separation within its native implementation
+    const DERIVE_UUID_ADDRESS_SCHEME: u8 = 0xFB;
+
     /// Maximum nesting from one object to another. That is objects can technically have infinte
     /// nesting, but any checks such as transfer will only be evaluated this deep.
     const MAXIMUM_OBJECT_NESTING: u8 = 8;
@@ -662,5 +666,18 @@ module aptos_framework::object {
         transfer_with_ref(linear_transfer_ref_good, @0x456);
         assert!(owner(hero) == @0x456, 0);
         transfer_with_ref(linear_transfer_ref_bad, @0x789);
+    }
+
+    #[test]
+    fun test_correct_uuid() {
+        if (std::features::uuids_enabled()) {
+            let uuid1 = aptos_framework::transaction_context::create_unique_addr();
+            let bytes = aptos_framework::transaction_context::get_txn_hash();
+            std::vector::push_back(&mut bytes, 0);
+            std::vector::push_back(&mut bytes, 1);
+            std::vector::push_back(&mut bytes, DERIVE_UUID_ADDRESS_SCHEME);
+            let uuid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
+            assert!(uuid1 == uuid2, 0);
+        }
     }
 }

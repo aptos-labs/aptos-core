@@ -12,6 +12,7 @@
 -  [Function `create_unique_addr`](#0x1_transaction_context_create_unique_addr)
 -  [Function `get_script_hash`](#0x1_transaction_context_get_script_hash)
 -  [Function `create_uuid`](#0x1_transaction_context_create_uuid)
+-  [Function `get_unique_address`](#0x1_transaction_context_get_unique_address)
 -  [Specification](#@Specification_1)
     -  [Function `get_txn_hash`](#@Specification_1_get_txn_hash)
     -  [Function `create_unique_address`](#@Specification_1_create_unique_address)
@@ -192,6 +193,30 @@ the generated unique address wrapped in the UUID class.
     <b>return</b> <a href="transaction_context.md#0x1_transaction_context_UUID">UUID</a> {
         unique_address: <a href="transaction_context.md#0x1_transaction_context_create_unique_address">create_unique_address</a>()
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_context_get_unique_address"></a>
+
+## Function `get_unique_address`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_unique_address">get_unique_address</a>(uuid: <a href="transaction_context.md#0x1_transaction_context_UUID">transaction_context::UUID</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_unique_address">get_unique_address</a>(uuid: <a href="transaction_context.md#0x1_transaction_context_UUID">UUID</a>): <b>address</b> {
+    uuid.unique_address
 }
 </code></pre>
 
