@@ -952,7 +952,12 @@ impl RestOptions {
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
-    /// Dev mode, uses [dev-addresses] rather than [addresses] for compilation
+    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
+    ///
+    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
+    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+    ///
+    /// Currently, it also additionally pulls in all test compilation artifacts
     #[clap(long)]
     pub dev: bool,
     /// Path to a move package (the folder with a Move.toml file)
