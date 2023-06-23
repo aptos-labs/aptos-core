@@ -7,10 +7,23 @@ use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, Transaction, TransactionPayload},
 };
 use std::path::PathBuf;
 use std::time::Instant;
+
+//// generate a TransactionPayload for modules
+fn generate_module_payload(package: BuiltPackage) -> TransactionPayload {
+    // publish package similar to create_publish_package in harness.rs
+    let code = package.extract_code();
+    let metadata = package
+        .extract_metadata()
+        .expect("extracting package metadata must succeed");
+    aptos_stdlib::code_publish_package_txn(
+        bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+        code,
+    )
+}
 
 fn main() {
     //// Compile test-package
@@ -32,14 +45,7 @@ fn main() {
     let creator = executor.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
 
     // publish package similar to create_publish_package in harness.rs
-    let code = package.extract_code();
-    let metadata = package
-        .extract_metadata()
-        .expect("extracting package metadata must succeed");
-    let module_payload = aptos_stdlib::code_publish_package_txn(
-        bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
-        code,
-    );
+    let module_payload = generate_module_payload(package);
     let module_signed_txn = creator
         .transaction()
         .sequence_number(sequence_num_counter)
