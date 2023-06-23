@@ -86,17 +86,6 @@ fn main() {
     let mut executor = executor.set_not_parallel();
     let mut sequence_num_counter = 0;
 
-    /*let pkg_md = package.extract_metadata().expect("work");
-    let modules = pkg_md.modules;
-    for mods in modules {
-        println!("{:?}", mods.source_map.len());
-        let vec_bytes = mods.source_map.as_slice();
-        let src_map = bcs::from_bytes::<SourceMap>(vec_bytes).expect("shouldwork");
-
-        //let (addr, _) = src_map.module_name_opt.unwrap();
-        //println!("{:?}", addr);
-    }*/
-
     let codes = package.extract_code();
     let compiled_module = CompiledModule::deserialize(&codes[0]).unwrap();
     let mut module_bytes = vec![];
@@ -104,8 +93,7 @@ fn main() {
     let module_id = compiled_module.self_id();
     let address = &module_id.address();
 
-    //// publish test-package under 0xbeef
-    // let creator = executor.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    //// publish test-package under module address
     let creator = executor.new_account_at(**address);
 
     // publish package similar to create_publish_package in harness.rs
