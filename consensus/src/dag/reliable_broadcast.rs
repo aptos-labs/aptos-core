@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{dag::types::DAGMessage, network_interface::ConsensusMsg};
+use crate::dag::types::{DAGMessage, DAGNetworkSender};
 use aptos_consensus_types::common::Author;
-use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
 use std::{future::Future, sync::Arc, time::Duration};
 
@@ -13,16 +12,6 @@ pub trait BroadcastStatus {
     type Message: DAGMessage;
 
     fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>>;
-}
-
-#[async_trait]
-pub trait DAGNetworkSender: Send + Sync {
-    async fn send_rpc(
-        &self,
-        receiver: Author,
-        message: ConsensusMsg,
-        timeout: Duration,
-    ) -> anyhow::Result<ConsensusMsg>;
 }
 
 pub struct ReliableBroadcast {
