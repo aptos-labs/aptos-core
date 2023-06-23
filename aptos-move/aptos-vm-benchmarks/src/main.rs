@@ -107,6 +107,8 @@ fn main() {
             let address = &module_id.address();
             let identifier = &module_id.name().as_str();
 
+            // find non-entry functions and ignore them
+            // keep entry function names in func_identifiers vector
             let funcs = compiled_module.function_defs;
             let func_handles = compiled_module.function_handles;
             let func_identifier_pool = compiled_module.identifiers;
