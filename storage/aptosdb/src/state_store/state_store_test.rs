@@ -46,6 +46,7 @@ fn put_value_set(
         .unwrap();
     let ledger_batch = SchemaBatch::new();
     let sharded_state_kv_batches = new_sharded_kv_schema_batch();
+    let state_kv_metadata_batch = SchemaBatch::new();
     state_store
         .put_value_sets(
             vec![&sharded_value_set],
@@ -54,6 +55,9 @@ fn put_value_set(
             None,
             &ledger_batch,
             &sharded_state_kv_batches,
+            &state_kv_metadata_batch,
+            /*put_state_value_indices=*/ false,
+            /*skip_usage=*/ false,
         )
         .unwrap();
     state_store
@@ -63,7 +67,7 @@ fn put_value_set(
         .unwrap();
     state_store
         .state_kv_db
-        .commit(version, sharded_state_kv_batches)
+        .commit(version, state_kv_metadata_batch, sharded_state_kv_batches)
         .unwrap();
     root
 }

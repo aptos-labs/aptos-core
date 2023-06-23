@@ -58,18 +58,18 @@ pub struct ApiConnectionConfig {
     /// To manually generate a keypair, use generate-key:
     /// `cargo run -p generate-keypair -- -o <output_file_path>`
     #[serde(default = "ApiConnectionConfig::default_mint_key_file_path")]
-    #[clap(long, default_value = DEFAULT_KEY_FILE_PATH, parse(from_os_str))]
+    #[clap(long, default_value = DEFAULT_KEY_FILE_PATH, value_parser)]
     key_file_path: PathBuf,
 
     /// Hex string of an Ed25519PrivateKey for minting / transferring coins.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[clap(long, parse(try_from_str = ConfigKey::from_encoded_string))]
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string)]
     key: Option<ConfigKey<Ed25519PrivateKey>>,
 
     /// Chain ID of the network this client is connecting to. For example, for mainnet:
     /// "MAINNET" or 1, testnet: "TESTNET" or 2. If there is no predefined string
     /// alias (e.g. "MAINNET"), just use the number. Note: Chain ID of 0 is not allowed.
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value_t = ChainId::testnet())]
     pub chain_id: ChainId,
 }
 

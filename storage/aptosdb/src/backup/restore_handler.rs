@@ -141,10 +141,7 @@ impl RestoreHandler {
     }
 
     pub fn get_next_expected_transaction_version(&self) -> Result<Version> {
-        Ok(self
-            .aptosdb
-            .get_latest_transaction_info_option()?
-            .map_or(0, |(ver, _txn_info)| ver + 1))
+        Ok(self.aptosdb.get_latest_version().map_or(0, |ver| ver + 1))
     }
 
     pub fn get_state_snapshot_before(

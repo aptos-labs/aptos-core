@@ -12,7 +12,8 @@
     "test": "run-s bcs_transaction multisig_transaction simple_nft transfer_coin",
     "your_coin": "ts-node your_coin.ts",
     "call_aptos_cli": "ts-node call_aptos_cli.ts",
-    "ambassador": "ts-node ambassador"
+    "ambassador": "ts-node ambassador",
+    "knight": "ts-node knight"
   },
   "keywords": [],
   "author": "",

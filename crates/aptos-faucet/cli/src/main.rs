@@ -127,3 +127,9 @@ fn process_account_address(str: &str) -> AccountAddress {
         panic!("Account address is in an invalid format {}", str)
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    FaucetCliArgs::command().debug_assert()
+}
