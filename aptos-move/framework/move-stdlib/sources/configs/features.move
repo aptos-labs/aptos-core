@@ -194,6 +194,13 @@ module std::features {
         is_enabled(DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING)
     }
 
+    /// Whether alternate gas payer is supported
+    /// Lifetime: transient
+    const GAS_PAYER_ENABLED: u64 = 22;
+    public fun gas_payer_enabled(): bool acquires Features {
+        is_enabled(GAS_PAYER_ENABLED)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
