@@ -285,6 +285,11 @@ module aptos_framework::object {
         ref.self
     }
 
+    /// Returns the address associated with the constructor
+    public fun address_from_derive_ref(ref: &DeriveRef): address {
+        ref.self
+    }
+
     /// Returns an Object<T> from within a ConstructorRef
     public fun object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T> {
         address_to_object<T>(ref.self)

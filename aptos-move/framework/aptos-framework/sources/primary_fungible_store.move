@@ -72,14 +72,19 @@ module aptos_framework::primary_fungible_store {
         metadata: Object<T>,
     ): Object<FungibleStore> acquires DeriveRefPod {
         let metadata_addr = object::object_address(&metadata);
-        object::address_to_object<Metadata>(metadata_addr);
         let derive_ref = &borrow_global<DeriveRefPod>(metadata_addr).metadata_derive_ref;
+        create_primary_store_with_ref(derive_ref, owner_addr)
+    }
+
+    /// Create a primary store object to hold fungible asset for the given address, with a passed-in DeriveRef.
+    public fun create_primary_store_with_ref(derive_ref: &DeriveRef, owner_addr: address): Object<FungibleStore> {
         let constructor_ref = &object::create_user_derived_object(owner_addr, derive_ref);
 
         // Disable ungated transfer as deterministic stores shouldn't be transferrable.
         let transfer_ref = &object::generate_transfer_ref(constructor_ref);
         object::disable_ungated_transfer(transfer_ref);
 
+        let metadata = object::address_to_object<Metadata>(object::address_from_derive_ref(derive_ref));
         fungible_asset::create_store(constructor_ref, metadata)
     }
 

@@ -52,6 +52,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `generate_derive_ref`](#0x1_object_generate_derive_ref)
 -  [Function `generate_signer`](#0x1_object_generate_signer)
 -  [Function `address_from_constructor_ref`](#0x1_object_address_from_constructor_ref)
+-  [Function `address_from_derive_ref`](#0x1_object_address_from_derive_ref)
 -  [Function `object_from_constructor_ref`](#0x1_object_object_from_constructor_ref)
 -  [Function `can_generate_delete_ref`](#0x1_object_can_generate_delete_ref)
 -  [Function `create_guid`](#0x1_object_create_guid)
@@ -1095,6 +1096,31 @@ Returns the address associated with the constructor
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <b>address</b> {
+    ref.self
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_address_from_derive_ref"></a>
+
+## Function `address_from_derive_ref`
+
+Returns the address associated with the constructor
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_derive_ref">address_from_derive_ref</a>(ref: &<a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_derive_ref">address_from_derive_ref</a>(ref: &<a href="object.md#0x1_object_DeriveRef">DeriveRef</a>): <b>address</b> {
     ref.self
 }
 </code></pre>

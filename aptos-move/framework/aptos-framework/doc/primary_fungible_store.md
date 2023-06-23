@@ -22,6 +22,7 @@ fungible asset to it. This emits an deposit event.
 -  [Function `create_primary_store_enabled_fungible_asset`](#0x1_primary_fungible_store_create_primary_store_enabled_fungible_asset)
 -  [Function `ensure_primary_store_exists`](#0x1_primary_fungible_store_ensure_primary_store_exists)
 -  [Function `create_primary_store`](#0x1_primary_fungible_store_create_primary_store)
+-  [Function `create_primary_store_with_ref`](#0x1_primary_fungible_store_create_primary_store_with_ref)
 -  [Function `primary_store_address`](#0x1_primary_fungible_store_primary_store_address)
 -  [Function `primary_store`](#0x1_primary_fungible_store_primary_store)
 -  [Function `primary_store_exists`](#0x1_primary_fungible_store_primary_store_exists)
@@ -173,14 +174,39 @@ Create a primary store object to hold fungible asset for the given address.
     metadata: Object&lt;T&gt;,
 ): Object&lt;FungibleStore&gt; <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
     <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
-    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(metadata_addr);
     <b>let</b> derive_ref = &<b>borrow_global</b>&lt;<a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a>&gt;(metadata_addr).metadata_derive_ref;
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_with_ref">create_primary_store_with_ref</a>(derive_ref, owner_addr)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_primary_fungible_store_create_primary_store_with_ref"></a>
+
+## Function `create_primary_store_with_ref`
+
+Create a primary store object to hold fungible asset for the given address, with a passed-in DeriveRef.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_with_ref">create_primary_store_with_ref</a>(derive_ref: &<a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a>, owner_addr: <b>address</b>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">fungible_asset::FungibleStore</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_with_ref">create_primary_store_with_ref</a>(derive_ref: &DeriveRef, owner_addr: <b>address</b>): Object&lt;FungibleStore&gt; {
     <b>let</b> constructor_ref = &<a href="object.md#0x1_object_create_user_derived_object">object::create_user_derived_object</a>(owner_addr, derive_ref);
 
     // Disable ungated transfer <b>as</b> deterministic stores shouldn't be transferrable.
     <b>let</b> transfer_ref = &<a href="object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(constructor_ref);
     <a href="object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(transfer_ref);
 
+    <b>let</b> metadata = <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(<a href="object.md#0x1_object_address_from_derive_ref">object::address_from_derive_ref</a>(derive_ref));
     <a href="fungible_asset.md#0x1_fungible_asset_create_store">fungible_asset::create_store</a>(constructor_ref, metadata)
 }
 </code></pre>
