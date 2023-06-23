@@ -386,7 +386,7 @@ fn spawn_partitioning_shard(
     thread::Builder::new()
         .name(format!("partitioning-shard-{}", shard_id))
         .spawn(move || {
-            let partitioning_shard =
+            let mut partitioning_shard =
                 PartitioningShard::new(shard_id, control_rx, result_tx, message_rxs, messages_txs);
             partitioning_shard.start();
         })
@@ -404,7 +404,7 @@ mod tests {
     };
     use aptos_crypto::hash::CryptoHash;
     use aptos_types::{
-        block_executor::partitioner::{SubBlock, TxnIdxWithShardId},
+        block_executor::partitioner::{SubBlock, TxnIndexForSharding},
         transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
     };
     use move_core_types::account_address::AccountAddress;
@@ -673,7 +673,7 @@ mod tests {
             .for_each(|txn| {
                 let required_deps = txn
                     .cross_shard_dependencies
-                    .get_required_edge_for(TxnIdxWithShardId::new(6, 1))
+                    .get_required_edge_for(TxnIndexForSharding::new(6, 1, 0))
                     .unwrap();
                 // txn (6, 7) and 8 has conflict only on the coin store of account 7 as txn (6,7) are sending
                 // from account 7 and txn 8 is receiving in account 7
@@ -690,7 +690,7 @@ mod tests {
             .unwrap()
             .transactions[3]
             .cross_shard_dependencies
-            .get_dependent_edge_for(TxnIdxWithShardId::new(7, 2))
+            .get_dependent_edge_for(TxnIndexForSharding::new(7, 2, 1))
             .unwrap();
         assert_eq!(required_deps.len(), 1);
         assert_eq!(
@@ -703,7 +703,7 @@ mod tests {
             .unwrap()
             .transactions[3]
             .cross_shard_dependencies
-            .get_dependent_edge_for(TxnIdxWithShardId::new(8, 2))
+            .get_dependent_edge_for(TxnIndexForSharding::new(8, 2, 1))
             .unwrap();
         assert_eq!(required_deps.len(), 1);
         assert_eq!(
