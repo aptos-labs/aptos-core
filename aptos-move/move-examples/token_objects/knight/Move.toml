@@ -5,6 +5,13 @@ version = '1.0.0'
 [addresses]
 token_objects = "_"
 
+[dev-addresses]
+token_objects = "0xcafe"
+
 [dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+AptosTokenObjects = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-token-objects' }
+
+[dev-dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }
 AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }

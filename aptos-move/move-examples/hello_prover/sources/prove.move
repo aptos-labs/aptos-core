@@ -1,4 +1,4 @@
-module 0x42::prove {
+module hello_prover::prove {
     fun plus1(x: u64): u64 {
         x+1
     }

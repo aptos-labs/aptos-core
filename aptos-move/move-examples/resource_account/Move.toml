@@ -1,11 +1,16 @@
 [package]
-name = "test_package"
+name = "ResourceAccountExample"
 version = "0.0.0"
 upgrade_policy = "compatible"
 
-[dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
-
 [addresses]
-# change it to `source_addr = "_" when calling `create-resource-account-and-publish-package` from the cli
+source_addr = "_"
+
+[dev-addresses]
 source_addr = "0xcafe"
+
+[dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+
+[dev-dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }

@@ -1,7 +1,7 @@
 script {
     use aptos_framework::aptos_governance;
 
-    fun main(proposal_id: u64) {
+    fun governance_update_voting_duration(proposal_id: u64) {
         let framework_signer = aptos_governance::resolve(proposal_id, @aptos_framework);
         // Update voting duration of Aptos governance proposals to 1 day. Other params don't change.
         let updated_voting_duration_secs = 24 * 60 * 60;

@@ -5,5 +5,11 @@ version = "0.0.0"
 [addresses]
 resource_groups_primary = "_"
 
+[dev-addresses]
+resource_groups_primary = "0xcafe"
+
 [dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+
+[dev-dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }

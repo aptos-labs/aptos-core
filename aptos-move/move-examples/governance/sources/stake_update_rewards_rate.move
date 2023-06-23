@@ -3,7 +3,7 @@ script {
     use aptos_framework::block;
     use aptos_framework::staking_config;
 
-    fun main(proposal_id: u64) {
+    fun stake_update_rewards_rate(proposal_id: u64) {
         let framework_signer = aptos_governance::resolve(proposal_id, @aptos_framework);
         let num_seconds_in_a_year = 365 * 24 * 60 * 60;
         let epoch_duration_secs = block::get_epoch_interval_secs();

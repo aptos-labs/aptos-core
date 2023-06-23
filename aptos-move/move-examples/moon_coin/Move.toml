@@ -1,9 +1,15 @@
 [package]
-name = "Examples"
+name = "MoonCoinExample"
 version = "0.0.0"
 
 [addresses]
 MoonCoin = "_"
 
+[dev-addresses]
+MoonCoin = "0xcafe"
+
 [dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+
+[dev-dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }

@@ -4,7 +4,7 @@ script {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::staking_config;
 
-    fun main(proposal_id: u64) {
+    fun stake_update_min_max(proposal_id: u64) {
         let framework_signer = aptos_governance::resolve(proposal_id, @aptos_framework);
         let one_aptos_coin_with_decimals = 10 ** (coin::decimals<AptosCoin>() as u64);
         // Change min to 1000 and max to 1M Aptos coins.

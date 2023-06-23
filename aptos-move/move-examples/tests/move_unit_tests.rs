@@ -30,6 +30,7 @@ pub fn run_tests_for_pkg(
     let ok = run_move_unit_tests(
         &pkg_path,
         move_package::BuildConfig {
+            dev_mode: true,
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             additional_named_addresses: named_addr,
@@ -60,19 +61,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
 }
 
 fn test_common(pkg: &str) {
-    let named_address = BTreeMap::from([(
-        String::from(pkg),
-        AccountAddress::from_hex_literal("0xf00d").unwrap(),
-    )]);
-    run_tests_for_pkg(pkg, named_address);
-}
-
-fn test_resource_account_common(pkg: &str) {
-    let named_address = BTreeMap::from([(
-        String::from(pkg),
-        create_resource_address(AccountAddress::from_hex_literal("0xcafe").unwrap(), &[]),
-    )]);
-    run_tests_for_pkg(pkg, named_address);
+    run_tests_for_pkg(pkg, BTreeMap::new());
 }
 
 #[test]
@@ -112,59 +101,31 @@ fn test_message_board() {
 
 #[test]
 fn test_fungible_asset() {
-    let named_address = BTreeMap::from([(
-        String::from("example_addr"),
-        AccountAddress::from_hex_literal("0xcafe").unwrap(),
-    )]);
-    run_tests_for_pkg(
-        "fungible_asset/managed_fungible_asset",
-        named_address.clone(),
-    );
-    run_tests_for_pkg(
-        "fungible_asset/managed_fungible_token",
-        named_address.clone(),
-    );
-    run_tests_for_pkg(
-        "fungible_asset/preminted_managed_coin",
-        named_address.clone(),
-    );
-    run_tests_for_pkg("fungible_asset/simple_managed_coin", named_address);
+    test_common("fungible_asset/managed_fungible_asset");
+    test_common("fungible_asset/managed_fungible_token");
+    test_common("fungible_asset/preminted_managed_coin");
+    test_common("fungible_asset/simple_managed_coin");
 }
 
 #[test]
 fn test_mint_nft() {
-    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let named_address = BTreeMap::from([
-        (String::from("mint_nft"), create_resource_address(addr, &[])),
-        (String::from("source_addr"), addr),
-    ]);
-    run_tests_for_pkg("mint_nft/4-Getting-Production-Ready", named_address);
+    test_common("mint_nft/4-Getting-Production-Ready");
 }
 
 #[test]
 fn test_minter() {
-    run_tests_for_pkg("scripts/minter", BTreeMap::new());
+    test_common("scripts/minter");
 }
 
 #[test]
 fn test_resource_account() {
-    test_resource_account_common("resource_account");
+    test_common("resource_account");
 }
 
 #[test]
 fn test_resource_groups() {
-    let named_address = BTreeMap::from([
-        (
-            String::from("resource_groups_primary"),
-            AccountAddress::from_hex_literal("0xf00d").unwrap(),
-        ),
-        (
-            String::from("resource_groups_secondary"),
-            AccountAddress::from_hex_literal("0xcafe").unwrap(),
-        ),
-    ]);
-    run_tests_for_pkg("resource_groups/primary", named_address.clone());
-    run_tests_for_pkg("resource_groups/secondary", named_address);
+    test_common("resource_groups/primary");
+    test_common("resource_groups/secondary");
 }
 
 #[test]
@@ -174,32 +135,22 @@ fn test_shared_account() {
 
 #[test]
 fn test_token_objects() {
-    let named_address = BTreeMap::from([(
-        String::from("token_objects"),
-        AccountAddress::from_hex_literal("0xcafe").unwrap(),
-    )]);
-    run_tests_for_pkg("token_objects/hero", named_address.clone());
-    run_tests_for_pkg("token_objects/token_lockup", named_address.clone());
-    run_tests_for_pkg("token_objects/ambassador/move", named_address);
+    test_common("token_objects/hero");
+    test_common("token_objects/token_lockup");
+    test_common("token_objects/ambassador/move");
 }
 
 #[test]
 fn test_two_by_two_transfer() {
-    run_tests_for_pkg("scripts/two_by_two_transfer", BTreeMap::new());
+    test_common("scripts/two_by_two_transfer");
 }
 
 #[test]
 fn test_post_mint_reveal_nft() {
-    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let named_address = BTreeMap::from([(String::from("post_mint_reveal_nft"), addr)]);
-    run_tests_for_pkg("post_mint_reveal_nft", named_address);
+    test_common("post_mint_reveal_nft");
 }
 
 #[test]
 fn test_nft_dao_test() {
-    let named_address = BTreeMap::from([(
-        String::from("dao_platform"),
-        AccountAddress::from_hex_literal("0xcafe").unwrap(),
-    )]);
-    run_tests_for_pkg("dao/nft_dao", named_address);
+    test_common("dao/nft_dao");
 }

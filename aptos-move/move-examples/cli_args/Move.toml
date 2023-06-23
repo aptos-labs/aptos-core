@@ -6,5 +6,11 @@ upgrade_policy = "compatible"
 [addresses]
 test_account = "_"
 
-[dependencies.AptosFramework]
-local = "../../framework/aptos-framework"
+[dev-addresses]
+test_account = "0xcafe"
+
+[dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+
+[dev-dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }

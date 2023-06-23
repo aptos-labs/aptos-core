@@ -1,10 +1,15 @@
 [package]
-name = "MessageBoard"
+name = "MessageBoardExample"
 version = "0.0.1"
 
-[dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
-
 [addresses]
-std = "0x1"
 message_board = "_"
+
+[dev-addresses]
+message_board = "0xcafe"
+
+[dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+
+[dev-dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }

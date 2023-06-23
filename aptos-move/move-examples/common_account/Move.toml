@@ -2,8 +2,14 @@
 name = "CommonAccount"
 version = "1.0.0"
 
-[dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
-
 [addresses]
 common_account = "_"
+
+[dev-addresses]
+common_account = "0xcafe"
+
+[dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+
+[dev-dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }

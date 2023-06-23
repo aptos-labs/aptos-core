@@ -1,9 +1,15 @@
 [package]
-name = "DataStructure"
+name = "IterableTable"
 version = "0.0.1"
 
-[dependencies]
-AptosStdlib = { local = "../../framework/aptos-stdlib" }
-
 [addresses]
-std = "0x1"
+iterable_table_account = "_"
+
+[dev-addresses]
+iterable_table_account = "0xcafe"
+
+[dependencies]
+AptosStdlib = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-stdlib' }
+
+[dev-dependencies]
+AptosStdLib = { local = "../../framework/aptos-stdlib" }

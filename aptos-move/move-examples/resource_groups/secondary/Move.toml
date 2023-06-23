@@ -6,6 +6,13 @@ version = "0.0.0"
 resource_groups_primary = "_"
 resource_groups_secondary = "_"
 
+[dev-addresses]
+resource_groups_primary = "0xcafe"
+resource_groups_secondary = "0xbeef"
+
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
 ResourceGroupsPrimary = { local = "../primary" }
+
+[dev-dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }

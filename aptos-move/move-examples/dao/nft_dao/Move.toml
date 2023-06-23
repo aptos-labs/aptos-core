@@ -5,8 +5,14 @@ upgrade_policy = "immutable"
 
 [addresses]
 dao_platform = "_"
-aptos_framework = "0x1"
+
+[dev-addresses]
+dao_platform = "0xcafe"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+AptosToken = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-token' }
+
+[dev-dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
 AptosToken = { local = "../../../framework/aptos-token" }

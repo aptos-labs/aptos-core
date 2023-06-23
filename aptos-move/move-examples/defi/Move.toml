@@ -1,9 +1,15 @@
 [package]
-name = "Examples"
+name = "LockedCoins"
 version = "0.0.0"
 
 [addresses]
 defi = "_"
 
+[dev-addresses]
+defi = "0xcafe"
+
 [dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+
+[dev-dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }

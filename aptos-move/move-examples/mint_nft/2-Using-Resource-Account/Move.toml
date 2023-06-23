@@ -1,10 +1,17 @@
 [package]
-name = "Examples"
+name = "MintNFTExamplePart2"
 version = "0.0.0"
 
+[addresses]
+mint_nft = "_"
+
+[dev-addresses]
+mint_nft = "0xcafe"
+
 [dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+AptosToken = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-token' }
+
+[dev-dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }
 AptosToken = { local = "../../../framework/aptos-token" }
-
-[addresses]
-aptos_framework = "0x1"

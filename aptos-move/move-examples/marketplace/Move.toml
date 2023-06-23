@@ -1,11 +1,19 @@
 [package]
-name = "Marketplace"
+name = "MarketplaceExample"
 version = "0.0.0"
 
 [addresses]
 marketplace = "_"
 
+[dev-addresses]
+marketplace = "0xcafe"
+
 [dependencies]
+AptosFramework = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-framework' }
+AptosToken = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-token' }
+AptosTokenObjects = { git = 'https://github.com/aptos-labs/aptos-core.git', rev = 'mainnet', subdir = 'aptos-move/framework/aptos-token-objects' }
+
+[dev-dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }
 AptosToken = { local = "../../framework/aptos-token" }
 AptosTokenObjects = { local = "../../framework/aptos-token-objects" }
