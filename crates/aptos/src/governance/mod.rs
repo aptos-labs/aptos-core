@@ -869,30 +869,37 @@ impl CliCommand<()> for GenerateUpgradeProposal {
 pub struct GenerateExecutionHash {
     #[clap(long)]
     pub script_path: Option<PathBuf>,
+    #[clap(long)]
+    pub framework_local_dir: Option<PathBuf>,
 }
 
 impl GenerateExecutionHash {
     pub fn generate_hash(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        let framework_local_dir = if self.framework_local_dir.is_some() {
+            self.framework_local_dir.clone()
+        } else {
+            Option::from({
+                let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                path.pop();
+                path.pop();
+                path.join("aptos-move")
+                    .join("framework")
+                    .join("aptos-framework")
+                    .canonicalize()
+                    .map_err(|err| {
+                        CliError::IO(
+                            format!("Failed to canonicalize aptos framework path: {:?}", path),
+                            err,
+                        )
+                    })?
+            })
+        };
         CompileScriptFunction {
             script_path: self.script_path.clone(),
             compiled_script_path: None,
             framework_package_args: FrameworkPackageArgs {
                 framework_git_rev: None,
-                framework_local_dir: Option::from({
-                    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-                    path.pop();
-                    path.pop();
-                    path.join("aptos-move")
-                        .join("framework")
-                        .join("aptos-framework")
-                        .canonicalize()
-                        .map_err(|err| {
-                            CliError::IO(
-                                format!("Failed to canonicalize aptos framework path: {:?}", path),
-                                err,
-                            )
-                        })?
-                }),
+                framework_local_dir,
                 skip_fetch_latest_git_deps: false,
             },
             bytecode_version: None,

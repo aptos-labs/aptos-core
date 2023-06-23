@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::components::get_execution_hash;
+use crate::{aptos_core_path, components::get_execution_hash};
 use anyhow::Result;
 use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use aptos_temppath::TempPath;
@@ -58,10 +58,6 @@ pub fn generate_upgrade_proposals(
         package_path_list.reverse();
     }
 
-    let mut root_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
-    root_path.pop();
-    root_path.pop();
-
     for (publish_addr, relative_package_path) in package_path_list.iter() {
         let account = AccountAddress::from_hex_literal(publish_addr)?;
         let temp_script_path = TempPath::new();
@@ -72,7 +68,7 @@ pub fn generate_upgrade_proposals(
         let mut package_path = if config.git_hash.is_some() {
             temp_root_path.path().to_path_buf()
         } else {
-            root_path.canonicalize()?
+            aptos_core_path()
         };
 
         package_path.push(relative_package_path);
