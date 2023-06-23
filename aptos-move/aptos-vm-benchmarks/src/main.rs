@@ -87,18 +87,13 @@ fn main() {
         vec![],
         vec![],
     ));
-    let entry_fun_signed_txn = creator
-        .transaction()
-        .sequence_number(sequence_num_counter)
-        .max_gas_amount(2_000_000)
-        .gas_unit_price(200)
-        .payload(entry_fun_payload)
-        .sign();
-
-    let entry_fun_txn_output = executor.execute_transaction(entry_fun_signed_txn);
-    let entry_fun_txn_status = entry_fun_txn_output.status().to_owned();
+    let entry_fun_txn_status = sign_txn(
+        &mut executor,
+        &creator,
+        entry_fun_payload,
+        sequence_num_counter,
+    );
     println!("call entry function status: {:?}", entry_fun_txn_status);
-    executor.apply_write_set(entry_fun_txn_output.write_set());
 
     println!("running time (ms): {}", start.elapsed().as_millis());
 }
