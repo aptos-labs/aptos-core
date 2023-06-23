@@ -2,6 +2,9 @@
 module 0xbeef::test {
     public entry fun benchmark() {
     }
+
+    public fun benchmark1() {
+    }
 }
 
 module 0xbeef::test1 {

@@ -25,14 +25,19 @@ fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
 }
 
 //// generate a TransactionPayload for entry functions
-fn generate_entry_fun_payloads(account: &Account, package_name: &str) -> TransactionPayload {
+fn generate_entry_fun_payloads(
+    account: &Account,
+    package_name: &str,
+    func_name: &str,
+) -> TransactionPayload {
     let MemberId {
         module_id,
         member_id: function_id,
     } = str::parse(&format!(
-        "0x{}::{}::benchmark",
+        "0x{}::{}::{}",
         *account.address(),
         package_name,
+        func_name,
     ))
     .unwrap();
     TransactionPayload::EntryFunction(EntryFunction::new(module_id, function_id, vec![], vec![]))
@@ -94,45 +99,69 @@ fn main() {
             let mut sequence_num_counter = 0;
 
             let compiled_module = CompiledModule::deserialize(&code).unwrap();
+
+            // get module address
             let mut module_bytes = vec![];
             compiled_module.serialize(&mut module_bytes).unwrap();
             let module_id = compiled_module.self_id();
             let address = &module_id.address();
             let identifier = &module_id.name().as_str();
 
+            let funcs = compiled_module.function_defs;
+            let func_handles = compiled_module.function_handles;
+            let func_identifier_pool = compiled_module.identifiers;
+            let mut func_identifiers = Vec::new();
+            for func in funcs {
+                let is_entry = func.is_entry;
+                if !is_entry {
+                    continue;
+                }
+
+                let idx: usize = func.function.0.into();
+                let handle = &func_handles[idx];
+
+                let func_identifier_idx: usize = handle.name.0.into();
+                let func_identifier = &func_identifier_pool[func_identifier_idx];
+
+                func_identifiers.push(func_identifier.as_str());
+            }
+
             //// publish test-package under module address
             let creator = executor.new_account_at(**address);
 
-            println!(
-                "Executing {}::{}::benchmark",
-                address.to_string(),
-                identifier
-            );
+            for func_identifier in func_identifiers {
+                println!(
+                    "Executing {}::{}::benchmark",
+                    address.to_string(),
+                    identifier
+                );
 
-            // publish package similar to create_publish_package in harness.rs
-            let module_payload = generate_module_payload(&package);
-            sign_txn(
-                &mut executor,
-                &creator,
-                module_payload,
-                sequence_num_counter,
-            );
-            sequence_num_counter = sequence_num_counter + 1;
+                // publish package similar to create_publish_package in harness.rs
+                let module_payload = generate_module_payload(&package);
+                sign_txn(
+                    &mut executor,
+                    &creator,
+                    module_payload,
+                    sequence_num_counter,
+                );
+                sequence_num_counter = sequence_num_counter + 1;
 
-            //// Restart timer and sequence counter for each new package
-            //// only count running time of entry function
-            let start = Instant::now();
+                //// Restart timer and sequence counter for each new package
+                //// only count running time of entry function
+                let start = Instant::now();
 
-            //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
-            let entry_fun_payload = generate_entry_fun_payloads(&creator, *identifier);
-            sign_txn(
-                &mut executor,
-                &creator,
-                entry_fun_payload,
-                sequence_num_counter,
-            );
+                //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
+                let entry_fun_payload =
+                    generate_entry_fun_payloads(&creator, identifier, func_identifier);
+                sign_txn(
+                    &mut executor,
+                    &creator,
+                    entry_fun_payload,
+                    sequence_num_counter,
+                );
 
-            println!("running time (ms): {}", start.elapsed().as_millis());
+                println!("running time (ms): {}", start.elapsed().as_millis());
+            }
         }
     }
 }
