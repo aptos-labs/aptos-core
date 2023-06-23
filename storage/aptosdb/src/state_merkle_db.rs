@@ -198,6 +198,7 @@ impl StateMerkleDb {
             &DbMetadataValue::Version(version),
         )?;
 
+        info!(version = version, "Committing StateMerkleDb.");
         self.state_merkle_metadata_db.write_schemas(batch)
     }
 

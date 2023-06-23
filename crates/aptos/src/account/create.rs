@@ -18,7 +18,7 @@ pub const DEFAULT_FUNDED_COINS: u64 = 100_000_000;
 #[derive(Debug, Parser)]
 pub struct CreateAccount {
     /// Address of the new account
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     #[clap(flatten)]

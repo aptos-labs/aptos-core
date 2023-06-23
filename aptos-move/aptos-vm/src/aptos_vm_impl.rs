@@ -199,7 +199,7 @@ impl AptosVMImpl {
                 log_context,
                 "VM Startup Failed. Gas Parameters Not Found".into()
             );
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
+            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, None)
         })
     }
 
@@ -212,7 +212,7 @@ impl AptosVMImpl {
                 log_context,
                 "VM Startup Failed. Storage Gas Parameters Not Found".into()
             );
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
+            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, None)
         })
     }
 
@@ -223,7 +223,7 @@ impl AptosVMImpl {
     pub fn get_version(&self) -> Result<Version, VMStatus> {
         self.version.clone().ok_or_else(|| {
             alert!("VM Startup Failed. Version Not Found");
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
+            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, None)
         })
     }
 
@@ -276,7 +276,7 @@ impl AptosVMImpl {
                         raw_bytes_len, txn_gas_params.max_transaction_size_in_bytes
                     ),
                 );
-                return Err(VMStatus::Error(
+                return Err(VMStatus::error(
                     StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
                     None,
                 ));
@@ -295,7 +295,7 @@ impl AptosVMImpl {
                     txn_data.max_gas_amount()
                 ),
             );
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
                 None,
             ));
@@ -317,7 +317,7 @@ impl AptosVMImpl {
                     txn_data.max_gas_amount()
                 ),
             );
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
                 None,
             ));
@@ -337,7 +337,7 @@ impl AptosVMImpl {
                     txn_data.gas_unit_price()
                 ),
             );
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
                 None,
             ));
@@ -353,7 +353,7 @@ impl AptosVMImpl {
                     txn_data.gas_unit_price()
                 ),
             );
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
                 None,
             ));
@@ -477,7 +477,7 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let transaction_validation = self.transaction_validation();
-        let unreachable_error = VMStatus::Error(StatusCode::UNREACHABLE, None);
+        let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
         let provided_payload = if let Some(payload) = &payload.transaction_payload {
             bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
         } else {
@@ -512,7 +512,7 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         fail_point!("move_adapter::run_success_epilogue", |_| {
-            Err(VMStatus::Error(
+            Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 None,
             ))
