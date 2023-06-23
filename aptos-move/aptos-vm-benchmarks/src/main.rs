@@ -32,6 +32,7 @@ fn main() {
     // disable parallel execution
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
+    let mut sequence_num_counter = 0;
 
     // publish test-package under 0xbeef
     let creator = executor.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
@@ -46,7 +47,7 @@ fn main() {
     );
     let module_signed_txn = creator
         .transaction()
-        .sequence_number(0)
+        .sequence_number(sequence_num_counter)
         .max_gas_amount(2_000_000)
         .gas_unit_price(200)
         .payload(module_payload)
@@ -54,6 +55,8 @@ fn main() {
     let module_txn_output = executor.execute_transaction(module_signed_txn);
     let module_txn_status = module_txn_output.status().to_owned();
     println!("module publish status: {:?}", module_txn_status);
+    executor.apply_write_set(module_txn_output.write_set());
+    sequence_num_counter = sequence_num_counter + 1;
 
     // send a txn that invokes the entry function 0xbeef::test::benchmark
     let MemberId {
@@ -69,7 +72,7 @@ fn main() {
 
     let entry_fun_signed_txn = creator
         .transaction()
-        .sequence_number(0)
+        .sequence_number(sequence_num_counter)
         .max_gas_amount(2_000_000)
         .gas_unit_price(200)
         .payload(entry_fun_payload)
@@ -78,6 +81,7 @@ fn main() {
     let entry_fun_txn_output = executor.execute_transaction(entry_fun_signed_txn);
     let entry_fun_txn_status = entry_fun_txn_output.status().to_owned();
     println!("call entry function status: {:?}", entry_fun_txn_status);
+    executor.apply_write_set(entry_fun_txn_output.write_set());
 
     println!("running time (ms): {}", start.elapsed().as_millis());
 }
