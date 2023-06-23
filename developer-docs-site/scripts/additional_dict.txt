@@ -26,6 +26,7 @@ AptosCoin
 AptosLabs
 AptosNet
 AptosRelease
+AptosToken
 AptosWalletAdapterProvider
 BCS
 BFT
@@ -582,3 +583,4 @@ ANSClient
 FaucetClient
 CoinClient
 RESTful
+FungibleAssetsClient
