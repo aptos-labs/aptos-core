@@ -4,6 +4,15 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.11.0 (2023-06-22)
+
+- Export `bcsSerializeU256` from `bcs/helper.ts`
+- Add `examples` folder to `.npmignore`
+- Use `0x1::aptos_account::transfer` in tests
+- Support transfer a fungible token.
+  - Add a `transfer` function to the `AptosToken` class that accepts `NonFungibleTokenParameters` or `FungibleTokenParameters` types.
+- `getTokenData` query supports token standard v2. Return fields have changed.
+
 ## 1.10.0 (2023-06-07)
 
 - Add `x-aptos-client` header to `IndexerClient` requests

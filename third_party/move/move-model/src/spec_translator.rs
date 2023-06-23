@@ -495,7 +495,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                 ExpData::Temporary(..)
                 | ExpData::Call(_, Operation::Old, ..)
                 | ExpData::Call(_, Operation::Result(_), ..) => (true, e),
-                ExpData::Call(id, op @ Operation::Function(..), args) => (
+                ExpData::Call(id, op @ Operation::SpecFunction(..), args) => (
                     true,
                     ExpData::Call(
                         *id,
@@ -712,7 +712,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                 )
                 .into_exp(),
             ),
-            Function(mid, fid, None) if self.in_old => {
+            SpecFunction(mid, fid, None) if self.in_old => {
                 let used_memory = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
@@ -726,7 +726,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                     let mem = mem.instantiate(&inst);
                     labels.push(self.save_memory(mem));
                 }
-                Some(Call(id, Function(*mid, *fid, Some(labels)), args.to_owned()).into_exp())
+                Some(Call(id, SpecFunction(*mid, *fid, Some(labels)), args.to_owned()).into_exp())
             },
             Old => Some(args[0].to_owned()),
             Result(n) => {
