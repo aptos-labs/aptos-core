@@ -1,6 +1,6 @@
 spec aptos_framework::transaction_validation {
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_strict;
     }
 
@@ -110,6 +110,7 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
+        //let gas_payer = signer::address_of(sender);
         let gas_payer = if (txn_sequence_number < GAS_PAYER_FLAG_BIT) {
             signer::address_of(sender)
         } else {

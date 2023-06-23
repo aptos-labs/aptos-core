@@ -53,7 +53,6 @@ const PERMISSION_DENIED: u8 = 0x5;
 fn error_split(code: u64) -> (u8, u64) {
     let reason = code & 0xFFFF;
     let category = ((code >> 16) & 0xFF) as u8;
-    println!("split {} {}\n", category, reason);
     (category, reason)
 }
 
