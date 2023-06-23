@@ -165,13 +165,23 @@ impl FrameworkPackageArgs {
         const APTOS_FRAMEWORK: &str = "AptosFramework";
         const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
         const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
-        const DEFAULT_BRANCH: &str = "main";
+        const DEFAULT_BRANCH: &str = "mainnet";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), prompt_options)?;
         create_dir_if_not_exist(
             package_dir
                 .join(SourcePackageLayout::Sources.path())
+                .as_path(),
+        )?;
+        create_dir_if_not_exist(
+            package_dir
+                .join(SourcePackageLayout::Tests.path())
+                .as_path(),
+        )?;
+        create_dir_if_not_exist(
+            package_dir
+                .join(SourcePackageLayout::Scripts.path())
                 .as_path(),
         )?;
 
@@ -202,10 +212,13 @@ impl FrameworkPackageArgs {
             package: PackageInfo {
                 name: name.to_string(),
                 version: "1.0.0".to_string(),
-                author: None,
+                license: None,
+                authors: vec![],
             },
             addresses,
             dependencies,
+            dev_addresses: Default::default(),
+            dev_dependencies: Default::default(),
         };
 
         write_to_file(
@@ -316,6 +329,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
             .modules()
             .map(|m| m.self_id().to_string())
             .collect::<Vec<_>>();
+        // TODO: Also say how many scripts are compiled
         Ok(ids)
     }
 }
