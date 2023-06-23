@@ -105,3 +105,29 @@ def test_move_compile_script(run_helper: RunHelper, test_name=None):
 
     if "script_hash" not in response.stdout:
         raise TestError("Script did not compile successfully")
+
+
+@test_case
+def test_move_run(run_helper: RunHelper, test_name=None):
+    # Run the min_hero entry function with default profile
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "run",
+            "--assume-yes",
+            "--function-id",
+            "default::cli_e2e_tests::mint_hero",
+            "--args",
+            "string:Boss",
+            "string:Male",
+            "string:Jin",
+            "string:Undead",
+            "string:",
+        ],
+    )
+
+    response = json.loads(response.stdout)
+    if response["Result"].get("success") != True:
+        raise TestError("Move run did not execute successfully")
