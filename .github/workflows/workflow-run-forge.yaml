@@ -112,9 +112,14 @@ jobs:
       - name: Install python deps
         run: pip3 install click==8.1.3 psutil==5.9.1
 
+      # Calculate the auth duration based on the test duration
+      # If the test duration is less than the default 90 minutes, use the default
+      # otherwise add 30 minutes to the length of the Forge test run
       - name: Calculate Forge Auth Duration
         id: calculate-auth-duration
-        run: echo "auth_duration=$(( $FORGE_RUNNER_DURATION_SECS + 600 ))" >> $GITHUB_OUTPUTS
+        run: |
+          auth_duration=$(( $FORGE_RUNNER_DURATION_SECS > 5400 ? $FORGE_RUNNER_DURATION_SECS + 30 * 60 : 5400 ))
+          echo "auth_duration=${auth_duration}" >> $GITHUB_OUTPUTS
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
