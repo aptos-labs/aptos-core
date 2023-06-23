@@ -25,6 +25,20 @@ fn generate_module_payload(package: BuiltPackage) -> TransactionPayload {
     )
 }
 
+//// generate a TransactionPayload for entry functions
+fn generate_entry_fun_payloads(account: &Account, package_name: &str) -> TransactionPayload {
+    let MemberId {
+        module_id,
+        member_id: function_id,
+    } = str::parse(&format!(
+        "0x{}::{}::benchmark",
+        *account.address(),
+        package_name,
+    ))
+    .unwrap();
+    TransactionPayload::EntryFunction(EntryFunction::new(module_id, function_id, vec![], vec![]))
+}
+
 //// sign transaction and return transaction status
 fn sign_txn(
     executor: &mut FakeExecutor,
@@ -77,16 +91,7 @@ fn main() {
     sequence_num_counter = sequence_num_counter + 1;
 
     //// send a txn that invokes the entry function 0xbeef::test::benchmark
-    let MemberId {
-        module_id,
-        member_id: function_id,
-    } = str::parse("0xbeef::test::benchmark").unwrap();
-    let entry_fun_payload = TransactionPayload::EntryFunction(EntryFunction::new(
-        module_id,
-        function_id,
-        vec![],
-        vec![],
-    ));
+    let entry_fun_payload = generate_entry_fun_payloads(&creator, "test");
     let entry_fun_txn_status = sign_txn(
         &mut executor,
         &creator,
