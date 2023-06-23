@@ -62,7 +62,12 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     // Write events to DB
     for (version, events_for_version) in events.iter().enumerate() {
         event_store
-            .put_events(version as u64, events_for_version, &batch)
+            .put_events(
+                version as u64,
+                events_for_version,
+                /*skip_index=*/ false,
+                &batch,
+            )
             .unwrap();
     }
     aptos_db.ledger_db.event_db().write_schemas(batch).unwrap();
@@ -103,7 +108,12 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
     // Write events to DB
     for (version, events_for_version) in events.iter().enumerate() {
         event_store
-            .put_events(version as u64, events_for_version, &batch)
+            .put_events(
+                version as u64,
+                events_for_version,
+                /*skip_index=*/ false,
+                &batch,
+            )
             .unwrap();
     }
     aptos_db.ledger_db.event_db().write_schemas(batch).unwrap();

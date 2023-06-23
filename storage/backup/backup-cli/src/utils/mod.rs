@@ -99,6 +99,7 @@ impl From<RocksdbOpt> for RocksdbConfigs {
             },
             split_ledger_db: opt.split_ledger_db,
             use_sharded_state_merkle_db: opt.use_sharded_state_merkle_db,
+            skip_index_and_usage: false,
             state_kv_db_config: RocksdbConfig {
                 max_open_files: opt.state_kv_db_max_open_files,
                 max_total_wal_size: opt.state_kv_db_max_total_wal_size,

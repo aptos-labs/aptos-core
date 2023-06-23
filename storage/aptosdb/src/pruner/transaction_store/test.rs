@@ -237,7 +237,12 @@ fn put_txn_in_store(
     let transaction_batch = SchemaBatch::new();
     for i in 0..txns.len() {
         transaction_store
-            .put_transaction(i as u64, txns.get(i).unwrap(), &transaction_batch)
+            .put_transaction(
+                i as u64,
+                txns.get(i).unwrap(),
+                /*skip_index=*/ false,
+                &transaction_batch,
+            )
             .unwrap();
     }
     aptos_db
