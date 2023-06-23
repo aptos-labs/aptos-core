@@ -2,8 +2,8 @@ module aptos_framework::transaction_context {
 
     use std::features;
 
-    /// create_unique_address uses this for domain separation within its native implementation
     #[test_only]
+    /// create_unique_address uses this for domain separation within its native implementation
     const DERIVE_UUID_ADDRESS_SCHEME: u8 = 0xFB;
 
     /// UUID feature is not supported.
