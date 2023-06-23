@@ -12,7 +12,7 @@ use aptos_types::{
     transaction::{Transaction, Version},
 };
 use std::{
-    sync::{mpsc, mpsc::Sender, Arc},
+    sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
 
@@ -26,7 +26,6 @@ pub struct TransactionExecutor<V> {
     commit_sender: Option<mpsc::SyncSender<CommitBlockMessage>>,
     allow_discards: bool,
     allow_aborts: bool,
-    maybe_exe_fin_sender: Option<Sender<()>>,
 }
 
 impl<V> TransactionExecutor<V>
@@ -40,7 +39,6 @@ where
         commit_sender: Option<mpsc::SyncSender<CommitBlockMessage>>,
         allow_discards: bool,
         allow_aborts: bool,
-        maybe_exe_fin_sender: Option<Sender<()>>,
     ) -> Self {
         Self {
             num_blocks_processed: 0,
@@ -51,7 +49,6 @@ where
             commit_sender,
             allow_discards,
             allow_aborts,
-            maybe_exe_fin_sender,
         }
     }
 
@@ -147,12 +144,6 @@ where
                 .unwrap();
         }
         self.parent_block_id = block_id;
-
-        if let Some(tx) = &self.maybe_exe_fin_sender {
-            // We are in partition-then-execute mode. Notify the partitioning stage to pick up the next batch.
-            tx.send(()).unwrap();
-        }
-
         self.num_blocks_processed += 1;
     }
 }

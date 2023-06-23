@@ -11,24 +11,15 @@ use aptos_types::{
     },
     transaction::Transaction,
 };
-use std::{
-    sync::mpsc::{Receiver, SyncSender},
-    time::Instant,
-};
+use std::time::Instant;
 
 pub(crate) struct BlockPartitioningStage {
     num_blocks_processed: usize,
-    executable_block_sender: SyncSender<ExecuteBlockMessage>,
-    maybe_exe_fin_receiver: Option<Receiver<()>>,
     maybe_partitioner: Option<ShardedBlockPartitioner>,
 }
 
 impl BlockPartitioningStage {
-    pub fn new(
-        executable_block_sender: SyncSender<ExecuteBlockMessage>,
-        maybe_exe_fin_receiver: Option<Receiver<()>>,
-        num_shards: usize,
-    ) -> Self {
+    pub fn new(num_shards: usize) -> Self {
         let maybe_partitioner = if num_shards <= 1 {
             None
         } else {
@@ -38,13 +29,11 @@ impl BlockPartitioningStage {
 
         Self {
             num_blocks_processed: 0,
-            executable_block_sender,
-            maybe_exe_fin_receiver,
             maybe_partitioner,
         }
     }
 
-    pub fn process(&mut self, mut txns: Vec<Transaction>) {
+    pub fn process(&mut self, mut txns: Vec<Transaction>) -> ExecuteBlockMessage {
         let current_block_start_time = Instant::now();
         info!(
             "In iteration {}, received {:?} transactions.",
@@ -73,16 +62,11 @@ impl BlockPartitioningStage {
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
             },
         };
-        let msg = ExecuteBlockMessage {
+        self.num_blocks_processed += 1;
+        ExecuteBlockMessage {
             current_block_start_time,
             partition_time: Instant::now().duration_since(current_block_start_time),
             block,
-        };
-        self.executable_block_sender.send(msg).unwrap();
-        if let Some(rx) = &self.maybe_exe_fin_receiver {
-            // We are in partition-then-execute mode. Should not continue without the "execution finished" signal.
-            rx.recv().unwrap();
         }
-        self.num_blocks_processed += 1;
     }
 }
