@@ -93,9 +93,6 @@ fn main() {
 
         let codes = package.extract_code();
         for code in codes {
-            // avoid SEQUENCE_NUMBER_TOO_NEW error
-            let mut sequence_num_counter = 0;
-
             let compiled_module = CompiledModule::deserialize(&code).unwrap();
             let mut module_bytes = vec![];
             compiled_module.serialize(&mut module_bytes).unwrap();
@@ -121,6 +118,10 @@ fn main() {
                 sequence_num_counter,
             );
             sequence_num_counter = sequence_num_counter + 1;
+
+            // avoid SEQUENCE_NUMBER_TOO_NEW error
+            // only count running time of entry function
+            let mut sequence_num_counter = 0;
 
             //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
             let entry_fun_payload = generate_entry_fun_payloads(&creator, *identifier);
