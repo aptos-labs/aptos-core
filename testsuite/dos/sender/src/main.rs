@@ -43,7 +43,7 @@ struct Args {
     #[clap(short, long, value_parser, default_value_t = 0)]
     burst: u16,
 
-    #[clap(short, long, value_parser, default_value_t = 128.0)]
+    #[clap(long, value_parser, default_value_t = 128.0)]
     hertz: f64,
 }
 

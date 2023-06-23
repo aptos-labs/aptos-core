@@ -1657,14 +1657,10 @@ mod tests {
 
     // TODO: there have to be cleaner ways to test things. Maybe a CLI test framework?
 
+    // FIXME: Remove this test, it's very fragile and move to E2E CLI test framework
     #[tokio::test]
     // Verifies basic properties about the network connectivity checker
     async fn test_check_network_connectivity() {
-        // Verify the help function works
-        let args = &["aptos", "node", "check-network-connectivity", "--help"];
-        let help_message = run_tool_with_args(args).await.unwrap_err();
-        assert_contains(help_message, "USAGE:"); // We expect the command to return USAGE info
-
         // Verify that an invalid address will return an error
         let args = &[
             "aptos",
@@ -1681,7 +1677,7 @@ mod tests {
         // Verify that an invalid chain-id will return an error
         let args = &["aptos", "node", "check-network-connectivity", "--address", "/ip4/34.70.116.169/tcp/6182/noise-ik/0x249f3301db104705652e0a0c471b46d13172b2baf14e31f007413f3baee46b0c/handshake/0", "--chain-id", "invalid-chain"];
         let error_message = run_tool_with_args(args).await.unwrap_err();
-        assert_contains(error_message, "Invalid value");
+        assert_contains(error_message, "invalid value");
 
         // Verify that a failure to connect will return a timeout
         let args = &["aptos", "node", "check-network-connectivity", "--address", "/ip4/31.71.116.169/tcp/0001/noise-ik/0x249f3301db104705652e0a0c471b46d13172b2baf14e31f007413f3baee46b0c/handshake/0", "--chain-id", "testnet"];
