@@ -92,6 +92,7 @@ fn main() {
     compiled_module.serialize(&mut module_bytes).unwrap();
     let module_id = compiled_module.self_id();
     let address = &module_id.address();
+    let identifier = &module_id.name().as_str();
 
     //// publish test-package under module address
     let creator = executor.new_account_at(**address);
@@ -107,7 +108,7 @@ fn main() {
     sequence_num_counter = sequence_num_counter + 1;
 
     //// send a txn that invokes the entry function 0xbeef::test::benchmark
-    let entry_fun_payload = generate_entry_fun_payloads(&creator, "test");
+    let entry_fun_payload = generate_entry_fun_payloads(&creator, *identifier);
     sign_txn(
         &mut executor,
         &creator,
