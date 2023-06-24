@@ -24,6 +24,7 @@ clap = { workspace = true }
 dashmap = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
+once_cell = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 
