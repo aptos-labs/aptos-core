@@ -123,3 +123,9 @@ pub fn generate_update_proposal(args: &GenArgs) -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    GenArgs::command().debug_assert()
+}

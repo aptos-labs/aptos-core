@@ -9,7 +9,9 @@ pub(crate) mod ledger_store;
 pub(crate) mod pruner_manager;
 pub mod pruner_utils;
 pub(crate) mod pruner_worker;
+pub(crate) mod state_kv_metadata_pruner;
 pub(crate) mod state_kv_pruner;
+pub(crate) mod state_kv_shard_pruner;
 pub(crate) mod state_store;
 pub(crate) mod transaction_store;
 
