@@ -83,6 +83,7 @@ def test_move_compile(run_helper: RunHelper, test_name=None):
     if f"{account_info.account_address}::cli_e2e_tests" not in response.stdout:
         raise TestError("Module did not compile successfully")
 
+
 @test_case
 def test_move_compile_dev_mode(run_helper: RunHelper, test_name=None):
     package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
@@ -103,6 +104,7 @@ def test_move_compile_dev_mode(run_helper: RunHelper, test_name=None):
 
     if f"{account_info.account_address}::cli_e2e_tests" not in response.stdout:
         raise TestError("Module did not compile successfully")
+
 
 @test_case
 def test_move_compile_script(run_helper: RunHelper, test_name=None):
@@ -176,3 +178,26 @@ def test_move_run(run_helper: RunHelper, test_name=None):
         raise TestError(
             "Data on chain (view_hero) does not match expected data from (mint_hero)"
         )
+
+
+@test_case
+def test_move_view(run_helper: RunHelper, test_name=None):
+    account_info = run_helper.get_account_info()
+
+    # Run the view function
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "view",
+            "--function-id",
+            "0x1::account::exists_at",
+            "--args",
+            f"address:{account_info.account_address}",
+        ],
+    )
+
+    response = json.loads(response.stdout)
+    if response["Result"] == None or response["Result"][0] != True:
+        raise TestError("View function did not return correct result")
