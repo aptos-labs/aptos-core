@@ -2,9 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{
-    counters::NUM_EXECUTOR_SHARDS, executor_shard::ExecutorShard, messages::CrossShardMsg,
-};
+use crate::sharded_block_executor::{counters::NUM_EXECUTOR_SHARDS, executor_shard::ExecutorShard};
 use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -52,25 +50,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         let mut result_rxs = vec![];
         let mut shard_join_handles = vec![];
         let num_executor_shards = executor_clients.len();
-        // create channels for cross shard messages across all shards. This is a full mesh connection.
-        // Each shard has a vector of channels for sending messages to other shards and
-        // a vector of channels for receiving messages from other shards.
-        let mut cross_shard_msg_txs = vec![];
-        let mut cross_shard_msg_rxs = vec![];
-        for _ in 0..num_executor_shards {
-            cross_shard_msg_txs.push(vec![]);
-            cross_shard_msg_rxs.push(vec![]);
-            for _ in 0..num_executor_shards {
-                let (messages_tx, messages_rx) = std::sync::mpsc::channel();
-                cross_shard_msg_txs.last_mut().unwrap().push(messages_tx);
-                cross_shard_msg_rxs.last_mut().unwrap().push(messages_rx);
-            }
-        }
-        for (i, (executor_client, cross_shard_msg_rxs)) in executor_clients
-            .into_iter()
-            .zip(cross_shard_msg_rxs.into_iter())
-            .enumerate()
-        {
+        for (i, executor_client) in executor_clients.into_iter().enumerate() {
             let (transactions_tx, transactions_rx) = std::sync::mpsc::channel();
             let (result_tx, result_rx) = std::sync::mpsc::channel();
             command_txs.push(transactions_tx);
@@ -81,11 +61,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
                 i,
                 transactions_rx,
                 result_tx,
-                cross_shard_msg_rxs,
-                cross_shard_msg_txs
-                    .iter()
-                    .map(|txs| txs[i].clone())
-                    .collect(),
             ));
         }
         info!(
@@ -166,8 +141,6 @@ fn spawn_executor_shard<
     shard_id: usize,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
-    message_rxs: Vec<Receiver<CrossShardMsg>>,
-    messages_txs: Vec<Sender<CrossShardMsg>>,
 ) -> thread::JoinHandle<()> {
     // create and start a new executor shard in a separate thread
     thread::Builder::new()
@@ -179,8 +152,6 @@ fn spawn_executor_shard<
                 shard_id,
                 command_rx,
                 result_tx,
-                message_rxs,
-                messages_txs,
             );
             executor_shard.start();
         })

@@ -11,6 +11,7 @@ use aptos_block_executor::{
     task::ExecutionStatus, txn_commit_listener::TransactionCommitListener,
     txn_last_input_output::TxnOutput,
 };
+use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -35,13 +36,10 @@ impl CrossShardCommitReceiver {
         cross_shard_state_view: Arc<CrossShardStateView<S>>,
         message_rx: &Receiver<CrossShardMsg>,
     ) {
-        println!("CrossShardCommitReceiver::start");
         loop {
             let msg = message_rx.recv().unwrap();
             match msg {
                 CrossShardMsg::RemoteTxnWriteMsg(txn_commit_msg) => {
-                    //println!("Received txn commit msg: {:?}", txn_commit_msg);
-
                     let (state_key, write_op) = txn_commit_msg.take();
                     cross_shard_state_view
                         .set_value(&state_key, write_op.and_then(|w| w.as_state_value()));
@@ -96,9 +94,10 @@ impl CrossShardCommitSender {
             }
         }
 
-        println!(
+        trace!(
             "CrossShardCommitSender::new: shard_id: {:?}, num_dependent_edges: {:?}",
-            shard_id, num_dependent_edges
+            shard_id,
+            num_dependent_edges
         );
 
         Self {
@@ -116,18 +115,11 @@ impl CrossShardCommitSender {
     ) {
         let edges = self.dependent_edges.get(&txn_idx).unwrap();
         let write_set = txn_output.committed_output().unwrap().write_set();
-        if write_set.is_empty() {
-            println!(
-                "write_set is empty for shard_id {:?} txn_idx: {:?}, output is {:?}",
-                self.shard_id, txn_idx, txn_output
-            );
-            return;
-        }
 
         for (state_key, write_op) in write_set.iter() {
             if let Some(dependent_shard_ids) = edges.get(state_key) {
                 for dependent_shard_id in dependent_shard_ids.iter() {
-                    println!("Sending remote update for success for shard id {:?} and txn_idx: {:?}, state_key: {:?}, dependent_txn_id: {:?}", self.shard_id, txn_idx, state_key, dependent_shard_id);
+                    trace!("Sending remote update for success for shard id {:?} and txn_idx: {:?}, state_key: {:?}, dependent shard id: {:?}", self.shard_id, txn_idx, state_key, dependent_shard_id);
                     let message = RemoteTxnWriteMsg(RemoteTxnWrite::new(
                         state_key.clone(),
                         Some(write_op.clone()),
