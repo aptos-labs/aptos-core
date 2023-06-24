@@ -18,7 +18,7 @@ pub struct ExecutorShard<S, E> {
     shard_id: usize,
     executor_client: E,
     command_rx: Receiver<ExecutorShardCommand<S>>,
-    result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+    result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
 }
 
 impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard<S, E> {
@@ -27,7 +27,7 @@ impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard
         executor_client: E,
         shard_id: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
-        result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+        result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
     ) -> Self {
         Self {
             num_shards,

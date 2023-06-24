@@ -64,13 +64,14 @@ impl BlockExecutorClient for RemoteExecutorClient {
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let input = BlockExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
             sub_blocks,
             state_view: S::as_in_memory_state_view(state_view),
             concurrency_level,
             maybe_block_gas_limit,
         });
+
         self.execute_block_with_retry(input).inner
     }
 }

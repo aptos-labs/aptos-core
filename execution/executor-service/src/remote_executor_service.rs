@@ -207,7 +207,7 @@ mod tests {
             let output = client
                 .execute_block(sub_blocks_for_shard, executor.data_store(), 2, None)
                 .unwrap();
-            verify_txn_output(1_000, &output, &mut executor, &receiver);
+            verify_txn_output(1_000, &output[0], &mut executor, &receiver);
         }
     }
 
