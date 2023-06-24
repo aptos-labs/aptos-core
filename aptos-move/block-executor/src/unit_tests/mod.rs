@@ -4,7 +4,9 @@
 
 use crate::{
     executor::BlockExecutor,
-    proptest_types::types::{DeltaDataView, ExpectedOutput, KeyType, Task, Transaction, ValueType},
+    proptest_types::types::{
+        DeltaDataView, ExpectedOutput, KeyType, Output, Task, Transaction, ValueType,
+    },
     scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
     txn_commit_listener::NoOpTransactionCommitListener,
 };
@@ -45,15 +47,10 @@ where
         Transaction<K, V>,
         Task<K, V>,
         DeltaDataView<K, V>,
-        NoOpTransactionCommitListener<Transaction<K, V>>,
+        NoOpTransactionCommitListener<Output<K, V>, usize>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, None)
-    .execute_transactions_parallel(
-        (),
-        &transactions,
-        &data_view,
-        &NoOpTransactionCommitListener::default(),
-    );
+    .execute_transactions_parallel((), &transactions, &data_view, &None);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);
     baseline.assert_output(&output);

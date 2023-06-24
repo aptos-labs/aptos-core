@@ -12,7 +12,7 @@ use crate::{
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_commit_listener::TransactionCommitListener,
-    txn_last_input_output::TxnLastInputOutput,
+    txn_last_input_output::{TxnLastInputOutput, TxnOutput},
     view::{LatestView, MVHashMapView},
 };
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
@@ -85,7 +85,7 @@ where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitListener<TransactionWrites = Vec<(T::Key, WriteOp)>>,
+    L: TransactionCommitListener<TxnOutput = TxnOutput<E::Output, E::Error>>,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
@@ -449,7 +449,7 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
-        txn_commit_listener: &L,
+        txn_commit_listener: &Option<L>,
     ) {
         let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
         let mut delta_writes = Vec::with_capacity(num_deltas);
@@ -484,8 +484,13 @@ where
                 WriteOp::Modification(serialize(&committed_delta)),
             ));
         }
-        txn_commit_listener.on_transaction_committed(txn_idx, &delta_writes);
         last_input_output.record_delta_writes(txn_idx, delta_writes);
+        if let Some(txn_commit_listener) = txn_commit_listener {
+            txn_commit_listener.on_transaction_committed(
+                txn_idx,
+                last_input_output.txn_output(txn_idx).unwrap().as_ref(),
+            );
+        }
     }
 
     fn work_task_with_scope(
@@ -497,7 +502,7 @@ where
         scheduler: &Scheduler,
         base_view: &S,
         role: CommitRole,
-        transaction_commit_listener: &L,
+        transaction_commit_listener: &Option<L>,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -592,7 +597,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-        transaction_commit_listener: &L,
+        transaction_commit_listener: &Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -769,7 +774,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: BlockExecutorTransactions<T>,
         base_view: &S,
-        transaction_commit_listener: &L,
+        transaction_commit_listener: Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let signature_verified_txns = signature_verified_block.into_txns();
         let mut ret = if self.concurrency_level > 1 {
@@ -777,7 +782,7 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
-                transaction_commit_listener,
+                &transaction_commit_listener,
             )
         } else {
             self.execute_transactions_sequential(

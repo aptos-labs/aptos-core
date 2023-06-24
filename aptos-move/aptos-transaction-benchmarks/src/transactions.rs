@@ -18,10 +18,10 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
+    vm_status::VMStatus,
 };
 use aptos_vm::{
-    adapter_common::PreprocessedTransaction,
-    block_executor::BlockAptosVM,
+    block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     sharded_block_executor::{block_executor_client::VMExecutorClient, ShardedBlockExecutor},
 };
@@ -344,13 +344,16 @@ where
     ) -> usize {
         let block_size = transactions.len();
         let timer = Instant::now();
-        BlockAptosVM::execute_block(
+        BlockAptosVM::execute_block::<
+            _,
+            NoOpTransactionCommitListener<AptosTransactionOutput, VMStatus>,
+        >(
             Arc::clone(&RAYON_EXEC_POOL),
             BlockExecutorTransactions::Unsharded(transactions),
             self.state_view.as_ref(),
             1,
             maybe_block_gas_limit,
-            NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
+            None,
         )
         .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
@@ -385,13 +388,16 @@ where
                 )
                 .expect("VM should not fail to start");
         } else {
-            BlockAptosVM::execute_block(
+            BlockAptosVM::execute_block::<
+                _,
+                NoOpTransactionCommitListener<AptosTransactionOutput, VMStatus>,
+            >(
                 Arc::clone(&RAYON_EXEC_POOL),
                 BlockExecutorTransactions::Unsharded(transactions),
                 self.state_view.as_ref(),
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
-                NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
+                None,
             )
             .expect("VM should not fail to start");
         }

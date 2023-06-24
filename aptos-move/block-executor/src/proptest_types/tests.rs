@@ -6,8 +6,8 @@ use crate::{
     errors::Error,
     executor::BlockExecutor,
     proptest_types::types::{
-        DeltaDataView, EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
-        TransactionGenParams, ValueType,
+        DeltaDataView, EmptyDataView, ExpectedOutput, KeyType, Output, Task, Transaction,
+        TransactionGen, TransactionGenParams, ValueType,
     },
     txn_commit_listener::NoOpTransactionCommitListener,
 };
@@ -66,19 +66,14 @@ fn run_transactions<K, V>(
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-            NoOpTransactionCommitListener<Transaction<KeyType<K>, ValueType<V>>>,
+            NoOpTransactionCommitListener<Output<KeyType<K>, ValueType<V>>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
-        .execute_transactions_parallel(
-            (),
-            &transactions,
-            &data_view,
-            &NoOpTransactionCommitListener::default(),
-        );
+        .execute_transactions_parallel((), &transactions, &data_view, &None);
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -207,19 +202,14 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitListener<Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>>,
+            NoOpTransactionCommitListener<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
-        .execute_transactions_parallel(
-            (),
-            &transactions,
-            &data_view,
-            &NoOpTransactionCommitListener::default(),
-        );
+        .execute_transactions_parallel((), &transactions, &data_view, &None);
 
         let baseline =
             ExpectedOutput::generate_baseline(&transactions, None, maybe_block_gas_limit);
@@ -264,19 +254,14 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitListener<Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>>,
+            NoOpTransactionCommitListener<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
-        .execute_transactions_parallel(
-            (),
-            &transactions,
-            &data_view,
-            &NoOpTransactionCommitListener::default(),
-        );
+        .execute_transactions_parallel((), &transactions, &data_view, &None);
 
         let delta_writes = output
             .as_ref()
@@ -444,15 +429,10 @@ fn publishing_fixed_params_with_block_gas_limit(
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        NoOpTransactionCommitListener<Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>>,
+        NoOpTransactionCommitListener<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, maybe_block_gas_limit)
-    .execute_transactions_parallel(
-        (),
-        &transactions,
-        &data_view,
-        &NoOpTransactionCommitListener::default(),
-    );
+    .execute_transactions_parallel((), &transactions, &data_view, &None);
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -494,19 +474,14 @@ fn publishing_fixed_params_with_block_gas_limit(
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitListener<Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>>,
+            NoOpTransactionCommitListener<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
             Some(max(w_index, r_index) as u64 + 1),
         ) // Ensure enough gas limit to commit the module txns
-        .execute_transactions_parallel(
-            (),
-            &transactions,
-            &data_view,
-            &NoOpTransactionCommitListener::default(),
-        );
+        .execute_transactions_parallel((), &transactions, &data_view, &None);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
     }

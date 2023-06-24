@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{adapter_common::PreprocessedTransaction, block_executor::BlockAptosVM};
+use crate::block_executor::{AptosTransactionOutput, BlockAptosVM};
 use aptos_block_executor::txn_commit_listener::NoOpTransactionCommitListener;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -28,13 +28,16 @@ impl BlockExecutorClient for VMExecutorClient {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block(
+        BlockAptosVM::execute_block::<
+            _,
+            NoOpTransactionCommitListener<AptosTransactionOutput, VMStatus>,
+        >(
             self.executor_thread_pool.clone(),
             BlockExecutorTransactions::Sharded(sub_blocks),
             state_view,
             concurrency_level,
             maybe_block_gas_limit,
-            NoOpTransactionCommitListener::<PreprocessedTransaction>::default(),
+            None,
         )
     }
 }

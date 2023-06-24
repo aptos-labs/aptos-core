@@ -356,6 +356,10 @@ impl AccountData {
         Self::with_account(Account::new(), balance, sequence_number)
     }
 
+    pub fn increment_sequence_number(&mut self) {
+        self.sequence_number += 1;
+    }
+
     /// Creates a new `AccountData` with a new account.
     ///
     /// Most tests will want to use this constructor.

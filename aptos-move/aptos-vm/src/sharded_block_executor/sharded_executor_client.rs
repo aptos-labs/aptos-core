@@ -3,11 +3,13 @@
 use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
-        block_executor_client::BlockExecutorClient, cross_shard_client::CrossShardCommitReceiver,
-        cross_shard_commit_sender::CrossShardCommitSender,
-        cross_shard_state_view::CrossShardStateView, messages::CrossShardMsg,
+        block_executor_client::BlockExecutorClient,
+        cross_shard_client::{CrossShardCommitReceiver, CrossShardCommitSender},
+        cross_shard_state_view::CrossShardStateView,
+        messages::CrossShardMsg,
     },
 };
+use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
@@ -96,7 +98,7 @@ impl ShardedExecutorClient {
                 }
             }
         }
-        CrossShardStateView::new(cross_shard_state_key, base_view)
+        CrossShardStateView::new(self.shard_id, cross_shard_state_key, base_view)
     }
 
     fn execute_sub_block<S: StateView + Sync + Send>(
@@ -107,11 +109,13 @@ impl ShardedExecutorClient {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        println!(
+        trace!(
             "executing sub block for shard {} and round {}",
-            self.shard_id, round
+            self.shard_id,
+            round
         );
         let cross_shard_commit_sender = CrossShardCommitSender::new(
+            self.shard_id,
             self.message_txs
                 .iter()
                 .map(|t| t.lock().unwrap().clone())
@@ -147,7 +151,7 @@ impl ShardedExecutorClient {
                     cross_shard_state_view.as_ref(),
                     concurrency_level,
                     maybe_block_gas_limit,
-                    cross_shard_commit_sender,
+                    Some(cross_shard_commit_sender),
                 );
                 // Send a stop command to the cross-shard commit receiver.
                 if round != 0 {
@@ -161,9 +165,10 @@ impl ShardedExecutorClient {
             });
         });
         let ret = block_on(callback_receiver).unwrap();
-        println!(
+        trace!(
             "finished executing sub block for shard {} and round {}",
-            self.shard_id, round
+            self.shard_id,
+            round
         );
         ret
     }
