@@ -181,10 +181,10 @@ impl BlockExecutorClient for ShardedExecutorClient {
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
-            result.extend(self.execute_sub_block(
+            result.push(self.execute_sub_block(
                 sub_block,
                 round,
                 state_view,

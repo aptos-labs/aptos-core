@@ -17,7 +17,7 @@ pub trait BlockExecutorClient {
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus>;
+    ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus>;
 }
 
 impl BlockExecutorClient for VMExecutorClient {
@@ -27,8 +27,8 @@ impl BlockExecutorClient for VMExecutorClient {
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block::<
+    ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
+        Ok(vec![BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitListener<AptosTransactionOutput, VMStatus>,
         >(
@@ -38,7 +38,7 @@ impl BlockExecutorClient for VMExecutorClient {
             concurrency_level,
             maybe_block_gas_limit,
             None,
-        )
+        )?])
     }
 }
 
