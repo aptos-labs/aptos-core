@@ -61,8 +61,8 @@ return true.
 -  [Function `partial_governance_voting_enabled`](#0x1_features_partial_governance_voting_enabled)
 -  [Function `get_delegation_pool_partial_governance_voting`](#0x1_features_get_delegation_pool_partial_governance_voting)
 -  [Function `delegation_pool_partial_governance_voting_enabled`](#0x1_features_delegation_pool_partial_governance_voting_enabled)
--  [Function `get_uuids`](#0x1_features_get_uuids)
--  [Function `uuids_enabled`](#0x1_features_uuids_enabled)
+-  [Function `get_auids`](#0x1_features_get_auids)
+-  [Function `auids_enabled`](#0x1_features_auids_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -124,6 +124,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_APTOS_STD_CHAIN_ID_NATIVES">APTOS_STD_CHAIN_ID_NATIVES</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="0x1_features_APTOS_UNIQUE_IDENTIFIERS"></a>
+
+Whether enable MOVE functions to call create_auid method to create AUIDs.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a>: u64 = 22;
 </code></pre>
 
 
@@ -328,17 +339,6 @@ Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TREAT_FRIEND_AS_PRIVATE">TREAT_FRIEND_AS_PRIVATE</a>: u64 = 2;
-</code></pre>
-
-
-
-<a name="0x1_features_UNIVERSALLY_UNIQUE_IDENTIFIERS"></a>
-
-Whether enable MOVE functions to call create_uuid method to create UUIDs.
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_UNIVERSALLY_UNIQUE_IDENTIFIERS">UNIVERSALLY_UNIQUE_IDENTIFIERS</a>: u64 = 22;
 </code></pre>
 
 
@@ -1046,13 +1046,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_uuids"></a>
+<a name="0x1_features_get_auids"></a>
 
-## Function `get_uuids`
+## Function `get_auids`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_uuids">get_uuids</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_auids">get_auids</a>(): u64
 </code></pre>
 
 
@@ -1061,20 +1061,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_uuids">get_uuids</a>(): u64 { <a href="features.md#0x1_features_UNIVERSALLY_UNIQUE_IDENTIFIERS">UNIVERSALLY_UNIQUE_IDENTIFIERS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_auids">get_auids</a>(): u64 { <a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_uuids_enabled"></a>
+<a name="0x1_features_auids_enabled"></a>
 
-## Function `uuids_enabled`
+## Function `auids_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_uuids_enabled">uuids_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_auids_enabled">auids_enabled</a>(): bool
 </code></pre>
 
 
@@ -1083,8 +1083,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_uuids_enabled">uuids_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_UNIVERSALLY_UNIQUE_IDENTIFIERS">UNIVERSALLY_UNIQUE_IDENTIFIERS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_auids_enabled">auids_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a>)
 }
 </code></pre>
 

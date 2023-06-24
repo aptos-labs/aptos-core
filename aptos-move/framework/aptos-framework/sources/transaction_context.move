@@ -2,12 +2,12 @@ module aptos_framework::transaction_context {
 
     use std::features;
 
-    /// UUID feature is not supported.
-    const EUUID_NOT_SUPPORTED: u64 = 3;
+    /// AUID feature is not supported.
+    const EAUID_NOT_SUPPORTED: u64 = 3;
 
-    /// A wrapper denoting universally unique identifer (UUID)
+    /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
-    struct UUID has drop, store {
+    struct AUID has drop, store {
         unique_address: address
     }
 
@@ -27,7 +27,7 @@ module aptos_framework::transaction_context {
     /// the private function `create_unique_address`. This function is
     /// created for to feature gate the `create_unique_address` function.
     public fun create_unique_addr(): address {
-        assert!(features::uuids_enabled(), EUUID_NOT_SUPPORTED);
+        assert!(features::auids_enabled(), EAUID_NOT_SUPPORTED);
         create_unique_address()
     }
 
@@ -35,15 +35,15 @@ module aptos_framework::transaction_context {
     public native fun get_script_hash(): vector<u8>;
 
     /// This method runs `create_unique_address` native function and returns
-    /// the generated unique address wrapped in the UUID class.
-    public fun create_uuid(): UUID {
-        assert!(features::uuids_enabled(), EUUID_NOT_SUPPORTED);
-        return UUID {
+    /// the generated unique address wrapped in the AUID class.
+    public fun create_auid(): AUID {
+        assert!(features::auids_enabled(), EAUID_NOT_SUPPORTED);
+        return AUID {
             unique_address: create_unique_address()
         }
     }
 
-    public fun get_unique_address(uuid: UUID): address {
-        uuid.unique_address
+    public fun get_unique_address(auid: AUID): address {
+        auid.unique_address
     }
 }

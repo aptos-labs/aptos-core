@@ -195,12 +195,12 @@ module std::features {
     }
 
 
-    /// Whether enable MOVE functions to call create_uuid method to create UUIDs.
+    /// Whether enable MOVE functions to call create_auid method to create AUIDs.
     /// Lifetime: transient
-    const UNIVERSALLY_UNIQUE_IDENTIFIERS: u64 = 22;
-    public fun get_uuids(): u64 { UNIVERSALLY_UNIQUE_IDENTIFIERS }
-    public fun uuids_enabled(): bool acquires Features {
-        is_enabled(UNIVERSALLY_UNIQUE_IDENTIFIERS)
+    const APTOS_UNIQUE_IDENTIFIERS: u64 = 22;
+    public fun get_auids(): u64 { APTOS_UNIQUE_IDENTIFIERS }
+    public fun auids_enabled(): bool acquires Features {
+        is_enabled(APTOS_UNIQUE_IDENTIFIERS)
     }
 
 
