@@ -5,6 +5,8 @@ use crate::{task::TransactionOutput, txn_last_input_output::TxnOutput};
 use aptos_mvhashmap::types::TxnIndex;
 use std::fmt::Debug;
 
+/// An interface for listening to transaction commit events. The listener is called only once
+/// for each transaction commit.
 pub trait TransactionCommitListener: Send + Sync {
     type TxnOutput;
 
