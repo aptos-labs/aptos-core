@@ -79,8 +79,8 @@
 ///     D = r G
 ///     c_1 =   b G + r_b Y
 ///     c_2 = r_b G
-///     c  = b G + r_b H
-///     c' = v G +   r H
+///     c' = b G + r_b H
+///     c  = v G +   r H
 /// }
 /// ```
 ///

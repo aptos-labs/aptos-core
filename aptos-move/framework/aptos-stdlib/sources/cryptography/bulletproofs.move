@@ -1,7 +1,7 @@
 /// This module implements a Bulletproof range proof verifier on the Ristretto255 curve.
 ///
 /// A Bulletproof-based zero-knowledge range proof is a proof that a Pedersen commitment
-/// $c = v G + r H$ commits to an $n$-bit value $v$ (i.e., $v \in [0, 2^n)$). Currently, this module only supports
+/// $c = v G + r H$ commits to an $n$-bit value $v$ (i.e., $v \in [0, 2^n) $). Currently, this module only supports
 /// $n \in \{8, 16, 32, 64\}$ for the number of bits.
 module aptos_std::bulletproofs {
     use std::error;
@@ -13,7 +13,7 @@ module aptos_std::bulletproofs {
     // Constants
     //
 
-    /// The maximum range supported by the Bulletproofs library is [0, 2^{64}).
+    /// The maximum range supported by the Bulletproofs library is $[0, 2^{64})$.
     const MAX_RANGE_BITS : u64 = 64;
 
     //
@@ -102,7 +102,7 @@ module aptos_std::bulletproofs {
     #[test_only]
     /// Computes a range proof for the Pedersen commitment to 'val' with randomness 'r', under the default Bulletproofs
     /// commitment key; see `pedersen::new_commitment_for_bulletproof`. Returns the said commitment too.
-    ///  Only works for `num_bits` \in {8, 16, 32, 64}.
+    ///  Only works for `num_bits` in `{8, 16, 32, 64}`.
     public fun prove_range_pedersen(val: &Scalar, r: &Scalar, num_bits: u64, dst: vector<u8>): (RangeProof, pedersen::Commitment) {
         let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst, &ristretto255::basepoint(), &ristretto255::hash_to_point_base());
         let point = ristretto255::new_compressed_point_from_bytes(compressed_comm);
