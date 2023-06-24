@@ -45,12 +45,12 @@ pub struct BuildOptions {
     pub with_abis: bool,
     #[clap(long)]
     pub with_source_maps: bool,
-    #[clap(long, default_value = "true")]
+    #[clap(long, default_value_t = true)]
     pub with_error_map: bool,
     #[clap(long)]
     pub with_docs: bool,
     /// Installation directory for compiled artifacts. Defaults to `<package>/build`.
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,

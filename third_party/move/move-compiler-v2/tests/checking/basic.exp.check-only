@@ -1,7 +1,0 @@
-failed: exiting with Move build errors
-Diagnostics:
-error: expected `u64` but found `address` in expression
-  ┌─ tests/checking/basic.move:3:22
-  │
-3 │     fun foo(): u64 { @22 }
-  │                      ^^^
