@@ -35,6 +35,7 @@ pub use base_config::*;
 pub use consensus_config::*;
 pub use error::*;
 pub use execution_config::*;
+pub use gas_estimation_config::*;
 pub use identity_config::*;
 pub use indexer_config::*;
 pub use indexer_grpc_config::*;

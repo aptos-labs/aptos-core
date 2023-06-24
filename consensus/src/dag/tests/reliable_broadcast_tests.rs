@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dag::reliable_broadcast::{BroadcastStatus, DAGMessage, DAGNetworkSender, ReliableBroadcast},
+    dag::{
+        reliable_broadcast::{BroadcastStatus, DAGNetworkSender, ReliableBroadcast},
+        types::DAGMessage,
+    },
     network_interface::ConsensusMsg,
 };
 use anyhow::bail;
@@ -10,6 +13,10 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
+use futures::{
+    future::{AbortHandle, Abortable},
+    FutureExt,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
@@ -22,15 +29,8 @@ use tokio::sync::oneshot;
 struct TestMessage(Vec<u8>);
 
 impl DAGMessage for TestMessage {
-    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
-        match msg {
-            ConsensusMsg::DAGTestMessage(payload) => Ok(Self(payload)),
-            _ => bail!("wrong message"),
-        }
-    }
-
-    fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGTestMessage(self.0)
+    fn epoch(&self) -> u64 {
+        1
     }
 }
 
@@ -38,12 +38,8 @@ impl DAGMessage for TestMessage {
 struct TestAck;
 
 impl DAGMessage for TestAck {
-    fn from_network_message(_: ConsensusMsg) -> anyhow::Result<Self> {
-        Ok(TestAck)
-    }
-
-    fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGTestMessage(vec![])
+    fn epoch(&self) -> u64 {
+        1
     }
 }
 
@@ -56,13 +52,6 @@ impl BroadcastStatus for TestBroadcastStatus {
     type Ack = TestAck;
     type Aggregated = HashSet<Author>;
     type Message = TestMessage;
-
-    fn empty(receivers: Vec<Author>) -> Self {
-        Self {
-            threshold: receivers.len(),
-            received: HashSet::new(),
-        }
-    }
 
     fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         self.received.insert(peer);
@@ -110,7 +99,7 @@ impl DAGNetworkSender for TestDAGSender {
         self.received
             .lock()
             .insert(receiver, TestMessage::from_network_message(message)?);
-        Ok(ConsensusMsg::DAGTestMessage(vec![]))
+        Ok(TestAck.into_network_message())
     }
 }
 
@@ -121,33 +110,71 @@ async fn test_reliable_broadcast() {
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestDAGSender::new(failures));
     let rb = ReliableBroadcast::new(validators.clone(), sender);
-    let message = TestMessage(vec![1, 2, 3]);
-    let (tx, rx) = oneshot::channel();
-    let (_cancel_tx, cancel_rx) = oneshot::channel();
-    tokio::spawn(rb.broadcast::<TestBroadcastStatus>(message, tx, cancel_rx));
-    assert_eq!(rx.await.unwrap(), validators.into_iter().collect());
+    let message = TestMessage(vec![42; validators.len() - 1]);
+    let aggregating = TestBroadcastStatus {
+        threshold: validators.len(),
+        received: HashSet::new(),
+    };
+    let fut = rb.broadcast::<TestBroadcastStatus>(message, aggregating);
+    assert_eq!(fut.await, validators.into_iter().collect());
 }
 
 #[tokio::test]
-async fn test_reliable_broadcast_cancel() {
+async fn test_chaining_reliable_broadcast() {
     let (_, validator_verifier) = random_validator_verifier(5, None, false);
     let validators = validator_verifier.get_ordered_account_addresses();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestDAGSender::new(failures));
     let rb = ReliableBroadcast::new(validators.clone(), sender);
-    let message = TestMessage(vec![1, 2, 3]);
+    let message = TestMessage(vec![42; validators.len()]);
+    let expected = validators.iter().cloned().collect();
+    let aggregating = TestBroadcastStatus {
+        threshold: validators.len(),
+        received: HashSet::new(),
+    };
+    let fut = rb
+        .broadcast::<TestBroadcastStatus>(message.clone(), aggregating)
+        .then(|aggregated| async move {
+            assert_eq!(aggregated, expected);
+            let aggregating = TestBroadcastStatus {
+                threshold: validator_verifier.len(),
+                received: HashSet::new(),
+            };
+            rb.broadcast::<TestBroadcastStatus>(message, aggregating)
+                .await
+        });
+    assert_eq!(fut.await, validators.into_iter().collect());
+}
 
-    // explicit send cancel
+#[tokio::test]
+async fn test_abort_reliable_broadcast() {
+    let (_, validator_verifier) = random_validator_verifier(5, None, false);
+    let validators = validator_verifier.get_ordered_account_addresses();
+    let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
+    let sender = Arc::new(TestDAGSender::new(failures));
+    let rb = ReliableBroadcast::new(validators.clone(), sender);
+    let message = TestMessage(vec![42; validators.len()]);
     let (tx, rx) = oneshot::channel();
-    let (cancel_tx, cancel_rx) = oneshot::channel();
-    cancel_tx.send(()).unwrap();
-    tokio::spawn(rb.broadcast::<TestBroadcastStatus>(message.clone(), tx, cancel_rx));
-    assert!(rx.await.is_err());
-
-    // implicit drop cancel
-    let (tx, rx) = oneshot::channel();
-    let (cancel_tx, cancel_rx) = oneshot::channel();
-    drop(cancel_tx);
-    tokio::spawn(rb.broadcast::<TestBroadcastStatus>(message, tx, cancel_rx));
+    let (abort_handle, abort_registration) = AbortHandle::new_pair();
+    let aggregating = TestBroadcastStatus {
+        threshold: validators.len(),
+        received: HashSet::new(),
+    };
+    let fut = Abortable::new(
+        rb.broadcast::<TestBroadcastStatus>(message.clone(), aggregating)
+            .then(|_| async move {
+                let aggregating = TestBroadcastStatus {
+                    threshold: validators.len(),
+                    received: HashSet::new(),
+                };
+                let ret = rb
+                    .broadcast::<TestBroadcastStatus>(message, aggregating)
+                    .await;
+                tx.send(ret)
+            }),
+        abort_registration,
+    );
+    tokio::spawn(fut);
+    abort_handle.abort();
     assert!(rx.await.is_err());
 }

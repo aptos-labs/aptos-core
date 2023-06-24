@@ -23,6 +23,7 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         module_prologue_name: Identifier::new("module_prologue").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
+        user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
     });
 
 /// A Rust representation of chain-specific account information
@@ -35,6 +36,7 @@ pub struct TransactionValidation {
     pub module_prologue_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
+    pub user_epilogue_gas_payer_name: Identifier,
 }
 
 impl TransactionValidation {

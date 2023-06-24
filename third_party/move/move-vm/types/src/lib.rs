@@ -22,7 +22,6 @@ macro_rules! debug_writeln {
     };
 }
 
-pub mod errors;
 pub mod gas;
 pub mod loaded_data;
 pub mod natives;

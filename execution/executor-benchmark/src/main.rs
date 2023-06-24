@@ -38,22 +38,22 @@ struct PrunerOpt {
     #[clap(long)]
     enable_ledger_pruner: bool,
 
-    #[clap(long, default_value = "100000")]
+    #[clap(long, default_value_t = 100000)]
     state_prune_window: u64,
 
-    #[clap(long, default_value = "100000")]
+    #[clap(long, default_value_t = 100000)]
     epoch_snapshot_prune_window: u64,
 
-    #[clap(long, default_value = "100000")]
+    #[clap(long, default_value_t = 100000)]
     ledger_prune_window: u64,
 
-    #[clap(long, default_value = "500")]
+    #[clap(long, default_value_t = 500)]
     ledger_pruning_batch_size: usize,
 
-    #[clap(long, default_value = "500")]
+    #[clap(long, default_value_t = 500)]
     state_pruning_batch_size: usize,
 
-    #[clap(long, default_value = "500")]
+    #[clap(long, default_value_t = 500)]
     epoch_snapshot_pruning_batch_size: usize,
 }
 
@@ -108,16 +108,16 @@ impl PipelineOpt {
 
 #[derive(Parser, Debug)]
 struct Opt {
-    #[clap(long, default_value = "10000")]
+    #[clap(long, default_value_t = 10000)]
     block_size: usize,
 
-    #[clap(long, default_value = "5")]
+    #[clap(long, default_value_t = 5)]
     transactions_per_sender: usize,
 
     #[clap(long)]
     concurrency_level: Option<usize>,
 
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     num_executor_shards: usize,
 
     #[clap(flatten)]
@@ -128,6 +128,9 @@ struct Opt {
 
     #[clap(long)]
     use_sharded_state_merkle_db: bool,
+
+    #[clap(long)]
+    skip_index_and_usage: bool,
 
     #[clap(flatten)]
     pipeline_opt: PipelineOpt,
@@ -163,51 +166,51 @@ impl Opt {
 #[derive(Subcommand, Debug)]
 enum Command {
     CreateDb {
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         data_dir: PathBuf,
 
-        #[clap(long, default_value = "1000000")]
+        #[clap(long, default_value_t = 1000000)]
         num_accounts: usize,
 
-        #[clap(long, default_value = "10000000000")]
+        #[clap(long, default_value_t = 10000000000)]
         init_account_balance: u64,
     },
     RunExecutor {
         /// number of transfer blocks to run
-        #[clap(long, default_value = "1000")]
+        #[clap(long, default_value_t = 1000)]
         blocks: usize,
 
-        #[clap(long, default_value = "1000000")]
+        #[clap(long, default_value_t = 1000000)]
         main_signer_accounts: usize,
 
-        #[clap(long, default_value = "0")]
+        #[clap(long, default_value_t = 0)]
         additional_dst_pool_accounts: usize,
 
         /// Workload (transaction type). Uses raw coin transfer if not set,
         /// and if set uses transaction-generator-lib to generate it
-        #[clap(long, arg_enum, ignore_case = true)]
+        #[clap(long, value_enum, ignore_case = true)]
         transaction_type: Option<TransactionTypeArg>,
 
-        #[clap(long, default_value = "1")]
+        #[clap(long, default_value_t = 1)]
         module_working_set_size: usize,
 
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         data_dir: PathBuf,
 
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         checkpoint_dir: PathBuf,
     },
     AddAccounts {
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         data_dir: PathBuf,
 
-        #[clap(long, parse(from_os_str))]
+        #[clap(long, value_parser)]
         checkpoint_dir: PathBuf,
 
-        #[clap(long, default_value = "1000000")]
+        #[clap(long, default_value_t = 1000000)]
         num_new_accounts: usize,
 
-        #[clap(long, default_value = "1000000")]
+        #[clap(long, default_value_t = 1000000)]
         init_account_balance: u64,
     },
 }
@@ -231,6 +234,7 @@ where
                 opt.verify_sequence_numbers,
                 opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
+                opt.skip_index_and_usage,
                 opt.pipeline_opt.pipeline_config(),
             );
         },
@@ -256,6 +260,7 @@ where
                 opt.pruner_opt.pruner_config(),
                 opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
+                opt.skip_index_and_usage,
                 opt.pipeline_opt.pipeline_config(),
             );
         },
@@ -275,6 +280,7 @@ where
                 opt.verify_sequence_numbers,
                 opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
+                opt.skip_index_and_usage,
                 opt.pipeline_opt.pipeline_config(),
             );
         },
@@ -305,4 +311,10 @@ fn main() {
     } else {
         run::<AptosVM>(opt);
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Opt::command().debug_assert()
 }

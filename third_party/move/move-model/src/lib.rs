@@ -72,7 +72,7 @@ pub struct PackageInfo {
 }
 
 /// Builds the Move model for the v2 compiler. This builds the model, compiling both code
-/// and specs from sources into the type-checked AST. No bytecode is attached to the model.
+/// and specs from sources into typed-checked AST. No bytecode is attached to the model.
 /// This currently uses the v1 compiler as the parser (up to expansion AST), after that
 /// a new type checker.
 pub fn run_model_builder_in_compiler_mode(
@@ -364,6 +364,19 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
         let module_id = ModuleId::new(module_count);
         let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
         module_translator.translate(loc, module_def, None);
+    }
+
+    // Compute information derived from AST (currently callgraph)
+    for module in env.module_data.iter_mut() {
+        for fun_data in module.function_data.values_mut() {
+            fun_data.called_funs = Some(
+                fun_data
+                    .def
+                    .clone()
+                    .map(|e| e.called_funs())
+                    .unwrap_or_default(),
+            )
+        }
     }
 }
 
