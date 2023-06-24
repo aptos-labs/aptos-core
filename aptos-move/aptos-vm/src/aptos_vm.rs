@@ -7,7 +7,7 @@ use crate::{
         discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals, GAS_PAYER_FLAG_BIT},
-    block_executor::BlockAptosVM,
+    block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
     data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
