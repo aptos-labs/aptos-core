@@ -2,9 +2,13 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::Result;
+use aptos_logger::trace;
 use aptos_state_view::{StateView, TStateView};
-use aptos_types::state_store::{
-    state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+use aptos_types::{
+    block_executor::partitioner::ShardId,
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -34,6 +38,8 @@ impl CrossShardStateValue {
     pub fn set_value(&self, value: Option<StateValue>) {
         let (lock, cvar) = &*self.value_condition;
         let mut status = lock.lock().unwrap();
+        // We only allow setting the value once and it must be in the waiting state
+        assert!(matches!(*status, CrossShardValueStatus::Waiting));
         *status = CrossShardValueStatus::Ready(value);
         cvar.notify_all();
     }
@@ -56,26 +62,50 @@ impl CrossShardStateValue {
 /// available in the hashmap, it will be fetched from the underlying base view.
 #[derive(Clone)]
 pub struct CrossShardStateView<'a, S> {
+    _shard_id: ShardId,
     cross_shard_data: HashMap<StateKey, CrossShardStateValue>,
     base_view: &'a S,
 }
 
 impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
-    pub fn new(cross_shard_keys: HashSet<StateKey>, base_view: &'a S) -> Self {
+    pub fn new(shard_id: ShardId, cross_shard_keys: HashSet<StateKey>, base_view: &'a S) -> Self {
         let mut cross_shard_data = HashMap::new();
+        trace!(
+            "Iniitalizing cross shard state view with {} keys for shard id {}",
+            cross_shard_keys.len(),
+            shard_id
+        );
         for key in cross_shard_keys {
             cross_shard_data.insert(key, CrossShardStateValue::waiting());
         }
         Self {
+            // Added for debugging purpose
+            _shard_id: shard_id,
             cross_shard_data,
             base_view,
         }
     }
 
+    #[cfg(test)]
+    fn waiting_count(&self) -> usize {
+        self.cross_shard_data
+            .values()
+            .filter(|v| {
+                matches!(
+                    v.value_condition.0.lock().unwrap().clone(),
+                    CrossShardValueStatus::Waiting
+                )
+            })
+            .count()
+    }
+
     pub fn set_value(&self, state_key: &StateKey, state_value: Option<StateValue>) {
-        if let Some(value) = self.cross_shard_data.get(state_key) {
-            value.set_value(state_value);
-        }
+        self.cross_shard_data
+            .get(state_key)
+            .unwrap()
+            .set_value(state_value);
+        // uncomment the following line to debug waiting count
+        // trace!("waiting count for shard id {} is {}", self.shard_id, self.waiting_count());
     }
 }
 
@@ -124,7 +154,7 @@ mod tests {
         let mut state_keys = HashSet::new();
         state_keys.insert(state_key.clone());
 
-        let cross_shard_state_view = Arc::new(CrossShardStateView::new(state_keys, &EMPTY_VIEW));
+        let cross_shard_state_view = Arc::new(CrossShardStateView::new(0, state_keys, &EMPTY_VIEW));
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
 
         let wait_thread = thread::spawn(move || {
@@ -136,6 +166,7 @@ mod tests {
         thread::sleep(Duration::from_millis(100));
 
         cross_shard_state_view.set_value(&state_key, Some(state_value));
+        assert_eq!(cross_shard_state_view.waiting_count(), 0);
 
         wait_thread.join().unwrap();
     }

@@ -5,7 +5,7 @@
 use crate::{
     executor::BlockExecutor,
     proptest_types::types::{
-        EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
+        EmptyDataView, ExpectedOutput, KeyType, Output, Task, Transaction, TransactionGen,
         TransactionGenParams, ValueType,
     },
     txn_commit_listener::NoOpTransactionCommitListener,
@@ -126,15 +126,10 @@ where
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-            NoOpTransactionCommitListener<Transaction<KeyType<K>, ValueType<V>>>,
+            NoOpTransactionCommitListener<Output<KeyType<K>, ValueType<V>>, usize>,
             ExecutableTestType,
         >::new(num_cpus::get(), executor_thread_pool, None)
-        .execute_transactions_parallel(
-            (),
-            &self.transactions,
-            &data_view,
-            &NoOpTransactionCommitListener::default(),
-        );
+        .execute_transactions_parallel((), &self.transactions, &data_view, &None);
 
         self.expected_output.assert_output(&output);
     }

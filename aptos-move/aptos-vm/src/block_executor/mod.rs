@@ -22,6 +22,7 @@ use aptos_block_executor::{
         TransactionOutput as BlockExecutorTransactionOutput,
     },
     txn_commit_listener::TransactionCommitListener,
+    txn_last_input_output::TxnOutput,
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
@@ -49,7 +50,7 @@ impl BlockExecutorTransaction for PreprocessedTransaction {
 
 // Wrapper to avoid orphan rule
 #[derive(Debug)]
-pub(crate) struct AptosTransactionOutput {
+pub struct AptosTransactionOutput {
     vm_output: Mutex<Option<VMOutput>>,
     committed_output: OnceCell<TransactionOutput>,
 }
@@ -60,6 +61,10 @@ impl AptosTransactionOutput {
             vm_output: Mutex::new(Some(output)),
             committed_output: OnceCell::new(),
         }
+    }
+
+    pub(crate) fn committed_output(&self) -> Option<&TransactionOutput> {
+        self.committed_output.get()
     }
 
     fn take_output(mut self) -> TransactionOutput {
@@ -197,14 +202,14 @@ impl BlockAptosVM {
 
     pub fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitListener<TransactionWrites = Vec<(StateKey, WriteOp)>>,
+        L: TransactionCommitListener<TxnOutput = TxnOutput<AptosTransactionOutput, VMStatus>>,
     >(
         executor_thread_pool: Arc<ThreadPool>,
         transactions: BlockExecutorTransactions<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-        transaction_commit_listener: L,
+        transaction_commit_listener: Option<L>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -249,7 +254,7 @@ impl BlockAptosVM {
             state_view,
             signature_verified_block,
             state_view,
-            &transaction_commit_listener,
+            transaction_commit_listener,
         );
         match ret {
             Ok(outputs) => {

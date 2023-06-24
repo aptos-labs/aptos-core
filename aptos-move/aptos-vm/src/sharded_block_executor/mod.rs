@@ -25,7 +25,6 @@ use std::{
 pub mod block_executor_client;
 mod counters;
 mod cross_shard_client;
-mod cross_shard_commit_sender;
 mod cross_shard_state_view;
 mod executor_shard;
 mod messages;

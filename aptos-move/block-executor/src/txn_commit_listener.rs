@@ -1,27 +1,27 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::task::Transaction;
+use crate::{task::TransactionOutput, txn_last_input_output::TxnOutput};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::write_set::WriteOp;
+use std::fmt::Debug;
 
 pub trait TransactionCommitListener: Send + Sync {
-    type TransactionWrites;
+    type TxnOutput;
 
-    fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_output: &Self::TransactionWrites);
+    fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_output: &Self::TxnOutput);
 }
 
-pub struct NoOpTransactionCommitListener<T> {
-    phantom: std::marker::PhantomData<T>,
+pub struct NoOpTransactionCommitListener<T, E> {
+    phantom: std::marker::PhantomData<(T, E)>,
 }
 
-impl<T> Default for NoOpTransactionCommitListener<T> {
+impl<T: TransactionOutput, E: Debug + Sync + Send> Default for NoOpTransactionCommitListener<T, E> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> NoOpTransactionCommitListener<T> {
+impl<T: TransactionOutput, E: Debug + Sync + Send> NoOpTransactionCommitListener<T, E> {
     pub fn new() -> Self {
         Self {
             phantom: std::marker::PhantomData,
@@ -29,13 +29,12 @@ impl<T> NoOpTransactionCommitListener<T> {
     }
 }
 
-impl<T> TransactionCommitListener for NoOpTransactionCommitListener<T>
-where
-    T: Transaction,
+impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitListener
+    for NoOpTransactionCommitListener<T, E>
 {
-    type TransactionWrites = Vec<(T::Key, WriteOp)>;
+    type TxnOutput = TxnOutput<T, E>;
 
-    fn on_transaction_committed(&self, _txn_idx: TxnIndex, _txn_writes: &Self::TransactionWrites) {
+    fn on_transaction_committed(&self, _txn_idx: TxnIndex, _txn_writes: &Self::TxnOutput) {
         // no-op
     }
 }
