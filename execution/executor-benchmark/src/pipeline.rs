@@ -16,7 +16,7 @@ use aptos_vm::counters::TXN_GAS_USAGE;
 use std::{
     marker::PhantomData,
     sync::{
-        mpsc::{self, SyncSender},
+        mpsc::{self, Receiver, SyncSender},
         Arc,
     },
     thread::JoinHandle,
@@ -119,38 +119,24 @@ where
             let exe_thread = std::thread::Builder::new()
                 .name("txn_executor".to_string())
                 .spawn(move || {
-                    start_execution_rx.map(|rx| rx.recv());
-                    let start_time = Instant::now();
-                    let mut executed = 0;
-                    let start_gas = TXN_GAS_USAGE.get_sample_sum();
-                    while let Ok(msg) = executable_block_receiver.recv() {
-                        let ExecuteBlockMessage {
-                            current_block_start_time,
-                            partition_time,
-                            block,
-                        } = msg;
-                        let block_size = block.transactions.num_transactions();
-                        info!("Received block of size {:?} to execute", block_size);
-                        executed += block_size;
-                        exe.execute_block(current_block_start_time, partition_time, block);
-                        info!("Finished executing block");
-                    }
-
-                    let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
-
-                    let elapsed = start_time.elapsed().as_secs_f32();
-                    info!(
-                        "Overall execution TPS: {} txn/s (over {} txns)",
-                        executed as f32 / elapsed,
-                        executed
+                    run_executor_message_loop(
+                        start_execution_rx,
+                        start_commit_tx,
+                        |executed: &mut usize| {
+                            while let Ok(msg) = executable_block_receiver.recv() {
+                                let ExecuteBlockMessage {
+                                    current_block_start_time,
+                                    partition_time,
+                                    block,
+                                } = msg;
+                                let block_size = block.transactions.num_transactions();
+                                info!("Received block of size {:?} to execute", block_size);
+                                *executed += block_size;
+                                exe.execute_block(current_block_start_time, partition_time, block);
+                                info!("Finished executing block");
+                            }
+                        },
                     );
-                    info!(
-                        "Overall execution GPS: {} gas/s (over {} txns)",
-                        delta_gas as f32 / elapsed,
-                        executed
-                    );
-
-                    start_commit_tx.map(|tx| tx.send(()));
                 })
                 .expect("Failed to spawn transaction executor thread.");
             join_handles.push(exe_thread);
@@ -158,41 +144,27 @@ where
             let par_exe_thread = std::thread::Builder::new()
                 .name("txn_partitioner_executor".to_string())
                 .spawn(move || {
-                    start_execution_rx.map(|rx| rx.recv());
-                    let start_time = Instant::now();
-                    let mut executed = 0;
-                    let start_gas = TXN_GAS_USAGE.get_sample_sum();
-                    while let Ok(raw_block) = raw_block_receiver.recv() {
-                        info!(
-                            "Received block of size {:?} to partition-then-execute.",
-                            raw_block.len()
-                        );
-                        let ExecuteBlockMessage {
-                            current_block_start_time,
-                            partition_time,
-                            block,
-                        } = partitioning_stage.process(raw_block);
-                        let block_size = block.transactions.num_transactions();
-                        executed += block_size;
-                        exe.execute_block(current_block_start_time, partition_time, block);
-                        info!("Finished executing block");
-                    }
-
-                    let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
-
-                    let elapsed = start_time.elapsed().as_secs_f32();
-                    info!(
-                        "Overall execution TPS: {} txn/s (over {} txns)",
-                        executed as f32 / elapsed,
-                        executed
+                    run_executor_message_loop(
+                        start_execution_rx,
+                        start_commit_tx,
+                        |executed: &mut usize| {
+                            while let Ok(raw_block) = raw_block_receiver.recv() {
+                                info!(
+                                    "Received block of size {:?} to partition-then-execute.",
+                                    raw_block.len()
+                                );
+                                let ExecuteBlockMessage {
+                                    current_block_start_time,
+                                    partition_time,
+                                    block,
+                                } = partitioning_stage.process(raw_block);
+                                let block_size = block.transactions.num_transactions();
+                                *executed += block_size;
+                                exe.execute_block(current_block_start_time, partition_time, block);
+                                info!("Finished executing block");
+                            }
+                        },
                     );
-                    info!(
-                        "Overall execution GPS: {} gas/s (over {} txns)",
-                        delta_gas as f32 / elapsed,
-                        executed
-                    );
-
-                    start_commit_tx.map(|tx| tx.send(()));
                 })
                 .expect("Failed to spawn transaction executor thread.");
             join_handles.push(par_exe_thread);
@@ -251,4 +223,31 @@ pub struct CommitBlockMessage {
     pub(crate) partition_time: Duration,
     pub(crate) execution_time: Duration,
     pub(crate) num_txns: usize,
+}
+
+fn run_executor_message_loop<F: FnMut(&mut usize)>(
+    start_execution_rx: Option<Receiver<()>>,
+    start_commit_tx: Option<SyncSender<()>>,
+    mut message_loop: F,
+) {
+    start_execution_rx.map(|rx| rx.recv());
+    let start_time = Instant::now();
+    let mut executed = 0;
+    let start_gas = TXN_GAS_USAGE.get_sample_sum();
+    message_loop(&mut executed);
+    let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
+
+    let elapsed = start_time.elapsed().as_secs_f32();
+    info!(
+        "Overall execution TPS: {} txn/s (over {} txns)",
+        executed as f32 / elapsed,
+        executed
+    );
+    info!(
+        "Overall execution GPS: {} gas/s (over {} txns)",
+        delta_gas as f32 / elapsed,
+        executed
+    );
+
+    start_commit_tx.map(|tx| tx.send(()));
 }
