@@ -19,8 +19,8 @@ use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 #[derive(Tid)]
 pub struct NativeTransactionContext {
     txn_hash: Vec<u8>,
-    /// This is the number of UUIDs (Universally unique identifiers) issued during the execution of this transaction
-    uuid_counter: u64,
+    /// This is the number of AUIDs (Aptos unique identifiers) issued during the execution of this transaction
+    auid_counter: u64,
     script_hash: Vec<u8>,
     chain_id: u8,
 }
@@ -31,7 +31,7 @@ impl NativeTransactionContext {
     pub fn new(txn_hash: Vec<u8>, script_hash: Vec<u8>, chain_id: u8) -> Self {
         Self {
             txn_hash,
-            uuid_counter: 0,
+            auid_counter: 0,
             script_hash,
             chain_id,
         }
@@ -69,18 +69,18 @@ fn native_get_txn_hash(
 }
 
 /***************************************************************************************************
- * native fun create_uuid
+ * native fun generate_unique_address
  *
  *   gas cost: base_cost
  *
  **************************************************************************************************/
 #[derive(Clone, Debug)]
-pub struct CreateUniqueAddressGasParameters {
+pub struct GenerateUniqueAddressGasParameters {
     pub base: InternalGas,
 }
 
-fn native_create_unique_address(
-    gas_params: &CreateUniqueAddressGasParameters,
+fn native_generate_unique_address(
+    gas_params: &GenerateUniqueAddressGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
@@ -90,11 +90,11 @@ fn native_create_unique_address(
     let mut transaction_context = context
         .extensions_mut()
         .get_mut::<NativeTransactionContext>();
-    transaction_context.uuid_counter += 1;
+    transaction_context.auid_counter += 1;
 
-    let hash_vec = AuthenticationKey::from_preimage(&AuthenticationKeyPreimage::uuid(
+    let hash_vec = AuthenticationKey::from_preimage(&AuthenticationKeyPreimage::auid(
         transaction_context.txn_hash.clone(),
-        transaction_context.uuid_counter,
+        transaction_context.auid_counter,
     ));
     Ok(smallvec![Value::address(AccountAddress::new(
         hash_vec
@@ -138,7 +138,7 @@ fn native_get_script_hash(
 pub struct GasParameters {
     pub get_txn_hash: GetTxnHashGasParameters,
     pub get_script_hash: GetScriptHashGasParameters,
-    pub create_unique_address: CreateUniqueAddressGasParameters,
+    pub generate_unique_address: GenerateUniqueAddressGasParameters,
 }
 
 pub fn make_all(
@@ -157,12 +157,12 @@ pub fn make_all(
             ),
         ),
         (
-            "create_uuid",
+            "generate_unique_address_internal",
             make_safe_native(
-                gas_params.create_unique_address,
+                gas_params.generate_unique_address,
                 timed_features.clone(),
                 features.clone(),
-                native_create_unique_address,
+                native_generate_unique_address,
             ),
         ),
         (

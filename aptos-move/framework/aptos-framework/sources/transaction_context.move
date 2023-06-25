@@ -7,7 +7,7 @@ module aptos_framework::transaction_context {
 
     /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
-    struct AUID has copy, drop, store {
+    struct AUID has drop, store {
         unique_address: address
     }
 
@@ -21,25 +21,25 @@ module aptos_framework::transaction_context {
     /// the sequence number and generates a new unique address.
     /// Uses Scheme in types/src/transaction/authenticator.rs for domain separation
     /// from other ways of generating unique addresses.
-    native fun create_unique_address(): address;
+    native fun generate_unique_address_internal(): address;
 
     /// Return a universally unique identifier. Internally calls
-    /// the private function `create_unique_address`. This function is
-    /// created for to feature gate the `create_unique_address` function.
-    public fun create_unique_addr(): address {
+    /// the private function `generate_unique_address_internal`. This function is
+    /// created for to feature gate the `generate_unique_address_internal` function.
+    public fun generate_unique_address(): address {
         assert!(features::auids_enabled(), EAUID_NOT_SUPPORTED);
-        create_unique_address()
+        generate_unique_address_internal()
     }
 
     /// Return the script hash of the current entry function.
     public native fun get_script_hash(): vector<u8>;
 
-    /// This method runs `create_unique_address` native function and returns
+    /// This method runs `generate_unique_address_internal` native function and returns
     /// the generated unique address wrapped in the AUID class.
-    public fun create_auid(): AUID {
+    public fun generate_auid(): AUID {
         assert!(features::auids_enabled(), EAUID_NOT_SUPPORTED);
         return AUID {
-            unique_address: create_unique_address()
+            unique_address: generate_unique_address_internal()
         }
     }
 

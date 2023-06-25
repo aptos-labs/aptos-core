@@ -246,7 +246,7 @@ pub enum Scheme {
     /// resources accounts. This application serves to domain separate hashes. Without such
     /// separation, an adversary could create (and get a signer for) a these accounts
     /// when a their address matches matches an existing address of a MultiEd25519 wallet.
-    DeriveUuid = 251,
+    DeriveAuid = 251,
     DeriveObjectAddressFromObject = 252,
     DeriveObjectAddressFromGuid = 253,
     DeriveObjectAddressFromSeed = 254,
@@ -258,7 +258,7 @@ impl fmt::Display for Scheme {
         let display = match self {
             Scheme::Ed25519 => "Ed25519",
             Scheme::MultiEd25519 => "MultiEd25519",
-            Scheme::DeriveUuid => "DeriveUuid",
+            Scheme::DeriveAuid => "DeriveAuid",
             Scheme::DeriveObjectAddressFromObject => "DeriveObjectAddressFromObject",
             Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
             Scheme::DeriveObjectAddressFromSeed => "DeriveObjectAddressFromSeed",
@@ -463,12 +463,12 @@ impl AuthenticationKeyPreimage {
         Self::new(public_key.to_bytes(), Scheme::MultiEd25519)
     }
 
-    /// Construct a preimage from a transaction-derived UUID as (txn_hash || uuid_scheme_id)
-    pub fn uuid(txn_hash: Vec<u8>, uuid_counter: u64) -> AuthenticationKeyPreimage {
+    /// Construct a preimage from a transaction-derived AUID as (txn_hash || auid_scheme_id)
+    pub fn auid(txn_hash: Vec<u8>, auid_counter: u64) -> AuthenticationKeyPreimage {
         let mut hash_arg = Vec::new();
         hash_arg.extend(txn_hash);
-        hash_arg.extend(uuid_counter.to_le_bytes().to_vec());
-        hash_arg.push(Scheme::DeriveUuid as u8);
+        hash_arg.extend(auid_counter.to_le_bytes().to_vec());
+        hash_arg.push(Scheme::DeriveAuid as u8);
         Self(hash_arg)
     }
 
