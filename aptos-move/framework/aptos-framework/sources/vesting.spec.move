@@ -45,8 +45,7 @@ spec aptos_framework::vesting {
     }
 
     spec total_accumulated_rewards(vesting_contract_address: address): u64 {
-        // A severe timeout will occur without using partial. 
-        pragma aborts_if_is_partial;
+        pragma verify_duration_estimate = 120;
 
         include TotalAccumulatedRewardsAbortsIf;
     }
@@ -68,7 +67,7 @@ spec aptos_framework::vesting {
         aborts_if !simple_map::spec_contains_key(staking_contracts, operator);
 
         let pool_address = staking_contract.pool_address;
-        let stake_pool = borrow_global<stake::StakePool>(pool_address);
+        let stake_pool = global<stake::StakePool>(pool_address);
         let active = coin::value(stake_pool.active);
         let pending_active = coin::value(stake_pool.pending_active);
         let total_active_stake = active + pending_active;
@@ -85,7 +84,6 @@ spec aptos_framework::vesting {
     spec accumulated_rewards(vesting_contract_address: address, shareholder_or_beneficiary: address): u64 {
         // TODO: A severe timeout can not be resolved.
         pragma verify = false;
-        pragma aborts_if_is_partial;
 
         include TotalAccumulatedRewardsAbortsIf;
         let vesting_contract = global<VestingContract>(vesting_contract_address);
@@ -93,7 +91,7 @@ spec aptos_framework::vesting {
         let staking_contracts = global<staking_contract::Store>(vesting_contract_address).staking_contracts;
         let staking_contract = simple_map::spec_get(staking_contracts, operator);
         let pool_address = staking_contract.pool_address;
-        let stake_pool = borrow_global<stake::StakePool>(pool_address);
+        let stake_pool = global<stake::StakePool>(pool_address);
         let active = coin::value(stake_pool.active);
         let pending_active = coin::value(stake_pool.pending_active);
         let total_active_stake = active + pending_active;
@@ -138,53 +136,110 @@ spec aptos_framework::vesting {
         // TODO: Data invariant does not hold.
         pragma verify = false;
         pragma aborts_if_is_partial;
+
+        aborts_if withdrawal_address == @aptos_framework || withdrawal_address == @vm_reserved;
+        aborts_if !exists<account::Account>(withdrawal_address);
+        aborts_if !exists<coin::CoinStore<AptosCoin>>(withdrawal_address);
+        aborts_if len(shareholders) == 0;
+        aborts_if simple_map::spec_len(buy_ins) != len(shareholders);
     }
 
     spec unlock_rewards(contract_address: address) {
-        // TODO: Calls `unlock_stake` which is not verified.
+        // TODO: Calls `unlock_stake` which is not verified. 
+        // Current verification times out even with partial.
         pragma verify = false;
         pragma aborts_if_is_partial;
+
+        include UnlockRewardsAbortsIf;
+    }
+
+    spec schema UnlockRewardsAbortsIf {
+        contract_address: address;
+
         include TotalAccumulatedRewardsAbortsIf { vesting_contract_address: contract_address };
+
+        let vesting_contract = global<VestingContract>(contract_address);
+        let operator = vesting_contract.staking.operator;
+        let staking_contracts = global<staking_contract::Store>(contract_address).staking_contracts;
+        let staking_contract = simple_map::spec_get(staking_contracts, operator);
+        let pool_address = staking_contract.pool_address;
+        let stake_pool = global<stake::StakePool>(pool_address);
+        let active = coin::value(stake_pool.active);
+        let pending_active = coin::value(stake_pool.pending_active);
+        let total_active_stake = active + pending_active;
+        let accumulated_rewards = total_active_stake - staking_contract.principal;
+        let commission_amount = accumulated_rewards * staking_contract.commission_percentage / 100;
+        let amount = total_active_stake - vesting_contract.remaining_grant - commission_amount;
+        
+        include UnlockStakeAbortsIf { vesting_contract, amount };
     }
 
     spec unlock_rewards_many(contract_addresses: vector<address>) {
         // TODO: Calls `unlock_rewards` in loop.
-        pragma verify = false;
         pragma aborts_if_is_partial;
+        aborts_if len(contract_addresses) == 0;
+        include PreconditionAbortsIf;
     }
 
     spec vest(contract_address: address) {
         // TODO: Calls `staking_contract::distribute` which is not verified.
+        // Current verification times out even with partial.
         pragma verify = false;
         pragma aborts_if_is_partial;
+        
+        include UnlockRewardsAbortsIf;
     }
 
     spec vest_many(contract_addresses: vector<address>) {
         // TODO: Calls `vest` in loop.
         pragma aborts_if_is_partial;
+        aborts_if len(contract_addresses) == 0;
+        include PreconditionAbortsIf;
+    }
+
+    spec schema PreconditionAbortsIf {
+        contract_addresses: vector<address>;
+
+        requires forall i in 0..len(contract_addresses): simple_map::spec_get(global<staking_contract::Store>(contract_addresses[i]).staking_contracts, global<VestingContract>(contract_addresses[i]).staking.operator).commission_percentage >= 0
+            && simple_map::spec_get(global<staking_contract::Store>(contract_addresses[i]).staking_contracts, global<VestingContract>(contract_addresses[i]).staking.operator).commission_percentage <= 100;
     }
 
     spec distribute(contract_address: address) {
         // TODO: Can't handle abort in loop.
         pragma aborts_if_is_partial;
+
+        include ActiveVestingContractAbortsIf<VestingContract>;
+
+        let vesting_contract = global<VestingContract>(contract_address);
+        include WithdrawStakeAbortsIf { vesting_contract };
     }
 
     spec distribute_many(contract_addresses: vector<address>) {
         // TODO: Calls `distribute` in loop.
         pragma aborts_if_is_partial;
+        aborts_if len(contract_addresses) == 0;
     }
 
     spec terminate_vesting_contract(admin: &signer, contract_address: address) {
         // TODO: Calls `staking_contract::distribute` which is not verified.
         pragma aborts_if_is_partial;
+
+        include ActiveVestingContractAbortsIf<VestingContract>;
+
+        let vesting_contract = global<VestingContract>(contract_address);
+        include WithdrawStakeAbortsIf { vesting_contract };
     }
 
     spec admin_withdraw(admin: &signer, contract_address: address) {
         // TODO: Calls `withdraw_stake` which is not verified.
         pragma aborts_if_is_partial;
-        include VerifyAdminAbortsIf;
+
         let vesting_contract = global<VestingContract>(contract_address);
         aborts_if vesting_contract.state != VESTING_POOL_TERMINATED;
+
+        include VerifyAdminAbortsIf;
+
+        include WithdrawStakeAbortsIf { vesting_contract };
     }
 
     spec update_operator(
@@ -195,7 +250,19 @@ spec aptos_framework::vesting {
     ) {
         // TODO: Calls `staking_contract::switch_operator` which is not verified.
         pragma aborts_if_is_partial;
+
         include VerifyAdminAbortsIf;
+
+        let vesting_contract = global<VestingContract>(contract_address);
+        let acc = vesting_contract.signer_cap.account;
+        let old_operator = vesting_contract.staking.operator;
+        include staking_contract::ContractExistsAbortsIf { staker: acc, operator: old_operator };
+        let store = global<staking_contract::Store>(acc);
+        let staking_contracts = store.staking_contracts;
+        aborts_if simple_map::spec_contains_key(staking_contracts, new_operator);
+
+        let staking_contract = simple_map::spec_get(staking_contracts, old_operator);
+        include DistributeInternalAbortsIf { staker: acc, operator: old_operator, staking_contract, distribute_events: store.distribute_events };
     }
 
     spec update_operator_with_same_commission(
@@ -355,11 +422,73 @@ spec aptos_framework::vesting {
     spec unlock_stake(vesting_contract: &VestingContract, amount: u64) {
         // TODO: Calls `staking_contract::unlock_stake` which is not verified.
         pragma aborts_if_is_partial;
+        
+        include UnlockStakeAbortsIf;
+    }
+
+    spec schema UnlockStakeAbortsIf {
+        vesting_contract: &VestingContract;
+        amount: u64;
+
+        // verify staking_contract::unlock_stake()
+        let acc = vesting_contract.signer_cap.account;
+        let operator = vesting_contract.staking.operator;
+        include amount != 0 ==> staking_contract::ContractExistsAbortsIf { staker: acc, operator };
+
+        // verify staking_contract::distribute_internal()
+        let store = global<staking_contract::Store>(acc);
+        let staking_contract = simple_map::spec_get(store.staking_contracts, operator);
+        include amount != 0 ==> DistributeInternalAbortsIf { staker: acc, operator, staking_contract, distribute_events: store.distribute_events };
     }
 
     spec withdraw_stake(vesting_contract: &VestingContract, contract_address: address): Coin<AptosCoin> {
         // TODO: Calls `staking_contract::distribute` which is not verified.
         pragma aborts_if_is_partial;
+
+        include WithdrawStakeAbortsIf;
+    }
+
+    spec schema WithdrawStakeAbortsIf {
+        vesting_contract: &VestingContract;
+        contract_address: address;
+
+        let operator = vesting_contract.staking.operator;
+        include staking_contract::ContractExistsAbortsIf { staker: contract_address, operator };
+
+        // verify staking_contract::distribute_internal()
+        let store = global<staking_contract::Store>(contract_address);
+        let staking_contract = simple_map::spec_get(store.staking_contracts, operator);
+        include DistributeInternalAbortsIf { staker: contract_address, operator, staking_contract, distribute_events: store.distribute_events };
+    }
+
+    spec schema DistributeInternalAbortsIf {
+        staker: address;    // The verification below does not contain the loop in staking_contract::update_distribution_pool().
+        operator: address;
+        staking_contract: staking_contract::StakingContract;
+        distribute_events: EventHandle<staking_contract::DistributeEvent>;
+
+        let pool_address = staking_contract.pool_address;
+        aborts_if !exists<stake::StakePool>(pool_address);
+        let stake_pool = global<stake::StakePool>(pool_address);
+        let inactive = stake_pool.inactive.value;
+        let pending_inactive = stake_pool.pending_inactive.value;
+        aborts_if inactive + pending_inactive > MAX_U64;
+
+        // verify stake::withdraw_with_cap()
+        let total_potential_withdrawable = inactive + pending_inactive;
+        let pool_address_1 = staking_contract.owner_cap.pool_address;
+        aborts_if !exists<stake::StakePool>(pool_address_1);
+        let stake_pool_1 = global<stake::StakePool>(pool_address_1);
+        aborts_if !exists<stake::ValidatorSet>(@aptos_framework);
+        let validator_set = global<stake::ValidatorSet>(@aptos_framework);
+        let inactive_state = !stake::spec_contains(validator_set.pending_active, pool_address_1)
+            && !stake::spec_contains(validator_set.active_validators, pool_address_1)
+            && !stake::spec_contains(validator_set.pending_inactive, pool_address_1);
+        let inactive_1 = stake_pool_1.inactive.value;
+        let pending_inactive_1 = stake_pool_1.pending_inactive.value;
+        let new_inactive_1 = inactive_1 + pending_inactive_1;
+        aborts_if inactive_state && timestamp::spec_now_seconds() >= stake_pool_1.locked_until_secs 
+            && inactive_1 + pending_inactive_1 > MAX_U64;
     }
 
     spec get_beneficiary(contract: &VestingContract, shareholder: address): address {
