@@ -1,3 +1,4 @@
+# This workflow runs Forge tests on a given commit or branch
 name: "*run Forge reusable workflow"
 
 on:
