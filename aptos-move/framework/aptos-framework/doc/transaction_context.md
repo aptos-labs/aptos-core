@@ -32,7 +32,7 @@ A wrapper denoting aptos unique identifer (AUID)
 for storing an address
 
 
-<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> <b>has</b> drop, store
+<pre><code><b>struct</b> <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -63,7 +63,7 @@ for storing an address
 AUID feature is not supported.
 
 
-<pre><code><b>const</b> <a href="transaction_context.md#0x1_transaction_context_EAUID_NOT_SUPPORTED">EAUID_NOT_SUPPORTED</a>: u64 = 3;
+<pre><code><b>const</b> <a href="transaction_context.md#0x1_transaction_context_EAUID_NOT_SUPPORTED">EAUID_NOT_SUPPORTED</a>: u64 = 1;
 </code></pre>
 
 
@@ -206,7 +206,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_unique_address">get_unique_address</a>(auid: <a href="transaction_context.md#0x1_transaction_context_AUID">transaction_context::AUID</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_unique_address">get_unique_address</a>(auid: &<a href="transaction_context.md#0x1_transaction_context_AUID">transaction_context::AUID</a>): <b>address</b>
 </code></pre>
 
 
@@ -215,7 +215,7 @@ the generated unique address wrapped in the AUID class.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_unique_address">get_unique_address</a>(auid: <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a>): <b>address</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_unique_address">get_unique_address</a>(auid: &<a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a>): <b>address</b> {
     auid.unique_address
 }
 </code></pre>
@@ -227,15 +227,6 @@ the generated unique address wrapped in the AUID class.
 <a name="@Specification_1"></a>
 
 ## Specification
-
-
-
-<a name="0x1_transaction_context_spec_get_txn_hash"></a>
-
-
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
 
 
 <a name="@Specification_1_get_txn_hash"></a>
@@ -252,6 +243,15 @@ the generated unique address wrapped in the AUID class.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>();
+</code></pre>
+
+
+
+
+<a name="0x1_transaction_context_spec_get_txn_hash"></a>
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_txn_hash">spec_get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 

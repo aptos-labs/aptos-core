@@ -3,11 +3,11 @@ module aptos_framework::transaction_context {
     use std::features;
 
     /// AUID feature is not supported.
-    const EAUID_NOT_SUPPORTED: u64 = 3;
+    const EAUID_NOT_SUPPORTED: u64 = 1;
 
     /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
-    struct AUID has drop, store {
+    struct AUID has copy, drop, store {
         unique_address: address
     }
 
@@ -43,7 +43,7 @@ module aptos_framework::transaction_context {
         }
     }
 
-    public fun get_unique_address(auid: AUID): address {
+    public fun get_unique_address(auid: &AUID): address {
         auid.unique_address
     }
 }

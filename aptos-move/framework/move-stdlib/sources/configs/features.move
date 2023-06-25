@@ -200,7 +200,7 @@ module std::features {
     public fun gas_payer_enabled(): bool acquires Features {
         is_enabled(GAS_PAYER_ENABLED)
     }
-    
+
     /// Whether enable MOVE functions to call create_auid method to create AUIDs.
     /// Lifetime: transient
     const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;

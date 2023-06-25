@@ -48,7 +48,6 @@ module aptos_framework::object {
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
 
-    #[test_only]
     /// create_unique_address uses this for domain separation within its native implementation
     const DERIVE_UUID_ADDRESS_SCHEME: u8 = 0xFB;
 
@@ -670,7 +669,7 @@ module aptos_framework::object {
 
     #[test]
     fun test_correct_uuid() {
-        if (std::features::uuids_enabled()) {
+        if (std::features::auids_enabled()) {
             let uuid1 = aptos_framework::transaction_context::create_unique_addr();
             let bytes = aptos_framework::transaction_context::get_txn_hash();
             std::vector::push_back(&mut bytes, 0);

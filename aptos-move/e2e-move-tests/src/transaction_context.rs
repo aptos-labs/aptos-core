@@ -13,14 +13,14 @@ pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {
     (harness, account)
 }
 
-pub fn create_many_uuids(
+pub fn create_many_auids(
     harness: &mut MoveHarness,
     account: &Account,
     count: u64,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
-        str::parse("0x1::transaction_context_test::create_many_uuids").unwrap(),
+        str::parse("0x1::transaction_context_test::create_many_auids").unwrap(),
         vec![],
         vec![bcs::to_bytes(&count).unwrap()],
     )

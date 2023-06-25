@@ -428,6 +428,16 @@ Emitted whenever the object's owner field is changed.
 ## Constants
 
 
+<a name="0x1_object_DERIVE_UUID_ADDRESS_SCHEME"></a>
+
+create_unique_address uses this for domain separation within its native implementation
+
+
+<pre><code><b>const</b> <a href="object.md#0x1_object_DERIVE_UUID_ADDRESS_SCHEME">DERIVE_UUID_ADDRESS_SCHEME</a>: u8 = 251;
+</code></pre>
+
+
+
 <a name="0x1_object_ECANNOT_DELETE"></a>
 
 The object does not allow for deletion
