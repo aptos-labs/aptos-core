@@ -20,7 +20,7 @@ pub struct ServerArgs {
 
     /// What endpoint to run the API on. e.g. setting this to "api" for example will
     /// result in you calling an endpoint like http://nhc.mysite.com:20121/api/check_node
-    #[clap(long, default_value = "", parse(from_str = parse_api_path))]
+    #[clap(long, default_value = "", value_parser = parse_api_path)]
     pub api_path: String,
 }
 
@@ -37,7 +37,7 @@ impl TryInto<Url> for ServerArgs {
     }
 }
 
-fn parse_api_path(path: &str) -> String {
+fn parse_api_path(path: &str) -> anyhow::Result<String> {
     let api_path = if path.starts_with('/') {
         // Strip any leading slash.
         let mut chars = path.chars();
@@ -46,5 +46,5 @@ fn parse_api_path(path: &str) -> String {
     } else {
         path
     };
-    api_path.to_owned()
+    Ok(api_path.to_owned())
 }

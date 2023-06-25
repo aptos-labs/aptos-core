@@ -26,13 +26,9 @@ use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
 };
 
-#[derive(Parser, Debug, Serialize, Deserialize)]
+#[derive(Parser, Clone, Debug, Serialize, Deserialize)]
 pub struct LocalFsOpt {
-    #[clap(
-        long = "dir",
-        parse(from_os_str),
-        help = "Target local dir to hold backups."
-    )]
+    #[clap(long = "dir", value_parser, help = "Target local dir to hold backups.")]
     pub dir: PathBuf,
 }
 

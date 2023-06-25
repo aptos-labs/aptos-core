@@ -9,7 +9,7 @@ use std::{fs::File, io::BufReader, path::PathBuf};
 
 #[derive(Clone, Debug, Parser)]
 pub struct ValidateConfig {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, value_parser)]
     config_path: PathBuf,
 }
 

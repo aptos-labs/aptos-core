@@ -103,3 +103,9 @@ pub struct Args {
     #[clap(short = 't', long = "threads")]
     pub num_threads: Option<u64>,
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

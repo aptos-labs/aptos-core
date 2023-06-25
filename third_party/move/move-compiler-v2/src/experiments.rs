@@ -21,7 +21,8 @@
 pub struct Experiment();
 
 impl Experiment {
-    /// Whether to exit after type checking.
-    /// Retention: permanent
-    pub const CHECK_ONLY: &'static str = "check-only";
+    // Example
+    // /// Whether to exit after type checking.
+    // /// Retention: permanent
+    // pub const CHECK_ONLY: &'static str = "check-only";
 }

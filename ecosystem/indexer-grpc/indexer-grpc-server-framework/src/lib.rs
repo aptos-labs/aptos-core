@@ -14,7 +14,7 @@ use warp::{http::Response, Filter};
 /// the specific service.
 #[derive(Parser)]
 pub struct ServerArgs {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, value_parser)]
     pub config_path: PathBuf,
 }
 
@@ -208,5 +208,11 @@ mod tests {
         assert_eq!(config.health_check_port, 12345);
         assert_eq!(config.server_config.test, 123);
         assert_eq!(config.server_config.test_name, "test");
+    }
+
+    #[test]
+    fn verify_tool() {
+        use clap::CommandFactory;
+        ServerArgs::command().debug_assert()
     }
 }

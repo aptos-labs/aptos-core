@@ -269,18 +269,9 @@ pub fn fetch_latest_synced_ledger_info(
 
 /// Fetches the latest synced version from the specified storage
 pub fn fetch_latest_synced_version(storage: Arc<dyn DbReader>) -> Result<Version, Error> {
-    let latest_transaction_info =
-        storage
-            .get_latest_transaction_info_option()
-            .map_err(|error| {
-                Error::StorageError(format!(
-                    "Failed to get the latest transaction info from storage: {:?}",
-                    error
-                ))
-            })?;
-    latest_transaction_info
-        .ok_or_else(|| Error::StorageError("Latest transaction info is missing!".into()))
-        .map(|(latest_synced_version, _)| latest_synced_version)
+    storage.get_latest_version().map_err(|e| {
+        Error::StorageError(format!("Failed to get latest version from storage: {e:?}"))
+    })
 }
 
 /// Initializes all relevant metric gauges (e.g., after a reboot
