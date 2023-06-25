@@ -120,6 +120,7 @@ members = [
     "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
+    "experimental/execution/ptx-executor",
     "mempool",
     "network",
     "network/builder",
