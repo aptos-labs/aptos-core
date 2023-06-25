@@ -28,7 +28,6 @@ use std::{
 pub mod generics;
 mod state_merkle_metadata_pruner;
 mod state_merkle_shard_pruner;
-pub(crate) mod state_value_pruner;
 
 #[cfg(test)]
 mod test;
