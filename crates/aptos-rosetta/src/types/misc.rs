@@ -109,6 +109,7 @@ pub enum OperationType {
     InitializeStakePool,
     ResetLockup,
     UnlockStake,
+    UpdateCommission,
     WithdrawUndelegatedFunds,
     DistributeStakingRewards,
     AddDelegatedStake,
@@ -130,6 +131,7 @@ impl OperationType {
     const STAKING_REWARD: &'static str = "staking_reward";
     const UNLOCK_DELEGATED_STAKE: &'static str = "unlock_delegated_stake";
     const UNLOCK_STAKE: &'static str = "unlock_stake";
+    const UPDATE_COMMISSION: &'static str = "update_commission";
     const WITHDRAW: &'static str = "withdraw";
     const WITHDRAW_UNDELEGATED_FUNDS: &'static str = "withdraw_undelegated_funds";
 
@@ -169,6 +171,7 @@ impl FromStr for OperationType {
             Self::INITIALIZE_STAKE_POOL => Ok(OperationType::InitializeStakePool),
             Self::RESET_LOCKUP => Ok(OperationType::ResetLockup),
             Self::UNLOCK_STAKE => Ok(OperationType::UnlockStake),
+            Self::UPDATE_COMMISSION => Ok(OperationType::UpdateCommission),
             Self::DISTRIBUTE_STAKING_REWARDS => Ok(OperationType::DistributeStakingRewards),
             Self::ADD_DELEGATED_STAKE => Ok(OperationType::AddDelegatedStake),
             Self::UNLOCK_DELEGATED_STAKE => Ok(OperationType::UnlockDelegatedStake),
@@ -194,6 +197,7 @@ impl Display for OperationType {
             InitializeStakePool => Self::INITIALIZE_STAKE_POOL,
             ResetLockup => Self::RESET_LOCKUP,
             UnlockStake => Self::UNLOCK_STAKE,
+            UpdateCommission => Self::UPDATE_COMMISSION,
             DistributeStakingRewards => Self::DISTRIBUTE_STAKING_REWARDS,
             AddDelegatedStake => Self::ADD_DELEGATED_STAKE,
             UnlockDelegatedStake => Self::UNLOCK_DELEGATED_STAKE,

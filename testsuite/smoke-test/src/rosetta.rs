@@ -891,6 +891,22 @@ async fn test_block() {
         .await
         .expect("Should successfully reset lockup");
 
+    // Update commission
+    update_commission_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        Some(account_id_3),
+        Some(50),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully update commission");
+
     // Successfully, and fail setting a voter
     set_voter_and_wait(
         &node_clients,
@@ -1397,6 +1413,60 @@ async fn parse_operations(
                             bcs::from_bytes(payload.args().first().unwrap()).unwrap();
                         let operator = operation.operator().unwrap();
                         assert_eq!(actual_operator_address, operator)
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
+            OperationType::UpdateCommission => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful update commission operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed update commission operation"
+                    );
+                }
+
+                // Check that reset lockup was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
+
+                        let new_commission = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .commission_percentage
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        let actual_new_commission: u64 =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        assert_eq!(actual_new_commission, new_commission);
                     } else {
                         panic!("Not an entry function");
                     }
@@ -2175,6 +2245,38 @@ async fn reset_lockup_and_wait(
         },
     )
     .await
+}
+
+async fn update_commission_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: Option<AccountAddress>,
+    new_commission_percentage: Option<u64>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .update_commission(
+            network_identifier,
+            sender_key,
+            operator,
+            new_commission_percentage,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
 }
 
 async fn unlock_stake_and_wait(
