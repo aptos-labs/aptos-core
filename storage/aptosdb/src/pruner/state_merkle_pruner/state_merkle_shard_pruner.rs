@@ -4,7 +4,7 @@
 use crate::{
     pruner::{
         pruner_utils::get_or_initialize_subpruner_progress,
-        state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+        state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
     schema::{
         db_metadata::{DbMetadataSchema, DbMetadataValue},
