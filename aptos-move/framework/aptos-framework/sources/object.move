@@ -48,8 +48,8 @@ module aptos_framework::object {
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
 
-    /// create_unique_address uses this for domain separation within its native implementation
-    const DERIVE_UUID_ADDRESS_SCHEME: u8 = 0xFB;
+    /// generate_unique_address uses this for domain separation within its native implementation
+    const DERIVE_AUID_ADDRESS_SCHEME: u8 = 0xFB;
 
     /// Maximum nesting from one object to another. That is objects can technically have infinte
     /// nesting, but any checks such as transfer will only be evaluated this deep.
@@ -213,13 +213,13 @@ module aptos_framework::object {
         create_object_internal(creator_address, obj_addr, false)
     }
 
-    /// Create a new object by generating a random UUID based on transaction hash.
-    /// The UUID is computed sha3_256([transaction hash | uuid counter | 0xFB]).
-    /// The created object is deletable as we can guarantee the same UUID can
+    /// Create a new object by generating a random unique address based on transaction hash.
+    /// The unique address is computed sha3_256([transaction hash | auid counter | 0xFB]).
+    /// The created object is deletable as we can guarantee the same unique address can
     /// never be regenerated with future txs.
     public fun create_object(owner_address: address): ConstructorRef {
-        let uuid = transaction_context::create_unique_addr();
-        create_object_internal(owner_address, uuid, true)
+        let unique_address = transaction_context::generate_unique_address();
+        create_object_internal(owner_address, unique_address, true)
     }
 
     #[deprecated]
@@ -668,15 +668,15 @@ module aptos_framework::object {
     }
 
     #[test]
-    fun test_correct_uuid() {
+    fun test_correct_auid() {
         if (std::features::auids_enabled()) {
-            let uuid1 = aptos_framework::transaction_context::create_unique_addr();
+            let auid1 = aptos_framework::transaction_context::generate_unique_address();
             let bytes = aptos_framework::transaction_context::get_txn_hash();
             std::vector::push_back(&mut bytes, 0);
             std::vector::push_back(&mut bytes, 1);
-            std::vector::push_back(&mut bytes, DERIVE_UUID_ADDRESS_SCHEME);
-            let uuid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
-            assert!(uuid1 == uuid2, 0);
+            std::vector::push_back(&mut bytes, DERIVE_AUID_ADDRESS_SCHEME);
+            let auid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
+            assert!(auid1 == auid2, 0);
         }
     }
 }

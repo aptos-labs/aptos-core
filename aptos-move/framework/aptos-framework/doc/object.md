@@ -428,12 +428,12 @@ Emitted whenever the object's owner field is changed.
 ## Constants
 
 
-<a name="0x1_object_DERIVE_UUID_ADDRESS_SCHEME"></a>
+<a name="0x1_object_DERIVE_AUID_ADDRESS_SCHEME"></a>
 
-create_unique_address uses this for domain separation within its native implementation
+generate_unique_address uses this for domain separation within its native implementation
 
 
-<pre><code><b>const</b> <a href="object.md#0x1_object_DERIVE_UUID_ADDRESS_SCHEME">DERIVE_UUID_ADDRESS_SCHEME</a>: u8 = 251;
+<pre><code><b>const</b> <a href="object.md#0x1_object_DERIVE_AUID_ADDRESS_SCHEME">DERIVE_AUID_ADDRESS_SCHEME</a>: u8 = 251;
 </code></pre>
 
 
@@ -845,9 +845,9 @@ Derivde objects, similar to named objects, cannot be deleted.
 
 ## Function `create_object`
 
-Create a new object by generating a random UUID based on transaction hash.
-The UUID is computed sha3_256([transaction hash | uuid counter | 0xFB]).
-The created object is deletable as we can guarantee the same UUID can
+Create a new object by generating a random unique address based on transaction hash.
+The unique address is computed sha3_256([transaction hash | auid counter | 0xFB]).
+The created object is deletable as we can guarantee the same unique address can
 never be regenerated with future txs.
 
 
@@ -861,8 +861,8 @@ never be regenerated with future txs.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_object">create_object</a>(owner_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
-    <b>let</b> uuid = <a href="transaction_context.md#0x1_transaction_context_create_unique_addr">transaction_context::create_unique_addr</a>();
-    <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, uuid, <b>true</b>)
+    <b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">transaction_context::generate_unique_address</a>();
+    <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, unique_address, <b>true</b>)
 }
 </code></pre>
 
