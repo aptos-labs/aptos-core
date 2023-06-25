@@ -6,7 +6,7 @@ use crate::sharded_block_partitioner::cross_shard_messages::{
 };
 use aptos_types::{
     block_executor::partitioner::{
-        CrossShardDependencies, CrossShardEdges, ShardId, SubBlocksForShard, TxnIndexForSharding,
+        CrossShardDependencies, CrossShardEdges, ShardId, SubBlocksForShard, ShardedTxnIndex,
         TxnIndex,
     },
     transaction::Transaction,
@@ -84,7 +84,7 @@ impl DependentEdgeCreator {
                 .entry(index_with_shard.txn_index)
                 .or_insert_with(CrossShardEdges::default);
             back_edges.add_edge(
-                TxnIndexForSharding::new(dependent_index, self.shard_id, self.round_id),
+                ShardedTxnIndex::new(dependent_index, self.shard_id, self.round_id),
                 storage_locations.clone(),
             );
         }
@@ -176,7 +176,7 @@ mod tests {
     use aptos_types::{
         block_executor::partitioner::{
             CrossShardDependencies, CrossShardEdges, SubBlock, SubBlocksForShard,
-            TransactionWithDependencies, TxnIndexForSharding,
+            TransactionWithDependencies, ShardedTxnIndex,
         },
         transaction::analyzed_transaction::StorageLocation,
     };
@@ -207,7 +207,7 @@ mod tests {
         dependent_edges_from_shard_1.push(CrossShardDependentEdges::new(
             4,
             CrossShardEdges::new(
-                TxnIndexForSharding::new(11, 1, round_id),
+                ShardedTxnIndex::new(11, 1, round_id),
                 txn_4_storgae_location.clone(),
             ),
         ));
@@ -215,7 +215,7 @@ mod tests {
         dependent_edges_from_shard_1.push(CrossShardDependentEdges::new(
             5,
             CrossShardEdges::new(
-                TxnIndexForSharding::new(12, 1, round_id),
+                ShardedTxnIndex::new(12, 1, round_id),
                 txn_5_storgae_location.clone(),
             ),
         ));
@@ -226,7 +226,7 @@ mod tests {
             CrossShardDependentEdges::new(
                 4,
                 CrossShardEdges::new(
-                    TxnIndexForSharding::new(21, 2, round_id),
+                    ShardedTxnIndex::new(21, 2, round_id),
                     txn_4_storgae_location.clone(),
                 ),
             ),
@@ -234,7 +234,7 @@ mod tests {
             CrossShardDependentEdges::new(
                 5,
                 CrossShardEdges::new(
-                    TxnIndexForSharding::new(22, 2, round_id),
+                    ShardedTxnIndex::new(22, 2, round_id),
                     txn_5_storgae_location.clone(),
                 ),
             ),
@@ -274,25 +274,25 @@ mod tests {
 
         let dependent_storage_locs = sub_block.transactions_with_deps()[4]
             .cross_shard_dependencies
-            .get_dependent_edge_for(TxnIndexForSharding::new(11, 1, round_id))
+            .get_dependent_edge_for(ShardedTxnIndex::new(11, 1, round_id))
             .unwrap();
         assert_eq!(dependent_storage_locs, &txn_4_storgae_location);
 
         let dependent_storage_locs = sub_block.transactions_with_deps()[5]
             .cross_shard_dependencies
-            .get_dependent_edge_for(TxnIndexForSharding::new(12, 1, round_id))
+            .get_dependent_edge_for(ShardedTxnIndex::new(12, 1, round_id))
             .unwrap();
         assert_eq!(dependent_storage_locs, &txn_5_storgae_location);
 
         let dependent_storage_locs = sub_block.transactions_with_deps()[4]
             .cross_shard_dependencies
-            .get_dependent_edge_for(TxnIndexForSharding::new(21, 2, round_id))
+            .get_dependent_edge_for(ShardedTxnIndex::new(21, 2, round_id))
             .unwrap();
         assert_eq!(dependent_storage_locs, &txn_4_storgae_location);
 
         let dependent_storage_locs = sub_block.transactions_with_deps()[5]
             .cross_shard_dependencies
-            .get_dependent_edge_for(TxnIndexForSharding::new(22, 2, round_id))
+            .get_dependent_edge_for(ShardedTxnIndex::new(22, 2, round_id))
             .unwrap();
         assert_eq!(dependent_storage_locs, &txn_5_storgae_location);
     }

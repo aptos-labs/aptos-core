@@ -23,7 +23,6 @@ pub struct PartitioningShard {
     control_rx: Receiver<ControlMsg>,
     result_tx: Sender<PartitioningResp>,
     cross_shard_client: Arc<CrossShardClient>,
-    num_rounds_finished: usize,
 }
 
 impl PartitioningShard {
@@ -43,7 +42,6 @@ impl PartitioningShard {
             control_rx,
             result_tx,
             cross_shard_client,
-            num_rounds_finished: 0,
         }
     }
 
@@ -53,8 +51,9 @@ impl PartitioningShard {
             prev_rounds_write_set_with_index,
             current_round_start_index,
             frozen_sub_blocks,
+            round_id,
         } = partition_msg;
-        let mut conflict_detector = CrossShardConflictDetector::new(self.shard_id, self.num_shards, self.num_rounds_finished);
+        let mut conflict_detector = CrossShardConflictDetector::new(self.shard_id, self.num_shards, round_id);
         // If transaction filtering is allowed, we need to prepare the dependency analysis and broadcast it to other shards
         // Based on the dependency analysis received from other shards, we will reject transactions that are conflicting with
         // transactions in other shards
@@ -85,7 +84,7 @@ impl PartitioningShard {
             self.cross_shard_client.clone(),
             frozen_sub_blocks,
             self.num_shards,
-            self.num_rounds_finished,
+            round_id,
         );
         dependent_edge_creator
             .create_dependent_edges(&accepted_cross_shard_dependencies, index_offset);
@@ -121,8 +120,9 @@ impl PartitioningShard {
             // The frozen dependencies in previous chunks.
             prev_rounds_write_set_with_index,
             mut frozen_sub_blocks,
+            round_id,
         } = partition_msg;
-        let conflict_detector = CrossShardConflictDetector::new(self.shard_id, self.num_shards, self.num_rounds_finished);
+        let conflict_detector = CrossShardConflictDetector::new(self.shard_id, self.num_shards, round_id);
 
         // Since txn filtering is not allowed, we can create the RW set with maximum txn
         // index with the index offset passed.
@@ -146,7 +146,7 @@ impl PartitioningShard {
             self.cross_shard_client.clone(),
             frozen_sub_blocks,
             self.num_shards,
-            self.num_rounds_finished,
+            round_id,
         );
         dependent_edge_creator.create_dependent_edges(&current_cross_shard_deps, index_offset);
 
@@ -173,7 +173,6 @@ impl PartitioningShard {
                     break;
                 },
             }
-            self.num_rounds_finished += 1;
         }
         trace!("Shard {} is shutting down", self.shard_id);
     }
