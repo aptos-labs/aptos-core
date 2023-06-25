@@ -23,7 +23,7 @@ use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use std::{fs, path::PathBuf};
 
-const DISASSEMBLED_CODE_FILE: &str = "disassembled-code.yaml";
+const DISASSEMBLED_CODE_FILE: &str = "disassembled-code.move";
 
 /// Disassemble the Move bytecode pointed to
 ///
@@ -50,7 +50,7 @@ pub struct Disassemble {
     pub code_coverage_path: Option<PathBuf>,
 
     /// Output directory for the key files
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) output_dir: Option<PathBuf>,
 
     #[clap(flatten)]

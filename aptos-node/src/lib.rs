@@ -25,7 +25,7 @@ use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use futures::channel::mpsc;
-use hex::FromHex;
+use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     fs,
@@ -49,20 +49,19 @@ pub struct AptosNodeArgs {
     #[clap(
         short = 'f',
         long,
-        parse(from_os_str),
-        required_unless = "test",
-        required_unless = "info"
+        value_parser,
+        required_unless_present_any = ["test", "info"],
     )]
     config: Option<PathBuf>,
 
     /// Directory to run the test mode in.
     ///
     /// Repeated runs will start up from previous state.
-    #[clap(long, parse(from_os_str), requires("test"))]
+    #[clap(long, value_parser, requires("test"))]
     test_dir: Option<PathBuf>,
 
     /// Path to node configuration file override for local test mode. Cannot be used with --config
-    #[clap(long, parse(from_os_str), requires("test"), conflicts_with("config"))]
+    #[clap(long, value_parser, requires("test"), conflicts_with("config"))]
     test_config_override: Option<PathBuf>,
 
     /// Run only a single validator node testnet.
@@ -70,7 +69,7 @@ pub struct AptosNodeArgs {
     test: bool,
 
     /// Random number generator seed for starting a single validator testnet.
-    #[clap(long, parse(try_from_str = FromHex::from_hex), requires("test"))]
+    #[clap(long, value_parser = load_seed, requires("test"))]
     seed: Option<[u8; 32]>,
 
     /// Use random ports instead of ports from the node configuration.
@@ -153,6 +152,15 @@ impl AptosNodeArgs {
             // Start the node
             start(config, None, true).expect("Node should start correctly");
         };
+    }
+}
+
+pub fn load_seed(input: &str) -> Result<Option<[u8; 32]>, FromHexError> {
+    let trimmed_input = input.trim();
+    if !trimmed_input.is_empty() {
+        FromHex::from_hex(trimmed_input).map(Some)
+    } else {
+        Ok(None)
     }
 }
 
@@ -498,7 +506,7 @@ pub fn setup_environment_and_start_node(
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
-        peers_and_metadata,
+        peers_and_metadata.clone(),
         &mut event_subscription_service,
     );
 
@@ -532,6 +540,7 @@ pub fn setup_environment_and_start_node(
             mempool_network_interfaces,
             mempool_listener,
             mempool_client_receiver,
+            peers_and_metadata,
         );
 
     // Create the consensus runtime (this blocks on state sync first)
@@ -564,4 +573,10 @@ pub fn setup_environment_and_start_node(
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    AptosNodeArgs::command().debug_assert()
 }

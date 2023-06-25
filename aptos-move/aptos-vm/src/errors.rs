@@ -82,18 +82,16 @@ pub fn convert_prologue_error(
                     StatusCode::MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH_HASH
                 },
                 (category, reason) => {
-                    speculative_error!(
-			log_context,
-			format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-				location, code, category, reason),
-		    );
-                    return Err(VMStatus::Error(
+                    let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+                    location, code, category, reason);
+                    speculative_error!(log_context, err_msg.clone());
+                    return Err(VMStatus::error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
-                        None,
+                        Some(err_msg),
                     ));
                 },
             };
-            VMStatus::Error(new_major_status, None)
+            VMStatus::error(new_major_status, None)
         },
         VMStatus::MoveAbort(location, code) => {
             let new_major_status = match error_split(code) {
@@ -119,27 +117,28 @@ pub fn convert_prologue_error(
                     StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
                 },
                 (category, reason) => {
-                    speculative_error!(
-                        log_context,
-                        format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-				location, code, category, reason),
-                    );
-                    return Err(VMStatus::Error(
-                        StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
-                        None,
-                    ));
+                    let err_msg = format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+                    location, code, category, reason);
+                    speculative_error!(log_context, err_msg.clone());
+                    return Err(VMStatus::Error {
+                        status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                        sub_status: None,
+                        message: Some(err_msg),
+                    });
                 },
             };
-            VMStatus::Error(new_major_status, None)
+            VMStatus::error(new_major_status, None)
         },
-        // Storage error can be a result of speculation failure so throw the error back for caller to handle.
-        e @ VMStatus::Error(StatusCode::STORAGE_ERROR, _) => e,
-        status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error(..) => {
+        status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error { .. } => {
             speculative_error!(
                 log_context,
                 format!("[aptos_vm] Unexpected prologue error: {:?}", status),
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
+            VMStatus::Error {
+                status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                sub_status: status.sub_status(),
+                message: None,
+            }
         },
     })
 }
@@ -159,33 +158,35 @@ pub fn convert_epilogue_error(
             if !transaction_validation.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
-            speculative_error!(
-                log_context,
-                format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-			location, code, category, reason),
-            );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
+            let err_msg = format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+			location, code, category, reason);
+            speculative_error!(log_context, err_msg.clone());
+            VMStatus::error(
+                StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                Some(err_msg),
+            )
         },
 
         VMStatus::MoveAbort(location, code) => match error_split(code) {
             (LIMIT_EXCEEDED, ECANT_PAY_GAS_DEPOSIT) => VMStatus::MoveAbort(location, code),
             (category, reason) => {
-                speculative_error!(
-                    log_context,
-                    format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-			    location, code, category, reason),
-                );
-                VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
+                let err_msg = format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+			    location, code, category, reason);
+                speculative_error!(log_context, err_msg.clone());
+                VMStatus::error(
+                    StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                    Some(err_msg),
+                )
             },
         },
-        // Storage error can be a result of speculation failure so throw the error back for caller to handle.
-        e @ VMStatus::Error(StatusCode::STORAGE_ERROR, _) => e,
         status => {
-            speculative_error!(
-                log_context,
-                format!("[aptos_vm] Unexpected success epilogue error: {:?}", status),
-            );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
+            let err_msg = format!("[aptos_vm] Unexpected success epilogue error: {:?}", status);
+            speculative_error!(log_context, err_msg.clone());
+            VMStatus::Error {
+                status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                sub_status: status.sub_status(),
+                message: Some(err_msg),
+            }
         },
     })
 }
@@ -202,18 +203,23 @@ pub fn expect_only_successful_execution(
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
         // Storage error can be a result of speculation failure so throw the error back for caller to handle.
-        e @ VMStatus::Error(StatusCode::STORAGE_ERROR, _) => e,
+        e @ VMStatus::Error {
+            status_code: StatusCode::STORAGE_ERROR,
+            ..
+        } => e,
         status => {
             // Only trigger a warning here as some errors could be a result of the speculative parallel execution.
             // We will report the errors after we obtained the final transaction output in update_counters_for_processed_chunk
-            speculative_warn!(
-                log_context,
-                format!(
-                    "[aptos_vm] Unexpected error from known Move function, '{}'. Error: {:?}",
-                    function_name, status
-                ),
+            let err_msg = format!(
+                "[aptos_vm] Unexpected error from known Move function, '{}'. Error: {:?}",
+                function_name, status
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
+            speculative_warn!(log_context, err_msg.clone());
+            VMStatus::Error {
+                status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                sub_status: status.sub_status(),
+                message: Some(err_msg),
+            }
         },
     })
 }

@@ -21,7 +21,7 @@ pub struct FundWithFaucet {
     /// Address to fund
     ///
     /// If the account wasn't previously created, it will be created when being funded
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     /// Number of Octas to fund the account from the faucet
