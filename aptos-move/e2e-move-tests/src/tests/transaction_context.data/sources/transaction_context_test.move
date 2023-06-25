@@ -7,7 +7,7 @@ module 0x1::transaction_context_test {
     const ENOT_UNIQUE: u64 = 20;
 
     public entry fun create_many_uuids(_account: &signer, count: u64) {
-        if (features::uuids_enabled()) {
+        if (features::auids_enabled()) {
             let uuids: vector<address> = vector<address>[];
             let i: u64 = 0;
             while (i < count) {
