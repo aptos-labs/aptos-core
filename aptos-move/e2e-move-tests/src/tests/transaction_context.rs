@@ -3,7 +3,7 @@
 use crate::{
     assert_success,
     tests::common,
-    transaction_context::{create_many_uuids, initialize},
+    transaction_context::{create_many_auids, initialize},
     MoveHarness,
 };
 use aptos_language_e2e_tests::account::Account;
@@ -13,10 +13,10 @@ fn setup() -> (MoveHarness, Account) {
 }
 
 #[test]
-fn test_many_unique_uuids() {
+fn test_many_unique_auids() {
     let (mut h, acc) = setup();
 
-    let txn1 = create_many_uuids(&mut h, &acc, 50);
+    let txn1 = create_many_auids(&mut h, &acc, 50);
 
     assert_success!(h.run(txn1));
 }
