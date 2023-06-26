@@ -2954,6 +2954,8 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
+ "bcs 0.1.4",
+ "crossbeam-channel",
  "once_cell",
  "serde 1.0.149",
  "thiserror",
