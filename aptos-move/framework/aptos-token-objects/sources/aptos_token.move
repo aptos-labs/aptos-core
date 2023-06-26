@@ -199,14 +199,25 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ): ConstructorRef acquires AptosCollection {
-        let constructor_ref = token::create_token(
-            creator,
-            collection,
-            description,
-            name,
-            option::none(),
-            uri,
-        );
+        let constructor_ref = if (std::features::auids_enabled()) {
+            token::create(
+                creator,
+                collection,
+                description,
+                name,
+                option::none(),
+                uri,
+            )
+        } else {
+            token::create_from_account(
+                creator,
+                collection,
+                description,
+                name,
+                option::none(),
+                uri,
+            )
+        };
 
         let object_signer = object::generate_signer(&constructor_ref);
 

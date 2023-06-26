@@ -152,7 +152,7 @@ module token_objects::ambassador {
         // is used to generate the refs of the token.
         let uri = base_uri;
         string::append(&mut uri, string::utf8(RANK_BRONZE));
-        let constructor_ref = token::create_token(
+        let constructor_ref = token::create(
             creator,
             collection,
             description,
