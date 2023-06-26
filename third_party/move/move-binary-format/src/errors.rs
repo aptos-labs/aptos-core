@@ -331,9 +331,7 @@ impl PartialVMError {
 
     pub fn new(major_status: StatusCode) -> Self {
         debug_assert!(major_status != StatusCode::EXECUTED);
-        let message = if cfg!(debug_assertions)
-            && major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-        {
+        let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
             Some(format!(
                 "UNKNOWN_INVARIANT_VIOLATION_ERROR at {:?}",
                 std::backtrace::Backtrace::force_capture()
@@ -362,9 +360,7 @@ impl PartialVMError {
     }
 
     pub fn with_message(mut self, mut message: String) -> Self {
-        if cfg!(debug_assertions)
-            && self.0.major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-        {
+        if self.0.major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
             if let Some(stacktrace) = self.0.message.take() {
                 message = format!("{} @{}", message, stacktrace);
             }
