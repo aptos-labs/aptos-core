@@ -152,7 +152,7 @@ module token_objects::ambassador {
         // is used to generate the refs of the token.
         let uri = base_uri;
         string::append(&mut uri, string::utf8(RANK_BRONZE));
-        let constructor_ref = token::create(
+        let constructor_ref = token::create_named_token(
             creator,
             collection,
             description,
@@ -283,13 +283,8 @@ module token_objects::ambassador {
         );
     }
 
-    #[test(creator = @0x123, user1 = @0x456, fx = @std)]
-    fun test_mint_burn(creator: &signer, user1: &signer, fx: signer) acquires AmbassadorToken, AmbassadorLevel {
-        use std::features;
-
-        let feature = features::get_auids();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
-
+    #[test(creator = @0x123, user1 = @0x456)]
+    fun test_mint_burn(creator: &signer, user1: &signer) acquires AmbassadorToken, AmbassadorLevel {
         // ------------------------------------------
         // Creator creates the Ambassador Collection.
         // ------------------------------------------
