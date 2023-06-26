@@ -21,15 +21,15 @@ use crate::{
 };
 use aptos_backup_cli::{
     coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt},
-    metadata::cache::MetadataCacheOpt,
-    storage::command_adapter::{config::CommandAdapterConfig, CommandAdapter},
-    utils::{ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt},
+    storage::DBToolStorageOpt,
+    utils::GlobalRestoreOpt,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, bls12381::PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
+use aptos_logger::Level;
 use aptos_network_checker::args::{
     validate_address, CheckEndpointArgs, HandshakeArgs, NodeAddressArgs,
 };
@@ -51,7 +51,6 @@ use bcs::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use futures::FutureExt;
-use hex::FromHex;
 use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -60,7 +59,6 @@ use std::{
     convert::{TryFrom, TryInto},
     path::PathBuf,
     pin::Pin,
-    sync::Arc,
     thread,
     time::Duration,
 };
@@ -75,7 +73,7 @@ const SECS_TO_MICROSECS: u64 = 1_000_000;
 #[derive(Parser)]
 pub enum NodeTool {
     AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
-    BootstrapDbFromBackup(BootstrapDbFromBackup),
+    BootstrapDb(BootstrapDb),
     CheckNetworkConnectivity(CheckNetworkConnectivity),
     GetPerformance(GetPerformance),
     GetStakePool(GetStakePool),
@@ -96,7 +94,10 @@ impl NodeTool {
         use NodeTool::*;
         match self {
             AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
-            BootstrapDbFromBackup(tool) => tool.execute_serialized().await,
+            BootstrapDb(tool) => {
+                tool.execute_serialized_with_logging_level(Level::Info)
+                    .await
+            },
             CheckNetworkConnectivity(tool) => tool.execute_serialized().await,
             GetPerformance(tool) => tool.execute_serialized().await,
             GetStakePool(tool) => tool.execute_serialized().await,
@@ -119,7 +120,7 @@ pub struct OperatorConfigFileArgs {
     /// Operator Configuration file
     ///
     /// Config file created from the `genesis set-validator-configuration` command
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) operator_config_file: Option<PathBuf>,
 }
 
@@ -140,13 +141,13 @@ pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
     ///
     /// The key should be a BLS12-381 public key
-    #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
+    #[clap(long, value_parser = bls12381::PublicKey::from_encoded_string)]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
 
     /// Hex encoded Consensus proof of possession
     ///
     /// The key should be a BLS12-381 proof of possession
-    #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
+    #[clap(long, value_parser = bls12381::ProofOfPossession::from_encoded_string)]
     pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
 }
 
@@ -194,7 +195,7 @@ pub struct ValidatorNetworkAddressesArgs {
     pub(crate) validator_host: Option<HostAndPort>,
 
     /// Validator x25519 public network key
-    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
+    #[clap(long, value_parser = x25519::PublicKey::from_encoded_string)]
     pub(crate) validator_network_public_key: Option<x25519::PublicKey>,
 
     /// Host and port pair for the fullnode
@@ -204,7 +205,7 @@ pub struct ValidatorNetworkAddressesArgs {
     pub(crate) full_node_host: Option<HostAndPort>,
 
     /// Full node x25519 public network key
-    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
+    #[clap(long, value_parser = x25519::PublicKey::from_encoded_string)]
     pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
 }
 
@@ -306,7 +307,7 @@ pub struct StakePoolResult {
 #[derive(Parser)]
 pub struct GetStakePool {
     /// The owner address of the stake pool
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) owner_address: AccountAddress,
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
@@ -1046,19 +1047,26 @@ pub struct RunLocalTestnet {
     ///
     /// If provided, the config will be used, and any needed configuration for the local testnet
     /// will override the config's values
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     config_path: Option<PathBuf>,
 
     /// The directory to save all files for the node
     ///
     /// Defaults to .aptos/testnet
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     test_dir: Option<PathBuf>,
+
+    /// Path to node configuration file override for local test mode.
+    ///
+    /// If provided, the default node config will be overridden by the config in the given file.
+    /// Cannot be used with --config-path
+    #[clap(long, value_parser, conflicts_with("config_path"))]
+    test_config_override: Option<PathBuf>,
 
     /// Random seed for key generation in test mode
     ///
     /// This allows you to have deterministic keys for testing
-    #[clap(long, parse(try_from_str = FromHex::from_hex))]
+    #[clap(long, value_parser = aptos_node::load_seed)]
     seed: Option<[u8; 32]>,
 
     /// Clean the state and start with a new chain at genesis
@@ -1127,6 +1135,7 @@ impl CliCommand<()> for RunLocalTestnet {
         let node_thread_handle = thread::spawn(move || {
             let result = aptos_node::setup_test_environment_and_start_node(
                 config_path,
+                self.test_config_override,
                 Some(test_dir_copy),
                 false,
                 false,
@@ -1342,7 +1351,7 @@ pub struct AnalyzeValidatorPerformance {
     /// First epoch to analyze
     ///
     /// Defaults to the first epoch
-    #[clap(long, default_value = "-2")]
+    #[clap(long, default_value_t = -2)]
     pub start_epoch: i64,
 
     /// Last epoch to analyze
@@ -1352,13 +1361,13 @@ pub struct AnalyzeValidatorPerformance {
     pub end_epoch: Option<i64>,
 
     /// Analyze mode for the validator: [All, DetailedEpochTable, ValidatorHealthOverTime, NetworkHealthOverTime]
-    #[clap(arg_enum, long)]
+    #[clap(value_enum, ignore_case = true, long)]
     pub(crate) analyze_mode: AnalyzeMode,
 
     /// Filter of stake pool addresses to analyze
     ///
     /// Defaults to all stake pool addresses
-    #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, num_args = 0.., value_parser = crate::common::types::load_account_arg)]
     pub pool_addresses: Vec<AccountAddress>,
 
     #[clap(flatten)]
@@ -1367,7 +1376,7 @@ pub struct AnalyzeValidatorPerformance {
     pub(crate) profile_options: ProfileOptions,
 }
 
-#[derive(PartialEq, Eq, clap::ArgEnum, Clone)]
+#[derive(PartialEq, Eq, clap::ValueEnum, Clone)]
 pub enum AnalyzeMode {
     /// Print all other modes simultaneously
     All,
@@ -1478,65 +1487,31 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
 ///
 /// Enables users to load from a backup to catch their node's DB up to a known state.
 #[derive(Parser)]
-pub struct BootstrapDbFromBackup {
-    /// Config file for the source backup
-    ///
-    /// This file configures if we should use local files or cloud storage, and how to access
-    /// the backup.
-    #[clap(long, parse(from_os_str))]
-    config_path: PathBuf,
-
-    /// Target database directory
-    ///
-    /// The directory to create the AptosDB with snapshots and transactions from the backup.
-    /// The data folder can later be used to start an Aptos node. e.g. /opt/aptos/data/db
-    #[clap(long = "target-db-dir", parse(from_os_str))]
-    pub db_dir: PathBuf,
-
+pub struct BootstrapDb {
     #[clap(flatten)]
-    pub metadata_cache_opt: MetadataCacheOpt,
-
+    storage: DBToolStorageOpt,
     #[clap(flatten)]
-    pub concurrent_downloads: ConcurrentDownloadsOpt,
-
+    opt: RestoreCoordinatorOpt,
     #[clap(flatten)]
-    pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
+    global: GlobalRestoreOpt,
 }
 
 #[async_trait]
-impl CliCommand<()> for BootstrapDbFromBackup {
+impl CliCommand<()> for BootstrapDb {
     fn command_name(&self) -> &'static str {
-        "BootstrapDbFromBackup"
+        "BootstrapDb"
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let opt = RestoreCoordinatorOpt {
-            metadata_cache_opt: self.metadata_cache_opt,
-            replay_all: false,
-            ledger_history_start_version: None,
-            skip_epoch_endings: false,
-        };
-        let global_opt = GlobalRestoreOpt {
-            dry_run: false,
-            db_dir: Some(self.db_dir),
-            target_version: None,
-            trusted_waypoints: Default::default(),
-            rocksdb_opt: RocksdbOpt::default(),
-            concurrent_downloads: self.concurrent_downloads,
-            replay_concurrency_level: self.replay_concurrency_level,
-        }
-        .try_into()?;
-        let storage = Arc::new(CommandAdapter::new(
-            CommandAdapterConfig::load_from_file(&self.config_path).await?,
-        ));
-
+        let storage = self.storage.init_storage().await?;
         // hack: get around this error, related to use of `async_trait`:
         //   error: higher-ranked lifetime error
         //   ...
         //   = note: could not prove for<'r, 's> Pin<Box<impl futures::Future<Output = std::result::Result<(), CliError>>>>: CoerceUnsized<Pin<Box<(dyn futures::Future<Output = std::result::Result<(), CliError>> + std::marker::Send + 's)>>>
         tokio::task::spawn_blocking(|| {
             let runtime = tokio::runtime::Runtime::new().unwrap();
-            runtime.block_on(RestoreCoordinator::new(opt, global_opt, storage).run())
+            runtime
+                .block_on(RestoreCoordinator::new(self.opt, self.global.try_into()?, storage).run())
         })
         .await
         .unwrap()?;
@@ -1682,14 +1657,10 @@ mod tests {
 
     // TODO: there have to be cleaner ways to test things. Maybe a CLI test framework?
 
+    // FIXME: Remove this test, it's very fragile and move to E2E CLI test framework
     #[tokio::test]
     // Verifies basic properties about the network connectivity checker
     async fn test_check_network_connectivity() {
-        // Verify the help function works
-        let args = &["aptos", "node", "check-network-connectivity", "--help"];
-        let help_message = run_tool_with_args(args).await.unwrap_err();
-        assert_contains(help_message, "USAGE:"); // We expect the command to return USAGE info
-
         // Verify that an invalid address will return an error
         let args = &[
             "aptos",
@@ -1706,7 +1677,7 @@ mod tests {
         // Verify that an invalid chain-id will return an error
         let args = &["aptos", "node", "check-network-connectivity", "--address", "/ip4/34.70.116.169/tcp/6182/noise-ik/0x249f3301db104705652e0a0c471b46d13172b2baf14e31f007413f3baee46b0c/handshake/0", "--chain-id", "invalid-chain"];
         let error_message = run_tool_with_args(args).await.unwrap_err();
-        assert_contains(error_message, "Invalid value");
+        assert_contains(error_message, "invalid value");
 
         // Verify that a failure to connect will return a timeout
         let args = &["aptos", "node", "check-network-connectivity", "--address", "/ip4/31.71.116.169/tcp/0001/noise-ik/0x249f3301db104705652e0a0c471b46d13172b2baf14e31f007413f3baee46b0c/handshake/0", "--chain-id", "testnet"];

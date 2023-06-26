@@ -45,12 +45,12 @@ pub struct BuildOptions {
     pub with_abis: bool,
     #[clap(long)]
     pub with_source_maps: bool,
-    #[clap(long, default_value = "true")]
+    #[clap(long, default_value_t = true)]
     pub with_error_map: bool,
     #[clap(long)]
     pub with_docs: bool,
     /// Installation directory for compiled artifacts. Defaults to `<package>/build`.
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,
@@ -362,7 +362,7 @@ fn inject_runtime_metadata(
                             let serialized_metadata = bcs::to_bytes(&module_metadata)
                                 .expect("BCS for RuntimeModuleMetadata");
                             named_module.module.metadata.push(Metadata {
-                                key: APTOS_METADATA_KEY_V1.clone(),
+                                key: APTOS_METADATA_KEY_V1.to_vec(),
                                 value: serialized_metadata,
                             });
                         } else {
@@ -370,7 +370,7 @@ fn inject_runtime_metadata(
                                 bcs::to_bytes(&module_metadata.clone().downgrade())
                                     .expect("BCS for RuntimeModuleMetadata");
                             named_module.module.metadata.push(Metadata {
-                                key: APTOS_METADATA_KEY.clone(),
+                                key: APTOS_METADATA_KEY.to_vec(),
                                 value: serialized_metadata,
                             });
                         }

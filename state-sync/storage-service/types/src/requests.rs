@@ -34,15 +34,15 @@ impl StorageServiceRequest {
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum DataRequest {
     GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest), // Fetches a list of epoch ending ledger infos
-    GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest), // Subscribes to new transaction outputs
-    GetNewTransactionsWithProof(NewTransactionsWithProofRequest), // Subscribes to new transactions with a proof
+    GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest), // Optimistically fetches new transaction outputs
+    GetNewTransactionsWithProof(NewTransactionsWithProofRequest), // Optimistically fetches new transactions
     GetNumberOfStatesAtVersion(Version), // Fetches the number of states at the specified version
     GetServerProtocolVersion,            // Fetches the protocol version run by the server
     GetStateValuesWithProof(StateValuesWithProofRequest), // Fetches a list of states with a proof
     GetStorageServerSummary,             // Fetches a summary of the storage server state
     GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest), // Fetches a list of transaction outputs with a proof
     GetTransactionsWithProof(TransactionsWithProofRequest), // Fetches a list of transactions with a proof
-    GetNewTransactionsOrOutputsWithProof(NewTransactionsOrOutputsWithProofRequest), // Subscribes to new transactions or outputs with a proof
+    GetNewTransactionsOrOutputsWithProof(NewTransactionsOrOutputsWithProofRequest), // Optimistically fetches new transactions or outputs
     GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest), // Fetches a list of transactions or outputs with a proof
 }
 
@@ -70,7 +70,7 @@ impl DataRequest {
         matches!(self, &Self::GetStorageServerSummary)
     }
 
-    pub fn is_data_subscription_request(&self) -> bool {
+    pub fn is_optimistic_fetch(&self) -> bool {
         matches!(self, &Self::GetNewTransactionOutputsWithProof(_))
             || matches!(self, &Self::GetNewTransactionsWithProof(_))
             || matches!(self, Self::GetNewTransactionsOrOutputsWithProof(_))

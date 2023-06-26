@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 pub mod account;
 pub mod common;
 pub mod config;
+pub mod ffi;
 pub mod genesis;
 pub mod governance;
 pub mod move_tool;
@@ -26,7 +27,7 @@ use std::collections::BTreeMap;
 
 /// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
-#[clap(name = "aptos", author, version, propagate_version = true)]
+#[clap(name = "aptos", author, version, propagate_version = true, styles = aptos_cli_common::aptos_cli_style())]
 pub enum Tool {
     #[clap(subcommand)]
     Account(account::AccountTool),
@@ -87,4 +88,10 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
     async fn execute(self) -> CliTypedResult<BTreeMap<String, String>> {
         Ok(cli_build_information())
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Tool::command().debug_assert()
 }

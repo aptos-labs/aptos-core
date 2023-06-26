@@ -33,7 +33,7 @@ fn end_to_end() {
     backup_dir.create_as_dir().unwrap();
     let store: Arc<dyn BackupStorage> = Arc::new(LocalFs::new(backup_dir.path().to_path_buf()));
 
-    let (rt, port) = start_local_backup_service(src_db);
+    let (rt, port) = start_local_backup_service(Arc::clone(&src_db));
     let client = Arc::new(BackupServiceClient::new(format!(
         "http://localhost:{}",
         port
@@ -108,6 +108,7 @@ fn end_to_end() {
             backup_handles,
             None,
             None,
+            None,
             VerifyExecutionMode::verify_all(),
             None,
         )
@@ -137,14 +138,7 @@ fn end_to_end() {
         assert_eq!(restore_ws, org_ws);
     }
 
-    assert_eq!(
-        tgt_db
-            .get_latest_transaction_info_option()
-            .unwrap()
-            .unwrap()
-            .0,
-        target_version,
-    );
+    assert_eq!(tgt_db.get_latest_version().unwrap(), target_version);
     let recovered_transactions = tgt_db
         .get_transactions(
             0,

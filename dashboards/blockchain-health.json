@@ -58,7 +58,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 20,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
@@ -1182,7 +1181,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "sum by (role, bucket) (rate(aptos_core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"commit_accepted\"}[$interval])) / sum by (role, bucket) (rate(aptos_core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"commit_accepted\"}[$interval]))",
+          "expr": "sum by (role, scope, bucket, submitted_by) (rate(aptos_core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"commit_accepted\"}[$interval])) / sum by (role, scope, bucket, submitted_by) (rate(aptos_core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", stage=\"commit_accepted\"}[$interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1218,7 +1217,13 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
@@ -1271,7 +1276,13 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
@@ -1295,6 +1306,64 @@
         }
       ],
       "title": "Transactions rejected by gas price bucket",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "Data on PFN nodes only. Unless clients send duplicate transactions, this is a reliable way to see E2E latency.\n\nThe time between Mempool receiving the transaction and time to be committed.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 51 },
+      "id": 193,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "sum by (bucket, submitted_by) (rate(aptos_core_mempool_txn_commit_latency_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", kubernetes_pod_name=~\"pfn.*\", stage=\"commit_accepted\"}[$interval])) / sum by (bucket, submitted_by) (rate(aptos_core_mempool_txn_commit_latency_count{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", kubernetes_pod_name=~\"pfn.*\", stage=\"commit_accepted\"}[$interval]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Aptos PFN-only Per Bucket Avg E2E Txn Commit Latency",
       "type": "timeseries"
     },
     {
@@ -1324,12 +1393,18 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 51 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 59 },
       "id": 181,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1352,7 +1427,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 67 },
       "id": 169,
       "panels": [],
       "title": "Mempool",
@@ -1388,7 +1463,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 60 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 68 },
       "id": 170,
       "interval": "2m",
       "options": {
@@ -1410,7 +1485,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 68 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 76 },
       "id": 137,
       "panels": [],
       "title": "Detailed Health",
@@ -1446,7 +1521,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 69 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 77 },
       "id": 142,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1495,7 +1570,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 69 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 77 },
       "id": 143,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1544,7 +1619,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 69 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 77 },
       "id": 151,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1593,7 +1668,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 77 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 85 },
       "id": 135,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1642,7 +1717,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 77 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 85 },
       "id": 138,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1691,7 +1766,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 77 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 85 },
       "id": 139,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1749,7 +1824,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 85 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 93 },
       "id": 144,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1834,7 +1909,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 85 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 93 },
       "id": 145,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1892,7 +1967,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 85 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 93 },
       "id": 171,
       "options": {
         "footer": { "countRows": false, "enablePagination": false, "fields": "", "reducer": ["sum"], "show": false },
@@ -1943,9 +2018,8 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 93 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 101 },
       "id": 189,
-      "isNew": false,
       "options": {
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
@@ -2028,7 +2102,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 93 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 101 },
       "id": 190,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -2086,7 +2160,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 93 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 101 },
       "id": 191,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -2107,7 +2181,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 101 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 109 },
       "id": 174,
       "panels": [],
       "title": "Halted Round Details",
@@ -2143,7 +2217,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 102 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 110 },
       "id": 176,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -2192,7 +2266,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 102 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 110 },
       "id": 192,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -2241,7 +2315,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 102 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 110 },
       "id": 177,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -2290,7 +2364,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 110 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 118 },
       "id": 175,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -2340,7 +2414,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 110 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 118 },
       "id": 178,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -2364,9 +2438,8 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 118 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 126 },
       "id": 18,
-      "isNew": false,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -2483,9 +2556,8 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 119 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 127 },
       "id": 59,
-      "isNew": false,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -2600,9 +2672,8 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 120 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 128 },
       "id": 55,
-      "isNew": false,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -2772,9 +2843,8 @@
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 121 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 129 },
       "id": 52,
-      "isNew": false,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -2940,7 +3010,7 @@
       "type": "row"
     }
   ],
-  "refresh": false,
+  "refresh": "",
   "revision": 1,
   "schemaVersion": 38,
   "style": "dark",
@@ -3158,6 +3228,6 @@
   "timezone": "browser",
   "title": "blockchain-health",
   "uid": "JnOvNs4Vk",
-  "version": 7,
+  "version": 12,
   "weekStart": ""
 }

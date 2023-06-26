@@ -11,8 +11,11 @@ use crate::{
     types::{auth::Claims, common::NodeType},
 };
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
+use std::time::Duration;
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
+
+const MAX_METRICS_POST_WAIT_DURATION_SECS: u64 = 5;
 
 pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "metrics")
@@ -58,16 +61,18 @@ pub async fn handle_metrics_ingest(
     let start_timer = Instant::now();
 
     let post_futures = client.iter().map(|(name, client)| async {
-        let result = client
-            .post_prometheus_metrics(
+        let result = tokio::time::timeout(
+            Duration::from_secs(MAX_METRICS_POST_WAIT_DURATION_SECS),
+            client.post_prometheus_metrics(
                 metrics_body.clone(),
                 extra_labels.clone(),
                 encoding.clone().unwrap_or_default(),
-            )
-            .await;
+            ),
+        )
+        .await;
 
         match result {
-            Ok(res) => {
+            Ok(Ok(res)) => {
                 METRICS_INGEST_BACKEND_REQUEST_DURATION
                     .with_label_values(&[&claims.peer_id.to_string(), name, res.status().as_str()])
                     .observe(start_timer.elapsed().as_secs_f64());
@@ -82,7 +87,7 @@ pub async fn handle_metrics_ingest(
                     return Err(());
                 }
             },
-            Err(err) => {
+            Ok(Err(err)) => {
                 METRICS_INGEST_BACKEND_REQUEST_DURATION
                     .with_label_values(&[name, "Unknown"])
                     .observe(start_timer.elapsed().as_secs_f64());
@@ -93,6 +98,7 @@ pub async fn handle_metrics_ingest(
                 );
                 return Err(());
             },
+            Err(_) => return Err(()),
         }
         Ok(())
     });
@@ -267,7 +273,7 @@ mod test {
             handle_metrics_ingest(test_context.inner, claims, Some("gzip".into()), body).await;
 
         mock1.assert();
-        mock2.assert_hits(4);
+        assert!(mock2.hits_async().await >= 1);
         assert!(result.is_ok());
     }
 
@@ -302,7 +308,7 @@ mod test {
         let result =
             handle_metrics_ingest(test_context.inner, claims, Some("gzip".into()), body).await;
 
-        mock1.assert_hits(4);
+        assert!(mock1.hits_async().await >= 1);
         mock2.assert();
         assert!(result.is_err());
     }

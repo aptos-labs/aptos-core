@@ -6,7 +6,13 @@ metadata:
     {{- include "testnet-addons.labels" . | nindent 4 }}
     app: {{ include "testnet-addons.fullname" . }}-waypoint
   annotations:
-    alb.ingress.kubernetes.io/healthcheck-path: /health
+    {{- if eq .Values.cloud "EKS" }}
+    alb.ingress.kubernetes.io/healthcheck-path: /waypoint.txt
+    {{- end }}
+    {{- if eq .Values.cloud "GKE" }}
+    cloud.google.com/backend-config: '{"default":"{{ include "testnet-addons.fullname" . }}-waypoint"}'
+    cloud.google.com/neg: '{"ingress": true}'
+    {{- end }}
 spec:
   selector:
     {{- include "testnet-addons.selectorLabels" . | nindent 4 }}
@@ -15,9 +21,25 @@ spec:
   - port: 80
     targetPort: 8080
   type: NodePort
-
 ---
-
+{{- if eq .Values.cloud "GKE" }}
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ include "testnet-addons.fullname" . }}-waypoint
+  namespace: default
+spec:
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+    type: HTTP
+    requestPath: /waypoint.txt
+    # container targetPort
+    port: 8080
+{{- end }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

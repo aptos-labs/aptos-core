@@ -9,12 +9,13 @@ pub mod framework_upgrade;
 pub mod fullnode_reboot_stress_test;
 pub mod load_vs_perf_benchmark;
 pub mod modifiers;
-pub mod multi_region_simulation_test;
+pub mod multi_region_network_test;
 pub mod network_bandwidth_test;
 pub mod network_loss_test;
 pub mod network_partition_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
+pub mod public_fullnode_performance;
 pub mod quorum_store_onchain_enable_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
@@ -27,7 +28,7 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
-    TxnEmitter, TxnStats, Version,
+    TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
@@ -138,10 +139,16 @@ pub trait NetworkLoadTest: Test {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
+
     // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
     // time to finish. How long this function takes will dictate how long the actual test lasts.
-    fn test(&self, _swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
+    fn test(
+        &self,
+        _swarm: &mut dyn Swarm,
+        _report: &mut TestReport,
+        duration: Duration,
+    ) -> Result<()> {
         std::thread::sleep(duration);
         Ok(())
     }
@@ -152,7 +159,7 @@ pub trait NetworkLoadTest: Test {
 }
 
 impl NetworkTest for dyn NetworkLoadTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let runtime = Runtime::new().unwrap();
         let start_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -174,7 +181,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                 rng,
             )?;
         ctx.report
-            .report_txn_stats(self.name().to_string(), &txn_stat, actual_test_duration);
+            .report_txn_stats(self.name().to_string(), &txn_stat);
 
         let end_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -231,6 +238,7 @@ impl dyn NetworkLoadTest {
             stats_tracking_phases = 3;
         }
 
+        info!("Starting emitting txns for {}s", duration.as_secs());
         let mut job = rt
             .block_on(emitter.start_job(
                 ctx.swarm().chain_info().root_account,
@@ -243,9 +251,8 @@ impl dyn NetworkLoadTest {
         let cooldown_duration = duration.mul_f32(cooldown_duration_fraction);
         let test_duration = duration - warmup_duration - cooldown_duration;
         let phase_duration = test_duration.div_f32((stats_tracking_phases - 2) as f32);
-        info!("Starting emitting txns for {}s", duration.as_secs());
 
-        std::thread::sleep(warmup_duration);
+        job = rt.block_on(job.periodic_stat_forward(warmup_duration, 60));
         info!("{}s warmup finished", warmup_duration.as_secs());
 
         let max_start_ledger_transactions = rt
@@ -272,8 +279,10 @@ impl dyn NetworkLoadTest {
             }
             let phase_start = Instant::now();
 
-            self.test(ctx.swarm(), phase_duration)
+            let join_stats = rt.spawn(job.periodic_stat_forward(phase_duration, 60));
+            self.test(ctx.swarm, ctx.report, phase_duration)
                 .context("test NetworkLoadTest")?;
+            job = rt.block_on(join_stats).context("join stats")?;
             actual_phase_durations.push(phase_start.elapsed());
         }
         let actual_test_duration = test_start.elapsed();
@@ -297,7 +306,7 @@ impl dyn NetworkLoadTest {
 
         let cooldown_used = cooldown_start.elapsed();
         if cooldown_used < cooldown_duration {
-            std::thread::sleep(cooldown_duration - cooldown_used);
+            job = rt.block_on(job.periodic_stat_forward(cooldown_duration - cooldown_used, 60));
         }
         info!("{}s cooldown finished", cooldown_duration.as_secs());
 
@@ -305,7 +314,7 @@ impl dyn NetworkLoadTest {
             "Emitting txns ran for {} secs, stopping job...",
             duration.as_secs()
         );
-        let stats_by_phase = rt.block_on(emitter.stop_job(job));
+        let stats_by_phase = rt.block_on(job.stop_job());
 
         info!("Stopped job");
         info!("Warmup stats: {}", stats_by_phase[0].rate());
@@ -346,17 +355,48 @@ impl dyn NetworkLoadTest {
 pub struct CompositeNetworkTest {
     // Wrapper tests - their setup and finish methods are called, before the test ones.
     // TODO don't know how to make this array, and have forge/main.rs work
-    pub wrapper: &'static dyn NetworkLoadTest,
+    pub wrappers: Vec<Box<dyn NetworkLoadTest>>,
     // This is the main test, return values from this test are used in setup, and
     // only it's test function is called.
-    pub test: &'static dyn NetworkTest,
+    pub test: Box<dyn NetworkTest>,
+}
+
+impl CompositeNetworkTest {
+    pub fn new<W: NetworkLoadTest + 'static, T: NetworkTest + 'static>(
+        wrapper: W,
+        test: T,
+    ) -> CompositeNetworkTest {
+        CompositeNetworkTest {
+            wrappers: vec![Box::new(wrapper)],
+            test: Box::new(test),
+        }
+    }
+
+    pub fn new_with_two_wrappers<
+        T1: NetworkLoadTest + 'static,
+        T2: NetworkLoadTest + 'static,
+        W: NetworkTest + 'static,
+    >(
+        wrapper1: T1,
+        wrapper2: T2,
+        test: W,
+    ) -> CompositeNetworkTest {
+        CompositeNetworkTest {
+            wrappers: vec![Box::new(wrapper1), Box::new(wrapper2)],
+            test: Box::new(test),
+        }
+    }
 }
 
 impl NetworkTest for CompositeNetworkTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
-        self.wrapper.setup(ctx)?;
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
+        for wrapper in &self.wrappers {
+            wrapper.setup(ctx)?;
+        }
         self.test.run(ctx)?;
-        self.wrapper.finish(ctx.swarm())?;
+        for wrapper in &self.wrappers {
+            wrapper.finish(ctx.swarm())?;
+        }
         Ok(())
     }
 }

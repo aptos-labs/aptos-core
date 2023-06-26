@@ -2,9 +2,36 @@
 
 All notable changes to the Aptos Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-**Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
-
 ## Unreleased
+
+## 1.11.0 (2023-06-22)
+
+- Export `bcsSerializeU256` from `bcs/helper.ts`
+- Add `examples` folder to `.npmignore`
+- Use `0x1::aptos_account::transfer` in tests
+- Support transfer a fungible token.
+  - Add a `transfer` function to the `AptosToken` class that accepts `NonFungibleTokenParameters` or `FungibleTokenParameters` types.
+- `getTokenData` query supports token standard v2. Return fields have changed.
+
+## 1.10.0 (2023-06-07)
+
+- Add `x-aptos-client` header to `IndexerClient` requests
+- Add `standardizeAddress` static function to `AccountAddress` class to standardizes an address to the format "0x" followed by 64 lowercase hexadecimal digits.
+- Change `indexerUrl` param on `Provider` class to an optional parameter
+- Add `getCollectionsWithOwnedTokens` query to fetch all collections that an account has tokens for
+- Support `tokenStandard` param in `getOwnedTokens` and `getTokenOwnedFromCollectionAddress` queries
+- Add `FungibleAssetClient` plugin to support fungible assets
+- Support fungible assets in `CoinClient` class operations
+
+## 1.9.1 (2023-05-24)
+
+- Add `x-aptos-client` header to `AptosClient` requests
+
+## 1.9.0 (2023-05-17)
+
+- Fix get number of delegators Indexer query
+- Include static methods from `AptosClient` and `IndexerClient` classes in the `Provider` class
+- Add Indexer queries for tokens - `getOwnedTokens`, `getTokenOwnedFromCollectionAddress`, `getTokenOwnedFromCollectionNameAndCreatorAddress`, `getCollectionData`, `getCollectionAddress`
 
 ## 1.8.5 (2023-04-29)
 

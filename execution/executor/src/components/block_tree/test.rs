@@ -4,7 +4,7 @@
 
 use crate::components::block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree};
 use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
-use aptos_executor_types::ExecutedChunk;
+use aptos_executor_types::ExecutedBlock;
 use aptos_infallible::Mutex;
 use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
@@ -17,7 +17,7 @@ impl BlockTree {
         let root = block_lookup
             .fetch_or_add_block(
                 *PRE_GENESIS_BLOCK_ID,
-                ExecutedChunk::new_empty(result_view),
+                ExecutedBlock::new_empty(result_view),
                 None,
             )
             .unwrap();
@@ -28,6 +28,7 @@ impl BlockTree {
         }
     }
 
+    #[cfg(test)]
     pub fn size(&self) -> usize {
         self.block_lookup.inner.lock().0.len()
     }
@@ -40,8 +41,8 @@ fn id(index: u64) -> HashValue {
     HashValue::new(buf)
 }
 
-fn empty_chunk() -> ExecutedChunk {
-    ExecutedChunk::new_empty(ExecutedTrees::new_empty())
+fn empty_block() -> ExecutedBlock {
+    ExecutedBlock::new_empty(ExecutedTrees::new_empty())
 }
 
 fn gen_ledger_info(block_id: HashValue, reconfig: bool) -> LedgerInfo {
@@ -79,20 +80,20 @@ fn create_tree() -> BlockTree {
     let block_tree = BlockTree::new_empty();
 
     block_tree
-        .add_block(*PRE_GENESIS_BLOCK_ID, id(1), empty_chunk())
+        .add_block(*PRE_GENESIS_BLOCK_ID, id(1), empty_block())
         .unwrap();
-    block_tree.add_block(id(1), id(2), empty_chunk()).unwrap();
-    block_tree.add_block(id(1), id(3), empty_chunk()).unwrap();
-    block_tree.add_block(id(3), id(4), empty_chunk()).unwrap();
-    block_tree.add_block(id(3), id(5), empty_chunk()).unwrap();
+    block_tree.add_block(id(1), id(2), empty_block()).unwrap();
+    block_tree.add_block(id(1), id(3), empty_block()).unwrap();
+    block_tree.add_block(id(3), id(4), empty_block()).unwrap();
+    block_tree.add_block(id(3), id(5), empty_block()).unwrap();
     block_tree
-        .add_block(*PRE_GENESIS_BLOCK_ID, id(6), empty_chunk())
+        .add_block(*PRE_GENESIS_BLOCK_ID, id(6), empty_block())
         .unwrap();
-    block_tree.add_block(id(6), id(7), empty_chunk()).unwrap();
-    block_tree.add_block(id(7), id(8), empty_chunk()).unwrap();
-    block_tree.add_block(id(6), id(9), empty_chunk()).unwrap();
-    block_tree.add_block(id(9), id(10), empty_chunk()).unwrap();
-    block_tree.add_block(id(9), id(11), empty_chunk()).unwrap();
+    block_tree.add_block(id(6), id(7), empty_block()).unwrap();
+    block_tree.add_block(id(7), id(8), empty_block()).unwrap();
+    block_tree.add_block(id(6), id(9), empty_block()).unwrap();
+    block_tree.add_block(id(9), id(10), empty_block()).unwrap();
+    block_tree.add_block(id(9), id(11), empty_block()).unwrap();
     block_tree
 }
 
@@ -103,7 +104,11 @@ fn test_branch() {
     // if assertion fails.
     let num_blocks = block_tree.size();
     assert_eq!(num_blocks, 12);
-    block_tree.prune(&gen_ledger_info(id(9), false)).unwrap();
+    block_tree
+        .prune(&gen_ledger_info(id(9), false))
+        .unwrap()
+        .recv()
+        .unwrap();
     let num_blocks = block_tree.size();
     assert_eq!(num_blocks, 3);
     assert_eq!(block_tree.root_block().id, id(9));
@@ -113,7 +118,7 @@ fn test_branch() {
 fn test_reconfig_id_update() {
     let block_tree = create_tree();
     let ledger_info = gen_ledger_info(id(1), true);
-    block_tree.prune(&ledger_info).unwrap();
+    block_tree.prune(&ledger_info).unwrap().recv().unwrap();
     let num_blocks = block_tree.size();
     // reconfig suffix blocks are ditched
     assert_eq!(num_blocks, 1);
@@ -126,16 +131,16 @@ fn test_reconfig_id_update() {
 #[test]
 fn test_add_duplicate_block() {
     let block_tree = create_tree();
-    block_tree.add_block(id(1), id(2), empty_chunk()).unwrap();
-    block_tree.add_block(id(1), id(2), empty_chunk()).unwrap();
+    block_tree.add_block(id(1), id(2), empty_block()).unwrap();
+    block_tree.add_block(id(1), id(2), empty_block()).unwrap();
     // can't change parent
-    assert!(block_tree.add_block(id(1), id(7), empty_chunk()).is_err());
+    assert!(block_tree.add_block(id(1), id(7), empty_block()).is_err());
 }
 
 #[test]
 fn test_add_block_missing_parent() {
     let block_tree = create_tree();
     assert!(block_tree
-        .add_block(id(99), id(100), empty_chunk())
+        .add_block(id(99), id(100), empty_block())
         .is_err());
 }

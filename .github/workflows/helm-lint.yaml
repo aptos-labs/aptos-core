@@ -21,19 +21,16 @@ jobs:
         id: changed-files
         uses: tj-actions/changed-files@60f4aabced9b4718c75acef86d42ffb631c4403a # pin@v29.0.3
 
-      - name: Setup Python
-        uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
-
-      - name: Install Python Dependencies
-        run: pip install -r testsuite/requirements.txt
+      - uses: ./.github/actions/python-setup
+        with:
+          pyproject_directory: testsuite
 
       - name: Should run lint
-        run: >
-          python testsuite/determinator.py changed-files --github-output-key
-          SHOULD_RUN --pattern 'terraform/helm/.*' ${{
-          steps.changed-files.outputs.all_changed_files }}
+        run: ./testrun determinator.py changed-files --github-output-key SHOULD_RUN --pattern 'terraform/helm/.*' ${{ steps.changed-files.outputs.all_changed_files }}
         id: should-run-tests
+        working-directory: testsuite
 
       - name: Run Helm Lint
         if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
-        run: python testsuite/lint.py helm terraform/helm/*
+        run: ./testrun lint.py helm ../terraform/helm/*
+        working-directory: testsuite

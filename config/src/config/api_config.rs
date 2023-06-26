@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig},
+    config::{
+        config_sanitizer::ConfigSanitizer, gas_estimation_config::GasEstimationConfig,
+        node_config_loader::NodeType, Error, NodeConfig,
+    },
     utils,
 };
 use aptos_types::chain_id::ChainId;
@@ -67,16 +70,18 @@ pub struct ApiConfig {
     ///
     /// If `max_runtime_workers` is set, this is ignored
     pub runtime_worker_multiplier: usize,
+    /// Configs for computing unit gas price estimation
+    pub gas_estimation: GasEstimationConfig,
 }
 
-pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
-pub const DEFAULT_PORT: u16 = 8080;
-pub const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 8 * 1024 * 1024; // 8 MB
+const DEFAULT_ADDRESS: &str = "127.0.0.1";
+const DEFAULT_PORT: u16 = 8080;
+const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 8 * 1024 * 1024; // 8 MB
 pub const DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE: usize = 10;
 pub const DEFAULT_MAX_PAGE_SIZE: u16 = 100;
-pub const DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE: u16 = 9999;
-pub const DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE: u16 = 9999;
-pub const DEFAULT_MAX_VIEW_GAS: u64 = 2_000_000; // We keep this value the same as the max number of gas allowed for one single transaction defined in aptos-gas.
+const DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE: u16 = 9999;
+const DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE: u16 = 9999;
+const DEFAULT_MAX_VIEW_GAS: u64 = 2_000_000; // We keep this value the same as the max number of gas allowed for one single transaction defined in aptos-gas.
 
 fn default_enabled() -> bool {
     true
@@ -110,6 +115,7 @@ impl Default for ApiConfig {
             max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
             max_runtime_workers: None,
             runtime_worker_multiplier: 2,
+            gas_estimation: GasEstimationConfig::default(),
         }
     }
 }
@@ -130,7 +136,7 @@ impl ApiConfig {
 impl ConfigSanitizer for ApiConfig {
     fn sanitize(
         node_config: &mut NodeConfig,
-        _node_type: NodeType,
+        node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
@@ -156,6 +162,8 @@ impl ConfigSanitizer for ApiConfig {
                 "runtime_worker_multiplier must be greater than 0!".into(),
             ));
         }
+
+        GasEstimationConfig::sanitize(node_config, node_type, chain_id)?;
 
         Ok(())
     }

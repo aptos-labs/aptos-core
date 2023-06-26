@@ -2,54 +2,43 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW},
+    ledger_db::LedgerDb,
+    metrics::{PRUNER_BATCH_SIZE, PRUNER_VERSIONS, PRUNER_WINDOW},
     pruner::{
-        db_pruner::DBPruner, ledger_pruner_worker::LedgerPrunerWorker,
         ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
+        pruner_worker::PrunerWorker,
     },
     pruner_utils,
 };
+use anyhow::Result;
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_infallible::Mutex;
-use aptos_schemadb::DB;
-use aptos_types::transaction::Version;
-use std::{sync::Arc, thread::JoinHandle};
+use aptos_types::transaction::{AtomicVersion, Version};
+use std::sync::{atomic::Ordering, Arc};
 
 /// The `PrunerManager` for `LedgerPruner`.
 pub(crate) struct LedgerPrunerManager {
-    pruner_enabled: bool,
+    ledger_db: Arc<LedgerDb>,
     /// DB version window, which dictates how many version of other stores like transaction, ledger
     /// info, events etc to keep.
     prune_window: Version,
-    /// Ledger pruner. Is always initialized regardless if the pruner is enabled to keep tracks
-    /// of the min_readable_version.
-    pruner: Arc<LedgerPruner>,
-    /// Wrapper class of the ledger pruner.
-    pruner_worker: Arc<LedgerPrunerWorker>,
-    /// The worker thread handle for ledger_pruner, created upon Pruner instance construction and
-    /// joined upon its destruction. It is `None` when the ledger pruner is not enabled or it only
-    /// becomes `None` after joined in `drop()`.
-    worker_thread: Option<JoinHandle<()>>,
-    /// We send a batch of version to the underlying pruners for performance reason. This tracks the
-    /// last version we sent to the pruners. Will only be set if the pruner is enabled.
-    pub(crate) last_version_sent_to_pruner: Arc<Mutex<Version>>,
+    /// It is None iff the pruner is not enabled.
+    pruner_worker: Option<PrunerWorker>,
     /// Ideal batch size of the versions to be sent to the ledger pruner
     pruning_batch_size: usize,
     /// latest version
     latest_version: Arc<Mutex<Version>>,
     /// Offset for displaying to users
     user_pruning_window_offset: u64,
+    /// The minimal readable version for the ledger data.
+    min_readable_version: AtomicVersion,
 }
 
 impl PrunerManager for LedgerPrunerManager {
     type Pruner = LedgerPruner;
 
-    fn pruner(&self) -> &Self::Pruner {
-        &self.pruner
-    }
-
     fn is_pruner_enabled(&self) -> bool {
-        self.pruner_enabled
+        self.pruner_worker.is_some()
     }
 
     fn get_prune_window(&self) -> Version {
@@ -57,7 +46,7 @@ impl PrunerManager for LedgerPrunerManager {
     }
 
     fn get_min_readable_version(&self) -> Version {
-        self.pruner.as_ref().min_readable_version()
+        self.min_readable_version.load(Ordering::SeqCst)
     }
 
     fn get_min_viable_version(&self) -> Version {
@@ -77,91 +66,98 @@ impl PrunerManager for LedgerPrunerManager {
     fn maybe_set_pruner_target_db_version(&self, latest_version: Version) {
         *self.latest_version.lock() = latest_version;
 
+        let min_readable_version = self.get_min_readable_version();
         // Only wake up the ledger pruner if there are `ledger_pruner_pruning_batch_size` pending
         // versions.
-        if self.pruner_enabled
+        if self.is_pruner_enabled()
             && latest_version
-                >= *self.last_version_sent_to_pruner.as_ref().lock()
-                    + self.pruning_batch_size as u64
+                >= min_readable_version + self.pruning_batch_size as u64 + self.prune_window
         {
             self.set_pruner_target_db_version(latest_version);
-            *self.last_version_sent_to_pruner.as_ref().lock() = latest_version;
         }
     }
 
-    fn set_pruner_target_db_version(&self, latest_version: Version) {
-        assert!(self.pruner_enabled);
+    fn save_min_readable_version(&self, min_readable_version: Version) -> Result<()> {
+        self.min_readable_version
+            .store(min_readable_version, Ordering::SeqCst);
+
+        PRUNER_VERSIONS
+            .with_label_values(&["ledger_pruner", "min_readable"])
+            .set(min_readable_version as i64);
+
+        self.ledger_db.write_pruner_progress(min_readable_version)
+    }
+
+    fn is_pruning_pending(&self) -> bool {
         self.pruner_worker
             .as_ref()
-            .set_target_db_version(latest_version.saturating_sub(self.prune_window));
+            .map_or(false, |w| w.is_pruning_pending())
+    }
+
+    #[cfg(test)]
+    fn set_worker_target_version(&self, target_version: Version) {
+        self.pruner_worker
+            .as_ref()
+            .unwrap()
+            .set_target_db_version(target_version);
     }
 }
 
 impl LedgerPrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(ledger_rocksdb: Arc<DB>, ledger_pruner_config: LedgerPrunerConfig) -> Self {
-        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_rocksdb);
-
-        if ledger_pruner_config.enable {
-            PRUNER_WINDOW
-                .with_label_values(&["ledger_pruner"])
-                .set(ledger_pruner_config.prune_window as i64);
-
-            PRUNER_BATCH_SIZE
-                .with_label_values(&["ledger_pruner"])
-                .set(ledger_pruner_config.batch_size as i64);
-        }
-
-        let ledger_pruner_worker = Arc::new(LedgerPrunerWorker::new(
-            Arc::clone(&ledger_pruner),
-            ledger_pruner_config,
-        ));
-
-        let ledger_pruner_worker_clone = Arc::clone(&ledger_pruner_worker);
-
-        let ledger_pruner_worker_thread = if ledger_pruner_config.enable {
-            Some(
-                std::thread::Builder::new()
-                    .name("aptosdb_ledger_pruner".into())
-                    .spawn(move || ledger_pruner_worker_clone.as_ref().work())
-                    .expect("Creating ledger pruner thread should succeed."),
-            )
+    pub fn new(ledger_db: Arc<LedgerDb>, ledger_pruner_config: LedgerPrunerConfig) -> Self {
+        let pruner_worker = if ledger_pruner_config.enable {
+            Some(Self::init_pruner(
+                Arc::clone(&ledger_db),
+                ledger_pruner_config,
+            ))
         } else {
             None
         };
 
-        let min_readable_version = ledger_pruner.min_readable_version();
+        let min_readable_version =
+            pruner_utils::get_ledger_pruner_progress(&ledger_db).expect("Must succeed.");
+
+        PRUNER_VERSIONS
+            .with_label_values(&["ledger_pruner", "min_readable"])
+            .set(min_readable_version as i64);
 
         Self {
-            pruner_enabled: ledger_pruner_config.enable,
+            ledger_db,
             prune_window: ledger_pruner_config.prune_window,
-            pruner: ledger_pruner,
-            pruner_worker: ledger_pruner_worker,
-            worker_thread: ledger_pruner_worker_thread,
-            last_version_sent_to_pruner: Arc::new(Mutex::new(min_readable_version)),
+            pruner_worker,
             pruning_batch_size: ledger_pruner_config.batch_size,
             latest_version: Arc::new(Mutex::new(min_readable_version)),
             user_pruning_window_offset: ledger_pruner_config.user_pruning_window_offset,
+            min_readable_version: AtomicVersion::new(min_readable_version),
         }
     }
 
-    #[cfg(test)]
-    pub fn testonly_update_min_version(&self, version: Version) {
-        self.pruner.testonly_update_min_version(version);
+    fn init_pruner(
+        ledger_db: Arc<LedgerDb>,
+        ledger_pruner_config: LedgerPrunerConfig,
+    ) -> PrunerWorker {
+        let pruner = pruner_utils::create_ledger_pruner(ledger_db);
+
+        PRUNER_WINDOW
+            .with_label_values(&["ledger_pruner"])
+            .set(ledger_pruner_config.prune_window as i64);
+
+        PRUNER_BATCH_SIZE
+            .with_label_values(&["ledger_pruner"])
+            .set(ledger_pruner_config.batch_size as i64);
+
+        PrunerWorker::new(pruner, ledger_pruner_config.batch_size, "ledger")
     }
-}
 
-impl Drop for LedgerPrunerManager {
-    fn drop(&mut self) {
-        if self.pruner_enabled {
-            self.pruner_worker.stop_pruning();
-
-            assert!(self.worker_thread.is_some());
-            self.worker_thread
-                .take()
-                .expect("Ledger pruner worker thread must exist.")
-                .join()
-                .expect("Ledger pruner worker thread should join peacefully.");
-        }
+    fn set_pruner_target_db_version(&self, latest_version: Version) {
+        assert!(self.pruner_worker.is_some());
+        let min_readable_version = latest_version.saturating_sub(self.prune_window);
+        self.min_readable_version
+            .store(min_readable_version, Ordering::SeqCst);
+        self.pruner_worker
+            .as_ref()
+            .unwrap()
+            .set_target_db_version(min_readable_version);
     }
 }

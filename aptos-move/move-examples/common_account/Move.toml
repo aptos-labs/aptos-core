@@ -1,0 +1,9 @@
+[package]
+name = "CommonAccount"
+version = "1.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+
+[addresses]
+common_account = "_"

@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
@@ -11,6 +10,7 @@ use aptos_crypto::{
 };
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
+    block_executor::partitioner::ExecutableBlock,
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -23,6 +23,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 pub use error::Error;
+pub use executed_block::ExecutedBlock;
 pub use executed_chunk::ExecutedChunk;
 pub use parsed_transaction_output::ParsedTransactionOutput;
 use serde::{Deserialize, Serialize};
@@ -37,6 +38,7 @@ use std::{
 };
 
 mod error;
+mod executed_block;
 mod executed_chunk;
 pub mod in_memory_state_calculator;
 mod parsed_transaction_output;
@@ -78,7 +80,7 @@ pub struct StateSnapshotDelta {
     pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
 }
 
-pub trait BlockExecutorTrait<T>: Send + Sync {
+pub trait BlockExecutorTrait: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
 
@@ -88,8 +90,9 @@ pub trait BlockExecutorTrait<T>: Send + Sync {
     /// Executes a block.
     fn execute_block(
         &self,
-        block: (HashValue, Vec<T>),
+        block: ExecutableBlock<Transaction>,
         parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error>;
 
     /// Saves eligible blocks to persistent storage.

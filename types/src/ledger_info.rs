@@ -32,7 +32,7 @@ use std::{
 /// reduce the number of proofs a client must get.
 ///
 /// Second, the structure contains a `consensus_data_hash` value. This is the hash of an internal
-/// data structure that represents a block that is voted on in HotStuff. If 2f+1 signatures are
+/// data structure that represents a block that is voted on in Consensus. If 2f+1 signatures are
 /// gathered on the same ledger info that represents a Quorum Certificate (QC) on the consensus
 /// data.
 ///
@@ -258,7 +258,7 @@ impl LedgerInfoWithV0 {
     }
 
     pub fn get_voters(&self, validator_addresses: &[AccountAddress]) -> Vec<AccountAddress> {
-        self.signatures.get_voter_addresses(validator_addresses)
+        self.signatures.get_signers_addresses(validator_addresses)
     }
 
     pub fn get_num_voters(&self) -> usize {
@@ -266,7 +266,7 @@ impl LedgerInfoWithV0 {
     }
 
     pub fn get_voters_bitvec(&self) -> &BitVec {
-        self.signatures.get_voters_bitvec()
+        self.signatures.get_signers_bitvec()
     }
 
     pub fn verify_signatures(

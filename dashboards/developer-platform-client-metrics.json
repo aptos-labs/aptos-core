@@ -1,0 +1,305 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 9,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "In order to view metrics for:\n- mainnet\n  - datasource: VictoriaMetrics Mainnet\n  - chain_name: mainnet\n- testnet\n  - datasource: VictoriaMetrics Global (Non-mainnet)\n  - chain_name: testnet\n- devnet\n  - datasource: VictoriaMetrics Global (Non-mainnet)\n  - chain_name: devnet",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "title": "Guide",
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
+      "id": 5,
+      "panels": [],
+      "title": "Aggregations",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 9 },
+      "id": 7,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "This section contains queries that aggregate across all clients. This means the `source_client` variable above doesn't do anything.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "title": "Explanation",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "This shows the most popular clients by request count over the configured time window.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 12 },
+      "id": 1,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "editorMode": "code",
+          "expr": "sum by(request_source_client) (increase(label_replace(aptos_api_request_source_client{chain_name=\"$chain_name\"}, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\")[$__range])) != 0",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Requests by client",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "This shows the most popular clients by request count over the configured time window. There is a separate entry per client + client version. ",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 15, "w": 12, "x": 12, "y": 12 },
+      "id": 8,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "editorMode": "code",
+          "expr": "sum by(request_source_client) (increase(aptos_api_request_source_client{chain_name=\"$chain_name\"}[$__range])) != 0",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Requests by client + version",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "grafana-falconlogscale-datasource", "uid": "b4f0e2cd-2eea-4ada-a4c0-261e41369ed5" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineWidth": 1,
+            "scaleDistribution": { "type": "linear" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "id": 10,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": { "mode": "single", "sort": "none" },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-falconlogscale-datasource", "uid": "b4f0e2cd-2eea-4ada-a4c0-261e41369ed5" },
+          "lsql": "| #resource.type=cloud_run_revision\n| resource.labels.service_name=indexer-$chain_name \n| jsonPayload.method=* logName=*stdout\n| case {jsonPayload.aptos_client!=* | jsonPayload.aptos_client:=\"unknown\"; *}\n| top(jsonPayload.aptos_client)",
+          "refId": "A",
+          "repository": "gcp"
+        }
+      ],
+      "title": "Indexer API requests by client",
+      "type": "barchart"
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "id": 4,
+      "panels": [
+        {
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 36 },
+          "id": 6,
+          "options": {
+            "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+            "content": "This section contains queries that show data for a specific client. To select which client to view metrics for, select one in the `source_client` variable dropdown above.",
+            "mode": "markdown"
+          },
+          "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+          "title": "Explanation",
+          "type": "text"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "This shows what are the top 5 most common endpoints called by users of this client in the configured time window.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 15, "w": 12, "x": 0, "y": 39 },
+          "id": 3,
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "pieType": "pie",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${datasource}" },
+              "editorMode": "code",
+              "expr": "topk(5, sum by(operation_id) (increase(aptos_api_request_source_client{request_source_client=\"$source_client\", chain_name=\"$chain_name\"}[$__range])))",
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Top 5 endpoints",
+          "type": "piechart"
+        }
+      ],
+      "repeat": "source_client",
+      "repeatDirection": "h",
+      "title": "Per client",
+      "type": "row"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "unknown", "value": "unknown" },
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "definition": "label_values(aptos_api_request_source_client,request_source_client)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "source_client",
+        "options": [],
+        "query": {
+          "query": "label_values(aptos_api_request_source_client,request_source_client)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "VictoriaMetrics.*Global|US",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": { "selected": false, "text": "testnet", "value": "testnet" },
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "definition": "label_values(aptos_api_request_source_client,chain_name)",
+        "description": "When looking at non-mainnet, use this to select the network.",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(aptos_api_request_source_client,chain_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "testnet|devnet|mainnet",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Developer Platform Client Metrics",
+  "uid": "be847ea3-c7cc-4048-b783-eb2fdb4f1abd",
+  "version": 53,
+  "weekStart": ""
+}

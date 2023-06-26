@@ -14,13 +14,13 @@ use crate::{
             create_data_stream_listener, create_empty_epoch_state, create_epoch_ending_ledger_info,
             create_full_node_driver_configuration, create_global_summary,
             create_output_list_with_proof, create_random_epoch_ending_ledger_info,
-            create_transaction_info, create_transaction_list_with_proof,
+            create_transaction_list_with_proof,
         },
     },
     utils::OutputFallbackHandler,
 };
 use aptos_config::config::BootstrappingMode;
-use aptos_data_client::GlobalDataSummary;
+use aptos_data_client::global_summary::GlobalDataSummary;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
@@ -1178,8 +1178,8 @@ fn create_bootstrapper(
         .expect_get_latest_ledger_info()
         .returning(|| Ok(create_epoch_ending_ledger_info()));
     mock_database_reader
-        .expect_get_latest_transaction_info_option()
-        .returning(|| Ok(Some((0, create_transaction_info()))));
+        .expect_get_latest_version()
+        .returning(|| Ok(0));
 
     // Create the output fallback handler
     let time_service = time_service.unwrap_or_else(TimeService::mock);
@@ -1222,8 +1222,8 @@ fn create_bootstrapper_with_storage(
         .expect_get_latest_ledger_info()
         .returning(|| Ok(create_epoch_ending_ledger_info()));
     mock_database_reader
-        .expect_get_latest_transaction_info_option()
-        .returning(move || Ok(Some((latest_synced_version, create_transaction_info()))));
+        .expect_get_latest_version()
+        .returning(move || Ok(latest_synced_version));
 
     // Create the output fallback handler
     let output_fallback_handler =

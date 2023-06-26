@@ -1,13 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-///! This file contains utilities that are helpful for performing
-///! database restore operations, as required by restore and
-///! state sync v2.
+//! This file contains utilities that are helpful for performing
+//! database restore operations, as required by restore and
+//! state sync v2.
 use crate::{
-    event_store::EventStore, ledger_store::LedgerStore,
-    schema::transaction_accumulator::TransactionAccumulatorSchema,
+    event_store::EventStore,
+    ledger_store::LedgerStore,
+    new_sharded_kv_schema_batch,
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction_accumulator::TransactionAccumulatorSchema,
+    },
+    state_store::StateStore,
     transaction_store::TransactionStore,
+    ShardedStateKvSchemaBatch,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
@@ -27,7 +34,7 @@ use std::sync::Arc;
 /// Saves the given ledger infos to the ledger store. If a change set is provided,
 /// a batch of db alterations will be added to the change set without writing them to the db.
 pub fn save_ledger_infos(
-    db: Arc<DB>,
+    ledger_metadata_db: &DB,
     ledger_store: Arc<LedgerStore>,
     ledger_infos: &[LedgerInfoWithSignatures],
     existing_batch: Option<&mut SchemaBatch>,
@@ -39,7 +46,7 @@ pub fn save_ledger_infos(
     } else {
         let mut batch = SchemaBatch::new();
         save_ledger_infos_impl(ledger_store.clone(), ledger_infos, &mut batch)?;
-        db.write_schemas(batch)?;
+        ledger_metadata_db.write_schemas(batch)?;
         update_latest_ledger_info(ledger_store, ledger_infos)?;
     }
 
@@ -65,7 +72,7 @@ pub fn update_latest_ledger_info(
 /// Confirms or saves the frozen subtrees. If a change set is provided, a batch
 /// of db alterations will be added to the change set without writing them to the db.
 pub fn confirm_or_save_frozen_subtrees(
-    db: Arc<DB>,
+    transaction_accumulator_db: &DB,
     num_leaves: LeafCount,
     frozen_subtrees: &[HashValue],
     existing_batch: Option<&mut SchemaBatch>,
@@ -79,11 +86,21 @@ pub fn confirm_or_save_frozen_subtrees(
     );
 
     if let Some(existing_batch) = existing_batch {
-        confirm_or_save_frozen_subtrees_impl(db, frozen_subtrees, positions, existing_batch)?;
+        confirm_or_save_frozen_subtrees_impl(
+            transaction_accumulator_db,
+            frozen_subtrees,
+            positions,
+            existing_batch,
+        )?;
     } else {
         let mut batch = SchemaBatch::new();
-        confirm_or_save_frozen_subtrees_impl(db.clone(), frozen_subtrees, positions, &mut batch)?;
-        db.write_schemas(batch)?;
+        confirm_or_save_frozen_subtrees_impl(
+            transaction_accumulator_db,
+            frozen_subtrees,
+            positions,
+            &mut batch,
+        )?;
+        transaction_accumulator_db.write_schemas(batch)?;
     }
 
     Ok(())
@@ -91,44 +108,69 @@ pub fn confirm_or_save_frozen_subtrees(
 
 /// Saves the given transactions to the db. If a change set is provided, a batch
 /// of db alterations will be added to the change set without writing them to the db.
-pub fn save_transactions(
-    db: Arc<DB>,
+pub(crate) fn save_transactions(
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     event_store: Arc<EventStore>,
+    state_store: Arc<StateStore>,
     first_version: Version,
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
     write_sets: Vec<WriteSet>,
-    existing_batch: Option<&mut SchemaBatch>,
+    existing_batch: Option<(
+        &mut SchemaBatch,
+        &mut ShardedStateKvSchemaBatch,
+        &SchemaBatch,
+    )>,
+    kv_replay: bool,
 ) -> Result<()> {
-    if let Some(existing_batch) = existing_batch {
+    if let Some((batch, state_kv_batches, state_kv_metadata_batch)) = existing_batch {
         save_transactions_impl(
-            ledger_store,
+            Arc::clone(&ledger_store),
             transaction_store,
             event_store,
+            state_store,
             first_version,
             txns,
             txn_infos,
             events,
             write_sets.as_ref(),
-            existing_batch,
+            batch,
+            state_kv_batches,
+            state_kv_metadata_batch,
+            kv_replay,
         )?;
     } else {
         let mut batch = SchemaBatch::new();
+        let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
+        let state_kv_metadata_batch = SchemaBatch::new();
         save_transactions_impl(
-            ledger_store,
+            Arc::clone(&ledger_store),
             transaction_store,
             event_store,
+            Arc::clone(&state_store),
             first_version,
             txns,
             txn_infos,
             events,
             write_sets.as_ref(),
             &mut batch,
+            &mut sharded_kv_schema_batch,
+            &state_kv_metadata_batch,
+            kv_replay,
         )?;
-        db.write_schemas(batch)?;
+        // get the last version and commit to the state kv db
+        // commit the state kv before ledger in case of failure happens
+        let last_version = first_version + txns.len() as u64 - 1;
+        state_store.state_db.state_kv_db.commit(
+            last_version,
+            state_kv_metadata_batch,
+            sharded_kv_schema_batch,
+        )?;
+
+        // TODO(grao): Support splitted ledger DBs here.
+        ledger_store.ledger_db.metadata_db().write_schemas(batch)?;
     }
 
     Ok(())
@@ -179,26 +221,57 @@ fn save_ledger_infos_impl(
 }
 
 /// A helper function that saves the transactions to the given change set
-pub fn save_transactions_impl(
+pub(crate) fn save_transactions_impl(
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     event_store: Arc<EventStore>,
+    state_store: Arc<StateStore>,
     first_version: Version,
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
     write_sets: &[WriteSet],
     batch: &mut SchemaBatch,
+    state_kv_batches: &mut ShardedStateKvSchemaBatch,
+    state_kv_metadata_batch: &SchemaBatch,
+    kv_replay: bool,
 ) -> Result<()> {
+    // TODO(grao): Support splited ledger db here.
     for (idx, txn) in txns.iter().enumerate() {
-        transaction_store.put_transaction(first_version + idx as Version, txn, batch)?;
+        transaction_store.put_transaction(
+            first_version + idx as Version,
+            txn,
+            /*skip_index=*/ false,
+            batch,
+        )?;
     }
-    ledger_store.put_transaction_infos(first_version, txn_infos, batch)?;
+    ledger_store.put_transaction_infos(first_version, txn_infos, batch, batch)?;
     event_store.put_events_multiple_versions(first_version, events, batch)?;
     // insert changes in write set schema batch
     for (idx, ws) in write_sets.iter().enumerate() {
         transaction_store.put_write_set(first_version + idx as Version, ws, batch)?;
     }
+
+    if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
+        state_store.put_write_sets(
+            write_sets.to_vec(),
+            first_version,
+            batch,
+            state_kv_batches,
+            state_kv_metadata_batch,
+            state_store.state_kv_db.enabled_sharding(),
+        )?;
+    }
+
+    let last_version = first_version + txns.len() as u64 - 1;
+    batch.put::<DbMetadataSchema>(
+        &DbMetadataKey::LedgerCommitProgress,
+        &DbMetadataValue::Version(last_version),
+    )?;
+    batch.put::<DbMetadataSchema>(
+        &DbMetadataKey::OverallCommitProgress,
+        &DbMetadataValue::Version(last_version),
+    )?;
 
     Ok(())
 }
@@ -219,7 +292,7 @@ pub fn save_transaction_outputs_impl(
 
 /// A helper function that confirms or saves the frozen subtrees to the given change set
 fn confirm_or_save_frozen_subtrees_impl(
-    db: Arc<DB>,
+    transaction_accumulator_db: &DB,
     frozen_subtrees: &[HashValue],
     positions: Vec<Position>,
     batch: &mut SchemaBatch,
@@ -228,7 +301,7 @@ fn confirm_or_save_frozen_subtrees_impl(
         .iter()
         .zip(frozen_subtrees.iter().rev())
         .map(|(p, h)| {
-            if let Some(_h) = db.get::<TransactionAccumulatorSchema>(p)? {
+            if let Some(_h) = transaction_accumulator_db.get::<TransactionAccumulatorSchema>(p)? {
                 ensure!(
                         h == &_h,
                         "Frozen subtree root does not match that already in DB. Provided: {}, in db: {}.",

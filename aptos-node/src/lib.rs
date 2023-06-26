@@ -18,18 +18,18 @@ mod tests;
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{NodeConfig, PersistableConfig};
+use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use futures::channel::mpsc;
-use hex::FromHex;
+use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     fs,
-    io::Write,
+    io::{Read, Write},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -49,24 +49,27 @@ pub struct AptosNodeArgs {
     #[clap(
         short = 'f',
         long,
-        parse(from_os_str),
-        required_unless = "test",
-        required_unless = "info"
+        value_parser,
+        required_unless_present_any = ["test", "info"],
     )]
     config: Option<PathBuf>,
 
     /// Directory to run the test mode in.
     ///
     /// Repeated runs will start up from previous state.
-    #[clap(long, parse(from_os_str), requires("test"))]
+    #[clap(long, value_parser, requires("test"))]
     test_dir: Option<PathBuf>,
+
+    /// Path to node configuration file override for local test mode. Cannot be used with --config
+    #[clap(long, value_parser, requires("test"), conflicts_with("config"))]
+    test_config_override: Option<PathBuf>,
 
     /// Run only a single validator node testnet.
     #[clap(long)]
     test: bool,
 
     /// Random number generator seed for starting a single validator testnet.
-    #[clap(long, parse(try_from_str = FromHex::from_hex), requires("test"))]
+    #[clap(long, value_parser = load_seed, requires("test"))]
     seed: Option<[u8; 32]>,
 
     /// Use random ports instead of ports from the node configuration.
@@ -119,6 +122,7 @@ impl AptosNodeArgs {
                 .unwrap_or_else(StdRng::from_entropy);
             setup_test_environment_and_start_node(
                 self.config,
+                self.test_config_override,
                 self.test_dir,
                 self.random_ports,
                 self.lazy,
@@ -148,6 +152,15 @@ impl AptosNodeArgs {
             // Start the node
             start(config, None, true).expect("Node should start correctly");
         };
+    }
+}
+
+pub fn load_seed(input: &str) -> Result<Option<[u8; 32]>, FromHexError> {
+    let trimmed_input = input.trim();
+    if !trimmed_input.is_empty() {
+        FromHex::from_hex(trimmed_input).map(Some)
+    } else {
+        Ok(None)
     }
 }
 
@@ -216,6 +229,7 @@ pub fn start(
 /// Creates a simple test environment and starts the node
 pub fn setup_test_environment_and_start_node<R>(
     config_path: Option<PathBuf>,
+    test_config_override_path: Option<PathBuf>,
     test_dir: Option<PathBuf>,
     random_ports: bool,
     enable_lazy_mode: bool,
@@ -243,7 +257,11 @@ where
             .map_err(|error| anyhow!("Unable to load config: {:?}", error))?
     } else {
         // Create a test only config for a single validator node
-        let node_config = create_single_node_test_config(config_path, enable_lazy_mode);
+        let node_config = create_single_node_test_config(
+            config_path.clone(),
+            test_config_override_path.clone(),
+            enable_lazy_mode,
+        )?;
 
         // Build genesis and the validator node
         let builder = aptos_genesis::builder::Builder::new(&test_dir, framework.clone())?
@@ -279,6 +297,18 @@ where
 
     // Print out useful information about the environment and the node
     println!("Completed generating configuration:");
+    if test_config_override_path.is_some() {
+        println!(
+            "\tMerged default config with override from path: {:?}",
+            test_config_override_path.unwrap()
+        );
+    }
+    if config_path.is_some() {
+        println!(
+            "\tUsed user-provided config from path: {:?}",
+            config_path.unwrap()
+        );
+    }
     println!("\tLog file: {:?}", log_file);
     println!("\tTest dir: {:?}", test_dir);
     println!("\tAptos root key path: {:?}", aptos_root_key_path);
@@ -293,6 +323,11 @@ where
         "\tAptosnet fullnode network endpoint: {}",
         &config.full_node_networks[0].listen_address
     );
+    if config.indexer_grpc.enabled {
+        if let Some(ref indexer_grpc_address) = config.indexer_grpc.address {
+            println!("\tIndexer gRPC endpoint: {}", indexer_grpc_address);
+        }
+    }
     if enable_lazy_mode {
         println!("\tLazy mode is enabled");
     }
@@ -305,10 +340,33 @@ where
 /// the overhead of running the node on a local machine.
 fn create_single_node_test_config(
     config_path: Option<PathBuf>,
+    test_config_override_path: Option<PathBuf>,
     enable_lazy_mode: bool,
-) -> NodeConfig {
-    // Build a single validator network with a generated config
-    let mut node_config = NodeConfig::get_default_validator_config();
+) -> anyhow::Result<NodeConfig> {
+    let mut node_config = match test_config_override_path {
+        // If a config override path was provided, merge it with the default config
+        Some(test_config_override_path) => {
+            let mut contents = String::new();
+            fs::File::open(&test_config_override_path)
+                .map_err(|e| {
+                    anyhow!(
+                        "Unable to open config override file {:?}. Error: {}",
+                        test_config_override_path,
+                        e
+                    )
+                })?
+                .read_to_string(&mut contents)?;
+            let values = serde_yaml::from_str::<serde_yaml::Value>(&contents).map_err(|e| {
+                anyhow!(
+                    "Unable to read config override file as YAML {:?}. Error: {}",
+                    test_config_override_path,
+                    e
+                )
+            })?;
+            merge_node_config(NodeConfig::get_default_validator_config(), values)?
+        },
+        None => NodeConfig::get_default_validator_config(),
+    };
 
     // Adjust some fields in the default template to lower the overhead of
     // running on a local machine.
@@ -372,12 +430,13 @@ fn create_single_node_test_config(
 
     // If a config path was provided, use that as the template
     if let Some(config_path) = config_path {
-        node_config = NodeConfig::load_config(&config_path).unwrap_or_else(|error| {
-            panic!(
-                "Failed to load persisted config at path: {:?}. Error: {:?}",
-                config_path, error
+        node_config = NodeConfig::load_config(&config_path).map_err(|e| {
+            anyhow!(
+                "Unable to load config from path: {:?}. Error: {:?}",
+                config_path,
+                e
             )
-        });
+        })?;
     }
 
     // Change the default log level
@@ -393,7 +452,7 @@ fn create_single_node_test_config(
         node_config.consensus.quorum_store_poll_time_ms = 3_600_000;
     }
 
-    node_config
+    Ok(node_config)
 }
 
 /// Initializes the node environment and starts the node
@@ -406,7 +465,8 @@ pub fn setup_environment_and_start_node(
     info!("Using node config {:?}", &node_config);
 
     // Start the node inspection service
-    services::start_node_inspection_service(&node_config);
+    let peers_and_metadata = network::create_peers_and_metadata(&node_config);
+    services::start_node_inspection_service(&node_config, peers_and_metadata.clone());
 
     // Set up the storage database and any RocksDB checkpoints
     let (aptos_db, db_rw, backup_service, genesis_waypoint) =
@@ -446,6 +506,7 @@ pub fn setup_environment_and_start_node(
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
+        peers_and_metadata.clone(),
         &mut event_subscription_service,
     );
 
@@ -479,6 +540,7 @@ pub fn setup_environment_and_start_node(
             mempool_network_interfaces,
             mempool_listener,
             mempool_client_receiver,
+            peers_and_metadata,
         );
 
     // Create the consensus runtime (this blocks on state sync first)
@@ -511,4 +573,10 @@ pub fn setup_environment_and_start_node(
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    AptosNodeArgs::command().debug_assert()
 }

@@ -39,27 +39,25 @@ impl BatchTransferTransactionGenerator {
 impl TransactionGenerator for BatchTransferTransactionGenerator {
     fn generate_transactions(
         &mut self,
-        accounts: Vec<&mut LocalAccount>,
-        transactions_per_account: usize,
+        account: &mut LocalAccount,
+        num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
-        for sender in accounts {
-            for _ in 0..transactions_per_account {
-                let receivers = self
-                    .all_addresses
-                    .read()
-                    .choose_multiple(&mut self.rng, self.batch_size)
-                    .cloned()
-                    .collect::<Vec<_>>();
-                requests.push(
-                    sender.sign_with_transaction_builder(self.txn_factory.payload(
-                        aptos_stdlib::aptos_account_batch_transfer(receivers, vec![
-                            self.send_amount;
-                            self.batch_size
-                        ]),
-                    )),
-                );
-            }
+        let mut requests = Vec::with_capacity(num_to_create);
+        for _ in 0..num_to_create {
+            let receivers = self
+                .all_addresses
+                .read()
+                .choose_multiple(&mut self.rng, self.batch_size)
+                .cloned()
+                .collect::<Vec<_>>();
+            requests.push(
+                account.sign_with_transaction_builder(self.txn_factory.payload(
+                    aptos_stdlib::aptos_account_batch_transfer(receivers, vec![
+                        self.send_amount;
+                        self.batch_size
+                    ]),
+                )),
+            );
         }
 
         requests

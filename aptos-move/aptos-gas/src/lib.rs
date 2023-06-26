@@ -15,7 +15,7 @@
 //! The reason why we need two different representations is that they serve different purposes:
 //!   - The Rust structs are used for quick (static) lookups by the gas meter and native functions
 //!     when calculating gas costs.
-//!   - The on-chain gas schedule needs to be extensible and unordered so we can upgrate it easily
+//!   - The on-chain gas schedule needs to be extensible and unordered so we can upgrade it easily
 //!     in the future.
 
 #[macro_use]
@@ -45,4 +45,6 @@ pub use move_core_types::gas_algebra::{
     Arg, Byte, GasQuantity, InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit,
     NumArgs, NumBytes, UnitDiv,
 };
-pub use transaction::{ChangeSetConfigs, StorageGasParameters, TransactionGasParameters};
+pub use transaction::{
+    ChangeSetConfigs, StorageGasParameters, StoragePricing, TransactionGasParameters,
+};

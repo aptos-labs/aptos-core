@@ -85,7 +85,9 @@ impl StateMerkleBatchCommitter {
                         .epoch_snapshot_pruner
                         .maybe_set_pruner_target_db_version(current_version);
 
-                    self.check_usage_consistency(&state_delta).unwrap();
+                    if !self.state_db.skip_usage {
+                        self.check_usage_consistency(&state_delta).unwrap();
+                    }
                 },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {
@@ -104,6 +106,7 @@ impl StateMerkleBatchCommitter {
         let usage_from_ledger_db: StateStorageUsage = self
             .state_db
             .ledger_db
+            .metadata_db()
             .get::<VersionDataSchema>(&version)?
             .ok_or_else(|| anyhow!("VersionData missing for version {}", version))?
             .get_state_storage_usage();

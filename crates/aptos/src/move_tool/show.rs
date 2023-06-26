@@ -32,11 +32,11 @@ impl ShowTool {
 pub struct ShowAbi {
     /// If provided, only show items from the given Move modules. These should be module
     /// names, not file paths. For example, `coin`.
-    #[clap(long, multiple_values = true)]
+    #[clap(long, num_args = 0..)]
     modules: Vec<String>,
 
     /// If provided, only show items with the given names. For example, `transfer`.
-    #[clap(long, multiple_values = true)]
+    #[clap(long, num_args = 0..)]
     names: Vec<String>,
 
     #[clap(flatten)]

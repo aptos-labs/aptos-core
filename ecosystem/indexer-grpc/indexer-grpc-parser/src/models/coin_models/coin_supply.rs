@@ -8,7 +8,7 @@
 use super::coin_infos::CoinInfoQuery;
 use crate::{models::default_models::move_tables::TableItem, schema::coin_supply};
 use anyhow::Context;
-use aptos_protos::transaction::testing1::v1::WriteTableItem;
+use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

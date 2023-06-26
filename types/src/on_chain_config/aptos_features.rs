@@ -26,6 +26,10 @@ pub enum FeatureFlag {
     PERIODICAL_REWARD_RATE_DECREASE = 16,
     PARTIAL_GOVERNANCE_VOTING = 17,
     SIGNATURE_CHECKER_V2 = 18,
+    STORAGE_SLOT_METADATA = 19,
+    CHARGE_INVARIANT_VIOLATION = 20,
+    DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING = 21,
+    GAS_PAYER_ENABLED = 22,
 }
 
 /// Representation of features on chain as a bitset.
@@ -58,6 +62,10 @@ impl Features {
 
     pub fn are_resource_groups_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS)
+    }
+
+    pub fn is_storage_slot_metadata_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
     }
 }
 

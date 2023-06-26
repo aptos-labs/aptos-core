@@ -52,13 +52,10 @@ module aptos_framework::aptos_account {
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
         );
 
-        let i = 0;
-        while (i < recipients_len) {
-            let to = *vector::borrow(&recipients, i);
+        vector::enumerate_ref(&recipients, |i, to| {
             let amount = *vector::borrow(&amounts, i);
-            transfer(source, to, amount);
-            i = i + 1;
-        };
+            transfer(source, *to, amount);
+        });
     }
 
     /// Convenient function to transfer APT to a recipient account that might not exist.
@@ -84,13 +81,10 @@ module aptos_framework::aptos_account {
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
         );
 
-        let i = 0;
-        while (i < recipients_len) {
-            let to = *vector::borrow(&recipients, i);
+        vector::enumerate_ref(&recipients, |i, to| {
             let amount = *vector::borrow(&amounts, i);
-            transfer_coins<CoinType>(from, to, amount);
-            i = i + 1;
-        };
+            transfer_coins<CoinType>(from, *to, amount);
+        });
     }
 
     /// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
@@ -104,6 +98,11 @@ module aptos_framework::aptos_account {
     public fun deposit_coins<CoinType>(to: address, coins: Coin<CoinType>) acquires DirectTransferConfig {
         if (!account::exists_at(to)) {
             create_account(to);
+            spec {
+                assert coin::is_account_registered<AptosCoin>(to);
+                assume aptos_std::type_info::type_of<CoinType>() == aptos_std::type_info::type_of<AptosCoin>() ==>
+                    coin::is_account_registered<CoinType>(to);
+            };
         };
         if (!coin::is_account_registered<CoinType>(to)) {
             assert!(

@@ -10,7 +10,6 @@ use base::{
 use move_package::BuildConfig;
 
 pub mod base;
-pub mod experimental;
 pub mod sandbox;
 pub mod utils;
 
@@ -38,7 +37,7 @@ type NativeFunctionRecord = (AccountAddress, Identifier, Identifier, NativeFunct
 #[clap(author, version, about)]
 pub struct Move {
     /// Path to a package which the command should be run with respect to.
-    #[clap(long = "path", short = 'p', global = true, parse(from_os_str))]
+    #[clap(long = "path", short = 'p', global = true, value_parser)]
     pub package_path: Option<PathBuf>,
 
     /// Print additional diagnostics if available.
@@ -79,20 +78,10 @@ pub enum Command {
     Sandbox {
         /// Directory storing Move resources, events, and module bytecodes produced by module publishing
         /// and script execution.
-        #[clap(long, default_value = DEFAULT_STORAGE_DIR, parse(from_os_str))]
+        #[clap(long, default_value = DEFAULT_STORAGE_DIR, value_parser)]
         storage_dir: PathBuf,
         #[clap(subcommand)]
         cmd: sandbox::cli::SandboxCommand,
-    },
-    /// (Experimental) Run static analyses on Move source or bytecode.
-    #[clap(name = "experimental")]
-    Experimental {
-        /// Directory storing Move resources, events, and module bytecodes produced by module publishing
-        /// and script execution.
-        #[clap(long, default_value = DEFAULT_STORAGE_DIR, parse(from_os_str))]
-        storage_dir: PathBuf,
-        #[clap(subcommand)]
-        cmd: experimental::cli::ExperimentalCommand,
     },
     #[clap(name = "movey-login")]
     MoveyLogin(MoveyLogin),
@@ -131,7 +120,6 @@ pub fn run_cli(
             &move_args,
             &storage_dir,
         ),
-        Command::Experimental { storage_dir, cmd } => cmd.handle_command(&move_args, &storage_dir),
         Command::MoveyLogin(c) => c.execute(),
     }
 }
@@ -149,4 +137,10 @@ pub fn move_cli(
         args.move_args,
         args.cmd,
     )
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    MoveCLI::command().debug_assert()
 }

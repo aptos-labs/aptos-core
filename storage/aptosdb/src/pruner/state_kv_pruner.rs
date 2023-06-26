@@ -2,29 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    db_metadata::DbMetadataSchema,
     metrics::PRUNER_VERSIONS,
     pruner::{
-        db_pruner::DBPruner, db_sub_pruner::DBSubPruner,
-        state_store::state_value_pruner::StateValuePruner,
+        db_pruner::DBPruner, state_kv_metadata_pruner::StateKvMetadataPruner,
+        state_kv_shard_pruner::StateKvShardPruner,
     },
-    pruner_utils,
-    schema::db_metadata::{DbMetadataKey, DbMetadataValue},
     state_kv_db::StateKvDb,
+    OTHER_TIMERS_SECONDS,
 };
-use aptos_schemadb::SchemaBatch;
+use anyhow::Result;
+use aptos_logger::info;
 use aptos_types::transaction::{AtomicVersion, Version};
-use std::sync::{atomic::Ordering, Arc};
+use std::{
+    cmp::min,
+    sync::{atomic::Ordering, Arc},
+};
 
 pub const STATE_KV_PRUNER_NAME: &str = "state_kv_pruner";
 
 /// Responsible for pruning state kv db.
 pub(crate) struct StateKvPruner {
-    state_kv_db: Arc<StateKvDb>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
-    min_readable_version: AtomicVersion,
-    state_value_pruner: Arc<dyn DBSubPruner + Send + Sync>,
+    progress: AtomicVersion,
+
+    metadata_pruner: StateKvMetadataPruner,
+    // Non-empty iff sharding is enabled.
+    shard_pruners: Vec<StateKvShardPruner>,
 }
 
 impl DBPruner for StateKvPruner {
@@ -32,110 +36,92 @@ impl DBPruner for StateKvPruner {
         STATE_KV_PRUNER_NAME
     }
 
-    fn prune(&self, max_versions: usize) -> anyhow::Result<Version> {
-        if !self.is_pruning_pending() {
-            return Ok(self.min_readable_version());
+    fn prune(&self, max_versions: usize) -> Result<Version> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["state_kv_pruner__prune"])
+            .start_timer();
+
+        let mut progress = self.progress();
+        let target_version = self.target_version();
+
+        while progress < target_version {
+            let current_batch_target_version =
+                min(progress + max_versions as Version, target_version);
+
+            self.metadata_pruner
+                .prune(progress, current_batch_target_version)?;
+
+            // NOTE: If necessary, this can be done in parallel.
+            self.shard_pruners
+                .iter()
+                .try_for_each(|pruner| pruner.prune(progress, current_batch_target_version))?;
+
+            progress = current_batch_target_version;
+            self.record_progress(progress);
         }
 
-        let mut db_batch = SchemaBatch::new();
-        let current_target_version = self.prune_inner(max_versions, &mut db_batch)?;
-        self.save_min_readable_version(current_target_version, &db_batch)?;
-        self.state_kv_db.commit_raw_batch(db_batch)?;
-        self.record_progress(current_target_version);
-
-        Ok(current_target_version)
+        Ok(target_version)
     }
 
-    fn save_min_readable_version(
-        &self,
-        version: Version,
-        batch: &SchemaBatch,
-    ) -> anyhow::Result<()> {
-        batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateKvPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )
-    }
-
-    fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
-        Ok(self
-            .state_kv_db
-            .metadata_db()
-            .get::<DbMetadataSchema>(&DbMetadataKey::StateKvPrunerProgress)?
-            .map_or(0, |v| v.expect_version()))
-    }
-
-    fn min_readable_version(&self) -> Version {
-        self.min_readable_version.load(Ordering::Relaxed)
+    fn progress(&self) -> Version {
+        self.progress.load(Ordering::SeqCst)
     }
 
     fn set_target_version(&self, target_version: Version) {
-        self.target_version.store(target_version, Ordering::Relaxed);
+        self.target_version.store(target_version, Ordering::SeqCst);
         PRUNER_VERSIONS
             .with_label_values(&["state_kv_pruner", "target"])
             .set(target_version as i64);
     }
 
     fn target_version(&self) -> Version {
-        self.target_version.load(Ordering::Relaxed)
+        self.target_version.load(Ordering::SeqCst)
     }
 
-    fn record_progress(&self, min_readable_version: Version) {
-        self.min_readable_version
-            .store(min_readable_version, Ordering::Relaxed);
+    fn record_progress(&self, progress: Version) {
+        self.progress.store(progress, Ordering::SeqCst);
         PRUNER_VERSIONS
-            .with_label_values(&["state_kv_pruner", "min_readable"])
-            .set(min_readable_version as i64);
-    }
-
-    /// (For tests only.) Updates the minimal readable version kept by pruner.
-    fn testonly_update_min_version(&self, version: Version) {
-        self.min_readable_version.store(version, Ordering::Relaxed)
+            .with_label_values(&["state_kv_pruner", "progress"])
+            .set(progress as i64);
     }
 }
 
 impl StateKvPruner {
-    pub fn new(state_kv_db: Arc<StateKvDb>) -> Self {
-        let pruner = StateKvPruner {
-            state_kv_db: Arc::clone(&state_kv_db),
-            target_version: AtomicVersion::new(0),
-            min_readable_version: AtomicVersion::new(0),
-            state_value_pruner: Arc::new(StateValuePruner::new(state_kv_db)),
+    pub fn new(state_kv_db: Arc<StateKvDb>) -> Result<Self> {
+        info!(name = STATE_KV_PRUNER_NAME, "Initializing...");
+
+        let metadata_pruner = StateKvMetadataPruner::new(Arc::clone(&state_kv_db));
+
+        let metadata_progress = metadata_pruner.progress()?;
+
+        let shard_pruners = if state_kv_db.enabled_sharding() {
+            let num_shards = state_kv_db.num_shards();
+            let mut shard_pruners = Vec::with_capacity(num_shards as usize);
+            for shard_id in 0..num_shards {
+                shard_pruners.push(StateKvShardPruner::new(
+                    shard_id,
+                    state_kv_db.db_shard_arc(shard_id),
+                    metadata_progress,
+                )?);
+            }
+            shard_pruners
+        } else {
+            Vec::new()
         };
-        pruner.initialize();
-        pruner
-    }
 
-    /// Prunes the genesis transaction and saves the db alterations to the given change set
-    pub fn prune_genesis(
-        state_kv_db: Arc<StateKvDb>,
-        db_batch: &mut SchemaBatch,
-    ) -> anyhow::Result<()> {
-        let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
-        let max_version = 1; // We should only be pruning a single version
+        let pruner = StateKvPruner {
+            target_version: AtomicVersion::new(metadata_progress),
+            progress: AtomicVersion::new(metadata_progress),
+            metadata_pruner,
+            shard_pruners,
+        };
 
-        let state_kv_pruner = pruner_utils::create_state_kv_pruner(state_kv_db);
-        state_kv_pruner.set_target_version(target_version);
-        state_kv_pruner.prune_inner(max_version, db_batch)?;
+        info!(
+            name = pruner.name(),
+            progress = metadata_progress,
+            "Initialized."
+        );
 
-        Ok(())
-    }
-
-    fn prune_inner(
-        &self,
-        max_versions: usize,
-        db_batch: &mut SchemaBatch,
-    ) -> anyhow::Result<Version> {
-        let min_readable_version = self.min_readable_version();
-
-        let current_target_version = self.get_current_batch_target(max_versions as Version);
-        if current_target_version < min_readable_version {
-            return Ok(min_readable_version);
-        }
-
-        self.state_value_pruner
-            .prune(db_batch, min_readable_version, current_target_version)?;
-
-        Ok(current_target_version)
+        Ok(pruner)
     }
 }

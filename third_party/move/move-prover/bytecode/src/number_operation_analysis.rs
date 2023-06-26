@@ -25,7 +25,7 @@ use itertools::Either;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::{Exp, ExpData, TempIndex},
-    model::{FunId, GlobalEnv, ModuleId},
+    model::{FunId, GlobalEnv, ModuleId, Parameter},
     ty::{PrimitiveType, Type},
 };
 use std::{
@@ -84,7 +84,7 @@ impl NumberOperationProcessor {
         }
     }
 
-    fn analyze_fun<'a>(&self, env: &'a GlobalEnv, target: FunctionTarget) {
+    fn analyze_fun(&self, env: &'_ GlobalEnv, target: FunctionTarget) {
         if !target.func_env.is_native_or_intrinsic() {
             let cfg = StacklessControlFlowGraph::one_block(target.get_bytecode());
             let analyzer = NumberOperationAnalysis {
@@ -289,7 +289,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                         move_model::ast::Operation::Bv2Int => {
                             global_state.update_node_oper(*id, Arithmetic, true);
                         },
-                        move_model::ast::Operation::Function(mid, sid, _) => {
+                        move_model::ast::Operation::SpecFunction(mid, sid, _) => {
                             let module_env = &self.func_target.global_env().get_module(*mid);
                             let callee_name = module_env
                                 .get_spec_fun(*sid)
@@ -334,7 +334,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     if callee_spec_fun.body.is_some() {
                                         let body_exp = callee_spec_fun.body.as_ref().unwrap();
                                         let local_map = body_exp.free_local_vars_with_node_id();
-                                        for (i, (sym, _)) in
+                                        for (i, Parameter(sym, _)) in
                                             callee_spec_fun.params.iter().enumerate()
                                         {
                                             if local_map.contains_key(sym) {

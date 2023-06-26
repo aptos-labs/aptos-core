@@ -15,7 +15,8 @@ use aptos_crypto::{
 };
 use aptos_infallible::Mutex;
 use aptos_storage_interface::{
-    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter,
+    ExecutedTrees, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -37,7 +38,7 @@ use aptos_types::{
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
-        table,
+        table, ShardedStateUpdates,
     },
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
@@ -49,7 +50,7 @@ use arc_swap::ArcSwapOption;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use move_core_types::move_resource::MoveStructType;
-use std::{collections::HashMap, mem::swap, sync::Arc};
+use std::{borrow::Borrow, collections::HashMap, mem::swap, sync::Arc};
 
 /// Alternate implementation of [crate::state_store::buffered_state::BufferedState] for use with consensus-only-perf-test feature.
 /// It stores the [StateDelta]s in memory similar to [crate::state_store::buffered_state::BufferedState] except that it does not
@@ -103,12 +104,9 @@ impl FakeBufferedState {
         ensure!(
             new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version
         );
-        if let Some(updates_until_next_checkpoint_since_current) =
+        if let Some(_updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option
         {
-            self.state_after_checkpoint
-                .updates_since_base
-                .extend(updates_until_next_checkpoint_since_current);
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
             swap(
@@ -171,12 +169,12 @@ impl FakeAptosDB {
 
     fn save_and_compute_root_hash(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
         first_version: Version,
     ) -> Result<HashValue> {
         let txn_infos: Vec<_> = txns_to_commit
             .iter()
-            .map(|t| t.transaction_info())
+            .map(|t| t.borrow().transaction_info())
             .cloned()
             .collect();
 
@@ -200,31 +198,10 @@ impl FakeAptosDB {
             num_transactions,
         )
     }
-}
 
-impl DbWriter for FakeAptosDB {
-    fn get_state_snapshot_receiver(
+    fn save_transactions_impl(
         &self,
-        version: Version,
-        expected_root_hash: HashValue,
-    ) -> Result<Box<dyn aptos_storage_interface::StateSnapshotReceiver<StateKey, StateValue>>> {
-        self.inner
-            .get_state_snapshot_receiver(version, expected_root_hash)
-    }
-
-    fn finalize_state_snapshot(
-        &self,
-        version: Version,
-        output_with_proof: TransactionOutputListWithProof,
-        ledger_infos: &[LedgerInfoWithSignatures],
-    ) -> Result<()> {
-        self.inner
-            .finalize_state_snapshot(version, output_with_proof, ledger_infos)
-    }
-
-    fn save_transactions(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
@@ -245,7 +222,10 @@ impl DbWriter for FakeAptosDB {
             // transaction is executed on the VM when consensus-only-perf-test feature is enabled.
             if first_version == 0 {
                 self.inner.save_transactions(
-                    txns_to_commit,
+                    &txns_to_commit
+                        .iter()
+                        .map(|txn| txn.borrow().clone())
+                        .collect::<Vec<_>>(),
                     first_version,
                     base_state_version,
                     ledger_info_with_sigs,
@@ -300,17 +280,6 @@ impl DbWriter for FakeAptosDB {
                     .current_version
                     .map(|version| version + 1)
                     .unwrap_or(0);
-                let num_transactions_in_db = self
-                    .get_latest_transaction_info_option()?
-                    .map(|(version, _)| version + 1)
-                    .unwrap_or(0);
-                ensure!(
-                     num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
-                    "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
-                    first_version,
-                    next_version_in_buffered_state,
-                    num_transactions_in_db,
-                );
 
                 let updates_until_latest_checkpoint_since_current = if let Some(
                     latest_checkpoint_version,
@@ -320,7 +289,7 @@ impl DbWriter for FakeAptosDB {
                     if latest_checkpoint_version >= first_version {
                         let idx = (latest_checkpoint_version - first_version) as usize;
                         ensure!(
-                            txns_to_commit[idx].is_state_checkpoint(),
+                            txns_to_commit[idx].borrow().is_state_checkpoint(),
                             "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
                             latest_checkpoint_version,
                             first_version + idx as u64
@@ -328,7 +297,10 @@ impl DbWriter for FakeAptosDB {
                         Some(
                             txns_to_commit[..=idx]
                                 .iter()
-                                .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
+                                .flat_map(|txn_to_commit| {
+                                    txn_to_commit.borrow().state_updates().clone()
+                                })
+                                .flatten()
                                 .collect(),
                         )
                     } else {
@@ -349,6 +321,7 @@ impl DbWriter for FakeAptosDB {
             // Iterate through the transactions and update the in-memory maps
             zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
                 |(ver, txn_to_commit)| -> Result<(), anyhow::Error> {
+                    let txn_to_commit = txn_to_commit.borrow();
                     self.txn_by_version
                         .insert(ver, txn_to_commit.transaction().clone());
                     self.txn_info_by_version
@@ -382,6 +355,67 @@ impl DbWriter for FakeAptosDB {
             }
             Ok(())
         })
+    }
+}
+
+impl DbWriter for FakeAptosDB {
+    fn get_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn aptos_storage_interface::StateSnapshotReceiver<StateKey, StateValue>>> {
+        self.inner
+            .get_state_snapshot_receiver(version, expected_root_hash)
+    }
+
+    fn finalize_state_snapshot(
+        &self,
+        version: Version,
+        output_with_proof: TransactionOutputListWithProof,
+        ledger_infos: &[LedgerInfoWithSignatures],
+    ) -> Result<()> {
+        self.inner
+            .finalize_state_snapshot(version, output_with_proof, ledger_infos)
+    }
+
+    fn save_transactions(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
+        latest_in_memory_state: StateDelta,
+    ) -> Result<()> {
+        self.save_transactions_impl(
+            txns_to_commit,
+            first_version,
+            base_state_version,
+            ledger_info_with_sigs,
+            sync_commit,
+            latest_in_memory_state,
+        )
+    }
+
+    fn save_transaction_block(
+        &self,
+        txns_to_commit: &[Arc<TransactionToCommit>],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
+        latest_in_memory_state: StateDelta,
+        _block_state_updates: ShardedStateUpdates,
+        _sharded_state_cache: &ShardedStateCache,
+    ) -> Result<()> {
+        self.save_transactions_impl(
+            txns_to_commit,
+            first_version,
+            base_state_version,
+            ledger_info_with_sigs,
+            sync_commit,
+            latest_in_memory_state,
+        )
     }
 }
 
@@ -442,16 +476,6 @@ impl DbReader for FakeAptosDB {
                 ),
             ))
         })
-    }
-
-    fn get_gas_prices(
-        &self,
-        start_version: Version,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<u64>> {
-        self.inner
-            .get_gas_prices(start_version, limit, ledger_version)
     }
 
     fn get_transaction_by_hash(
@@ -766,13 +790,8 @@ impl DbReader for FakeAptosDB {
         self.inner.get_epoch_ending_ledger_info(known_version)
     }
 
-    fn get_latest_transaction_info_option(
-        &self,
-    ) -> Result<Option<(Version, aptos_types::transaction::TransactionInfo)>> {
-        Ok(self
-            .latest_txn_info
-            .load_full()
-            .map(|txn| txn.as_ref().clone()))
+    fn get_latest_version(&self) -> Result<Version> {
+        Ok(self.get_latest_ledger_info()?.ledger_info().version())
     }
 
     fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue> {
@@ -868,7 +887,7 @@ mod tests {
         test_helper::{arb_blocks_to_commit, update_in_memory_state},
         AptosDB,
     };
-    use anyhow::{ensure, Result};
+    use anyhow::{anyhow, ensure, Result};
     use aptos_crypto::{hash::CryptoHash, HashValue};
     use aptos_storage_interface::{DbReader, DbWriter};
     use aptos_temppath::TempPath;
@@ -1013,7 +1032,7 @@ mod tests {
         let signed_transaction = transaction_with_proof
             .transaction
             .try_as_signed_user_txn()
-            .ok_or("not user transaction")?;
+            .ok_or(anyhow!("not user transaction"))?;
 
         ensure!(
             transaction_with_proof.version == version,

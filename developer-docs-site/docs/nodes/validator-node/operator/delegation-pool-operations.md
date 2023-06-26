@@ -11,7 +11,7 @@ Validator operators should follow these instructions to carry out delegation poo
 
 Once the delegation pool attains 1 million APT, the pool's owner who initiates the delegation pool should set an operator for the pool via the `set_operator` function described in the [Perform pool owner operations](#perform-pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. The operator should now [join in the active set of validators](./staking-pool-operations.md#joining-validator-set).
 
-The operator address will receive the pool commission that was set at the initialization of the delegation pool and will act as a normal Delegation Pool account that is able to do all of the operations described in [Perform delegation pool operations](#perform-delegation-pool-operations).
+The operator address will receive the pool commission that was set at the initialization of the delegation pool, which is automatically distributed as stake in the delegation pool at the end of each epoch. The operator will act as a normal Delegation Pool account that is able to do all of the operations described in [Perform delegation pool operations](#perform-delegation-pool-operations).
 
 
 ## Prerequisites
@@ -166,8 +166,8 @@ Use this formula to calculate *rewards earned* for `active` and `pending_inactiv
 1. Get the amount of `active` and `pending_inactive` staking from the [`get_stake`](https://github.com/aptos-labs/aptos-core/blob/ed63ab756cda61439287304ed89bbb156fcbeaed/aptos-move/framework/aptos-framework/sources/delegation_pool.move#L321) view function.
 
 2. Calculate principal:
-    - "active principal" = **AddStakeEvent** - **UnlockStakeEvent** + **ReactivateStakeEvent**. If at any point during the iteration, "active principal" < 0, reset to 0. Negative principal could happen when the amount users `unlock` or `reactivate` include rewards earned from staking.
-    - "pending inactive principal" = **UnlockStakeEvent** - **ReactivateStakeEvent**. If at any point during the iteration, "pending inactive principal" < 0, reset to 0. Negative principal could happen when the amount users `unlock` or `reactivate` include rewards earned from staking.
+    - "active principal" = **AddStakeEvent** - **UnlockStakeEvent** + **ReactivateStakeEvent**. If at any point during the iteration, "active principal" < 0, reset to 0. Negative principal could happen when the amount users `unlock` include rewards earned from staking.
+    - "pending inactive principal" = **UnlockStakeEvent** - **ReactivateStakeEvent**. If at any point during the iteration, "pending inactive principal" < 0, reset to 0. Negative principal could happen when the amount users `reactivate` include rewards earned from staking.
 
 3. Compute rewards earned:
     - active_rewards = `active` - *active principal*.

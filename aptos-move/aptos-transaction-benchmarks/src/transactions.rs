@@ -3,27 +3,47 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_bitvec::BitVec;
+use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
+use aptos_executor_service::remote_executor_client::RemoteExecutorClient;
 use aptos_language_e2e_tests::{
-    account_universe::{AUTransactionGen, AccountUniverseGen},
+    account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
+    data_store::FakeDataStore,
     executor::FakeExecutor,
     gas_costs::TXN_RESERVED,
 };
 use aptos_types::{
+    block_executor::partitioner::BlockExecutorTransactions,
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
-    transaction::Transaction,
+    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
-use aptos_vm::{block_executor::BlockAptosVM, data_cache::AsMoveResolver};
+use aptos_vm::{
+    block_executor::BlockAptosVM,
+    data_cache::AsMoveResolver,
+    sharded_block_executor::{block_executor_client::LocalExecutorClient, ShardedBlockExecutor},
+};
 use criterion::{measurement::Measurement, BatchSize, Bencher};
+use once_cell::sync::Lazy;
 use proptest::{
     collection::vec,
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
+use std::{net::SocketAddr, sync::Arc, time::Instant};
+
+pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .thread_name(|index| format!("par_exec_{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 /// Benchmarking support for transactions.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TransactionBencher<S> {
     num_accounts: usize,
     num_transactions: usize,
@@ -69,9 +89,12 @@ where
                     &self.strategy,
                     self.num_accounts,
                     self.num_transactions,
+                    1,
+                    None,
+                    AccountPickStyle::Unlimited,
                 )
             },
-            |state| state.execute(),
+            |state| state.execute_sequential(),
             // The input here is the entire list of signed transactions, so it's pretty large.
             BatchSize::LargeInput,
         )
@@ -85,6 +108,9 @@ where
                     &self.strategy,
                     self.num_accounts,
                     self.num_transactions,
+                    1,
+                    None,
+                    AccountPickStyle::Unlimited,
                 )
             },
             |state| state.execute_parallel(),
@@ -102,28 +128,56 @@ where
         run_seq: bool,
         num_warmups: usize,
         num_runs: usize,
-        concurrency_level: usize,
+        num_executor_shards: usize,
+        concurrency_level_per_shard: usize,
+        remote_executor_addresses: Option<Vec<SocketAddr>>,
+        no_conflict_txn: bool,
+        maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<usize>, Vec<usize>) {
         let mut par_tps = Vec::new();
         let mut seq_tps = Vec::new();
 
         let total_runs = num_warmups + num_runs;
-        for i in 0..total_runs {
-            let state = TransactionBenchState::with_size(&self.strategy, num_accounts, num_txn);
 
-            if i < num_warmups {
-                println!("WARMUP - ignore results");
-                state.execute_blockstm_benchmark(concurrency_level, run_par, run_seq);
-            } else {
-                println!(
-                    "RUN benchmark for: num_threads = {}, \
+        println!(
+            "RUN benchmark for: num_shards {},  concurrency_level_per_shard = {}, \
                         num_account = {}, \
                         block_size = {}",
-                    num_cpus::get(),
-                    num_accounts,
-                    num_txn,
+            num_executor_shards, concurrency_level_per_shard, num_accounts, num_txn,
+        );
+        let account_pick_style = if no_conflict_txn {
+            AccountPickStyle::Limited(1)
+        } else {
+            AccountPickStyle::Unlimited
+        };
+
+        let mut state = TransactionBenchState::with_size(
+            &self.strategy,
+            num_accounts,
+            num_txn,
+            num_executor_shards,
+            remote_executor_addresses,
+            account_pick_style,
+        );
+
+        for i in 0..total_runs {
+            if i < num_warmups {
+                println!("WARMUP - ignore results");
+                state.execute_blockstm_benchmark(
+                    run_par,
+                    run_seq,
+                    no_conflict_txn,
+                    concurrency_level_per_shard,
+                    maybe_block_gas_limit,
                 );
-                let tps = state.execute_blockstm_benchmark(concurrency_level, run_par, run_seq);
+            } else {
+                let tps = state.execute_blockstm_benchmark(
+                    run_par,
+                    run_seq,
+                    no_conflict_txn,
+                    concurrency_level_per_shard,
+                    maybe_block_gas_limit,
+                );
                 par_tps.push(tps.0);
                 seq_tps.push(tps.1);
             }
@@ -133,69 +187,50 @@ where
     }
 }
 
-struct TransactionBenchState {
-    // Use the fake executor for now.
-    // TODO: Hook up the real executor in the future. Here's what needs to be done:
-    // 1. Provide a way to construct a write set from the genesis write set + initial balances.
-    // 2. Provide a trait for an executor with the functionality required for account_universe.
-    // 3. Implement the trait for the fake executor.
-    // 4. Implement the trait for the real executor, using the genesis write set implemented in 1
-    //    and the helpers in the execution_tests crate.
-    // 5. Add a type parameter that implements the trait here and switch "executor" to use it.
-    // 6. Add an enum to TransactionBencher that lets callers choose between the fake and real
-    //    executors.
-    executor: FakeExecutor,
-    transactions: Vec<Transaction>,
+struct TransactionBenchState<S> {
+    num_transactions: usize,
+    strategy: S,
+    account_universe: AccountUniverse,
+    parallel_block_executor: Option<Arc<ShardedBlockExecutor<FakeDataStore>>>,
+    block_partitioner: Option<ShardedBlockPartitioner>,
+    validator_set: ValidatorSet,
+    state_view: Arc<FakeDataStore>,
 }
 
-impl TransactionBenchState {
+impl<S> TransactionBenchState<S>
+where
+    S: Strategy,
+    S::Value: AUTransactionGen,
+{
     /// Creates a new benchmark state with the given number of accounts and transactions.
-    fn with_size<S>(strategy: S, num_accounts: usize, num_transactions: usize) -> Self
-    where
-        S: Strategy,
-        S::Value: AUTransactionGen,
-    {
-        let mut state = Self::with_universe(
+    fn with_size(
+        strategy: S,
+        num_accounts: usize,
+        num_transactions: usize,
+        num_executor_shards: usize,
+        remote_executor_addresses: Option<Vec<SocketAddr>>,
+        account_pick_style: AccountPickStyle,
+    ) -> Self {
+        Self::with_universe(
             strategy,
-            universe_strategy(num_accounts, num_transactions),
+            universe_strategy(num_accounts, num_transactions, account_pick_style),
             num_transactions,
-        );
-
-        // Insert a blockmetadata transaction at the beginning to better simulate the real life traffic.
-        let validator_set =
-            ValidatorSet::fetch_config(&state.executor.get_state_view().as_move_resolver())
-                .expect("Unable to retrieve the validator set from storage");
-
-        let new_block = BlockMetadata::new(
-            HashValue::zero(),
-            0,
-            0,
-            *validator_set.payload().next().unwrap().account_address(),
-            BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
-            vec![],
-            1,
-        );
-
-        state
-            .transactions
-            .insert(0, Transaction::BlockMetadata(new_block));
-
-        state
+            num_executor_shards,
+            remote_executor_addresses,
+        )
     }
 
     /// Creates a new benchmark state with the given account universe strategy and number of
     /// transactions.
-    fn with_universe<S>(
+    fn with_universe(
         strategy: S,
         universe_strategy: impl Strategy<Value = AccountUniverseGen>,
         num_transactions: usize,
-    ) -> Self
-    where
-        S: Strategy,
-        S::Value: AUTransactionGen,
-    {
+        num_executor_shards: usize,
+        remote_executor_addresses: Option<Vec<SocketAddr>>,
+    ) -> Self {
         let mut runner = TestRunner::default();
-        let universe = universe_strategy
+        let universe_gen = universe_strategy
             .new_tree(&mut runner)
             .expect("creating a new value should succeed")
             .current();
@@ -204,56 +239,193 @@ impl TransactionBenchState {
         // Run in gas-cost-stability mode for now -- this ensures that new accounts are ignored.
         // XXX We may want to include new accounts in case they have interesting performance
         // characteristics.
-        let mut universe = universe.setup_gas_cost_stability(&mut executor);
+        let universe = universe_gen.setup_gas_cost_stability(&mut executor);
 
-        let transaction_gens = vec(strategy, num_transactions)
-            .new_tree(&mut runner)
-            .expect("creating a new value should succeed")
-            .current();
-        let transactions = transaction_gens
-            .into_iter()
-            .map(|txn_gen| Transaction::UserTransaction(txn_gen.apply(&mut universe).0))
-            .collect();
+        let state_view = Arc::new(executor.get_state_view().clone());
+        let (parallel_block_executor, block_partitioner) = if num_executor_shards == 1 {
+            (None, None)
+        } else {
+            let parallel_block_executor =
+                if let Some(remote_executor_addresses) = remote_executor_addresses {
+                    let remote_executor_clients = remote_executor_addresses
+                        .into_iter()
+                        .map(|addr| RemoteExecutorClient::new(addr, 10000))
+                        .collect::<Vec<RemoteExecutorClient>>();
+                    Arc::new(ShardedBlockExecutor::new(remote_executor_clients))
+                } else {
+                    let local_executor_client =
+                        LocalExecutorClient::create_local_clients(num_executor_shards, None);
+                    Arc::new(ShardedBlockExecutor::new(local_executor_client))
+                };
+            (
+                Some(parallel_block_executor),
+                Some(ShardedBlockPartitioner::new(num_executor_shards)),
+            )
+        };
+
+        let validator_set = ValidatorSet::fetch_config(
+            &FakeExecutor::from_head_genesis()
+                .get_state_view()
+                .as_move_resolver(),
+        )
+        .expect("Unable to retrieve the validator set from storage");
 
         Self {
-            executor,
-            transactions,
+            num_transactions,
+            strategy,
+            account_universe: universe,
+            parallel_block_executor,
+            block_partitioner,
+            validator_set,
+            state_view,
         }
     }
 
-    /// Executes this state in a single block.
-    fn execute(self) {
-        // The output is ignored here since we're just testing transaction performance, not trying
-        // to assert correctness.
-        BlockAptosVM::execute_block(self.transactions, self.executor.get_state_view(), 1)
-            .expect("VM should not fail to start");
+    pub fn gen_transaction(&mut self, no_conflict_txns: bool) -> Vec<Transaction> {
+        if no_conflict_txns {
+            // resetting the picker here so that we can re-use the same accounts from last block
+            // but still generate non conflicting transactions for this block.
+            self.account_universe.reset_picker()
+        }
+        let mut runner = TestRunner::default();
+        let transaction_gens = vec(&self.strategy, self.num_transactions)
+            .new_tree(&mut runner)
+            .expect("creating a new value should succeed")
+            .current();
+        let mut transactions: Vec<Transaction> = transaction_gens
+            .into_iter()
+            .map(|txn_gen| {
+                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe).0)
+            })
+            .collect();
+
+        // Insert a blockmetadata transaction at the beginning to better simulate the real life traffic.
+        let new_block = BlockMetadata::new(
+            HashValue::zero(),
+            0,
+            0,
+            *self
+                .validator_set
+                .payload()
+                .next()
+                .unwrap()
+                .account_address(),
+            BitVec::with_num_bits(self.validator_set.num_validators() as u16).into(),
+            vec![],
+            1,
+        );
+
+        transactions.insert(0, Transaction::BlockMetadata(new_block));
+        transactions
     }
 
-    /// Executes this state in a single block via parallel execution.
-    fn execute_parallel(self) {
+    /// Executes this state in a single block.
+    fn execute_sequential(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
+        let txns = self.gen_transaction(false);
+        self.execute_benchmark_sequential(txns, None);
+    }
+
+    /// Executes this state in a single block.
+    fn execute_parallel(mut self) {
+        // The output is ignored here since we're just testing transaction performance, not trying
+        // to assert correctness.
+        let txns = self.gen_transaction(false);
+        self.execute_benchmark_parallel(txns, num_cpus::get(), None);
+    }
+
+    fn execute_benchmark_sequential(
+        &self,
+        transactions: Vec<Transaction>,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> usize {
+        let block_size = transactions.len();
+        let timer = Instant::now();
         BlockAptosVM::execute_block(
-            self.transactions,
-            self.executor.get_state_view(),
-            num_cpus::get(),
+            Arc::clone(&RAYON_EXEC_POOL),
+            BlockExecutorTransactions::Unsharded(transactions),
+            self.state_view.as_ref(),
+            1,
+            maybe_block_gas_limit,
         )
         .expect("VM should not fail to start");
+        let exec_time = timer.elapsed().as_millis();
+
+        block_size * 1000 / exec_time as usize
+    }
+
+    fn execute_benchmark_parallel(
+        &self,
+        transactions: Vec<Transaction>,
+        concurrency_level_per_shard: usize,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> usize {
+        let block_size = transactions.len();
+        let timer = Instant::now();
+        if let Some(parallel_block_executor) = self.parallel_block_executor.as_ref() {
+            // TODO(skedia) partition in a pipelined way and evaluate how expensive it is to
+            // parse the txns in a single thread.
+            let partitioned_block = self.block_partitioner.as_ref().unwrap().partition(
+                transactions
+                    .into_iter()
+                    .map(|txn| txn.into())
+                    .collect::<Vec<AnalyzedTransaction>>(),
+                1,
+            );
+            parallel_block_executor
+                .execute_block(
+                    self.state_view.clone(),
+                    partitioned_block,
+                    concurrency_level_per_shard,
+                    maybe_block_gas_limit,
+                )
+                .expect("VM should not fail to start");
+        } else {
+            BlockAptosVM::execute_block(
+                Arc::clone(&RAYON_EXEC_POOL),
+                BlockExecutorTransactions::Unsharded(transactions),
+                self.state_view.as_ref(),
+                concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            )
+            .expect("VM should not fail to start");
+        }
+        let exec_time = timer.elapsed().as_millis();
+
+        block_size * 1000 / exec_time as usize
     }
 
     fn execute_blockstm_benchmark(
-        self,
-        concurrency_level: usize,
+        &mut self,
         run_par: bool,
         run_seq: bool,
+        no_conflict_txns: bool,
+        conurrency_level_per_shard: usize,
+        maybe_block_gas_limit: Option<u64>,
     ) -> (usize, usize) {
-        BlockAptosVM::execute_block_benchmark(
-            self.transactions,
-            self.executor.get_state_view(),
-            concurrency_level,
-            run_par,
-            run_seq,
-        )
+        let transactions = self.gen_transaction(no_conflict_txns);
+        let par_tps = if run_par {
+            println!("Parallel execution starts...");
+            let tps = self.execute_benchmark_parallel(
+                transactions.clone(),
+                conurrency_level_per_shard,
+                maybe_block_gas_limit,
+            );
+            println!("Parallel execution finishes, TPS = {}", tps);
+            tps
+        } else {
+            0
+        };
+        let seq_tps = if run_seq {
+            println!("Sequential execution starts...");
+            let tps = self.execute_benchmark_sequential(transactions, maybe_block_gas_limit);
+            println!("Sequential execution finishes, TPS = {}", tps);
+            tps
+        } else {
+            0
+        };
+        (par_tps, seq_tps)
     }
 }
 
@@ -262,7 +434,8 @@ impl TransactionBenchState {
 fn universe_strategy(
     num_accounts: usize,
     num_transactions: usize,
+    account_pick_style: AccountPickStyle,
 ) -> impl Strategy<Value = AccountUniverseGen> {
     let balance = TXN_RESERVED * num_transactions as u64 * 5;
-    AccountUniverseGen::strategy(num_accounts, balance..(balance + 1))
+    AccountUniverseGen::strategy(num_accounts, balance..(balance + 1), account_pick_style)
 }

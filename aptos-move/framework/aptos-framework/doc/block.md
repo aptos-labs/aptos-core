@@ -320,7 +320,8 @@ Can only be called as part of the Aptos governance proposal process established 
 Return epoch interval in seconds.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_epoch_interval_secs">get_epoch_interval_secs</a>(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_epoch_interval_secs">get_epoch_interval_secs</a>(): u64
 </code></pre>
 
 
@@ -425,7 +426,8 @@ The runtime always runs this before executing the transactions in a block.
 Get the current block height
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_current_block_height">get_current_block_height</a>(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_current_block_height">get_current_block_height</a>(): u64
 </code></pre>
 
 
@@ -667,7 +669,8 @@ The BlockResource existed under the @aptos_framework.
 ### Function `get_epoch_interval_secs`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_epoch_interval_secs">get_epoch_interval_secs</a>(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_epoch_interval_secs">get_epoch_interval_secs</a>(): u64
 </code></pre>
 
 
@@ -710,7 +713,8 @@ The BlockResource existed under the @aptos_framework.
 ### Function `get_current_block_height`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_current_block_height">get_current_block_height</a>(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_current_block_height">get_current_block_height</a>(): u64
 </code></pre>
 
 

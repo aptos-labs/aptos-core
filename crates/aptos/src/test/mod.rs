@@ -12,11 +12,12 @@ use crate::{
     common::{
         init::{InitTool, Network},
         types::{
-            account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec, CliError,
-            CliTypedResult, EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions,
-            KeyType, MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
-            PoolAddressArgs, PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions,
-            RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
+            account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
+            AuthenticationKeyInputOptions, CliError, CliTypedResult, EncodingOptions,
+            EntryFunctionArguments, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
+            MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
+            PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs, SaveFile,
+            ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -53,14 +54,13 @@ use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
 use aptos_rest_client::{
-    aptos_api_types::{IdentifierWrapper, MoveStructTag, MoveType},
+    aptos_api_types::{MoveStructTag, MoveType},
     Transaction,
 };
-use aptos_sdk::move_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-};
+use aptos_sdk::move_types::{account_address::AccountAddress, language_storage::ModuleId};
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
+use move_core_types::ident_str;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -242,6 +242,7 @@ impl CliTestFramework {
             rest_options: self.rest_options(),
             encoding_options: Default::default(),
             profile_options: Default::default(),
+            authentication_key_options: AuthenticationKeyInputOptions::from_public_key(public_key),
         }
         .execute()
         .await
@@ -311,25 +312,25 @@ impl CliTestFramework {
     ) -> CliTypedResult<TransactionSummary> {
         RunFunction {
             entry_function_args: EntryFunctionArguments {
-                function_id: MemberId {
-                    module_id: ModuleId::new(
-                        AccountAddress::ONE,
-                        Identifier::from_str("coin").unwrap(),
-                    ),
-                    member_id: Identifier::from_str("transfer").unwrap(),
-                },
+                function_id: Some(MemberId {
+                    module_id: ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
+                    member_id: ident_str!("transfer").into(),
+                }),
                 arg_vec: ArgWithTypeVec {
                     args: vec![
                         ArgWithType::from_str("address:0xdeadbeefcafebabe").unwrap(),
                         ArgWithType::from_str(&format!("u64:{}", amount)).unwrap(),
                     ],
                 },
-                type_args: vec![MoveType::Struct(MoveStructTag::new(
-                    AccountAddress::ONE.into(),
-                    IdentifierWrapper::from_str("aptos_coin").unwrap(),
-                    IdentifierWrapper::from_str("AptosCoin").unwrap(),
-                    vec![],
-                ))],
+                type_arg_vec: TypeArgVec {
+                    type_args: vec![MoveType::Struct(MoveStructTag::new(
+                        AccountAddress::ONE.into(),
+                        ident_str!("aptos_coin").into(),
+                        ident_str!("AptosCoin").into(),
+                        vec![],
+                    ))],
+                },
+                json_file: None,
             },
             txn_options: self.transaction_options(sender_index, gas_options),
         }
@@ -591,8 +592,9 @@ impl CliTestFramework {
     ) -> CliTypedResult<TransactionSummary> {
         RunFunction {
             entry_function_args: EntryFunctionArguments {
-                function_id: MemberId::from_str("0x1::staking_contract::create_staking_contract")
-                    .unwrap(),
+                function_id: Some(
+                    MemberId::from_str("0x1::staking_contract::create_staking_contract").unwrap(),
+                ),
                 arg_vec: ArgWithTypeVec {
                     args: vec![
                         ArgWithType::address(self.account_id(operator_index)),
@@ -602,7 +604,8 @@ impl CliTestFramework {
                         ArgWithType::bytes(vec![]),
                     ],
                 },
-                type_args: vec![],
+                type_arg_vec: TypeArgVec { type_args: vec![] },
+                json_file: None,
             },
             txn_options: self.transaction_options(owner_index, None),
         }
@@ -913,12 +916,15 @@ impl CliTestFramework {
         }
 
         RunFunction {
-            txn_options: self.transaction_options(index, gas_options),
             entry_function_args: EntryFunctionArguments {
-                function_id,
+                function_id: Some(function_id),
                 arg_vec: ArgWithTypeVec { args: parsed_args },
-                type_args: parsed_type_args,
+                type_arg_vec: TypeArgVec {
+                    type_args: parsed_type_args,
+                },
+                json_file: None,
             },
+            txn_options: self.transaction_options(index, gas_options),
         }
         .execute()
         .await
@@ -980,8 +986,11 @@ impl CliTestFramework {
                 framework_package_args,
                 bytecode_version: None,
             },
-            arg_vec: ArgWithTypeVec { args: Vec::new() },
-            type_args: Vec::new(),
+            script_function_args: ScriptFunctionArguments {
+                type_arg_vec: TypeArgVec { type_args: vec![] },
+                arg_vec: ArgWithTypeVec { args: vec![] },
+                json_file: None,
+            },
         }
         .execute()
         .await
@@ -1006,8 +1015,11 @@ impl CliTestFramework {
                 },
                 bytecode_version: None,
             },
-            arg_vec: ArgWithTypeVec { args },
-            type_args,
+            script_function_args: ScriptFunctionArguments {
+                type_arg_vec: TypeArgVec { type_args },
+                arg_vec: ArgWithTypeVec { args },
+                json_file: None,
+            },
         }
         .execute()
         .await
@@ -1118,6 +1130,8 @@ impl CliTestFramework {
         is_multi_step: bool,
     ) -> CliTypedResult<ProposalSubmissionSummary> {
         SubmitProposal {
+            #[cfg(feature = "no-upload-proposal")]
+            metadata_path: None,
             metadata_url: Url::parse(metadata_url).unwrap(),
             pool_address_args: PoolAddressArgs { pool_address },
             txn_options: self.transaction_options(index, None),

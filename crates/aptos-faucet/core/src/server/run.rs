@@ -271,6 +271,7 @@ impl RunConfig {
                     None,    // gas_unit_price_override
                     500_000, // max_gas_amount
                     30,      // transaction_expiration_secs
+                    35,      // wait_for_outstanding_txns_secs
                     false,   // wait_for_transactions
                 ),
                 mint_account_address: Some(aptos_test_root_address()),
@@ -293,7 +294,7 @@ pub enum FunderKeyEnum {
 
 #[derive(Clone, Debug, Parser)]
 pub struct Run {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, value_parser)]
     config_path: PathBuf,
 }
 

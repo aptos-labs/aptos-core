@@ -203,7 +203,7 @@ Specialized function for x * y / z that omits intermediate shifting
     <b>let</b> a = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">fixed_point64::get_raw_value</a>(x);
     <b>let</b> b = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">fixed_point64::get_raw_value</a>(y);
     <b>let</b> c = <a href="fixed_point64.md#0x1_fixed_point64_get_raw_value">fixed_point64::get_raw_value</a>(z);
-    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a> (math128::mul_div(a, b, c))
+    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a> (<a href="math128.md#0x1_math128_mul_div">math128::mul_div</a>(a, b, c))
 }
 </code></pre>
 
@@ -299,7 +299,8 @@ For functions that approximate a value it's useful to test a value is close
 to the most correct value up to last digit
 
 
-<pre><code><b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_assert_approx_the_same">assert_approx_the_same</a>(x: u256, y: u256, precission: u128)
+<pre><code>#[testonly]
+<b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_assert_approx_the_same">assert_approx_the_same</a>(x: u256, y: u256, precission: u128)
 </code></pre>
 
 

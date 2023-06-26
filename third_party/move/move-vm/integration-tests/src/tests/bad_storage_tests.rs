@@ -9,6 +9,7 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
+    metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
@@ -105,7 +106,7 @@ fn test_malformed_resource() {
     let (changeset, _) = sess.finish().unwrap();
     storage.apply(changeset).unwrap();
 
-    // Execut the second script and make sure it succeeds. This script simply checks
+    // Execute the second script and make sure it succeeds. This script simply checks
     // that the published resource is what we expect it to be. This inital run is to ensure
     // the testing environment is indeed free of errors without external interference.
     let mut script_blob = vec![];
@@ -508,6 +509,10 @@ struct BogusStorage {
 }
 
 impl ModuleResolver for BogusStorage {
+    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
+        vec![]
+    }
+
     fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, anyhow::Error> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
@@ -516,11 +521,12 @@ impl ModuleResolver for BogusStorage {
 }
 
 impl ResourceResolver for BogusStorage {
-    fn get_resource(
+    fn get_resource_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+        _metadata: &[Metadata],
+    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)

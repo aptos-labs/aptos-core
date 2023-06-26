@@ -99,7 +99,8 @@ make it so that a reference to a global object can be returned from a function.
 The core of the object model that defines ownership, transferability, and events.
 
 
-<pre><code><b>struct</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> <b>has</b> key
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> <b>has</b> key
 </code></pre>
 
 
@@ -146,7 +147,8 @@ The core of the object model that defines ownership, transferability, and events
 A shared resource group for storing object resources together in storage.
 
 
-<pre><code><b>struct</b> <a href="object.md#0x1_object_ObjectGroup">ObjectGroup</a>
+<pre><code>#[resource_group(#[scope = <b>global</b>])]
+<b>struct</b> <a href="object.md#0x1_object_ObjectGroup">ObjectGroup</a>
 </code></pre>
 
 
@@ -226,7 +228,7 @@ This is a one time ability given to the creator to configure the object as neces
 </dt>
 <dd>
  Set to true so long as deleting the object is possible. For example, the object was
- created via create_named_object.
+ created via create_object_from_guid.
 </dd>
 </dl>
 
@@ -1105,7 +1107,7 @@ Returns the address associated with the constructor
 
 ## Function `object_from_constructor_ref`
 
-Returns an Object<T> from within a DeleteRef
+Returns an Object<T> from within a ConstructorRef
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;

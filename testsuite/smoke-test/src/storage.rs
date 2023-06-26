@@ -111,8 +111,7 @@ async fn test_db_restore() {
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
     let port = node1_config.storage.backup_service_address.port();
-    let backup_path = db_backup(port, 5, 400, 200, 5, &[]);
-
+    let (backup_path, _) = db_backup(port, 5, 400, 200, 5, &[]);
     // take down node 0
     let node_to_restart = validator_peer_ids[0];
     swarm.validator_mut(node_to_restart).unwrap().stop();
@@ -132,7 +131,8 @@ async fn test_db_restore() {
         backup_path.path(),
         db_dir.as_path(),
         &[],
-        node0_config.storage.rocksdb_configs.use_state_kv_db,
+        node0_config.storage.rocksdb_configs.split_ledger_db,
+        None,
     );
 
     expected_balance_0 -= 3;
@@ -187,7 +187,7 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     metadata_cache_path.create_as_dir().unwrap();
 
     let mut cmd = Command::new(bin_path.as_path());
-
+    cmd.args(["backup", "verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
         cmd.arg(&w.to_string());
@@ -195,8 +195,6 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
 
     let status = cmd
         .args([
-            "backup",
-            "verify",
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
             "--concurrent-downloads",
@@ -261,7 +259,7 @@ fn wait_for_backups(
     metadata_cache_path: &Path,
     backup_path: &Path,
     trusted_waypoints: &[Waypoint],
-) -> Result<()> {
+) -> Result<Version> {
     for i in 0..120 {
         info!(
             "{}th wait for the backup to reach epoch {}, version {}.",
@@ -282,7 +280,7 @@ fn wait_for_backups(
                 now.elapsed().as_secs(),
                 state
             );
-            return Ok(());
+            return Ok(state.latest_state_snapshot_version.unwrap());
         }
         info!("Backup storage state: {}", state);
         if state.latest_transaction_version.is_some() {
@@ -325,7 +323,7 @@ pub(crate) fn db_backup(
     transaction_batch_size: usize,
     state_snapshot_interval_epochs: usize,
     trusted_waypoints: &[Waypoint],
-) -> TempPath {
+) -> (TempPath, Version) {
     info!("---------- running aptos db tool backup");
     let now = Instant::now();
     let bin_path = workspace_builder::get_bin("aptos-db-tool");
@@ -401,16 +399,17 @@ pub(crate) fn db_backup(
         std::str::from_utf8(&compaction.stderr).unwrap()
     );
     backup_coordinator.kill().unwrap();
-    wait_res.unwrap();
+    let snapshot_ver = wait_res.unwrap();
     replay_verify(backup_path.path(), trusted_waypoints);
-    backup_path
+    (backup_path, snapshot_ver)
 }
 
 pub(crate) fn db_restore(
     backup_path: &Path,
     db_path: &Path,
     trusted_waypoints: &[Waypoint],
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
+    target_verion: Option<Version>, /* target version should be same as epoch ending version to start a node */
 ) {
     let now = Instant::now();
     let bin_path = workspace_builder::get_bin("aptos-db-tool");
@@ -425,8 +424,12 @@ pub(crate) fn db_restore(
         cmd.arg(&w.to_string());
     });
 
-    if use_state_kv_db {
-        cmd.arg("--use-state-kv-db");
+    if split_ledger_db {
+        cmd.arg("--split-ledger-db");
+    }
+    if let Some(version) = target_verion {
+        cmd.arg("--target-version");
+        cmd.arg(&version.to_string());
     }
 
     let status = cmd

@@ -5,7 +5,7 @@ syntax = "proto3";
 
 package aptos.internal.fullnode.v1;
 
-import "aptos/transaction/testing1/v1/transaction.proto";
+import "aptos/transaction/v1/transaction.proto";
 
 // Transaction data is transferred via 1 stream with batches until terminated.
 // One stream consists:
@@ -15,7 +15,7 @@ import "aptos/transaction/testing1/v1/transaction.proto";
 //    StreamStatus: BATCH_END with version x + (k + 1) * n - 1
 
 message TransactionsOutput {
-  repeated aptos.transaction.testing1.v1.Transaction transactions  = 1;
+  repeated aptos.transaction.v1.Transaction transactions  = 1;
 }
 
 message StreamStatus {
@@ -30,17 +30,17 @@ message StreamStatus {
   // Required. Start version of current batch/stream, inclusive.
   uint64 start_version = 2;
   // End version of current *batch*, inclusive.
-  optional uint64 end_version = 3;
+  optional uint64 end_version = 3 [jstype = JS_STRING];
 }
 
 message GetTransactionsFromNodeRequest {
   // Required; start version of current stream.
   // If not set will panic somewhere
-  optional uint64 starting_version = 1;
+  optional uint64 starting_version = 1 [jstype = JS_STRING];
 
   // Optional; number of transactions to return in current stream.
   // If not set, response streams infinitely.
-  optional uint64 transactions_count = 2;
+  optional uint64 transactions_count = 2 [jstype = JS_STRING];
 }
 
 message TransactionsFromNodeResponse {

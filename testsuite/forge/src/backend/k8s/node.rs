@@ -13,7 +13,6 @@ use aptos_db::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
-use aptos_secure_storage::SECURE_STORAGE_DB_NAME;
 use aptos_state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use reqwest::Url;
 use serde_json::Value;
@@ -169,7 +168,6 @@ impl Node for K8sNode {
         // Remove all storage files
         let ledger_db_path = format!("{}/db/{}", APTOS_DATA_DIR, LEDGER_DB_NAME);
         let state_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_MERKLE_DB_NAME);
-        let secure_storage_db_path = format!("{}/{}", APTOS_DATA_DIR, SECURE_STORAGE_DB_NAME);
         let state_sync_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_SYNC_DB_NAME);
 
         let delete_storage_paths = [
@@ -182,7 +180,6 @@ impl Node for K8sNode {
             "-rf",
             &ledger_db_path,
             &state_db_path,
-            &secure_storage_db_path,
             &state_sync_db_path,
         ];
         info!("{:?}", delete_storage_paths);

@@ -17,8 +17,8 @@ public fun Test::update<#0>($t0|x: #0) {
 
 [variant baseline]
 public fun Test::assert_assume_memory() {
-  0: assume exists<Test::A<bool, u64>>(1)
-  1: assert exists<Test::A<u64, bool>>(1)
+  0: assume exists<Test::A<bool, u64>>(0x1)
+  1: assert exists<Test::A<u64, bool>>(0x1)
   2: return ()
 }
 
@@ -93,8 +93,8 @@ public fun Test::update<#0>($t0|x: #0) {
 
 [variant baseline]
 public fun Test::assert_assume_memory() {
-  0: assume exists<Test::A<bool, u64>>(1)
-  1: assert exists<Test::A<u64, bool>>(1)
+  0: assume exists<Test::A<bool, u64>>(0x1)
+  1: assert exists<Test::A<u64, bool>>(0x1)
   2: return ()
 }
 

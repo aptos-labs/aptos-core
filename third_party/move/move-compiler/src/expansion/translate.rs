@@ -2522,7 +2522,7 @@ fn check_valid_address_name_(
 
 fn check_valid_local_name(context: &mut Context, v: &Var) {
     fn is_valid(s: Symbol) -> bool {
-        s.starts_with('_') || s.starts_with(|c| matches!(c, 'a'..='z'))
+        s.starts_with('_') || s.starts_with(|c: char| c.is_ascii_lowercase())
     }
     if !is_valid(v.value()) {
         let msg = format!(
@@ -2682,7 +2682,7 @@ fn check_valid_module_member_name_impl(
 }
 
 pub fn is_valid_struct_constant_or_schema_name(s: &str) -> bool {
-    s.starts_with(|c| matches!(c, 'A'..='Z'))
+    s.starts_with(|c: char| c.is_ascii_uppercase())
 }
 
 // Checks for a restricted name in any decl case

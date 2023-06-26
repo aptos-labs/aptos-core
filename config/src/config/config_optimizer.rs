@@ -4,7 +4,7 @@
 use crate::{
     config::{
         node_config_loader::NodeType, utils::get_config_name, Error, InspectionServiceConfig,
-        LoggerConfig, NodeConfig, StateSyncConfig,
+        LoggerConfig, MempoolConfig, NodeConfig, PeerMonitoringServiceConfig, StateSyncConfig,
     },
     network_id::NetworkId,
 };
@@ -63,6 +63,17 @@ impl ConfigOptimizer for NodeConfig {
         }
         if LoggerConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(LoggerConfig::get_optimizer_name());
+        }
+        if MempoolConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(MempoolConfig::get_optimizer_name());
+        }
+        if PeerMonitoringServiceConfig::optimize(
+            node_config,
+            local_config_yaml,
+            node_type,
+            chain_id,
+        )? {
+            optimizers_with_modifications.push(PeerMonitoringServiceConfig::get_optimizer_name());
         }
         if StateSyncConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(StateSyncConfig::get_optimizer_name());
