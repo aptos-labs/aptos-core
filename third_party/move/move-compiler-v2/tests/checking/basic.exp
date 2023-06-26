@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: expected `u64` but found `address` in expression
+  ┌─ tests/checking/basic.move:2:22
+  │
+2 │     fun foo(): u64 { @22 }
+  │                      ^^^

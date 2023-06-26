@@ -14,7 +14,7 @@ pub const PAGE_SIZE: usize = 10;
 
 #[derive(Parser)]
 pub struct DbDir {
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     db_dir: PathBuf,
 }
 

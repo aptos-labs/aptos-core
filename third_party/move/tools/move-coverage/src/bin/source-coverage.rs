@@ -74,3 +74,9 @@ fn main() {
         .output_source_coverage(&mut coverage_writer)
         .unwrap();
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

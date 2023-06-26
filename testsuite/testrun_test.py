@@ -1,8 +1,6 @@
 import unittest
 from test_framework.shell import SpyShell, FakeCommand, RunResult
 from test_framework.filesystem import SpyFilesystem, FILE_NOT_FOUND
-from importlib.util import spec_from_loader, module_from_spec
-from importlib.machinery import SourceFileLoader
 
 import os
 import imp

@@ -212,11 +212,19 @@ impl BlockAptosVM {
             executor_thread_pool.install(|| Self::verify_transactions(transactions));
         drop(signature_verification_timer);
 
+        let is_sharded_execution = matches!(
+            signature_verified_block,
+            BlockExecutorTransactions::Sharded(_)
+        );
         let num_txns = signature_verified_block.num_txns();
-        if state_view.id() != StateViewId::Miscellaneous {
+        if !is_sharded_execution && state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
             init_speculative_logs(num_txns);
+        }
+
+        if is_sharded_execution {
+            aptos_vm_logging::disable_speculative_logging();
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
@@ -242,7 +250,7 @@ impl BlockAptosVM {
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());
 
-                if state_view.id() != StateViewId::Miscellaneous {
+                if !is_sharded_execution && state_view.id() != StateViewId::Miscellaneous {
                     // Speculation is disabled in Miscellaneous context, which is used by testing and
                     // can even lead to concurrent execute_block invocations, leading to errors on flush.
                     flush_speculative_logs(pos);

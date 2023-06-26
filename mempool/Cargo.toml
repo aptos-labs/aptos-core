@@ -19,6 +19,7 @@ aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-data-client = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
