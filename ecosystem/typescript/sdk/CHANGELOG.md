@@ -3,6 +3,7 @@
 All notable changes to the Aptos Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Add support for local testing without an indexer
 
 ## 1.13.2 (2023-07-12)
 - Add support for `Option<T>` and `vector<Object<T>>` in the SDK
