@@ -698,7 +698,8 @@ Aborts if length of public key hashed vector
 not equal the number of singers.
 
 
-<pre><code><b>let</b> gas_payer = <b>if</b> (txn_sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>) {
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>let</b> gas_payer = <b>if</b> (txn_sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>) {
     <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender)
 } <b>else</b> {
     secondary_signer_addresses[len(secondary_signer_addresses) - 1]
