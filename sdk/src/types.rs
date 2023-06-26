@@ -180,7 +180,9 @@ pub trait TransactionSigner {
     fn sign_with_transaction_builder(&mut self, builder: TransactionBuilder) -> SignedTransaction;
 }
 
-/// Similar
+/// Similar to LocalAccount, but for hardware wallets.
+/// HardwareWallet does not have private key exported.
+/// Anything that requires private key should be go through HardwareWallet.
 #[derive(Debug)]
 pub struct HardwareWalletAccount {
     address: AccountAddress,
