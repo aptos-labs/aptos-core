@@ -24,6 +24,7 @@ mod natives;
 #[macro_use]
 mod params;
 
+mod abstract_algebra;
 mod algebra;
 mod aptos_framework;
 mod gas_meter;
@@ -34,10 +35,14 @@ mod move_stdlib;
 mod table;
 mod transaction;
 
+pub use abstract_algebra::{
+    gas_switches::*, GasAdd, GasAlgebra, GasExpression, GasExpressionVisitor, GasMul,
+};
 pub use algebra::*;
 pub use gas_meter::{
     AptosGasMeter, AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule,
-    NativeGasParameters, StandardGasMeter, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+    NativeGasParameters, StandardGasAlgebra, StandardGasMeter, ToOnChainGasSchedule,
+    LATEST_GAS_FEATURE_VERSION,
 };
 pub use instr::InstructionGasParameters;
 pub use misc::{AbstractValueSizeGasParameters, MiscGasParameters};

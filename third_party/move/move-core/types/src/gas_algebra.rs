@@ -78,6 +78,18 @@ pub type InternalGasPerAbstractMemoryUnit =
 pub type InternalGasPerArg = GasQuantity<UnitDiv<InternalGasUnit, Arg>>;
 
 /***************************************************************************************************
+ * Get Unit
+ *
+ **************************************************************************************************/
+pub trait GasQuantityGetUnit {
+    type Unit;
+}
+
+impl<U> GasQuantityGetUnit for GasQuantity<U> {
+    type Unit = U;
+}
+
+/***************************************************************************************************
  * Constructors
  *
  **************************************************************************************************/

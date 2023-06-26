@@ -24,11 +24,13 @@ aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
+either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-types = { workspace = true }
+paste = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

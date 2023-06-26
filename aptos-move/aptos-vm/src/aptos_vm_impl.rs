@@ -14,7 +14,7 @@ use crate::{
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
-    Gas, NativeGasParameters, StorageGasParameters, StoragePricing,
+    Gas, GasExpression, NativeGasParameters, StorageGasParameters, StoragePricing,
 };
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_state_view::StateView;
@@ -211,7 +211,8 @@ impl AptosVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let txn_gas_params = &self.get_gas_parameters(log_context)?.txn;
+        let gas_params = self.get_gas_parameters(log_context)?;
+        let txn_gas_params = &gas_params.txn;
         let raw_bytes_len = txn_data.transaction_size;
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
@@ -278,8 +279,9 @@ impl AptosVMImpl {
         // The submitted transactions max gas units needs to be at least enough to cover the
         // intrinsic cost of the transaction as calculated against the size of the
         // underlying `RawTransaction`
-        let intrinsic_gas: Gas = txn_gas_params
+        let intrinsic_gas = txn_gas_params
             .calculate_intrinsic_gas(raw_bytes_len)
+            .materialize(self.gas_feature_version, gas_params)
             .to_unit_round_up_with_params(txn_gas_params);
 
         if txn_data.max_gas_amount() < intrinsic_gas {

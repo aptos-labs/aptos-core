@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas::{
-    AbstractValueSize, AptosGasMeter, AptosGasParameters, Fee, FeePerGasUnit, Gas,
-    GasScalingFactor, InternalGas, NumArgs, NumBytes,
+    AbstractValueSize, AptosGasMeter, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
@@ -460,16 +459,10 @@ impl<G> AptosGasMeter for MemoryTrackedGasMeter<G>
 where
     G: AptosGasMeter,
 {
+    type Algebra = G::Algebra;
+
     delegate! {
-        fn feature_version(&self) -> u64;
-
-        fn gas_params(&self) -> &AptosGasParameters;
-
-        fn balance(&self) -> Gas;
-
-        fn gas_unit_scaling_factor(&self) -> GasScalingFactor;
-
-        fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas;
+        fn algebra(&self) -> &Self::Algebra;
 
         fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
@@ -478,20 +471,12 @@ where
         fn storage_discount_for_events(&self, total_cost: Fee) -> Fee;
 
         fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee;
-
-        fn execution_gas_used(&self) -> Gas;
-
-        fn io_gas_used(&self) -> Gas;
-
-        fn storage_fee_used_in_gas_units(&self) -> Gas;
-
-        fn storage_fee_used(&self) -> Fee;
     }
 
     delegate_mut! {
-        fn charge_execution(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+        fn algebra_mut(&mut self) -> &mut Self::Algebra;
 
-        fn charge_io(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+        fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()>;
 
         fn charge_storage_fee(
             &mut self,
@@ -500,7 +485,5 @@ where
         ) -> PartialVMResult<()>;
 
         fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
-
-
     }
 }

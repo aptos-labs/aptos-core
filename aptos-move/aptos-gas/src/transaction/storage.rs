@@ -1,15 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
+use crate::{
+    abstract_algebra::GasExpression, transaction::gas_params::*, AptosGasParameters,
+    LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_types::{
     on_chain_config::{ConfigStorage, OnChainConfig, StorageGasSchedule},
     state_store::state_key::StateKey,
     write_set::WriteOp,
 };
 use aptos_vm_types::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
+use either::Either;
 use move_core_types::{
-    gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
+    gas_algebra::{
+        InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumArgs, NumBytes,
+    },
     vm_status::{StatusCode, VMStatus},
 };
 use std::fmt::Debug;
@@ -178,10 +184,52 @@ impl StoragePricingV2 {
     }
 }
 
+// No storage curve. New gas parameter representation.
+#[derive(Debug, Clone)]
+pub struct StoragePricingV3 {
+    pub feature_version: u64,
+    pub free_write_bytes_quota: NumBytes,
+}
+
+impl StoragePricingV3 {
+    fn calculate_read_gas(&self, loaded: NumBytes) -> impl GasExpression<Unit = InternalGasUnit> {
+        STORAGE_IO_PER_STATE_SLOT_READ * NumArgs::from(1) + STORAGE_IO_PER_STATE_BYTE_READ * loaded
+    }
+
+    fn write_op_size(&self, key: &StateKey, value: &[u8]) -> NumBytes {
+        let value_size = NumBytes::new(value.len() as u64);
+        let key_size = NumBytes::new(key.size() as u64);
+
+        (key_size + value_size)
+            .checked_sub(self.free_write_bytes_quota)
+            .unwrap_or(NumBytes::zero())
+    }
+
+    fn io_gas_per_write(
+        &self,
+        key: &StateKey,
+        op: &WriteOp,
+    ) -> impl GasExpression<Unit = InternalGasUnit> {
+        use WriteOp::*;
+
+        match op {
+            Creation(data)
+            | CreationWithMetadata { data, .. }
+            | Modification(data)
+            | ModificationWithMetadata { data, .. } => Either::Left(
+                STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
+                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, data),
+            ),
+            Deletion | DeletionWithMetadata { .. } => Either::Right(InternalGas::zero()),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum StoragePricing {
     V1(StoragePricingV1),
     V2(StoragePricingV2),
+    V3(StoragePricingV3),
 }
 
 impl StoragePricing {
@@ -209,27 +257,37 @@ impl StoragePricing {
         }
     }
 
-    pub fn calculate_read_gas(&self, resource_exists: bool, bytes_loaded: NumBytes) -> InternalGas {
+    pub fn calculate_read_gas(
+        &self,
+        resource_exists: bool,
+        bytes_loaded: NumBytes,
+    ) -> impl GasExpression<Unit = InternalGasUnit> {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => v1.calculate_read_gas(
+            V1(v1) => Either::Left(v1.calculate_read_gas(
                 if resource_exists {
                     Some(bytes_loaded)
                 } else {
                     None
                 },
-            ),
-            V2(v2) => v2.calculate_read_gas(bytes_loaded),
+            )),
+            V2(v2) => Either::Left(v2.calculate_read_gas(bytes_loaded)),
+            V3(v3) => Either::Right(v3.calculate_read_gas(bytes_loaded)),
         }
     }
 
-    pub fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
+    pub fn io_gas_per_write(
+        &self,
+        key: &StateKey,
+        op: &WriteOp,
+    ) -> impl GasExpression<Unit = InternalGasUnit> {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => v1.io_gas_per_write(key, op),
-            V2(v2) => v2.io_gas_per_write(key, op),
+            V1(v1) => Either::Left(v1.io_gas_per_write(key, op)),
+            V2(v2) => Either::Left(v2.io_gas_per_write(key, op)),
+            V3(v3) => Either::Right(v3.io_gas_per_write(key, op)),
         }
     }
 }

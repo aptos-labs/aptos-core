@@ -4,9 +4,12 @@
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::algebra::{
-    AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasScalingFactor, GasUnit,
-    NumSlots,
+use crate::{
+    abstract_algebra::GasExpression,
+    algebra::{
+        AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasScalingFactor,
+        GasUnit, NumSlots,
+    },
 };
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
@@ -18,6 +21,7 @@ use move_core_types::gas_algebra::{
 
 mod storage;
 
+use self::gas_params::{INTRINSIC_GAS_PER_BYTE, MIN_TRANSACTION_GAS_UNITS};
 pub use storage::{ChangeSetConfigs, StorageGasParameters, StoragePricing};
 
 const GAS_SCALING_FACTOR: u64 = 1_000_000;
@@ -25,6 +29,7 @@ const GAS_SCALING_FACTOR: u64 = 1_000_000;
 crate::params::define_gas_parameters!(
     TransactionGasParameters,
     "txn",
+    .txn,
     [
         // The flat minimum amount of gas required for any transaction.
         // Charged at the start of execution.
@@ -183,7 +188,7 @@ crate::params::define_gas_parameters!(
 impl TransactionGasParameters {
     // TODO(Gas): Right now we are relying on this to avoid div by zero errors when using the all-zero
     //            gas parameters. See if there's a better way we can handle this.
-    fn scaling_factor(&self) -> GasScalingFactor {
+    pub(crate) fn scaling_factor(&self) -> GasScalingFactor {
         match u64::from(self.gas_unit_scaling_factor) {
             0 => 1.into(),
             x => x.into(),
@@ -232,17 +237,15 @@ impl TransactionGasParameters {
     }
 
     /// Calculate the intrinsic gas for the transaction based upon its size in bytes.
-    pub fn calculate_intrinsic_gas(&self, transaction_size: NumBytes) -> InternalGas {
-        let min_transaction_fee = self.min_transaction_gas_units;
+    pub fn calculate_intrinsic_gas(
+        &self,
+        transaction_size: NumBytes,
+    ) -> impl GasExpression<Unit = InternalGasUnit> {
+        let excess = transaction_size
+            .checked_sub(self.large_transaction_cutoff)
+            .unwrap_or_else(|| 0.into());
 
-        if transaction_size > self.large_transaction_cutoff {
-            let excess = transaction_size
-                .checked_sub(self.large_transaction_cutoff)
-                .unwrap();
-            min_transaction_fee + (excess * self.intrinsic_gas_per_byte)
-        } else {
-            min_transaction_fee
-        }
+        MIN_TRANSACTION_GAS_UNITS + INTRINSIC_GAS_PER_BYTE * excess
     }
 }
 
