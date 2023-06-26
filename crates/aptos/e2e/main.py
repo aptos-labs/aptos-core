@@ -34,6 +34,7 @@ from cases.account import (
     test_account_fund_with_faucet,
     test_account_lookup_address,
 )
+from cases.config import test_config_show_profiles
 from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
 from cases.move import test_move_compile, test_move_compile_script, test_move_publish
 from common import Network
@@ -106,6 +107,9 @@ def run_tests(run_helper):
 
     # Run init tests. We run these first to set up the CLI.
     test_init(run_helper)
+
+    # Run config tests.
+    test_config_show_profiles(run_helper)
 
     # Run account tests.
     test_account_fund_with_faucet(run_helper)

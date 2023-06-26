@@ -2,23 +2,28 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::pipeline::CommitBlockMessage;
 use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_types::transaction::{Transaction, Version};
+use aptos_logger::info;
+use aptos_types::{
+    block_executor::partitioner::ExecutableBlock,
+    transaction::{Transaction, Version},
+};
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
 
 pub struct TransactionExecutor<V> {
+    num_blocks_processed: usize,
     executor: Arc<BlockExecutor<V>>,
     parent_block_id: HashValue,
-    start_time: Option<Instant>,
+    maybe_first_block_start_time: Option<Instant>,
     version: Version,
     // If commit_sender is `None`, we will commit all the execution result immediately in this struct.
-    commit_sender:
-        Option<mpsc::SyncSender<(HashValue, HashValue, Instant, Instant, Duration, usize)>>,
+    commit_sender: Option<mpsc::SyncSender<CommitBlockMessage>>,
     allow_discards: bool,
     allow_aborts: bool,
 }
@@ -31,37 +36,42 @@ where
         executor: Arc<BlockExecutor<V>>,
         parent_block_id: HashValue,
         version: Version,
-        commit_sender: Option<
-            mpsc::SyncSender<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
-        >,
+        commit_sender: Option<mpsc::SyncSender<CommitBlockMessage>>,
         allow_discards: bool,
         allow_aborts: bool,
     ) -> Self {
         Self {
+            num_blocks_processed: 0,
             executor,
             parent_block_id,
             version,
-            start_time: None,
+            maybe_first_block_start_time: None,
             commit_sender,
             allow_discards,
             allow_aborts,
         }
     }
 
-    pub fn execute_block(&mut self, transactions: Vec<Transaction>) {
-        if self.start_time.is_none() {
-            self.start_time = Some(Instant::now())
+    pub fn execute_block(
+        &mut self,
+        current_block_start_time: Instant,
+        partition_time: Duration,
+        executable_block: ExecutableBlock<Transaction>,
+    ) {
+        let execution_start_time = Instant::now();
+        if self.maybe_first_block_start_time.is_none() {
+            self.maybe_first_block_start_time = Some(current_block_start_time);
         }
-
-        let num_txns = transactions.len();
+        let block_id = executable_block.block_id;
+        info!(
+            "In iteration {}, received block {}.",
+            self.num_blocks_processed, block_id
+        );
+        let num_txns = executable_block.transactions.num_transactions();
         self.version += num_txns as Version;
-
-        let execution_start = Instant::now();
-
-        let block_id = HashValue::random();
         let output = self
             .executor
-            .execute_block((block_id, transactions).into(), self.parent_block_id, None)
+            .execute_block(executable_block, self.parent_block_id, None)
             .unwrap();
 
         assert_eq!(output.compute_status().len(), num_txns);
@@ -112,19 +122,17 @@ where
             &aborts[..(aborts.len().min(3))]
         );
 
-        self.parent_block_id = block_id;
-
-        if let Some(ref commit_sender) = self.commit_sender {
-            commit_sender
-                .send((
-                    block_id,
-                    output.root_hash(),
-                    self.start_time.unwrap(),
-                    execution_start,
-                    Instant::now().duration_since(execution_start),
-                    num_txns - discards.len(),
-                ))
-                .unwrap();
+        if let Some(commit_sender) = &self.commit_sender {
+            let msg = CommitBlockMessage {
+                block_id,
+                root_hash: output.root_hash(),
+                first_block_start_time: *self.maybe_first_block_start_time.as_ref().unwrap(),
+                current_block_start_time,
+                partition_time,
+                execution_time: Instant::now().duration_since(execution_start_time),
+                num_txns: num_txns - discards.len(),
+            };
+            commit_sender.send(msg).unwrap();
         } else {
             let ledger_info_with_sigs = super::transaction_committer::gen_li_with_sigs(
                 block_id,
@@ -135,5 +143,7 @@ where
                 .commit_blocks(vec![block_id], ledger_info_with_sigs)
                 .unwrap();
         }
+        self.parent_block_id = block_id;
+        self.num_blocks_processed += 1;
     }
 }
