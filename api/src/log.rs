@@ -81,6 +81,18 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
         ])
         .observe(elapsed.as_secs_f64());
 
+    if "submit_transaction"
+        == response
+            .data::<OperationId>()
+            .map(|operation_id| operation_id.0)
+            .unwrap_or("operation_id_not_set")
+    {
+        sample!(
+            SampleRate::Duration(Duration::from_secs(5)),
+            info!("DEVNET_TRACE (ms): total elapsed: {}", elapsed.as_millis()),
+        );
+    }
+
     // Push a counter based on the request source, sliced up by endpoint + method.
     REQUEST_SOURCE_CLIENT
         .with_label_values(&[

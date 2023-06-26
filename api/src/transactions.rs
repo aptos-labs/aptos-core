@@ -28,6 +28,7 @@ use aptos_api_types::{
     MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
+use aptos_logger::prelude::*;
 use aptos_types::{
     account_config::CoinStoreResource,
     account_view::AccountView,
@@ -44,7 +45,7 @@ use poem_openapi::{
     payload::Json,
     ApiRequest, OpenApi,
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -297,6 +298,7 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
+        let trace_start = std::time::Instant::now();
         data.verify()
             .context("Submitted transaction invalid'")
             .map_err(|err| {
@@ -311,10 +313,22 @@ impl TransactionsApi {
         }
         self.context
             .check_api_output_enabled("Submit transaction", &accept_type)?;
+        let trace_before_ledger_info = trace_start.elapsed();
         let ledger_info = self.context.get_latest_ledger_info()?;
+        let trace_before_signed_transaction = trace_start.elapsed();
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
-        self.create(&accept_type, &ledger_info, signed_transaction)
-            .await
+        let trace_before_create = trace_start.elapsed();
+        let result = self
+            .create(&accept_type, &ledger_info, signed_transaction)
+            .await;
+        let trace_before_return = trace_start.elapsed();
+        sample!(
+            SampleRate::Duration(Duration::from_secs(5)),
+            info!("DEVNET_TRACE (ms): before ledger_info:{}, signed_transaction:{}, create:{}, return:{}",
+                trace_before_ledger_info.as_millis(), trace_before_signed_transaction.as_millis(), trace_before_create.as_millis(), trace_before_return.as_millis())
+        );
+
+        result
     }
 
     /// Submit batch transactions
@@ -1057,9 +1071,11 @@ impl TransactionsApi {
         ledger_info: &LedgerInfo,
         txn: SignedTransaction,
     ) -> SubmitTransactionResult<PendingTransaction> {
+        let trace_start = std::time::Instant::now();
         match self.create_internal(txn.clone()).await {
             Ok(()) => match accept_type {
                 AcceptType::Json => {
+                    let trace_before_state_view = trace_start.elapsed();
                     let state_view = self
                         .context
                         .latest_state_view()
@@ -1071,8 +1087,10 @@ impl TransactionsApi {
                                 ledger_info,
                             )
                         })?;
+                    let trace_before_resolver = trace_start.elapsed();
                     let resolver = state_view.as_move_resolver();
 
+                    let trace_before_pending_txn = trace_start.elapsed();
                     // We provide the pending transaction so that users have the hash associated
                     let pending_txn = resolver
                             .as_converter(self.context.db.clone())
@@ -1083,11 +1101,20 @@ impl TransactionsApi {
                                 AptosErrorCode::InternalError,
                                 ledger_info,
                             ))?;
-                    SubmitTransactionResponse::try_from_json((
+                    let trace_before_response = trace_start.elapsed();
+                    let response = SubmitTransactionResponse::try_from_json((
                         pending_txn,
                         ledger_info,
                         SubmitTransactionResponseStatus::Accepted,
-                    ))
+                    ));
+                    let trace_before_return = trace_start.elapsed();
+
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(5)),
+                        info!("DEVNET_TRACE (ms): before state_view:{}, resolver:{}, pending_txn:{}, response:{}, return:{}",
+                        trace_before_state_view.as_millis(), trace_before_resolver.as_millis(), trace_before_pending_txn.as_millis(), trace_before_response.as_millis(), trace_before_return.as_millis()),
+                    );
+                    response
                 },
                 // With BCS, we don't return the pending transaction for efficiency, because there
                 // is no new information.  The hash can be retrieved by hashing the original
