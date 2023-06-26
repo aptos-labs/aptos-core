@@ -6,7 +6,8 @@ title: Aptos VM Benchmarks
 ## Aptos VM Benchmarks
 
 The Aptos VM Benchmark allows anyone to specify a set of Move modules and benchmark 
-the running time of transactions in the AptosVM measured in milliseconds.
+the running time of transactions in the AptosVM measured in milliseconds. The Aptos
+VM Benchmark allows an arbitrary amount of packages to be benchmarked.
 
 ## Usage
 
@@ -33,3 +34,12 @@ public entry fun benchmark_addition(_x: u64, _y: u64) {}
 ```
 
 To run the benchmarks, simply run `cargo run`.
+
+## Examples
+
+Two basics examples are included under the `/samples` directory to demonstrate how the 
+crate works: `/samples/add-numbers` and `/samples/do-nothing`. The `do-nothing` package 
+demonstrates basic usage, as well as situations where the benchmark script will complain.
+
+Additionally, `add-numbers` shows a simple implementation of a Move module and how one
+might benchmark it.
