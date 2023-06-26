@@ -18,11 +18,10 @@ use aptos_block_executor::{
     errors::Error,
     executor::BlockExecutor,
     task::{
-        Transaction as BlockExecutorTransaction,
+        ExecutionStatus as BlockExecutorExecutionStatus, Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
     txn_commit_listener::TransactionCommitListener,
-    txn_last_input_output::TxnOutput,
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
@@ -202,7 +201,9 @@ impl BlockAptosVM {
 
     pub fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitListener<TxnOutput = TxnOutput<AptosTransactionOutput, VMStatus>>,
+        L: TransactionCommitListener<
+            ExecutionStatus = BlockExecutorExecutionStatus<AptosTransactionOutput, Error<VMStatus>>,
+        >,
     >(
         executor_thread_pool: Arc<ThreadPool>,
         transactions: BlockExecutorTransactions<Transaction>,

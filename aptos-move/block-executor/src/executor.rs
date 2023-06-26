@@ -12,7 +12,7 @@ use crate::{
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_commit_listener::TransactionCommitListener,
-    txn_last_input_output::{TxnLastInputOutput, TxnOutput},
+    txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
@@ -85,7 +85,7 @@ where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitListener<TxnOutput = TxnOutput<E::Output, E::Error>>,
+    L: TransactionCommitListener<ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>>,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
@@ -504,7 +504,11 @@ where
         if let Some(txn_commit_listener) = txn_commit_listener {
             txn_commit_listener.on_transaction_committed(
                 txn_idx,
-                last_input_output.txn_output(txn_idx).unwrap().as_ref(),
+                last_input_output
+                    .txn_output(txn_idx)
+                    .unwrap()
+                    .as_ref()
+                    .output_status(),
             );
         }
     }

@@ -109,7 +109,7 @@ pub mod data_cache;
 #[cfg(feature = "mirai-contracts")]
 pub mod foreign_contracts;
 
-pub mod adapter_common;
+mod adapter_common;
 pub mod aptos_vm;
 mod aptos_vm_impl;
 pub mod block_executor;

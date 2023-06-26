@@ -8,8 +8,7 @@ use crate::{
     },
 };
 use aptos_block_executor::{
-    task::ExecutionStatus, txn_commit_listener::TransactionCommitListener,
-    txn_last_input_output::TxnOutput,
+    errors::Error, task::ExecutionStatus, txn_commit_listener::TransactionCommitListener,
 };
 use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
@@ -136,12 +135,16 @@ impl CrossShardCommitSender {
 }
 
 impl TransactionCommitListener for CrossShardCommitSender {
-    type TxnOutput = TxnOutput<AptosTransactionOutput, VMStatus>;
+    type ExecutionStatus = ExecutionStatus<AptosTransactionOutput, Error<VMStatus>>;
 
-    fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_writes: &Self::TxnOutput) {
+    fn on_transaction_committed(
+        &self,
+        txn_idx: TxnIndex,
+        execution_status: &Self::ExecutionStatus,
+    ) {
         let global_txn_idx = txn_idx + self.index_offset;
         if self.dependent_edges.contains_key(&global_txn_idx) {
-            match txn_writes.output_status() {
+            match execution_status {
                 ExecutionStatus::Success(output) => {
                     self.send_remote_update_for_success(global_txn_idx, output);
                 },

@@ -28,13 +28,13 @@ type TxnInput<K> = Vec<ReadDescriptor<K>>;
 // When a transaction is committed, the output delta writes must be populated by
 // the WriteOps corresponding to the deltas in the corresponding outputs.
 #[derive(Debug)]
-pub struct TxnOutput<T: TransactionOutput, E: Debug> {
+pub(crate) struct TxnOutput<T: TransactionOutput, E: Debug> {
     output_status: ExecutionStatus<T, Error<E>>,
 }
 type KeySet<T> = HashSet<<<T as TransactionOutput>::Txn as Transaction>::Key>;
 
 impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
-    fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
+    pub fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
         Self { output_status }
     }
 
