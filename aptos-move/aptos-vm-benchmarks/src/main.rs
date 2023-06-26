@@ -145,6 +145,7 @@ fn main() {
                         "[WARNING] benchmark function should not have parameters: {}",
                         func_name,
                     );
+                    // TODO: should we exit instead of continuing with the benchmark
                     continue;
                 }
 
