@@ -23,6 +23,7 @@ pub struct IndexerGrpcProcessorConfig {
     pub starting_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
     pub ans_address: Option<String>,
+    pub nft_points_contract: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -42,6 +43,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             self.starting_version,
             self.number_concurrent_processing_tasks,
             self.ans_address.clone(),
+            self.nft_points_contract.clone(),
         )
         .await;
         worker.run().await;

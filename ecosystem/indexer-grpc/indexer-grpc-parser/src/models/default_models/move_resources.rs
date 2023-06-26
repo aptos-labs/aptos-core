@@ -27,10 +27,11 @@ pub struct MoveResource {
     pub generic_type_params: Option<serde_json::Value>,
     pub data: Option<serde_json::Value>,
     pub is_deleted: bool,
+    pub state_key_hash: String,
 }
 
 pub struct MoveStructTag {
-    pub address: String,
+    address: String,
     pub module: String,
     pub name: String,
     pub generic_type_params: Option<serde_json::Value>,
@@ -60,6 +61,9 @@ impl MoveResource {
             generic_type_params: parsed_data.generic_type_params,
             data: Some(serde_json::from_str(write_resource.data.as_str()).unwrap()),
             is_deleted: false,
+            state_key_hash: standardize_address(
+                hex::encode(write_resource.state_key_hash.as_slice()).as_str(),
+            ),
         }
     }
 
@@ -86,6 +90,9 @@ impl MoveResource {
             generic_type_params: parsed_data.generic_type_params,
             data: None,
             is_deleted: true,
+            state_key_hash: standardize_address(
+                hex::encode(delete_resource.state_key_hash.as_slice()).as_str(),
+            ),
         }
     }
 
@@ -113,9 +120,15 @@ impl MoveResource {
 
         format!(
             "{}::{}::{}",
-            standardize_address(move_struct_tag.address.as_str()),
-            move_struct_tag.module.clone(),
-            move_struct_tag.name.clone(),
+            move_struct_tag.get_address(),
+            move_struct_tag.module,
+            move_struct_tag.name,
         )
+    }
+}
+
+impl MoveStructTag {
+    pub fn get_address(&self) -> String {
+        standardize_address(self.address.as_str())
     }
 }

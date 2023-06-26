@@ -18,7 +18,7 @@ use crate::{
             PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
             PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
         },
-        database::{execute_with_better_error, new_db_pool},
+        database::{execute_with_better_error, new_db_pool, PgDbPool},
     },
 };
 use anyhow::Context;
@@ -29,18 +29,11 @@ use aptos_moving_average::MovingAverage;
 use aptos_protos::indexer::v1::{
     raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse,
 };
-use diesel::{
-    pg::PgConnection,
-    r2d2::{ConnectionManager, PooledConnection},
-};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures::StreamExt;
 use std::sync::Arc;
 use tracing::{error, info};
 
-pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
-pub type PgDbPool = Arc<PgPool>;
-pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 pub struct Worker {
@@ -54,6 +47,7 @@ pub struct Worker {
     pub starting_version: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
     pub ans_address: Option<String>,
+    pub nft_points_contract: Option<String>,
 }
 
 impl Worker {
@@ -67,6 +61,7 @@ impl Worker {
         starting_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
         ans_address: Option<String>,
+        nft_points_contract: Option<String>,
     ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
@@ -92,6 +87,7 @@ impl Worker {
             auth_token,
             number_concurrent_processing_tasks,
             ans_address,
+            nft_points_contract,
         }
     }
 
@@ -198,6 +194,7 @@ impl Worker {
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
                 self.ans_address.clone(),
+                self.nft_points_contract.clone(),
             )),
             Processor::StakeProcessor => {
                 Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))

@@ -6,10 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::token_utils::TokenWriteSet;
-use crate::{
-    schema::{current_token_datas, token_datas},
-    utils::util::standardize_address,
-};
+use crate::schema::{current_token_datas, token_datas};
 use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
@@ -106,7 +103,7 @@ impl TokenData {
                     Self {
                         collection_data_id_hash: collection_data_id_hash.clone(),
                         token_data_id_hash: token_data_id_hash.clone(),
-                        creator_address: standardize_address(&token_data_id.creator),
+                        creator_address: token_data_id.get_creator_address(),
                         collection_name: collection_name.clone(),
                         name: name.clone(),
                         transaction_version: txn_version,
@@ -114,7 +111,7 @@ impl TokenData {
                         supply: token_data.supply.clone(),
                         largest_property_version: token_data.largest_property_version.clone(),
                         metadata_uri: metadata_uri.clone(),
-                        payee_address: standardize_address(&token_data.royalty.payee_address),
+                        payee_address: token_data.royalty.get_payee_address(),
                         royalty_points_numerator: token_data
                             .royalty
                             .royalty_points_numerator
@@ -135,14 +132,14 @@ impl TokenData {
                     CurrentTokenData {
                         collection_data_id_hash,
                         token_data_id_hash,
-                        creator_address: standardize_address(&token_data_id.creator),
+                        creator_address: token_data_id.get_creator_address(),
                         collection_name,
                         name,
                         maximum: token_data.maximum,
                         supply: token_data.supply,
                         largest_property_version: token_data.largest_property_version,
                         metadata_uri,
-                        payee_address: standardize_address(&token_data.royalty.payee_address),
+                        payee_address: token_data.royalty.get_payee_address(),
                         royalty_points_numerator: token_data.royalty.royalty_points_numerator,
                         royalty_points_denominator: token_data.royalty.royalty_points_denominator,
                         maximum_mutable: token_data.mutability_config.maximum,

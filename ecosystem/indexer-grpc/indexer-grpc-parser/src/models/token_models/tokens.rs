@@ -58,7 +58,7 @@ pub struct Token {
 
 #[derive(Debug)]
 pub struct TableMetadataForToken {
-    pub owner_address: Address,
+    owner_address: Address,
     pub table_type: TableType,
 }
 
@@ -271,7 +271,7 @@ impl Token {
             let token_pg = Self {
                 collection_data_id_hash,
                 token_data_id_hash,
-                creator_address: standardize_address(&token_data_id.creator),
+                creator_address: token_data_id.get_creator_address(),
                 collection_name,
                 name,
                 property_version: token_id.property_version,
@@ -328,7 +328,7 @@ impl Token {
             let token = Self {
                 collection_data_id_hash,
                 token_data_id_hash,
-                creator_address: standardize_address(&token_data_id.creator),
+                creator_address: token_data_id.get_creator_address(),
                 collection_name,
                 name,
                 property_version: token_id.property_version,
@@ -407,7 +407,7 @@ impl TableMetadataForToken {
         );
 
         let value = TableMetadataForToken {
-            owner_address: standardize_address(&resource.address),
+            owner_address: resource.address.clone(),
             table_type: write_resource.type_str.clone(),
         };
         let table_handle: TableHandle = match TokenResource::from_resource(
@@ -416,14 +416,18 @@ impl TableMetadataForToken {
             txn_version,
         )? {
             TokenResource::CollectionResource(collection_resource) => {
-                collection_resource.collection_data.handle
+                collection_resource.collection_data.get_handle()
             },
-            TokenResource::TokenStoreResource(inner) => inner.tokens.handle,
-            TokenResource::PendingClaimsResource(inner) => inner.pending_claims.handle,
+            TokenResource::TokenStoreResource(inner) => inner.tokens.get_handle(),
+            TokenResource::PendingClaimsResource(inner) => inner.pending_claims.get_handle(),
         };
         Ok(Some(HashMap::from([(
             standardize_address(&table_handle),
             value,
         )])))
+    }
+
+    pub fn get_owner_address(&self) -> String {
+        standardize_address(&self.owner_address)
     }
 }

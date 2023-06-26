@@ -13,26 +13,36 @@ use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Formatter};
 
-const TOKEN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000003";
-const NAME_LENGTH: usize = 128;
-const URI_LENGTH: usize = 512;
+pub const TOKEN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000003";
+pub const NAME_LENGTH: usize = 128;
+pub const URI_LENGTH: usize = 512;
 /**
  * This file defines deserialized move types as defined in our 0x3 contracts.
  */
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Table {
-    pub handle: String,
+    handle: String,
+}
+
+impl Table {
+    pub fn get_handle(&self) -> String {
+        standardize_address(&self.handle)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenDataIdType {
-    pub creator: String,
+    creator: String,
     collection: String,
     name: String,
 }
 
 impl TokenDataIdType {
+    pub fn to_id(&self) -> String {
+        format!("0x{}", self.to_hash())
+    }
+
     pub fn to_hash(&self) -> String {
         hash_str(&self.to_string())
     }
@@ -47,6 +57,14 @@ impl TokenDataIdType {
 
     pub fn get_collection_data_id_hash(&self) -> String {
         CollectionDataIdType::new(self.creator.clone(), self.collection.clone()).to_hash()
+    }
+
+    pub fn get_collection_id(&self) -> String {
+        CollectionDataIdType::new(self.creator.clone(), self.collection.clone()).to_id()
+    }
+
+    pub fn get_creator_address(&self) -> String {
+        standardize_address(&self.creator)
     }
 }
 
@@ -79,6 +97,10 @@ impl CollectionDataIdType {
 
     pub fn get_name_trunc(&self) -> String {
         truncate_str(&self.name, NAME_LENGTH)
+    }
+
+    pub fn to_id(&self) -> String {
+        format!("0x{}", self.to_hash())
     }
 }
 
@@ -144,13 +166,18 @@ pub struct TokenDataMutabilityConfigType {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RoyaltyType {
-    pub payee_address: String,
+    payee_address: String,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub royalty_points_denominator: BigDecimal,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub royalty_points_numerator: BigDecimal,
 }
 
+impl RoyaltyType {
+    pub fn get_payee_address(&self) -> String {
+        standardize_address(&self.payee_address)
+    }
+}
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenType {
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -188,8 +215,14 @@ impl CollectionDataType {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenOfferIdType {
-    pub to_addr: String,
+    to_addr: String,
     pub token_id: TokenIdType,
+}
+
+impl TokenOfferIdType {
+    pub fn get_to_address(&self) -> String {
+        standardize_address(&self.to_addr)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -253,23 +286,42 @@ pub struct MutateTokenPropertyMapEventType {
 pub struct OfferTokenEventType {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
-    pub to_address: String,
+    to_address: String,
     pub token_id: TokenIdType,
+}
+
+impl OfferTokenEventType {
+    pub fn get_to_address(&self) -> String {
+        standardize_address(&self.to_address)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CancelTokenOfferEventType {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
-    pub to_address: String,
+    to_address: String,
     pub token_id: TokenIdType,
 }
+
+impl CancelTokenOfferEventType {
+    pub fn get_to_address(&self) -> String {
+        standardize_address(&self.to_address)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClaimTokenEventType {
     #[serde(deserialize_with = "deserialize_from_string")]
     pub amount: BigDecimal,
-    pub to_address: String,
+    to_address: String,
     pub token_id: TokenIdType,
+}
+
+impl ClaimTokenEventType {
+    pub fn get_to_address(&self) -> String {
+        standardize_address(&self.to_address)
+    }
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TypeInfo {

@@ -10,9 +10,11 @@ use crate::{
         current_delegated_staking_pool_balances, delegated_staking_pool_balances,
         delegated_staking_pools,
     },
-    util::standardize_address,
+    utils::util::standardize_address,
 };
-use aptos_api_types::{Transaction, WriteResource, WriteSetChange, WriteTableItem};
+use aptos_protos::transaction::v1::{
+    transaction::TxnData, write_set_change::Change, Transaction, WriteResource, WriteTableItem,
+};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -94,11 +96,21 @@ impl DelegatorPool {
         let mut delegator_pool_map = HashMap::new();
         let mut delegator_pool_balances = vec![];
         let mut delegator_pool_balances_map = HashMap::new();
+        let txn_data = transaction
+            .txn_data
+            .as_ref()
+            .expect("Txn Data doesn't exit!");
+        let txn_version = transaction.version as i64;
+
         // Do a first pass to get the mapping of active_share table handles to staking pool addresses
-        if let Transaction::UserTransaction(user_txn) = transaction {
-            let txn_version = user_txn.info.version.0 as i64;
-            for wsc in &user_txn.info.changes {
-                if let WriteSetChange::WriteResource(write_resource) = wsc {
+        if let TxnData::User(_) = txn_data {
+            let changes = &transaction
+                .info
+                .as_ref()
+                .expect("Transaction info doesn't exist!")
+                .changes;
+            for wsc in changes {
+                if let Change::WriteResource(write_resource) = wsc.change.as_ref().unwrap() {
                     let maybe_write_resource =
                         Self::from_write_resource(write_resource, txn_version)?;
                     if let Some((pool, pool_balances, current_pool_balances)) = maybe_write_resource
@@ -151,18 +163,18 @@ impl DelegatorPool {
     ) -> anyhow::Result<Option<PoolBalanceMetadata>> {
         let table_item_data = write_table_item.data.as_ref().unwrap();
 
-        if let Some(StakeTableItem::Pool(inner)) = StakeTableItem::from_table_item_type(
+        if let Some(StakeTableItem::Pool(inner)) = &StakeTableItem::from_table_item_type(
             table_item_data.value_type.as_str(),
             &table_item_data.value,
             txn_version,
         )? {
-            let total_coins = inner.total_coins;
+            let total_coins = inner.total_coins.clone();
             let total_shares = &inner.total_shares / &inner.scaling_factor;
             Ok(Some(PoolBalanceMetadata {
                 transaction_version: txn_version,
                 total_coins,
                 total_shares,
-                scaling_factor: inner.scaling_factor,
+                scaling_factor: inner.scaling_factor.clone(),
                 shares_table_handle: inner.shares.inner.get_handle(),
                 parent_table_handle: standardize_address(&write_table_item.handle.to_string()),
             }))
@@ -176,7 +188,7 @@ impl DelegatorPool {
         txn_version: i64,
     ) -> anyhow::Result<Option<(Self, DelegatorPoolBalance, CurrentDelegatorPoolBalance)>> {
         if let Some(balance) =
-            Self::get_delegated_pool_metadata_from_write_resource(write_resource, txn_version)?
+            &Self::get_delegated_pool_metadata_from_write_resource(write_resource, txn_version)?
         {
             let staking_pool_address = balance.staking_pool_address.clone();
             let total_coins = balance.total_coins.clone();
@@ -203,7 +215,7 @@ impl DelegatorPool {
                     last_transaction_version: transaction_version,
                     operator_commission_percentage: balance.operator_commission_percentage.clone(),
                     inactive_table_handle: balance.inactive_share_table_handle.clone(),
-                    active_table_handle: balance.active_share_table_handle,
+                    active_table_handle: balance.active_share_table_handle.clone(),
                 },
             )))
         } else {

@@ -14,7 +14,7 @@ use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-const COIN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
+pub const COIN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const COIN_TYPE_HASH_LENGTH: usize = 5000;
 /**
  * This file defines deserialized coin types as defined in our 0x1 contracts.
@@ -76,7 +76,7 @@ pub struct IntegerWrapperResource {
 
 impl IntegerWrapperResource {
     /// In case we do want to track supply
-    pub fn _get_supply(&self) -> Option<BigDecimal> {
+    pub fn get_supply(&self) -> Option<BigDecimal> {
         self.vec.get(0).map(|inner| inner.value.clone())
     }
 }
@@ -129,9 +129,13 @@ pub struct EventGuidResource {
 }
 
 impl EventGuidResource {
+    pub fn get_address(&self) -> String {
+        standardize_address(&self.addr)
+    }
+
     pub fn get_standardized(&self) -> Self {
         Self {
-            addr: standardize_address(&self.addr),
+            addr: self.get_address(),
             creation_num: self.creation_num,
         }
     }
@@ -151,7 +155,7 @@ pub struct DepositCoinEvent {
 
 pub struct CoinInfoType {
     coin_type: String,
-    pub creator_address: String,
+    creator_address: String,
 }
 
 impl CoinInfoType {
@@ -168,6 +172,10 @@ impl CoinInfoType {
             error!(txn_version = txn_version, move_type = ?move_type, "Expected struct tag");
             panic!();
         }
+    }
+
+    pub fn get_creator_address(&self) -> String {
+        standardize_address(&self.creator_address)
     }
 
     pub fn to_hash(&self) -> String {
