@@ -132,7 +132,8 @@ fn main() {
                 let func_identifier = &func_identifier_pool[func_identifier_idx];
 
                 // check if it starts with "benchmark"
-                if !func_identifier.as_str().starts_with(PREFIX) {
+                let func_name = func_identifier.as_str();
+                if !func_name.starts_with(PREFIX) {
                     continue;
                 }
 
@@ -140,11 +141,14 @@ fn main() {
                 let signature_idx: usize = handle.parameters.0.into();
                 let func_params = &signature_pool[signature_idx];
                 if func_params.len() != 0 {
-                    eprintln!("[WARNING] benchmark functions should not have parameters");
+                    eprintln!(
+                        "[WARNING] benchmark function should not have parameters: {}",
+                        func_name,
+                    );
                     continue;
                 }
 
-                func_identifiers.push(func_identifier.as_str());
+                func_identifiers.push(func_name);
             }
 
             //// publish test-package under module address
