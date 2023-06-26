@@ -47,22 +47,16 @@ impl CrossShardConflictDetector {
         let mut rejected_txns = Vec::new();
         let mut discarded_senders = HashSet::new();
         for (_, txn) in txns.into_iter().enumerate() {
-            if self.check_for_cross_shard_conflict(self.shard_id, &txn, cross_shard_rw_set) {
+            let sender_was_discarded = txn
+                .sender()
+                .map_or(false, |sender| discarded_senders.contains(&sender));
+            if sender_was_discarded
+                || self.check_for_cross_shard_conflict(self.shard_id, &txn, cross_shard_rw_set)
+            {
                 if let Some(sender) = txn.sender() {
                     discarded_senders.insert(sender);
                 }
                 rejected_txns.push(txn);
-            } else if let Some(sender) = txn.sender() {
-                if discarded_senders.contains(&sender) {
-                    rejected_txns.push(txn);
-                } else {
-                    accepted_txn_dependencies.push(self.get_deps_for_frozen_txn(
-                        &txn,
-                        Arc::new(vec![]),
-                        prev_rounds_rw_set_with_index.clone(),
-                    ));
-                    accepted_txns.push(txn);
-                }
             } else {
                 accepted_txn_dependencies.push(self.get_deps_for_frozen_txn(
                     &txn,
