@@ -555,31 +555,33 @@ module aptos_token_objects::token {
         assert!(!object::is_object(token_addr), 2);
     }
 
-    #[test(creator = @0x123)]
-    fun test_create_burn_and_delete(creator: &signer) acquires Token {
-        if (std::features::auids_enabled()) {
-            use aptos_framework::account;
+    #[test(creator = @0x123,fx = @std)]
+    fun test_create_burn_and_delete(creator: &signer, fx: signer) acquires Token {
+        use aptos_framework::account;
+        use std::features;
 
-            let collection_name = string::utf8(b"collection name");
-            let token_name = string::utf8(b"token name");
+        let feature = features::get_auids();
+        features::change_feature_flags(&fx, vector[feature], vector[]);
 
-            create_collection_helper(creator, collection_name, 1);
-            account::create_account_for_test(signer::address_of(creator));
-            let constructor_ref = create(
-                creator,
-                collection_name,
-                string::utf8(b"token description"),
-                token_name,
-                option::none(),
-                string::utf8(b"token uri"),
-            );
-            let burn_ref = generate_burn_ref(&constructor_ref);
-            let token_addr = object::address_from_constructor_ref(&constructor_ref);
-            assert!(exists<Token>(token_addr), 0);
-            burn(burn_ref);
-            assert!(!exists<Token>(token_addr), 1);
-            assert!(!object::is_object(token_addr), 2);
-        }
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, collection_name, 1);
+        account::create_account_for_test(signer::address_of(creator));
+        let constructor_ref = create(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            token_name,
+            option::none(),
+            string::utf8(b"token uri"),
+        );
+        let burn_ref = generate_burn_ref(&constructor_ref);
+        let token_addr = object::address_from_constructor_ref(&constructor_ref);
+        assert!(exists<Token>(token_addr), 0);
+        burn(burn_ref);
+        assert!(!exists<Token>(token_addr), 1);
+        assert!(!object::is_object(token_addr), 2);
     }
 
     #[test_only]
