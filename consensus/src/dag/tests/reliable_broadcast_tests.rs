@@ -3,8 +3,8 @@
 
 use crate::{
     dag::{
-        reliable_broadcast::{BroadcastStatus, DAGNetworkSender, ReliableBroadcast},
-        types::DAGMessage,
+        reliable_broadcast::{BroadcastStatus, ReliableBroadcast},
+        types::{DAGMessage, DAGNetworkSender},
     },
     network_interface::ConsensusMsg,
 };
@@ -100,6 +100,15 @@ impl DAGNetworkSender for TestDAGSender {
             .lock()
             .insert(receiver, TestMessage::from_network_message(message)?);
         Ok(TestAck.into_network_message())
+    }
+
+    async fn send_rpc_with_fallbacks(
+        &self,
+        _responders: Vec<Author>,
+        _message: ConsensusMsg,
+        _timeout: Duration,
+    ) -> anyhow::Result<ConsensusMsg> {
+        unimplemented!();
     }
 }
 
