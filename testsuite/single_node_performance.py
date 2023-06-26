@@ -19,17 +19,17 @@ EXPECTED_TPS = {
     ("no-op", False, 1): (18800.0, True),
     ("no-op", False, 1000): (2980.0, True),
     ("coin-transfer", False, 1): (12600.0, True),
-    ("coin-transfer", True, 1): (22100.0, True),
+    ("coin-transfer", True, 1): (30000.0, True),
     ("account-generation", False, 1): (11000.0, True),
-    ("account-generation", True, 1): (17600.0, True),
+    ("account-generation", True, 1): (26000.0, True),
     # changed to not use account_pool. either recalibrate or add here to use account pool.
-    ("account-resource32-b", False, 1): (13000.0, False),
+    ("account-resource32-b", False, 1): (15000.0, False),
     ("modify-global-resource", False, 1): (3700.0, True),
     ("modify-global-resource", False, 10): (10800.0, True),
     # seems to have changed, disabling as land_blocking, until recalibrated
-    ("publish-package", False, 1): (159.0, False),
+    ("publish-package", False, 1): (120.0, False),
     ("batch100-transfer", False, 1): (350, True),
-    ("batch100-transfer", True, 1): (553, True),
+    ("batch100-transfer", True, 1): (880, True),
     ("token-v1ft-mint-and-transfer", False, 1): (1650.0, True),
     ("token-v1ft-mint-and-transfer", False, 20): (7100.0, True),
     ("token-v1nft-mint-and-transfer-sequential", False, 1): (1100.0, True),
@@ -222,7 +222,7 @@ errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {BLOCK_SIZE} --concurrency-level {CONCURRENCY_LEVEL} --use-state-kv-db --use-sharded-state-merkle-db create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {BLOCK_SIZE} --concurrency-level {CONCURRENCY_LEVEL} --split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -237,7 +237,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         executor_type = "native" if use_native_executor else "VM"
 
         use_native_executor_str = "--use-native-executor" if use_native_executor else ""
-        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --use-state-kv-db --use-sharded-state-merkle-db run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         concurrency_level_results = {}
 

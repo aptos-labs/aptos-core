@@ -39,6 +39,8 @@ pub enum FeatureFlag {
     SignatureCheckerV2,
     StorageSlotMetadata,
     ChargeInvariantViolation,
+    DelegationPoolPartialGovernanceVoting,
+    GasPayerEnabled,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -91,7 +93,7 @@ pub fn generate_feature_upgrade_proposal(
         &writer,
         is_testnet,
         next_execution_hash.clone(),
-        &["std::features", "aptos_framework::reconfiguration"],
+        &["std::features"],
         |writer| {
             emit!(writer, "let enabled_blob: vector<u64> = ");
             generate_features_blob(writer, &enabled);
@@ -106,19 +108,13 @@ pub fn generate_feature_upgrade_proposal(
                     writer,
                     "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
                 );
-                emitln!(
-                    writer,
-                    "reconfiguration::reconfigure_with_signer(framework_signer);"
-                );
+                emitln!(writer, "aptos_governance::reconfigure(framework_signer);");
             } else {
                 emitln!(
                     writer,
                     "features::change_feature_flags(&framework_signer, enabled_blob, disabled_blob);"
                 );
-                emitln!(
-                    writer,
-                    "reconfiguration::reconfigure_with_signer(&framework_signer);"
-                );
+                emitln!(writer, "aptos_governance::reconfigure(&framework_signer);");
             }
         },
     );
@@ -162,6 +158,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::SignatureCheckerV2 => AptosFeatureFlag::SIGNATURE_CHECKER_V2,
             FeatureFlag::StorageSlotMetadata => AptosFeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::ChargeInvariantViolation => AptosFeatureFlag::CHARGE_INVARIANT_VIOLATION,
+            FeatureFlag::DelegationPoolPartialGovernanceVoting => {
+                AptosFeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING
+            },
+            FeatureFlag::GasPayerEnabled => AptosFeatureFlag::GAS_PAYER_ENABLED,
         }
     }
 }
@@ -202,6 +202,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::SIGNATURE_CHECKER_V2 => FeatureFlag::SignatureCheckerV2,
             AptosFeatureFlag::STORAGE_SLOT_METADATA => FeatureFlag::StorageSlotMetadata,
             AptosFeatureFlag::CHARGE_INVARIANT_VIOLATION => FeatureFlag::ChargeInvariantViolation,
+            AptosFeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING => {
+                FeatureFlag::DelegationPoolPartialGovernanceVoting
+            },
+            AptosFeatureFlag::GAS_PAYER_ENABLED => FeatureFlag::GasPayerEnabled,
         }
     }
 }

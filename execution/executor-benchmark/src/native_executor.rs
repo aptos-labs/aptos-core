@@ -13,6 +13,7 @@ use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{deposit::DepositEvent, withdraw::WithdrawEvent},
+    block_executor::partitioner::ExecutableTransactions,
     contract_event::ContractEvent,
     event::EventKey,
     state_store::state_key::StateKey,
@@ -336,10 +337,14 @@ impl NativeExecutor {
 
 impl TransactionBlockExecutor for NativeExecutor {
     fn execute_transaction_block(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions<Transaction>,
         state_view: CachedStateView,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
+        let transactions = match transactions {
+            ExecutableTransactions::Unsharded(txns) => txns,
+            _ => todo!("sharded execution not yet supported"),
+        };
         let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             transactions
                 .par_iter()

@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
-    ERROR_COUNT, LATEST_PROCESSED_VERSION, OBSERVED_LATEST_PROCESSED_VERSION, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
+    ERROR_COUNT, LATEST_PROCESSED_VERSION, PROCESSED_BATCH_SIZE, PROCESSED_LATENCY_IN_SECS,
+    PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
 };
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcFileStoreConfig,
-    constants::{GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER},
+    constants::{BLOB_STORAGE_SIZE, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER},
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
 };
@@ -22,10 +22,7 @@ use futures::Stream;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::{pin::Pin, sync::Arc, time::Duration};
-use tokio::sync::{
-    mpsc::{channel, error::SendTimeoutError},
-    watch::channel as watch_channel,
-};
+use tokio::sync::mpsc::{channel, error::SendTimeoutError};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn, Instrument};
@@ -117,8 +114,6 @@ impl RawData for RawDataServerWrapper {
                 return Result::Err(Status::aborted("Starting version is not set"));
             },
         };
-        // This is to monitor the latest processed version.
-        let (watch_sender, mut watch_receiver) = watch_channel(current_version);
 
         let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store_config {
             IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
@@ -141,11 +136,9 @@ impl RawData for RawDataServerWrapper {
         );
 
         let redis_client = self.redis_client.clone();
-        let request_metadata_clone = request_metadata.clone();
         tokio::spawn(
             async move {
                 let mut transactions_count = transactions_count;
-                let request_metadata = request_metadata_clone;
                 let conn = match redis_client.get_async_connection().await {
                     Ok(conn) => conn,
                     Err(e) => {
@@ -153,7 +146,14 @@ impl RawData for RawDataServerWrapper {
                             .with_label_values(&["redis_connection_failed"])
                             .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
-                        let _result = tx.send_timeout(Err(Status::unavailable("[Indexer Data] Cannot connect to Redis; please retry.")), RESPONSE_CHANNEL_SEND_TIMEOUT).await;
+                        let _result = tx
+                            .send_timeout(
+                                Err(Status::unavailable(
+                                    "[Indexer Data] Cannot connect to Redis; please retry.",
+                                )),
+                                RESPONSE_CHANNEL_SEND_TIMEOUT,
+                            )
+                            .await;
                         error!(
                             error = e.to_string(),
                             "[Indexer Data] Failed to get redis connection."
@@ -171,7 +171,14 @@ impl RawData for RawDataServerWrapper {
                             .with_label_values(&["redis_get_chain_id_failed"])
                             .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
-                        let _result = tx.send_timeout(Err(Status::unavailable("[Indexer Data] Cannot get the chain id; please retry.")), RESPONSE_CHANNEL_SEND_TIMEOUT).await;
+                        let _result = tx
+                            .send_timeout(
+                                Err(Status::unavailable(
+                                    "[Indexer Data] Cannot get the chain id; please retry.",
+                                )),
+                                RESPONSE_CHANNEL_SEND_TIMEOUT,
+                            )
+                            .await;
                         error!(
                             error = e.to_string(),
                             "[Indexer Data] Failed to get chain id."
@@ -240,7 +247,13 @@ impl RawData for RawDataServerWrapper {
                         .timestamp
                         .as_ref()
                         .map(time_diff_since_pb_timestamp_in_secs);
-                    match tx.send_timeout(Result::<TransactionsResponse, Status>::Ok(resp_item), RESPONSE_CHANNEL_SEND_TIMEOUT).await {
+                    match tx
+                        .send_timeout(
+                            Result::<TransactionsResponse, Status>::Ok(resp_item),
+                            RESPONSE_CHANNEL_SEND_TIMEOUT,
+                        )
+                        .await
+                    {
                         Ok(_) => {
                             PROCESSED_BATCH_SIZE
                                 .with_label_values(&[
@@ -261,15 +274,21 @@ impl RawData for RawDataServerWrapper {
                                 ])
                                 .inc_by(current_batch_size as u64);
                             if let Some(data_latency_in_secs) = data_latency_in_secs {
-                                PROCESSED_LATENCY_IN_SECS
-                                    .with_label_values(&[
-                                        request_metadata.request_token.as_str(),
-                                        request_metadata.request_name.as_str(),
-                                    ])
-                                    .set(data_latency_in_secs);
-                                PROCESSED_LATENCY_IN_SECS_ALL
-                                    .with_label_values(&[request_metadata.request_source.as_str()])
-                                    .observe(data_latency_in_secs);
+                                // If it's a partial batch, we record the latency because it usually means
+                                // the data is the latest.
+                                if current_batch_size % BLOB_STORAGE_SIZE != 0 {
+                                    PROCESSED_LATENCY_IN_SECS
+                                        .with_label_values(&[
+                                            request_metadata.request_token.as_str(),
+                                            request_metadata.request_name.as_str(),
+                                        ])
+                                        .set(data_latency_in_secs);
+                                    PROCESSED_LATENCY_IN_SECS_ALL
+                                        .with_label_values(&[request_metadata
+                                            .request_source
+                                            .as_str()])
+                                        .observe(data_latency_in_secs);
+                                }
                             }
                         },
                         Err(SendTimeoutError::Timeout(_)) => {
@@ -284,12 +303,6 @@ impl RawData for RawDataServerWrapper {
                     // 3. Update the current version and record current tps.
                     tps_calculator.tick_now(current_batch_size as u64);
                     current_version = end_of_batch_version + 1;
-                    if watch_sender.send(current_version).is_err() {
-                        error!(
-                            "[Indexer Data] Failed to send the current version to the watch channel."
-                        );
-                        break;
-                    }
                     info!(
                         current_version = current_version,
                         end_version = end_of_batch_version,
@@ -303,38 +316,6 @@ impl RawData for RawDataServerWrapper {
             .instrument(serving_span),
         );
 
-        let monitoring_span = tracing::span!(
-            tracing::Level::INFO,
-            "Data Monitoring",
-            request_id = request_metadata.request_id.as_str(),
-            request_remote_addr = request_metadata.request_remote_addr.as_str(),
-            request_token = request_metadata.request_token.as_str(),
-            request_name = request_metadata.request_name.as_str(),
-            request_source = request_metadata.request_source.as_str(),
-        );
-
-        tokio::spawn(
-            async move {
-                let request_token = request_metadata.request_token.as_str();
-                let request_name = request_metadata.request_name.as_str();
-                loop {
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                    match watch_receiver.changed().await.is_ok() {
-                        true => {
-                            let current_processed_version = *watch_receiver.borrow();
-                            OBSERVED_LATEST_PROCESSED_VERSION
-                                .with_label_values(&[request_token, request_name])
-                                .set(current_processed_version as i64);
-                        },
-                        false => {
-                            info!("[Indexer Data] Version watch receiver is closed; exiting.");
-                            break;
-                        },
-                    }
-                }
-            }
-            .instrument(monitoring_span),
-        );
         let output_stream = ReceiverStream::new(rx);
         Ok(Response::new(
             Box::pin(output_stream) as Self::GetTransactionsStream

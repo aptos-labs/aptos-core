@@ -84,7 +84,7 @@ impl NumberOperationProcessor {
         }
     }
 
-    fn analyze_fun<'a>(&self, env: &'a GlobalEnv, target: FunctionTarget) {
+    fn analyze_fun(&self, env: &'_ GlobalEnv, target: FunctionTarget) {
         if !target.func_env.is_native_or_intrinsic() {
             let cfg = StacklessControlFlowGraph::one_block(target.get_bytecode());
             let analyzer = NumberOperationAnalysis {
@@ -289,7 +289,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                         move_model::ast::Operation::Bv2Int => {
                             global_state.update_node_oper(*id, Arithmetic, true);
                         },
-                        move_model::ast::Operation::Function(mid, sid, _) => {
+                        move_model::ast::Operation::SpecFunction(mid, sid, _) => {
                             let module_env = &self.func_target.global_env().get_module(*mid);
                             let callee_name = module_env
                                 .get_spec_fun(*sid)

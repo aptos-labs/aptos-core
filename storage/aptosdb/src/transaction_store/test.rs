@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::redundant_clone)] // Required to work around prop_assert_eq! limitations
+
 use super::*;
 use crate::AptosDB;
 use aptos_proptest_helpers::Index;
@@ -215,7 +217,9 @@ fn init_store(
 
     let batch = SchemaBatch::new();
     for (ver, txn) in txns.iter().enumerate() {
-        store.put_transaction(ver as Version, txn, &batch).unwrap();
+        store
+            .put_transaction(ver as Version, txn, /*skip_index=*/ false, &batch)
+            .unwrap();
     }
     store
         .ledger_db

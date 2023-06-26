@@ -347,8 +347,12 @@ impl Node {
     pub fn new(node: NodeInfo, config: NodeConfig) -> Node {
         let (network_interfaces, network_client, network_service_events, peers_and_metadata) =
             setup_node_network_interfaces(&node);
-        let (mempool, runtime, subscriber) =
-            start_node_mempool(config, network_client, network_service_events);
+        let (mempool, runtime, subscriber) = start_node_mempool(
+            config,
+            network_client,
+            network_service_events,
+            peers_and_metadata.clone(),
+        );
 
         Node {
             node_info: node,
@@ -375,6 +379,7 @@ impl Node {
                 transaction.gas_unit_price(),
                 0,
                 TimelineState::NotReady,
+                false,
             );
         }
     }
@@ -414,7 +419,10 @@ impl Node {
             return;
         }
 
-        panic!("Failed to get expected event '{:?}'", expected)
+        panic!(
+            "Failed to get expected event '{:?}', instead: '{:?}'",
+            expected, event
+        )
     }
 
     /// Checks that there are no `SharedMempoolNotification`s on the subscriber
@@ -581,6 +589,7 @@ fn start_node_mempool(
     config: NodeConfig,
     network_client: NetworkClient<MempoolSyncMsg>,
     network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Arc<Mutex<CoreMempool>>,
     Runtime,
@@ -617,6 +626,7 @@ fn start_node_mempool(
         Arc::new(MockDbReaderWriter),
         Arc::new(RwLock::new(MockVMValidator)),
         vec![sender],
+        peers_and_metadata,
     );
 
     (mempool, runtime, subscriber)

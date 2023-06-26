@@ -179,7 +179,7 @@ describe("Indexer", () => {
         const tokenData = await indexerClient.getTokenData(
           accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
         );
-        expect(tokenData.current_token_datas[0].name).toEqual("Alice Token");
+        expect(tokenData.current_token_datas_v2[0].token_name).toEqual("Alice Token");
       },
       longTestTimeout,
     );
@@ -235,6 +235,11 @@ describe("Indexer", () => {
       expect(tokens.current_token_ownerships_v2).toHaveLength(2);
     });
 
+    it("gets account current tokens from a specified token standard", async () => {
+      const tokens = await indexerClient.getOwnedTokens(alice.address().hex(), { tokenStandard: "v2" });
+      expect(tokens.current_token_ownerships_v2).toHaveLength(1);
+    });
+
     it("gets the collection data", async () => {
       const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionName);
       expect(collectionData.current_collections_v2).toHaveLength(1);
@@ -281,6 +286,26 @@ describe("Indexer", () => {
         expect(tokensFromCollectionAddress.current_token_ownerships_v2).toEqual(
           tokensFromNameAndCreatorAddress.current_token_ownerships_v2,
         );
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "queries for all collections that an account has tokens for",
+      async () => {
+        const collections = await indexerClient.getCollectionsWithOwnedTokens(alice.address().hex());
+        expect(collections.current_collection_ownership_v2_view.length).toEqual(2);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "queries for all v2 collections that an account has tokens for",
+      async () => {
+        const collections = await indexerClient.getCollectionsWithOwnedTokens(alice.address().hex(), {
+          tokenStandard: "v2",
+        });
+        expect(collections.current_collection_ownership_v2_view.length).toEqual(1);
       },
       longTestTimeout,
     );

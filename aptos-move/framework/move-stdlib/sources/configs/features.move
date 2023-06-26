@@ -174,7 +174,7 @@ module std::features {
         is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
     }
 
-    /// Whether enable paritial governance voting.
+    /// Whether enable paritial governance voting on aptos_governance.
     /// Lifetime: transient
     const PARTIAL_GOVERNANCE_VOTING: u64 = 17;
     public fun get_partial_governance_voting(): u64 { PARTIAL_GOVERNANCE_VOTING }
@@ -185,6 +185,21 @@ module std::features {
     /// Charge invariant violation error.
     /// Lifetime: transient
     const CHARGE_INVARIANT_VIOLATION: u64 = 20;
+
+    /// Whether enable paritial governance voting on delegation_pool.
+    /// Lifetime: transient
+    const DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING: u64 = 21;
+    public fun get_delegation_pool_partial_governance_voting(): u64 { DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING }
+    public fun delegation_pool_partial_governance_voting_enabled(): bool acquires Features {
+        is_enabled(DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING)
+    }
+
+    /// Whether alternate gas payer is supported
+    /// Lifetime: transient
+    const GAS_PAYER_ENABLED: u64 = 22;
+    public fun gas_payer_enabled(): bool acquires Features {
+        is_enabled(GAS_PAYER_ENABLED)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation

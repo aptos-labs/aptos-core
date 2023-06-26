@@ -23,7 +23,7 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct CreateResourceAccount {
     /// Optional Resource Account authentication key.
-    #[clap(long, parse(try_from_str = AuthenticationKey::from_str))]
+    #[clap(long, value_parser = AuthenticationKey::from_str)]
     pub(crate) authentication_key: Option<AuthenticationKey>,
 
     #[clap(flatten)]

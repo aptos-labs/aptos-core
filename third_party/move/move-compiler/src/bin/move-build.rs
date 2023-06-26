@@ -22,9 +22,7 @@ pub struct Options {
     /// The source files to check and compile
     #[clap(
         name = "PATH_TO_SOURCE_FILE",
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub source_files: Vec<String>,
 
@@ -58,7 +56,7 @@ pub struct Options {
         name = "NAMED_ADDRESSES",
         short = 'a',
         long = "addresses",
-        parse(try_from_str = shared::parse_named_address)
+        value_parser = shared::parse_named_address
     )]
     pub named_addresses: Vec<(String, NumericalAddress)>,
 
@@ -91,4 +89,10 @@ pub fn main() -> anyhow::Result<()> {
         compiled_units,
         &out_dir,
     )
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Options::command().debug_assert()
 }

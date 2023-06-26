@@ -22,8 +22,8 @@ use crate::{
     options::ModelBuilderOptions,
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_ABSTRACT_PROP,
-        CONDITION_CONCRETE_PROP, CONDITION_DEACTIVATED_PROP, CONDITION_INJECTED_PROP,
-        OPAQUE_PRAGMA, VERIFY_PRAGMA,
+        CONDITION_CONCRETE_PROP, CONDITION_DEACTIVATED_PROP, CONDITION_EXPORT_PROP,
+        CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, Type, BOOL_TYPE},
@@ -524,7 +524,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let spec_fun_id = SpecFunId::new(self.spec_funs.len());
         self.parent.define_spec_fun(qsym, SpecFunEntry {
             loc: loc.clone(),
-            oper: Operation::Function(self.module_id, spec_fun_id, None),
+            oper: Operation::SpecFunction(self.module_id, spec_fun_id, None),
             type_params: type_params.clone(),
             params: params.clone(),
             result_type: result_type.clone(),
@@ -605,7 +605,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         self.parent
             .define_spec_fun(self.qualified_by_module(name), SpecFunEntry {
                 loc: loc.clone(),
-                oper: Operation::Function(self.module_id, fun_id, None),
+                oper: Operation::SpecFunction(self.module_id, fun_id, None),
                 type_params: type_params.clone(),
                 params: params.clone(),
                 result_type: result_type.clone(),
@@ -1122,7 +1122,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         let spec_fun_idx = spec_fun_id.as_usize();
         let body = if self.spec_funs[spec_fun_idx].body.is_some() {
-            std::mem::replace(&mut self.spec_funs[spec_fun_idx].body, None).unwrap()
+            self.spec_funs[spec_fun_idx].body.take().unwrap()
         } else {
             // If the function is native and contains no mutable references
             // as parameters, consider it pure.
@@ -1142,7 +1142,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         };
         let mut is_pure = true;
         body.visit(&mut |e: &ExpData| {
-            if let ExpData::Call(_, Operation::Function(mid, fid, _), _) = e {
+            if let ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) = e {
                 if mid.to_usize() < self.module_id.to_usize() {
                     // This is calling a function from another module we already have
                     // translated. In this case, the impurity has already been propagated
@@ -2951,8 +2951,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     et.get_type_params()
                 };
                 // Create a property marking this as injected.
-                let context_properties =
+                let mut context_properties =
                     self.add_bool_property(PropertyBag::default(), CONDITION_INJECTED_PROP, true);
+                context_properties =
+                    self.add_bool_property(context_properties, CONDITION_EXPORT_PROP, true);
                 self.def_ana_schema_inclusion_outside_schema(
                     loc,
                     &SpecBlockContext::Function(fun_name),
@@ -3078,7 +3080,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         // the full self. Rust requires us to do so (at least the author doesn't know better yet),
         // but moving it should be not too expensive.
         let body = if self.spec_funs[fun_idx].body.is_some() {
-            std::mem::replace(&mut self.spec_funs[fun_idx].body, None).unwrap()
+            self.spec_funs[fun_idx].body.take().unwrap()
         } else {
             // No body: assume it is pure.
             return;
@@ -3107,7 +3109,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let mut callees = BTreeSet::new();
         exp.visit(&mut |e: &ExpData| {
             match e {
-                ExpData::Call(id, Operation::Function(mid, fid, _), _) => {
+                ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
                     callees.insert(mid.qualified(*fid));
                     let inst = self.parent.env.get_node_instantiation(*id);
                     // Extend used memory with that of called functions, after applying type

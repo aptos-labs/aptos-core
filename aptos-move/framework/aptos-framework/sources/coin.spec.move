@@ -15,8 +15,10 @@ spec aptos_framework::coin {
     }
 
     spec schema TotalSupplyTracked<CoinType> {
-        invariant spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
-                    global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply);
+        ensures old(spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
+            global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply)) ==>
+            spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
+                global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply);
     }
 
     spec fun spec_fun_supply_no_change<CoinType>(old_supply: Option<OptionalAggregator>,

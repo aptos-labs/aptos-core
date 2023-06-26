@@ -4,64 +4,75 @@ metadata:
   name: {FORGE_POD_NAME}
   labels:
     app.kubernetes.io/name: forge
+    app.kubernetes.io/part-of: forge-test-runner
     forge-namespace: {FORGE_NAMESPACE}
     forge-image-tag: {FORGE_IMAGE_TAG}
 spec:
   restartPolicy: Never
   serviceAccountName: forge
   containers:
-  - name: main
-    image: {FORGE_IMAGE_REPO}:{FORGE_IMAGE_TAG}
-    imagePullPolicy: Always
-    command:
-    - /bin/bash
-    - -c
-    - |
-      ulimit -n 1048576
-      {FORGE_ARGS}
-    resources:
-      limits:
-        cpu: 15.5
-        memory: 26Gi
-      requests:
-        cpu: 15
-        memory: 26Gi
-    env:
-    - name: FORGE_TRIGGERED_BY
-      value: {FORGE_TRIGGERED_BY}
-    - name: PROMETHEUS_URL
-      valueFrom:
-        secretKeyRef:
-          name: prometheus-read-only
-          key: url
-          optional: true
-    - name: PROMETHEUS_TOKEN
-      valueFrom:
-        secretKeyRef:
-          name: prometheus-read-only
-          key: token
-          optional: true
-    - name: RUST_BACKTRACE
-      value: "1"
-    # - name: RUST_LOG
-    #   value: debug
+    - name: main
+      image: {FORGE_IMAGE}
+      imagePullPolicy: Always
+      command:
+        - /bin/bash
+        - -c
+        - |
+          ulimit -n 1048576
+          {FORGE_ARGS}
+      resources:
+        limits:
+          cpu: 15.5
+          memory: 26Gi
+        requests:
+          cpu: 15
+          memory: 26Gi
+      env:
+        - name: FORGE_TRIGGERED_BY
+          value: {FORGE_TRIGGERED_BY}
+        - name: PROMETHEUS_URL
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-read-only
+              key: url
+              optional: true
+        - name: PROMETHEUS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-read-only
+              key: token
+              optional: true
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: KUBECONFIG
+          value: {KUBECONFIG}
+      # - name: RUST_LOG
+      #   value: debug
+      volumeMounts:
+        - name: multiregion-kubeconfig
+          readOnly: true
+          mountPath: {MULTIREGION_KUBECONFIG_DIR}
   affinity:
     # avoid scheduling with other forge or validator/fullnode pods
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
-      - labelSelector:
-          matchExpressions:
-          - key: app.kubernetes.io/name
-            operator: In
-            values: ["validator", "fullnode", "forge"]
-          - key: run
-            operator: Exists
-        topologyKey: "kubernetes.io/hostname"
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: ["validator", "fullnode", "forge"]
+              - key: run
+                operator: Exists
+          topologyKey: "kubernetes.io/hostname"
   # schedule on a k8s worker node in the "validators" nodegroup
   # to access more compute
-  nodeSelector:
-    {VALIDATOR_NODE_SELECTOR}
+  nodeSelector: {VALIDATOR_NODE_SELECTOR}
   tolerations:
-  - effect: NoExecute
-    key: aptos.org/nodepool
-    value: validators
+    - effect: NoExecute
+      key: aptos.org/nodepool
+      value: validators
+  volumes:
+    - name: multiregion-kubeconfig
+      secret:
+        secretName: multiregion-kubeconfig
+        optional: true

@@ -544,21 +544,13 @@ impl Interpreter {
     ) -> PartialVMResult<&'c mut GlobalValue> {
         match data_store.load_resource(loader, addr, ty) {
             Ok((gv, load_res)) => {
-                if let Some(loaded) = load_res {
-                    let opt = match loaded {
-                        Some(num_bytes) => {
-                            let view = gv.view().ok_or_else(|| {
-                                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                    .with_message(
-                                        "Failed to create view for global value".to_owned(),
-                                    )
-                            })?;
-
-                            Some((num_bytes, view))
-                        },
-                        None => None,
-                    };
-                    gas_meter.charge_load_resource(addr, TypeWithLoader { ty, loader }, opt)?;
+                if let Some(bytes_loaded) = load_res {
+                    gas_meter.charge_load_resource(
+                        addr,
+                        TypeWithLoader { ty, loader },
+                        gv.view(),
+                        bytes_loaded,
+                    )?;
                 }
                 Ok(gv)
             },
@@ -1118,7 +1110,8 @@ fn check_ability(has_ability: bool) -> PartialVMResult<()> {
     } else {
         Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Paranoid Mode: Expected ability mismatch".to_string()),
+                .with_message("Paranoid Mode: Expected ability mismatch".to_string())
+                .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
         )
     }
 }
