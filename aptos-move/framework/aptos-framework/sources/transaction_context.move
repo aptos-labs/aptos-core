@@ -11,8 +11,16 @@ module aptos_framework::transaction_context {
         unique_address: address
     }
 
-    /// Return the transaction hash of the current transaction
-    public native fun get_txn_hash(): vector<u8>;
+    /// Return the transaction hash of the current transaction.
+    native fun get_txn_hash(): vector<u8>;
+
+    /// Return the transaction hash of the current transaction.
+    /// Internally calls the private function `get_txn_hash`.
+    /// This function is created for to feature gate the `get_txn_hash` function.
+    public fun get_transaction_hash(): vector<u8> {
+        assert!(features::auids_enabled(), EAUID_NOT_SUPPORTED);
+        get_txn_hash()
+    }
 
     /// Return a universally unique identifier (of type address) generated
     /// by hashing the transaction hash of this transaction and a sequence number
