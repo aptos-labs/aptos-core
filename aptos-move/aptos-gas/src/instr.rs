@@ -6,13 +6,12 @@
 //! gas schedule.
 
 use crate::{algebra::InternalGasPerAbstractValueUnit, gas_meter::EXECUTION_GAS_MULTIPLIER as MUL};
-use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte};
-use move_vm_types::gas::SimpleInstruction;
 
 crate::params::define_gas_parameters!(
     InstructionGasParameters,
     "instr",
+    .instr,
     [
         // nop
         [nop: InternalGas, "nop", 10 * MUL],
@@ -40,7 +39,8 @@ crate::params::define_gas_parameters!(
         [
             ld_const_per_byte: InternalGasPerByte,
             "ld_const.per_byte",
-            35 * MUL
+            35 * MUL,
+            LD_CONST_PER_BYTE
         ],
         // borrow
         [imm_borrow_loc: InternalGas, "imm_borrow_loc", 60 * MUL],
@@ -204,64 +204,3 @@ crate::params::define_gas_parameters!(
         ],
     ]
 );
-
-impl InstructionGasParameters {
-    pub(crate) fn simple_instr_cost(
-        &self,
-        instr: SimpleInstruction,
-    ) -> PartialVMResult<InternalGas> {
-        use SimpleInstruction::*;
-
-        Ok(match instr {
-            Nop => self.nop,
-
-            Abort => self.abort,
-            Ret => self.ret,
-
-            LdU8 => self.ld_u8,
-            LdU16 => self.ld_u16,
-            LdU32 => self.ld_u32,
-            LdU64 => self.ld_u64,
-            LdU128 => self.ld_u128,
-            LdU256 => self.ld_u256,
-            LdTrue => self.ld_true,
-            LdFalse => self.ld_false,
-
-            ImmBorrowLoc => self.imm_borrow_loc,
-            MutBorrowLoc => self.mut_borrow_loc,
-            ImmBorrowField => self.imm_borrow_field,
-            MutBorrowField => self.mut_borrow_field,
-            ImmBorrowFieldGeneric => self.imm_borrow_field_generic,
-            MutBorrowFieldGeneric => self.mut_borrow_field_generic,
-            FreezeRef => self.freeze_ref,
-
-            CastU8 => self.cast_u8,
-            CastU16 => self.cast_u16,
-            CastU32 => self.cast_u32,
-            CastU64 => self.cast_u64,
-            CastU128 => self.cast_u128,
-            CastU256 => self.cast_u256,
-
-            Add => self.add,
-            Sub => self.sub,
-            Mul => self.mul,
-            Mod => self.mod_,
-            Div => self.div,
-
-            BitOr => self.bit_or,
-            BitAnd => self.bit_and,
-            Xor => self.xor,
-            Shl => self.shl,
-            Shr => self.shr,
-
-            Or => self.or,
-            And => self.and,
-            Not => self.not,
-
-            Lt => self.lt,
-            Gt => self.gt,
-            Le => self.le,
-            Ge => self.ge,
-        })
-    }
-}

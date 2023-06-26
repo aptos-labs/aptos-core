@@ -19,8 +19,9 @@ macro_rules! define_gas_parameters {
     (
         $params_name: ident,
         $prefix: literal,
+        $(.$field: ident)*,
         [$(
-            [$name: ident: $ty: ty, $key_bindings: tt, $initial: expr $(, $tn: ident)? $(,)?]
+            [$name: ident: $ty: ident, $key_bindings: tt, $initial: expr $(, $tn: ident)? $(,)?]
         ),* $(,)?]
     ) => {
         #[derive(Debug, Clone)]
@@ -76,12 +77,62 @@ macro_rules! define_gas_parameters {
         }
 
         pub mod gas_params {
+            use $crate::abstract_algebra::{GasExpression, GasExpressionVisitor, GasMul, GasAdd};
+            use std::ops::{Add, Mul};
+            use move_core_types::gas_algebra::{GasQuantity, GasQuantityGetUnit};
+
+            macro_rules! get {
+                ($gas_params: expr, $leaf: ident) => {
+                    $gas_params $(.$field)* .$leaf
+                }
+            }
+
             $(
-                $(
-                    /// Marker type representing the corresponding gas parameter.
+                paste::paste! {
+                    #[doc = "Type representing the `" $name "` gas parameter."]
                     #[allow(non_camel_case_types)]
-                    pub enum $tn {}
-                )?
+                    pub struct [<$name:upper>];
+
+                    impl GasExpression for [<$name:upper>] {
+                        type Unit =  <super::$ty as GasQuantityGetUnit>::Unit;
+
+                        fn materialize(
+                            &self,
+                            _feature_version: u64,
+                            gas_params: &$crate::gas_meter::AptosGasParameters,
+                        ) -> GasQuantity<Self::Unit> {
+                            get!(gas_params, $name)
+                        }
+
+                        fn visit(&self, visitor: &mut impl GasExpressionVisitor) {
+                            visitor.gas_param::<Self>();
+                        }
+                    }
+
+                    impl<T> Add<T> for [<$name:upper>]
+                    where
+                        Self: GasExpression,
+                        T: GasExpression,
+                    {
+                        type Output = GasAdd<Self, T>;
+
+                        fn add(self, rhs: T) -> Self::Output {
+                            GasAdd { left: self, right: rhs }
+                        }
+                    }
+
+                    impl<T> Mul<T> for [<$name:upper>]
+                    where
+                        Self: GasExpression,
+                        T: GasExpression,
+                    {
+                        type Output = GasMul<Self, T>;
+
+                        fn mul(self, rhs: T) -> Self::Output {
+                            GasMul { left: self, right: rhs }
+                        }
+                    }
+                }
             )*
         }
 

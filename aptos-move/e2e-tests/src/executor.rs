@@ -18,8 +18,8 @@ use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas::{
-    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasMeter,
-    LATEST_GAS_FEATURE_VERSION,
+    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasAlgebra,
+    StandardGasMeter, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_keygen::KeyGen;
@@ -511,12 +511,13 @@ impl FakeExecutor {
                 &txn,
                 &log_context,
                 |gas_feature_version, gas_params, storage_gas_params, balance| {
-                    let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
-                        gas_feature_version,
-                        gas_params,
-                        storage_gas_params,
-                        balance,
-                    ));
+                    let gas_meter =
+                        MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+                            gas_feature_version,
+                            gas_params,
+                            storage_gas_params,
+                            balance,
+                        )));
                     let gas_profiler = match txn.payload() {
                         TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
                         TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(

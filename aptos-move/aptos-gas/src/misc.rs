@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 crate::params::define_gas_parameters!(
     AbstractValueSizeGasParameters,
     "misc.abs_val",
+    .misc.abs_val,
     [
         // abstract value size
         [u8: AbstractValueSize, "u8", 40],
