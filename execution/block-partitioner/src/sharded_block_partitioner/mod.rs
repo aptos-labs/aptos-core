@@ -407,12 +407,12 @@ mod tests {
     };
     use aptos_crypto::hash::CryptoHash;
     use aptos_types::{
-        block_executor::partitioner::{SubBlock, TxnIdxWithShardId},
+        block_executor::partitioner::{SubBlock, SubBlocksForShard, TxnIdxWithShardId},
         transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
     };
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
-    use std::collections::HashMap;
+    use std::{collections::HashMap, sync::Mutex};
 
     fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock<Transaction>>) {
         for sub_blocks in sub_blocks_for_shards {
@@ -535,6 +535,53 @@ mod tests {
                 .cloned()
                 .collect(),
         );
+    }
+
+    fn get_account_seq_number(txn: &Transaction) -> (AccountAddress, u64) {
+        match txn {
+            Transaction::UserTransaction(txn) => (txn.sender(), txn.sequence_number()),
+            _ => unreachable!("Only user transaction can be executed in executor"),
+        }
+    }
+
+    #[test]
+    // Ensures that transactions from the same sender are not reordered.
+    fn test_relative_ordering_for_sender() {
+        let mut rng = OsRng;
+        let num_shards = 8;
+        let num_accounts = 50;
+        let num_txns = 500;
+        let mut accounts = Vec::new();
+        for _ in 0..num_accounts {
+            accounts.push(Mutex::new(generate_test_account()));
+        }
+        let mut transactions = Vec::new();
+
+        for _ in 0..num_txns {
+            let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
+            let sender = &mut accounts[indices.index(0)].lock().unwrap();
+            let receiver = &accounts[indices.index(1)].lock().unwrap();
+            let txn = create_signed_p2p_transaction(sender, vec![receiver]).remove(0);
+            transactions.push(txn.clone());
+            transactions.push(create_signed_p2p_transaction(sender, vec![receiver]).remove(0));
+        }
+
+        let partitioner = ShardedBlockPartitioner::new(num_shards);
+        let sub_blocks = partitioner.partition(transactions.clone(), 1);
+
+        let mut account_to_expected_seq_number: HashMap<AccountAddress, u64> = HashMap::new();
+        SubBlocksForShard::flatten(sub_blocks)
+            .iter()
+            .for_each(|txn| {
+                let (sender, seq_number) = get_account_seq_number(txn);
+                if account_to_expected_seq_number.contains_key(&sender) {
+                    assert_eq!(
+                        account_to_expected_seq_number.get(&sender).unwrap(),
+                        &seq_number
+                    );
+                }
+                account_to_expected_seq_number.insert(sender, seq_number + 1);
+            });
     }
 
     #[test]
