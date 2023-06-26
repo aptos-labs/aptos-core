@@ -719,6 +719,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
+        transaction_commit_listener: &Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
@@ -735,6 +736,25 @@ where
                 idx as TxnIndex,
                 true,
             );
+
+            let res = match res {
+                ExecutionStatus::Success(output) => {
+                    // Apply the writes/deltas to the versioned_data_cache.
+                    ExecutionStatus::Success(output)
+                },
+                ExecutionStatus::SkipRest(output) => {
+                    // Apply the writes/deltas and record status indicating skip.
+                    ExecutionStatus::SkipRest(output)
+                },
+                ExecutionStatus::Abort(err) => {
+                    // Record the status indicating abort.
+                    ExecutionStatus::Abort(Error::UserError(err))
+                },
+            };
+
+            if let Some(listener) = transaction_commit_listener {
+                listener.on_transaction_committed(idx as TxnIndex, &res);
+            }
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
@@ -756,7 +776,7 @@ where
                 },
                 ExecutionStatus::Abort(err) => {
                     // Record the status indicating abort.
-                    return Err(Error::UserError(err));
+                    return Err(err);
                 },
             }
 
@@ -813,6 +833,7 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
+                &transaction_commit_listener,
             )
         };
 
@@ -827,6 +848,7 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
+                &transaction_commit_listener,
             )
         }
         self.executor_thread_pool.spawn(move || {
