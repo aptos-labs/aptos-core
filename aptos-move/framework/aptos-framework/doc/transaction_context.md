@@ -8,14 +8,14 @@
 -  [Struct `AUID`](#0x1_transaction_context_AUID)
 -  [Constants](#@Constants_0)
 -  [Function `get_txn_hash`](#0x1_transaction_context_get_txn_hash)
--  [Function `generate_unique_address_internal`](#0x1_transaction_context_generate_unique_address_internal)
 -  [Function `generate_unique_address`](#0x1_transaction_context_generate_unique_address)
+-  [Function `generate_auid_address`](#0x1_transaction_context_generate_auid_address)
 -  [Function `get_script_hash`](#0x1_transaction_context_get_script_hash)
 -  [Function `generate_auid`](#0x1_transaction_context_generate_auid)
 -  [Function `auid_address`](#0x1_transaction_context_auid_address)
 -  [Specification](#@Specification_1)
     -  [Function `get_txn_hash`](#@Specification_1_get_txn_hash)
-    -  [Function `generate_unique_address_internal`](#@Specification_1_generate_unique_address_internal)
+    -  [Function `generate_unique_address`](#@Specification_1_generate_unique_address)
     -  [Function `get_script_hash`](#@Specification_1_get_script_hash)
 
 
@@ -91,9 +91,9 @@ Return the transaction hash of the current transaction
 
 </details>
 
-<a name="0x1_transaction_context_generate_unique_address_internal"></a>
+<a name="0x1_transaction_context_generate_unique_address"></a>
 
-## Function `generate_unique_address_internal`
+## Function `generate_unique_address`
 
 Return a universally unique identifier (of type address) generated
 by hashing the transaction hash of this transaction and a sequence number
@@ -104,7 +104,7 @@ Uses Scheme in types/src/transaction/authenticator.rs for domain separation
 from other ways of generating unique addresses.
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address_internal">generate_unique_address_internal</a>(): <b>address</b>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>(): <b>address</b>
 </code></pre>
 
 
@@ -113,23 +113,23 @@ from other ways of generating unique addresses.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address_internal">generate_unique_address_internal</a>(): <b>address</b>;
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>(): <b>address</b>;
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_transaction_context_generate_unique_address"></a>
+<a name="0x1_transaction_context_generate_auid_address"></a>
 
-## Function `generate_unique_address`
+## Function `generate_auid_address`
 
-Return a universally unique identifier. Internally calls
-the private function <code>generate_unique_address_internal</code>. This function is
-created for to feature gate the <code>generate_unique_address_internal</code> function.
+Return a aptos unique identifier. Internally calls
+the private function <code>generate_unique_address</code>. This function is
+created for to feature gate the <code>generate_unique_address</code> function.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>(): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">generate_auid_address</a>(): <b>address</b>
 </code></pre>
 
 
@@ -138,9 +138,9 @@ created for to feature gate the <code>generate_unique_address_internal</code> fu
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>(): <b>address</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">generate_auid_address</a>(): <b>address</b> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_auids_enabled">features::auids_enabled</a>(), <a href="transaction_context.md#0x1_transaction_context_EAUID_NOT_SUPPORTED">EAUID_NOT_SUPPORTED</a>);
-    <a href="transaction_context.md#0x1_transaction_context_generate_unique_address_internal">generate_unique_address_internal</a>()
+    <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>()
 }
 </code></pre>
 
@@ -175,7 +175,7 @@ Return the script hash of the current entry function.
 
 ## Function `generate_auid`
 
-This method runs <code>generate_unique_address_internal</code> native function and returns
+This method runs <code>generate_unique_address</code> native function and returns
 the generated unique address wrapped in the AUID class.
 
 
@@ -191,7 +191,7 @@ the generated unique address wrapped in the AUID class.
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_auid">generate_auid</a>(): <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_auids_enabled">features::auids_enabled</a>(), <a href="transaction_context.md#0x1_transaction_context_EAUID_NOT_SUPPORTED">EAUID_NOT_SUPPORTED</a>);
     <b>return</b> <a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a> {
-        unique_address: <a href="transaction_context.md#0x1_transaction_context_generate_unique_address_internal">generate_unique_address_internal</a>()
+        unique_address: <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>()
     }
 }
 </code></pre>
@@ -256,12 +256,12 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a name="@Specification_1_generate_unique_address_internal"></a>
+<a name="@Specification_1_generate_unique_address"></a>
 
-### Function `generate_unique_address_internal`
+### Function `generate_unique_address`
 
 
-<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address_internal">generate_unique_address_internal</a>(): <b>address</b>
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>(): <b>address</b>
 </code></pre>
 
 

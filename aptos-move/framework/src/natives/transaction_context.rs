@@ -157,7 +157,7 @@ pub fn make_all(
             ),
         ),
         (
-            "generate_unique_address_internal",
+            "generate_unique_address",
             make_safe_native(
                 gas_params.generate_unique_address,
                 timed_features.clone(),

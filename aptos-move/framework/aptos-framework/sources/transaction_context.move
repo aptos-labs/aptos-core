@@ -21,25 +21,25 @@ module aptos_framework::transaction_context {
     /// the sequence number and generates a new unique address.
     /// Uses Scheme in types/src/transaction/authenticator.rs for domain separation
     /// from other ways of generating unique addresses.
-    native fun generate_unique_address_internal(): address;
+    native fun generate_unique_address(): address;
 
-    /// Return a universally unique identifier. Internally calls
-    /// the private function `generate_unique_address_internal`. This function is
-    /// created for to feature gate the `generate_unique_address_internal` function.
-    public fun generate_unique_address(): address {
+    /// Return a aptos unique identifier. Internally calls
+    /// the private function `generate_unique_address`. This function is
+    /// created for to feature gate the `generate_unique_address` function.
+    public fun generate_auid_address(): address {
         assert!(features::auids_enabled(), EAUID_NOT_SUPPORTED);
-        generate_unique_address_internal()
+        generate_unique_address()
     }
 
     /// Return the script hash of the current entry function.
     public native fun get_script_hash(): vector<u8>;
 
-    /// This method runs `generate_unique_address_internal` native function and returns
+    /// This method runs `generate_unique_address` native function and returns
     /// the generated unique address wrapped in the AUID class.
     public fun generate_auid(): AUID {
         assert!(features::auids_enabled(), EAUID_NOT_SUPPORTED);
         return AUID {
-            unique_address: generate_unique_address_internal()
+            unique_address: generate_unique_address()
         }
     }
 
@@ -60,7 +60,7 @@ module aptos_framework::transaction_context {
         let count: u64 = 50;
         while (i < count) {
             i = i + 1;
-            vector::push_back(&mut auids, generate_unique_address());
+            vector::push_back(&mut auids, generate_auid_address());
         };
         i = 0;
         while (i < count - 1) {

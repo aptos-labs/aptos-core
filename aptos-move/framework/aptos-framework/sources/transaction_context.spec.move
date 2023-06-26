@@ -11,7 +11,7 @@ spec aptos_framework::transaction_context {
         ensures result == spec_get_txn_hash();
     }
     spec fun spec_get_txn_hash(): vector<u8>;
-    spec generate_unique_address_internal(): address {
+    spec generate_unique_address(): address {
         pragma opaque;
     }
 }

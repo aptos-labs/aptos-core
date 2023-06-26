@@ -48,12 +48,12 @@ module aptos_framework::object {
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
 
-    /// generate_unique_address uses this for domain separation within its native implementation
-    const DERIVE_AUID_ADDRESS_SCHEME: u8 = 0xFB;
-
     /// Maximum nesting from one object to another. That is objects can technically have infinte
     /// nesting, but any checks such as transfer will only be evaluated this deep.
     const MAXIMUM_OBJECT_NESTING: u8 = 8;
+
+    /// generate_unique_address uses this for domain separation within its native implementation
+    const DERIVE_AUID_ADDRESS_SCHEME: u8 = 0xFB;
 
     /// Scheme identifier used to generate an object's address `obj_addr` as derived from another object.
     /// The object's address is generated as:
@@ -218,7 +218,7 @@ module aptos_framework::object {
     /// The created object is deletable as we can guarantee the same unique address can
     /// never be regenerated with future txs.
     public fun create_object(owner_address: address): ConstructorRef {
-        let unique_address = transaction_context::generate_unique_address();
+        let unique_address = transaction_context::generate_auid_address();
         create_object_internal(owner_address, unique_address, true)
     }
 
