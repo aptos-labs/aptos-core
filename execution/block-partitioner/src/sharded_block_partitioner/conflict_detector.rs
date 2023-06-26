@@ -51,7 +51,7 @@ impl CrossShardConflictDetector {
             } else {
                 accepted_txn_dependencies.push(self.get_deps_for_frozen_txn(
                     &txn,
-                    Arc::new(vec![]),
+                    Arc::new(vec![WriteSetWithTxnIndex::default(); self.num_shards]),
                     prev_rounds_rw_set_with_index.clone(),
                 ));
                 accepted_txns.push(txn);
@@ -86,13 +86,19 @@ impl CrossShardConflictDetector {
             // and find the first shard id that has taken a write lock on the storage location. This ensures that we find the highest txn index that is conflicting
             // with the current transaction. Please note that since we use a multi-version database, there is no conflict if any previous txn index has taken
             // a read lock on the storage location.
-            let mut current_shard_id = (self.shard_id + self.num_shards - 1) % self.num_shards; // current shard id - 1 in a wrapping fashion
+            let mut current_shard_id = self.shard_id; // current shard id - 1 in a wrapping fashion
             for rw_set_with_index in current_round_rw_set_with_index
                 .iter()
                 .take(self.shard_id)
                 .rev()
                 .chain(prev_rounds_rw_set_with_index.iter().rev())
             {
+                if current_shard_id == 0 {
+                    current_shard_id = self.num_shards - 1;
+                } else {
+                    current_shard_id -= 1;
+                };
+
                 if rw_set_with_index.has_write_lock(storage_location) {
                     cross_shard_dependencies.add_required_edge(
                         TxnIdxWithShardId::new(
@@ -103,8 +109,6 @@ impl CrossShardConflictDetector {
                     );
                     break;
                 }
-                // perform a wrapping substraction
-                current_shard_id = (current_shard_id + self.num_shards - 1) % self.num_shards;
             }
         }
 
