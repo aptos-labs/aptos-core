@@ -681,8 +681,8 @@ module aptos_framework::object {
         let feature = features::get_auids();
         features::change_feature_flags(&fx, vector[feature], vector[]);
 
-        let auid1 = aptos_framework::transaction_context::generate_unique_address();
-        let bytes = aptos_framework::transaction_context::get_txn_hash();
+        let auid1 = aptos_framework::transaction_context::generate_auid_address();
+        let bytes = aptos_framework::transaction_context::get_transaction_hash();
         std::vector::push_back(&mut bytes, 1);
         std::vector::push_back(&mut bytes, 0);
         std::vector::push_back(&mut bytes, 0);
