@@ -386,10 +386,20 @@ impl BroadcastStatus for CertificateAckState {
 /// the first round we care about in the DAG, `exists_bitmask` is a two dimensional bitmask represents
 /// if a node exist at [start_round + index][validator_index].
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct FetchRequest {
+pub struct RemoteFetchRequest {
     target: NodeMetadata,
     start_round: Round,
     exists_bitmask: Vec<Vec<bool>>,
+}
+
+impl RemoteFetchRequest {
+    pub fn new(target: NodeMetadata, start_round: Round, exists_bitmask: Vec<Vec<bool>>) -> Self {
+        Self {
+            target,
+            start_round,
+            exists_bitmask,
+        }
+    }
 }
 
 /// Represents a response to FetchRequest, `certified_nodes` are indexed by [round][validator_index]
@@ -407,7 +417,7 @@ impl FetchResponse {
 
     pub fn verify(
         self,
-        _request: &FetchRequest,
+        _request: &RemoteFetchRequest,
         _validator_verifier: &ValidatorVerifier,
     ) -> anyhow::Result<Self> {
         todo!("verification");
@@ -427,7 +437,7 @@ pub enum DAGMessage {
     NodeDigestSignatureMsg(NodeDigestSignature),
     NodeCertificateMsg(NodeCertificate),
     CertifiedAckMsg(CertifiedAck),
-    FetchRequest(FetchRequest),
+    FetchRequest(RemoteFetchRequest),
     FetchResponse(FetchResponse),
 
     #[cfg(test)]
@@ -522,7 +532,7 @@ impl TryFrom<DAGMessage> for CertifiedAck {
     }
 }
 
-impl TryFrom<DAGMessage> for FetchRequest {
+impl TryFrom<DAGMessage> for RemoteFetchRequest {
     type Error = anyhow::Error;
 
     fn try_from(msg: DAGMessage) -> Result<Self, Self::Error> {
@@ -568,8 +578,8 @@ impl From<CertifiedAck> for DAGMessage {
     }
 }
 
-impl From<FetchRequest> for DAGMessage {
-    fn from(req: FetchRequest) -> Self {
+impl From<RemoteFetchRequest> for DAGMessage {
+    fn from(req: RemoteFetchRequest) -> Self {
         Self::FetchRequest(req)
     }
 }
