@@ -1435,7 +1435,7 @@ async fn parse_operations(
                     );
                 }
 
-                // Check that reset lockup was set the same
+                // Check that update commmission was set the same
                 if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
                     actual_txn.transaction
                 {
