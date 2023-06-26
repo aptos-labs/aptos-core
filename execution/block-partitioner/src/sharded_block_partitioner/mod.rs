@@ -27,6 +27,8 @@ use std::{
     },
     thread,
 };
+use aptos_crypto::hash::CryptoHash;
+use aptos_types::state_store::state_key::StateKey;
 
 mod conflict_detector;
 mod cross_shard_messages;
@@ -353,6 +355,25 @@ impl ShardedBlockPartitioner {
             frozen_write_set_with_index,
         );
 
+        // for (shard_id, sub_block_list) in frozen_sub_blocks.iter().enumerate() {
+        //     for (round_id, sub_block) in sub_block_list.sub_blocks.iter().enumerate() {
+        //         for (local_tid, td) in sub_block.transactions.iter().enumerate() {
+        //             let tid = sub_block.start_index + local_tid;
+        //             for (src_tid, locs) in td.cross_shard_dependencies.required_edges().iter() {
+        //                 for loc in locs.iter() {
+        //                     let key_str = loc.clone().into_state_key().hash().to_hex();
+        //                     info!("PAREND - round={}, shard={}, tid={}, wait for key={} from round=???, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.shard_id, src_tid.txn_index);
+        //                 }
+        //             }
+        //             for (src_tid, locs) in td.cross_shard_dependencies.dependent_edges().iter() {
+        //                 for loc in locs.iter() {
+        //                     let key_str = loc.clone().into_state_key().hash().to_hex();
+        //                     info!("PAREND - round={}, shard={}, tid={}, unblock key={} for round=???, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.shard_id, src_tid.txn_index);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
         // Assert rejected transactions are empty
         assert!(rejected_txns.iter().all(|txns| txns.is_empty()));
         frozen_sub_blocks

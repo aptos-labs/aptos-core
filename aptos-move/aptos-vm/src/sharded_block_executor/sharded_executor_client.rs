@@ -9,7 +9,7 @@ use crate::{
         messages::CrossShardMsg,
     },
 };
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
@@ -26,6 +26,8 @@ use std::{
         Arc, Mutex,
     },
 };
+use aptos_crypto::hash::CryptoHash;
+use aptos_vm_logging::disable_speculative_logging;
 
 pub struct ShardedExecutorClient {
     shard_id: ShardId,
@@ -91,10 +93,13 @@ impl ShardedExecutorClient {
         sub_block: &SubBlock<Transaction>,
     ) -> CrossShardStateView<'a, S> {
         let mut cross_shard_state_key = HashSet::new();
-        for txn in &sub_block.transactions {
-            for (_, storage_locations) in txn.cross_shard_dependencies.required_edges_iter() {
+        for (local_tid, txn) in sub_block.transactions.iter().enumerate() {
+            for (src_txn, storage_locations) in txn.cross_shard_dependencies.required_edges_iter() {
                 for storage_location in storage_locations {
-                    cross_shard_state_key.insert(storage_location.clone().into_state_key());
+                    let state_key = storage_location.clone().into_state_key();
+                    // let key_str = state_key.hash().to_hex();
+                    // info!("CCSSV, dst_shard_id={}, dst_txn_idx={}, src_shard_id={}, src_txn_idx={}, key={}", self.shard_id, sub_block.start_index + local_tid, src_txn.shard_id, src_txn.txn_index, key_str);
+                    cross_shard_state_key.insert(state_key);
                 }
             }
         }
@@ -145,6 +150,7 @@ impl ShardedExecutorClient {
                 }
             });
             s.spawn(move |_| {
+                disable_speculative_logging();
                 let ret = BlockAptosVM::execute_block(
                     self.executor_thread_pool.clone(),
                     BlockExecutorTransactions::Unsharded(sub_block.into_txns()),

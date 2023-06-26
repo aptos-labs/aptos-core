@@ -75,12 +75,15 @@ pub fn disable_speculative_logging() {
     DISABLE_SPECULATION.store(true, Ordering::Relaxed);
 }
 
-fn speculation_disabled() -> bool {
+pub fn speculation_disabled() -> bool {
     DISABLE_SPECULATION.load(Ordering::Relaxed)
 }
 
 /// Initializes the storage of speculative logs for num_txns many transactions.
 pub fn init_speculative_logs(num_txns: usize) {
+    if speculation_disabled() {
+        return;
+    }
     BUFFERED_LOG_EVENTS.swap(Some(Arc::new(SpeculativeEvents::new(num_txns))));
 }
 
@@ -118,6 +121,9 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
 /// log / event storage with None. Must be called after block execution is complete as it
 /// removes the storage from Arc.
 pub fn flush_speculative_logs(num_to_flush: usize) {
+    if speculation_disabled() {
+        return;
+    }
     match BUFFERED_LOG_EVENTS.swap(None) {
         Some(log_events_ptr) => {
             match Arc::try_unwrap(log_events_ptr) {
@@ -128,12 +134,10 @@ pub fn flush_speculative_logs(num_to_flush: usize) {
             };
         },
         None => {
-            if !speculation_disabled() {
-                // Alert only if speculation is not disabled.
-                speculative_alert!(
-                    "Clear all logs called on uninitialized speculative log storage"
-                );
-            }
+            // Alert only if speculation is not disabled.
+            speculative_alert!(
+                "Clear all logs called on uninitialized speculative log storage"
+            );
         },
     }
 }
@@ -141,6 +145,9 @@ pub fn flush_speculative_logs(num_to_flush: usize) {
 /// Clear speculative logs recorded for a specific transction, useful when transaction
 /// execution fails validation and aborts - setting stage for the re-execution.
 pub fn clear_speculative_txn_logs(txn_idx: usize) {
+    if speculation_disabled() {
+        return;
+    }
     match &*BUFFERED_LOG_EVENTS.load() {
         Some(log_events) => {
             if let Err(e) = log_events.clear_txn_events(txn_idx) {
@@ -148,12 +155,9 @@ pub fn clear_speculative_txn_logs(txn_idx: usize) {
             };
         },
         None => {
-            if !speculation_disabled() {
-                // Alert only if speculation is not disabled.
-                speculative_alert!(
-                    "Clear all logs called on uninitialized speculative log storage"
-                );
-            }
+            speculative_alert!(
+                "Clear all logs called on uninitialized speculative log storage"
+            );
         },
     }
 }

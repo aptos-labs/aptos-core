@@ -11,7 +11,7 @@ use aptos_block_executor::{
     task::ExecutionStatus, txn_commit_listener::TransactionCommitListener,
     txn_last_input_output::TxnOutput,
 };
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -28,6 +28,7 @@ use std::{
         Arc, Mutex,
     },
 };
+use aptos_crypto::hash::CryptoHash;
 
 pub struct CrossShardCommitReceiver {}
 
@@ -119,7 +120,8 @@ impl CrossShardCommitSender {
         for (state_key, write_op) in write_set.iter() {
             if let Some(dependent_shard_ids) = edges.get(state_key) {
                 for dependent_shard_id in dependent_shard_ids.iter() {
-                    trace!("Sending remote update for success for shard id {:?} and txn_idx: {:?}, state_key: {:?}, dependent shard id: {:?}", self.shard_id, txn_idx, state_key, dependent_shard_id);
+                    // let key_str = state_key.hash().to_hex();
+                    // info!("SRUFS, src_shard_id={}, src_txn_idx={}, dst_shard_id={}, key={}", self.shard_id, txn_idx, dependent_shard_id, key_str);
                     let message = RemoteTxnWriteMsg(RemoteTxnWrite::new(
                         state_key.clone(),
                         Some(write_op.clone()),

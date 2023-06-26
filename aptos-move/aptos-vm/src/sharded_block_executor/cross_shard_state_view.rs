@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::Result;
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_state_view::{StateView, TStateView};
 use aptos_types::{
     block_executor::partitioner::ShardId,
@@ -14,6 +14,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Condvar, Mutex},
 };
+use aptos_crypto::hash::CryptoHash;
 
 #[derive(Clone)]
 enum CrossShardValueStatus {
