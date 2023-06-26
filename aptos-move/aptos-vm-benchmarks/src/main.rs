@@ -11,6 +11,8 @@ use std::fs::read_dir;
 use std::path::PathBuf;
 use std::time::Instant;
 
+const PREFIX: &str = "benchmark";
+
 //// generate a TransactionPayload for modules
 fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
     // publish package similar to create_publish_package in harness.rs
@@ -112,6 +114,10 @@ fn main() {
             let funcs = compiled_module.function_defs;
             let func_handles = compiled_module.function_handles;
             let func_identifier_pool = compiled_module.identifiers;
+
+            // find # of params in each func if it is entry function
+            let signature_pool = compiled_module.signatures;
+
             let mut func_identifiers = Vec::new();
             for func in funcs {
                 let is_entry = func.is_entry;
@@ -119,11 +125,24 @@ fn main() {
                     continue;
                 }
 
-                let idx: usize = func.function.0.into();
-                let handle = &func_handles[idx];
+                let func_idx: usize = func.function.0.into();
+                let handle = &func_handles[func_idx];
 
                 let func_identifier_idx: usize = handle.name.0.into();
                 let func_identifier = &func_identifier_pool[func_identifier_idx];
+
+                // check if it starts with "benchmark"
+                if !func_identifier.as_str().starts_with(PREFIX) {
+                    continue;
+                }
+
+                // if it does, ensure no params in benchmark function
+                let signature_idx: usize = handle.parameters.0.into();
+                let func_params = &signature_pool[signature_idx];
+                if func_params.len() != 0 {
+                    eprintln!("[WARNING] benchmark functions should not have parameters");
+                    continue;
+                }
 
                 func_identifiers.push(func_identifier.as_str());
             }
@@ -133,9 +152,10 @@ fn main() {
 
             for func_identifier in func_identifiers {
                 println!(
-                    "Executing {}::{}::benchmark",
+                    "Executing {}::{}::{}",
                     address.to_string(),
-                    identifier
+                    identifier,
+                    func_identifier,
                 );
 
                 // publish package similar to create_publish_package in harness.rs

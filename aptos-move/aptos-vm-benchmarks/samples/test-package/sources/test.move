@@ -8,6 +8,9 @@ module 0xbeef::test {
 }
 
 module 0xbeef::test1 {
-    public entry fun benchmark() {
+    public entry fun benchmark_test1() {
+    }
+
+    public entry fun benchmark_test2(_x: u64) {
     }
 }
