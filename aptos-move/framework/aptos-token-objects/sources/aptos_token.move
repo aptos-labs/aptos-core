@@ -8,6 +8,7 @@
 /// * Metadata property type
 module aptos_token_objects::aptos_token {
     use std::error;
+    use std::features;
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
@@ -199,7 +200,7 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ): ConstructorRef acquires AptosCollection {
-        let constructor_ref = if (std::features::auids_enabled()) {
+        let constructor_ref = if (features::auids_enabled()) {
             token::create(
                 creator,
                 collection,

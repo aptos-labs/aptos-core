@@ -472,7 +472,7 @@ With an existing collection, directly mint a soul bound token into the recipient
     property_types: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
     property_values: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
 ): ConstructorRef <b>acquires</b> <a href="aptos_token.md#0x4_aptos_token_AptosCollection">AptosCollection</a> {
-    <b>let</b> constructor_ref = <b>if</b> (std::features::auids_enabled()) {
+    <b>let</b> constructor_ref = <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_auids_enabled">features::auids_enabled</a>()) {
         <a href="token.md#0x4_token_create">token::create</a>(
             creator,
             <a href="collection.md#0x4_collection">collection</a>,

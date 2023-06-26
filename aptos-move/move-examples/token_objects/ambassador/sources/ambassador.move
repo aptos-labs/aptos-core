@@ -283,8 +283,13 @@ module token_objects::ambassador {
         );
     }
 
-    #[test(creator = @0x123, user1 = @0x456)]
-    fun test_mint_burn(creator: &signer, user1: &signer) acquires AmbassadorToken, AmbassadorLevel {
+    #[test(creator = @0x123, user1 = @0x456, fx = @std)]
+    fun test_mint_burn(creator: &signer, user1: &signer, fx: signer) acquires AmbassadorToken, AmbassadorLevel {
+        use std::features;
+
+        let feature = features::get_auids();
+        features::change_feature_flags(&fx, vector[feature], vector[]);
+
         // ------------------------------------------
         // Creator creates the Ambassador Collection.
         // ------------------------------------------
