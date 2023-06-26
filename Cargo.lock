@@ -2913,6 +2913,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-global-constants",
+ "aptos-ledger",
  "aptos-rest-client",
  "aptos-types",
  "bcs 0.1.4",
