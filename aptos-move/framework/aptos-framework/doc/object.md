@@ -229,7 +229,7 @@ This is a one time ability given to the creator to configure the object as neces
 <code>can_delete: bool</code>
 </dt>
 <dd>
- Set to true so long as deleting the object is possible.
+ True if the object can be deleted. Named objects are not deletable.
 </dd>
 </dl>
 

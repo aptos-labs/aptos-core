@@ -112,7 +112,7 @@ module aptos_framework::object {
     /// This is a one time ability given to the creator to configure the object as necessary
     struct ConstructorRef has drop {
         self: address,
-        /// Set to true so long as deleting the object is possible.
+        /// True if the object can be deleted. Named objects are not deletable.
         can_delete: bool,
     }
 

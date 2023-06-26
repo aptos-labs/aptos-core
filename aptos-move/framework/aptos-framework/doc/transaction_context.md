@@ -12,7 +12,7 @@
 -  [Function `generate_unique_address`](#0x1_transaction_context_generate_unique_address)
 -  [Function `get_script_hash`](#0x1_transaction_context_get_script_hash)
 -  [Function `generate_auid`](#0x1_transaction_context_generate_auid)
--  [Function `get_unique_address`](#0x1_transaction_context_get_unique_address)
+-  [Function `auid_address`](#0x1_transaction_context_auid_address)
 -  [Specification](#@Specification_1)
     -  [Function `get_txn_hash`](#@Specification_1_get_txn_hash)
     -  [Function `generate_unique_address_internal`](#@Specification_1_generate_unique_address_internal)
@@ -200,13 +200,13 @@ the generated unique address wrapped in the AUID class.
 
 </details>
 
-<a name="0x1_transaction_context_get_unique_address"></a>
+<a name="0x1_transaction_context_auid_address"></a>
 
-## Function `get_unique_address`
+## Function `auid_address`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_unique_address">get_unique_address</a>(auid: &<a href="transaction_context.md#0x1_transaction_context_AUID">transaction_context::AUID</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_auid_address">auid_address</a>(auid: &<a href="transaction_context.md#0x1_transaction_context_AUID">transaction_context::AUID</a>): <b>address</b>
 </code></pre>
 
 
@@ -215,7 +215,7 @@ the generated unique address wrapped in the AUID class.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_unique_address">get_unique_address</a>(auid: &<a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a>): <b>address</b> {
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_auid_address">auid_address</a>(auid: &<a href="transaction_context.md#0x1_transaction_context_AUID">AUID</a>): <b>address</b> {
     auid.unique_address
 }
 </code></pre>
