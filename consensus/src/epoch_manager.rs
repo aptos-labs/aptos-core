@@ -681,7 +681,8 @@ impl EpochManager {
         let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
-        let block_gas_limit = onchain_execution_config.block_gas_limit();
+        // let block_gas_limit = onchain_execution_config.block_gas_limit();
+        let block_gas_limit = Some(100_1000);
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         self.quorum_store_msg_tx = quorum_store_msg_tx;
