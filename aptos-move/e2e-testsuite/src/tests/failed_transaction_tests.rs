@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas::{
-    AptosGasParameters, StandardGasMeter, StorageGasParameters, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, StandardGasAlgebra, StandardGasMeter, StorageGasParameters,
+    LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
@@ -40,12 +41,12 @@ fn failed_transaction_cleanup_test() {
 
     let change_set_configs = storage_gas_params.change_set_configs.clone();
 
-    let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
+    let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
         LATEST_GAS_FEATURE_VERSION,
         gas_params,
         storage_gas_params,
         10_000,
-    ));
+    )));
 
     // TYPE_MISMATCH should be kept and charged.
     let out1 = aptos_vm.failed_transaction_cleanup(
