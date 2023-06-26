@@ -53,6 +53,8 @@ module tic_tac_toe::ttt {
         col: u64,
     }
 
+    //// TODO: event handle should be stored in permanent struct, if we want
+    //// to access game records after games are over.
     struct Game has key, store {
         board: Board,
         player_x: Option<Player>,
@@ -66,6 +68,7 @@ module tic_tac_toe::ttt {
      * @notice initializes a valid, playable Game
      * @dev stores the Game into global storage
      */
+    //// TODO: have Game as its own object, with its own address
     public entry fun start_game(creator: &signer) {
         // check game doesn't already exist under creator address
         assert!(!exists<Game>(signer::address_of(creator)), error::already_exists(EGAME_ALREADY_EXISTS_FOR_USER));
