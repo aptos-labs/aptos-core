@@ -1,5 +1,5 @@
 [package]
-name = 'do-nothing-example'
+name = 'do-nothing'
 version = '1.0.0'
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }

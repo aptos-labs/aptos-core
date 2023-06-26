@@ -1,5 +1,5 @@
 [package]
-name = 'test-package-1'
+name = 'add-numbers'
 version = '1.0.0'
 [dependencies.AptosFramework]
 git = 'https://github.com/aptos-labs/aptos-core.git'
