@@ -18,6 +18,7 @@ aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-global-constants = { workspace = true }
+aptos-ledger = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
