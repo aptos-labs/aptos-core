@@ -83,6 +83,26 @@ def test_move_compile(run_helper: RunHelper, test_name=None):
     if f"{account_info.account_address}::cli_e2e_tests" not in response.stdout:
         raise TestError("Module did not compile successfully")
 
+@test_case
+def test_move_compile_dev_mode(run_helper: RunHelper, test_name=None):
+    package_dir = f"move/cli-e2e-tests/{run_helper.base_network}"
+    account_info = run_helper.get_account_info()
+
+    # Compile the module.  Should not need an address passed in
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "compile",
+            "--dev",
+            "--package-dir",
+            package_dir,
+        ],
+    )
+
+    if f"{account_info.account_address}::cli_e2e_tests" not in response.stdout:
+        raise TestError("Module did not compile successfully")
 
 @test_case
 def test_move_compile_script(run_helper: RunHelper, test_name=None):

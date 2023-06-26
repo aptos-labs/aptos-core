@@ -837,6 +837,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
         } = self;
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts.build_options(
+            move_options.dev,
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
             move_options.bytecode_version,

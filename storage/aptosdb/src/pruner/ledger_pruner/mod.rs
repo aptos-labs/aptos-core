@@ -1,15 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod event_store_pruner;
+mod ledger_metadata_pruner;
+pub(crate) mod ledger_pruner_manager;
+mod transaction_accumulator_pruner;
+mod transaction_info_pruner;
+mod transaction_pruner;
+mod write_set_pruner;
+
 use crate::{
     ledger_db::LedgerDb,
     metrics::PRUNER_VERSIONS,
     pruner::{
         db_pruner::DBPruner,
         db_sub_pruner::DBSubPruner,
-        event_store::event_store_pruner::EventStorePruner,
-        ledger_store::ledger_metadata_pruner::LedgerMetadataPruner,
-        transaction_store::{
+        ledger_pruner::{
+            event_store_pruner::EventStorePruner, ledger_metadata_pruner::LedgerMetadataPruner,
             transaction_accumulator_pruner::TransactionAccumulatorPruner,
             transaction_info_pruner::TransactionInfoPruner, transaction_pruner::TransactionPruner,
             write_set_pruner::WriteSetPruner,
