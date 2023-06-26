@@ -165,7 +165,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
 
     [.transaction_context.get_txn_hash.base, { 10.. => "transaction_context.get_txn_hash.base" }, 200 * MUL],
     [.transaction_context.get_script_hash.base, "transaction_context.get_script_hash.base", 200 * MUL],
-    // Using SHA2-256's cost
+    // Based on SHA3-256's cost
     [.transaction_context.generate_unique_address.base, { 10.. => "transaction_context.generate_unique_address.base" }, 4000 * MUL],
 
     [.code.request_publish.base, "code.request_publish.base", 500 * MUL],
