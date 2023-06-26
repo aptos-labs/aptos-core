@@ -353,7 +353,7 @@ impl RosettaClient {
         network_identifier: &NetworkIdentifier,
         private_key: &Ed25519PrivateKey,
         operator: Option<AccountAddress>,
-        new_commission_persentage: Option<u64>,
+        new_commission_percentage: Option<u64>,
         expiry_time_secs: u64,
         sequence_number: Option<u64>,
         max_gas: Option<u64>,
@@ -365,13 +365,12 @@ impl RosettaClient {
         let mut keys = HashMap::new();
         keys.insert(sender, private_key);
 
-        // A transfer operation is made up of a withdraw and a deposit
         let operations = vec![Operation::update_commission(
             0,
             None,
             sender,
             operator.map(AccountIdentifier::base_account),
-            new_commission_persentage,
+            new_commission_percentage,
         )];
 
         self.submit_operations(
