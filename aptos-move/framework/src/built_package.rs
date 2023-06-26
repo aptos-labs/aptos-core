@@ -39,7 +39,12 @@ pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 /// Represents a set of options for building artifacts from Move.
 #[derive(Debug, Clone, Parser, Serialize, Deserialize)]
 pub struct BuildOptions {
-    /// Dev mode to use [dev-addresses]
+    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
+    ///
+    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
+    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+    ///
+    /// Currently, it also additionally pulls in all test compilation artifacts
     #[clap(long)]
     pub dev: bool,
     #[clap(long)]
