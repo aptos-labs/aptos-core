@@ -1,15 +1,10 @@
 module tic_tac_toe::ttt {
-    use std::vector;
-    use std::option::{Self, Option};
-    use std::signer;
-    use std::error;
     use aptos_framework::account;
     use aptos_framework::event;
-
-    #[test_only]
-    use aptos_framework::account::create_account_for_test;
-
-
+    use std::error;
+    use std::option::{Self, Option};
+    use std::signer;
+    use std::vector;
 
     //// GAME CONSTANTS
     const GRID_SIZE: u64 = 9;
@@ -323,7 +318,10 @@ module tic_tac_toe::ttt {
     }
 
 
-    // Tests
+    //// Tests
+    #[test_only]
+    use aptos_framework::account::create_account_for_test;
+
     #[test(creator = @0x123)]
     fun test_start_game(creator: &signer) {
         create_account_for_test(signer::address_of(creator));
