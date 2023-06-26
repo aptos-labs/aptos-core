@@ -125,3 +125,54 @@ def test_move_compile_script(run_helper: RunHelper, test_name=None):
 
     if "script_hash" not in response.stdout:
         raise TestError("Script did not compile successfully")
+
+
+@test_case
+def test_move_run(run_helper: RunHelper, test_name=None):
+    account_info = run_helper.get_account_info()
+
+    # Run the min_hero entry function with default profile
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "run",
+            "--assume-yes",
+            "--function-id",
+            "default::cli_e2e_tests::mint_hero",
+            "--args",
+            "string:Boss",
+            "string:Male",
+            "string:Jin",
+            "string:Undead",
+            "string:",
+        ],
+    )
+
+    response = json.loads(response.stdout)
+    if response["Result"].get("success") != True:
+        raise TestError("Move run did not execute successfully")
+
+    # Get what modules exist on chain.
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "view",
+            "--assume-yes",
+            "--function-id",
+            f"0x{account_info.account_address}::cli_e2e_tests::view_hero",
+            "--args",
+            f"address:0x{account_info.account_address}",
+            "string:Hero Quest",
+            "string:Jin",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    if result[0].get("gender") != "Male" and result[0].get("race") != "Undead":
+        raise TestError(
+            "Data on chain (view_hero) does not match expected data from (mint_hero)"
+        )

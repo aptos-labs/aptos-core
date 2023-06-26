@@ -36,7 +36,12 @@ from cases.account import (
 )
 from cases.config import test_config_show_profiles
 from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
-from cases.move import test_move_compile, test_move_compile_script, test_move_publish
+from cases.move import (
+    test_move_compile,
+    test_move_compile_script,
+    test_move_publish,
+    test_move_run,
+)
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -123,6 +128,7 @@ def run_tests(run_helper):
     test_move_compile(run_helper)
     test_move_compile_script(run_helper)
     test_move_publish(run_helper)
+    test_move_run(run_helper)
 
 
 def main():
