@@ -81,10 +81,10 @@ module token_objects::food {
             sender,
             string::utf8(b"Corn Token Description"),
             string::utf8(CORN_TOKEN_NAME),
-            string::utf8(b"https://raw.githubusercontent.com/junkil-park/metadata/main/knight/Corn"),
+            string::utf8(b"https://raw.githubusercontent.com/aptos-labs/aptos-core/main/ecosystem/typescript/sdk/examples/typescript/metadata/knight/Corn"),
             string::utf8(b"Corn"),
             string::utf8(b"CORN"),
-            string::utf8(b"https://raw.githubusercontent.com/junkil-park/metadata/main/knight/Corn.png"),
+            string::utf8(b"https://raw.githubusercontent.com/aptos-labs/aptos-core/main/ecosystem/typescript/sdk/examples/typescript/metadata/knight/Corn.png"),
             string::utf8(b"https://www.aptoslabs.com"),
             5,
         );
@@ -92,10 +92,10 @@ module token_objects::food {
             sender,
             string::utf8(b"Meat Token Description"),
             string::utf8(MEAT_TOKEN_NAME),
-            string::utf8(b"https://raw.githubusercontent.com/junkil-park/metadata/main/knight/Meat"),
+            string::utf8(b"https://raw.githubusercontent.com/aptos-labs/aptos-core/main/ecosystem/typescript/sdk/examples/typescript/metadata/knight/Meat"),
             string::utf8(b"Meat"),
             string::utf8(b"MEAT"),
-            string::utf8(b"https://raw.githubusercontent.com/junkil-park/metadata/main/knight/Meat.png"),
+            string::utf8(b"https://raw.githubusercontent.com/aptos-labs/aptos-core/main/ecosystem/typescript/sdk/examples/typescript/metadata/knight/Meat.png"),
             string::utf8(b"https://www.aptoslabs.com"),
             20,
         );
@@ -132,6 +132,41 @@ module token_objects::food {
     /// Returns the food token address by name
     public fun food_token_address(food_token_name: String): address {
         token::create_token_address(&@token_objects, &string::utf8(FOOD_COLLECTION_NAME), &food_token_name)
+    }
+
+    /// Mints the given amount of the corn token to the given receiver.
+    public entry fun mint_corn(creator: &signer, receiver: address, amount: u64) acquires FoodToken {
+        let corn_token = object::address_to_object<FoodToken>(corn_token_address());
+        mint_internal(creator, corn_token, receiver, amount);
+    }
+
+    /// Mints the given amount of the meat token to the given receiver.
+    public entry fun mint_meat(creator: &signer, receiver: address, amount: u64) acquires FoodToken {
+        let meat_token = object::address_to_object<FoodToken>(meat_token_address());
+        mint_internal(creator, meat_token, receiver, amount);
+    }
+
+    /// Transfers the given amount of the corn token from the given sender to the given receiver.
+    public entry fun transfer_corn(from: &signer, to: address, amount: u64) {
+        transfer_food(from, object::address_to_object<FoodToken>(corn_token_address()), to, amount);
+    }
+
+    /// Transfers the given amount of the meat token from the given sender to the given receiver.
+    public entry fun transfer_meat(from: &signer, to: address, amount: u64) {
+        transfer_food(from, object::address_to_object<FoodToken>(meat_token_address()), to, amount);
+    }
+
+    public entry fun transfer_food(from: &signer, food: Object<FoodToken>, to: address, amount: u64) {
+        let metadata = object::convert<FoodToken, Metadata>(food);
+        primary_fungible_store::transfer(from, metadata, to, amount);
+    }
+
+    public(friend) fun burn_food(from: &signer, food: Object<FoodToken>, amount: u64) acquires FoodToken {
+        let metadata = object::convert<FoodToken, Metadata>(food);
+        let food_addr = object::object_address(&food);
+        let food_token = borrow_global<FoodToken>(food_addr);
+        let from_store = primary_fungible_store::ensure_primary_store_exists(signer::address_of(from), metadata);
+        fungible_asset::burn_from(&food_token.fungible_asset_burn_ref, from_store, amount);
     }
 
     /// Creates the food collection.
@@ -215,47 +250,12 @@ module token_objects::food {
         move_to(&object_signer, food_token);
     }
 
-    /// Mints the given amount of the corn token to the given receiver.
-    public entry fun mint_corn(creator: &signer, receiver: address, amount: u64) acquires FoodToken {
-        let corn_token = object::address_to_object<FoodToken>(corn_token_address());
-        mint_internal(creator, corn_token, receiver, amount);
-    }
-
-    /// Mints the given amount of the meat token to the given receiver.
-    public entry fun mint_meat(creator: &signer, receiver: address, amount: u64) acquires FoodToken {
-        let meat_token = object::address_to_object<FoodToken>(meat_token_address());
-        mint_internal(creator, meat_token, receiver, amount);
-    }
-
     /// The internal mint function.
     fun mint_internal(creator: &signer, token: Object<FoodToken>, receiver: address, amount: u64) acquires FoodToken {
         let food_token = authorized_borrow<FoodToken>(creator, &token);
         let fungible_asset_mint_ref = &food_token.fungible_asset_mint_ref;
         let fa = fungible_asset::mint(fungible_asset_mint_ref, amount);
         primary_fungible_store::deposit(receiver, fa);
-    }
-
-    /// Transfers the given amount of the corn token from the given sender to the given receiver.
-    public entry fun transfer_corn(from: &signer, to: address, amount: u64) {
-        transfer_food(from, object::address_to_object<FoodToken>(corn_token_address()), to, amount);
-    }
-
-    /// Transfers the given amount of the meat token from the given sender to the given receiver.
-    public entry fun transfer_meat(from: &signer, to: address, amount: u64) {
-        transfer_food(from, object::address_to_object<FoodToken>(meat_token_address()), to, amount);
-    }
-
-    public entry fun transfer_food(from: &signer, food: Object<FoodToken>, to: address, amount: u64) {
-        let metadata = object::convert<FoodToken, Metadata>(food);
-        primary_fungible_store::transfer(from, metadata, to, amount);
-    }
-
-    public(friend) fun burn_food(from: &signer, food: Object<FoodToken>, amount: u64) acquires FoodToken {
-        let metadata = object::convert<FoodToken, Metadata>(food);
-        let food_addr = object::object_address(&food);
-        let food_token = borrow_global<FoodToken>(food_addr);
-        let from_store = primary_fungible_store::ensure_primary_store_exists(signer::address_of(from), metadata);
-        fungible_asset::burn_from(&food_token.fungible_asset_burn_ref, from_store, amount);
     }
 
     inline fun authorized_borrow<T: key>(creator: &signer, token: &Object<T>): &FoodToken {

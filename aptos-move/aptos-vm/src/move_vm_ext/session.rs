@@ -359,13 +359,13 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let write_set = write_set_mut
             .freeze()
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))?;
+            .map_err(|_| VMStatus::error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
             .map(|(guid, seq_num, ty_tag, blob)| {
                 let key = bcs::from_bytes(guid.as_slice())
-                    .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH, None))?;
+                    .map_err(|_| VMStatus::error(StatusCode::EVENT_KEY_MISMATCH, None))?;
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
@@ -403,7 +403,7 @@ impl<'r> WriteOpConverter<'r> {
         use WriteOp::*;
 
         let existing_value_opt = self.remote.get_state_value(state_key).map_err(|_| {
-            VMStatus::Error(
+            VMStatus::error(
                 StatusCode::STORAGE_ERROR,
                 err_msg("Storage read failed when converting change set."),
             )
@@ -411,14 +411,14 @@ impl<'r> WriteOpConverter<'r> {
 
         let write_op = match (existing_value_opt, move_storage_op) {
             (None, Modify(_) | Delete) => {
-                return Err(VMStatus::Error(
+                return Err(VMStatus::error(
                     // Possible under speculative execution, returning storage error waiting for re-execution
                     StatusCode::STORAGE_ERROR,
                     err_msg("When converting write op: updating non-existent value."),
                 ));
             },
             (Some(_), New(_)) => {
-                return Err(VMStatus::Error(
+                return Err(VMStatus::error(
                     // Possible under speculative execution, returning storage error waiting for re-execution
                     StatusCode::STORAGE_ERROR,
                     err_msg("When converting write op: Recreating existing value."),
@@ -463,7 +463,7 @@ impl<'r> WriteOpConverter<'r> {
         let existing_value_opt = self
             .remote
             .get_state_value(state_key)
-            .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))?;
+            .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         let data = serialize(&value);
 
         let op = match existing_value_opt {

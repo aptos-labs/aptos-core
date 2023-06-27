@@ -31,7 +31,10 @@ use aptos_types::{
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::output::VMOutput;
 use fail::fail_point;
-use move_binary_format::{errors::VMResult, CompiledModule};
+use move_binary_format::{
+    errors::{Location, PartialVMError, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     gas_algebra::NumArgs,
     language_storage::ModuleId,
@@ -43,6 +46,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
+pub const GAS_PAYER_FLAG_BIT: u64 = 1u64 << 63; // MSB of sequence number is used to flag a gas payer tx
 
 /// A wrapper to make VMRuntime standalone
 pub struct AptosVMImpl {
@@ -199,7 +203,7 @@ impl AptosVMImpl {
                 log_context,
                 "VM Startup Failed. Gas Parameters Not Found".into()
             );
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
+            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, None)
         })
     }
 
@@ -212,7 +216,7 @@ impl AptosVMImpl {
                 log_context,
                 "VM Startup Failed. Storage Gas Parameters Not Found".into()
             );
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
+            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, None)
         })
     }
 
@@ -223,7 +227,7 @@ impl AptosVMImpl {
     pub fn get_version(&self) -> Result<Version, VMStatus> {
         self.version.clone().ok_or_else(|| {
             alert!("VM Startup Failed. Version Not Found");
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
+            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, None)
         })
     }
 
@@ -276,7 +280,7 @@ impl AptosVMImpl {
                         raw_bytes_len, txn_gas_params.max_transaction_size_in_bytes
                     ),
                 );
-                return Err(VMStatus::Error(
+                return Err(VMStatus::error(
                     StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
                     None,
                 ));
@@ -295,7 +299,7 @@ impl AptosVMImpl {
                     txn_data.max_gas_amount()
                 ),
             );
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
                 None,
             ));
@@ -317,7 +321,7 @@ impl AptosVMImpl {
                     txn_data.max_gas_amount()
                 ),
             );
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
                 None,
             ));
@@ -337,7 +341,7 @@ impl AptosVMImpl {
                     txn_data.gas_unit_price()
                 ),
             );
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
                 None,
             ));
@@ -353,7 +357,7 @@ impl AptosVMImpl {
                     txn_data.gas_unit_price()
                 ),
             );
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
                 None,
             ));
@@ -477,7 +481,7 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let transaction_validation = self.transaction_validation();
-        let unreachable_error = VMStatus::Error(StatusCode::UNREACHABLE, None);
+        let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
         let provided_payload = if let Some(payload) = &payload.transaction_payload {
             bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
         } else {
@@ -502,28 +506,21 @@ impl AptosVMImpl {
             .or_else(|err| convert_prologue_error(transaction_validation, err, log_context))
     }
 
-    /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
-    /// in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_success_epilogue(
+    fn run_epiloque(
         &self,
         session: &mut SessionExt,
         gas_remaining: Gas,
         txn_data: &TransactionMetadata,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        fail_point!("move_adapter::run_success_epilogue", |_| {
-            Err(VMStatus::Error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                None,
-            ))
-        });
-
-        let transaction_validation = self.transaction_validation();
+        transaction_validation: &TransactionValidation,
+    ) -> VMResult<()> {
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
-        session
-            .execute_function_bypass_visibility(
+        // We can unconditionally do this as this condition can only be true if the prologue
+        // accepted it, in which case the gas payer feature is enabled.
+        if txn_sequence_number & GAS_PAYER_FLAG_BIT == 0 {
+            // Regular tx, run the normal epilogue
+            session.execute_function_bypass_visibility(
                 &transaction_validation.module_id(),
                 &transaction_validation.user_epilogue_name,
                 // TODO: Deprecate this once we remove gas currency on the Move side.
@@ -537,8 +534,50 @@ impl AptosVMImpl {
                 ]),
                 &mut UnmeteredGasMeter,
             )
-            .map(|_return_vals| ())
-            .map_err(expect_no_verification_errors)
+        } else {
+            // Gas payer tx
+            let gas_payer = *txn_data.secondary_signers.last().ok_or_else(|| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .finish(Location::Undefined)
+            })?;
+            session.execute_function_bypass_visibility(
+                &transaction_validation.module_id(),
+                &transaction_validation.user_epilogue_gas_payer_name,
+                // TODO: Deprecate this once we remove gas currency on the Move side.
+                vec![],
+                serialize_values(&vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(gas_payer),
+                    MoveValue::U64(txn_sequence_number),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                ]),
+                &mut UnmeteredGasMeter,
+            )
+        }
+        .map(|_return_vals| ())
+        .map_err(expect_no_verification_errors)
+    }
+
+    /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
+    /// in the `ACCOUNT_MODULE` on chain.
+    pub(crate) fn run_success_epilogue(
+        &self,
+        session: &mut SessionExt,
+        gas_remaining: Gas,
+        txn_data: &TransactionMetadata,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        fail_point!("move_adapter::run_success_epilogue", |_| {
+            Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
+            ))
+        });
+
+        let transaction_validation = self.transaction_validation();
+        self.run_epiloque(session, gas_remaining, txn_data, transaction_validation)
             .or_else(|err| convert_epilogue_error(transaction_validation, err, log_context))
     }
 
@@ -552,26 +591,7 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let transaction_validation = self.transaction_validation();
-        let txn_sequence_number = txn_data.sequence_number();
-        let txn_gas_price = txn_data.gas_unit_price();
-        let txn_max_gas_units = txn_data.max_gas_amount();
-        session
-            .execute_function_bypass_visibility(
-                &transaction_validation.module_id(),
-                &transaction_validation.user_epilogue_name,
-                // TODO: Deprecate this once we remove gas currency on the Move side.
-                vec![],
-                serialize_values(&vec![
-                    MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
-                    MoveValue::U64(txn_gas_price.into()),
-                    MoveValue::U64(txn_max_gas_units.into()),
-                    MoveValue::U64(gas_remaining.into()),
-                ]),
-                &mut UnmeteredGasMeter,
-            )
-            .map(|_return_vals| ())
-            .map_err(expect_no_verification_errors)
+        self.run_epiloque(session, gas_remaining, txn_data, transaction_validation)
             .or_else(|e| {
                 expect_only_successful_execution(
                     e,

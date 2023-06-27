@@ -89,7 +89,7 @@ impl ResourceAccountSeed {
 #[derive(Debug, Parser)]
 pub struct DeriveResourceAccount {
     /// Address of the creator's account
-    #[clap(long, alias = "account", parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, alias = "account", value_parser = crate::common::types::load_account_arg)]
     pub(crate) address: AccountAddress,
 
     #[clap(flatten)]

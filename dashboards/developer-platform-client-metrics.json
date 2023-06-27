@@ -28,7 +28,7 @@
         "content": "In order to view metrics for:\n- mainnet\n  - datasource: VictoriaMetrics Mainnet\n  - chain_name: mainnet\n- testnet\n  - datasource: VictoriaMetrics Global (Non-mainnet)\n  - chain_name: testnet\n- devnet\n  - datasource: VictoriaMetrics Global (Non-mainnet)\n  - chain_name: devnet",
         "mode": "markdown"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "title": "Guide",
       "type": "text"
     },
@@ -42,20 +42,73 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
-      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 9 },
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 9 },
       "id": 7,
       "options": {
         "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
         "content": "This section contains queries that aggregate across all clients. This means the `source_client` variable above doesn't do anything.",
         "mode": "markdown"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "title": "Explanation",
       "type": "text"
     },
     {
+      "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 9 },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^C$/", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "sum(increase(aptos_api_request_source_client{chain_name=\"$chain_name\", request_source_client=~\"^unknown.*\"}[$__range]))",
+          "hide": true,
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "sum(increase(aptos_api_request_source_client{chain_name=\"$chain_name\"}[$__range]))",
+          "hide": true,
+          "instant": false,
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": { "name": "Expression", "type": "__expr__", "uid": "__expr__" },
+          "expression": "1-($A/$B)",
+          "hide": false,
+          "refId": "C",
+          "type": "math"
+        }
+      ],
+      "title": "Percentage of node API requests the with x-aptos-client header set",
+      "type": "stat"
+    },
+    {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "This shows the most popular clients by request count over the configured time window.",
+      "description": "This shows the most popular clients by request count over the configured time window. Note, the \"unknown\" value is excluded.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -64,9 +117,10 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 12 },
+      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 14 },
       "id": 1,
       "options": {
+        "displayLabels": [],
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
         "pieType": "pie",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -76,7 +130,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "editorMode": "code",
-          "expr": "sum by(request_source_client) (increase(label_replace(aptos_api_request_source_client{chain_name=\"$chain_name\"}, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\")[$__range])) != 0",
+          "expr": "sum by(request_source_client) (increase(label_replace(aptos_api_request_source_client{chain_name=\"$chain_name\", request_source_client != \"unknown\"}, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\")[$__range])) != 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -87,7 +141,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "This shows the most popular clients by request count over the configured time window. There is a separate entry per client + client version. ",
+      "description": "This shows the most popular clients by request count over the configured time window. There is a separate entry per client + client version. Note, the \"unknown\" value is excluded.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -96,7 +150,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 15, "w": 12, "x": 12, "y": 12 },
+      "gridPos": { "h": 15, "w": 12, "x": 12, "y": 14 },
       "id": 8,
       "options": {
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -108,7 +162,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "editorMode": "code",
-          "expr": "sum by(request_source_client) (increase(aptos_api_request_source_client{chain_name=\"$chain_name\"}[$__range])) != 0",
+          "expr": "sum by(request_source_client) (increase(aptos_api_request_source_client{chain_name=\"$chain_name\", request_source_client!~\"^unknown.*\"}[$__range])) != 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -145,7 +199,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
       "id": 10,
       "options": {
         "barRadius": 0,
@@ -174,19 +228,19 @@
     },
     {
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
       "id": 4,
       "panels": [
         {
           "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
-          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 36 },
+          "gridPos": { "h": 3, "w": 12, "x": 0, "y": 38 },
           "id": 6,
           "options": {
             "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
             "content": "This section contains queries that show data for a specific client. To select which client to view metrics for, select one in the `source_client` variable dropdown above.",
             "mode": "markdown"
           },
-          "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+          "pluginVersion": "10.0.1-cloud.3.f250259e",
           "title": "Explanation",
           "type": "text"
         },
@@ -201,7 +255,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 15, "w": 12, "x": 0, "y": 39 },
+          "gridPos": { "h": 15, "w": 12, "x": 0, "y": 41 },
           "id": 3,
           "options": {
             "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -300,6 +354,6 @@
   "timezone": "",
   "title": "Developer Platform Client Metrics",
   "uid": "be847ea3-c7cc-4048-b783-eb2fdb4f1abd",
-  "version": 53,
+  "version": 62,
   "weekStart": ""
 }

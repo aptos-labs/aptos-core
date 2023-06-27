@@ -763,8 +763,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     pub fn translate_exp(&mut self, exp: &EA::Exp, expected_type: &Type) -> ExpData {
         let loc = self.to_loc(&exp.loc);
         let make_value = |et: &mut ExpTranslator, val: Value, ty: Type| {
-            let rty = et.check_type(&loc, &ty, expected_type, "in expression");
-            let id = et.new_node_id_with_type_loc(&rty, &loc);
+            let _rty = et.check_type(&loc, &ty, expected_type, "in expression");
+            let id = et.new_node_id_with_type_loc(&ty, &loc);
             ExpData::Value(id, val)
         };
         match &exp.value {
@@ -1140,7 +1140,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
                 // construct the call
                 match &spec_fun_entry.oper {
-                    Operation::Function(module_id, spec_fun_id, None) => {
+                    Operation::SpecFunction(module_id, spec_fun_id, None) => {
                         if !self.translating_fun_as_spec_fun {
                             // Record the usage of spec function in specs, used later in spec
                             // translator.
@@ -1784,7 +1784,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&ty, loc);
                 self.set_node_instantiation(id, instantiation);
 
-                if let Operation::Function(module_id, spec_fun_id, None) = cand.oper {
+                if let Operation::SpecFunction(module_id, spec_fun_id, None) = cand.oper {
                     if !self.translating_fun_as_spec_fun {
                         // Record the usage of spec function in specs, used later
                         // in spec translator.

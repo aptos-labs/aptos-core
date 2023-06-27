@@ -134,19 +134,14 @@ impl CrossShardClientInterface for CrossShardClient {
         let num_shards = self.message_txs.len();
 
         for (shard_id, dependent_edges) in dependent_edges.into_iter().enumerate() {
-            if shard_id != self.shard_id {
-                self.message_txs[shard_id]
-                    .send(CrossShardDependentEdgesMsg(dependent_edges))
-                    .unwrap();
-            }
+            self.message_txs[shard_id]
+                .send(CrossShardDependentEdgesMsg(dependent_edges))
+                .unwrap();
         }
 
         let mut cross_shard_dependent_edges = vec![vec![]; num_shards];
 
         for (i, msg_rx) in self.message_rxs.iter().enumerate() {
-            if i == self.shard_id {
-                continue;
-            }
             let msg = msg_rx.recv().unwrap();
             match msg {
                 CrossShardDependentEdgesMsg(dependent_edges) => {

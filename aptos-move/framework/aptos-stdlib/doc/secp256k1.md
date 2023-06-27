@@ -16,6 +16,11 @@ This module implements ECDSA signatures based on the prime-order secp256k1 ellpt
 -  [Function `ecdsa_recover`](#0x1_secp256k1_ecdsa_recover)
 -  [Function `ecdsa_recover_internal`](#0x1_secp256k1_ecdsa_recover_internal)
 -  [Specification](#@Specification_1)
+    -  [Function `ecdsa_signature_from_bytes`](#@Specification_1_ecdsa_signature_from_bytes)
+    -  [Function `ecdsa_raw_public_key_from_64_bytes`](#@Specification_1_ecdsa_raw_public_key_from_64_bytes)
+    -  [Function `ecdsa_raw_public_key_to_bytes`](#@Specification_1_ecdsa_raw_public_key_to_bytes)
+    -  [Function `ecdsa_signature_to_bytes`](#@Specification_1_ecdsa_signature_to_bytes)
+    -  [Function `ecdsa_recover`](#@Specification_1_ecdsa_recover)
     -  [Function `ecdsa_recover_internal`](#@Specification_1_ecdsa_recover_internal)
 
 
@@ -290,6 +295,94 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 ## Specification
 
 
+<a name="@Specification_1_ecdsa_signature_from_bytes"></a>
+
+### Function `ecdsa_signature_from_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="secp256k1.md#0x1_secp256k1_ecdsa_signature_from_bytes">ecdsa_signature_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="secp256k1.md#0x1_secp256k1_ECDSASignature">secp256k1::ECDSASignature</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> len(bytes) != <a href="secp256k1.md#0x1_secp256k1_SIGNATURE_NUM_BYTES">SIGNATURE_NUM_BYTES</a>;
+<b>ensures</b> result == <a href="secp256k1.md#0x1_secp256k1_ECDSASignature">ECDSASignature</a> { bytes };
+</code></pre>
+
+
+
+<a name="@Specification_1_ecdsa_raw_public_key_from_64_bytes"></a>
+
+### Function `ecdsa_raw_public_key_from_64_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="secp256k1.md#0x1_secp256k1_ecdsa_raw_public_key_from_64_bytes">ecdsa_raw_public_key_from_64_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="secp256k1.md#0x1_secp256k1_ECDSARawPublicKey">secp256k1::ECDSARawPublicKey</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> len(bytes) != <a href="secp256k1.md#0x1_secp256k1_RAW_PUBLIC_KEY_NUM_BYTES">RAW_PUBLIC_KEY_NUM_BYTES</a>;
+<b>ensures</b> result == <a href="secp256k1.md#0x1_secp256k1_ECDSARawPublicKey">ECDSARawPublicKey</a> { bytes };
+</code></pre>
+
+
+
+<a name="@Specification_1_ecdsa_raw_public_key_to_bytes"></a>
+
+### Function `ecdsa_raw_public_key_to_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="secp256k1.md#0x1_secp256k1_ecdsa_raw_public_key_to_bytes">ecdsa_raw_public_key_to_bytes</a>(pk: &<a href="secp256k1.md#0x1_secp256k1_ECDSARawPublicKey">secp256k1::ECDSARawPublicKey</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == pk.bytes;
+</code></pre>
+
+
+
+<a name="@Specification_1_ecdsa_signature_to_bytes"></a>
+
+### Function `ecdsa_signature_to_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="secp256k1.md#0x1_secp256k1_ecdsa_signature_to_bytes">ecdsa_signature_to_bytes</a>(sig: &<a href="secp256k1.md#0x1_secp256k1_ECDSASignature">secp256k1::ECDSASignature</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == sig.bytes;
+</code></pre>
+
+
+
+<a name="@Specification_1_ecdsa_recover"></a>
+
+### Function `ecdsa_recover`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="secp256k1.md#0x1_secp256k1_ecdsa_recover">ecdsa_recover</a>(message: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, recovery_id: u8, signature: &<a href="secp256k1.md#0x1_secp256k1_ECDSASignature">secp256k1::ECDSASignature</a>): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="secp256k1.md#0x1_secp256k1_ECDSARawPublicKey">secp256k1::ECDSARawPublicKey</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="secp256k1.md#0x1_secp256k1_ecdsa_recover_internal_abort_condition">ecdsa_recover_internal_abort_condition</a>(message, recovery_id, signature.bytes);
+<b>let</b> pk = <a href="secp256k1.md#0x1_secp256k1_spec_ecdsa_recover_internal_result_1">spec_ecdsa_recover_internal_result_1</a>(message, recovery_id, signature.bytes);
+<b>let</b> success = <a href="secp256k1.md#0x1_secp256k1_spec_ecdsa_recover_internal_result_2">spec_ecdsa_recover_internal_result_2</a>(message, recovery_id, signature.bytes);
+<b>ensures</b> success ==&gt; result == std::option::spec_some(<a href="secp256k1.md#0x1_secp256k1_ecdsa_raw_public_key_from_64_bytes">ecdsa_raw_public_key_from_64_bytes</a>(pk));
+<b>ensures</b> !success ==&gt; result == std::option::spec_none&lt;<a href="secp256k1.md#0x1_secp256k1_ECDSARawPublicKey">ECDSARawPublicKey</a>&gt;();
+</code></pre>
+
+
+
 <a name="@Specification_1_ecdsa_recover_internal"></a>
 
 ### Function `ecdsa_recover_internal`
@@ -302,6 +395,37 @@ and returns <code>([], <b>false</b>)</code> otherwise.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="secp256k1.md#0x1_secp256k1_ecdsa_recover_internal_abort_condition">ecdsa_recover_internal_abort_condition</a>(message, recovery_id, signature);
+<b>ensures</b> result_1 == <a href="secp256k1.md#0x1_secp256k1_spec_ecdsa_recover_internal_result_1">spec_ecdsa_recover_internal_result_1</a>(message, recovery_id, signature);
+<b>ensures</b> result_2 == <a href="secp256k1.md#0x1_secp256k1_spec_ecdsa_recover_internal_result_2">spec_ecdsa_recover_internal_result_2</a>(message, recovery_id, signature);
+<b>ensures</b> len(result_1) == <b>if</b> (result_2) { <a href="secp256k1.md#0x1_secp256k1_RAW_PUBLIC_KEY_NUM_BYTES">RAW_PUBLIC_KEY_NUM_BYTES</a> } <b>else</b> { 0 };
+</code></pre>
+
+
+
+
+<a name="0x1_secp256k1_ecdsa_recover_internal_abort_condition"></a>
+
+
+<pre><code><b>fun</b> <a href="secp256k1.md#0x1_secp256k1_ecdsa_recover_internal_abort_condition">ecdsa_recover_internal_abort_condition</a>(message: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, recovery_id: u8, signature: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_secp256k1_spec_ecdsa_recover_internal_result_1"></a>
+
+
+<pre><code><b>fun</b> <a href="secp256k1.md#0x1_secp256k1_spec_ecdsa_recover_internal_result_1">spec_ecdsa_recover_internal_result_1</a>(message: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, recovery_id: u8, signature: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_secp256k1_spec_ecdsa_recover_internal_result_2"></a>
+
+
+<pre><code><b>fun</b> <a href="secp256k1.md#0x1_secp256k1_spec_ecdsa_recover_internal_result_2">spec_ecdsa_recover_internal_result_2</a>(message: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, recovery_id: u8, signature: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
 </code></pre>
 
 

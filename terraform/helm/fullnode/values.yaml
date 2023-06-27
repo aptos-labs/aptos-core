@@ -147,6 +147,20 @@ backup_verify:
   tolerations: []
   affinity: {}
 
+backup_compaction:
+  # -- The schedule for backup compaction
+  schedule: "@daily"
+  resources:
+    limits:
+      cpu: 1
+      memory: 1Gi
+    requests:
+      cpu: 1
+      memory: 1Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 restore:
   image:
     # -- Image repo to use for restore images
