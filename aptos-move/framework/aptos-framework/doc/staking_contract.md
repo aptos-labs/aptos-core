@@ -72,7 +72,7 @@ pool.
 -  [Function `get_staking_contract_amounts_internal`](#0x1_staking_contract_get_staking_contract_amounts_internal)
 -  [Function `create_stake_pool`](#0x1_staking_contract_create_stake_pool)
 -  [Function `update_distribution_pool`](#0x1_staking_contract_update_distribution_pool)
--  [Function `compute_resource_account_seed`](#0x1_staking_contract_compute_resource_account_seed)
+-  [Function `create_resource_account_seed`](#0x1_staking_contract_create_resource_account_seed)
 -  [Function `new_staking_contracts_holder`](#0x1_staking_contract_new_staking_contracts_holder)
 -  [Specification](#@Specification_1)
     -  [Function `stake_pool_address`](#@Specification_1_stake_pool_address)
@@ -1053,7 +1053,7 @@ Return the address of the stake pool to be created with the provided staker, ope
     operator: <b>address</b>,
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ): <b>address</b> {
-    <b>let</b> seed = <a href="staking_contract.md#0x1_staking_contract_compute_resource_account_seed">compute_resource_account_seed</a>(staker, operator, contract_creation_seed);
+    <b>let</b> seed = <a href="staking_contract.md#0x1_staking_contract_create_resource_account_seed">create_resource_account_seed</a>(staker, operator, contract_creation_seed);
     <a href="account.md#0x1_account_create_resource_address">account::create_resource_address</a>(&staker, seed)
 }
 </code></pre>
@@ -1853,7 +1853,7 @@ Calculate accumulated rewards and commissions since last update.
     voter: <b>address</b>,
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ): (<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, SignerCapability, OwnerCapability) {
-    <b>let</b> seed = <a href="staking_contract.md#0x1_staking_contract_compute_resource_account_seed">compute_resource_account_seed</a>(
+    <b>let</b> seed = <a href="staking_contract.md#0x1_staking_contract_create_resource_account_seed">create_resource_account_seed</a>(
         <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker), operator, contract_creation_seed);
 
     <b>let</b> (stake_pool_signer, stake_pool_signer_cap) = <a href="account.md#0x1_account_create_resource_account">account::create_resource_account</a>(staker, seed);
@@ -1925,14 +1925,14 @@ Calculate accumulated rewards and commissions since last update.
 
 </details>
 
-<a name="0x1_staking_contract_compute_resource_account_seed"></a>
+<a name="0x1_staking_contract_create_resource_account_seed"></a>
 
-## Function `compute_resource_account_seed`
+## Function `create_resource_account_seed`
 
-Compute the seed to derive the resource account address.
+Create the seed to derive the resource account address.
 
 
-<pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_compute_resource_account_seed">compute_resource_account_seed</a>(staker: <b>address</b>, operator: <b>address</b>, contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_create_resource_account_seed">create_resource_account_seed</a>(staker: <b>address</b>, operator: <b>address</b>, contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1941,7 +1941,7 @@ Compute the seed to derive the resource account address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_compute_resource_account_seed">compute_resource_account_seed</a>(
+<pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_create_resource_account_seed">create_resource_account_seed</a>(
     staker: <b>address</b>,
     operator: <b>address</b>,
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,

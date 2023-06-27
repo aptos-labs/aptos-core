@@ -240,7 +240,7 @@ module aptos_framework::staking_contract {
         operator: address,
         contract_creation_seed: vector<u8>,
     ): address {
-        let seed = compute_resource_account_seed(staker, operator, contract_creation_seed);
+        let seed = create_resource_account_seed(staker, operator, contract_creation_seed);
         account::create_resource_address(&staker, seed)
     }
 
@@ -680,7 +680,7 @@ module aptos_framework::staking_contract {
         voter: address,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability, OwnerCapability) {
-        let seed = compute_resource_account_seed(
+        let seed = create_resource_account_seed(
             signer::address_of(staker), operator, contract_creation_seed);
 
         let (stake_pool_signer, stake_pool_signer_cap) = account::create_resource_account(staker, seed);
@@ -727,8 +727,8 @@ module aptos_framework::staking_contract {
         pool_u64::update_total_coins(distribution_pool, updated_total_coins);
     }
 
-    /// Compute the seed to derive the resource account address.
-    fun compute_resource_account_seed(
+    /// Create the seed to derive the resource account address.
+    fun create_resource_account_seed(
         staker: address,
         operator: address,
         contract_creation_seed: vector<u8>,
