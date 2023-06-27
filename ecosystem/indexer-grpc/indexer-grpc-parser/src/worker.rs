@@ -262,9 +262,12 @@ impl Worker {
                     break;
                 }
             }
-
             // Process the transactions in parallel
             let mut tasks = vec![];
+            if transactions_batches.is_empty() {
+                // If we get an empty batch, we want to skip and continue polling.
+                continue;
+            }
             for transactions in transactions_batches {
                 let processor_clone = processor.clone();
                 let auth_token = self.auth_token.clone();
