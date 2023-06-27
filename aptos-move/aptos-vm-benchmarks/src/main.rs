@@ -59,12 +59,19 @@ fn sign_txn(
         .gas_unit_price(200)
         .payload(payload)
         .sign();
+
+    // Restart timer and sequence counter for each new package
+    // only count running time of entry function
+    let start = Instant::now();
     let txn_output = executor.execute_transaction(sign_tx);
+    // apply write set to avoid LINKER_ERROR
+    executor.apply_write_set(txn_output.write_set());
+    let elapsed = start.elapsed();
+    println!("running time (ms): {}", elapsed.as_millis());
+
     let txn_status = txn_output.status().to_owned();
     assert!(txn_output.status().status().unwrap().is_success());
     println!("txn status: {:?}", txn_status);
-    // apply write set to avoid LINKER_ERROR
-    executor.apply_write_set(txn_output.write_set());
 }
 
 fn main() {
@@ -174,10 +181,6 @@ fn main() {
                 );
                 sequence_num_counter = sequence_num_counter + 1;
 
-                //// Restart timer and sequence counter for each new package
-                //// only count running time of entry function
-                let start = Instant::now();
-
                 //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
                 let entry_fun_payload =
                     generate_entry_fun_payloads(&creator, identifier, func_identifier);
@@ -188,8 +191,6 @@ fn main() {
                     entry_fun_payload,
                     sequence_num_counter,
                 );
-
-                println!("running time (ms): {}", start.elapsed().as_millis());
             }
         }
     }
