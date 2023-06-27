@@ -6,6 +6,7 @@ use aptos_gas::{
     AptosGasParameters, StandardGasMeter, StorageGasParameters, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
+use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
 use aptos_types::{
     transaction::ExecutionStatus,
@@ -39,12 +40,12 @@ fn failed_transaction_cleanup_test() {
 
     let change_set_configs = storage_gas_params.change_set_configs.clone();
 
-    let mut gas_meter = StandardGasMeter::new(
+    let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
         LATEST_GAS_FEATURE_VERSION,
         gas_params,
         storage_gas_params,
         10_000,
-    );
+    ));
 
     // TYPE_MISMATCH should be kept and charged.
     let out1 = aptos_vm.failed_transaction_cleanup(

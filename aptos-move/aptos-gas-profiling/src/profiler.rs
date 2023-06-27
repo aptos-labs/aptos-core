@@ -5,7 +5,7 @@ use crate::log::{
     CallFrame, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, FrameName, StorageFees,
     TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
-use aptos_gas::{AptosGasMeter, Fee, Gas, GasScalingFactor};
+use aptos_gas::{AptosGasMeter, AptosGasParameters, Fee, Gas, GasScalingFactor};
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
@@ -476,6 +476,8 @@ where
 {
     delegate! {
         fn feature_version(&self) -> u64;
+
+        fn gas_params(&self) -> &AptosGasParameters;
 
         fn balance(&self) -> Gas;
 
