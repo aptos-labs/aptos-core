@@ -1114,7 +1114,9 @@ async fn construction_payloads(
             }
         },
         InternalOperation::UpdateCommission(inner) => {
-            if let InternalOperation::UpdateCommission(ref metadata_op) = metadata.internal_operation {
+            if let InternalOperation::UpdateCommission(ref metadata_op) =
+                metadata.internal_operation
+            {
                 if inner.owner != metadata_op.owner || inner.operator != metadata_op.operator {
                     return Err(ApiError::InvalidInput(Some(format!(
                         "Update commission operation doesn't match metadata {:?} vs {:?}",
