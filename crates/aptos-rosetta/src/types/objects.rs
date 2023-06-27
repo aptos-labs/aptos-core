@@ -408,7 +408,10 @@ impl Operation {
             status,
             AccountIdentifier::base_account(owner),
             None,
-            Some(OperationMetadata::update_commission(operator, new_commission_percentage)),
+            Some(OperationMetadata::update_commission(
+                operator,
+                new_commission_percentage,
+            )),
         )
     }
 
@@ -698,7 +701,10 @@ impl OperationMetadata {
         }
     }
 
-    pub fn update_commission(operator: Option<AccountIdentifier>, new_commission_percentage: Option<u64>) -> Self {
+    pub fn update_commission(
+        operator: Option<AccountIdentifier>,
+        new_commission_percentage: Option<u64>,
+    ) -> Self {
         OperationMetadata {
             operator,
             commission_percentage: new_commission_percentage.map(U64::from),
@@ -1902,7 +1908,9 @@ impl InternalOperation {
                         Ok(OperationType::UpdateCommission) => {
                             if let (
                                 Some(OperationMetadata {
-                                    operator, commission_percentage, ..
+                                    operator,
+                                    commission_percentage,
+                                    ..
                                 }),
                                 Some(account),
                             ) = (&operation.metadata, &operation.account)
@@ -1917,7 +1925,9 @@ impl InternalOperation {
                                 return Ok(Self::UpdateCommission(UpdateCommission {
                                     owner: account.account_address()?,
                                     operator,
-                                    new_commission_percentage: commission_percentage.map(u64::from).unwrap_or_default(),
+                                    new_commission_percentage: commission_percentage
+                                        .map(u64::from)
+                                        .unwrap_or_default(),
                                 }));
                             }
                         },
