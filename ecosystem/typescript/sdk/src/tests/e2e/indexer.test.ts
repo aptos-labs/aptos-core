@@ -192,7 +192,20 @@ describe("Indexer", () => {
           accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
           0,
         );
-        expect(tokenOwnersData.current_token_ownerships[0].owner_address).toEqual(alice.address().hex());
+        expect(tokenOwnersData.current_token_ownerships_v2[0].owner_address).toEqual(alice.address().hex());
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets token current owner data",
+      async () => {
+        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
+        const tokenOwnersData = await indexerClient.getTokenCurrentOwnerData(
+          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
+          0,
+        );
+        expect(tokenOwnersData.current_token_ownerships_v2[0].owner_address).toEqual(alice.address().hex());
       },
       longTestTimeout,
     );
