@@ -59,6 +59,9 @@ return true.
 -  [Function `periodical_reward_rate_decrease_enabled`](#0x1_features_periodical_reward_rate_decrease_enabled)
 -  [Function `get_partial_governance_voting`](#0x1_features_get_partial_governance_voting)
 -  [Function `partial_governance_voting_enabled`](#0x1_features_partial_governance_voting_enabled)
+-  [Function `get_delegation_pool_partial_governance_voting`](#0x1_features_get_delegation_pool_partial_governance_voting)
+-  [Function `delegation_pool_partial_governance_voting_enabled`](#0x1_features_delegation_pool_partial_governance_voting_enabled)
+-  [Function `gas_payer_enabled`](#0x1_features_gas_payer_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -205,6 +208,17 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING"></a>
+
+Whether enable paritial governance voting on delegation_pool.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING">DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING</a>: u64 = 21;
+</code></pre>
+
+
+
 <a name="0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH"></a>
 
 Whether native_public_key_validate aborts when a public key of the wrong length is given
@@ -222,6 +236,17 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_features_GAS_PAYER_ENABLED"></a>
+
+Whether alternate gas payer is supported
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>: u64 = 22;
 </code></pre>
 
 
@@ -250,7 +275,7 @@ Lifetime: transient
 
 <a name="0x1_features_PARTIAL_GOVERNANCE_VOTING"></a>
 
-Whether enable paritial governance voting.
+Whether enable paritial governance voting on aptos_governance.
 Lifetime: transient
 
 
@@ -974,6 +999,76 @@ Lifetime: transient
 
 </details>
 
+<a name="0x1_features_get_delegation_pool_partial_governance_voting"></a>
+
+## Function `get_delegation_pool_partial_governance_voting`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_partial_governance_voting">get_delegation_pool_partial_governance_voting</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_partial_governance_voting">get_delegation_pool_partial_governance_voting</a>(): u64 { <a href="features.md#0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING">DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_delegation_pool_partial_governance_voting_enabled"></a>
+
+## Function `delegation_pool_partial_governance_voting_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">delegation_pool_partial_governance_voting_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">delegation_pool_partial_governance_voting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING">DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_gas_payer_enabled"></a>
+
+## Function `gas_payer_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_gas_payer_enabled">gas_payer_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_gas_payer_enabled">gas_payer_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -1226,6 +1321,17 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">spec_periodical_reward_rate_decrease_enabled</a>(): bool {
    <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>)
+}
+</code></pre>
+
+
+
+
+<a name="0x1_features_spec_gas_payer_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_gas_payer_enabled">spec_gas_payer_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>)
 }
 </code></pre>
 

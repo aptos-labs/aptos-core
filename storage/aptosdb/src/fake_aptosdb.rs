@@ -280,17 +280,6 @@ impl FakeAptosDB {
                     .current_version
                     .map(|version| version + 1)
                     .unwrap_or(0);
-                let num_transactions_in_db = self
-                    .get_latest_transaction_info_option()?
-                    .map(|(version, _)| version + 1)
-                    .unwrap_or(0);
-                ensure!(
-                     num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
-                    "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
-                    first_version,
-                    next_version_in_buffered_state,
-                    num_transactions_in_db,
-                );
 
                 let updates_until_latest_checkpoint_since_current = if let Some(
                     latest_checkpoint_version,
@@ -801,13 +790,8 @@ impl DbReader for FakeAptosDB {
         self.inner.get_epoch_ending_ledger_info(known_version)
     }
 
-    fn get_latest_transaction_info_option(
-        &self,
-    ) -> Result<Option<(Version, aptos_types::transaction::TransactionInfo)>> {
-        Ok(self
-            .latest_txn_info
-            .load_full()
-            .map(|txn| txn.as_ref().clone()))
+    fn get_latest_version(&self) -> Result<Version> {
+        Ok(self.get_latest_ledger_info()?.ledger_info().version())
     }
 
     fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue> {
@@ -903,7 +887,7 @@ mod tests {
         test_helper::{arb_blocks_to_commit, update_in_memory_state},
         AptosDB,
     };
-    use anyhow::{ensure, Result};
+    use anyhow::{anyhow, ensure, Result};
     use aptos_crypto::{hash::CryptoHash, HashValue};
     use aptos_storage_interface::{DbReader, DbWriter};
     use aptos_temppath::TempPath;
@@ -1048,7 +1032,7 @@ mod tests {
         let signed_transaction = transaction_with_proof
             .transaction
             .try_as_signed_user_txn()
-            .ok_or("not user transaction")?;
+            .ok_or(anyhow!("not user transaction"))?;
 
         ensure!(
             transaction_with_proof.version == version,

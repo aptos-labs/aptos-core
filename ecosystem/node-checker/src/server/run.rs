@@ -21,9 +21,9 @@ pub struct Run {
     #[clap(
         long,
         required = true,
-        min_values = 1,
+        num_args = 1..,
         use_value_delimiter = true,
-        parse(from_os_str)
+        value_parser
     )]
     pub baseline_config_paths: Vec<PathBuf>,
 }
