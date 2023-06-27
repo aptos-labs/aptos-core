@@ -14,6 +14,7 @@ use aptos_crypto::{
     CryptoMaterialError, HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
+use aptos_enum_conversion_derive::EnumConversion;
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
     epoch_state::EpochState,
@@ -431,7 +432,7 @@ pub struct DAGNetworkMessage {
     pub data: Vec<u8>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, EnumConversion)]
 pub enum DAGMessage {
     NodeMsg(Node),
     NodeDigestSignatureMsg(NodeDigestSignature),
@@ -488,130 +489,9 @@ impl TryFrom<ConsensusMsg> for DAGMessage {
     }
 }
 
-impl TryFrom<DAGMessage> for Node {
-    type Error = anyhow::Error;
-
-    fn try_from(msg: DAGMessage) -> Result<Self, Self::Error> {
-        match msg {
-            DAGMessage::NodeMsg(node) => Ok(node),
-            _ => Err(anyhow::anyhow!("invalid message type")),
-        }
-    }
-}
-
-impl TryFrom<DAGMessage> for NodeDigestSignature {
-    type Error = anyhow::Error;
-
-    fn try_from(msg: DAGMessage) -> Result<Self, Self::Error> {
-        match msg {
-            DAGMessage::NodeDigestSignatureMsg(node) => Ok(node),
-            _ => Err(anyhow::anyhow!("invalid message type")),
-        }
-    }
-}
-
-impl TryFrom<DAGMessage> for NodeCertificate {
-    type Error = anyhow::Error;
-
-    fn try_from(msg: DAGMessage) -> Result<Self, Self::Error> {
-        match msg {
-            DAGMessage::NodeCertificateMsg(certificate) => Ok(certificate),
-            _ => Err(anyhow::anyhow!("invalid message type")),
-        }
-    }
-}
-
-impl TryFrom<DAGMessage> for CertifiedAck {
-    type Error = anyhow::Error;
-
-    fn try_from(msg: DAGMessage) -> Result<Self, Self::Error> {
-        match msg {
-            DAGMessage::CertifiedAckMsg(ack) => Ok(ack),
-            _ => Err(anyhow::anyhow!("invalid message type")),
-        }
-    }
-}
-
-impl TryFrom<DAGMessage> for RemoteFetchRequest {
-    type Error = anyhow::Error;
-
-    fn try_from(msg: DAGMessage) -> Result<Self, Self::Error> {
-        match msg {
-            DAGMessage::FetchRequest(req) => Ok(req),
-            _ => Err(anyhow::anyhow!("invalid message type")),
-        }
-    }
-}
-
-impl TryFrom<DAGMessage> for FetchResponse {
-    type Error = anyhow::Error;
-
-    fn try_from(msg: DAGMessage) -> Result<Self, Self::Error> {
-        match msg {
-            DAGMessage::FetchResponse(res) => Ok(res),
-            _ => Err(anyhow::anyhow!("invalid message type")),
-        }
-    }
-}
-
-impl From<Node> for DAGMessage {
-    fn from(node: Node) -> Self {
-        Self::NodeMsg(node)
-    }
-}
-
-impl From<NodeDigestSignature> for DAGMessage {
-    fn from(signature: NodeDigestSignature) -> Self {
-        Self::NodeDigestSignatureMsg(signature)
-    }
-}
-
-impl From<NodeCertificate> for DAGMessage {
-    fn from(node: NodeCertificate) -> Self {
-        Self::NodeCertificateMsg(node)
-    }
-}
-
-impl From<CertifiedAck> for DAGMessage {
-    fn from(ack: CertifiedAck) -> Self {
-        Self::CertifiedAckMsg(ack)
-    }
-}
-
-impl From<RemoteFetchRequest> for DAGMessage {
-    fn from(req: RemoteFetchRequest) -> Self {
-        Self::FetchRequest(req)
-    }
-}
-
-impl From<FetchResponse> for DAGMessage {
-    fn from(response: FetchResponse) -> Self {
-        Self::FetchResponse(response)
-    }
-}
-
 #[cfg(test)]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TestMessage(pub Vec<u8>);
-
-#[cfg(test)]
-impl From<TestMessage> for DAGMessage {
-    fn from(msg: TestMessage) -> DAGMessage {
-        DAGMessage::TestMessage(msg)
-    }
-}
-
-#[cfg(test)]
-impl TryFrom<DAGMessage> for TestMessage {
-    type Error = anyhow::Error;
-
-    fn try_from(msg: DAGMessage) -> Result<Self, Self::Error> {
-        match msg {
-            DAGMessage::TestMessage(ack) => Ok(ack),
-            _ => Err(anyhow::anyhow!("invalid message type")),
-        }
-    }
-}
 
 #[cfg(test)]
 impl TDAGMessage for TestMessage {
@@ -620,27 +500,9 @@ impl TDAGMessage for TestMessage {
     }
 }
 
+#[cfg(test)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct TestAck(pub Vec<u8>);
-
-#[cfg(test)]
-impl From<TestAck> for DAGMessage {
-    fn from(ack: TestAck) -> DAGMessage {
-        DAGMessage::TestAck(ack)
-    }
-}
-
-#[cfg(test)]
-impl TryFrom<DAGMessage> for TestAck {
-    type Error = anyhow::Error;
-
-    fn try_from(msg: DAGMessage) -> Result<Self, Self::Error> {
-        match msg {
-            DAGMessage::TestAck(ack) => Ok(ack),
-            _ => Err(anyhow::anyhow!("invalid message type")),
-        }
-    }
-}
 
 #[cfg(test)]
 impl TDAGMessage for TestAck {
