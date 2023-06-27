@@ -16,12 +16,6 @@ jobs:
   # triggered the workflow or on 'pull_request's which have set auto_merge=true
   # or have the label "CICD:run-e2e-tests".
   permission-check:
-    if: |
-      github.event_name == 'push' ||
-      contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:build-') ||
-      contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:run-') ||
-      github.event.pull_request.auto_merge != null ||
-      contains(github.event.pull_request.body, '#e2e')
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
