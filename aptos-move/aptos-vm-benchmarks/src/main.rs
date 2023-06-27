@@ -165,6 +165,7 @@ fn main() {
 
                 // publish package similar to create_publish_package in harness.rs
                 let module_payload = generate_module_payload(&package);
+                print!("Signing txn for module... ");
                 sign_txn(
                     &mut executor,
                     &creator,
@@ -180,6 +181,7 @@ fn main() {
                 //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
                 let entry_fun_payload =
                     generate_entry_fun_payloads(&creator, identifier, func_identifier);
+                print!("Signing user txn... ");
                 sign_txn(
                     &mut executor,
                     &creator,
