@@ -79,7 +79,7 @@ test("gets account modules", async () => {
 test("gets the AptosCoin module", async () => {
   const client = new AptosClient(NODE_URL);
   const module = await client.getAccountModule("0x1", "aptos_coin");
-  expect(module!.abi!.address).toBe("0x1");
+  expect(module!.abi!.address).toBe("0x2");
 });
 
 test(
