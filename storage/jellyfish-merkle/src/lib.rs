@@ -109,6 +109,7 @@ use thiserror::Error;
 
 const MAX_PARALLELIZABLE_DEPTH: usize = 2;
 const NUM_IO_THREADS: usize = 32;
+const MIN_LEAF_DEPTH: usize = 1;
 
 pub static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
     ThreadPoolBuilder::new()
@@ -818,53 +819,55 @@ where
 {
     if kvs.len() == 1 {
         if let (key, Some((value_hash, state_key))) = kvs[0] {
-            let new_leaf_node = Node::new_leaf(key, *value_hash, (state_key.clone(), version));
-            Ok(Some(new_leaf_node))
-        } else {
-            Ok(None)
-        }
-    } else {
-        let mut children = vec![];
-        for (left, right) in NibbleRangeIterator::new(kvs, depth) {
-            let child_index = kvs[left].0.get_nibble(depth);
-            let child_node_key = node_key.gen_child_node_key(version, child_index);
-            if let Some(new_child_node) = batch_update_subtree(
-                &child_node_key,
-                version,
-                &kvs[left..=right],
-                depth + 1,
-                hash_cache,
-                batch,
-            )? {
-                children.push((child_index, new_child_node))
+            if depth >= MIN_LEAF_DEPTH {
+                let new_leaf_node = Node::new_leaf(key, *value_hash, (state_key.clone(), version));
+                return Ok(Some(new_leaf_node));
             }
-        }
-        if children.is_empty() {
-            Ok(None)
-        } else if children.len() == 1 && children[0].1.is_leaf() {
-            let (_, child) = children.pop().expect("Must exist");
-            Ok(Some(child))
         } else {
-            let new_internal_node = InternalNode::new(
-                children
-                    .into_iter()
-                    .map(|(child_index, new_child_node)| {
-                        let new_child_node_key = node_key.gen_child_node_key(version, child_index);
-                        let result = (
-                            child_index,
-                            Child::new(
-                                get_hash(&new_child_node_key, &new_child_node, hash_cache),
-                                version,
-                                new_child_node.node_type(),
-                            ),
-                        );
-                        batch.put_node(new_child_node_key, new_child_node);
-                        result
-                    })
-                    .collect(),
-            );
-            Ok(Some(new_internal_node.into()))
+            return Ok(None);
         }
+    }
+
+    let mut children = vec![];
+    for (left, right) in NibbleRangeIterator::new(kvs, depth) {
+        let child_index = kvs[left].0.get_nibble(depth);
+        let child_node_key = node_key.gen_child_node_key(version, child_index);
+        if let Some(new_child_node) = batch_update_subtree(
+            &child_node_key,
+            version,
+            &kvs[left..=right],
+            depth + 1,
+            hash_cache,
+            batch,
+        )? {
+            children.push((child_index, new_child_node))
+        }
+    }
+    if children.is_empty() {
+        Ok(None)
+    } else if children.len() == 1 && children[0].1.is_leaf() && depth >= MIN_LEAF_DEPTH {
+        let (_, child) = children.pop().expect("Must exist");
+        Ok(Some(child))
+    } else {
+        let new_internal_node = InternalNode::new(
+            children
+                .into_iter()
+                .map(|(child_index, new_child_node)| {
+                    let new_child_node_key = node_key.gen_child_node_key(version, child_index);
+                    let result = (
+                        child_index,
+                        Child::new(
+                            get_hash(&new_child_node_key, &new_child_node, hash_cache),
+                            version,
+                            new_child_node.node_type(),
+                        ),
+                    );
+                    batch.put_node(new_child_node_key, new_child_node);
+                    result
+                })
+                .collect(),
+        );
+        Ok(Some(new_internal_node.into()))
     }
 }
 
@@ -927,7 +930,7 @@ where
 
         if children.is_empty() {
             Ok(None)
-        } else if children.len() == 1 && children[0].1.is_leaf() {
+        } else if children.len() == 1 && children[0].1.is_leaf() && depth >= MIN_LEAF_DEPTH {
             let (_, child) = children.pop().expect("Must exist");
             Ok(Some(child))
         } else {
@@ -962,13 +965,11 @@ trait NibbleExt {
 impl NibbleExt for HashValue {
     /// Returns the `index`-th nibble.
     fn get_nibble(&self, index: usize) -> Nibble {
-        Nibble::from(
-            if index % 2 == 0 {
-                self[index / 2] >> 4
-            } else {
-                self[index / 2] & 0x0F
-            },
-        )
+        Nibble::from(if index % 2 == 0 {
+            self[index / 2] >> 4
+        } else {
+            self[index / 2] & 0x0F
+        })
     }
 
     /// Returns the length of common prefix of `self` and `other` in nibbles.
