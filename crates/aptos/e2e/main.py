@@ -131,8 +131,8 @@ def run_tests(run_helper):
     test_move_compile(run_helper)
     test_move_compile_script(run_helper)
     test_move_publish(run_helper)
-    test_move_run(run_helper)
     test_move_test(run_helper)
+    test_move_run(run_helper)
 
 
 def main():
