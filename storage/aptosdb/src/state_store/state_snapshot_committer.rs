@@ -70,11 +70,6 @@ impl StateSnapshotCommitter {
         while let Ok(msg) = self.state_snapshot_commit_receiver.recv() {
             match msg {
                 CommitMessage::Data(delta_to_commit) => {
-                    let node_hashes = delta_to_commit
-                        .current
-                        .clone()
-                        .freeze()
-                        .new_node_hashes_since(&delta_to_commit.base.clone().freeze());
                     let version = delta_to_commit.current_version.expect("Cannot be empty");
                     let base_version = delta_to_commit.base_version;
                     let previous_epoch_ending_version = self
@@ -90,6 +85,14 @@ impl StateSnapshotCommitter {
                         (0..16)
                             .into_par_iter()
                             .map(|shard_id| {
+                                let node_hashes = delta_to_commit
+                                    .current
+                                    .clone()
+                                    .freeze()
+                                    .new_node_hashes_since(
+                                        &delta_to_commit.base.clone().freeze(),
+                                        shard_id,
+                                    );
                                 self.state_db.state_merkle_db.merklize_value_set_for_shard(
                                     shard_id,
                                     jmt_update_refs(&jmt_updates(
