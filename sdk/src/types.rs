@@ -187,7 +187,6 @@ pub trait TransactionSigner {
 pub struct HardwareWalletAccount {
     address: AccountAddress,
     public_key: Ed25519PublicKey,
-    authentication_key: AuthenticationKey,
     derivation_path: String,
     hardware_wallet_type: HardwareWalletType,
     /// Same as LocalAccount's sequence_number.
@@ -220,7 +219,6 @@ impl HardwareWalletAccount {
     pub fn new(
         address: AccountAddress,
         public_key: Ed25519PublicKey,
-        authentication_key: AuthenticationKey,
         derivation_path: String,
         hardware_wallet_type: HardwareWalletType,
         sequence_number: u64,
@@ -228,7 +226,6 @@ impl HardwareWalletAccount {
         Self {
             address,
             public_key,
-            authentication_key,
             derivation_path,
             hardware_wallet_type,
             sequence_number,
@@ -248,7 +245,6 @@ impl HardwareWalletAccount {
         Ok(Self::new(
             address,
             public_key,
-            authentication_key,
             derivation_path,
             HardwareWalletType::Ledger,
             sequence_number,
@@ -261,10 +257,6 @@ impl HardwareWalletAccount {
 
     pub fn public_key(&self) -> &Ed25519PublicKey {
         &self.public_key
-    }
-
-    pub fn authentication_key(&self) -> &AuthenticationKey {
-        &self.authentication_key
     }
 
     pub fn derivation_path(&self) -> &str {

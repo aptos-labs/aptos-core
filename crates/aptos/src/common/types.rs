@@ -31,7 +31,11 @@ use aptos_rest_client::{
     error::RestError,
     AptosBaseUrl, Client, Transaction,
 };
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_sdk::{
+    transaction_builder::TransactionFactory,
+    types::{HardwareWalletAccount, HardwareWalletType},
+    types::{LocalAccount, TransactionSigner},
+};
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
@@ -425,6 +429,11 @@ impl ProfileOptions {
                 .clone()
                 .unwrap_or_else(|| DEFAULT_PROFILE.to_string()),
         ))
+    }
+
+    pub fn derivative_path(&self) -> CliTypedResult<Option<String>> {
+        let profile = self.profile()?;
+        Ok(profile.derivative_path)
     }
 
     pub fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
@@ -1416,6 +1425,12 @@ impl Default for GasOptions {
     }
 }
 
+#[derive(Debug)]
+pub enum AccountType {
+    Local,
+    HardwareWallet,
+}
+
 /// Common options for interacting with an account for a validator
 #[derive(Debug, Default, Parser)]
 pub struct TransactionOptions {
@@ -1451,6 +1466,28 @@ impl TransactionOptions {
         self.rest_options.client(&self.profile_options)
     }
 
+    pub fn get_transaction_account_type(&self) -> CliTypedResult<AccountType> {
+        if self.private_key_options.private_key.is_some()
+            || self.private_key_options.private_key_file.is_some()
+        {
+            Ok(AccountType::Local)
+        } else if let Some(profile) = CliConfig::load_profile(
+            self.profile_options.profile_name(),
+            ConfigSearchMode::CurrentDirAndParents,
+        )? {
+            if profile.private_key.is_some() {
+                Ok(AccountType::Local)
+            } else {
+                Ok(AccountType::HardwareWallet)
+            }
+        } else {
+            Err(CliError::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'] or profile must be used"
+                    .to_string(),
+            ))
+        }
+    }
+
     /// Retrieves the private key and the associated address
     /// TODO: Cache this information
     pub fn get_key_and_address(&self) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
@@ -1462,8 +1499,11 @@ impl TransactionOptions {
     }
 
     pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
-        let (private_key, address) = self.get_key_and_address()?;
-        Ok((private_key.public_key(), address))
+        self.private_key_options.extract_public_key_and_address(
+            self.encoding_options.encoding,
+            &self.profile_options,
+            self.sender_account,
+        )
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
@@ -1501,11 +1541,7 @@ impl TransactionOptions {
         payload: TransactionPayload,
     ) -> CliTypedResult<Transaction> {
         let client = self.rest_client()?;
-        let (sender_key, sender_address) = self.get_key_and_address()?;
-        let sender_public_key = self
-            .private_key_options
-            .extract_public_key(self.encoding_options.encoding, &self.profile_options)?;
-        let sender_address = account_address_from_public_key(&sender_public_key);
+        let (sender_public_key, sender_address) = self.get_public_key_and_address()?;
 
         // Ask to confirm price if the gas unit price is estimated above the lowest value when
         // it is automatically estimated
@@ -1561,7 +1597,7 @@ impl TransactionOptions {
 
             let signed_transaction = SignedTransaction::new(
                 unsigned_transaction,
-                sender_key.public_key(),
+                sender_public_key.clone(),
                 Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
             );
 
@@ -1600,15 +1636,44 @@ impl TransactionOptions {
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas)
             .with_transaction_expiration_time(self.gas_options.expiration_secs);
-        let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
-        let transaction =
-            sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-        let response = client
-            .submit_and_wait(&transaction)
-            .await
-            .map_err(|err| CliError::ApiError(err.to_string()))?;
 
-        Ok(response.into_inner())
+        match self.get_transaction_account_type() {
+            Ok(AccountType::Local) => {
+                println!("Local account");
+                let (private_key, _) = self.get_key_and_address()?;
+                let sender_account =
+                    &mut LocalAccount::new(sender_address, private_key, sequence_number);
+                let transaction = sender_account
+                    .sign_with_transaction_builder(transaction_factory.payload(payload));
+                let response = client
+                    .submit_and_wait(&transaction)
+                    .await
+                    .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+                return Ok(response.into_inner());
+            },
+            Ok(AccountType::HardwareWallet) => {
+                let sender_account = &mut HardwareWalletAccount::new(
+                    sender_address,
+                    sender_public_key,
+                    self.profile_options
+                        .derivative_path()
+                        .expect("derivative path is required")
+                        .unwrap(),
+                    HardwareWalletType::Ledger,
+                    sequence_number,
+                );
+                let transaction = sender_account
+                    .sign_with_transaction_builder(transaction_factory.payload(payload));
+                let response = client
+                    .submit_and_wait(&transaction)
+                    .await
+                    .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+                return Ok(response.into_inner());
+            },
+            Err(err) => return Err(err),
+        }
     }
 
     /// Simulate the transaction locally using the debugger, with the gas profiler enabled.
