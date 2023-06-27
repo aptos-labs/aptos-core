@@ -1,0 +1,6 @@
+error[E14003]: feature not supported in inlined functions
+  ┌─ tests/move_check/inlining/lambda_param.move:7:15
+  │
+7 │     inline_apply(f, b)
+  │                  ^ Inlined function-typed parameter currently must be a literal lambda expression
+
