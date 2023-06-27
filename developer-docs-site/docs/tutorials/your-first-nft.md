@@ -105,7 +105,6 @@ Alice's collection: {
     "supply": "1",
     "uri": "https://alice.com"
 }
-Alice's token balance: 1
 Alice's token data: {
     "default_properties": {
         "map": {
@@ -131,6 +130,7 @@ Alice's token data: {
     "supply": "1",
     "uri": "https://aptos.dev/img/nyan.jpeg"
 }
+Alice's token balance: 1
 
 === Transferring the token to Bob ===
 Alice's token balance: 0

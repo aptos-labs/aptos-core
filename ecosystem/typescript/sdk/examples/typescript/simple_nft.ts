@@ -83,10 +83,13 @@ import { NODE_URL, FAUCET_URL } from "./common";
   ); // <:!:section_5
   await client.waitForTransaction(txnHash2, { checkSuccess: true });
 
-  // Print the collection data.
+  // Print the collection and token data.
   // :!:>section_6
   const collectionData = await tokenClient.getCollectionData(alice.address(), collectionName);
-  console.log(`Alice's collection: ${JSON.stringify(collectionData, null, 4)}`); // <:!:section_6
+  console.log(`Alice's collection: ${JSON.stringify(collectionData, null, 4)}`);
+
+  const tokenData = await tokenClient.getTokenData(alice.address(), collectionName, tokenName);
+  console.log(`Alice's token data: ${JSON.stringify(tokenData, null, 4)}`); // <:!:section_6
 
   // Get the token balance.
   // :!:>section_7
@@ -98,14 +101,9 @@ import { NODE_URL, FAUCET_URL } from "./common";
   );
   console.log(`Alice's token balance: ${aliceBalance1["amount"]}`); // <:!:section_7
 
-  // Get the token data.
-  // :!:>section_8
-  const tokenData = await tokenClient.getTokenData(alice.address(), collectionName, tokenName);
-  console.log(`Alice's token data: ${JSON.stringify(tokenData, null, 4)}`); // <:!:section_8
-
   // Alice offers one token to Bob.
   console.log("\n=== Transferring the token to Bob ===");
-  // :!:>section_9
+  // :!:>section_8
   const txnHash3 = await tokenClient.offerToken(
     alice,
     bob.address(),
@@ -114,11 +112,10 @@ import { NODE_URL, FAUCET_URL } from "./common";
     tokenName,
     1,
     tokenPropertyVersion,
-  ); // <:!:section_9
+  );
   await client.waitForTransaction(txnHash3, { checkSuccess: true });
 
   // Bob claims the token Alice offered him.
-  // :!:>section_10
   const txnHash4 = await tokenClient.claimToken(
     bob,
     alice.address(),
@@ -126,7 +123,7 @@ import { NODE_URL, FAUCET_URL } from "./common";
     collectionName,
     tokenName,
     tokenPropertyVersion,
-  ); // <:!:section_10
+  ); // <:!:section_8
   await client.waitForTransaction(txnHash4, { checkSuccess: true });
 
   // Print their balances.
@@ -141,7 +138,7 @@ import { NODE_URL, FAUCET_URL } from "./common";
   console.log(`Bob's token balance: ${bobBalance2["amount"]}`);
 
   console.log("\n=== Transferring the token back to Alice using MultiAgent ===");
-  // :!:>section_11
+  // :!:>section_9
   let txnHash5 = await tokenClient.directTransferToken(
     bob,
     alice,
@@ -150,7 +147,7 @@ import { NODE_URL, FAUCET_URL } from "./common";
     tokenName,
     1,
     tokenPropertyVersion,
-  ); // <:!:section_11
+  ); // <:!:section_9
   await client.waitForTransaction(txnHash5, { checkSuccess: true });
 
   // Print out their balances one last time.
