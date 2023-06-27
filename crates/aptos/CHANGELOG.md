@@ -9,6 +9,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ### Updated
 - Updated CLI source compilation to use rust toolchain version 1.7.0 (from 1.66.1).
 - Set 2 seconds timeout for telemetry
+### Removed
+- init command from config subcommand is removed. Please use init from the root command.
+  - Example: `aptos config init` -> `aptos init`
 
 ## [2.0.1] - 2023/06/05
 ### Fixed
