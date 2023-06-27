@@ -258,9 +258,13 @@ impl<'env> Generator<'env> {
 impl<'env> Generator<'env> {
     fn gen_call(&mut self, targets: Vec<TempIndex>, id: NodeId, op: &Operation, args: &[Exp]) {
         match op {
-            Operation::Pack(_, _) | Operation::Exists(_) | Operation::BorrowGlobal(_) => {
-                self.internal_error(id, "not yet implemented")
-            },
+            Operation::Pack(_, _)
+            | Operation::Exists(_)
+            | Operation::BorrowGlobal(_)
+            | Operation::MoveFrom
+            | Operation::MoveTo
+            | Operation::Abort
+            | Operation::Freeze => self.internal_error(id, "not yet implemented"),
             Operation::MoveFunction(m, f) => {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
