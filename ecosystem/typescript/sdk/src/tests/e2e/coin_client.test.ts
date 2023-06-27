@@ -20,7 +20,7 @@ test(
 
     await client.waitForTransaction(await coinClient.transfer(alice, bob, 42), { checkSuccess: true });
 
-    expect(await coinClient.checkBalance(bob)).toBe(BigInt(42));
+    expect(await coinClient.checkBalance(bob)).toBe(BigInt(43));
 
     // Test that `createReceiverIfMissing` works.
     const jemima = new AptosAccount();
