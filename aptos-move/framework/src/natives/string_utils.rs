@@ -175,13 +175,18 @@ fn native_format_impl(
             write!(out, "@{}", str).unwrap();
         },
         MoveTypeLayout::Signer => {
-            let addr = val.value_as::<move_core_types::account_address::AccountAddress>()?;
+            let strct = val.value_as::<Struct>()?;
+            let addr = strct
+                .unpack()?
+                .next()
+                .unwrap()
+                .value_as::<move_core_types::account_address::AccountAddress>()?;
             let str = if context.canonicalize {
                 addr.to_canonical_string()
             } else {
                 addr.to_hex_literal()
             };
-            write!(out, "signer({})", str).unwrap();
+            write!(out, "signer(@{})", str).unwrap();
         },
         MoveTypeLayout::Vector(ty) => {
             if let MoveTypeLayout::U8 = ty.as_ref() {
