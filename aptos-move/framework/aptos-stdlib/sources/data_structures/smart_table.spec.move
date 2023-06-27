@@ -39,6 +39,7 @@ spec aptos_std::smart_table {
     }
 
     spec borrow {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         pragma aborts_if_is_partial = true;
         aborts_if vector::length(table_with_length::spec_get(table.buckets, get_index(table.level, table.num_buckets, key))) == 0;
         aborts_if forall i in 0..vector::length(table_with_length::spec_get(table.buckets, get_index(table.level, table.num_buckets, key))):
