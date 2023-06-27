@@ -10,14 +10,17 @@ use crate::{
     },
     builder::{
         exp_builder::ExpTranslator,
-        model_builder::{ConstEntry, FunEntry, LocalVarEntry, ModelBuilder, SpecFunEntry},
+        model_builder::{
+            ConstEntry, EntryVisibility, FunEntry, LocalVarEntry, ModelBuilder,
+            SpecOrBuiltinFunEntry,
+        },
     },
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
     model::{
-        FieldData, FieldId, FunId, FunctionData, Loc, ModuleId, MoveIrLoc, NamedConstantData,
-        NamedConstantId, NodeId, Parameter, QualifiedId, QualifiedInstId, SchemaId, SpecFunId,
-        SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
+        FieldData, FieldId, FunId, FunctionData, FunctionKind, Loc, ModuleId, MoveIrLoc,
+        NamedConstantData, NamedConstantId, NodeId, Parameter, QualifiedId, QualifiedInstId,
+        SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -444,9 +447,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 Value::Bool(false)
             }
         };
-        et.parent
-            .parent
-            .define_const(qsym, ConstEntry { loc, ty, value });
+        et.parent.parent.define_const(qsym, ConstEntry {
+            loc,
+            ty,
+            value,
+            visibility: EntryVisibility::SpecAndImpl,
+        });
     }
 
     fn decl_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
@@ -487,7 +493,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             )
         }
         let fun_id = FunId::new(qsym.symbol);
-        let attrs = self.translate_attributes(&def.attributes);
+        let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.enter_scope();
         let type_params = et
@@ -495,8 +501,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         et.enter_scope();
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
-        let is_entry = def.entry.is_some();
-        let is_inline = def.inline;
+        let kind = if def.entry.is_some() {
+            FunctionKind::Entry
+        } else if def.inline {
+            FunctionKind::Inline
+        } else {
+            FunctionKind::Regular
+        };
         let visibility = match def.visibility {
             EA::Visibility::Public(_) => Visibility::Public,
             EA::Visibility::Friend(_) => Visibility::Friend,
@@ -504,31 +515,32 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         };
         let is_native = matches!(def.body.value, EA::FunctionBody_::Native);
         let loc = et.to_loc(&def.loc);
-        et.parent.parent.define_fun(
-            loc.clone(),
-            attrs,
-            qsym.clone(),
-            et.parent.module_id,
+        et.parent.parent.define_fun(qsym.clone(), FunEntry {
+            loc: loc.clone(),
+            module_id: et.parent.module_id,
             fun_id,
             visibility,
             is_native,
-            is_entry,
-            is_inline,
-            type_params.clone(),
-            params.clone(),
-            result_type.clone(),
-            def.specs.clone(),
-        );
-
-        // Add function as a spec fun entry as well.
-        let spec_fun_id = SpecFunId::new(self.spec_funs.len());
-        self.parent.define_spec_fun(qsym, SpecFunEntry {
-            loc: loc.clone(),
-            oper: Operation::SpecFunction(self.module_id, spec_fun_id, None),
+            kind,
             type_params: type_params.clone(),
             params: params.clone(),
             result_type: result_type.clone(),
+            is_pure: false,
+            attributes,
+            inline_specs: def.specs.clone(),
         });
+
+        // Add function as a spec fun entry as well.
+        let spec_fun_id = SpecFunId::new(self.spec_funs.len());
+        self.parent
+            .define_spec_or_builtin_fun(qsym, SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::SpecFunction(self.module_id, spec_fun_id, None),
+                type_params: type_params.clone(),
+                params: params.clone(),
+                result_type: result_type.clone(),
+                visibility: EntryVisibility::Spec,
+            });
 
         // Add $ to the name so the spec version does not name clash with the Move version.
         let spec_fun_name = self.symbol_pool().make(&format!("${}", name.0.value));
@@ -602,14 +614,17 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
         // Add the function to the symbol table.
         let fun_id = SpecFunId::new(self.spec_funs.len());
-        self.parent
-            .define_spec_fun(self.qualified_by_module(name), SpecFunEntry {
+        self.parent.define_spec_or_builtin_fun(
+            self.qualified_by_module(name),
+            SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
                 oper: Operation::SpecFunction(self.module_id, fun_id, None),
                 type_params: type_params.clone(),
                 params: params.clone(),
                 result_type: result_type.clone(),
-            });
+                visibility: EntryVisibility::Spec,
+            },
+        );
 
         // Add a prototype of the SpecFunDecl to the module build. This
         // will for now have an empty body which we fill in during a 2nd pass.
@@ -829,7 +844,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             }
 
                             // TODO: to be revisited once we have high-order function
-                            if fun_decl.is_inline {
+                            if fun_decl.kind == FunctionKind::Inline {
                                 self.parent.error(
                                     &loc,
                                     "functional spec blocks for inline functions are not supported yet",
@@ -1007,7 +1022,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .clone();
         let mut et = ExpTranslator::new(self);
         let loc = et.to_loc(&name.0.loc);
-        et.define_type_params(&loc, &type_params);
+        et.define_type_params(&loc, &type_params, false);
         let fields = match &def.fields {
             EA::StructFields::Defined(fields) => {
                 let mut field_map = BTreeMap::new();
@@ -1067,7 +1082,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
                 let loc = et.to_loc(&body.loc);
                 for (pos, TypeParameter(name, _)) in type_params.iter().enumerate() {
-                    et.define_type_param(&loc, *name, Type::new_param(pos));
+                    et.define_type_param(&loc, *name, Type::new_param(pos), false);
                 }
                 et.enter_scope();
                 for (idx, Parameter(n, ty)) in params.iter().enumerate() {
@@ -1483,7 +1498,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
                 for (pos, TypeParameter(name, _)) in entry.type_params.iter().enumerate() {
-                    et.define_type_param(loc, *name, Type::new_param(pos));
+                    et.define_type_param(
+                        loc,
+                        *name,
+                        Type::new_param(pos),
+                        false, /*report_errors*/
+                    );
                 }
 
                 et.enter_scope();
@@ -1518,7 +1538,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
                 for (pos, TypeParameter(name, _)) in entry.type_params.iter().enumerate() {
-                    et.define_type_param(loc, *name, Type::new_param(pos));
+                    et.define_type_param(loc, *name, Type::new_param(pos), false);
                 }
 
                 et.enter_scope();
@@ -1565,7 +1585,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .clone();
 
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                et.define_type_params(loc, &entry.type_params);
+                et.define_type_params(loc, &entry.type_params, false);
                 if let Some(fields) = &entry.fields {
                     et.enter_scope();
                     for (n, (_, ty)) in fields {
@@ -1591,9 +1611,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 // define the type params
                 match kind {
                     ConditionKind::GlobalInvariant(ty_params)
-                    | ConditionKind::GlobalInvariantUpdate(ty_params) => {
-                        et.define_type_params(loc, &TypeParameter::from_symbols(ty_params.iter()))
-                    },
+                    | ConditionKind::GlobalInvariantUpdate(ty_params) => et.define_type_params(
+                        loc,
+                        &TypeParameter::from_symbols(ty_params.iter()),
+                        false,
+                    ),
                     _ => (),
                 }
 
@@ -1610,7 +1632,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let type_params = entry.type_params.clone();
                 let all_vars = entry.all_vars.clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                et.define_type_params(loc, &type_params);
+                et.define_type_params(loc, &type_params, false);
                 et.enter_scope();
                 for (n, entry) in all_vars {
                     et.define_local(loc, n, entry.type_, None, None);
@@ -1951,7 +1973,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 (first.into_exp(), exps)
             },
             ConditionKind::Axiom(ref type_params) => {
-                et.define_type_params(loc, &TypeParameter::from_symbols(type_params.iter()));
+                et.define_type_params(loc, &TypeParameter::from_symbols(type_params.iter()), false);
                 (et.translate_exp(exp, &expected_type).into_exp(), vec![])
             },
             _ => {
@@ -2109,7 +2131,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let result_type = entry.result_type.clone();
                 let mut et = ExpTranslator::new(self);
                 let loc = et.to_loc(&body.loc);
-                et.define_type_params(&loc, &type_params);
+                et.define_type_params(&loc, &type_params, false);
                 et.enter_scope();
                 for Parameter(n, ty) in params {
                     et.define_local(&loc, n, ty, None, None);
@@ -2143,7 +2165,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 .expect("spec var defined")
                 .clone();
             let mut et = ExpTranslator::new(self);
-            et.define_type_params(loc, &entry.type_params);
+            et.define_type_params(loc, &entry.type_params, false);
             let translated = et.translate_exp(exp, &entry.type_);
             et.finalize_types();
             // Store the translated init expression into the declaration.
@@ -2800,7 +2822,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         vars: &mut BTreeMap<Symbol, LocalVarEntry>,
     ) -> ExpTranslator<'env, 'translator, 'module_translator> {
         let mut et = ExpTranslator::new_with_old(self, true);
-        et.define_type_params(loc, context_type_params);
+        et.define_type_params(loc, context_type_params, false);
         et.enter_scope();
         for (n, entry) in vars.iter() {
             et.define_local(
@@ -3308,8 +3330,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             fun_name.display(self.parent.env)
                         )
                     });
-                    let has_unknown_caller =
-                        matches!(fun_entry.visibility, Visibility::Public) || fun_entry.is_entry;
+                    let has_unknown_caller = matches!(fun_entry.visibility, Visibility::Public)
+                        || fun_entry.kind == FunctionKind::Entry;
                     if has_unknown_caller && options.ignore_pragma_opaque_internal_only {
                         continue;
                     }
@@ -3381,8 +3403,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 handle_idx: None,
                 visibility: entry.visibility,
                 is_native: entry.is_native,
-                is_entry: entry.is_entry,
-                is_inline: entry.is_inline,
+                kind: entry.kind,
                 attributes: entry.attributes.clone(),
                 type_params: entry.type_params.clone(),
                 params: entry.params.clone(),
@@ -3402,7 +3423,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 continue;
             }
             // New constant
-            let ConstEntry { loc, value, ty } = const_entry.clone();
+            let ConstEntry {
+                loc,
+                value,
+                ty,
+                visibility: _,
+            } = const_entry.clone();
             let data = NamedConstantData {
                 name: name.symbol,
                 loc,

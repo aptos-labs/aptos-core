@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: unexpected name in this position
+  ┌─ tests/checking/naming/standalone_module_ident.move:9:17
+  │
+9 │         let x = 0x2::X;
+  │                 ^^^^^^
+  │                 │
+  │                 Unexpected module identifier. A module identifier is not a valid expression
+  │                 Expected a module name
+
+error: unexpected name in this position
+   ┌─ tests/checking/naming/standalone_module_ident.move:10:17
+   │
+10 │         let y = 0x2::Y;
+   │                 ^^^^^^
+   │                 │
+   │                 Unexpected module identifier. A module identifier is not a valid expression
+   │                 Expected a module name
+
+warning: unused alias
+  ┌─ tests/checking/naming/standalone_module_ident.move:6:14
+  │
+6 │     use 0x2::X;
+  │              ^ Unused 'use' of alias 'X'. Consider removing it

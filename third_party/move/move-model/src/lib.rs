@@ -27,12 +27,12 @@ use move_binary_format::{
 use move_compiler::{
     self,
     compiled_unit::{self, AnnotatedCompiledScript, AnnotatedCompiledUnit},
-    diagnostics::Diagnostics,
+    diagnostics::{codes::Severity, Diagnostics},
     expansion::ast::{self as E, ModuleIdent, ModuleIdent_},
     naming::ast as N,
     parser::ast::{self as P, ModuleName as ParserModuleName},
     shared::{
-        parse_named_address, unique_map::UniqueMap, Identifier as IdentifierTrait,
+        parse_named_address, unique_map::UniqueMap, CompilationEnv, Identifier as IdentifierTrait,
         NumericalAddress, PackagePaths,
     },
     typing::ast as T,
@@ -239,7 +239,17 @@ pub fn run_model_builder_with_options_and_compilation_flags<
             add_move_lang_diagnostics(&mut env, diags);
             return Ok(env);
         },
-        Ok(compiler) => compiler.into_ast(),
+        Ok(mut compiler) => {
+            // There may have been errors but nevertheless a stepped compiler is returned.
+            let compiler_env: &mut CompilationEnv = compiler.compilation_env();
+            if let Err(diags) = compiler_env.check_diags_at_or_above_severity(Severity::Warning) {
+                add_move_lang_diagnostics(&mut env, diags);
+                if env.has_errors() {
+                    return Ok(env);
+                }
+            }
+            compiler.into_ast()
+        },
     };
 
     // Extract the module/script closure
