@@ -18,6 +18,7 @@ pub(crate) mod stale_node_index;
 pub(crate) mod stale_node_index_cross_epoch;
 pub(crate) mod stale_state_value_index;
 pub(crate) mod state_value;
+pub(crate) mod state_value_index;
 pub(crate) mod transaction;
 pub(crate) mod transaction_accumulator;
 pub(crate) mod transaction_by_account;
@@ -41,6 +42,7 @@ pub const STALE_NODE_INDEX_CF_NAME: ColumnFamilyName = "stale_node_index";
 pub const STALE_NODE_INDEX_CROSS_EPOCH_CF_NAME: ColumnFamilyName = "stale_node_index_cross_epoch";
 pub const STALE_STATE_VALUE_INDEX_CF_NAME: ColumnFamilyName = "stale_state_value_index";
 pub const STATE_VALUE_CF_NAME: ColumnFamilyName = "state_value";
+pub const STATE_VALUE_INDEX_CF_NAME: ColumnFamilyName = "state_value_index";
 pub const TRANSACTION_CF_NAME: ColumnFamilyName = "transaction";
 pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accumulator";
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
@@ -94,6 +96,7 @@ pub mod fuzzing {
                 data,
             );
             assert_no_panic_decoding::<super::state_value::StateValueSchema>(data);
+            assert_no_panic_decoding::<super::state_value_index::StateValueIndexSchema>(data);
             assert_no_panic_decoding::<super::transaction::TransactionSchema>(data);
             assert_no_panic_decoding::<super::transaction_accumulator::TransactionAccumulatorSchema>(
                 data,

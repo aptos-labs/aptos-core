@@ -134,3 +134,9 @@ fn main() {
         }
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

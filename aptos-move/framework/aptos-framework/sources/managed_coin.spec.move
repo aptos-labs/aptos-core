@@ -8,24 +8,37 @@ spec aptos_framework::managed_coin {
         account: &signer,
         amount: u64,
     ) {
+        use aptos_framework::optional_aggregator;
         use aptos_std::type_info;
-        // TODO: Unspecified 'optional_aggregator::sub()' used in 'coin::burn()'.
-        pragma aborts_if_is_partial;
+        use std::option;
+        use aptos_framework::aggregator;
+
         let account_addr = signer::address_of(account);
+
         // Resource Capabilities<CoinType> should exists in the signer address.
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
         let coin_store = global<coin::CoinStore<CoinType>>(account_addr);
         let balance = coin_store.coin.value;
+
         // Resource CoinStore<CoinType> should exists in the signer.
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr);
+
         // Account should not be frozen and should have sufficient balance.
         aborts_if coin_store.frozen;
         aborts_if balance < amount;
 
         let addr =  type_info::type_of<CoinType>().account_address;
-        aborts_if amount <= 0;
+        let maybe_supply = global<coin::CoinInfo<CoinType>>(addr).supply;
 
+        // Ensure the amount won't be overflow.
+        aborts_if amount <= 0;
         aborts_if !exists<coin::CoinInfo<CoinType>>(addr);
+        aborts_if option::is_some(maybe_supply) && optional_aggregator::is_parallelizable(option::borrow(maybe_supply))
+            && aggregator::spec_aggregator_get_val(option::borrow(option::borrow(maybe_supply).aggregator)) <
+            amount;
+        aborts_if option::is_some(maybe_supply) && !optional_aggregator::is_parallelizable(option::borrow(maybe_supply))
+            && option::borrow(option::borrow(maybe_supply).integer).value <
+            amount;
     }
 
     /// Make sure `name` and `symbol` are legal length.

@@ -1,6 +1,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import logging
 import os
 import pathlib
@@ -15,6 +16,7 @@ from common import METRICS_PORT, NODE_PORT, AccountInfo, Network, build_image_na
 LOG = logging.getLogger(__name__)
 
 WORKING_DIR_IN_CONTAINER = "/tmp"
+
 
 # We pass this class into all test functions to help with calling the CLI,
 # collecting output, and accessing common info.
@@ -157,7 +159,7 @@ class RunHelper:
     def prepare_move(self):
         shutil.copytree(
             "../../../aptos-move/move-examples/cli-e2e-tests",
-            os.path.join(self.host_working_directory, "move"),
+            os.path.join(self.host_working_directory, "move/cli-e2e-tests"),
             ignore=shutil.ignore_patterns("build"),
         )
 
@@ -175,6 +177,19 @@ class RunHelper:
         else:
             if not os.path.isfile(self.cli_path):
                 raise RuntimeError(f"CLI not found at path: {self.cli_path}")
+
+            # If we're testing a CLI in the host system, i.e. from the --test-cli-path flag,
+            # make sure we're using "workspace" configuration and not "global" configuration.
+            response = self.run_command(
+                "check_workspace_config",
+                ["aptos", "config", "show-global-config"],
+            )
+            response = json.loads(response.stdout)
+            if response["Result"]["config_type"].lower() != "workspace":
+                raise RuntimeError(
+                    "When using --test-cli-path you must use workspace configuration, "
+                    "try running `aptos config set-global-config --config-type workspace`"
+                )
 
     # Get the account info of the account created by test_init.
     def get_account_info(self):
