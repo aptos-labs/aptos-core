@@ -1,11 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod state_kv_metadata_pruner;
+pub(crate) mod state_kv_pruner_manager;
+mod state_kv_shard_pruner;
+
 use crate::{
     metrics::PRUNER_VERSIONS,
     pruner::{
-        db_pruner::DBPruner, state_kv_metadata_pruner::StateKvMetadataPruner,
-        state_kv_shard_pruner::StateKvShardPruner,
+        db_pruner::DBPruner,
+        state_kv_pruner::{
+            state_kv_metadata_pruner::StateKvMetadataPruner,
+            state_kv_shard_pruner::StateKvShardPruner,
+        },
     },
     state_kv_db::StateKvDb,
     OTHER_TIMERS_SECONDS,

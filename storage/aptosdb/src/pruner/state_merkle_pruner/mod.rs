@@ -1,11 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub(in crate::pruner) mod generics;
+mod state_merkle_metadata_pruner;
+pub(crate) mod state_merkle_pruner_manager;
+mod state_merkle_shard_pruner;
+#[cfg(test)]
+mod test;
+
 use crate::{
     metrics::PRUNER_VERSIONS,
     pruner::{
         db_pruner::DBPruner,
-        state_store::{
+        state_merkle_pruner::{
             generics::StaleNodeIndexSchemaTrait,
             state_merkle_metadata_pruner::StateMerkleMetadataPruner,
             state_merkle_shard_pruner::StateMerkleShardPruner,
@@ -24,13 +31,6 @@ use std::{
     marker::PhantomData,
     sync::{atomic::Ordering, Arc},
 };
-
-pub mod generics;
-mod state_merkle_metadata_pruner;
-mod state_merkle_shard_pruner;
-
-#[cfg(test)]
-mod test;
 
 static TREE_PRUNER_WORKER_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -185,7 +185,7 @@ where
         Ok(())
     }
 
-    fn get_stale_node_indices(
+    pub(in crate::pruner::state_merkle_pruner) fn get_stale_node_indices(
         state_merkle_db_shard: &DB,
         start_version: Version,
         target_version: Version,

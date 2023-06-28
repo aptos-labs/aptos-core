@@ -110,6 +110,7 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
+        pragma verify_duration_estimate = 120;
         let gas_payer = if (txn_sequence_number < GAS_PAYER_FLAG_BIT) {
             signer::address_of(sender)
         } else {

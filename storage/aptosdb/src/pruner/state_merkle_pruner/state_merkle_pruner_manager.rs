@@ -8,10 +8,10 @@ use crate::{
     metrics::{PRUNER_BATCH_SIZE, PRUNER_VERSIONS, PRUNER_WINDOW},
     pruner::{
         pruner_manager::PrunerManager,
+        pruner_utils,
         pruner_worker::PrunerWorker,
-        state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+        state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
-    pruner_utils,
     state_merkle_db::StateMerkleDb,
 };
 use anyhow::Result;
@@ -136,7 +136,10 @@ where
         state_merkle_db: Arc<StateMerkleDb>,
         state_merkle_pruner_config: StateMerklePrunerConfig,
     ) -> PrunerWorker {
-        let pruner = pruner_utils::create_state_merkle_pruner::<S>(state_merkle_db);
+        let pruner = Arc::new(
+            StateMerklePruner::<S>::new(Arc::clone(&state_merkle_db))
+                .expect("Failed to create state merkle pruner."),
+        );
 
         PRUNER_WINDOW
             .with_label_values(&[S::name()])

@@ -1,6 +1,14 @@
 name: "Indexer gRPC Integration Tests"
 on:
-  pull_request:
+  pull_request_target:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write  # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
 
 # cancel redundant builds
 concurrency:
@@ -9,11 +17,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Note on the job-level `if` conditions:
+  # This workflow is designed such that we run subsequent jobs only when a 'push'
+  # triggered the workflow or on 'pull_request's which have set auto_merge=true
+  # or have the label "CICD:run-e2e-tests".
+  permission-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check repository permission for user which triggered workflow
+        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+        with:
+          required-permission: write
+          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+
   run-tests-local-testnet:
+    needs: [permission-check]
     runs-on: high-perf-docker
-    permissions:
-      contents: read
-      id-token: write
     env:
       # spin up the local testnet using the latest devnet image
       VALIDATOR_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/validator
