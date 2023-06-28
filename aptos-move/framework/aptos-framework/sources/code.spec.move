@@ -23,9 +23,8 @@ spec aptos_framework::code {
     }
 
     spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
-        // TODO: Can't verify `check_upgradability` in while loop.
-        pragma verify = false;
-        pragma opaque;
+        // TODO: Can't verify 'vector::enumerate' loop.
+        pragma aborts_if_is_partial;
         let addr = signer::address_of(owner);
         modifies global<PackageRegistry>(addr);
         aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
