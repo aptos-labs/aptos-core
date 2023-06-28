@@ -3548,6 +3548,7 @@ dependencies = [
  "clap 4.3.5",
  "move-binary-format",
  "move-bytecode-source-map",
+ "move-core-types",
 ]
 
 [[package]]

@@ -15,3 +15,4 @@ aptos-cached-packages = { workspace = true }
 bcs = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
+move-core-types = { workspace = true }
