@@ -603,7 +603,7 @@ ureq = { version = "1.5.4", features = [
 ], default_features = false }
 url = { version = "2.4.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
-walkdir = "2.3.2"
+walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
