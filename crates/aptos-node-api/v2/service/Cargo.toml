@@ -1,0 +1,21 @@
+[package]
+name = "aptos-node-api-v2-service"
+description = "Aptos node API v2 service"
+version = "2.0.1"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-node-api-context = { workspace = true }
+async-graphql = { workspace = true }
+async-graphql-poem = { workspace = true }
+poem = { workspace = true }
+

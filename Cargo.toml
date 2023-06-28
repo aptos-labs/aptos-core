@@ -62,6 +62,7 @@ members = [
     "crates/aptos-node-api/v1/core",
     "crates/aptos-node-api/v1/openapi-spec-generator",
     "crates/aptos-node-api/v1/types",
+    "crates/aptos-node-api/v2/service",
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
     "crates/aptos-proptest-helpers",
@@ -257,6 +258,7 @@ aptos-node-api-v1-core = { path = "crates/aptos-node-api/v1/core" }
 aptos-node-api-v1-types = { path = "crates/aptos-node-api/v1/types" }
 aptos-node-api-v1-spec-generator = { path = "crates/aptos-node-api/v1/types" }
 aptos-node-api-test-context = { path = "crates/aptos-node-api/test-context" }
+aptos-node-api-v2-service = { path = "crates/aptos-node-api/v2/service" }
 aptos-backup-cli = { path = "storage/backup/backup-cli" }
 aptos-backup-service = { path = "storage/backup/backup-service" }
 aptos-bounded-executor = { path = "crates/bounded-executor" }
@@ -405,6 +407,8 @@ ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.1.1"
+async-graphql = "5.0.10"
+async-graphql-poem = "5.0.10"
 async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.5.16"

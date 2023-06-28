@@ -7,6 +7,7 @@ use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_node_api_context::Context;
 use aptos_node_api_v1_core::{build_api_v1_routes, ApiV1Config};
+use aptos_node_api_v2_service::{build_api_v2_routes, ApiV2Config};
 use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use poem::{
@@ -28,9 +29,11 @@ pub fn bootstrap(
 
     let context = Arc::new(Context::new(chain_id, db, mp_sender, config.clone()));
 
-    let api_v1_config = ApiV1Config::new(context);
+    let api_v1_config = ApiV1Config::new(context.clone());
+    let api_v2_config = ApiV2Config::new(context);
 
-    let routes = build_routes(api_v1_config).context("Failed to build API routes")?;
+    let routes =
+        build_routes(api_v1_config, api_v2_config).context("Failed to build API routes")?;
 
     attach_to_runtime(runtime.handle(), config, routes, false)
         .context("Failed to attach poem to runtime")?;
@@ -38,9 +41,13 @@ pub fn bootstrap(
     Ok(runtime)
 }
 
-pub fn build_routes(api_v1_config: ApiV1Config) -> Result<impl IntoEndpoint> {
+pub fn build_routes(
+    api_v1_config: ApiV1Config,
+    api_v2_config: ApiV2Config,
+) -> Result<impl IntoEndpoint> {
     let v1_routes = build_api_v1_routes(api_v1_config)?;
-    let routes = Route::new().nest("/v1", v1_routes);
+    let v2_routes = build_api_v2_routes(api_v2_config)?;
+    let routes = Route::new().nest("/v1", v1_routes).nest("/v2", v2_routes);
     Ok(routes)
 }
 

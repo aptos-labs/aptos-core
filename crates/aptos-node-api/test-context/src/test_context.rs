@@ -24,6 +24,7 @@ use aptos_node_api_v1_types::{
     mime_types, response::BasicError, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
+use aptos_node_api_v2_service::ApiV2Config;
 use aptos_sdk::{
     bcs,
     transaction_builder::TransactionFactory,
@@ -145,8 +146,11 @@ pub fn new_test_context(
 
     // Configure the testing depending on which API version we're testing.
     let runtime_handle = tokio::runtime::Handle::current();
-    let routes =
-        build_routes(ApiV1Config::new(context.clone())).expect("Failed to build API routes");
+    let routes = build_routes(
+        ApiV1Config::new(context.clone()),
+        ApiV2Config::new(context.clone()),
+    )
+    .expect("Failed to build API routes");
     let poem_address = attach_to_runtime(&runtime_handle, &node_config, routes, true)
         .expect("Failed to attach API to runtime");
     let api_specific_config = ApiSpecificConfig::V1(poem_address);
