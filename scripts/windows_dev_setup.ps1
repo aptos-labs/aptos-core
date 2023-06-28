@@ -185,6 +185,9 @@ function install_winget {
   # Add WinGet directory to user PATH environment variable
   [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$env:LOCALAPPDATA\Microsoft\WindowsApps", "User")
 
+  # First installation needs this to be added see: https://learn.microsoft.com/en-us/windows/package-manager/winget/#install-winget
+  Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe
+
   # Reload the PATH environment variables for this session
   $env:Path = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
   Write-Host "WinGet has been installed. We recommend stopping the script and restarting your system to ensure WinGet has been set up correctly before continuing."
