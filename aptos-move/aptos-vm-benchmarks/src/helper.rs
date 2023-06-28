@@ -5,6 +5,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
 use aptos_types::transaction::TransactionPayload;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use move_core_types::language_storage::ModuleId;
 use std::time::Instant;
 
 //// generate a TransactionPayload for modules
@@ -47,4 +48,11 @@ pub fn sign_module_txn(
     let txn_status = txn_output.status().to_owned();
     assert!(txn_output.status().status().unwrap().is_success());
     println!("txn status: {:?}", txn_status);
+}
+
+pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
+    let start = Instant::now();
+    executor.exec_module(module_name, function_name, vec![], vec![]);
+    let elapsed = start.elapsed();
+    println!("running time (microseconds): {}", elapsed.as_micros());
 }

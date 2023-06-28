@@ -9,19 +9,10 @@ use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use clap::Parser;
 use move_binary_format::CompiledModule;
-use move_core_types::language_storage::ModuleId;
 use std::fs::read_dir;
 use std::path::PathBuf;
-use std::time::Instant;
 
 const PREFIX: &str = "benchmark";
-
-fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
-    let start = Instant::now();
-    executor.exec_module(module_name, function_name, vec![], vec![]);
-    let elapsed = start.elapsed();
-    println!("running time (microseconds): {}", elapsed.as_micros());
-}
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -158,7 +149,7 @@ fn main() {
                     func_identifier,
                 ))
                 .unwrap();
-                sign_user_txn(&mut executor, &module_id, func_identifier);
+                helper::sign_user_txn(&mut executor, &module_id, func_identifier);
             }
         }
     }
