@@ -30,6 +30,7 @@ pub enum FeatureFlag {
     CHARGE_INVARIANT_VIOLATION = 20,
     DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING = 21,
     GAS_PAYER_ENABLED = 22,
+    APTOS_UNIQUE_IDENTIFIERS = 23,
 }
 
 /// Representation of features on chain as a bitset.
