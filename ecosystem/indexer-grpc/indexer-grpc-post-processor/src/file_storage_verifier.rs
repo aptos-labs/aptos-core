@@ -54,15 +54,15 @@ impl FileStorageVerifier {
             "Chain ID mismatch"
         );
         let mut next_version_to_verify = verification_metadata.next_version_to_verify;
-        let mut current_head_version = file_store_metadata.version;
+        let mut next_version_to_store = file_store_metadata.version;
 
         loop {
-            if next_version_to_verify > current_head_version {
+            if next_version_to_verify > next_version_to_store {
                 VERIFICATION_ERROR_COUNT.inc();
                 bail!("Next version to verify is greater than current head version, which is impossible.");
             }
 
-            if next_version_to_verify == current_head_version {
+            if next_version_to_verify == next_version_to_store {
                 // Update the metadata in a minute and retry.
                 std::thread::sleep(std::time::Duration::from_secs(60));
                 tracing::info!(
@@ -73,7 +73,7 @@ impl FileStorageVerifier {
                     .get_file_store_metadata()
                     .await
                     .ok_or(anyhow::anyhow!("File Store metadata does not exist"))?;
-                current_head_version = file_store_metadata.version;
+                next_version_to_store = file_store_metadata.version;
                 continue;
             }
 
