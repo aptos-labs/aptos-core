@@ -207,14 +207,7 @@ fn main() {
                 sequence_num_counter = sequence_num_counter + 1;
 
                 //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
-                //let entry_fun_payload = generate_entry_fun_payloads(&creator, identifier, func_identifier);
                 print!("Signing user txn... ");
-                /*sign_txn(
-                    &mut executor,
-                    &creator,
-                    entry_fun_payload,
-                    sequence_num_counter,
-                );*/
                 let MemberId {
                     module_id,
                     member_id: _function_id,
