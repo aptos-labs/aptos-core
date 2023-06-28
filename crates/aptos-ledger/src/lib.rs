@@ -25,7 +25,7 @@ use std::{
 };
 use thiserror::Error;
 
-/// derivation path template
+/// Derivation path template
 /// A piece of data which tells a wallet how to derive a specific key within a tree of keys
 /// 637 is the key for Aptos
 pub const DERIVATION_PATH: &str = "m/44'/637'/{index}'/0'/0'";

@@ -147,10 +147,10 @@ impl CliCommand<()> for InitTool {
             );
 
             // Iterate through the accounts and print them out
-            for (index, (deri_path, account)) in account_map.iter().enumerate() {
+            for (index, (derivation_path, account)) in account_map.iter().enumerate() {
                 eprintln!(
-                    "Index: {}, Derivatiion Path: {} Address: {}",
-                    index, deri_path, account
+                    "[{}] Derivation path: {} (Address: {})",
+                    index, derivation_path, account
                 );
             }
             let input_index = read_line("derivation_index")?;
@@ -160,7 +160,8 @@ impl CliCommand<()> for InitTool {
             // Validate the path
             if !aptos_ledger::validate_derivation_path(&path) {
                 return Err(CliError::UnexpectedError(
-                    "Invalid derivation path".to_owned(),
+                    "Invalid index input. Please make sure the input is a valid number index"
+                        .to_owned(),
                 ));
             }
             Some(path)

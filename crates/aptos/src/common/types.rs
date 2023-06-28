@@ -227,7 +227,7 @@ pub struct ProfileConfig {
     /// URL for the Faucet endpoint (if applicable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub faucet_url: Option<String>,
-    /// derivation path index of the account on ledger
+    /// Derivation path index of the account on ledger
     pub derivation_path: Option<String>,
 }
 
