@@ -6,6 +6,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
+use clap::Parser;
 use move_binary_format::CompiledModule;
 use std::fs::read_dir;
 use std::path::PathBuf;
@@ -74,7 +75,17 @@ fn sign_txn(
     println!("txn status: {:?}", txn_status);
 }
 
+#[derive(Parser, Debug)]
+struct Cli {
+    pattern: String,
+}
+
 fn main() {
+    //// Implement CLI
+    let args = Cli::parse();
+    let mut pattern = String::new();
+    pattern.push_str(&args.pattern.as_str());
+
     //// Discover all top-level packages in samples directory
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples");
     let dirs = read_dir(path.as_path()).unwrap();
@@ -138,9 +149,20 @@ fn main() {
                 let func_identifier_idx: usize = handle.name.0.into();
                 let func_identifier = &func_identifier_pool[func_identifier_idx];
 
-                // check if it starts with "benchmark"
+                // skip if it doesn't start with "benchmark"
                 let func_name = func_identifier.as_str();
                 if !func_name.starts_with(PREFIX) {
+                    continue;
+                }
+
+                // skip if it doesn't match pattern
+                let mut fully_qualified_path = String::new();
+                fully_qualified_path.push_str(address.to_string().as_str());
+                fully_qualified_path.push_str("::");
+                fully_qualified_path.push_str(identifier);
+                fully_qualified_path.push_str("::");
+                fully_qualified_path.push_str(func_name);
+                if !fully_qualified_path.contains(&pattern) && !pattern.is_empty() {
                     continue;
                 }
 
@@ -149,7 +171,7 @@ fn main() {
                 let func_params = &signature_pool[signature_idx];
                 if func_params.len() != 0 {
                     eprintln!(
-                        "[WARNING] benchmark function should not have parameters: {}",
+                        "\n[WARNING] benchmark function should not have parameters: {}\n",
                         func_name,
                     );
                     // TODO: should we exit instead of continuing with the benchmark
