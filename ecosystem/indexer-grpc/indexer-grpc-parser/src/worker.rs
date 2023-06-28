@@ -371,7 +371,7 @@ impl Worker {
                 if count == 0 {
                     info!(
                         processor_name = processor_name,
-                        "[Parser] No transactions processed."
+                        "[Parser] No transactions to process. Sleeping for 12 hours."
                     );
                     FINISHED_PROCESSORS_COUNT
                         .with_label_values(&[processor_name])
