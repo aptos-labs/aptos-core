@@ -3,11 +3,11 @@
 
 use crate::{
     config::{
-        node_config_loader::NodeConfigLoader, persistable_config::PersistableConfig,
-        utils::RootPath, ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig,
-        IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
-        NetworkConfig, PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig,
-        StorageConfig,
+        benchmark::BenchmarkConfig, node_config_loader::NodeConfigLoader,
+        persistable_config::PersistableConfig, utils::RootPath, ApiConfig, BaseConfig,
+        ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
+        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
+        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
     },
     network_id::NetworkId,
 };
@@ -58,6 +58,8 @@ pub struct NodeConfig {
     pub storage: StorageConfig,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
+    #[serde(default)]
+    pub benchmark: Option<BenchmarkConfig>,
 }
 
 impl NodeConfig {
