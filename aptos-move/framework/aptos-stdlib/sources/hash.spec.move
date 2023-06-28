@@ -32,12 +32,14 @@ spec aptos_std::aptos_hash {
     spec sip_hash(bytes: vector<u8>): u64 {
         pragma opaque;
         aborts_if [abstract] false;
-        ensures [abstract] result == spec_sip_hash(bytes);
+        pragma bv_ret = b"0";
+        ensures [abstract] result == int2bv(spec_sip_hash(bytes));
     }
 
     spec sip_hash_from_value<MoveValue>(v: &MoveValue): u64 {
         pragma opaque;
-        ensures result == spec_sip_hash(bcs::serialize(v));
+        pragma bv_ret = b"0";
+        ensures result == int2bv(spec_sip_hash(bcs::serialize(v)));
     }
 
     spec keccak256(bytes: vector<u8>): vector<u8> {

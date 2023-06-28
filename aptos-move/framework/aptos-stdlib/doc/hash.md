@@ -437,7 +437,8 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
-<b>ensures</b> [abstract] result == <a href="hash.md#0x1_aptos_hash_spec_sip_hash">spec_sip_hash</a>(bytes);
+<b>pragma</b> bv_ret = b"0";
+<b>ensures</b> [abstract] result == int2bv(<a href="hash.md#0x1_aptos_hash_spec_sip_hash">spec_sip_hash</a>(bytes));
 </code></pre>
 
 
@@ -454,7 +455,8 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>ensures</b> result == <a href="hash.md#0x1_aptos_hash_spec_sip_hash">spec_sip_hash</a>(<a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(v));
+<b>pragma</b> bv_ret = b"0";
+<b>ensures</b> result == int2bv(<a href="hash.md#0x1_aptos_hash_spec_sip_hash">spec_sip_hash</a>(<a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(v)));
 </code></pre>
 
 

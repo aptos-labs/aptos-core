@@ -33,6 +33,7 @@ it tolerates collisions.
 -  [Function `update_split_load_threshold`](#0x1_smart_table_update_split_load_threshold)
 -  [Function `update_target_bucket_size`](#0x1_smart_table_update_target_bucket_size)
 -  [Specification](#@Specification_1)
+    -  [Struct `Entry`](#@Specification_1_Entry)
     -  [Struct `SmartTable`](#@Specification_1_SmartTable)
     -  [Function `new`](#@Specification_1_new)
     -  [Function `new_with_config`](#@Specification_1_new_with_config)
@@ -838,6 +839,50 @@ Update <code>target_bucket_size</code>.
 ## Specification
 
 
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_Entry"></a>
+
+### Struct `Entry`
+
+
+<pre><code><b>struct</b> <a href="smart_table.md#0x1_smart_table_Entry">Entry</a>&lt;K, V&gt; <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code><a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a>: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>key: K</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>value: V</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>pragma</b> bv = b"0";
+</code></pre>
+
+
+
 <a name="@Specification_1_SmartTable"></a>
 
 ### Struct `SmartTable`
@@ -889,10 +934,11 @@ Update <code>target_bucket_size</code>.
 
 
 
-<pre><code><b>invariant</b> split_load_threshold &lt;= 100 && split_load_threshold &gt; 0;
-<b>invariant</b> num_buckets != 0;
-<b>invariant</b> level &lt;= 62;
-<b>invariant</b> target_bucket_size &gt; 0;
+<pre><code><b>pragma</b> bv = b"0,1,2,3,5";
+<b>invariant</b> (split_load_threshold &lt;= (100 <b>as</b> u8)) && (split_load_threshold &gt; (0 <b>as</b> u8));
+<b>invariant</b> num_buckets != (0 <b>as</b> u64);
+<b>invariant</b> level &lt;= (62 <b>as</b> u8);
+<b>invariant</b> target_bucket_size &gt; (0 <b>as</b> u64);
 </code></pre>
 
 
@@ -1008,7 +1054,8 @@ Update <code>target_bucket_size</code>.
 
 
 
-<pre><code><b>aborts_if</b> level + 1 &gt; 63;
+<pre><code><b>pragma</b> bv = b"0,1,2";
+<b>aborts_if</b> ((level + (1 <b>as</b> u8)) <b>as</b> u8) &gt; (63 <b>as</b> u8);
 </code></pre>
 
 
@@ -1100,9 +1147,17 @@ Update <code>target_bucket_size</code>.
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> verify_duration_estimate = 120;
 <b>pragma</b> aborts_if_is_partial = <b>true</b>;
-<b>aborts_if</b> !<a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(<a href="table.md#0x1_table">table</a>.buckets, <a href="smart_table.md#0x1_smart_table_get_index">get_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, key));
+<b>let</b> <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> = spec_sip_hash(<a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(key));
+<b>let</b> index = <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> % (1 &lt;&lt; (bv2int(<a href="table.md#0x1_table">table</a>.level) + 1));
+<b>let</b> idx = <b>if</b> (index &lt; bv2int(<a href="table.md#0x1_table">table</a>.num_buckets)) {
+    index
+} <b>else</b> {
+    index % (1 &lt;&lt; bv2int(<a href="table.md#0x1_table">table</a>.level))
+};
+<b>aborts_if</b> !<a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(<a href="table.md#0x1_table">table</a>.buckets, idx);
 </code></pre>
 
 
@@ -1153,16 +1208,7 @@ Update <code>target_bucket_size</code>.
 <a name="0x1_smart_table_get_index"></a>
 
 
-<pre><code><b>fun</b> <a href="smart_table.md#0x1_smart_table_get_index">get_index</a>&lt;K&gt;(level: u8, num_buckets: u64, key: K): u64 {
-   <b>use</b> std::bcs;
-   <b>let</b> <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> = spec_sip_hash(<a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(key));
-   <b>let</b> index = <a href="../../move-stdlib/doc/hash.md#0x1_hash">hash</a> % (1 &lt;&lt; (level + 1));
-   <b>if</b> (index &lt; num_buckets) {
-       index
-   } <b>else</b> {
-       index % (1 &lt;&lt; level)
-   }
-}
+<pre><code><b>fun</b> <a href="smart_table.md#0x1_smart_table_get_index">get_index</a>&lt;K&gt;(level: u8, num_buckets: u64, key: K): u64;
 </code></pre>
 
 
@@ -1194,7 +1240,7 @@ Update <code>target_bucket_size</code>.
 
 
 
-<pre><code><b>aborts_if</b> (<a href="table.md#0x1_table">table</a>.size * 100 &gt;= MAX_U64) || (<a href="table.md#0x1_table">table</a>.num_buckets == 0) || (<a href="table.md#0x1_table">table</a>.target_bucket_size == 0);
+<pre><code><b>aborts_if</b> ((<a href="table.md#0x1_table">table</a>.size * (100 <b>as</b> u64) <b>as</b> u64) &gt;= (MAX_U64 <b>as</b> u64) || (<a href="table.md#0x1_table">table</a>.num_buckets == (0 <b>as</b> u64)) || (<a href="table.md#0x1_table">table</a>.target_bucket_size == (0 <b>as</b> u64)));
 </code></pre>
 
 
