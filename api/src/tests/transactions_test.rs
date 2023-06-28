@@ -5,7 +5,7 @@
 use super::new_test_context;
 use crate::tests::new_test_context_with_config;
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{GasEstimationStaticOverride, NodeConfig};
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
@@ -1168,6 +1168,39 @@ async fn test_gas_estimation_cache() {
 async fn test_gas_estimation_disabled() {
     let mut node_config = NodeConfig::default();
     node_config.api.gas_estimation.enabled = false;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+
+    let ctx = &mut context;
+    let creator = &mut ctx.gen_account();
+    let mint_txn = ctx.mint_user_account(creator).await;
+
+    // Include the mint txn in the first block
+    let mut block = vec![mint_txn];
+    // First block is ignored in gas estimate, so make 11
+    for _i in 0..11 {
+        fill_block(&mut block, ctx, creator).await;
+        ctx.commit_block(&block).await;
+        block.clear();
+    }
+
+    // It's disabled, so we always expect the default, despite the blocks being filled above
+    let resp = context.get("/estimate_gas_price").await;
+    for _i in 0..2 {
+        let cached = context.get("/estimate_gas_price").await;
+        assert_eq!(resp, cached);
+    }
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_static_override() {
+    let mut node_config = NodeConfig::default();
+    node_config.api.gas_estimation.enabled = true;
+    node_config.api.gas_estimation.static_override = Some(GasEstimationStaticOverride {
+        low: 100,
+        market: 200,
+        aggressive: 300,
+    });
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
     let ctx = &mut context;

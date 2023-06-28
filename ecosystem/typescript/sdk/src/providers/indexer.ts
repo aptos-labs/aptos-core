@@ -255,13 +255,28 @@ export class IndexerClient {
   /**
    * Queries token data
    *
-   * @param tokenId Token ID
+   * @param tokenId Token ID address
    * @returns GetTokenDataQuery response type
    */
-  async getTokenData(tokenId: string): Promise<GetTokenDataQuery> {
+  async getTokenData(
+    tokenId: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<GetTokenDataQuery> {
+    const tokenAddress = HexString.ensure(tokenId).hex();
+    IndexerClient.validateAddress(tokenAddress);
+
+    const whereCondition: any = {
+      token_data_id: { _eq: tokenAddress },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
     const graphqlQuery = {
       query: GetTokenData,
-      variables: { token_id: tokenId },
+      variables: { where_condition: whereCondition },
     };
     return this.queryIndexer(graphqlQuery);
   }

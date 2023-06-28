@@ -294,8 +294,7 @@ export class ModuleId {
 
   /**
    * Converts a string literal to a ModuleId
-   * @param moduleId String literal in format "AccountAddress::module_name",
-   *   e.g. "0x1::coin"
+   * @param moduleId String literal in format "AccountAddress::module_name", e.g. "0x1::coin"
    * @returns
    */
   static fromStr(moduleId: string): ModuleId {

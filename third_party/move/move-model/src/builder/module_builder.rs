@@ -524,7 +524,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let spec_fun_id = SpecFunId::new(self.spec_funs.len());
         self.parent.define_spec_fun(qsym, SpecFunEntry {
             loc: loc.clone(),
-            oper: Operation::Function(self.module_id, spec_fun_id, None),
+            oper: Operation::SpecFunction(self.module_id, spec_fun_id, None),
             type_params: type_params.clone(),
             params: params.clone(),
             result_type: result_type.clone(),
@@ -605,7 +605,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         self.parent
             .define_spec_fun(self.qualified_by_module(name), SpecFunEntry {
                 loc: loc.clone(),
-                oper: Operation::Function(self.module_id, fun_id, None),
+                oper: Operation::SpecFunction(self.module_id, fun_id, None),
                 type_params: type_params.clone(),
                 params: params.clone(),
                 result_type: result_type.clone(),
@@ -1142,7 +1142,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         };
         let mut is_pure = true;
         body.visit(&mut |e: &ExpData| {
-            if let ExpData::Call(_, Operation::Function(mid, fid, _), _) = e {
+            if let ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) = e {
                 if mid.to_usize() < self.module_id.to_usize() {
                     // This is calling a function from another module we already have
                     // translated. In this case, the impurity has already been propagated
@@ -3109,7 +3109,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let mut callees = BTreeSet::new();
         exp.visit(&mut |e: &ExpData| {
             match e {
-                ExpData::Call(id, Operation::Function(mid, fid, _), _) => {
+                ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
                     callees.insert(mid.qualified(*fid));
                     let inst = self.parent.env.get_node_instantiation(*id);
                     // Extend used memory with that of called functions, after applying type

@@ -1,0 +1,4 @@
+
+Forge output: 
+Forge failed
+Forge took longer than 1 hour to run. This can cause the job to fail even when the test is successful because of gcp + github auth expiration. If you think this is the case please check the GCP_AUTH_DURATION in the github workflow.

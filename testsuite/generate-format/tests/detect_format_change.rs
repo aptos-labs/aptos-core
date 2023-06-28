@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use clap::ValueEnum;
 use generate_format::Corpus;
 use serde_reflection::Registry;
 use std::collections::{btree_map::Entry, BTreeMap};
@@ -10,7 +11,7 @@ use std::collections::{btree_map::Entry, BTreeMap};
 fn analyze_serde_formats() {
     let mut all_corpuses = BTreeMap::new();
 
-    for corpus in Corpus::values() {
+    for corpus in Corpus::value_variants() {
         // Compute the Serde formats of this corpus by analyzing the codebase.
         let registry = corpus.get_registry();
 
@@ -18,7 +19,12 @@ fn analyze_serde_formats() {
         if let Some(path) = corpus.output_file() {
             let content = std::fs::read_to_string(path).unwrap();
             let expected = serde_yaml::from_str::<Registry>(content.as_str()).unwrap();
-            assert_registry_has_not_changed(&corpus.to_string(), path, registry.clone(), expected);
+            assert_registry_has_not_changed(
+                &(*corpus).to_string(),
+                path,
+                registry.clone(),
+                expected,
+            );
         }
 
         // Test that the definitions in all corpus are unique and pass the linter.
