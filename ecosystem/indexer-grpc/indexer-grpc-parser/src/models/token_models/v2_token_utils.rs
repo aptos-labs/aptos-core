@@ -425,12 +425,12 @@ impl V2TokenResource {
     pub fn is_resource_supported(data_type: &str) -> bool {
         [
             format!("{}::object::ObjectCore", COIN_ADDR),
-            format!("{}::::collection::Collection", TOKEN_V2_ADDR),
-            format!("{}::::collection::FixedSupply", TOKEN_V2_ADDR),
-            format!("{}::::collection::UnlimitedSupply", TOKEN_V2_ADDR),
-            format!("{}::::aptos_token::AptosCollection", TOKEN_V2_ADDR),
-            format!("{}::::token::Token", TOKEN_V2_ADDR),
-            format!("{}::::property_map::PropertyMap", TOKEN_V2_ADDR),
+            format!("{}::collection::Collection", TOKEN_V2_ADDR),
+            format!("{}::collection::FixedSupply", TOKEN_V2_ADDR),
+            format!("{}::collection::UnlimitedSupply", TOKEN_V2_ADDR),
+            format!("{}::aptos_token::AptosCollection", TOKEN_V2_ADDR),
+            format!("{}::token::Token", TOKEN_V2_ADDR),
+            format!("{}::property_map::PropertyMap", TOKEN_V2_ADDR),
         ]
         .contains(&data_type.to_string())
     }
@@ -444,22 +444,22 @@ impl V2TokenResource {
             x if x == format!("{}::object::ObjectCore", COIN_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::ObjectCore(inner)))
             },
-            x if x == format!("{}::::collection::Collection", TOKEN_V2_ADDR) => {
+            x if x == format!("{}::collection::Collection", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::Collection(inner)))
             },
-            x if x == format!("{}::::collection::FixedSupply", TOKEN_V2_ADDR) => {
+            x if x == format!("{}::collection::FixedSupply", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::FixedSupply(inner)))
             },
-            x if x == format!("{}::::collection::UnlimitedSupply", TOKEN_V2_ADDR) => {
+            x if x == format!("{}::collection::UnlimitedSupply", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::UnlimitedSupply(inner)))
             },
-            x if x == format!("{}::::aptos_token::AptosCollection", TOKEN_V2_ADDR) => {
+            x if x == format!("{}::aptos_token::AptosCollection", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::AptosCollection(inner)))
             },
-            x if x == format!("{}::::token::Token", TOKEN_V2_ADDR) => {
+            x if x == format!("{}::token::Token", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::TokenV2(inner)))
             },
-            x if x == format!("{}::::property_map::PropertyMap", TOKEN_V2_ADDR) => {
+            x if x == format!("{}::property_map::PropertyMap", TOKEN_V2_ADDR) => {
                 serde_json::from_value(data.clone())
                     .map(|inner| Some(Self::PropertyMapModel(inner)))
             },

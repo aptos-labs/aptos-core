@@ -21,6 +21,7 @@ pub struct IndexerGrpcProcessorConfig {
     pub indexer_grpc_http2_ping_timeout_in_secs: Option<u64>,
     pub auth_token: String,
     pub starting_version: Option<u64>,
+    pub ending_version: Option<u64>,
     pub number_concurrent_processing_tasks: Option<usize>,
     pub ans_address: Option<String>,
     pub nft_points_contract: Option<String>,
@@ -29,7 +30,7 @@ pub struct IndexerGrpcProcessorConfig {
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcProcessorConfig {
     async fn run(&self) -> Result<()> {
-        let worker = Worker::new(
+        let mut worker = Worker::new(
             self.processor_name.clone(),
             self.postgres_connection_string.clone(),
             self.indexer_grpc_data_service_addresss.clone(),
@@ -41,6 +42,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
             ),
             self.auth_token.clone(),
             self.starting_version,
+            self.ending_version,
             self.number_concurrent_processing_tasks,
             self.ans_address.clone(),
             self.nft_points_contract.clone(),

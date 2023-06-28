@@ -10,9 +10,10 @@ use super::{
     v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping},
 };
 use crate::{
-    schema::{current_token_datas_v2, token_datas_v2}, utils::util::standardize_address,
+    schema::{current_token_datas_v2, token_datas_v2},
+    utils::util::standardize_address,
 };
-use aptos_protos::transaction::v1::{WriteTableItem, WriteResource};
+use aptos_protos::transaction::v1::{WriteResource, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
