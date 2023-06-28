@@ -254,7 +254,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
 
         if let Some(ts) = self.latest_metadata_update_timestamp {
             // a periodic metadata update
-            if (std::time::Instant::now() - ts).as_secs() > FILE_STORE_UPDATE_FREQUENCY_SECS {
+            if ts.elapsed().as_secs() > FILE_STORE_UPDATE_FREQUENCY_SECS {
                 self.update_file_store_metadata(chain_id, start_version + batch_size as u64)
                     .await?;
             }
