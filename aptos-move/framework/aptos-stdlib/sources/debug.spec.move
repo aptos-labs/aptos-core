@@ -1,9 +1,19 @@
 spec aptos_std::debug {
-    spec native_print {
-        pragma opaque;
+    spec print<T>(x: &T) {
+        aborts_if false;
     }
 
-    spec native_stack_trace {
+    spec print_stack_trace() {
+        aborts_if false;
+    }
+
+    spec native_print(x: String) {
         pragma opaque;
+        aborts_if false;
+    }
+
+    spec native_stack_trace(): String {
+        pragma opaque;
+        aborts_if false;
     }
 }

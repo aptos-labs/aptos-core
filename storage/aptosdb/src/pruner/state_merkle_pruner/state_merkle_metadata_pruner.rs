@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    pruner::state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+    pruner::state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     schema::{
         db_metadata::{DbMetadataSchema, DbMetadataValue},
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,

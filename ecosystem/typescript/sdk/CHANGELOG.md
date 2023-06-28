@@ -4,6 +4,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- Use amount greater than 0 in `getTokenOwnersData` query
+
 ## 1.11.0 (2023-06-22)
 
 - Export `bcsSerializeU256` from `bcs/helper.ts`
