@@ -14,9 +14,9 @@ use crate::{
     schema::ledger_infos,
     utils::{
         counters::{
-            LATEST_PROCESSED_VERSION, PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS,
-            PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS, PROCESSOR_ERRORS_COUNT,
-            PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
+            FINISHED_PROCESSORS_COUNT, LATEST_PROCESSED_VERSION,
+            PROCESSOR_DATA_PROCESSED_LATENCY_IN_SECS, PROCESSOR_DATA_RECEIVED_LATENCY_IN_SECS,
+            PROCESSOR_ERRORS_COUNT, PROCESSOR_INVOCATIONS_COUNT, PROCESSOR_SUCCESSES_COUNT,
         },
         database::{execute_with_better_error, new_db_pool, PgDbPool},
     },
@@ -31,7 +31,8 @@ use aptos_protos::indexer::v1::{
 };
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures::StreamExt;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
+use tokio::time::sleep;
 use tracing::{error, info};
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
@@ -45,6 +46,7 @@ pub struct Worker {
     pub indexer_grpc_http2_ping_timeout: std::time::Duration,
     pub auth_token: String,
     pub starting_version: Option<u64>,
+    pub transactions_count: Option<u64>,
     pub number_concurrent_processing_tasks: usize,
     pub ans_address: Option<String>,
     pub nft_points_contract: Option<String>,
@@ -59,6 +61,7 @@ impl Worker {
         indexer_grpc_http2_ping_timeout: std::time::Duration,
         auth_token: String,
         starting_version: Option<u64>,
+        transactions_count: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
         ans_address: Option<String>,
         nft_points_contract: Option<String>,
@@ -84,6 +87,7 @@ impl Worker {
             indexer_grpc_http2_ping_interval,
             indexer_grpc_http2_ping_timeout,
             starting_version,
+            transactions_count,
             auth_token,
             number_concurrent_processing_tasks,
             ans_address,
@@ -163,6 +167,7 @@ impl Worker {
 
         let request = grpc_request_builder(
             starting_version,
+            self.transactions_count,
             self.auth_token.clone(),
             self.processor_name.clone(),
         );
@@ -204,21 +209,8 @@ impl Worker {
 
         let mut ma = MovingAverage::new(10_000);
         info!(processor_name = processor_name, "[Parser] Starting stream");
-        match resp_stream.next().await {
-            Some(Ok(r)) => {
-                self.validate_grpc_chain_id(r)
-                    .await
-                    .expect("Invalid grpc response with INIT frame.");
-            },
-            _ => {
-                error!(
-                    processor_name = processor_name,
-                    "[Parser] Error receiving datastream response"
-                );
-                panic!();
-            },
-        }
         let mut batch_start_version = starting_version;
+        let mut transactions_count = self.transactions_count;
         loop {
             let mut transactions_batches = vec![];
             // Gets a batch of transactions from the stream. Batch size is set in the grpc server.
@@ -226,24 +218,16 @@ impl Worker {
             for _ in 0..concurrent_tasks {
                 let next_stream = match resp_stream.next().await {
                     Some(Ok(r)) => r,
+                    None => {
+                        // If we get a None, then the stream has ended, i.e., this is a finite stream.
+                        break;
+                    },
                     _ => {
                         error!(
                             processor_name = processor_name,
-                            "[Parser] Error receiving datastream response; reconnecting..."
+                            "[Parser] Error receiving datastream response; please restart the processor..."
                         );
-                        // If we get an error, we need to reconnect to the stream.
-                        let request = grpc_request_builder(
-                            batch_start_version,
-                            self.auth_token.clone(),
-                            self.processor_name.clone(),
-                        );
-                        resp_stream = rpc_client
-                            .get_transactions(request)
-                            .await
-                            .expect("Failed to get grpc response. Is the server running?")
-                            .into_inner();
-                        transactions_batches.clear();
-                        continue;
+                        panic!();
                     },
                 };
                 let transactions = next_stream.transactions;
@@ -362,6 +346,9 @@ impl Worker {
             let batch_start = processed_versions_sorted.first().unwrap().0;
             let batch_end = processed_versions_sorted.last().unwrap().1;
             batch_start_version = batch_end + 1;
+            if let Some(c) = transactions_count.as_mut() {
+                *c -= batch_end + 1 - batch_start;
+            }
 
             LATEST_PROCESSED_VERSION
                 .with_label_values(&[processor_name])
@@ -380,6 +367,18 @@ impl Worker {
                 tps = (ma.avg() * 1000.0) as u64,
                 "[Parser] Processed transactions.",
             );
+            if let Some(count) = transactions_count {
+                if count == 0 {
+                    info!(
+                        processor_name = processor_name,
+                        "[Parser] No transactions processed."
+                    );
+                    FINISHED_PROCESSORS_COUNT
+                        .with_label_values(&[processor_name])
+                        .inc();
+                    sleep(Duration::from_secs(12 * 3600)).await;
+                }
+            }
         }
     }
 
@@ -456,11 +455,13 @@ impl Worker {
 
 pub fn grpc_request_builder(
     starting_version: u64,
+    transactions_count: Option<u64>,
     grpc_auth_token: String,
     processor_name: String,
 ) -> tonic::Request<GetTransactionsRequest> {
     let mut request = tonic::Request::new(GetTransactionsRequest {
         starting_version: Some(starting_version),
+        transactions_count,
         ..GetTransactionsRequest::default()
     });
     request.metadata_mut().insert(
