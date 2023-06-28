@@ -208,6 +208,7 @@ members = [
     "third_party/move/tools/move-unit-test",
     "types",
     "vm-validator",
+    "third_party/move/tools/move-mv-llvm-compiler",
 ]
 
 exclude = ["crates/aptos-protos"]

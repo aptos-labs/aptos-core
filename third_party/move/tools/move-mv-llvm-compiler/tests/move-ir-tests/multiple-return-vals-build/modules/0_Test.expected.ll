@@ -1,7 +1,5 @@
 ; ModuleID = '0x100__Test'
 source_filename = "<unknown>"
-target datalayout = "e-m:e-p:64:64-i64:64-n32:64-S128"
-target triple = "sbf-solana-solana"
 
 declare i32 @memcmp(ptr, ptr, i64)
 
@@ -29,11 +27,11 @@ entry:
   %load_store_tmp = load ptr, ptr %local_0, align 8
   store ptr %load_store_tmp, ptr %local_1, align 8
   store i8 8, ptr %local_2, align 1
-  store i128 128, ptr %local_3, align 8
+  store i128 128, ptr %local_3, align 4
   store i32 32, ptr %local_4, align 4
   %rv.0 = load ptr, ptr %local_1, align 8
   %rv.1 = load i8, ptr %local_2, align 1
-  %rv.2 = load i128, ptr %local_3, align 8
+  %rv.2 = load i128, ptr %local_3, align 4
   %rv.3 = load i32, ptr %local_4, align 4
   %insert_0 = insertvalue { ptr, i8, i128, i32 } undef, ptr %rv.0, 0
   %insert_1 = insertvalue { ptr, i8, i128, i32 } %insert_0, i8 %rv.1, 1
@@ -75,9 +73,9 @@ entry:
   %local_11 = alloca i8, align 1
   %local_12 = alloca i128, align 8
   %local_13 = alloca i32, align 4
-  store i64 0, ptr %local_4, align 8
-  %load_store_tmp = load i64, ptr %local_4, align 8
-  store i64 %load_store_tmp, ptr %local_0, align 8
+  store i64 0, ptr %local_4, align 4
+  %load_store_tmp = load i64, ptr %local_4, align 4
+  store i64 %load_store_tmp, ptr %local_0, align 4
   store ptr %local_0, ptr %local_5, align 8
   %call_arg_0 = load ptr, ptr %local_5, align 8
   %retval = call { ptr, i8, i128, i32 } @Test__ret_4vals(ptr %call_arg_0)
@@ -87,21 +85,21 @@ entry:
   %extract_3 = extractvalue { ptr, i8, i128, i32 } %retval, 3
   store ptr %extract_0, ptr %local_6, align 8
   store i8 %extract_1, ptr %local_7, align 1
-  store i128 %extract_2, ptr %local_8, align 8
+  store i128 %extract_2, ptr %local_8, align 4
   store i32 %extract_3, ptr %local_9, align 4
   %load_store_tmp1 = load i32, ptr %local_9, align 4
   store i32 %load_store_tmp1, ptr %local_3, align 4
-  %load_store_tmp2 = load i128, ptr %local_8, align 8
-  store i128 %load_store_tmp2, ptr %local_2, align 8
+  %load_store_tmp2 = load i128, ptr %local_8, align 4
+  store i128 %load_store_tmp2, ptr %local_2, align 4
   %load_store_tmp3 = load i8, ptr %local_7, align 1
   store i8 %load_store_tmp3, ptr %local_1, align 1
   %load_deref_store_tmp1 = load ptr, ptr %local_6, align 8
-  %load_deref_store_tmp2 = load i64, ptr %load_deref_store_tmp1, align 8
-  store i64 %load_deref_store_tmp2, ptr %local_10, align 8
+  %load_deref_store_tmp2 = load i64, ptr %load_deref_store_tmp1, align 4
+  store i64 %load_deref_store_tmp2, ptr %local_10, align 4
   %load_store_tmp4 = load i8, ptr %local_1, align 1
   store i8 %load_store_tmp4, ptr %local_11, align 1
-  %load_store_tmp5 = load i128, ptr %local_2, align 8
-  store i128 %load_store_tmp5, ptr %local_12, align 8
+  %load_store_tmp5 = load i128, ptr %local_2, align 4
+  store i128 %load_store_tmp5, ptr %local_12, align 4
   %load_store_tmp6 = load i32, ptr %local_3, align 4
   store i32 %load_store_tmp6, ptr %local_13, align 4
   ret void

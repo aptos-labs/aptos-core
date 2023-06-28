@@ -188,17 +188,14 @@ impl Context {
         }
     }
 
-    pub fn abi_size_of_type(&self, data_layout: TargetData, ty: Type) -> usize {
-        unsafe { LLVMABISizeOfType(data_layout.0, ty.0) as usize }
+    pub fn abi_size_of_type(&self, data_layout: LLVMTargetDataRef, ty: Type) -> usize {
+        unsafe { LLVMABISizeOfType(data_layout, ty.0) as usize }
     }
 
-    pub fn abi_alignment_of_type(&self, data_layout: TargetData, ty: Type) -> usize {
-        unsafe { LLVMABIAlignmentOfType(data_layout.0, ty.0) as usize }
+    pub fn abi_alignment_of_type(&self, data_layout: LLVMTargetDataRef, ty: Type) -> usize {
+        unsafe { LLVMABIAlignmentOfType(data_layout, ty.0) as usize }
     }
 }
-
-#[derive(Copy, Clone)]
-pub struct TargetData(LLVMTargetDataRef);
 
 pub struct Module(LLVMModuleRef);
 
@@ -220,12 +217,6 @@ impl Module {
     pub fn set_target(&self, triple: &str) {
         unsafe {
             LLVMSetTarget(self.0, triple.cstr());
-        }
-    }
-
-    pub fn dump(&self) {
-        unsafe {
-            LLVMDumpModule(self.0);
         }
     }
 
@@ -305,12 +296,11 @@ impl Module {
         }
     }
 
-    pub fn get_module_data_layout(&self) -> TargetData {
-        use log::debug;
+    pub fn get_module_data_layout(&self) -> LLVMTargetDataRef {
         unsafe {
-            let dl = LLVMGetModuleDataLayout(self.0);
-            debug!(target: "dl", "\n{}", CStr::from_ptr(LLVMCopyStringRepOfTargetData(dl)).to_str().unwrap());
-            TargetData(dl)
+            // Ordinarily we'd call LLVMGetModuleDataLayout(self.0), but there is an existing
+            // defect elsewhere in setting up the data layout.
+            LLVMCreateTargetData("e-m:e-p:64:64-i64:64-n32:64-S128".cstr())
         }
     }
 
@@ -566,9 +556,9 @@ impl Builder {
         }
     }
 
-    pub fn build_cond_br(&self, cnd_reg: AnyValue, bb0: BasicBlock, bb1: BasicBlock) {
+    pub fn build_cond_br(&self, cnd_reg: LLVMValueRef, bb0: BasicBlock, bb1: BasicBlock) {
         unsafe {
-            LLVMBuildCondBr(self.0, cnd_reg.0, bb0.0, bb1.0);
+            LLVMBuildCondBr(self.0, cnd_reg, bb0.0, bb1.0);
         }
     }
 
@@ -579,8 +569,13 @@ impl Builder {
         }
     }
 
-    pub fn build_extract_value(&self, agg_val: AnyValue, index: u32, name: &str) -> AnyValue {
-        unsafe { AnyValue(LLVMBuildExtractValue(self.0, agg_val.0, index, name.cstr())) }
+    pub fn build_extract_value(
+        &self,
+        agg_val: LLVMValueRef,
+        index: u32,
+        name: &str,
+    ) -> LLVMValueRef {
+        unsafe { LLVMBuildExtractValue(self.0, agg_val, index, name.cstr()) }
     }
 
     // Build call to an intrinsic (use the 'types' parameter for overloaded intrinsics).
@@ -589,11 +584,11 @@ impl Builder {
         module: &Module,
         iname: &str,
         types: &[Type],
-        args: &[AnyValue],
+        args: &[LLVMValueRef],
         resname: &str,
-    ) -> AnyValue {
+    ) -> LLVMValueRef {
         let mut tys = types.iter().map(|ty| ty.0).collect::<Vec<_>>();
-        let mut args = args.iter().map(|arg| arg.0).collect::<Vec<_>>();
+        let mut args = args.to_vec();
 
         unsafe {
             let iid = LLVMLookupIntrinsicID(iname.cstr(), iname.len());
@@ -602,14 +597,14 @@ impl Builder {
 
             let cx = LLVMGetModuleContext(module.0);
             let fnty = LLVMIntrinsicGetType(cx, iid, tys.as_mut_ptr(), tys.len());
-            AnyValue(LLVMBuildCall2(
+            LLVMBuildCall2(
                 self.0,
                 fnty,
                 fv,
                 args.as_mut_ptr(),
                 args.len() as libc::c_uint,
                 resname.cstr(),
-            ))
+            )
         }
     }
 
@@ -721,8 +716,13 @@ impl Builder {
         unsafe { AnyValue(LLVMBuildLoad2(self.0, ty.0, src0_reg.0, name.cstr())) }
     }
 
-    pub fn build_load_from_valref(&self, ty: Type, src0_reg: AnyValue, name: &str) -> AnyValue {
-        unsafe { AnyValue(LLVMBuildLoad2(self.0, ty.0, src0_reg.0, name.cstr())) }
+    pub fn build_load_from_valref(
+        &self,
+        ty: Type,
+        src0_reg: LLVMValueRef,
+        name: &str,
+    ) -> LLVMValueRef {
+        unsafe { LLVMBuildLoad2(self.0, ty.0, src0_reg, name.cstr()) }
     }
 
     pub fn build_load_global_const(&self, gval: Global) -> Constant {
@@ -732,9 +732,9 @@ impl Builder {
         }
     }
 
-    pub fn build_store(&self, dst_reg: AnyValue, dst: Alloca) {
+    pub fn build_store(&self, dst_reg: LLVMValueRef, dst: Alloca) {
         unsafe {
-            LLVMBuildStore(self.0, dst_reg.0, dst.0);
+            LLVMBuildStore(self.0, dst_reg, dst.0);
         }
     }
 
@@ -752,30 +752,35 @@ impl Builder {
     pub fn build_binop(
         &self,
         op: LLVMOpcode,
-        lhs: AnyValue,
-        rhs: AnyValue,
+        lhs: LLVMValueRef,
+        rhs: LLVMValueRef,
         name: &str,
-    ) -> AnyValue {
-        unsafe { AnyValue(LLVMBuildBinOp(self.0, op, lhs.0, rhs.0, name.cstr())) }
+    ) -> LLVMValueRef {
+        unsafe { LLVMBuildBinOp(self.0, op, lhs, rhs, name.cstr()) }
     }
     pub fn build_compare(
         &self,
         pred: LLVMIntPredicate,
-        lhs: AnyValue,
-        rhs: AnyValue,
+        lhs: LLVMValueRef,
+        rhs: LLVMValueRef,
         name: &str,
-    ) -> AnyValue {
-        unsafe { AnyValue(LLVMBuildICmp(self.0, pred, lhs.0, rhs.0, name.cstr())) }
+    ) -> LLVMValueRef {
+        unsafe { LLVMBuildICmp(self.0, pred, lhs, rhs, name.cstr()) }
     }
     #[allow(dead_code)]
-    pub fn build_unary_bitcast(&self, val: AnyValue, dest_ty: Type, name: &str) -> AnyValue {
-        unsafe { AnyValue(LLVMBuildBitCast(self.0, val.0, dest_ty.0, name.cstr())) }
+    pub fn build_unary_bitcast(
+        &self,
+        val: LLVMValueRef,
+        dest_ty: LLVMTypeRef,
+        name: &str,
+    ) -> LLVMValueRef {
+        unsafe { LLVMBuildBitCast(self.0, val, dest_ty, name.cstr()) }
     }
-    pub fn build_zext(&self, val: AnyValue, dest_ty: Type, name: &str) -> AnyValue {
-        unsafe { AnyValue(LLVMBuildZExt(self.0, val.0, dest_ty.0, name.cstr())) }
+    pub fn build_zext(&self, val: LLVMValueRef, dest_ty: LLVMTypeRef, name: &str) -> LLVMValueRef {
+        unsafe { LLVMBuildZExt(self.0, val, dest_ty, name.cstr()) }
     }
-    pub fn build_trunc(&self, val: AnyValue, dest_ty: Type, name: &str) -> AnyValue {
-        unsafe { AnyValue(LLVMBuildTrunc(self.0, val.0, dest_ty.0, name.cstr())) }
+    pub fn build_trunc(&self, val: LLVMValueRef, dest_ty: LLVMTypeRef, name: &str) -> LLVMValueRef {
+        unsafe { LLVMBuildTrunc(self.0, val, dest_ty, name.cstr()) }
     }
 
     pub fn wrap_as_any_value(&self, val: LLVMValueRef) -> AnyValue {
@@ -822,15 +827,15 @@ impl Type {
         }
     }
 
-    pub fn dump_properties_to_str(&self, data_layout: TargetData) -> String {
+    pub fn dump_properties_to_str(&self, data_layout: LLVMTargetDataRef) -> String {
         unsafe {
             let ty = self.0;
             let s = &format!(
                 "StoreSizeOfType: {}\nABISizeOfType: {}\nABIAlignmnetOfType: {}\nSizeOfTypeInBits: {}\n",
-                LLVMStoreSizeOfType(data_layout.0, ty) as u32,
-                LLVMABISizeOfType(data_layout.0, ty) as u32,
-                LLVMABIAlignmentOfType(data_layout.0, ty),
-                LLVMSizeOfTypeInBits(data_layout.0, ty) as u32,
+                LLVMStoreSizeOfType(data_layout, ty) as u32,
+                LLVMABISizeOfType(data_layout, ty) as u32,
+                LLVMABIAlignmentOfType(data_layout, ty),
+                LLVMSizeOfTypeInBits(data_layout, ty) as u32,
             );
             s.to_string()
         }
@@ -880,8 +885,8 @@ impl StructType {
         unsafe { Type(LLVMStructGetTypeAtIndex(self.0, idx as libc::c_uint)) }
     }
 
-    pub fn offset_of_element(&self, data_layout: TargetData, idx: usize) -> usize {
-        unsafe { LLVMOffsetOfElement(data_layout.0, self.0, idx as libc::c_uint) as usize }
+    pub fn offset_of_element(&self, data_layout: LLVMTargetDataRef, idx: usize) -> usize {
+        unsafe { LLVMOffsetOfElement(data_layout, self.0, idx as libc::c_uint) as usize }
     }
 
     pub fn dump(&self) {

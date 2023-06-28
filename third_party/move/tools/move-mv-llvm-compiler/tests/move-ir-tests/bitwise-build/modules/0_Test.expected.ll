@@ -1,7 +1,5 @@
 ; ModuleID = '0x100__Test'
 source_filename = "<unknown>"
-target datalayout = "e-m:e-p:64:64-i64:64-n32:64-S128"
-target triple = "sbf-solana-solana"
 
 declare i32 @memcmp(ptr, ptr, i64)
 
@@ -54,13 +52,13 @@ entry:
   %local_2 = alloca i128, align 8
   %local_3 = alloca i8, align 1
   %local_4 = alloca i128, align 8
-  store i128 %0, ptr %local_0, align 8
+  store i128 %0, ptr %local_0, align 4
   store i8 %1, ptr %local_1, align 1
-  %load_store_tmp = load i128, ptr %local_0, align 8
-  store i128 %load_store_tmp, ptr %local_2, align 8
+  %load_store_tmp = load i128, ptr %local_0, align 4
+  store i128 %load_store_tmp, ptr %local_2, align 4
   %load_store_tmp1 = load i8, ptr %local_1, align 1
   store i8 %load_store_tmp1, ptr %local_3, align 1
-  %shl_src_0 = load i128, ptr %local_2, align 8
+  %shl_src_0 = load i128, ptr %local_2, align 4
   %shl_src_1 = load i8, ptr %local_3, align 1
   %rangecond = icmp uge i8 %shl_src_1, -128
   br i1 %rangecond, label %then_bb, label %join_bb
@@ -72,8 +70,8 @@ then_bb:                                          ; preds = %entry
 join_bb:                                          ; preds = %entry
   %zext_dst = zext i8 %shl_src_1 to i128
   %shl_dst = shl i128 %shl_src_0, %zext_dst
-  store i128 %shl_dst, ptr %local_4, align 8
-  %retval = load i128, ptr %local_4, align 8
+  store i128 %shl_dst, ptr %local_4, align 4
+  %retval = load i128, ptr %local_4, align 4
   ret i128 %retval
 }
 
@@ -114,13 +112,13 @@ entry:
   %local_2 = alloca i64, align 8
   %local_3 = alloca i8, align 1
   %local_4 = alloca i64, align 8
-  store i64 %0, ptr %local_0, align 8
+  store i64 %0, ptr %local_0, align 4
   store i8 %1, ptr %local_1, align 1
-  %load_store_tmp = load i64, ptr %local_0, align 8
-  store i64 %load_store_tmp, ptr %local_2, align 8
+  %load_store_tmp = load i64, ptr %local_0, align 4
+  store i64 %load_store_tmp, ptr %local_2, align 4
   %load_store_tmp1 = load i8, ptr %local_1, align 1
   store i8 %load_store_tmp1, ptr %local_3, align 1
-  %shl_src_0 = load i64, ptr %local_2, align 8
+  %shl_src_0 = load i64, ptr %local_2, align 4
   %shl_src_1 = load i8, ptr %local_3, align 1
   %rangecond = icmp uge i8 %shl_src_1, 64
   br i1 %rangecond, label %then_bb, label %join_bb
@@ -132,8 +130,8 @@ then_bb:                                          ; preds = %entry
 join_bb:                                          ; preds = %entry
   %zext_dst = zext i8 %shl_src_1 to i64
   %shl_dst = shl i64 %shl_src_0, %zext_dst
-  store i64 %shl_dst, ptr %local_4, align 8
-  %retval = load i64, ptr %local_4, align 8
+  store i64 %shl_dst, ptr %local_4, align 4
+  %retval = load i64, ptr %local_4, align 4
   ret i64 %retval
 }
 
@@ -173,13 +171,13 @@ entry:
   %local_2 = alloca i128, align 8
   %local_3 = alloca i8, align 1
   %local_4 = alloca i128, align 8
-  store i128 %0, ptr %local_0, align 8
+  store i128 %0, ptr %local_0, align 4
   store i8 %1, ptr %local_1, align 1
-  %load_store_tmp = load i128, ptr %local_0, align 8
-  store i128 %load_store_tmp, ptr %local_2, align 8
+  %load_store_tmp = load i128, ptr %local_0, align 4
+  store i128 %load_store_tmp, ptr %local_2, align 4
   %load_store_tmp1 = load i8, ptr %local_1, align 1
   store i8 %load_store_tmp1, ptr %local_3, align 1
-  %shr_src_0 = load i128, ptr %local_2, align 8
+  %shr_src_0 = load i128, ptr %local_2, align 4
   %shr_src_1 = load i8, ptr %local_3, align 1
   %rangecond = icmp uge i8 %shr_src_1, -128
   br i1 %rangecond, label %then_bb, label %join_bb
@@ -191,8 +189,8 @@ then_bb:                                          ; preds = %entry
 join_bb:                                          ; preds = %entry
   %zext_dst = zext i8 %shr_src_1 to i128
   %shr_dst = lshr i128 %shr_src_0, %zext_dst
-  store i128 %shr_dst, ptr %local_4, align 8
-  %retval = load i128, ptr %local_4, align 8
+  store i128 %shr_dst, ptr %local_4, align 4
+  %retval = load i128, ptr %local_4, align 4
   ret i128 %retval
 }
 
@@ -233,13 +231,13 @@ entry:
   %local_2 = alloca i64, align 8
   %local_3 = alloca i8, align 1
   %local_4 = alloca i64, align 8
-  store i64 %0, ptr %local_0, align 8
+  store i64 %0, ptr %local_0, align 4
   store i8 %1, ptr %local_1, align 1
-  %load_store_tmp = load i64, ptr %local_0, align 8
-  store i64 %load_store_tmp, ptr %local_2, align 8
+  %load_store_tmp = load i64, ptr %local_0, align 4
+  store i64 %load_store_tmp, ptr %local_2, align 4
   %load_store_tmp1 = load i8, ptr %local_1, align 1
   store i8 %load_store_tmp1, ptr %local_3, align 1
-  %shr_src_0 = load i64, ptr %local_2, align 8
+  %shr_src_0 = load i64, ptr %local_2, align 4
   %shr_src_1 = load i8, ptr %local_3, align 1
   %rangecond = icmp uge i8 %shr_src_1, 64
   br i1 %rangecond, label %then_bb, label %join_bb
@@ -251,8 +249,8 @@ then_bb:                                          ; preds = %entry
 join_bb:                                          ; preds = %entry
   %zext_dst = zext i8 %shr_src_1 to i64
   %shr_dst = lshr i64 %shr_src_0, %zext_dst
-  store i64 %shr_dst, ptr %local_4, align 8
-  %retval = load i64, ptr %local_4, align 8
+  store i64 %shr_dst, ptr %local_4, align 4
+  %retval = load i64, ptr %local_4, align 4
   ret i64 %retval
 }
 

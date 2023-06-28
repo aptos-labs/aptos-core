@@ -1,7 +1,5 @@
 ; ModuleID = '0x100__M3'
 source_filename = "<unknown>"
-target datalayout = "e-m:e-p:64:64-i64:64-n32:64-S128"
-target triple = "sbf-solana-solana"
 
 @acct.addr = internal constant [32 x i8] c"\1F\1E\1D\1C\1B\1A\19\18\17\16\15\14\13\12\11\10\0F\0E\0D\0C\0B\0A\09\08\07\06\05\04\03\02\01\00"
 

@@ -28,8 +28,12 @@ pub struct Args {
     pub is_script: bool,
 
     /// The path to the move bytecode file to compile.
-    #[clap(short = 'b', long = "bytecode")]
-    pub bytecode_file_path: String,
+    // #[clap(short = 'b', long = "bytecode")]
+    // pub bytecode_file_path: String,
+
+    /// The path to the move source file to compile.
+    #[clap(short = 'm', long = "move")]
+    pub move_file_path: String,
 
     /// Bytecode dependencies, sorted.
     #[clap(short = 'd', long = "deps")]

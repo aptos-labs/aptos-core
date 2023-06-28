@@ -1,7 +1,5 @@
 ; ModuleID = '0x100__Test'
 source_filename = "<unknown>"
-target datalayout = "e-m:e-p:64:64-i64:64-n32:64-S128"
-target triple = "sbf-solana-solana"
 
 declare i32 @memcmp(ptr, ptr, i64)
 
@@ -66,8 +64,8 @@ bb_1:                                             ; preds = %entry
   br label %bb_2
 
 bb_0:                                             ; preds = %entry
-  store i64 10, ptr %local_7, align 8
-  %call_arg_02 = load i64, ptr %local_7, align 8
+  store i64 10, ptr %local_7, align 4
+  %call_arg_02 = load i64, ptr %local_7, align 4
   call void @move_rt_abort(i64 %call_arg_02)
   unreachable
 

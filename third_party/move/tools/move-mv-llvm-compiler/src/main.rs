@@ -21,99 +21,23 @@ use move_ir_types::location::Spanned;
 use move_mv_llvm_compiler::{cli::Args, disassembler::Disassembler};
 use std::{fs, path::Path};
 
+use move_model::model::{FunId, FunctionData, GlobalEnv, Loc, ModuleData, ModuleId, StructId};
+use move_binary_format::file_format::{FunctionDefinitionIndex, StructDefinitionIndex};
+use move_binary_format::access::ModuleAccess;
+
+use move_model::ast::Spec;
+use move_model::model;
+use move_core_types::account_address::{AccountAddress};
+use std::collections::BTreeMap;
+use move_model::{run_model_builder, model::StructData};
+use move_model::ast::{ModuleName, SpecVarDecl, SpecFunDecl};
+
+use move_compiler::shared::PackagePaths;
+
+use move_symbol_pool::Symbol as MoveSymbol;
+
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-
-    let move_extension = MOVE_EXTENSION;
-    let mv_bytecode_extension = MOVE_COMPILED_EXTENSION;
-    let source_map_extension = SOURCE_MAP_EXTENSION;
-
-    let source_path = Path::new(&args.bytecode_file_path);
-    let extension = source_path
-        .extension()
-        .context("Missing file extension for bytecode file")?;
-    if extension != mv_bytecode_extension {
-        anyhow::bail!(
-            "Bad source file extension {:?}; expected {}",
-            extension,
-            mv_bytecode_extension
-        );
-    }
-
-    let bytecode_bytes =
-        fs::read(&args.bytecode_file_path).context("Unable to read bytecode file")?;
-
-    let mut dep_bytecode_bytes = vec![];
-    for dep in &args.bytecode_dependency_paths {
-        let bytes = fs::read(dep).context("Unable to read dependency bytecode file {dep}")?;
-        dep_bytecode_bytes.push(bytes);
-    }
-
-    let source_path = Path::new(&args.bytecode_file_path).with_extension(move_extension);
-    let source = fs::read_to_string(&source_path).ok();
-    let source_map = source_map_from_file(
-        &Path::new(&args.bytecode_file_path).with_extension(source_map_extension),
-    );
-
-    let no_loc = Spanned::unsafe_no_loc(()).loc;
-    let module: CompiledModule;
-    let script: CompiledScript;
-    let bytecode = if args.is_script {
-        script = CompiledScript::deserialize(&bytecode_bytes)
-            .context("Script blob can't be deserialized")?;
-        BinaryIndexedView::Script(&script)
-    } else {
-        module = CompiledModule::deserialize(&bytecode_bytes)
-            .context("Module blob can't be deserialized")?;
-        BinaryIndexedView::Module(&module)
-    };
-
-    let mut source_mapping = {
-        if let Ok(s) = source_map {
-            SourceMapping::new(s, bytecode)
-        } else {
-            SourceMapping::new_from_view(bytecode, no_loc)
-                .context("Unable to build dummy source mapping")?
-        }
-    };
-
-    if let Some(source_code) = source {
-        source_mapping.with_source_code((source_path.to_str().unwrap().to_string(), source_code));
-    }
-
-    let model_env = {
-        let main_move_module = if args.is_script {
-            let script = CompiledScript::deserialize(&bytecode_bytes)
-                .context("Script blob can't be deserialized")?;
-            move_model::script_into_module(script)
-        } else {
-            CompiledModule::deserialize(&bytecode_bytes)
-                .context("Module blob can't be deserialized")?
-        };
-
-        let mut dep_move_modules = vec![];
-
-        for bytes in &dep_bytecode_bytes {
-            let dep_module = CompiledModule::deserialize(bytes)
-                .context("Dependency module blob can't be deserialized")?;
-            dep_move_modules.push(dep_module);
-        }
-
-        let modules = dep_move_modules
-            .into_iter()
-            .chain(Some(main_move_module))
-            .collect::<Vec<_>>();
-
-        move_model::run_bytecode_model_builder(&modules)?
-    };
-
-    // let llvm_context = unsafe { LLVMContextCreate() };
-
-    // let move_module = model_env.get_modules().next().expect("module");
-    // let mut disassembler = Disassembler::new(source_mapping, move_module, llvm_context);
-    // let module = disassembler.disassemble()
-    //    .context("Failed to disassemble bytecode")?;
-    // disassembler.llvm_write_to_file(module, args.llvm_ir, &args.output_file_path)?;
 
     if args.llvm_ir && args.obj {
         anyhow::bail!("can't output both LLVM IR (-S) and object file (-O)");
@@ -129,32 +53,74 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    {
-        use move_mv_llvm_compiler::stackless::{Target, *};
+    let move_extension = MOVE_EXTENSION;
+    let mv_bytecode_extension = MOVE_COMPILED_EXTENSION;
+    let source_map_extension = SOURCE_MAP_EXTENSION;
 
-        let tgt_platform = TargetPlatform::Solana;
-        tgt_platform.initialize_llvm();
-        let lltarget = Target::from_triple(tgt_platform.triple())?;
-        let llmachine = lltarget.create_target_machine(
-            tgt_platform.triple(),
-            tgt_platform.llvm_cpu(),
-            tgt_platform.llvm_features(),
+    let move_path = Path::new(&args.move_file_path);
+    let extension= move_path
+        .extension()
+        .context("Missing file extension for bytecode file")?;
+    if extension != move_extension {
+        anyhow::bail!(
+            "Bad source file extension {:?}; expected {}",
+            extension,
+            move_extension
         );
-        let mod_id = model_env
+    }
+
+    let targets = vec![PackagePaths {
+        name: None,
+        paths: vec![move_path.to_str().unwrap().to_string()],
+        named_address_map: std::collections::BTreeMap::<String, _>::new(),
+    }];
+
+    let global_env = run_model_builder(targets, vec![])?;
+
+/*
+    {
+        use move_mv_llvm_compiler::stackless::*;
+
+        let mod_id = global_env
             .get_modules()
             .last()
             .map(|m| m.get_id())
             .expect(".");
-        let global_cx = GlobalContext::new(&model_env, tgt_platform, &llmachine);
+        let global_cx = GlobalContext::new(&global_env, Target::Solana);
         let mod_cx = global_cx.create_module_context(mod_id, &args);
         let mut llmod = mod_cx.translate();
         if !args.obj {
             llvm_write_to_file(llmod.as_mut(), args.llvm_ir, &args.output_file_path)?;
             drop(llmod);
         } else {
-            write_object_file(llmod, &llmachine, &args.output_file_path)?;
+            write_object_file(llmod, Target::Solana, &args.output_file_path)?;
         }
 
+        // NB: context must outlive llvm module
+        // fixme this should be handled with lifetimes
+        drop(global_cx);
+    };
+*/
+    {
+        use move_mv_llvm_compiler::stackless::*;
+        let global_cx = GlobalContext::new(&global_env, Target::Solana);
+
+        let num_modules = global_env.get_module_count();
+        println!("Program {} generated {} {}", &args.move_file_path, num_modules,
+            if num_modules > 1 {"modules".to_string()} else {"module".to_string()});
+
+        for mod_id in global_env
+            .get_modules()
+            .map(|m| m.get_id()) {
+                let mod_cx = global_cx.create_module_context(mod_id, &args);
+                let mut llmod = mod_cx.translate();
+                if !args.obj {
+                    llvm_write_to_file(llmod.as_mut(), args.llvm_ir, &args.output_file_path)?;
+                    drop(llmod);
+                } else {
+                    write_object_file(llmod, Target::Solana, &args.output_file_path)?;
+                }
+        }
         // NB: context must outlive llvm module
         // fixme this should be handled with lifetimes
         drop(global_cx);
@@ -162,6 +128,7 @@ fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
 
 fn llvm_write_to_file(
     module: LLVMModuleRef,

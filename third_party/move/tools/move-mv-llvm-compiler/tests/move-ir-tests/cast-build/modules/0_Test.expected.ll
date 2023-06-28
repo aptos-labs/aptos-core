@@ -1,7 +1,5 @@
 ; ModuleID = '0x100__Test'
 source_filename = "<unknown>"
-target datalayout = "e-m:e-p:64:64-i64:64-n32:64-S128"
-target triple = "sbf-solana-solana"
 
 declare i32 @memcmp(ptr, ptr, i64)
 
@@ -30,8 +28,8 @@ entry:
   store i8 %load_store_tmp, ptr %local_1, align 1
   %cast_src = load i8, ptr %local_1, align 1
   %zext_dst = zext i8 %cast_src to i64
-  store i64 %zext_dst, ptr %local_2, align 8
-  %retval = load i64, ptr %local_2, align 8
+  store i64 %zext_dst, ptr %local_2, align 4
+  %retval = load i64, ptr %local_2, align 4
   ret i64 %retval
 }
 

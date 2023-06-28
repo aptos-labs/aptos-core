@@ -28,6 +28,7 @@ move-compiler = { path = "../../move-compiler" }
 move-model = { path = "../../move-model" }
 move-native = { path = "../../move-native" }
 move-stackless-bytecode = { path = "../../move-prover/bytecode" }
+move-symbol-pool = { path = "../../move-symbol-pool" }
 
 clap = { version = "3.1.8", features = ["derive"] }
 #inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm14-0"] }
