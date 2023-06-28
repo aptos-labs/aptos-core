@@ -776,7 +776,7 @@ dependencies = [
  "ark-serialize",
  "ark-std",
  "bcs 0.1.4",
- "bitvec 0.19.6",
+ "bitvec 1.0.1",
  "blake2",
  "blake2-rfc",
  "blst",
@@ -2878,7 +2878,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-metrics-core",
  "aptos-types",
- "bitvec 0.19.6",
+ "bitvec 1.0.1",
  "criterion",
  "itertools",
  "jemallocator",
@@ -4395,18 +4395,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "031043d04099746d8db04daf1fa424b2bc8bd69d92b25962dcde24da39ab64a2"
 dependencies = [
  "typenum",
-]
-
-[[package]]
-name = "bitvec"
-version = "0.19.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55f93d0ef3363c364d5976646a38f04cf67cfe1d4c8d160cdea02cab2c116b33"
-dependencies = [
- "funty 1.1.0",
- "radium 0.5.3",
- "tap",
- "wyz 0.2.0",
 ]
 
 [[package]]
@@ -10427,12 +10415,6 @@ dependencies = [
  "parking_lot 0.12.1",
  "scheduled-thread-pool",
 ]
-
-[[package]]
-name = "radium"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "941ba9d78d8e2f7ce474c015eea4d9c6d25b6a3327f9832ee29a4de27f91bbb8"
 
 [[package]]
 name = "radium"
