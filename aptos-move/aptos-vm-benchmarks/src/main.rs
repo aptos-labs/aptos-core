@@ -34,6 +34,7 @@ fn main() {
     let mut executor = executor.set_not_parallel();
 
     //// Go over all Move projects
+    //// TODO: refactor logic into separate components
     for dir in dirs {
         let entry = dir.unwrap();
         if !entry.path().is_dir() {
