@@ -209,4 +209,23 @@ impl FileStoreOperator for LocalFileStoreOperator {
 
         Ok(())
     }
+
+    async fn get_or_create_verification_metadata(
+        &self,
+        _chain_id: u64,
+    ) -> Result<VerificationMetadata> {
+        anyhow::bail!("Verification is not impelemented for local file store.")
+    }
+
+    async fn update_verification_metadata(
+        &mut self,
+        _chain_id: u64,
+        _next_version_to_verify: u64,
+    ) -> Result<()> {
+        anyhow::bail!("Verification is not impelemented for local file store.")
+    }
+
+    async fn get_raw_transactions(&self, _version: u64) -> anyhow::Result<TransactionsFile> {
+        anyhow::bail!("Unimplemented");
+    }
 }
