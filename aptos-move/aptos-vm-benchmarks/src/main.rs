@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod helper;
 use aptos::move_tool::MemberId;
-use aptos_cached_packages::aptos_stdlib;
-use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_framework::BuildOptions;
+use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use clap::Parser;
@@ -14,67 +15,6 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 const PREFIX: &str = "benchmark";
-
-//// generate a TransactionPayload for modules
-fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
-    // publish package similar to create_publish_package in harness.rs
-    let code = package.extract_code();
-    let metadata = package
-        .extract_metadata()
-        .expect("extracting package metadata must succeed");
-    aptos_stdlib::code_publish_package_txn(
-        bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
-        code,
-    )
-}
-
-//// generate a TransactionPayload for entry functions
-fn generate_entry_fun_payloads(
-    account: &Account,
-    package_name: &str,
-    func_name: &str,
-) -> TransactionPayload {
-    let MemberId {
-        module_id,
-        member_id: function_id,
-    } = str::parse(&format!(
-        "0x{}::{}::{}",
-        *account.address(),
-        package_name,
-        func_name,
-    ))
-    .unwrap();
-    TransactionPayload::EntryFunction(EntryFunction::new(module_id, function_id, vec![], vec![]))
-}
-
-//// sign transaction and return transaction status
-fn sign_module_txn(
-    executor: &mut FakeExecutor,
-    account: &Account,
-    payload: TransactionPayload,
-    sequence_number: u64,
-) {
-    let sign_tx = account
-        .transaction()
-        .sequence_number(sequence_number)
-        .max_gas_amount(2_000_000)
-        .gas_unit_price(200)
-        .payload(payload)
-        .sign();
-
-    // Restart timer and sequence counter for each new package
-    // only count running time of entry function
-    let start = Instant::now();
-    let txn_output = executor.execute_transaction(sign_tx);
-    // apply write set to avoid LINKER_ERROR
-    executor.apply_write_set(txn_output.write_set());
-    let elapsed = start.elapsed();
-    println!("running time (microseconds): {}", elapsed.as_micros());
-
-    let txn_status = txn_output.status().to_owned();
-    assert!(txn_output.status().status().unwrap().is_success());
-    println!("txn status: {:?}", txn_status);
-}
 
 fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
     let start = Instant::now();
@@ -196,9 +136,9 @@ fn main() {
                 );
 
                 // publish package similar to create_publish_package in harness.rs
-                let module_payload = generate_module_payload(&package);
+                let module_payload = helper::generate_module_payload(&package);
                 print!("Signing txn for module... ");
-                sign_module_txn(
+                helper::sign_module_txn(
                     &mut executor,
                     &creator,
                     module_payload,
