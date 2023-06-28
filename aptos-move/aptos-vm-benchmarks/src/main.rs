@@ -77,14 +77,14 @@ fn sign_txn(
 
 #[derive(Parser, Debug)]
 struct Cli {
+    #[clap(default_value = "")]
     pattern: String,
 }
 
 fn main() {
     //// Implement CLI
     let args = Cli::parse();
-    let mut pattern = String::new();
-    pattern.push_str(&args.pattern.as_str());
+    let pattern = &args.pattern;
 
     //// Discover all top-level packages in samples directory
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples");
@@ -162,7 +162,7 @@ fn main() {
                 fully_qualified_path.push_str(identifier);
                 fully_qualified_path.push_str("::");
                 fully_qualified_path.push_str(func_name);
-                if !fully_qualified_path.contains(&pattern) && !pattern.is_empty() {
+                if !fully_qualified_path.contains(pattern) && !pattern.is_empty() {
                     continue;
                 }
 
