@@ -107,7 +107,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
     // entry function should not return
     if !func.return_.is_empty() {
-        return Err(VMStatus::Error(
+        return Err(VMStatus::error(
             StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
             None,
         ));
@@ -135,7 +135,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
             allowed_structs,
         );
         if !valid {
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
                 None,
             ));
@@ -143,7 +143,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     }
 
     if (signer_param_cnt + args.len()) != func.parameters.len() {
-        return Err(VMStatus::Error(
+        return Err(VMStatus::error(
             StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
             None,
         ));
@@ -154,7 +154,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     // moving on to the validation of non-signer args.
     // the number of txn senders should be the same number of signers
     if signer_param_cnt > 0 && senders.len() != signer_param_cnt {
-        return Err(VMStatus::Error(
+        return Err(VMStatus::error(
             StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
             None,
         ));
@@ -240,7 +240,7 @@ pub(crate) fn construct_args(
 }
 
 fn invalid_signature() -> VMStatus {
-    VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE, None)
+    VMStatus::error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE, None)
 }
 
 fn construct_arg(
@@ -270,7 +270,7 @@ fn construct_arg(
             // Check cursor has parsed everything
             // Unfortunately, is_empty is only enabled in nightly, so we check this way.
             if cursor.position() != arg.len() as u64 {
-                return Err(VMStatus::Error(
+                return Err(VMStatus::error(
                     StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
                     Some(String::from(
                         "The serialized arguments to constructor contained extra data",
@@ -369,7 +369,7 @@ fn validate_and_construct(
     max_invocations: &mut u64,
 ) -> Result<Vec<u8>, VMStatus> {
     if *max_invocations == 0 {
-        return Err(VMStatus::Error(
+        return Err(VMStatus::error(
             StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
             None,
         ));
@@ -391,7 +391,7 @@ fn validate_and_construct(
                     .finish(Location::Module(constructor.module_id.clone()))
                     .into_vm_status()
             } else {
-                VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None)
+                VMStatus::error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None)
             }
         };
         // short cut for the utf8 constructor, which is a special case
@@ -400,7 +400,7 @@ fn validate_and_construct(
         read_n_bytes(len, cursor, &mut arg)?;
         std::str::from_utf8(&arg).map_err(|_| constructor_error())?;
         return bcs::to_bytes(&arg)
-            .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None));
+            .map_err(|_| VMStatus::error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None));
     } else {
         *max_invocations -= 1;
     }
@@ -428,7 +428,7 @@ fn validate_and_construct(
         session.execute_instantiated_function(function, instantiation, args, gas_meter)?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
-    let deserialize_error = VMStatus::Error(
+    let deserialize_error = VMStatus::error(
         StatusCode::INTERNAL_TYPE_ERROR,
         Some(String::from("Constructor did not return value")),
     );
@@ -439,7 +439,7 @@ fn validate_and_construct(
 // Length of vectors in BCS uses uleb128 as a compression format.
 fn get_len(cursor: &mut Cursor<&[u8]>) -> Result<usize, VMStatus> {
     match read_uleb128_as_u64(cursor) {
-        Err(_) => Err(VMStatus::Error(
+        Err(_) => Err(VMStatus::error(
             StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
             None,
         )),
@@ -460,7 +460,7 @@ fn read_n_bytes(n: usize, src: &mut Cursor<&[u8]>, dest: &mut Vec<u8>) -> Result
     let len = dest.len();
     dest.resize(len + n, 0);
     src.read_exact(&mut dest[len..]).map_err(|_| {
-        VMStatus::Error(
+        VMStatus::error(
             StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
             Some(String::from("Couldn't read bytes")),
         )

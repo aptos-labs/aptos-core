@@ -11,6 +11,7 @@ import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client"
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 import { HexString, MaybeHexString } from "../utils";
 import { getPropertyValueRaw, getSinglePropertyValueRaw } from "../utils/property_map_serde";
+import { FungibleAssetClient } from "./fungible_asset_client";
 
 export interface CreateCollectionOptions {
   royaltyNumerator?: number;
@@ -40,6 +41,22 @@ const PropertyTypeMap = {
 };
 
 export type PropertyType = keyof typeof PropertyTypeMap;
+
+type FungibleTokenParameters = {
+  owner: AptosAccount;
+  tokenAddress: MaybeHexString;
+  recipient: MaybeHexString;
+  amount: number | bigint;
+  extraArgs?: OptionalTransactionArgs;
+};
+
+type NonFungibleTokenParameters = {
+  owner: AptosAccount;
+  tokenAddress: MaybeHexString;
+  recipient: MaybeHexString;
+  tokenType?: string;
+  extraArgs?: OptionalTransactionArgs;
+};
 
 /**
  * Class for managing aptos_token
@@ -460,7 +477,7 @@ export class AptosToken {
   }
 
   /**
-   * Transfer a token ownership.
+   * Transfer a non fungible token ownership.
    * We can transfer a token only when the token is not frozen (i.e. owner transfer is not disabled such as for soul bound tokens)
    * @param owner The account of the current token owner
    * @param token Token address
@@ -474,7 +491,7 @@ export class AptosToken {
     tokenType?: string,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+    const builder = new TransactionBuilderRemoteABI(this.provider, {
       sender: owner.address(),
       ...extraArgs,
     });
@@ -484,7 +501,52 @@ export class AptosToken {
       [HexString.ensure(token).hex(), HexString.ensure(recipient).hex()],
     );
     const bcsTxn = AptosClient.generateBCSTransaction(owner, rawTxn);
-    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    const pendingTransaction = await this.provider.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
+  }
+
+  /**
+   * Transfer a token. This function supports transfer non-fungible token and fungible token.
+   *
+   * To set the token type, set isFungibleToken param to true or false.
+   * If isFungibleToken param is not set, the function would query Indexer
+   * for the token data and check whether it is a non-fungible or a fungible token.
+   *
+   * Note: this function supports only token v2 standard (it does not support the token v1 standard)
+   *
+   * @param data NonFungibleTokenParameters | FungibleTokenParameters type
+   * @param isFungibleToken (optional) The token type, non-fungible or fungible token.
+   * @returns The hash of the transaction submitted to the API
+   */
+  async transfer(
+    data: NonFungibleTokenParameters | FungibleTokenParameters,
+    isFungibleToken?: boolean | null,
+  ): Promise<string> {
+    let isFungible = isFungibleToken;
+    if (isFungible === undefined || isFungible === null) {
+      const tokenData = await this.provider.getTokenData(HexString.ensure(data.tokenAddress).hex());
+      isFungible = tokenData.current_token_datas_v2[0].is_fungible_v2;
+    }
+    if (isFungible) {
+      const token = data as FungibleTokenParameters;
+      const fungibleAsset = new FungibleAssetClient(this.provider);
+      const txnHash = await fungibleAsset.transfer(
+        token.owner,
+        token.tokenAddress,
+        token.recipient,
+        token.amount,
+        token.extraArgs,
+      );
+      return txnHash;
+    }
+    const token = data as NonFungibleTokenParameters;
+    const txnHash = await this.transferTokenOwnership(
+      token.owner,
+      token.tokenAddress,
+      token.recipient,
+      token.tokenType,
+      token.extraArgs,
+    );
+    return txnHash;
   }
 }

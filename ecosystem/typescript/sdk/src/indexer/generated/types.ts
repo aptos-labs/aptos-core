@@ -3677,6 +3677,7 @@ export enum Order_By {
 export type Processor_Status = {
   __typename?: 'processor_status';
   last_success_version: Scalars['bigint'];
+  last_updated: Scalars['timestamp'];
   processor: Scalars['String'];
 };
 
@@ -3686,12 +3687,14 @@ export type Processor_Status_Bool_Exp = {
   _not?: InputMaybe<Processor_Status_Bool_Exp>;
   _or?: InputMaybe<Array<Processor_Status_Bool_Exp>>;
   last_success_version?: InputMaybe<Bigint_Comparison_Exp>;
+  last_updated?: InputMaybe<Timestamp_Comparison_Exp>;
   processor?: InputMaybe<String_Comparison_Exp>;
 };
 
 /** Ordering options when selecting data from "processor_status". */
 export type Processor_Status_Order_By = {
   last_success_version?: InputMaybe<Order_By>;
+  last_updated?: InputMaybe<Order_By>;
   processor?: InputMaybe<Order_By>;
 };
 
@@ -3699,6 +3702,8 @@ export type Processor_Status_Order_By = {
 export enum Processor_Status_Select_Column {
   /** column name */
   LastSuccessVersion = 'last_success_version',
+  /** column name */
+  LastUpdated = 'last_updated',
   /** column name */
   Processor = 'processor'
 }
@@ -3714,6 +3719,7 @@ export type Processor_Status_Stream_Cursor_Input = {
 /** Initial value of the column from where the streaming should start */
 export type Processor_Status_Stream_Cursor_Value_Input = {
   last_success_version?: InputMaybe<Scalars['bigint']>;
+  last_updated?: InputMaybe<Scalars['timestamp']>;
   processor?: InputMaybe<Scalars['String']>;
 };
 

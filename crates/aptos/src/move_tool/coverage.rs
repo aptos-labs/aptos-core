@@ -145,6 +145,7 @@ fn compile_coverage(
     move_options: MovePackageDir,
 ) -> CliTypedResult<(CoverageMap, CompiledPackage)> {
     let config = BuildConfig {
+        dev_mode: move_options.dev,
         additional_named_addresses: move_options.named_addresses(),
         test_mode: false,
         install_dir: move_options.output_dir.clone(),

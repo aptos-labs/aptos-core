@@ -17,16 +17,6 @@ pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Observed latest processed transaction version.
-pub static OBSERVED_LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "indexer_grpc_data_service_observed_latest_processed_version",
-        "Latest processed transaction version",
-        &["request_token", "processor_name"],
-    )
-    .unwrap()
-});
-
 /// Number of transactions that served by data service.
 pub static PROCESSED_VERSIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
