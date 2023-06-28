@@ -452,12 +452,12 @@ diesel = { version = "2.1.0", features = [
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
-dirs = "4.0.0"
+dirs = "5.0.1"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.8"
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 erased-serde = "0.3.13"
 event-listener = "2.5.3"
 fail = "0.5.0"
@@ -605,7 +605,7 @@ url = { version = "2.2.2", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 walkdir = "2.3.2"
 warp = { version = "0.3.3", features = ["tls"] }
-warp-reverse-proxy = "0.5.0"
+warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
 x25519-dalek = "1.2.0"
 
