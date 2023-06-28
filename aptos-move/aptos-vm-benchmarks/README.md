@@ -33,7 +33,12 @@ public entry fun benchmark_addition(_x: u64, _y: u64) {}
 
 ```
 
-To run the benchmarks, simply run `cargo run`.
+To run the benchmarks, simply run `cargo run`. There is also support for filtering specific 
+tests to run. If no pattern is provided, it will run all the benchmarks.
+
+```Bash
+cargo run --release PATTERN
+```
 
 ## Examples
 
