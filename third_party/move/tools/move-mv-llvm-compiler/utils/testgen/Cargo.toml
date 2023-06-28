@@ -1,0 +1,13 @@
+[package]
+name = "testgen"
+authors = ["Diem Association <opensource@diem.com>"]
+license = "Apache-2.0"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+clap = {version = "3.1.8", features = ["cargo"] }
+mustache = "*"
+serde = "*"
+serde_derive = "*"

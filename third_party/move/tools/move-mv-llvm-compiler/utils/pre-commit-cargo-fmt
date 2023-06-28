@@ -1,0 +1,14 @@
+#!/bin/bash -xe
+echo "Running precommit: cargo fmt"
+
+diff=$(cargo fmt -- --check)
+result=$?
+
+if [[ ${result} -ne 0 ]] ; then
+    cat <<\EOF
+Code style issues detected, run `cargo fmt` before commit.
+EOF
+    exit 1
+fi
+
+exit 0

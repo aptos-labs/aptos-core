@@ -1,0 +1,4 @@
+module 0x1.TestBinaryOps {
+  struct T { b: bool }
+  struct Pair { x: u64, y: u64}
+}

@@ -1,0 +1,3 @@
+//# print-bytecode --input=module
+module 0x3d10.Example {
+}

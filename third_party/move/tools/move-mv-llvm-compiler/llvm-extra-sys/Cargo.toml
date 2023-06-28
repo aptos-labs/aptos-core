@@ -1,0 +1,16 @@
+[package]
+name = "llvm-extra-sys"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Additional LLVM glue"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+libc = "0.2"
+llvm-sys = "150.0.3"
+
+[build-dependencies]
+cc = "1.0.78"
+anyhow = "1.0.68"

@@ -1,0 +1,3 @@
+// xfail: no expected.ll file
+module 0x1.TestBinaryOps {
+}

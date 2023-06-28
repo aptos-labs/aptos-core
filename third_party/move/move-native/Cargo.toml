@@ -1,0 +1,22 @@
+[package]
+name = "move-native"
+version = "0.1.1"
+edition = "2021"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Runtime calls for LLVM-compiled Move"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[features]
+solana = []
+
+[dependencies]
+ethnum = { version = "1.0.4", default-features = false }
+serde = { version = "1.0.124", default-features = false }
+sha2 = { version = "0.9.3", default-features = false }
+sha3 = { version = "0.9.1", default-features = false }

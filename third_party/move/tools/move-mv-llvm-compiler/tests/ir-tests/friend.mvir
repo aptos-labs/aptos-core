@@ -1,0 +1,5 @@
+module 0x42.A {
+    // cyclic friends
+    friend 0x42.B;
+    friend 0x42.C;
+}

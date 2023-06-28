@@ -1,0 +1,7 @@
+// ignore
+module 0x1.test {
+main() {
+        label b0:
+            return;
+}
+}

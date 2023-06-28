@@ -1,0 +1,7 @@
+//# print-bytecode --input=module
+module 0x3d10.Example {
+    public value(): u64 {
+    label a:
+        return 100;
+    }
+}
