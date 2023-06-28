@@ -266,7 +266,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util 0.7.3",
- "toml 0.5.9",
+ "toml 0.7.4",
  "walkdir",
 ]
 
@@ -761,7 +761,7 @@ dependencies = [
  "backtrace",
  "move-core-types",
  "serde 1.0.149",
- "toml 0.5.9",
+ "toml 0.7.4",
 ]
 
 [[package]]
@@ -1163,7 +1163,7 @@ dependencies = [
  "rayon",
  "serde 1.0.149",
  "tokio",
- "toml 0.5.9",
+ "toml 0.7.4",
 ]
 
 [[package]]
@@ -1888,7 +1888,7 @@ dependencies = [
  "serde 1.0.149",
  "serde_json",
  "tokio",
- "toml 0.5.9",
+ "toml 0.7.4",
  "tonic",
  "tracing",
  "tracing-subscriber",
@@ -1910,7 +1910,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tempfile",
  "tokio",
- "toml 0.5.9",
+ "toml 0.7.4",
  "tracing",
  "tracing-subscriber",
  "warp",
@@ -1942,7 +1942,7 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
- "toml 0.5.9",
+ "toml 0.7.4",
  "tonic",
  "tracing",
  "tracing-subscriber",
