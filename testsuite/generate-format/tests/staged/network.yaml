@@ -152,6 +152,10 @@ ProtocolId:
       ConsensusRpcCompressed: UNIT
     12:
       ConsensusDirectSendCompressed: UNIT
+    13:
+      BenchmarkDirectSend: UNIT
+    14:
+      BenchmarkRpc: UNIT
 ProtocolIdSet:
   NEWTYPESTRUCT:
     TYPENAME: BitVec
