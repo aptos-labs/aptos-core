@@ -488,7 +488,7 @@ jemallocator = { version = "0.3.2", features = [
 ] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
-libfuzzer-sys = "=0.3.2"
+libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 log = "0.4.17"
 lru = "0.7.5"
@@ -571,7 +571,7 @@ strum_macros = "0.24.2"
 structopt = "0.3.21"
 substreams = "0.0.17"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
-sysinfo = "0.24.2"
+sysinfo = "0.28.4"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
 textwrap = "0.15.0"
