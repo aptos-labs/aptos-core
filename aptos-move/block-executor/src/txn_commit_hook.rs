@@ -10,23 +10,23 @@ use std::fmt::Debug;
 
 /// An interface for listening to transaction commit events. The listener is called only once
 /// for each transaction commit.
-pub trait TransactionCommitListener: Send + Sync {
+pub trait TransactionCommitHook: Send + Sync {
     type ExecutionStatus;
 
     fn on_transaction_committed(&self, txn_idx: TxnIndex, execution_status: &Self::ExecutionStatus);
 }
 
-pub struct NoOpTransactionCommitListener<T, E> {
+pub struct NoOpTransactionCommitHook<T, E> {
     phantom: std::marker::PhantomData<(T, E)>,
 }
 
-impl<T: TransactionOutput, E: Debug + Sync + Send> Default for NoOpTransactionCommitListener<T, E> {
+impl<T: TransactionOutput, E: Debug + Sync + Send> Default for NoOpTransactionCommitHook<T, E> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: TransactionOutput, E: Debug + Sync + Send> NoOpTransactionCommitListener<T, E> {
+impl<T: TransactionOutput, E: Debug + Sync + Send> NoOpTransactionCommitHook<T, E> {
     pub fn new() -> Self {
         Self {
             phantom: std::marker::PhantomData,
@@ -34,8 +34,8 @@ impl<T: TransactionOutput, E: Debug + Sync + Send> NoOpTransactionCommitListener
     }
 }
 
-impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitListener
-    for NoOpTransactionCommitListener<T, E>
+impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitHook
+    for NoOpTransactionCommitHook<T, E>
 {
     type ExecutionStatus = ExecutionStatus<T, Error<E>>;
 

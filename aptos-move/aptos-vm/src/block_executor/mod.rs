@@ -21,7 +21,7 @@ use aptos_block_executor::{
         ExecutionStatus as BlockExecutorExecutionStatus, Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
-    txn_commit_listener::TransactionCommitListener,
+    txn_commit_hook::TransactionCommitHook,
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
@@ -201,7 +201,7 @@ impl BlockAptosVM {
 
     pub fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitListener<
+        L: TransactionCommitHook<
             ExecutionStatus = BlockExecutorExecutionStatus<AptosTransactionOutput, Error<VMStatus>>,
         >,
     >(
@@ -249,14 +249,10 @@ impl BlockAptosVM {
             concurrency_level,
             executor_thread_pool,
             maybe_block_gas_limit,
-        );
-
-        let ret = executor.execute_block(
-            state_view,
-            signature_verified_block,
-            state_view,
             transaction_commit_listener,
         );
+
+        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs

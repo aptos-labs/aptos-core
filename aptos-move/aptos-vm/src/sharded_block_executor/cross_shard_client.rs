@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use aptos_block_executor::{
-    errors::Error, task::ExecutionStatus, txn_commit_listener::TransactionCommitListener,
+    errors::Error, task::ExecutionStatus, txn_commit_hook::TransactionCommitHook,
 };
 use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
@@ -134,7 +134,7 @@ impl CrossShardCommitSender {
     }
 }
 
-impl TransactionCommitListener for CrossShardCommitSender {
+impl TransactionCommitHook for CrossShardCommitSender {
     type ExecutionStatus = ExecutionStatus<AptosTransactionOutput, Error<VMStatus>>;
 
     fn on_transaction_committed(

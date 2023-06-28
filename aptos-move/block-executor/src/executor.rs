@@ -11,7 +11,7 @@ use crate::{
     errors::*,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
-    txn_commit_listener::TransactionCommitListener,
+    txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
@@ -77,6 +77,7 @@ pub struct BlockExecutor<T, E, S, L, X> {
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
     maybe_block_gas_limit: Option<u64>,
+    transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
 }
 
@@ -85,7 +86,7 @@ where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitListener<ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>>,
+    L: TransactionCommitHook<ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>>,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
@@ -94,6 +95,7 @@ where
         concurrency_level: usize,
         executor_thread_pool: Arc<ThreadPool>,
         maybe_block_gas_limit: Option<u64>,
+        transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
@@ -104,6 +106,7 @@ where
             concurrency_level,
             executor_thread_pool,
             maybe_block_gas_limit,
+            transaction_commit_hook,
             phantom: PhantomData,
         }
     }
@@ -465,7 +468,6 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
-        txn_commit_listener: &Option<L>,
     ) {
         let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
         let mut delta_writes = Vec::with_capacity(num_deltas);
@@ -501,7 +503,7 @@ where
             ));
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
-        if let Some(txn_commit_listener) = txn_commit_listener {
+        if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             txn_commit_listener.on_transaction_committed(
                 txn_idx,
                 last_input_output
@@ -522,7 +524,6 @@ where
         scheduler: &Scheduler,
         base_view: &S,
         role: CommitRole,
-        transaction_commit_listener: &Option<L>,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -559,7 +560,6 @@ where
                             versioned_cache,
                             last_input_output,
                             base_view,
-                            transaction_commit_listener,
                         );
                     }
                 },
@@ -604,7 +604,6 @@ where
                                 versioned_cache,
                                 last_input_output,
                                 base_view,
-                                transaction_commit_listener,
                             );
                         }
                     }
@@ -619,7 +618,6 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-        transaction_commit_listener: &Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -665,7 +663,6 @@ where
                         &scheduler,
                         base_view,
                         role,
-                        transaction_commit_listener,
                     );
                 });
             }
@@ -719,7 +716,6 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-        transaction_commit_listener: &Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
@@ -738,21 +734,12 @@ where
             );
 
             let res = match res {
-                ExecutionStatus::Success(output) => {
-                    // Apply the writes/deltas to the versioned_data_cache.
-                    ExecutionStatus::Success(output)
-                },
-                ExecutionStatus::SkipRest(output) => {
-                    // Apply the writes/deltas and record status indicating skip.
-                    ExecutionStatus::SkipRest(output)
-                },
-                ExecutionStatus::Abort(err) => {
-                    // Record the status indicating abort.
-                    ExecutionStatus::Abort(Error::UserError(err))
-                },
+                ExecutionStatus::Success(output) => ExecutionStatus::Success(output),
+                ExecutionStatus::SkipRest(output) => ExecutionStatus::SkipRest(output),
+                ExecutionStatus::Abort(err) => ExecutionStatus::Abort(Error::UserError(err)),
             };
 
-            if let Some(listener) = transaction_commit_listener {
+            if let Some(listener) = &self.transaction_commit_hook {
                 listener.on_transaction_committed(idx as TxnIndex, &res);
             }
 
@@ -818,7 +805,6 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: BlockExecutorTransactions<T>,
         base_view: &S,
-        transaction_commit_listener: Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let signature_verified_txns = signature_verified_block.into_txns();
         let mut ret = if self.concurrency_level > 1 {
@@ -826,14 +812,12 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
-                &transaction_commit_listener,
             )
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
-                &transaction_commit_listener,
             )
         };
 
@@ -848,7 +832,6 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
-                &transaction_commit_listener,
             )
         }
         self.executor_thread_pool.spawn(move || {
