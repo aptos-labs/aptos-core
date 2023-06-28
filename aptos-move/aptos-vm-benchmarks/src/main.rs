@@ -156,12 +156,7 @@ fn main() {
                 }
 
                 // skip if it doesn't match pattern
-                let mut fully_qualified_path = String::new();
-                fully_qualified_path.push_str(address.to_string().as_str());
-                fully_qualified_path.push_str("::");
-                fully_qualified_path.push_str(identifier);
-                fully_qualified_path.push_str("::");
-                fully_qualified_path.push_str(func_name);
+                let fully_qualified_path = format!("{}::{}::{}", address, identifier, func_name);
                 if !fully_qualified_path.contains(pattern) && !pattern.is_empty() {
                     continue;
                 }
