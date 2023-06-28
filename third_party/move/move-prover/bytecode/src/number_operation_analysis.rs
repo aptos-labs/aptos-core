@@ -211,6 +211,7 @@ impl<'a> NumberOperationAnalysis<'a> {
         };
         let visitor = &mut |exp: &ExpData| {
             match exp {
+                ExpData::Sequence(_, _) => {},
                 ExpData::Temporary(id, idx) => {
                     let baseline_flag = self.func_target.data.variant == FunctionVariant::Baseline;
                     let oper = global_state
@@ -220,10 +221,14 @@ impl<'a> NumberOperationAnalysis<'a> {
                     global_state.update_node_oper(*id, *oper, true);
                 },
                 ExpData::Block(id, _, _, exp) => {
+                    self.handle_exp(attr_id, exp, global_state, state);
                     let exp_oper = global_state.get_node_num_oper(exp.node_id());
                     global_state.update_node_oper(*id, exp_oper, true);
                 },
-                ExpData::IfElse(id, _, true_exp, false_exp) => {
+                ExpData::IfElse(id, cond_exp, true_exp, false_exp) => {
+                    self.handle_exp(attr_id, cond_exp, global_state, state);
+                    self.handle_exp(attr_id, true_exp, global_state, state);
+                    self.handle_exp(attr_id, false_exp, global_state, state);
                     let true_oper = global_state.get_node_num_oper(true_exp.node_id());
                     let false_oper = global_state.get_node_num_oper(false_exp.node_id());
                     if !allow_merge && true_oper.conflict(&false_oper) {

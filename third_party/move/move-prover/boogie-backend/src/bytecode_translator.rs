@@ -1355,6 +1355,17 @@ impl<'env> FunctionTranslator<'env> {
                                     }
                                     args_str_vec.push(args_src_1_str);
                                 };
+                            let rewrite_bv2int_for_table = |args_str_vec: &mut Vec<String>| {
+                                if !srcs.is_empty() {
+                                    args_str_vec.push(str_local(srcs[0]));
+                                }
+                                if srcs.len() >= 2 && self.get_local_type(srcs[1]).is_number() {
+                                    instrument_bv2int(srcs[1], args_str_vec);
+                                    for src in srcs.iter().skip(2) {
+                                        args_str_vec.push(str_local(*src));
+                                    }
+                                }
+                            };
                             let callee_name = callee_env.get_name_str();
                             if dest_str.is_empty() {
                                 let bv_flag = !srcs.is_empty() && compute_flag(srcs[0]);
@@ -1370,6 +1381,9 @@ impl<'env> FunctionTranslator<'env> {
                                     fun_name =
                                         boogie_function_bv_name(&callee_env, inst, &[bv_flag]);
                                 } else if module_env.is_table() {
+                                    let mut args_str_vec = vec![];
+                                    rewrite_bv2int_for_table(&mut args_str_vec);
+                                    args_str = args_str_vec.iter().cloned().join(", ");
                                     fun_name = boogie_function_bv_name(&callee_env, inst, &[
                                         false, bv_flag,
                                     ]);
@@ -1439,6 +1453,10 @@ impl<'env> FunctionTranslator<'env> {
                                             fun_name,
                                             args_str
                                         );
+                                    } else {
+                                        let mut args_str_vec = vec![];
+                                        rewrite_bv2int_for_table(&mut args_str_vec);
+                                        args_str = args_str_vec.iter().cloned().join(", ");
                                     }
                                 }
                                 emitln!(writer, "call {} := {}({});", dest_str, fun_name, args_str);
