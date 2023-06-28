@@ -92,7 +92,7 @@ impl Default for ExecutionConfigV2 {
     fn default() -> Self {
         Self {
             transaction_shuffler_type: TransactionShufflerType::NoShuffling,
-            block_gas_limit: Some(100_000),
+            block_gas_limit: Some(10_000),
         }
     }
 }
