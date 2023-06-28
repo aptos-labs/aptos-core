@@ -406,7 +406,7 @@ ark-ff = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 assert_approx_eq = "1.1.0"
-assert_unordered = "0.1.1"
+assert_unordered = "0.3.5"
 async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.5.16"
