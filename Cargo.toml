@@ -601,7 +601,7 @@ ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
 ], default_features = false }
-url = { version = "2.2.2", features = ["serde"] }
+url = { version = "2.4.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 walkdir = "2.3.2"
 warp = { version = "0.3.5", features = ["tls"] }
