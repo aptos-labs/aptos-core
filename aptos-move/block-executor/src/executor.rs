@@ -12,7 +12,7 @@ use crate::{
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_commit_listener::TransactionCommitListener,
-    txn_last_input_output::{TxnLastInputOutput, TxnOutput},
+    txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
@@ -85,7 +85,7 @@ where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitListener<TxnOutput = TxnOutput<E::Output, E::Error>>,
+    L: TransactionCommitListener<ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>>,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
@@ -488,7 +488,11 @@ where
         if let Some(txn_commit_listener) = txn_commit_listener {
             txn_commit_listener.on_transaction_committed(
                 txn_idx,
-                last_input_output.txn_output(txn_idx).unwrap().as_ref(),
+                last_input_output
+                    .txn_output(txn_idx)
+                    .unwrap()
+                    .as_ref()
+                    .output_status(),
             );
         }
     }
@@ -697,6 +701,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
+        transaction_commit_listener: &Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
@@ -714,6 +719,24 @@ where
                 true,
             );
 
+            let res = match res {
+                ExecutionStatus::Success(output) => {
+                    // Apply the writes/deltas to the versioned_data_cache.
+                    ExecutionStatus::Success(output)
+                },
+                ExecutionStatus::SkipRest(output) => {
+                    // Apply the writes/deltas and record status indicating skip.
+                    ExecutionStatus::SkipRest(output)
+                },
+                ExecutionStatus::Abort(err) => {
+                    // Record the status indicating abort.
+                    ExecutionStatus::Abort(Error::UserError(err))
+                },
+            };
+
+            if let Some(listener) = transaction_commit_listener {
+                listener.on_transaction_committed(idx as TxnIndex, &res);
+            }
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -734,7 +757,7 @@ where
                 },
                 ExecutionStatus::Abort(err) => {
                     // Record the status indicating abort.
-                    return Err(Error::UserError(err));
+                    return Err(err);
                 },
             }
 
@@ -789,6 +812,7 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
+                &transaction_commit_listener,
             )
         };
 
@@ -803,6 +827,7 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
+                &transaction_commit_listener,
             )
         }
         self.executor_thread_pool.spawn(move || {
