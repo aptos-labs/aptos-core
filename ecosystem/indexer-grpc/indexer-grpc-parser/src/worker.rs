@@ -229,7 +229,7 @@ impl Worker {
             // The number of batches depends on our config
             // There could be several special scenarios:
             // 1. If we're at the head, we will break out of the loop as soon as we get a partial (transaction counts < 1000) batch.
-            // 2. If we lose the connection, we will reset the connection and continue processing from the beginning of the batch.
+            // 2. If we lose the connection, we will panic.
             // 3. If we specified an end version and we hit that, we will break out of the loop as soon as we get an empty batch.
             for _ in 0..concurrent_tasks {
                 let next_stream = match resp_stream.next().await {
@@ -254,11 +254,7 @@ impl Worker {
                         break;
                     },
                     _ => {
-                        error!(
-                            processor_name = processor_name,
-                            "[Parser] Error receiving datastream response; reconnecting..."
-                        );
-                        panic!();
+                        panic!("[Parser] Error receiving datastream response.");
                     },
                 };
                 let transactions = next_stream.transactions;
