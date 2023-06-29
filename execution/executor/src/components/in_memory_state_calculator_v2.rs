@@ -220,6 +220,9 @@ impl InMemoryStateCalculatorV2 {
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
             .with_label_values(&["calculate_usage"])
             .start_timer();
+        if old_usage.is_untracked() {
+            return StateStorageUsage::new_untracked();
+        }
         let (items_delta, bytes_delta) = updates
             .par_iter()
             .enumerate()

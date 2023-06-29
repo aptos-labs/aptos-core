@@ -6,7 +6,7 @@ use crate::vm_status::{StatusCode, VMStatus};
 
 #[test]
 fn test_stats_code() {
-    let vm_status = VMStatus::Error(StatusCode::OUT_OF_GAS, None);
+    let vm_status = VMStatus::error(StatusCode::OUT_OF_GAS, None);
     let code = vm_status.status_code();
     assert_eq!(code, StatusCode::OUT_OF_GAS);
 }

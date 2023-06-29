@@ -28,19 +28,19 @@ use std::{fs, path::PathBuf, sync::Arc};
 #[clap(about = "Delete all data after the provided version.")]
 #[clap(group(clap::ArgGroup::new("backup")
         .required(true)
-        .args(&["backup-checkpoint-dir", "opt-out-backup-checkpoint"]),
+        .args(&["backup_checkpoint_dir", "opt_out_backup_checkpoint"]),
 ))]
 pub struct Cmd {
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     db_dir: PathBuf,
 
     #[clap(long)]
     target_version: u64,
 
-    #[clap(long, default_value = "1000")]
+    #[clap(long, default_value_t = 1000)]
     ledger_db_batch_size: usize,
 
-    #[clap(long, parse(from_os_str), group = "backup")]
+    #[clap(long, value_parser, group = "backup")]
     backup_checkpoint_dir: Option<PathBuf>,
 
     #[clap(long, group = "backup")]
@@ -234,7 +234,7 @@ mod test {
                 version += txns_to_commit.len() as u64;
             }
 
-            let db_version = db.get_latest_transaction_info_option().unwrap().unwrap().0;
+            let db_version = db.get_latest_version().unwrap();
             prop_assert_eq!(db_version, version - 1);
 
             drop(db);
@@ -253,7 +253,7 @@ mod test {
             cmd.run().unwrap();
 
             let db = AptosDB::new_for_test(&tmp_dir);
-            let db_version = db.get_latest_transaction_info_option().unwrap().unwrap().0;
+            let db_version = db.get_latest_version().unwrap();
             prop_assert_eq!(db_version, target_version);
 
             let txn_list_with_proof = db.get_transactions(0, db_version + 1, db_version, true).unwrap();
