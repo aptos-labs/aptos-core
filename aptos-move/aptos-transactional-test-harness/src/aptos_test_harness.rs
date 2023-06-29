@@ -833,6 +833,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     &private_key,
                     secondary_signers,
                     secondary_private_keys.iter().collect(),
+                    false, // TODO fee payer
                 )?
                 .into_inner()
             },

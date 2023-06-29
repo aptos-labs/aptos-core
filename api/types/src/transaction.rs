@@ -1108,6 +1108,7 @@ pub struct MultiAgentSignature {
     pub secondary_signer_addresses: Vec<Address>,
     /// The associated signatures, in the same order as the secondary addresses
     pub secondary_signers: Vec<AccountSignature>,
+    pub with_fee_payer: bool,
 }
 
 impl VerifyInput for MultiAgentSignature {
@@ -1137,6 +1138,7 @@ impl TryFrom<MultiAgentSignature> for TransactionAuthenticator {
             sender,
             secondary_signer_addresses,
             secondary_signers,
+            with_fee_payer,
         } = value;
         Ok(TransactionAuthenticator::multi_agent(
             sender.try_into()?,
@@ -1148,6 +1150,7 @@ impl TryFrom<MultiAgentSignature> for TransactionAuthenticator {
                 .into_iter()
                 .map(|s| s.try_into())
                 .collect::<anyhow::Result<_>>()?,
+            with_fee_payer,
         ))
     }
 }
@@ -1211,19 +1214,22 @@ impl
         &AccountAuthenticator,
         &Vec<AccountAddress>,
         &Vec<AccountAuthenticator>,
+        &bool,
     )> for MultiAgentSignature
 {
     fn from(
-        (sender, addresses, signers): (
+        (sender, addresses, signers, with_fee_payer): (
             &AccountAuthenticator,
             &Vec<AccountAddress>,
             &Vec<AccountAuthenticator>,
+            &bool,
         ),
     ) -> Self {
         Self {
             sender: sender.into(),
             secondary_signer_addresses: addresses.iter().map(|address| (*address).into()).collect(),
             secondary_signers: signers.iter().map(|s| s.into()).collect(),
+            with_fee_payer: *with_fee_payer,
         }
     }
 }
@@ -1245,7 +1251,20 @@ impl From<TransactionAuthenticator> for TransactionSignature {
                 secondary_signer_addresses,
                 secondary_signers,
             } => Self::MultiAgentSignature(
-                (sender, secondary_signer_addresses, secondary_signers).into(),
+                (
+                    sender,
+                    secondary_signer_addresses,
+                    secondary_signers,
+                    &false,
+                )
+                    .into(),
+            ),
+            MultiAgentWithFeePayer {
+                sender,
+                secondary_signer_addresses,
+                secondary_signers,
+            } => Self::MultiAgentSignature(
+                (sender, secondary_signer_addresses, secondary_signers, &true).into(),
             ),
         }
     }

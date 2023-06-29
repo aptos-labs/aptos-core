@@ -250,6 +250,7 @@ impl RawTransaction {
         sender_private_key: &Ed25519PrivateKey,
         secondary_signers: Vec<AccountAddress>,
         secondary_private_keys: Vec<&Ed25519PrivateKey>,
+        is_multi_agent_with_fee_payer: bool,
     ) -> Result<SignatureCheckedTransaction> {
         let message =
             RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone());
@@ -279,6 +280,7 @@ impl RawTransaction {
                 sender_authenticator,
                 secondary_signers,
                 secondary_authenticators,
+                is_multi_agent_with_fee_payer,
             ),
         ))
     }
@@ -366,6 +368,10 @@ pub enum RawTransactionWithData {
         raw_txn: RawTransaction,
         secondary_signer_addresses: Vec<AccountAddress>,
     },
+    MultiAgentWithFeePayer {
+        raw_txn: RawTransaction,
+        secondary_signer_addresses: Vec<AccountAddress>,
+    },
 }
 
 impl RawTransactionWithData {
@@ -374,6 +380,16 @@ impl RawTransactionWithData {
         secondary_signer_addresses: Vec<AccountAddress>,
     ) -> Self {
         Self::MultiAgent {
+            raw_txn,
+            secondary_signer_addresses,
+        }
+    }
+
+    pub fn new_multi_agent_with_fee_payer(
+        raw_txn: RawTransaction,
+        secondary_signer_addresses: Vec<AccountAddress>,
+    ) -> Self {
+        Self::MultiAgentWithFeePayer {
             raw_txn,
             secondary_signer_addresses,
         }
@@ -527,6 +543,7 @@ impl SignedTransaction {
         sender: AccountAuthenticator,
         secondary_signer_addresses: Vec<AccountAddress>,
         secondary_signers: Vec<AccountAuthenticator>,
+        is_multi_agent_with_fee_payer: bool,
     ) -> Self {
         SignedTransaction {
             raw_txn,
@@ -534,6 +551,7 @@ impl SignedTransaction {
                 sender,
                 secondary_signer_addresses,
                 secondary_signers,
+                is_multi_agent_with_fee_payer,
             ),
             size: OnceCell::new(),
         }

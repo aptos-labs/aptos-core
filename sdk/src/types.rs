@@ -123,6 +123,7 @@ impl LocalAccount {
                 self.private_key(),
                 secondary_signer_addresses,
                 secondary_signer_privkeys,
+                false, // TODO fee payer
             )
             .expect("Signing multi agent txn failed")
             .into_inner()

@@ -281,6 +281,7 @@ impl TransactionBuilder {
             &self.sender.privkey,
             secondary_signer_addresses,
             secondary_private_keys,
+            false, // TODO add e2e for fee payer
         )
         .unwrap()
         .into_inner()

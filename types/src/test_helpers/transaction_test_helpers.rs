@@ -217,6 +217,7 @@ pub fn get_test_unchecked_multi_agent_txn(
         sender_authenticator,
         secondary_signers,
         secondary_authenticators,
+        false, // TODO replicate for gas fee payer
     )
 }
 
