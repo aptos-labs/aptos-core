@@ -11,9 +11,7 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError, wire::handshake::v1::ProtocolId},
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
-// use aptos_network::protocols::wire::handshake::v1::ProtocolId::BenchmarkDirectSend;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::PeerId;
+use aptos_types::{account_address::AccountAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot::Sender,
@@ -28,7 +26,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{runtime::Handle, select, sync::RwLock};
-// use futures::future::MaybeDone::Future;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[allow(clippy::large_enum_variant)]
@@ -60,120 +57,6 @@ pub static PENDING_BENCHMARK_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| 
     )
     .unwrap()
 });
-//
-// pub struct BenchmarkService {
-//     time_service: TimeService,
-//     shared : Arc<RwLock<BenchmarkSharedState>>,
-// }
-//
-// impl BenchmarkService {
-//     // pub async fn run(
-//     //     network_client : NetworkClient<BenchmarkMessage>,
-//     //     events: NetworkServiceEvents<BenchmarkMessage>,
-//     //     time_service: TimeService,
-//     //     shared : Arc<RwLock<BenchmarkSharedState>>,
-//     // ) {
-//     //     let bs = BenchmarkService{
-//     //         time_service,
-//     //         shared,
-//     //     };
-//     //     bs.service_loop(network_client, events).await;
-//     // }
-//
-//     // all-in-one, get events from NetworkServiceEvents and handle them.
-//     async fn service_loop(
-//         mut self,
-//         network_client : NetworkClient<BenchmarkMessage>,
-//         network_requests: NetworkServiceEvents<BenchmarkMessage>,
-//     ) {
-//         let network_events: Vec<_> = network_requests
-//             .into_network_and_events()
-//             .into_iter()
-//             .map(|(network_id, events)| events.map(move |event| (network_id, event)))
-//             .collect();
-//         let mut network_events = futures::stream::select_all(network_events).fuse();
-//
-//         loop {
-//             let (network_id, event) = match network_events.next().await {
-//                 None => { return; }  // fused stream will never return more
-//                 Some(x) => { x }
-//             };
-//             match event {
-//                 Event::Message(peer_id, wat) => {
-//                     let msg_wrapper: BenchmarkMessage = wat;
-//                     // TODO: counters, note blob size and increment message counter
-//                     self.handle_direct(&network_client, network_id, peer_id, msg_wrapper).await;
-//                 }
-//                 Event::RpcRequest(peer_id, msg_wrapper, protocol_id, sender) => {
-//                     self.handle_rpc(peer_id, msg_wrapper, protocol_id, sender).await;
-//                 }
-//                 Event::NewPeer(_) => {}  // don't care
-//                 Event::LostPeer(_) => {}  // don't care
-//             }
-//         }
-//     }
-//
-//     async fn handle_direct(
-//         &mut self,
-//         network_client : &NetworkClient<BenchmarkMessage>,
-//         network_id: NetworkId,
-//         peer_id: AccountAddress,
-//         msg_wrapper: BenchmarkMessage
-//     ) {
-//         handle_direct(network_client, network_id, peer_id, msg_wrapper, self.time_service.clone(), self.shared.clone()).await;
-//         // match msg_wrapper {
-//         //     BenchmarkMessage::DataSend(send) => {
-//         //         let reply = BenchmarkDataReply {
-//         //             request_counter: send.request_counter,
-//         //             send_micros: self.time_service.now_unix_time().as_micros() as i64,
-//         //             your_send_micros: send.send_micros,
-//         //         };
-//         //         let result = network_client.send_to_peer(BenchmarkMessage::DataReply(reply), PeerNetworkId::new(network_id, peer_id));
-//         //         if let Err(_) = result {
-//         //             // TODO: log, counter
-//         //         }
-//         //     }
-//         //     BenchmarkMessage::DataReply(reply) => {
-//         //         let receive_time = self.time_service.now_unix_time().as_micros() as i64;
-//         //         let rec = {
-//         //             let reader = self.shared.read().await;
-//         //             reader.find(reply.request_counter)
-//         //         };
-//         //         if rec.request_counter == reply.request_counter {
-//         //             info!("pmd[{}] {} bytes at {} in {} micros", rec.request_counter, rec.bytes_sent, receive_time, receive_time - rec.send_micros);
-//         //         } else {
-//         //             info!("pmd[{}] unk bytes in > {} micros", reply.request_counter, receive_time - rec.send_micros)
-//         //         }
-//         //     }
-//         // }
-//     }
-//
-//     async fn handle_rpc(&mut self, _peer_id: AccountAddress, msg_wrapper: BenchmarkMessage, protocol_id: ProtocolId, sender: Sender<Result<Bytes, RpcError>>) {
-//         handle_rpc(_peer_id, msg_wrapper, protocol_id, self.time_service.clone(), sender).await;
-//         // match msg_wrapper {
-//         //     BenchmarkMessage::DataSend(send) => {
-//         //         let reply = BenchmarkDataReply {
-//         //             request_counter: send.request_counter,
-//         //             send_micros: self.time_service.now_unix_time().as_micros() as i64,
-//         //             your_send_micros: send.send_micros,
-//         //         };
-//         //         let reply = BenchmarkMessage::DataReply(reply);
-//         //         let reply_bytes = match protocol_id.to_bytes(&reply) {
-//         //             Ok(rb) => { rb }
-//         //             Err(_) => {return} // TODO: counter, log
-//         //         };
-//         //         let reply_bytes: Bytes = reply_bytes.into();
-//         //         let result = sender.send(Ok(reply_bytes));
-//         //         if let Err(_) = result {
-//         //             // TODO: log, counter
-//         //         }
-//         //     }
-//         //     BenchmarkMessage::DataReply(_) => {
-//         //         // TODO: ERROR, log, counter, this should come back at the point of the RPC call, not here
-//         //     }
-//         // }
-//     }
-// }
 
 // Get messages from the network and quickly shuffle them to N threads of workers.
 async fn source_loop(
@@ -194,13 +77,11 @@ async fn source_loop(
                 work.close();
                 return;
             },
-            Some(x) => {
-                match work.send(x).await {
-                    Ok(_) => {},
-                    Err(se) => {
-                        warn!("benchmark source_loop work send: {}", se);
-                    },
-                } // TODO: log, counter
+            Some(x) => match work.send(x).await {
+                Ok(_) => {},
+                Err(se) => {
+                    warn!("benchmark source_loop work send: {}", se);
+                },
             },
         };
     }
@@ -227,7 +108,7 @@ async fn handle_direct(
             );
             if let Err(err) = result {
                 info!(
-                    "benchmark could not reply to {}, {}",
+                    "benchmark ds [{}] could not reply: {}",
                     send.request_counter, err
                 );
             }
@@ -282,7 +163,10 @@ async fn handle_rpc(
                 match err {
                     Ok(_) => {}, // what? Ok inside Err?
                     Err(err) => {
-                        info!("benchmark rpc reply {}: {}", send.request_counter, err);
+                        info!(
+                            "benchmark rpc [{}] reply err: {}",
+                            send.request_counter, err
+                        );
                     },
                 }
             }
@@ -314,7 +198,6 @@ async fn handler_thread(
             Event::Message(peer_id, wat) => {
                 let msg_wrapper: BenchmarkMessage = wat;
                 // TODO: counters, note blob size and increment message counter
-                //self.handle_direct(&network_client, network_id, peer_id, msg_wrapper).await;
                 handle_direct(
                     &network_client,
                     network_id,
@@ -326,7 +209,6 @@ async fn handler_thread(
                 .await;
             },
             Event::RpcRequest(peer_id, msg_wrapper, protocol_id, sender) => {
-                //self.handle_rpc(peer_id, msg_wrapper, protocol_id, sender).await;
                 handle_rpc(
                     peer_id,
                     msg_wrapper,
@@ -366,7 +248,6 @@ async fn handler_thread(
 /// run_benchmark_service() does not return, it should be called by .spawn()
 pub async fn run_benchmark_service(
     node_config: NodeConfig,
-    // benchmark_service_threads: Option<usize>,
     network_client: NetworkClient<BenchmarkMessage>,
     network_requests: NetworkServiceEvents<BenchmarkMessage>,
     time_service: TimeService,
@@ -479,45 +360,6 @@ pub async fn direct_sender(
         }
     }
 }
-//
-// pub async fn inner_rpc_send<T>(
-//     network_client : &NetworkClient<BenchmarkMessage>,
-//     counter: u64,
-//     blob: &mut Vec<u8>,
-//     time_service: &TimeService,
-//     network_id: NetworkId,
-//     peer_id: PeerId,
-//     shared : Arc<RwLock<BenchmarkSharedState>>,
-//     open_rpcs: &mut FuturesUnordered<T>
-// ) -> i64 {
-//     {
-//         // tweak the random payload a little on every send
-//         let counter_bytes: [u8; 8] = counter.to_le_bytes();
-//         let (dest, _) = blob.deref_mut().split_at_mut(8);
-//         dest.copy_from_slice(&counter_bytes);
-//     }
-//
-//     let nowu = time_service.now_unix_time().as_micros() as i64;
-//     let msg = BenchmarkDataSend {
-//         request_counter: counter,
-//         send_micros: nowu,
-//         data: blob.clone(),
-//     };
-//     {
-//         shared.write().await.set(SendRecord{
-//             request_counter: counter,
-//             send_micros: nowu,
-//             bytes_sent: blob.len(),
-//         })
-//     }
-//     let wrapper = BenchmarkMessage::DataSend(msg);
-//     //let start_send : Instant = time_service.now();
-//     // let result = network_client.send_to_peer(wrapper, PeerNetworkId::new(network_id, peer_id));
-//     let result = network_client.send_to_peer_rpc(wrapper, Duration::from_secs(10), PeerNetworkId::new(network_id, peer_id));
-//     //let send_end : Instant = time_service.now(); We probably don't care how long it takes to _start_ an rpc
-//     open_rpcs.push(result);
-//     return nowu;
-// }
 
 pub async fn rpc_sender(
     node_config: NodeConfig,
@@ -543,21 +385,16 @@ pub async fn rpc_sender(
 
     let mut next_blab: i64 = 0;
 
-    //let mut open_rpcs = vec![];
     let mut open_rpcs = FuturesUnordered::new();
-
-    // let mut tick_missed = false;
 
     loop {
         select! {
             _ = ticker.next() => {
                 if open_rpcs.len() >= config.rpc_in_flight {
-                    // tick_missed = true;
                     continue;
                 }
                 // do rpc send
                 counter += 1;
-                //let nowu = inner_rpc_send(&network_client, counter, &mut blob, &time_service, network_id, peer_id, shared.clone(), &mut open_rpcs).await;
                 {
                     // tweak the random payload a little on every send
                     let counter_bytes: [u8; 8] = counter.to_le_bytes();
@@ -579,10 +416,7 @@ pub async fn rpc_sender(
                     })
                 }
                 let wrapper = BenchmarkMessage::DataSend(msg);
-                //let start_send : Instant = time_service.now();
-                // let result = network_client.send_to_peer(wrapper, PeerNetworkId::new(network_id, peer_id));
                 let result = network_client.send_to_peer_rpc(wrapper, Duration::from_secs(10), PeerNetworkId::new(network_id, peer_id));
-                //let send_end : Instant = time_service.now(); We probably don't care how long it takes to _start_ an rpc
                 open_rpcs.push(result);
 
                 if nowu > next_blab {
@@ -601,21 +435,19 @@ pub async fn rpc_sender(
                 let nowu = time_service.now_unix_time().as_micros() as i64;
                 match result {
                     Err(err) => {
-            info!("benchmark [{},{}] rpc send err: {}", network_id, peer_id, err);
-            // TODO: some error limit, or error-per-second limit, or specifically detect unrecoverable errors
-            return;
+                        info!("benchmark [{},{}] rpc send err: {}", network_id, peer_id, err);
+                        // TODO: some error limit, or error-per-second limit, or specifically detect unrecoverable errors
+                        return;
                     }
                     Ok(msg_wrapper) => {
                         if let BenchmarkMessage::DataReply(msg) = msg_wrapper {
                             let send_dt = nowu - msg.your_send_micros;
-                            //let send_dt = send_end.duration_since(start_send);
-                            info!("benchmark [{}] rpc at {} µs, took {} µs", counter, nowu, send_dt);
+                            info!("benchmark [{}] rpc at {} µs, took {} µs", msg.request_counter, nowu, send_dt);
                         } else {
                             info!("benchmark [{}] rpc wat", counter);
                         }
                     }
                 }
-                // TODO: if tick_missed {start a new send right now}
             }
         }
     }
