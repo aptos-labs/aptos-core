@@ -287,7 +287,7 @@ export const GetTokenOwnedFromCollection = `
 export const GetTokenOwnersData = `
     query getTokenOwnersData($token_id: String, $property_version: numeric) {
   current_token_ownerships(
-    where: {token_data_id_hash: {_eq: $token_id}, property_version: {_eq: $property_version}}
+    where: {token_data_id_hash: {_eq: $token_id}, property_version: {_eq: $property_version}, amount: {_gt: "0"}}
   ) {
     owner_address
   }

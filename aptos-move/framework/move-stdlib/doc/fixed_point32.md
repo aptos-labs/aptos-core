@@ -819,10 +819,8 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 
-TODO: worked in the past but started to time out since last z3 update
 
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_ceil">spec_ceil</a>(num);
@@ -858,7 +856,8 @@ TODO: worked in the past but started to time out since last z3 update
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="fixed_point32.md#0x1_fixed_point32_spec_round">spec_round</a>(num);
 </code></pre>

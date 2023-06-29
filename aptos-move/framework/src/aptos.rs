@@ -99,6 +99,7 @@ impl ReleaseTarget {
             .collect::<Vec<_>>();
         ReleaseOptions {
             build_options: BuildOptions {
+                dev: false,
                 with_srcs,
                 with_abis: true,
                 with_source_maps: false,

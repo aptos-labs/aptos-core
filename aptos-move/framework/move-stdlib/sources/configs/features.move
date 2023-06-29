@@ -194,6 +194,21 @@ module std::features {
         is_enabled(DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING)
     }
 
+    /// Whether alternate gas payer is supported
+    /// Lifetime: transient
+    const GAS_PAYER_ENABLED: u64 = 22;
+    public fun gas_payer_enabled(): bool acquires Features {
+        is_enabled(GAS_PAYER_ENABLED)
+    }
+
+    /// Whether enable MOVE functions to call create_auid method to create AUIDs.
+    /// Lifetime: transient
+    const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
+    public fun get_auids(): u64 { APTOS_UNIQUE_IDENTIFIERS }
+    public fun auids_enabled(): bool acquires Features {
+        is_enabled(APTOS_UNIQUE_IDENTIFIERS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

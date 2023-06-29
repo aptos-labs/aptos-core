@@ -92,6 +92,10 @@ pub struct PipelineOpt {
     allow_discards: bool,
     #[clap(long)]
     allow_aborts: bool,
+    #[clap(long, default_value = "1")]
+    num_executor_shards: usize,
+    #[clap(long)]
+    async_partitioning: bool,
 }
 
 impl PipelineOpt {
@@ -102,6 +106,8 @@ impl PipelineOpt {
             skip_commit: self.skip_commit,
             allow_discards: self.allow_discards,
             allow_aborts: self.allow_aborts,
+            num_executor_shards: self.num_executor_shards,
+            async_partitioning: self.async_partitioning,
         }
     }
 }
@@ -116,9 +122,6 @@ struct Opt {
 
     #[clap(long)]
     concurrency_level: Option<usize>,
-
-    #[clap(long, default_value_t = 1)]
-    num_executor_shards: usize,
 
     #[clap(flatten)]
     pruner_opt: PrunerOpt,
@@ -150,11 +153,11 @@ impl Opt {
     fn concurrency_level(&self) -> usize {
         match self.concurrency_level {
             None => {
-                let level =
-                    (num_cpus::get() as f64 / self.num_executor_shards as f64).ceil() as usize;
+                let level = (num_cpus::get() as f64 / self.pipeline_opt.num_executor_shards as f64)
+                    .ceil() as usize;
                 println!(
                     "\nVM concurrency level defaults to {} for number of shards {} \n",
-                    level, self.num_executor_shards
+                    level, self.pipeline_opt.num_executor_shards
                 );
                 level
             },
@@ -303,7 +306,7 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
     AptosVM::set_concurrency_level_once(opt.concurrency_level());
-    AptosVM::set_num_shards_once(opt.num_executor_shards);
+    AptosVM::set_num_shards_once(opt.pipeline_opt.num_executor_shards);
     NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
 
     if opt.use_native_executor {

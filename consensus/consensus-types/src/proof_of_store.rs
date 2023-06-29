@@ -310,7 +310,7 @@ impl ProofOfStore {
     pub fn shuffled_signers(&self, validator: &ValidatorVerifier) -> Vec<PeerId> {
         let mut ret: Vec<PeerId> = self
             .multi_signature
-            .get_voter_addresses(&validator.get_ordered_account_addresses());
+            .get_signers_addresses(&validator.get_ordered_account_addresses());
         ret.shuffle(&mut thread_rng());
         ret
     }

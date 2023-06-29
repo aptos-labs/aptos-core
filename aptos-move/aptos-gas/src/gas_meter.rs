@@ -34,6 +34,7 @@ use std::collections::BTreeMap;
 
 // Change log:
 // - V10
+//   - Added generate_unique_address and get_txn_hash native functions
 //   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
 // - V9
 //   - Accurate tracking of the cost of loading resource groups

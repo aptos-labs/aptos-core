@@ -235,7 +235,7 @@ def workflow_dispatch_forge(
     return True
 
 
-def ensure_git_status(git: Git) -> Tuple[str, str]:
+def ensure_git_status(git: Git, ignore_uncommitted_changes: bool) -> Tuple[str, str]:
     """Ensure that the git status is clean and return the git SHA and branch name of the experimental branch"""
     current_git_branch = git.branch()
     new_exp_git_branch = (
@@ -247,7 +247,10 @@ def ensure_git_status(git: Git) -> Tuple[str, str]:
         log.info("ERROR: uncommitted changes in git workspace")
         uncommitted_files = git.run(["status", "--porcelain"]).unwrap().decode().strip()
         log.info("Uncommitted files:\n%s", uncommitted_files)
-        cleanup_and_exit(git, 1)
+        if ignore_uncommitted_changes:
+            log.info("WARNING: ignoring uncommitted changes in the git workspace")
+        else:
+            cleanup_and_exit(git, 1)
 
     # create a new branch and push it to the remote
     try:
@@ -291,6 +294,11 @@ def main(log_metadata: bool) -> None:
     help="Cargo profile to build",
 )
 @click.option(
+    "--ignore-uncommitted-changes",
+    is_flag=True,
+    help="Ignores uncommitted changes in the git workspace",
+)
+@click.option(
     "--wait",
     is_flag=True,
     help="Wait for all scheduled workflows to finish",
@@ -318,16 +326,21 @@ def main(log_metadata: bool) -> None:
 def run(
     features: List[str],
     profile: str,
+    ignore_uncommitted_changes: bool,
     wait: bool,
     dry_run: bool,
     with_forge: bool,
     forge_runner_duration_secs: int,
     forge_test_suite: str,
 ) -> None:
+    # If --with-forge is specified, --wait should be True, otherwise the job will fail.
+    if with_forge:
+        wait = True
+
     shell = LocalShell()
     git = Git(shell)
 
-    git_sha, new_exp_git_branch = ensure_git_status(git)
+    git_sha, new_exp_git_branch = ensure_git_status(git, ignore_uncommitted_changes)
     features = ",".join(features)
     profile = profile
 

@@ -47,9 +47,16 @@ module aptos_std::pool_u64 {
     }
 
     /// Create a new pool.
-    public fun create(shareholders_limit: u64): Pool {
+    public fun new(shareholders_limit: u64): Pool {
         // Default to a scaling factor of 1 (effectively no scaling).
         create_with_scaling_factor(shareholders_limit, 1)
+    }
+
+    #[deprecated]
+    /// Deprecated. Use `new` instead.
+    /// Create a new pool.
+    public fun create(shareholders_limit: u64): Pool {
+        new(shareholders_limit)
     }
 
     /// Create a new pool with custom `scaling_factor`.
@@ -274,7 +281,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_buy_in_and_redeem() {
-        let pool = create(5);
+        let pool = new(5);
 
         // Shareholders 1 and 2 buy in first.
         buy_in(&mut pool, @1, 1000);
@@ -329,14 +336,14 @@ module aptos_std::pool_u64 {
     #[test]
     #[expected_failure(abort_code = 196611, location = Self)]
     public entry fun test_destroy_empty_should_fail_if_not_empty() {
-        let pool = create(1);
+        let pool = new(1);
         update_total_coins(&mut pool, 100);
         destroy_empty(pool);
     }
 
     #[test]
     public entry fun test_buy_in_and_redeem_large_numbers() {
-        let pool = create(2);
+        let pool = new(2);
         let half_max_u64 = MAX_U64 / 2;
         let shares_1 = buy_in(&mut pool, @1, half_max_u64);
         assert!(shares_1 == half_max_u64, 0);
@@ -363,7 +370,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_buy_in_zero_amount() {
-        let pool = create(2);
+        let pool = new(2);
         buy_in(&mut pool, @1, 100);
         assert!(buy_in(&mut pool, @2, 0) == 0, 0);
         assert!(total_shares(&pool) == shares(&pool, @1), 1);
@@ -373,7 +380,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_buy_in_with_small_coins_amount() {
-        let pool = create(2);
+        let pool = new(2);
         // Shareholder 1 buys in with 1e17 coins.
         buy_in(&mut pool, @1, 100000000000000000);
         // Shareholder 2 buys in with a very small amount.
@@ -390,7 +397,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_add_zero_shares_should_not_add_shareholder() {
-        let pool = create(1);
+        let pool = new(1);
         update_total_coins(&mut pool, 1000);
         assert!(add_shares(&mut pool, @1, 0) == 0, 0);
         assert!(shareholders_count(&pool) == 0, 1);
@@ -399,7 +406,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_add_zero_shares_returns_existing_number_of_shares() {
-        let pool = create(1);
+        let pool = new(1);
         update_total_coins(&mut pool, 1000);
         add_shares(&mut pool, @1, 1);
         assert!(shares(&pool, @1) == add_shares(&mut pool, @1, 0), 0);
@@ -408,7 +415,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_add_shares_existing_shareholder() {
-        let pool = create(1);
+        let pool = new(1);
         update_total_coins(&mut pool, 1000);
         add_shares(&mut pool, @1, 1);
         add_shares(&mut pool, @1, 2);
@@ -418,7 +425,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_add_shares_new_shareholder() {
-        let pool = create(2);
+        let pool = new(2);
         update_total_coins(&mut pool, 1000);
         add_shares(&mut pool, @1, 1);
         add_shares(&mut pool, @2, 2);
@@ -430,7 +437,7 @@ module aptos_std::pool_u64 {
     #[test]
     #[expected_failure(abort_code = 196610, location = Self)]
     public entry fun test_add_shares_should_enforce_shareholder_limit() {
-        let pool = create(2);
+        let pool = new(2);
         add_shares(&mut pool, @1, 1);
         add_shares(&mut pool, @2, 2);
         add_shares(&mut pool, @3, 2);
@@ -439,7 +446,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_add_shares_should_work_after_reducing_shareholders_below_limit() {
-        let pool = create(3);
+        let pool = new(3);
         add_shares(&mut pool, @1, 1);
         add_shares(&mut pool, @2, 2);
         deduct_shares(&mut pool, @2, 2);
@@ -451,7 +458,7 @@ module aptos_std::pool_u64 {
     #[test]
     #[expected_failure(abort_code = 65537, location = Self)]
     public entry fun test_redeem_shares_non_existent_shareholder() {
-        let pool = create(1);
+        let pool = new(1);
         add_shares(&mut pool, @1, 1);
         redeem_shares(&mut pool, @2, 1);
         destroy_pool(pool);
@@ -460,7 +467,7 @@ module aptos_std::pool_u64 {
     #[test]
     #[expected_failure(abort_code = 65540, location = Self)]
     public entry fun test_redeem_shares_insufficient_shares() {
-        let pool = create(1);
+        let pool = new(1);
         add_shares(&mut pool, @1, 1);
         redeem_shares(&mut pool, @1, 2);
         destroy_pool(pool);
@@ -468,7 +475,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_redeem_small_number_of_shares() {
-        let pool = create(2);
+        let pool = new(2);
         // 1e17 shares and coins.
         buy_in(&mut pool, @1, 100000000000000000);
         buy_in(&mut pool, @2, 100000000000000000);
@@ -478,7 +485,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_redeem_zero_shares() {
-        let pool = create(2);
+        let pool = new(2);
         buy_in(&mut pool, @1, 1);
         assert!(redeem_shares(&mut pool, @1, 0) == 0, 0);
         assert!(shares(&pool, @1) == 1, 1);
@@ -490,7 +497,7 @@ module aptos_std::pool_u64 {
     #[test]
     #[expected_failure(abort_code = 65537, location = Self)]
     public entry fun test_deduct_shares_non_existent_shareholder() {
-        let pool = create(1);
+        let pool = new(1);
         add_shares(&mut pool, @1, 1);
         deduct_shares(&mut pool, @2, 1);
         destroy_pool(pool);
@@ -499,7 +506,7 @@ module aptos_std::pool_u64 {
     #[test]
     #[expected_failure(abort_code = 65540, location = Self)]
     public entry fun test_deduct_shares_insufficient_shares() {
-        let pool = create(1);
+        let pool = new(1);
         add_shares(&mut pool, @1, 1);
         deduct_shares(&mut pool, @1, 2);
         destroy_pool(pool);
@@ -507,7 +514,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_deduct_shares_remove_shareholder_with_no_shares() {
-        let pool = create(2);
+        let pool = new(2);
         add_shares(&mut pool, @1, 1);
         add_shares(&mut pool, @2, 2);
         assert!(shareholders_count(&pool) == 2, 0);
@@ -518,7 +525,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_transfer_shares() {
-        let pool = create(2);
+        let pool = new(2);
         add_shares(&mut pool, @1, 2);
         add_shares(&mut pool, @2, 2);
         assert!(shareholders_count(&pool) == 2, 0);
@@ -530,7 +537,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_amount_to_shares_empty_pool() {
-        let pool = create(1);
+        let pool = new(1);
         // No total shares and total coins.
         assert!(amount_to_shares(&pool, 1000) == 1000, 0);
 
@@ -547,7 +554,7 @@ module aptos_std::pool_u64 {
 
     #[test]
     public entry fun test_shares_to_amount_empty_pool() {
-        let pool = create(1);
+        let pool = new(1);
         // No total shares and total coins.
         assert!(shares_to_amount(&pool, 1000) == 0, 0);
 
