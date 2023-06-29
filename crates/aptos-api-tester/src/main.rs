@@ -162,6 +162,28 @@ async fn probe_getaccountbalance_1() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
+// Calls get_account_balance on a static account.
+async fn probe_getaccountbalance_2() -> Result<&'static str> {
+    // create the rest client
+    let client = Client::new(TESTNET_NODE_URL.clone());
+
+    // ask for account balance
+    let response = client
+        .get_account_balance(*TEST_ACCOUNT_1)
+        .await
+        .context(ERROR_CLIENT_RESPONSE)?;
+    let response = response.inner();
+
+    // check balance
+    let expected_balance = U64(176767177);
+    let actual_balance = response.coin.value;
+    if !(actual_balance == expected_balance) {
+        return Ok(FAIL_WRONG_BALANCE);
+    }
+
+    Ok(SUCCESS)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     match probe_getaccount_1().await {
@@ -173,6 +195,10 @@ async fn main() -> Result<()> {
         Err(e) => println!("{}", e),
     }
     match probe_getaccountbalance_1().await {
+        Ok(result) => println!("{}", result),
+        Err(e) => println!("{}", e),
+    }
+    match probe_getaccountbalance_2().await {
         Ok(result) => println!("{}", result),
         Err(e) => println!("{}", e),
     }
