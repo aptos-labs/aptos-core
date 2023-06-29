@@ -149,7 +149,7 @@ backup_verify:
 
 backup_compaction:
   # -- The schedule for backup compaction
-  schedule: "@daily"
+  schedule: "0 6 * * *"
   resources:
     limits:
       cpu: 1
