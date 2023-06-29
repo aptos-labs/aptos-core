@@ -3,11 +3,14 @@
 
 use crate::{
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
-    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction::TransactionSchema,
+    },
     TransactionStore,
 };
-use anyhow::Result;
-use aptos_schemadb::{SchemaBatch, DB};
+use anyhow::{ensure, Result};
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_types::transaction::{Transaction, Version};
 use std::sync::Arc;
 
@@ -65,9 +68,25 @@ impl TransactionPruner {
         &self,
         start: Version,
         end: Version,
-    ) -> anyhow::Result<Vec<Transaction>> {
-        self.transaction_store
-            .get_transaction_iter(start, (end - start) as usize)?
-            .collect()
+    ) -> Result<Vec<Transaction>> {
+        ensure!(end >= start);
+
+        let mut iter = self
+            .transaction_db
+            .iter::<TransactionSchema>(ReadOptions::default())?;
+        iter.seek(&start)?;
+
+        // The capacity is capped by the max number of txns we prune in a single batch. It's a
+        // relatively small number set in the config, so it won't cause high memory usage here.
+        let mut txns = Vec::with_capacity((end - start) as usize);
+        for item in iter {
+            let (version, txn) = item?;
+            if version >= end {
+                break;
+            }
+            txns.push(txn);
+        }
+
+        Ok(txns)
     }
 }
