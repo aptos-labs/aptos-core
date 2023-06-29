@@ -137,16 +137,43 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
   }
 
   if (argType instanceof TypeTagStruct) {
-    const { address, module_name: moduleName, name } = (argType as TypeTagStruct).value;
-    if (
-      `${HexString.fromUint8Array(address.address).toShortString()}::${moduleName.value}::${name.value}` !==
-      "0x1::string::String"
-    ) {
-      throw new Error("The only supported struct arg is of type 0x1::string::String");
-    }
-    assertType(argVal, ["string"]);
+    const { address, module_name: moduleName, name, typeArgs } = (argType as TypeTagStruct).value;
+    const structType = `${HexString.fromUint8Array(address.address).toShortString()}::${moduleName.value}::${
+      name.value
+    }`;
+    if (structType === "0x1::string::String") {
+      assertType(argVal, ["string"]);
+      serializer.serializeStr(argVal);
+    } else if (structType === "0x1::option::Option") {
+      // For option, we determine if it's empty or not empty first
+      // empty option is nothing, we specifically check for undefined to prevent fuzzy matching
+      if (argVal === undefined) {
+        serializer.serializeU32AsUleb128(0);
+        return;
+      }
 
-    serializer.serializeStr(argVal);
+      // Something means we need an array of 1
+      serializer.serializeU32AsUleb128(1);
+
+      // Serialize the inner type arg
+      // Checking first to prevent loops and bad types TODO: possibly just do a count on nesting
+      const innerType = typeArgs[0];
+      if (innerType instanceof TypeTagStruct) {
+        const { address: innerAddress, module_name: innerModule, name: innerName } = (argType as TypeTagStruct).value;
+
+        const innerStructType = `${HexString.fromUint8Array(innerAddress.address).toShortString()}::${
+          innerModule.value
+        }::${innerName.value}`;
+        if (innerStructType === "0x1::option::Option") {
+          throw new Error("Options can not be nested in options.");
+        }
+      }
+
+      serializeArg(argVal, innerType, serializer);
+
+      throw new Error("Unsupported struct type in function argument");
+    }
+
     return;
   }
   throw new Error("Unsupported arg type.");
