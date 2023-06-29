@@ -395,6 +395,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-api-tester"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "aptos-types",
+ "once_cell",
+ "rand 0.7.3",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "aptos-api-types"
 version = "0.0.1"
 dependencies = [
