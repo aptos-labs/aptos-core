@@ -43,13 +43,16 @@ where
         Ok(())
     });
     let main_task_handler = runtime.spawn(async move { config.run().await });
-    let results = futures::future::join_all(vec![task_handler, main_task_handler]).await;
-    let errors = results.iter().filter(|r| r.is_err()).collect::<Vec<_>>();
-    if !errors.is_empty() {
-        return Err(anyhow::anyhow!("Failed to run server: {:?}", errors));
+    tokio::select! {
+        _ = task_handler => {
+            error!("Probes and metrics handler exited");
+            process::exit(1);
+        },
+        _ = main_task_handler => {
+            error!("Main task exited");
+            process::exit(1);
+        },
     }
-    // TODO(larry): fix the dropped runtime issue.
-    Ok(())
 }
 
 #[derive(Deserialize, Debug, Serialize)]

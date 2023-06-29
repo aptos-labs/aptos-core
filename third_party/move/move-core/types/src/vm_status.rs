@@ -282,6 +282,10 @@ impl fmt::Display for VMStatus {
             status = format!("{} with sub status {}", status, code);
         }
 
+        if let Some(msg) = self.message() {
+            status = format!("{} with message {}", status, msg);
+        }
+
         write!(f, "{}", status)
     }
 }

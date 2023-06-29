@@ -496,7 +496,7 @@ impl CliCommand<&'static str> for TestPackage {
             self.compute_coverage,
             &mut std::io::stdout(),
         )
-        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+        .map_err(|err| CliError::UnexpectedError(format!("Failed to run tests: {:#}", err)))?;
 
         // Print coverage summary if --coverage is set
         if self.compute_coverage {

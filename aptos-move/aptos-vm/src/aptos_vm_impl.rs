@@ -52,14 +52,14 @@ pub const GAS_PAYER_FLAG_BIT: u64 = 1u64 << 63; // MSB of sequence number is use
 pub struct AptosVMImpl {
     move_vm: MoveVmExt,
     gas_feature_version: u64,
-    gas_params: Option<AptosGasParameters>,
-    storage_gas_params: Option<StorageGasParameters>,
+    gas_params: Result<AptosGasParameters, String>,
+    storage_gas_params: Result<StorageGasParameters, String>,
     version: Option<Version>,
     transaction_validation: Option<TransactionValidation>,
     features: Features,
 }
 
-pub fn gas_config(storage: &impl MoveResolverExt) -> (Option<AptosGasParameters>, u64) {
+pub fn gas_config(storage: &impl MoveResolverExt) -> (Result<AptosGasParameters, String>, u64) {
     match GasScheduleV2::fetch_config(storage) {
         Some(gas_schedule) => {
             let feature_version = gas_schedule.feature_version;
@@ -74,7 +74,7 @@ pub fn gas_config(storage: &impl MoveResolverExt) -> (Option<AptosGasParameters>
                 let map = gas_schedule.to_btree_map();
                 (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
             },
-            None => (None, 0),
+            None => (Err("Neither gas schedule v2 nor v1 exists.".to_string()), 0),
         },
     }
 }
@@ -85,35 +85,35 @@ impl AptosVMImpl {
         let storage = StorageAdapter::new(state);
 
         // Get the gas parameters
-        let (mut gas_params, gas_feature_version): (Option<AptosGasParameters>, u64) =
-            gas_config(&storage);
+        let (mut gas_params, gas_feature_version) = gas_config(&storage);
 
-        let storage_gas_params = if let Some(gas_params) = &mut gas_params {
-            let storage_gas_params =
-                StorageGasParameters::new(gas_feature_version, gas_params, &storage);
+        let storage_gas_params = match &mut gas_params {
+            Ok(gas_params) => {
+                let storage_gas_params =
+                    StorageGasParameters::new(gas_feature_version, gas_params, &storage);
 
-            if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
-                // Overwrite table io gas parameters with global io pricing.
-                let g = &mut gas_params.natives.table.common;
-                match gas_feature_version {
-                    0..=1 => (),
-                    2..=6 => {
-                        g.load_base_legacy = pricing.per_item_read * NumArgs::new(1);
-                        g.load_base_new = 0.into();
-                        g.load_per_byte = pricing.per_byte_read;
-                        g.load_failure = 0.into();
-                    },
-                    7.. => {
-                        g.load_base_legacy = 0.into();
-                        g.load_base_new = pricing.per_item_read * NumArgs::new(1);
-                        g.load_per_byte = pricing.per_byte_read;
-                        g.load_failure = 0.into();
-                    },
+                if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
+                    // Overwrite table io gas parameters with global io pricing.
+                    let g = &mut gas_params.natives.table.common;
+                    match gas_feature_version {
+                        0..=1 => (),
+                        2..=6 => {
+                            g.load_base_legacy = pricing.per_item_read * NumArgs::new(1);
+                            g.load_base_new = 0.into();
+                            g.load_per_byte = pricing.per_byte_read;
+                            g.load_failure = 0.into();
+                        },
+                        7.. => {
+                            g.load_base_legacy = 0.into();
+                            g.load_base_new = pricing.per_item_read * NumArgs::new(1);
+                            g.load_per_byte = pricing.per_byte_read;
+                            g.load_failure = 0.into();
+                        },
+                    }
                 }
-            }
-            Some(storage_gas_params)
-        } else {
-            None
+                Ok(storage_gas_params)
+            },
+            Err(err) => Err(format!("Failed to initialize storage gas params due to failure to load main gas parameters: {}", err)),
         };
 
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
@@ -121,8 +121,8 @@ impl AptosVMImpl {
         //            which logically speaking, shouldn't be handled by the VM at all.
         //            We should clean up the logic here once we get that refactored.
         let (native_gas_params, abs_val_size_gas_params) = match &gas_params {
-            Some(gas_params) => (gas_params.natives.clone(), gas_params.misc.abs_val.clone()),
-            None => (
+            Ok(gas_params) => (gas_params.natives.clone(), gas_params.misc.abs_val.clone()),
+            Err(_) => (
                 NativeGasParameters::zeros(),
                 AbstractValueSizeGasParameters::zeros(),
             ),
@@ -198,12 +198,10 @@ impl AptosVMImpl {
         &self,
         log_context: &AdapterLogSchema,
     ) -> Result<&AptosGasParameters, VMStatus> {
-        self.gas_params.as_ref().ok_or_else(|| {
-            speculative_error!(
-                log_context,
-                "VM Startup Failed. Gas Parameters Not Found".into()
-            );
-            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, None)
+        self.gas_params.as_ref().map_err(|err| {
+            let msg = format!("VM Startup Failed. {}", err);
+            speculative_error!(log_context, msg.clone());
+            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, Some(msg))
         })
     }
 
@@ -211,12 +209,10 @@ impl AptosVMImpl {
         &self,
         log_context: &AdapterLogSchema,
     ) -> Result<&StorageGasParameters, VMStatus> {
-        self.storage_gas_params.as_ref().ok_or_else(|| {
-            speculative_error!(
-                log_context,
-                "VM Startup Failed. Storage Gas Parameters Not Found".into()
-            );
-            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, None)
+        self.storage_gas_params.as_ref().map_err(|err| {
+            let msg = format!("VM Startup Failed. {}", err);
+            speculative_error!(log_context, msg.clone());
+            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, Some(msg))
         })
     }
 

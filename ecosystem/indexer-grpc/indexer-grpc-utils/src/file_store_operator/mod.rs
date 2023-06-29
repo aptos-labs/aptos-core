@@ -12,6 +12,7 @@ pub use local::*;
 
 pub const FILE_FOLDER_NAME: &str = "files";
 const METADATA_FILE_NAME: &str = "metadata.json";
+const VERIFICATION_FILE_NAME: &str = "verification.json";
 const FILE_STORE_UPDATE_FREQUENCY_SECS: u64 = 5;
 
 #[inline]
@@ -22,7 +23,7 @@ pub fn generate_blob_name(starting_version: u64) -> String {
 /// TransactionsFile is the file format for storing transactions.
 /// It's a JSON file with name: ${starting_version}.json.
 #[derive(Serialize, Deserialize)]
-pub(crate) struct TransactionsFile {
+pub struct TransactionsFile {
     // The version of the first transaction in the file.
     // It must be the same as the starting_version in the file name.
     pub starting_version: u64,
@@ -40,6 +41,15 @@ pub struct FileStoreMetadata {
     pub file_folder_size: usize,
     // The current version of the file store.
     pub version: u64,
+}
+
+/// FileStoreMetadata is the metadata for the file store.
+/// It's a JSON file with name: metadata.json.
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+pub struct VerificationMetadata {
+    pub chain_id: u64,
+    // The current version of the file store.
+    pub next_version_to_verify: u64,
 }
 
 impl FileStoreMetadata {
@@ -83,6 +93,21 @@ pub trait FileStoreOperator: Send + Sync {
         let metadata = self.get_file_store_metadata().await;
         metadata.map(|metadata| metadata.version)
     }
+    /// Gets the raw transaction file; mainly for verification purpose.
+    async fn get_raw_transactions(&self, version: u64) -> Result<TransactionsFile>;
+
+    /// Fetch the verification metadata file; this is used for bootstrap of the verifier.
+    async fn get_or_create_verification_metadata(
+        &self,
+        chain_id: u64,
+    ) -> Result<VerificationMetadata>;
+
+    /// Updates the verification metadata file.
+    async fn update_verification_metadata(
+        &mut self,
+        chain_id: u64,
+        next_version_to_verify: u64,
+    ) -> Result<()>;
 }
 
 pub(crate) fn build_transactions_file(
