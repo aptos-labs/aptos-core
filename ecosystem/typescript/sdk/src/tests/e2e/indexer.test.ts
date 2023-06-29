@@ -20,6 +20,9 @@ const collectionNameV2 = "AliceCollection2";
 const tokenName = "Alice Token";
 const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.DEVNET]);
 
+let skipTest = false;
+let runTests = describe;
+
 describe("Indexer", () => {
   it("should throw an error when account address is not valid", async () => {
     const address1 = "702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
@@ -41,56 +44,78 @@ describe("Indexer", () => {
   });
 
   beforeAll(async () => {
-    await faucetClient.fundAccount(alice.address(), 100000000);
-    // Create collection and token on Alice's account
-    await provider.waitForTransaction(
-      await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
-      { checkSuccess: true },
-    );
-    await provider.waitForTransaction(
-      await tokenClient.createTokenWithMutabilityConfig(
-        alice,
-        collectionName,
-        tokenName,
-        "Alice's simple token",
-        1,
-        "https://aptos.dev/img/nyan.jpeg",
-        1000,
-        alice.address(),
-        1,
-        0,
-        ["TOKEN_BURNABLE_BY_OWNER"],
-        [bcsSerializeBool(true)],
-        ["bool"],
-        [false, false, false, false, true],
-      ),
-      { checkSuccess: true },
+    const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
+    const fullNodeChainId = await provider.getChainId();
+
+    console.log(
+      `\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
     );
 
-    await provider.waitForTransaction(
-      await aptosToken.createCollection(alice, "Alice's simple collection", collectionNameV2, "https://aptos.dev", 5, {
-        royaltyNumerator: 10,
-        royaltyDenominator: 10,
-      }),
-      { checkSuccess: true },
-    );
+    if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
+      console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+      skipTest = true;
+      runTests = describe.skip;
+    }
 
-    await provider.waitForTransactionWithResult(
-      await aptosToken.mint(
-        alice,
-        collectionNameV2,
-        "Alice's simple token",
-        tokenName,
-        "https://aptos.dev/img/nyan.jpeg",
-        ["key"],
-        ["bool"],
-        ["true"],
-      ),
-      { checkSuccess: true },
-    );
+    if (!skipTest) {
+      await faucetClient.fundAccount(alice.address(), 100000000);
+      // Create collection and token on Alice's account
+      await provider.waitForTransaction(
+        await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+        { checkSuccess: true },
+      );
+      await provider.waitForTransaction(
+        await tokenClient.createTokenWithMutabilityConfig(
+          alice,
+          collectionName,
+          tokenName,
+          "Alice's simple token",
+          1,
+          "https://aptos.dev/img/nyan.jpeg",
+          1000,
+          alice.address(),
+          1,
+          0,
+          ["TOKEN_BURNABLE_BY_OWNER"],
+          [bcsSerializeBool(true)],
+          ["bool"],
+          [false, false, false, false, true],
+        ),
+        { checkSuccess: true },
+      );
+
+      await provider.waitForTransaction(
+        await aptosToken.createCollection(
+          alice,
+          "Alice's simple collection",
+          collectionNameV2,
+          "https://aptos.dev",
+          5,
+          {
+            royaltyNumerator: 10,
+            royaltyDenominator: 10,
+          },
+        ),
+        { checkSuccess: true },
+      );
+
+      await provider.waitForTransactionWithResult(
+        await aptosToken.mint(
+          alice,
+          collectionNameV2,
+          "Alice's simple token",
+          tokenName,
+          "https://aptos.dev/img/nyan.jpeg",
+          ["key"],
+          ["bool"],
+          ["true"],
+        ),
+        { checkSuccess: true },
+      );
+    }
   }, longTestTimeout);
 
-  describe("get data", () => {
+  runTests("get data", () => {
     jest.retryTimes(5);
     beforeEach(async () => {
       await sleep(1000);
