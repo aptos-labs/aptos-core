@@ -378,7 +378,7 @@ spec aptos_framework::staking_contract {
         let staker_address = signer::address_of(staker);
         let account = global<account::Account>(staker_address);
         aborts_if !exists<Store>(staker_address) && !exists<account::Account>(staker_address);
-        aborts_if !exists<Store>(staker_address) && account.guid_creation_num + 9 + 12 >= account::MAX_GUID_CREATION_NUM; // 12 in create_stake_pool
+        aborts_if !exists<Store>(staker_address) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
         ensures exists<Store>(staker_address);
 
         let store = global<Store>(staker_address);
@@ -457,6 +457,7 @@ spec aptos_framework::staking_contract {
         aborts_if exists<stake::AllowedValidators>(@aptos_framework) && !contains(allowed.accounts, resource_addr);
         aborts_if exists<stake::StakePool>(resource_addr);
         aborts_if exists<stake::OwnerCapability>(resource_addr);
+        // 12 is the times that calls 'events::guids'
         aborts_if exists<account::Account>(resource_addr) && acc.guid_creation_num + 12 >= account::MAX_GUID_CREATION_NUM;
     }
 }
