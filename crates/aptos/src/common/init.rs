@@ -139,31 +139,38 @@ impl CliCommand<()> for InitTool {
         }
 
         // Fetch the top 5 (index 0-4) accounts from Ledger
-        let derivative_path = if self.ledger {
+        let derivation_path = if self.ledger {
             let account_map = aptos_ledger::fetch_batch_accounts(Some(0..5))?;
             eprintln!(
-                "Please choose a derivative path from the following {} ledger accounts, or choose an arbitrary path that you want to use:",
+                "Please choose an index from the following {} ledger accounts, or choose an arbitrary index that you want to use:",
                 account_map.len()
             );
-            for (index, account) in account_map.iter() {
-                eprintln!("Path: {} Address {}", index, account);
+
+            // Iterate through the accounts and print them out
+            for (index, (derivation_path, account)) in account_map.iter().enumerate() {
+                eprintln!(
+                    "[{}] Derivation path: {} (Address: {})",
+                    index, derivation_path, account
+                );
             }
-            let input = read_line("derivative_path")?;
-            let input = input.trim();
+            let input_index = read_line("derivation_index")?;
+            let input_index = input_index.trim();
+            let path = aptos_ledger::DERIVATION_PATH.replace("{index}", input_index);
 
             // Validate the path
-            if !aptos_ledger::validate_derivative_path(input) {
+            if !aptos_ledger::validate_derivation_path(&path) {
                 return Err(CliError::UnexpectedError(
-                    "Invalid derivative path".to_owned(),
+                    "Invalid index input. Please make sure the input is a valid number index"
+                        .to_owned(),
                 ));
             }
-            Some(input.to_string())
+            Some(path)
         } else {
             None
         };
 
-        // Set the derivative_path to the one user chose
-        profile_config.derivative_path = derivative_path.clone();
+        // Set the derivation_path to the one user chose
+        profile_config.derivation_path = derivation_path.clone();
 
         // Private key
         let private_key = if self.ledger {
@@ -203,9 +210,9 @@ impl CliCommand<()> for InitTool {
         // Public key
         let public_key = if self.ledger {
             let pub_key = match aptos_ledger::get_public_key(
-                derivative_path
+                derivation_path
                     .ok_or(CliError::UnexpectedError(
-                        "Invalid derivative path".to_string(),
+                        "Invalid derivation path".to_string(),
                     ))?
                     .as_str(),
                 false,
