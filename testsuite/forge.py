@@ -988,8 +988,14 @@ def image_exists(
 
 def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> str:
     """
-    Sanitize the intended forge resource name to be a valid k8s resource name
+    Sanitize the intended forge resource name to be a valid k8s resource name.
+    Resource names must be: (i) 63 characters or less; (ii) contain characters
+    that are alphanumeric, '-', or '.'; (iii) start and end with an alphanumeric
+    character; and (iv) start with "forge-".
     """
+    if not forge_resource.startswith("forge-"):
+        raise Exception("Forge resource name must start with 'forge-'")
+
     sanitized_namespace = ""
     for i, c in enumerate(forge_resource):
         if i >= max_length:
@@ -997,9 +1003,13 @@ def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> s
         if c.isalnum():
             sanitized_namespace += c
         else:
-            sanitized_namespace += "-"
-    if not forge_resource.startswith("forge-"):
-        raise Exception("Forge resource name must start with 'forge-'")
+            sanitized_namespace += "-"  # Replace the invalid character with a '-'
+
+    if sanitized_namespace.endswith("-"):
+        sanitized_namespace = (
+            sanitized_namespace[:-1] + "0"
+        )  # Set the last character to '0'
+
     return sanitized_namespace
 
 
