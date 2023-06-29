@@ -168,8 +168,16 @@ impl StateKvDb {
         &self.state_kv_db_shards[shard_id as usize]
     }
 
+    pub(crate) fn db_shard_arc(&self, shard_id: u8) -> Arc<DB> {
+        Arc::clone(&self.state_kv_db_shards[shard_id as usize])
+    }
+
     pub(crate) fn enabled_sharding(&self) -> bool {
         self.enabled_sharding
+    }
+
+    pub(crate) fn num_shards(&self) -> u8 {
+        NUM_STATE_SHARDS as u8
     }
 
     pub(crate) fn commit_single_shard(

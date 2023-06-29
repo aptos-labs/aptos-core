@@ -536,6 +536,18 @@ impl MoveHarness {
             .sequence_number()
     }
 
+    pub fn modify_gas_schedule_raw(&mut self, modify: impl FnOnce(&mut GasScheduleV2)) {
+        let mut gas_schedule: GasScheduleV2 = self
+            .read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
+            .unwrap();
+        modify(&mut gas_schedule);
+        self.set_resource(
+            CORE_CODE_ADDRESS,
+            GasScheduleV2::struct_tag(),
+            &gas_schedule,
+        )
+    }
+
     pub fn modify_gas_schedule(&mut self, modify: impl FnOnce(&mut AptosGasParameters)) {
         let gas_schedule: GasScheduleV2 = self
             .read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())

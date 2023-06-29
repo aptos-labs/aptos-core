@@ -98,6 +98,7 @@ impl ProverOptions {
     /// Runs the move prover on the package.
     pub fn prove(
         self,
+        dev_mode: bool,
         package_path: &Path,
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
@@ -105,6 +106,7 @@ impl ProverOptions {
         let now = Instant::now();
         let for_test = self.for_test;
         let model = build_model(
+            dev_mode,
             package_path,
             named_addresses,
             self.filter.clone(),

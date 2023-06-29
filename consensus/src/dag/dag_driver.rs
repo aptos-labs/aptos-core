@@ -5,7 +5,7 @@ use crate::{
     dag::{
         dag_store::Dag,
         reliable_broadcast::ReliableBroadcast,
-        types::{CertificateAckState, CertifiedNode, Node, NodeMetadata, SignatureBuilder},
+        types::{CertificateAckState, CertifiedNode, Node, NodeCertificate, SignatureBuilder},
     },
     state_replication::PayloadClient,
     util::time_service::TimeService,
@@ -19,7 +19,7 @@ use futures::{
 };
 use std::sync::Arc;
 
-struct DagDriver {
+pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
@@ -55,7 +55,11 @@ impl DagDriver {
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let mut dag_writer = self.dag.write();
         let round = node.metadata().round();
-        if dag_writer.all_exists(node.parents().iter().map(|metadata| metadata.digest())) {
+        if dag_writer.all_exists(
+            node.parents()
+                .iter()
+                .map(|certificate| certificate.metadata().digest()),
+        ) {
             dag_writer.add_node(node)?;
             if self.current_round == round {
                 let maybe_strong_links = dag_writer
@@ -70,7 +74,7 @@ impl DagDriver {
         Ok(())
     }
 
-    pub fn enter_new_round(&mut self, strong_links: Vec<NodeMetadata>) {
+    pub fn enter_new_round(&mut self, strong_links: Vec<NodeCertificate>) {
         // TODO: support pulling payload
         let payload = Payload::empty(false);
         // TODO: need to wait to pass median of parents timestamp
@@ -90,7 +94,8 @@ impl DagDriver {
     pub fn broadcast_node(&mut self, node: Node) {
         let rb = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
-        let signature_builder = SignatureBuilder::new(node.digest(), self.epoch_state.clone());
+        let signature_builder =
+            SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let task = self
             .reliable_broadcast

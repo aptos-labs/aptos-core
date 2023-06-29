@@ -14,7 +14,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
     proof::position::Position,
-    state_store::state_storage_usage::StateStorageUsage,
+    state_merkle_pruner::state_storage_usage::StateStorageUsage,
     transaction::{SignedTransaction, Transaction, TransactionInfo, Version},
     write_set::WriteSet,
 };

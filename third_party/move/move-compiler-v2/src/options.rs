@@ -6,7 +6,7 @@ use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 
 /// Defines options for a run of the compiler.
-#[derive(Parser, Debug)]
+#[derive(Parser, Clone, Debug)]
 #[clap(author, version, about)]
 pub struct Options {
     /// Directories where to lookup dependencies.

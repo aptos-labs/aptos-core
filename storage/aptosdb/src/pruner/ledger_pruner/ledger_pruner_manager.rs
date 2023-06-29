@@ -5,10 +5,9 @@ use crate::{
     ledger_db::LedgerDb,
     metrics::{PRUNER_BATCH_SIZE, PRUNER_VERSIONS, PRUNER_WINDOW},
     pruner::{
-        ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
+        ledger_pruner::LedgerPruner, pruner_manager::PrunerManager, pruner_utils,
         pruner_worker::PrunerWorker,
     },
-    pruner_utils,
 };
 use anyhow::Result;
 use aptos_config::config::LedgerPrunerConfig;
@@ -137,7 +136,8 @@ impl LedgerPrunerManager {
         ledger_db: Arc<LedgerDb>,
         ledger_pruner_config: LedgerPrunerConfig,
     ) -> PrunerWorker {
-        let pruner = pruner_utils::create_ledger_pruner(ledger_db);
+        let pruner =
+            Arc::new(LedgerPruner::new(ledger_db).expect("Failed to create ledger pruner."));
 
         PRUNER_WINDOW
             .with_label_values(&["ledger_pruner"])

@@ -5,6 +5,9 @@ version = "0.0.1"
 [addresses]
 addr = "_"
 
+[dev-addresses]
+addr = "0x12345"
+
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-core.git"
 rev = "devnet"
