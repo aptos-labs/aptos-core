@@ -16,7 +16,7 @@ use hex::encode;
 use ledger_apdu::APDUCommand;
 use ledger_transport_hid::{hidapi::HidApi, LedgerHIDError, TransportNativeHID};
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fmt,
     fmt::{Debug, Display},
     ops::Range,
@@ -25,10 +25,10 @@ use std::{
 };
 use thiserror::Error;
 
-/// Derivative path template
+/// Derivation path template
 /// A piece of data which tells a wallet how to derive a specific key within a tree of keys
 /// 637 is the key for Aptos
-pub const DERIVATIVE_PATH: &str = "m/44'/637'/{index}'/0'/0'";
+pub const DERIVATION_PATH: &str = "m/44'/637'/{index}'/0'/0'";
 
 const CLA_APTOS: u8 = 0x5B; // Aptos CLA Instruction class
 const INS_GET_VERSION: u8 = 0x03; // Get version instruction code
@@ -76,8 +76,8 @@ impl Display for Version {
     }
 }
 
-/// Validate the input derivative path to check if it's valid
-pub fn validate_derivative_path(input: &str) -> bool {
+/// Validate the input derivation path to check if it's valid
+pub fn validate_derivation_path(input: &str) -> bool {
     let prefix = "m/44'/637'/";
     let suffix = "'";
 
@@ -183,7 +183,7 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
 /// * `index_range` - start(inclusive) - end(exclusive) acounts, that you want to fetch, if None default to 0-10
 pub fn fetch_batch_accounts(
     index_range: Option<Range<u32>>,
-) -> Result<HashMap<String, AccountAddress>, AptosLedgerError> {
+) -> Result<BTreeMap<String, AccountAddress>, AptosLedgerError> {
     let range = if let Some(range) = index_range {
         range
     } else {
@@ -201,9 +201,9 @@ pub fn fetch_batch_accounts(
     // Open connection to ledger
     let transport = open_ledger_transport()?;
 
-    let mut accounts = HashMap::new();
+    let mut accounts = BTreeMap::new();
     for i in range {
-        let path = DERIVATIVE_PATH.replace("{index}", &i.to_string());
+        let path = DERIVATION_PATH.replace("{index}", &i.to_string());
         let cdata = serialize_bip32(&path);
 
         match transport.exchange(&APDUCommand {
@@ -263,7 +263,7 @@ pub fn get_public_key(path: &str, display: bool) -> Result<Ed25519PublicKey, Apt
     // Open connection to ledger
     let transport = open_ledger_transport()?;
 
-    // Serialize the derivative path
+    // Serialize the derivation path
     let cdata = serialize_bip32(path);
 
     // APDU command's instruction parameter 1 or p1
@@ -316,22 +316,22 @@ pub fn get_public_key(path: &str, display: bool) -> Result<Ed25519PublicKey, Apt
 ///
 /// # Arguments
 ///
-/// * `path` - derivative path of the ledger account
+/// * `path` - derivation path of the ledger account
 /// * `raw_message` - the raw message that need to be signed
 pub fn sign_message(path: &str, raw_message: &[u8]) -> Result<Ed25519Signature, AptosLedgerError> {
     // open connection to ledger
     let transport = open_ledger_transport()?;
 
-    // Serialize the derivative path
-    let derivative_path_bytes = serialize_bip32(path);
+    // Serialize the derivation path
+    let derivation_path_bytes = serialize_bip32(path);
 
-    // Send the derivative path over as first message
+    // Send the derivation path over as first message
     let sign_start = transport.exchange(&APDUCommand {
         cla: CLA_APTOS,
         ins: INS_SIGN_TXN,
         p1: P1_START,
         p2: P2_MORE,
-        data: derivative_path_bytes,
+        data: derivation_path_bytes,
     });
 
     if let Err(err) = sign_start {
