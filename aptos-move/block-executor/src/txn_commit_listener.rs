@@ -10,10 +10,11 @@ use std::fmt::Debug;
 
 /// An interface for listening to transaction commit events. The listener is called only once
 /// for each transaction commit.
-pub trait TransactionCommitListener: Send + Sync {
+pub trait TransactionCommitListener<TO>: Send + Sync {
     type ExecutionStatus;
 
     fn on_transaction_committed(&self, txn_idx: TxnIndex, execution_status: &Self::ExecutionStatus);
+    fn send_remote_update_for_success(&self, txn_idx: TxnIndex, txn_output: &TO);
 }
 
 pub struct NoOpTransactionCommitListener<T, E> {
@@ -34,7 +35,7 @@ impl<T: TransactionOutput, E: Debug + Sync + Send> NoOpTransactionCommitListener
     }
 }
 
-impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitListener
+impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitListener<T>
     for NoOpTransactionCommitListener<T, E>
 {
     type ExecutionStatus = ExecutionStatus<T, Error<E>>;
@@ -45,5 +46,9 @@ impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitListener
         _execution_status: &Self::ExecutionStatus
     ) {
         // no-op
+    }
+
+    fn send_remote_update_for_success(&self, txn_idx: TxnIndex, txn_output: &T) {
+        //no-op
     }
 }

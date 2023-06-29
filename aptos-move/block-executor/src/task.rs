@@ -99,4 +99,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
+
+    fn committed_output(&self) -> Option<&aptos_types::transaction::TransactionOutput>;
 }

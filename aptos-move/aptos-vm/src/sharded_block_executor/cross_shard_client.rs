@@ -27,6 +27,7 @@ use std::{
         Arc, Mutex,
     },
 };
+use aptos_block_executor::task::TransactionOutput;
 use aptos_crypto::hash::CryptoHash;
 
 pub struct CrossShardCommitReceiver {}
@@ -107,12 +108,41 @@ impl CrossShardCommitSender {
             index_offset: sub_block.start_index as TxnIndex,
         }
     }
+}
+
+impl<TO: TransactionOutput> TransactionCommitListener<TO> for CrossShardCommitSender {
+    type ExecutionStatus = ExecutionStatus<AptosTransactionOutput, Error<VMStatus>>;
+
+    fn on_transaction_committed(
+        &self,
+        txn_idx: TxnIndex,
+        execution_status: &Self::ExecutionStatus,
+    ) {
+        let global_txn_idx = txn_idx + self.index_offset;
+        if self.dependent_edges.contains_key(&global_txn_idx) {
+            match execution_status {
+                ExecutionStatus::Success(output) => {
+                    self.send_remote_update_for_success(txn_idx, output);
+                },
+                ExecutionStatus::Abort(_) => {
+                    todo!("Handle abort case")
+                },
+                ExecutionStatus::SkipRest(output) => {
+                    self.send_remote_update_for_success(txn_idx, output);
+                },
+            }
+        }
+    }
 
     fn send_remote_update_for_success(
         &self,
         txn_idx: TxnIndex,
-        txn_output: &AptosTransactionOutput,
+        txn_output: &TO,
     ) {
+        let txn_idx = self.index_offset + txn_idx;
+        if !self.dependent_edges.contains_key(&txn_idx) {
+            return;
+        }
         let edges = self.dependent_edges.get(&txn_idx).unwrap();
         let write_set = txn_output.committed_output().unwrap().write_set();
 
@@ -131,31 +161,6 @@ impl CrossShardCommitSender {
                         .send(message)
                         .unwrap();
                 }
-            }
-        }
-    }
-}
-
-impl TransactionCommitListener for CrossShardCommitSender {
-    type ExecutionStatus = ExecutionStatus<AptosTransactionOutput, Error<VMStatus>>;
-
-    fn on_transaction_committed(
-        &self,
-        txn_idx: TxnIndex,
-        execution_status: &Self::ExecutionStatus,
-    ) {
-        let global_txn_idx = txn_idx + self.index_offset;
-        if self.dependent_edges.contains_key(&global_txn_idx) {
-            match execution_status {
-                ExecutionStatus::Success(output) => {
-                    self.send_remote_update_for_success(global_txn_idx, output);
-                },
-                ExecutionStatus::Abort(_) => {
-                    todo!("Handle abort case")
-                },
-                ExecutionStatus::SkipRest(output) => {
-                    self.send_remote_update_for_success(global_txn_idx, output);
-                },
             }
         }
     }

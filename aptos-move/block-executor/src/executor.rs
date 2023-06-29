@@ -85,7 +85,7 @@ where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitListener<ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>>,
+    L: TransactionCommitListener<E::Output, ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>>,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
@@ -734,9 +734,6 @@ where
                 },
             };
 
-            if let Some(listener) = transaction_commit_listener {
-                listener.on_transaction_committed(idx as TxnIndex, &res);
-            }
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -753,6 +750,10 @@ where
                     let fee_statement = output.fee_statement();
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
                     self.update_sequential_txn_gas_counters(&accumulated_fee_statement);
+                    if let Some(listener) = transaction_commit_listener {
+                        output.incorporate_delta_writes(vec![]);
+                        listener.send_remote_update_for_success(idx as TxnIndex, &output);
+                    }
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {

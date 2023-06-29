@@ -63,11 +63,7 @@ impl AptosTransactionOutput {
         }
     }
 
-    pub(crate) fn committed_output(&self) -> Option<&TransactionOutput> {
-        self.committed_output.get()
-    }
-
-    fn take_output(mut self) -> TransactionOutput {
+    pub fn take_output(mut self) -> TransactionOutput {
         match self.committed_output.take() {
             Some(output) => output,
             None => self
@@ -82,6 +78,10 @@ impl AptosTransactionOutput {
 
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type Txn = PreprocessedTransaction;
+
+    fn committed_output(&self) -> Option<&TransactionOutput> {
+        self.committed_output.get()
+    }
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self {
@@ -202,7 +202,7 @@ impl BlockAptosVM {
 
     pub fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitListener<ExecutionStatus = BlockExecutorExecutionStatus<AptosTransactionOutput, Error<VMStatus>>,>,
+        L: TransactionCommitListener<AptosTransactionOutput, ExecutionStatus = BlockExecutorExecutionStatus<AptosTransactionOutput, Error<VMStatus>>,>,
     >(
         executor_thread_pool: Arc<ThreadPool>,
         transactions: BlockExecutorTransactions<Transaction>,
