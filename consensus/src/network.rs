@@ -5,12 +5,13 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
+    dag::DAGNetworkMessage,
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     quorum_store::types::{Batch, BatchMsg, BatchRequest},
 };
-use anyhow::{anyhow, ensure};
+use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
@@ -39,10 +40,29 @@ use futures::{
     stream::{select, select_all},
     SinkExt, Stream, StreamExt,
 };
+use serde::{de::DeserializeOwned, Serialize};
 use std::{
     mem::{discriminant, Discriminant},
     time::Duration,
 };
+
+pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
+    fn epoch(&self) -> u64;
+
+    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
+        match msg {
+            ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+            _ => bail!("unexpected consensus message type {:?}", msg),
+        }
+    }
+
+    fn into_network_message(self) -> ConsensusMsg {
+        ConsensusMsg::DAGMessage(DAGNetworkMessage {
+            epoch: self.epoch(),
+            data: bcs::to_bytes(&self).unwrap(),
+        })
+    }
+}
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
@@ -56,6 +76,13 @@ pub struct IncomingBlockRetrievalRequest {
 #[derive(Debug)]
 pub struct IncomingBatchRetrievalRequest {
     pub req: BatchRequest,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
+pub struct IncomingDAGRequest {
+    pub req: ConsensusMsg,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }

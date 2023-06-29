@@ -4,20 +4,28 @@
 use crate::{constants::BLOB_STORAGE_SIZE, file_store_operator::*, EncodedTransactionWithVersion};
 use cloud_storage::{Bucket, Object};
 use itertools::{any, Itertools};
+use std::env;
 
 const JSON_FILE_TYPE: &str = "application/json";
+// The environment variable to set the service account path.
+const SERVICE_ACCOUNT_ENV_VAR: &str = "SERVICE_ACCOUNT";
 
 pub struct GcsFileStoreOperator {
     bucket_name: String,
     /// The timestamp of the latest metadata update; this is to avoid too frequent metadata update.
     latest_metadata_update_timestamp: Option<std::time::Instant>,
+
+    /// The timestamp of the latest verification metadata update; this is to avoid too frequent metadata update.
+    latest_verification_metadata_update_timestamp: Option<std::time::Instant>,
 }
 
 impl GcsFileStoreOperator {
-    pub fn new(bucket_name: String) -> Self {
+    pub fn new(bucket_name: String, service_account_path: String) -> Self {
+        env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
         Self {
             bucket_name,
             latest_metadata_update_timestamp: None,
+            latest_verification_metadata_update_timestamp: None,
         }
     }
 }
@@ -43,7 +51,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
         match Object::download(&self.bucket_name, current_file_name.as_str()).await {
             Ok(file) => {
                 let file: TransactionsFile =
-                    serde_json::from_slice(&file).expect("Expected file to be valid JSON.");
+                    serde_json::from_slice(&file).map_err(|e| anyhow::anyhow!(e.to_string()))?;
                 Ok(file
                     .transactions
                     .into_iter()
@@ -67,6 +75,15 @@ impl FileStoreOperator for GcsFileStoreOperator {
                 );
             },
         }
+    }
+
+    /// Gets the raw transactions file from the file store. Mainly for verification purpose.
+    async fn get_raw_transactions(&self, version: u64) -> anyhow::Result<TransactionsFile> {
+        let batch_start_version = version / BLOB_STORAGE_SIZE as u64 * BLOB_STORAGE_SIZE as u64;
+        let current_file_name = generate_blob_name(batch_start_version);
+        let bytes = Object::download(&self.bucket_name, current_file_name.as_str()).await?;
+        serde_json::from_slice(&bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize transactions file: {}", e))
     }
 
     /// Gets the metadata from the file store. Operator will panic if error happens when accessing the metadata file(except not found).
@@ -153,6 +170,40 @@ impl FileStoreOperator for GcsFileStoreOperator {
         }
     }
 
+    /// Updates the verification metadata file.
+    async fn update_verification_metadata(
+        &mut self,
+        chain_id: u64,
+        next_version_to_verify: u64,
+    ) -> Result<()> {
+        let verification_metadata = VerificationMetadata {
+            chain_id,
+            next_version_to_verify,
+        };
+        let time_now = std::time::Instant::now();
+        if let Some(last_update_time) = self.latest_verification_metadata_update_timestamp {
+            if time_now.duration_since(last_update_time) < std::time::Duration::from_secs(20) {
+                return Ok(());
+            }
+        }
+        // If the metadata is not updated, the indexer will be restarted.
+        match Object::create(
+            self.bucket_name.as_str(),
+            serde_json::to_vec(&verification_metadata).unwrap(),
+            VERIFICATION_FILE_NAME,
+            JSON_FILE_TYPE,
+        )
+        .await
+        {
+            Ok(_) => {
+                self.latest_verification_metadata_update_timestamp =
+                    Some(std::time::Instant::now());
+                Ok(())
+            },
+            Err(err) => Err(anyhow::Error::from(err)),
+        }
+    }
+
     /// Uploads the transactions to the file store. The transactions are grouped into batches of BLOB_STORAGE_SIZE.
     /// Updates the file store metadata after the upload.
     async fn upload_transactions(
@@ -203,7 +254,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
 
         if let Some(ts) = self.latest_metadata_update_timestamp {
             // a periodic metadata update
-            if (std::time::Instant::now() - ts).as_secs() > FILE_STORE_UPDATE_FREQUENCY_SECS {
+            if ts.elapsed().as_secs() > FILE_STORE_UPDATE_FREQUENCY_SECS {
                 self.update_file_store_metadata(chain_id, start_version + batch_size as u64)
                     .await?;
             }
@@ -214,5 +265,48 @@ impl FileStoreOperator for GcsFileStoreOperator {
         }
 
         Ok(())
+    }
+
+    async fn get_or_create_verification_metadata(
+        &self,
+        chain_id: u64,
+    ) -> Result<VerificationMetadata> {
+        let file_metadata = self
+            .get_file_store_metadata()
+            .await
+            .ok_or(anyhow::anyhow!("No file store metadata found"))?;
+        anyhow::ensure!(file_metadata.chain_id == chain_id, "Chain ID mismatch");
+
+        match Object::download(&self.bucket_name, VERIFICATION_FILE_NAME).await {
+            Ok(verification_metadata) => {
+                let metadata: VerificationMetadata = serde_json::from_slice(&verification_metadata)
+                    .expect("Expected metadata to be valid JSON.");
+                anyhow::ensure!(metadata.chain_id == chain_id, "Chain ID mismatch.");
+                Ok(metadata)
+            },
+            Err(cloud_storage::Error::Other(err)) => {
+                if err.contains("No such object: ") {
+                    // Metadata is not found.
+                    let metadata = VerificationMetadata {
+                        chain_id,
+                        next_version_to_verify: 0,
+                    };
+                    match Object::create(
+                        self.bucket_name.as_str(),
+                        serde_json::to_vec(&metadata).unwrap(),
+                        VERIFICATION_FILE_NAME,
+                        JSON_FILE_TYPE,
+                    )
+                    .await
+                    {
+                        Ok(_) => Ok(metadata),
+                        Err(err) => Err(anyhow::Error::from(err)),
+                    }
+                } else {
+                    Err(anyhow::anyhow!("{:?}", err))
+                }
+            },
+            Err(err) => Err(anyhow::Error::from(err)),
+        }
     }
 }
