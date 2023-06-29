@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Result};
 use aptos_rest_client::{
-    aptos_api_types::{IdentifierWrapper, MoveResource, WriteSetChange},
+    aptos_node_api_v1_types::{IdentifierWrapper, MoveResource, WriteSetChange},
     Client as RestClient, Transaction, VersionedNewBlockEvent,
 };
 use aptos_types::account_address::AccountAddress;

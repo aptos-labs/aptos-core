@@ -45,16 +45,17 @@ import { TransactionBuilderEd25519 } from "../../transaction_builder/builder";
 
 // eslint-disable-next-line operator-linebreak
 const VECTOR_FILES_ROOT_DIR =
-  process.env.VECTOR_FILES_ROOT_DIR || path.resolve(__dirname, "..", "..", "..", "..", "..", "..", "api", "goldens");
+  process.env.VECTOR_FILES_ROOT_DIR ||
+  path.resolve(__dirname, "..", "..", "..", "..", "..", "..", "crates", "aptos-node-api", "v1", "core", "goldens");
 
 const ENTRY_FUNCTION_VECTOR = path.join(
   VECTOR_FILES_ROOT_DIR,
-  "aptos_api__tests__transaction_vector_test__test_entry_function_payload.json",
+  "aptos_node_api_v1_core__tests__transaction_vector_test__test_entry_function_payload.json",
 );
 
 const SCRIPT_VECTOR = path.join(
   VECTOR_FILES_ROOT_DIR,
-  "aptos_api__tests__transaction_vector_test__test_script_payload.json",
+  "aptos_node_api_v1_core__tests__transaction_vector_test__test_script_payload.json",
 );
 
 function parseTypeTag(typeTag: any): TypeTag {

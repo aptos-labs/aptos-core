@@ -85,8 +85,8 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<Path>(&samples)?;
 
     // api types
-    tracer.trace_type::<aptos_api_types::TransactionData>(&samples)?;
-    tracer.trace_type::<aptos_api_types::TransactionOnChainData>(&samples)?;
+    tracer.trace_type::<aptos_node_api_v1_types::TransactionData>(&samples)?;
+    tracer.trace_type::<aptos_node_api_v1_types::TransactionOnChainData>(&samples)?;
 
     // output types
     tracer.trace_type::<CoinStoreResource>(&samples)?;

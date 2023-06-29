@@ -4,13 +4,13 @@
 
 use crate::{models::transactions::Transaction, schema::signatures, util::standardize_address};
 use anyhow::{Context, Result};
-use aptos_api_types::{
+use aptos_bitvec::BitVec;
+use aptos_node_api_v1_types::{
     AccountSignature as APIAccountSignature, Ed25519Signature as APIEd25519Signature,
     MultiAgentSignature as APIMultiAgentSignature,
     MultiEd25519Signature as APIMultiEd25519Signature,
     TransactionSignature as APITransactionSignature,
 };
-use aptos_bitvec::BitVec;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

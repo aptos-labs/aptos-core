@@ -11,7 +11,7 @@ use crate::{
     models::processor_statuses::ProcessorStatusModel,
     schema,
 };
-use aptos_api_types::Transaction;
+use aptos_node_api_v1_types::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, prelude::*};
 use field_count::FieldCount;

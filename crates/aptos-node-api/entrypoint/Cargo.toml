@@ -1,0 +1,27 @@
+[package]
+name = "aptos-node-api-entrypoint"
+description = "Aptos API entrypoint"
+version = "1.0.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-mempool = { workspace = true }
+aptos-node-api-context = { workspace = true }
+aptos-node-api-v1-core = { workspace = true }
+aptos-runtimes = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-types = { workspace = true }
+num_cpus = { workspace = true }
+poem = { workspace = true }
+tokio = { workspace = true }

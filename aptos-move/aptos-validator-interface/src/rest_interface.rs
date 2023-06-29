@@ -3,7 +3,7 @@
 
 use crate::AptosValidatorInterface;
 use anyhow::{anyhow, Result};
-use aptos_api_types::{AptosError, AptosErrorCode};
+use aptos_node_api_v1_types::{AptosError, AptosErrorCode};
 use aptos_rest_client::{
     error::{AptosErrorResponse, RestError},
     Client,

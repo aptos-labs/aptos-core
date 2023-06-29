@@ -8,7 +8,7 @@ hide_table_of_contents: true
 
 # Aptos Developer Documentation
 
-Welcome! Aptos is a Layer 1 for everyone. In the [Ohlone language](https://en.wikipedia.org/wiki/Ohlone_languages), ["Aptos"](https://en.wikipedia.org/wiki/Aptos,_California) means "The People." This site is here to help you grow a [web3 ecosystem project](https://github.com/aptos-foundation/ecosystem-projects) that benefits the entire world through easier development, more reliable services, faster transactions, and a supportive, decentralized family. 
+Welcome! Aptos is a Layer 1 for everyone. In the [Ohlone language](https://en.wikipedia.org/wiki/Ohlone_languages), ["Aptos"](https://en.wikipedia.org/wiki/Aptos,_California) means "The People." This site is here to help you grow a [web3 ecosystem project](https://github.com/aptos-foundation/ecosystem-projects) that benefits the entire world through easier development, more reliable services, faster transactions, and a supportive, decentralized family.
 
 This documentation will help you develop applications for the Aptos blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
@@ -22,7 +22,7 @@ See the newest Aptos releases in the [Latest Releases](./releases/index.md) list
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-3a g-4">
-  
+
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column" >
     <a href="/category/environment" class="card-title card-link stretched-link"> <h2>Getting started</h2></a>
@@ -85,7 +85,7 @@ See the newest Aptos releases in the [Latest Releases](./releases/index.md) list
     <p class="card-text">Run a public fullnode and connect to devnet.</p>
 </div>
   </div>
-  
+
 </div>
 </div>
 
@@ -112,8 +112,8 @@ See the newest Aptos releases in the [Latest Releases](./releases/index.md) list
   <div class="col">
   <div class="card h-100" >
     <div class="card-body d-flex flex-column"  >
-    <a href="https://aptos.dev/nodes/aptos-api-spec/#/" class="card-title card-link stretched-link"> <h2>REST API</h2></a>
-    <p class="card-text">Reference for the REST API to interact with the Aptos blockchain.</p>
+    <a href="https://aptos.dev/nodes/aptos-api-spec/#/" class="card-title card-link stretched-link"> <h2>Node API v1 spec</h2></a>
+    <p class="card-text">Reference for the v1 Node API to interact with the Aptos blockchain.</p>
 </div>
 </div>
 </div>

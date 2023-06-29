@@ -1,0 +1,45 @@
+[package]
+name = "aptos-node-api-test-context"
+description = "Aptos node API test context"
+version = "0.2.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-cached-packages = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-db = { workspace = true, features = ["fuzzing"] }
+aptos-executor = { workspace = true }
+aptos-executor-types = { workspace = true }
+aptos-framework = { workspace = true }
+aptos-genesis = { workspace = true }
+aptos-mempool = { workspace = true, features = ["fuzzing"] }
+aptos-mempool-notifications = { workspace = true }
+aptos-node-api-context = { workspace = true }
+aptos-node-api-entrypoint = { workspace = true }
+aptos-node-api-v1-core = { workspace = true }
+aptos-node-api-v1-types = { workspace = true }
+aptos-sdk = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-temppath = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+aptos-vm-validator = { workspace = true }
+bcs = { workspace = true }
+bytes = { workspace = true }
+goldenfile = { workspace = true }
+hyper = { workspace = true }
+rand = { workspace = true }
+regex = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+warp = { workspace = true }
+warp-reverse-proxy = { workspace = true }

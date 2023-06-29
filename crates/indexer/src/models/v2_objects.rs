@@ -10,7 +10,7 @@ use crate::{
     models::move_resources::MoveResource,
     schema::{current_objects, objects},
 };
-use aptos_api_types::{DeleteResource, Transaction, WriteResource, WriteSetChange};
+use aptos_node_api_v1_types::{DeleteResource, Transaction, WriteResource, WriteSetChange};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

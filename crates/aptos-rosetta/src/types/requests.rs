@@ -9,7 +9,7 @@ use crate::{
     },
     AccountAddress, ApiError,
 };
-use aptos_rest_client::aptos_api_types::U64;
+use aptos_rest_client::aptos_node_api_v1_types::U64;
 use aptos_types::{
     chain_id::ChainId,
     transaction::{RawTransaction, SignedTransaction},

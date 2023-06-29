@@ -8,7 +8,7 @@ use crate::{
     schema::delegated_staking_activities,
     util::{standardize_address, u64_to_bigdecimal},
 };
-use aptos_api_types::Transaction as APITransaction;
+use aptos_node_api_v1_types::Transaction as APITransaction;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

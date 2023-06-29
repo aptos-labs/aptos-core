@@ -28,7 +28,7 @@ RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release
 COPY --link --from=tools-builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/aptos-db-bootstrapper
 COPY --link --from=tools-builder /aptos/dist/aptos-db-tool /usr/local/bin/aptos-db-tool
 COPY --link --from=tools-builder /aptos/dist/aptos /usr/local/bin/aptos
-COPY --link --from=tools-builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
+COPY --link --from=tools-builder /aptos/dist/aptos-node-api-v1-spec-generator /usr/local/bin/aptos-node-api-v1-spec-generator
 COPY --link --from=tools-builder /aptos/dist/aptos-fn-check-client /usr/local/bin/aptos-fn-check-client
 COPY --link --from=tools-builder /aptos/dist/aptos-transaction-emitter /usr/local/bin/aptos-transaction-emitter
 

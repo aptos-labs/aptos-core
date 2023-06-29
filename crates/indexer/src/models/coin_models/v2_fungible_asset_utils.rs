@@ -12,7 +12,7 @@ use crate::{
     util::truncate_str,
 };
 use anyhow::{Context, Result};
-use aptos_api_types::{deserialize_from_string, WriteResource};
+use aptos_node_api_v1_types::{deserialize_from_string, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 

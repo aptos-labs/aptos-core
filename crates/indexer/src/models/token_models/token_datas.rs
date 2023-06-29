@@ -10,7 +10,7 @@ use crate::{
     schema::{current_token_datas, token_datas},
     util::standardize_address,
 };
-use aptos_api_types::WriteTableItem as APIWriteTableItem;
+use aptos_node_api_v1_types::WriteTableItem as APIWriteTableItem;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

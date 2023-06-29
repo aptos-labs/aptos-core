@@ -194,7 +194,6 @@ name = "aptos"
 version = "2.0.2"
 dependencies = [
  "anyhow",
- "aptos-api-types",
  "aptos-backup-cli",
  "aptos-bitvec",
  "aptos-build-info",
@@ -215,6 +214,7 @@ dependencies = [
  "aptos-logger",
  "aptos-network-checker",
  "aptos-node",
+ "aptos-node-api-v1-types",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -298,124 +298,6 @@ dependencies = [
  "move-table-extension",
  "once_cell",
  "smallvec",
-]
-
-[[package]]
-name = "aptos-api"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "aptos-api-test-context",
- "aptos-api-types",
- "aptos-build-info",
- "aptos-cached-packages",
- "aptos-config",
- "aptos-crypto",
- "aptos-framework",
- "aptos-gas",
- "aptos-logger",
- "aptos-mempool",
- "aptos-metrics-core",
- "aptos-proptest-helpers",
- "aptos-runtimes",
- "aptos-sdk",
- "aptos-state-view",
- "aptos-storage-interface",
- "aptos-types",
- "aptos-vm",
- "async-trait",
- "bcs 0.1.4",
- "bytes",
- "fail 0.5.0",
- "futures",
- "hex",
- "hyper",
- "itertools",
- "mime",
- "move-core-types",
- "move-package",
- "num_cpus",
- "once_cell",
- "paste",
- "percent-encoding",
- "poem",
- "poem-openapi",
- "proptest",
- "rand 0.7.3",
- "regex",
- "reqwest",
- "serde 1.0.149",
- "serde_json",
- "tokio",
- "url",
- "warp",
-]
-
-[[package]]
-name = "aptos-api-test-context"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "aptos-api",
- "aptos-api-types",
- "aptos-cached-packages",
- "aptos-config",
- "aptos-crypto",
- "aptos-db",
- "aptos-executor",
- "aptos-executor-types",
- "aptos-framework",
- "aptos-genesis",
- "aptos-mempool",
- "aptos-mempool-notifications",
- "aptos-sdk",
- "aptos-storage-interface",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "aptos-vm-validator",
- "bcs 0.1.4",
- "bytes",
- "goldenfile",
- "hyper",
- "poem",
- "poem-openapi",
- "proptest",
- "rand 0.7.3",
- "regex",
- "reqwest",
- "serde 1.0.149",
- "serde_json",
- "tokio",
- "url",
- "warp",
- "warp-reverse-proxy",
-]
-
-[[package]]
-name = "aptos-api-types"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-framework",
- "aptos-logger",
- "aptos-openapi",
- "aptos-storage-interface",
- "aptos-types",
- "aptos-vm",
- "async-trait",
- "bcs 0.1.4",
- "hex",
- "indoc",
- "move-binary-format",
- "move-core-types",
- "move-resource-viewer",
- "poem",
- "poem-openapi",
- "serde 1.0.149",
- "serde_json",
 ]
 
 [[package]]
@@ -1605,14 +1487,14 @@ name = "aptos-indexer"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "aptos-api",
- "aptos-api-test-context",
- "aptos-api-types",
  "aptos-bitvec",
  "aptos-config",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-node-api-context",
+ "aptos-node-api-test-context",
+ "aptos-node-api-v1-types",
  "aptos-runtimes",
  "aptos-storage-interface",
  "aptos-types",
@@ -1726,9 +1608,6 @@ name = "aptos-indexer-grpc-fullnode"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aptos-api",
- "aptos-api-test-context",
- "aptos-api-types",
  "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
@@ -1743,6 +1622,10 @@ dependencies = [
  "aptos-mempool-notifications",
  "aptos-metrics-core",
  "aptos-moving-average",
+ "aptos-node-api-context",
+ "aptos-node-api-test-context",
+ "aptos-node-api-v1-core",
+ "aptos-node-api-v1-types",
  "aptos-proptest-helpers",
  "aptos-protos",
  "aptos-runtimes",
@@ -2361,7 +2244,6 @@ name = "aptos-node"
 version = "1.5.0"
 dependencies = [
  "anyhow",
- "aptos-api",
  "aptos-backup-service",
  "aptos-build-info",
  "aptos-cached-packages",
@@ -2388,6 +2270,8 @@ dependencies = [
  "aptos-mempool-notifications",
  "aptos-network",
  "aptos-network-builder",
+ "aptos-node-api-entrypoint",
+ "aptos-node-api-v1-core",
  "aptos-node-identity",
  "aptos-peer-monitoring-service-client",
  "aptos-peer-monitoring-service-server",
@@ -2423,15 +2307,176 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-node-api-context"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-gas",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-node-api-v1-types",
+ "aptos-state-view",
+ "aptos-storage-interface",
+ "aptos-types",
+ "aptos-vm",
+ "bcs 0.1.4",
+ "futures",
+ "move-core-types",
+]
+
+[[package]]
+name = "aptos-node-api-entrypoint"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-node-api-context",
+ "aptos-node-api-v1-core",
+ "aptos-runtimes",
+ "aptos-storage-interface",
+ "aptos-types",
+ "num_cpus",
+ "poem",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-node-api-test-context"
+version = "0.2.0"
+dependencies = [
+ "aptos-cached-packages",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-db",
+ "aptos-executor",
+ "aptos-executor-types",
+ "aptos-framework",
+ "aptos-genesis",
+ "aptos-mempool",
+ "aptos-mempool-notifications",
+ "aptos-node-api-context",
+ "aptos-node-api-entrypoint",
+ "aptos-node-api-v1-core",
+ "aptos-node-api-v1-types",
+ "aptos-sdk",
+ "aptos-storage-interface",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-validator",
+ "bcs 0.1.4",
+ "bytes",
+ "goldenfile",
+ "hyper",
+ "rand 0.7.3",
+ "regex",
+ "serde_json",
+ "tokio",
+ "warp",
+ "warp-reverse-proxy",
+]
+
+[[package]]
+name = "aptos-node-api-v1-core"
+version = "1.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-build-info",
+ "aptos-cached-packages",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-framework",
+ "aptos-gas",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-node-api-context",
+ "aptos-node-api-test-context",
+ "aptos-node-api-v1-types",
+ "aptos-proptest-helpers",
+ "aptos-sdk",
+ "aptos-state-view",
+ "aptos-storage-interface",
+ "aptos-types",
+ "aptos-vm",
+ "async-trait",
+ "bcs 0.1.4",
+ "fail 0.5.0",
+ "futures",
+ "hex",
+ "hyper",
+ "move-core-types",
+ "move-package",
+ "once_cell",
+ "paste",
+ "percent-encoding",
+ "poem",
+ "poem-openapi",
+ "proptest",
+ "rand 0.7.3",
+ "regex",
+ "reqwest",
+ "serde 1.0.149",
+ "serde_json",
+ "tokio",
+ "warp",
+]
+
+[[package]]
+name = "aptos-node-api-v1-spec-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-mempool",
+ "aptos-node-api-context",
+ "aptos-node-api-v1-core",
+ "aptos-storage-interface",
+ "aptos-types",
+ "clap 4.3.5",
+]
+
+[[package]]
+name = "aptos-node-api-v1-types"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-framework",
+ "aptos-logger",
+ "aptos-openapi",
+ "aptos-storage-interface",
+ "aptos-types",
+ "aptos-vm",
+ "async-trait",
+ "bcs 0.1.4",
+ "hex",
+ "indoc",
+ "mime",
+ "move-binary-format",
+ "move-core-types",
+ "move-resource-viewer",
+ "paste",
+ "poem",
+ "poem-openapi",
+ "serde 1.0.149",
+ "serde_json",
+]
+
+[[package]]
 name = "aptos-node-checker"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "aptos-api",
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
  "aptos-network-checker",
+ "aptos-node-api-v1-core",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-emitter-lib",
@@ -2498,19 +2543,6 @@ dependencies = [
  "poem-openapi",
  "serde 1.0.149",
  "serde_json",
-]
-
-[[package]]
-name = "aptos-openapi-spec-generator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-api",
- "aptos-config",
- "aptos-mempool",
- "aptos-storage-interface",
- "aptos-types",
- "clap 4.3.5",
 ]
 
 [[package]]
@@ -2655,12 +2687,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos",
- "aptos-api-types",
  "aptos-build-info",
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
  "aptos-genesis",
+ "aptos-node-api-v1-types",
  "aptos-rest-client",
  "aptos-temppath",
  "aptos-types",
@@ -2700,10 +2732,10 @@ name = "aptos-rest-client"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "aptos-api-types",
  "aptos-crypto",
  "aptos-infallible",
  "aptos-logger",
+ "aptos-node-api-v1-types",
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
@@ -2860,10 +2892,10 @@ name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "aptos-api-types",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-global-constants",
+ "aptos-node-api-v1-types",
  "aptos-rest-client",
  "aptos-types",
  "bcs 0.1.4",
@@ -3116,7 +3148,6 @@ name = "aptos-telemetry"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-api",
  "aptos-config",
  "aptos-consensus",
  "aptos-crypto",
@@ -3126,6 +3157,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-network",
+ "aptos-node-api-v1-core",
  "aptos-node-resource-metrics",
  "aptos-runtimes",
  "aptos-state-sync-driver",
@@ -3350,12 +3382,12 @@ name = "aptos-transactional-test-harness"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-api-types",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
  "aptos-language-e2e-tests",
+ "aptos-node-api-v1-types",
  "aptos-state-view",
  "aptos-storage-interface",
  "aptos-types",
@@ -3419,9 +3451,9 @@ name = "aptos-validator-interface"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-api-types",
  "aptos-config",
  "aptos-db",
+ "aptos-node-api-v1-types",
  "aptos-rest-client",
  "aptos-state-view",
  "aptos-storage-interface",
@@ -3603,9 +3635,9 @@ name = "aptos-warp-webserver"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-api-types",
  "aptos-config",
  "aptos-logger",
+ "aptos-node-api-v1-types",
  "bcs 0.1.4",
  "hyper",
  "serde 1.0.149",
@@ -6337,13 +6369,13 @@ dependencies = [
 name = "generate-format"
 version = "0.1.0"
 dependencies = [
- "aptos-api-types",
  "aptos-config",
  "aptos-consensus",
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-network",
+ "aptos-node-api-v1-types",
  "aptos-types",
  "bcs 0.1.4",
  "clap 4.3.5",

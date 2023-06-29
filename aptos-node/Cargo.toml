@@ -14,7 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-api = { workspace = true }
 aptos-backup-service = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-cached-packages = { workspace = true }
@@ -41,6 +40,8 @@ aptos-mempool = { workspace = true }
 aptos-mempool-notifications = { workspace = true }
 aptos-network = { workspace = true }
 aptos-network-builder = { workspace = true }
+aptos-node-api-entrypoint = { workspace = true }
+aptos-node-api-v1-core = { workspace = true }
 aptos-node-identity = { workspace = true }
 aptos-peer-monitoring-service-client = { workspace = true }
 aptos-peer-monitoring-service-server = { workspace = true }
@@ -81,7 +82,7 @@ assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-clone
 check-vm-features = []
 consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]
 default = []
-failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
+failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-node-api-v1-core/failpoints"]
 indexer = ["aptos-indexer"]
 network-perf-test = ["aptos-peer-monitoring-service-client/network-perf-test", "aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test"]
 tokio-console = ["aptos-logger/tokio-console"]

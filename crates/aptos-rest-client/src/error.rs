@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::State;
-use aptos_api_types::AptosError;
+use aptos_node_api_v1_types::AptosError;
 use reqwest::StatusCode;
 use thiserror::Error;
 

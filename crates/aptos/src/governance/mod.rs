@@ -19,7 +19,7 @@ use aptos_crypto::HashValue;
 use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use aptos_logger::warn;
 use aptos_rest_client::{
-    aptos_api_types::{Address, HexEncodedBytes, U128, U64},
+    aptos_node_api_v1_types::{Address, HexEncodedBytes, U128, U64},
     Client, Transaction,
 };
 use aptos_sdk::move_types::language_storage::CORE_CODE_ADDRESS;
@@ -1034,7 +1034,7 @@ impl From<JsonProposal> for Proposal {
 struct JsonProposal {
     creation_time_secs: U64,
     early_resolution_vote_threshold: JsonEarlyResolutionThreshold,
-    execution_hash: aptos_rest_client::aptos_api_types::HashValue,
+    execution_hash: aptos_rest_client::aptos_node_api_v1_types::HashValue,
     expiration_secs: U64,
     is_resolved: bool,
     min_vote_threshold: U128,

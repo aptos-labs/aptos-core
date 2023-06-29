@@ -6,9 +6,9 @@ use crate::{
     counters::{FETCHED_LATENCY_IN_SECS, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
-use aptos_api::context::Context;
-use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
 use aptos_logger::{error, info, sample, sample::SampleRate};
+use aptos_node_api_context::Context;
+use aptos_node_api_v1_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
 use aptos_protos::{
     internal::fullnode::v1::{
         transactions_from_node_response, TransactionsFromNodeResponse, TransactionsOutput,
@@ -237,9 +237,9 @@ impl IndexerStreamCoordinator {
             });
         let mut timestamp = block_event.proposed_time();
         let mut epoch = block_event.epoch();
-        let mut epoch_bcs = aptos_api_types::U64::from(epoch);
+        let mut epoch_bcs = aptos_node_api_v1_types::U64::from(epoch);
         let mut block_height = block_event.height();
-        let mut block_height_bcs = aptos_api_types::U64::from(block_height);
+        let mut block_height_bcs = aptos_node_api_v1_types::U64::from(block_height);
 
         let mut transactions = vec![];
         for (ind, raw_txn) in raw_txns.into_iter().enumerate() {
@@ -250,9 +250,9 @@ impl IndexerStreamCoordinator {
                 if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                     epoch = txn.epoch();
-                    epoch_bcs = aptos_api_types::U64::from(epoch);
+                    epoch_bcs = aptos_node_api_v1_types::U64::from(epoch);
                     block_height += 1;
-                    block_height_bcs = aptos_api_types::U64::from(block_height);
+                    block_height_bcs = aptos_node_api_v1_types::U64::from(block_height);
                 }
             }
             match converter
@@ -365,7 +365,7 @@ impl IndexerStreamCoordinator {
 }
 
 /// Record the transaction fetched from the storage latency.
-fn record_fetched_transaction_latency(txn: &aptos_api_types::Transaction) {
+fn record_fetched_transaction_latency(txn: &aptos_node_api_v1_types::Transaction) {
     let current_time_in_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Current time is before UNIX_EPOCH")

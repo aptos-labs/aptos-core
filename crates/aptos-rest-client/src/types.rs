@@ -2,8 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub use aptos_api_types::deserialize_from_string;
-use aptos_api_types::{Address, U64};
+pub use aptos_node_api_v1_types::deserialize_from_string;
+use aptos_node_api_v1_types::{Address, U64};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use move_core_types::{language_storage::StructTag, parser::parse_struct_tag};
 use serde::{Deserialize, Deserializer, Serialize};

@@ -33,7 +33,7 @@ use aptos_logger::Level;
 use aptos_network_checker::args::{
     validate_address, CheckEndpointArgs, HandshakeArgs, NodeAddressArgs,
 };
-use aptos_rest_client::{aptos_api_types::VersionedEvent, Client, State};
+use aptos_rest_client::{aptos_node_api_v1_types::VersionedEvent, Client, State};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{BlockResource, CORE_CODE_ADDRESS},

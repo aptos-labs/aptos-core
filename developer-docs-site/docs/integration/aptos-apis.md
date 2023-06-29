@@ -44,11 +44,11 @@ The REST API offers querying transactions and events in these ways:
 
 ## Reading state with the View function
 
-View functions do not modify blockchain state when called from the API. A [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) can be used to read potentially complex on-chain state using Move. For example, you can evaluate who has the highest bid in an auction contract. Here are related files:
+View functions do not modify blockchain state when called from the API. A [View](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-node-api/v1/core/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) can be used to read potentially complex on-chain state using Move. For example, you can evaluate who has the highest bid in an auction contract. Here are related files:
 
-* [`view_function.rs`](https://github.com/aptos-labs/aptos-core/blob/main/api/src/tests/view_function.rs) for an example
+* [`view_function.rs`](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-node-api/v1/core/src/view_function.rs) for an example
 * related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code
-* [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
+* [specification](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-node-api/v1/doc/spec.yaml#L8513).
 
 The view function operates like the [Aptos Simulation API](../guides/system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
 
@@ -59,7 +59,7 @@ In order to use the View functions, you need to [publish the module](../move/mov
 
 In the Aptos CLI, a view function request would look like this:
 ```
-aptos move view --function-id devnet::message::get_message --profile devnet --args address:devnet                   
+aptos move view --function-id devnet::message::get_message --profile devnet --args address:devnet
 {
   "Result": [
     "View functions rock!"

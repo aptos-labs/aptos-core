@@ -8,9 +8,9 @@ use aptos::{
     governance::{ExecuteProposal, SubmitProposal, SubmitVote},
     move_tool::{RunFunction, RunScript},
 };
-use aptos_api_types::U64;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_genesis::keys::PrivateIdentity;
+use aptos_node_api_v1_types::U64;
 use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;

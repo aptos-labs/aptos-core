@@ -49,7 +49,7 @@ Ensure your account has sufficient funds to perform transactions by clicking the
 
 ### Aptos CLI
 
-We will also be installing the Aptos CLI so that we can publish 
+We will also be installing the Aptos CLI so that we can publish
 
 1. Install the [Aptos CLI](../tools/install-cli/index.md).
 
@@ -57,7 +57,7 @@ We will also be installing the Aptos CLI so that we can publish
 
 3. Select the network `devnet`
 
-4. When prompted for your private key, paste the private key from the Petra Wallet and press **Return**. 
+4. When prompted for your private key, paste the private key from the Petra Wallet and press **Return**.
    1. You can find the private key by going to settings, manage account, show the private key, and copy that field.
 
 You will see output resembling:
@@ -160,7 +160,7 @@ import './App.css';
 function App() {
   // Retrieve aptos.account on initial render and store it.
   const [address, setAddress] = React.useState<string | null>(null);
-  
+
   /**
    * init function
    */
@@ -169,7 +169,7 @@ function App() {
     const { address, publicKey } = await window.aptos.connect();
     setAddress(address);
   }
-  
+
   React.useEffect(() => {
      init();
   }, []);
@@ -220,7 +220,7 @@ You will now see `"aptos": "^1.3.15"` (or similar) in your `package.json`.
 
 ### Create an `AptosClient`
 
-Now we can import the SDK and create an `AptosClient` to interact with the blockchain (technically it interacts with [the REST API](https://github.com/aptos-labs/aptos-core/tree/main/api), which interacts with the blockchain).
+Now we can import the SDK and create an `AptosClient` to interact with the blockchain (technically it interacts with [the REST API](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-node-api), which interacts with the blockchain).
 
 As our wallet account is on devnet, we will set up the `AptosClient` to interact with devnet as well. Add the following to `src/App.tsx`:
 
@@ -406,7 +406,7 @@ This makes it possible to publish the module for the given account, in this case
 
 The `--save-metadata` argument, if set, generates and saves the package metadata in the package's `build` directory. This metadata can be used to construct a transaction to publish a package.
 
-At this point, we should have a `build` folder in the same directory of our `hello_blockchain` folder. The next step would be to publish the module to the chain. 
+At this point, we should have a `build` folder in the same directory of our `hello_blockchain` folder. The next step would be to publish the module to the chain.
 The TypeScript SDK provides us a `publishPackage()` function where it expects to get both package metadata and the move module as `Uint8Array`. We can supply this by converting both the `package-metadata.bcs` file and the `bytecode_modules/message.mv` module into hex strings (using a command, below), and then to `Uint8Array` (using the SDK).
 
 Convert `package-metadata.bcs` file and the `bytecode_modules/message.mv` module into hex strings:
@@ -439,7 +439,7 @@ REACT_APP_ACCOUNT_PK=<account-private-key>
 Make sure to restart the local server so the app will load the new `.env` file.
 
 2. Add the following to `src/App.tsx`, where:
-- `process.env.REACT_APP_ACCOUNT_PK` holds the account private key. 
+- `process.env.REACT_APP_ACCOUNT_PK` holds the account private key.
 - `<package-metadata.bcs hex string>` is the `package-metadata.bcs` hex string output we get from the previous step.
 - `<message.mv hex string>` is the `message.mv` hex string output we get from the previous step.
 

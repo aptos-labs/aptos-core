@@ -14,7 +14,7 @@ use crate::{
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_rest_client::{
-    aptos_api_types::{AptosError, AptosErrorCode},
+    aptos_node_api_v1_types::{AptosError, AptosErrorCode},
     error::{AptosErrorResponse, RestError},
 };
 use async_trait::async_trait;

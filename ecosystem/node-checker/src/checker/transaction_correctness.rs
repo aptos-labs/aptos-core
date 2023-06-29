@@ -7,7 +7,7 @@ use crate::{
     provider::{api_index::ApiIndexProvider, Provider, ProviderCollection},
 };
 use anyhow::Result;
-use aptos_rest_client::{aptos_api_types::TransactionData, Client as AptosRestClient};
+use aptos_rest_client::{aptos_node_api_v1_types::TransactionData, Client as AptosRestClient};
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
 

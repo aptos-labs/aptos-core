@@ -1,0 +1,23 @@
+[package]
+name = "aptos-node-api-v1-spec-generator"
+description = "Aptos node API v1 OpenAPI spec generator"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-mempool = { workspace = true, features = ["fuzzing"] }
+aptos-node-api-context = { workspace = true }
+aptos-node-api-v1-core = { workspace = true }
+aptos-storage-interface = { workspace = true, features = ["fuzzing"] }
+aptos-types = { workspace = true }
+clap = { workspace = true }

@@ -6,7 +6,7 @@ use crate::{
     schema::{current_table_items, table_items, table_metadatas},
     util::{hash_str, standardize_address},
 };
-use aptos_api_types::{DeleteTableItem, WriteTableItem};
+use aptos_node_api_v1_types::{DeleteTableItem, WriteTableItem};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

@@ -10,7 +10,7 @@ use super::{
 use crate::{
     models::transactions::Transaction, schema::write_set_changes, util::standardize_address,
 };
-use aptos_api_types::WriteSetChange as APIWriteSetChange;
+use aptos_node_api_v1_types::WriteSetChange as APIWriteSetChange;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

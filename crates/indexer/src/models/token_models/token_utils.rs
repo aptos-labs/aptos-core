@@ -9,7 +9,7 @@ use crate::util::{
     standardize_address, truncate_str,
 };
 use anyhow::{Context, Result};
-use aptos_api_types::deserialize_from_string;
+use aptos_node_api_v1_types::deserialize_from_string;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Formatter};

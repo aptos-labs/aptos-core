@@ -17,7 +17,7 @@ use crate::{
     schema::{block_metadata_transactions, transactions, user_transactions},
     util::u64_to_bigdecimal,
 };
-use aptos_api_types::{Transaction as APITransaction, TransactionInfo};
+use aptos_node_api_v1_types::{Transaction as APITransaction, TransactionInfo};
 use bigdecimal::BigDecimal;
 use diesel::{
     BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,

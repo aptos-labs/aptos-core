@@ -15,8 +15,8 @@ use crate::{
     schema::{ledger_infos, processor_status},
 };
 use anyhow::{ensure, Context, Result};
-use aptos_api::context::Context as ApiContext;
 use aptos_logger::{debug, info};
+use aptos_node_api_context::Context as ApiContext;
 use chrono::ParseError;
 use diesel::{
     pg::upsert::excluded,
@@ -310,9 +310,9 @@ mod test {
         models::transactions::TransactionQuery,
         processors::default_processor::DefaultTransactionProcessor,
     };
-    use aptos_api_test_context::new_test_context;
-    use aptos_api_types::{LedgerInfo as APILedgerInfo, Transaction, U64};
     use aptos_config::config::NodeConfig;
+    use aptos_node_api_test_context::new_test_context;
+    use aptos_node_api_v1_types::{LedgerInfo as APILedgerInfo, Transaction, U64};
     use diesel::RunQueryDsl;
     use serde_json::json;
 
@@ -378,10 +378,9 @@ mod test {
 
         let test_context =
             new_test_context("doesnt_matter".to_string(), NodeConfig::default(), true);
-        let context: Arc<ApiContext> = Arc::new(test_context.context);
         let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
         let mut tailer = Tailer::new(
-            context,
+            test_context.context,
             conn_pool.clone(),
             Arc::new(pg_transaction_processor),
             TransactionFetcherOptions::default(),
@@ -686,7 +685,7 @@ mod test {
         )).unwrap();
         // This is needed because deserializer only parses epoch once so info.epoch is always None
         if let Transaction::BlockMetadataTransaction(ref mut bmt) = block_metadata_transaction {
-            bmt.info.epoch = Some(aptos_api_types::U64::from(1));
+            bmt.info.epoch = Some(aptos_node_api_v1_types::U64::from(1));
         }
 
         tailer

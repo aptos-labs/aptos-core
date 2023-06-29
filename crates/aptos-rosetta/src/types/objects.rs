@@ -24,7 +24,7 @@ use anyhow::anyhow;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_logger::warn;
-use aptos_rest_client::aptos_api_types::{TransactionOnChainData, U64};
+use aptos_rest_client::aptos_node_api_v1_types::{TransactionOnChainData, U64};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, WithdrawEvent},

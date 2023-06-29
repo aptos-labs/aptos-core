@@ -14,9 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-api-types = { workspace = true }
 aptos-config = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-node-api-v1-types = { workspace = true }
 bcs = { workspace = true }
 hyper = { workspace = true }
 serde = { workspace = true }

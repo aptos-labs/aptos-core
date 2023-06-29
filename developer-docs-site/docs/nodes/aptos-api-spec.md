@@ -1,5 +1,5 @@
 ---
-title: "Aptos API Spec"
+title: "Aptos Node API v1 Spec"
 slug: "aptos-api-spec"
 hide_table_of_contents: true
 hide_title: true

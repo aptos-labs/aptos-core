@@ -80,7 +80,9 @@ async fn account_balance(
         metadata: AccountBalanceMetadata {
             sequence_number: sequence_number.into(),
             operators,
-            lockup_expiration_time_utc: aptos_rest_client::aptos_api_types::U64(lockup_expiration),
+            lockup_expiration_time_utc: aptos_rest_client::aptos_node_api_v1_types::U64(
+                lockup_expiration,
+            ),
         },
     })
 }

@@ -73,7 +73,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 async fn build_block(
     server_context: &RosettaContext,
     parent_block_identifier: BlockIdentifier,
-    block: aptos_rest_client::aptos_api_types::BcsBlock,
+    block: aptos_rest_client::aptos_node_api_v1_types::BcsBlock,
     chain_id: ChainId,
     keep_empty_transactions: bool,
 ) -> ApiResult<Block> {
@@ -111,7 +111,7 @@ async fn get_block_by_index(
     chain_id: ChainId,
 ) -> ApiResult<(
     BlockIdentifier,
-    aptos_rest_client::aptos_api_types::BcsBlock,
+    aptos_rest_client::aptos_node_api_v1_types::BcsBlock,
 )> {
     let block = block_cache.get_block_by_height(block_height, true).await?;
 
@@ -144,7 +144,7 @@ pub struct BlockInfo {
 
 impl BlockInfo {
     pub fn from_block(
-        block: &aptos_rest_client::aptos_api_types::BcsBlock,
+        block: &aptos_rest_client::aptos_node_api_v1_types::BcsBlock,
         chain_id: ChainId,
     ) -> BlockInfo {
         BlockInfo {
@@ -195,7 +195,7 @@ impl BlockRetriever {
         &self,
         height: u64,
         with_transactions: bool,
-    ) -> ApiResult<aptos_rest_client::aptos_api_types::BcsBlock> {
+    ) -> ApiResult<aptos_rest_client::aptos_node_api_v1_types::BcsBlock> {
         if with_transactions {
             Ok(self
                 .rest_client

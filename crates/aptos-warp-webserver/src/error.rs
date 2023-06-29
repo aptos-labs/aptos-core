@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::U64;
+use aptos_node_api_v1_types::U64;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::From,

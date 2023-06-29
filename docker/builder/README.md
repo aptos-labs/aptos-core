@@ -19,7 +19,7 @@ The builder can produce the following Docker images. To build a particular image
 
 1. `validator-testing` : Image containing the `aptos-node` binary and other linux tools useful for debugging and testing. This image is used in Forge tests.
 2. `validator` : Image containing only the `aptos-node` binary. This image is usually used for distribution.
-3. `tools`: Image containing all the aptos tools binaries including `aptos-db-bootstrapper`, `aptos-db-tool`, `aptos`, `aptos-transaction-emitter`, `aptos-openapi-spec-generator` and `aptos-fn-check-client`. Also, includes the Aptos Move framework for use with genesis generation.
+3. `tools`: Image containing all the aptos tools binaries including `aptos-db-bootstrapper`, `aptos-db-tool`, `aptos`, `aptos-transaction-emitter`, `aptos-node-api-v1-spec-generator` and `aptos-fn-check-client`. Also, includes the Aptos Move framework for use with genesis generation.
 4. `forge`: Image containing the `forge` binary that orchestrates and runs Forge tests.
 5. `node-checker`: Image containing the `node-checker` binary that checks the health of a node.
 6. `faucet`: Image containing the `faucet` binary that provides a faucet service for minting coins.

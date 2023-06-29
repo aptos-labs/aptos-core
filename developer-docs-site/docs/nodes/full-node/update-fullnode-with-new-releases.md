@@ -36,7 +36,7 @@ When `devnet` is wiped and updated with newer versions, you will need to update 
 
 ## If you run a fullnode on GCP
 
-Aptos devnet releases can be of two types: 
+Aptos devnet releases can be of two types:
 - One with a data wipe to start over the Aptos blockchain
 - Second type is only a software update without a data wipe
 
@@ -76,7 +76,7 @@ Aptos devnet releases can be of two types:
   terraform apply -var force_helm_update=true
   ```
 
-[rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
+[rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-node-api/v1/doc
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt
 [aptos-labs/aptos-core]: https://github.com/aptos-labs/aptos-core.git

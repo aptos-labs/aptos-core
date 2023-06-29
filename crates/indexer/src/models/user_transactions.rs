@@ -13,7 +13,7 @@ use crate::{
     schema::user_transactions,
     util::{parse_timestamp, parse_timestamp_secs, standardize_address, u64_to_bigdecimal},
 };
-use aptos_api_types::{TransactionPayload, UserTransaction as APIUserTransaction};
+use aptos_node_api_v1_types::{TransactionPayload, UserTransaction as APIUserTransaction};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

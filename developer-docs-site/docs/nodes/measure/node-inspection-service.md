@@ -3,7 +3,7 @@ title: "Node Inspection Service"
 slug: "node-inspection-service"
 ---
 
-# Node Inspection Service 
+# Node Inspection Service
 
 Aptos nodes collect metrics and system information while running. These metrics provide a way to track,
 monitor and inspect the health and performance of the node dynamically, at runtime. Node metrics and system
@@ -85,7 +85,7 @@ If you'd like to disable this endpoint, add the following to your node configura
 ```yaml
  inspection_service:
    expose_system_information: false
-``` 
+```
 
 :::tip System information accuracy
 The system information displayed here is not guaranteed to be 100% accurate due to limitations
@@ -118,7 +118,7 @@ increase at least once per hour.
 During consensus, we expect this value to increase once per consensus round, which should be multiple
 times per second. If this does not happen, it is likely the node is not participating in consensus.
 3. `aptos_consensus_timeout_count`: Counts the number of times the node locally timed out while trying
-to participate in consensus. If this counter increases, it is likely the node is not participating 
+to participate in consensus. If this counter increases, it is likely the node is not participating
 in consensus and may be having issues, e.g., network difficulties.
 4. `aptos_state_sync_executing_component_counters{label="consensus"`: This counter increases
 a few times per second as long as the node is participating in consensus. When this counter stops
@@ -180,7 +180,7 @@ the mempool of the node and waiting to be committed to the blockchain:
    that either: (i) your node is unable to forward transactions to other validators to be included in the blockchain; or
    (ii) that the entire blockchain is under heavy load and may soon become congested.
 
-### REST API
+### Node API v1
 
 The following [REST API](https://aptos.dev/nodes/aptos-api-spec) metrics are important:
 1. `aptos_api_requests_count{method="GET"` and `aptos_api_requests_count{method="POST"`: These metrics count

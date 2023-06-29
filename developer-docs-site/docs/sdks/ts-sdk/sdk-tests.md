@@ -30,8 +30,8 @@ An example of an e2e test for submitting a BCS transaction can be found in [`apt
 
 There are a two test vectors. Each covers one type of transaction payload:
 
-- [EntryFunction](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_entry_function_payload.json) vector
-- [Script](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_script_payload.json) vector
+- [EntryFunction](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-node-api/v1/core/goldens/aptos_node_api_v1_core__tests__transaction_vector_test__test_entry_function_payload.json) vector
+- [Script](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-node-api/v1/core/goldens/aptos_node_api_v1_core__tests__transaction_vector_test__test_script_payload.json) vector
 
 Vector items are self-explanatory. However, a special serialization method is used to save space and avoid data overflow. The details are described below:
 

@@ -15,12 +15,12 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos = { workspace = true, features = [ "no-upload-proposal" ] }
-aptos-api-types = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-genesis = { workspace = true }
+aptos-node-api-v1-types = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }

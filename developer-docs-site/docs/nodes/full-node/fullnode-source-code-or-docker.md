@@ -32,7 +32,7 @@ We recommend the following hardware resources:
 
 ## Storage requirements
 
-The amount of data stored by Aptos depends on the ledger history (length) of the blockchain and the number of on-chain states (e.g., accounts). These values depend on several factors, including: the age of the blockchain, the average transaction rate and the configuration of the ledger pruner. Follow the storage requirements described in [Validator Hardware Requirements](../validator-node/operator/node-requirements.md#hardware-requirements). 
+The amount of data stored by Aptos depends on the ledger history (length) of the blockchain and the number of on-chain states (e.g., accounts). These values depend on several factors, including: the age of the blockchain, the average transaction rate and the configuration of the ledger pruner. Follow the storage requirements described in [Validator Hardware Requirements](../validator-node/operator/node-requirements.md#hardware-requirements).
 
 :::tip Devnet blockchain storage
 The Aptos devnet is currently reset on a weekly basis. Hence we estimate that if you are connecting to the devnet, then the Aptos blockchain will not require more than several GBs of storage. See the `#devnet-release` channel on Aptos Discord.
@@ -62,7 +62,7 @@ See [Building Aptos From Source](../../guides/building-from-source.md)
    to create a copy of the public fullnode configuration YAML template. You will edit this file to ensure that your public fullnode:
 
     - Contains the correct genesis blob that is published by the Aptos mainnet.
-    - Synchronizes correctly with the mainnet, by using the checkpoint file `waypoint.txt` published by the mainnet. 
+    - Synchronizes correctly with the mainnet, by using the checkpoint file `waypoint.txt` published by the mainnet.
     - Stores the mainnet database at a location of your choice on your local machine.
 
 1. Make sure your current working directory is `aptos-core`. The Aptos mainnet publishes the `genesis.blob` and `waypoint.txt` files. Download them:
@@ -76,7 +76,7 @@ See [Building Aptos From Source](../../guides/building-from-source.md)
       ```bash
       curl -O https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt
       ```
-  
+
     :::caution Don't want to connect to mainnet?
     To connect to other networks (e.g., `devnet` and `testnet`), you can find genesis and waypoint here ➜ https://github.com/aptos-labs/aptos-networks.
     Be sure to download the `genesis.blob` and `waypoint.txt` for those networks, instead of using the genesis
@@ -249,7 +249,7 @@ docker exec -it $id /bin/bash
 du -cs -BM /opt/aptos/data
 ```
 
-[rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
+[rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-node-api/v1/doc
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt
 [aptos-labs/aptos-core]: https://github.com/aptos-labs/aptos-core.git

@@ -9,7 +9,7 @@ use crate::{
     util::{hash_str, truncate_str},
 };
 use anyhow::{Context, Result};
-use aptos_api_types::{deserialize_from_string, MoveType, WriteResource};
+use aptos_node_api_v1_types::{deserialize_from_string, MoveType, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 

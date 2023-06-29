@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::models::property_map::{PropertyMap, TokenObjectPropertyMap};
-use aptos_api_types::Address;
+use aptos_node_api_v1_types::Address;
 use bigdecimal::{BigDecimal, Signed, ToPrimitive, Zero};
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;

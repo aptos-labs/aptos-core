@@ -19,7 +19,7 @@ use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_genesis::builder::InitConfigFn;
 use aptos_global_constants::GAS_UNIT_PRICE;
 use aptos_rest_client::{
-    aptos_api_types::{TransactionOnChainData, UserTransaction},
+    aptos_node_api_v1_types::{TransactionOnChainData, UserTransaction},
     Response, Transaction,
 };
 use aptos_rosetta::{

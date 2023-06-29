@@ -6,7 +6,7 @@ use crate::{
     index, CustomEventConfig, LogIngestConfig, MetricsEndpointsConfig, TelemetryServiceConfig,
 };
 use aptos_crypto::{x25519, Uniform};
-use aptos_rest_client::aptos_api_types::mime_types;
+use aptos_rest_client::aptos_node_api_v1_types::mime_types;
 use rand::SeedableRng;
 use reqwest::header::AUTHORIZATION;
 use serde_json::Value;

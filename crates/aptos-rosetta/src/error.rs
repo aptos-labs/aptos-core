@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{types, types::ErrorDetails};
-use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError};
+use aptos_rest_client::{aptos_node_api_v1_types::AptosErrorCode, error::RestError};
 use hex::FromHexError;
 use move_core_types::account_address::AccountAddressParseError;
 use serde::{Deserialize, Serialize};

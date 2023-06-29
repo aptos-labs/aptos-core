@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use aptos_api_types::AsConverter;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::HashValue,
@@ -11,6 +10,7 @@ use aptos_crypto::{
 };
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
+use aptos_node_api_v1_types::AsConverter;
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,

@@ -10,7 +10,7 @@ use super::{
     v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenEvent},
 };
 use crate::{schema::token_activities_v2, util::standardize_address};
-use aptos_api_types::Event as APIEvent;
+use aptos_node_api_v1_types::Event as APIEvent;
 use bigdecimal::{BigDecimal, One, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

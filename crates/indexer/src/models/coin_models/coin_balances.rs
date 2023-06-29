@@ -13,7 +13,7 @@ use crate::{
     schema::{coin_balances, current_coin_balances},
     util::standardize_address,
 };
-use aptos_api_types::WriteResource as APIWriteResource;
+use aptos_node_api_v1_types::WriteResource as APIWriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

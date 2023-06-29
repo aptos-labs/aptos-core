@@ -15,7 +15,7 @@ use crate::{
     util::standardize_address,
 };
 use anyhow::Context;
-use aptos_api_types::WriteTableItem as APIWriteTableItem;
+use aptos_node_api_v1_types::WriteTableItem as APIWriteTableItem;
 use bigdecimal::BigDecimal;
 use diesel::{prelude::*, ExpressionMethods};
 use field_count::FieldCount;

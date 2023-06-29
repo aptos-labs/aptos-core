@@ -20,7 +20,7 @@ use anyhow::anyhow;
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, ValidCryptoMaterialStringExt,
 };
-use aptos_rest_client::aptos_api_types::mime_types::JSON;
+use aptos_rest_client::aptos_node_api_v1_types::mime_types::JSON;
 use aptos_types::{account_address::AccountAddress, transaction::RawTransaction};
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use serde::{de::DeserializeOwned, Serialize};

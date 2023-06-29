@@ -1,0 +1,29 @@
+[package]
+name = "aptos-node-api-context"
+description = "Aptos node API context"
+version = "0.3.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-gas = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-mempool = { workspace = true, features = ["fuzzing"] }
+aptos-node-api-v1-types = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+bcs = { workspace = true }
+futures = { workspace = true }
+move-core-types = { workspace = true }

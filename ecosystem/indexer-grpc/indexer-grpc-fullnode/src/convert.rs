@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::{
+use aptos_bitvec::BitVec;
+use aptos_logger::warn;
+use aptos_node_api_v1_types::{
     AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId,
     EntryFunctionPayload, Event, GenesisPayload, MoveAbility, MoveFunction,
     MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
@@ -9,8 +11,6 @@ use aptos_api_types::{
     MultiEd25519Signature, MultisigPayload, MultisigTransactionPayload, ScriptPayload, Transaction,
     TransactionInfo, TransactionPayload, TransactionSignature, WriteSet, WriteSetChange,
 };
-use aptos_bitvec::BitVec;
-use aptos_logger::warn;
 use aptos_protos::{transaction::v1 as transaction, util::timestamp};
 use hex;
 use move_binary_format::file_format::Ability;

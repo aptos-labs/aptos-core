@@ -96,7 +96,7 @@ fn collect_mempool_metrics(core_metrics: &mut BTreeMap<String, String>) {
 
 /// Collects the REST metrics and appends it to the given map
 fn collect_rest_metrics(core_metrics: &mut BTreeMap<String, String>) {
-    let rest_response_metrics = aptos_api::metrics::RESPONSE_STATUS.collect();
+    let rest_response_metrics = aptos_node_api_v1_core::metrics::RESPONSE_STATUS.collect();
     let rest_response_count = sum_all_histogram_counts(&rest_response_metrics);
     core_metrics.insert(REST_RESPONSE_COUNT.into(), rest_response_count.to_string());
 }

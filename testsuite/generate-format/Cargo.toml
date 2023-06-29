@@ -13,13 +13,13 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-api-types = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus = { workspace = true, features = ["fuzzing"] }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-network = { workspace = true }
+aptos-node-api-v1-types = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }

@@ -54,7 +54,7 @@ use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
 use aptos_rest_client::{
-    aptos_api_types::{MoveStructTag, MoveType},
+    aptos_node_api_v1_types::{MoveStructTag, MoveType},
     Transaction,
 };
 use aptos_sdk::move_types::{account_address::AccountAddress, language_storage::ModuleId};

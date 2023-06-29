@@ -9,7 +9,7 @@ use crate::{
     schema::current_ans_lookup,
     util::{bigdecimal_to_u64, parse_timestamp_secs, standardize_address},
 };
-use aptos_api_types::{deserialize_from_string, MoveType, Transaction as APITransaction};
+use aptos_node_api_v1_types::{deserialize_from_string, MoveType, Transaction as APITransaction};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

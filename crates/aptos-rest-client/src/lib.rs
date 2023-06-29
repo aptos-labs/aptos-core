@@ -20,18 +20,18 @@ use crate::{
     error::RestError,
 };
 use anyhow::{anyhow, Result};
-pub use aptos_api_types::{
+use aptos_crypto::HashValue;
+use aptos_logger::{debug, info, sample, sample::SampleRate};
+pub use aptos_node_api_v1_types::{
     self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
 };
-use aptos_api_types::{
+use aptos_node_api_v1_types::{
     deserialize_from_string,
     mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, JSON},
     AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId,
     TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
     VersionedEvent, ViewRequest,
 };
-use aptos_crypto::HashValue;
-use aptos_logger::{debug, info, sample, sample::SampleRate};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},

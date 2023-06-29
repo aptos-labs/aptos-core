@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account;
 use aptos_rest_client::{
-    aptos_api_types::{WriteResource, WriteSetChange},
+    aptos_node_api_v1_types::{WriteResource, WriteSetChange},
     Transaction,
 };
 use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};

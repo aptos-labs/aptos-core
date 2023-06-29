@@ -27,7 +27,7 @@ use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
 use aptos_rest_client::{
-    aptos_api_types::{EntryFunctionId, HashValue, MoveType, ViewRequest},
+    aptos_node_api_v1_types::{EntryFunctionId, HashValue, MoveType, ViewRequest},
     error::RestError,
     AptosBaseUrl, Client, Transaction,
 };
@@ -944,7 +944,10 @@ impl RestOptions {
     pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
         Ok(Client::builder(AptosBaseUrl::Custom(self.url(profile)?))
             .timeout(Duration::from_secs(self.connection_timeout_secs))
-            .header(aptos_api_types::X_APTOS_CLIENT, X_APTOS_CLIENT_VALUE)?
+            .header(
+                aptos_node_api_v1_types::X_APTOS_CLIENT,
+                X_APTOS_CLIENT_VALUE,
+            )?
             .build())
     }
 }

@@ -8,8 +8,8 @@ hide_table_of_contents: true
 
 |Description                                 |Mainnet | Testnet | Devnet |
 |--------------------------------------------|---|---|---|
-|**REST API**             | https://fullnode.mainnet.aptoslabs.com/v1 | https://fullnode.testnet.aptoslabs.com/v1 | https://fullnode.devnet.aptoslabs.com/v1 |
-|**REST API Spec**        | <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">Link</a> | <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">Link</a> | <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">Link</a> |
+|**Node API v1**             | https://fullnode.mainnet.aptoslabs.com/v1 | https://fullnode.testnet.aptoslabs.com/v1 | https://fullnode.devnet.aptoslabs.com/v1 |
+|**Node API v1 spec**        | <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">Link</a> | <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">Link</a> | <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">Link</a> |
 |**Indexer API**          | https://indexer.mainnet.aptoslabs.com/v1/graphql | https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql | https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql |
 |**Indexer API Spec**     | <a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Link</a> | <a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Link</a> | <a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Link</a> |
 |**Faucet**               | No Faucet | https://faucet.testnet.aptoslabs.com/ | https://faucet.devnet.aptoslabs.com/ |

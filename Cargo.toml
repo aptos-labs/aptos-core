@@ -2,10 +2,6 @@
 resolver = "2"
 
 members = [
-    "api",
-    "api/openapi-spec-generator",
-    "api/test-context",
-    "api/types",
     "aptos-move/aptos-aggregator",
     "aptos-move/aptos-debugger",
     "aptos-move/aptos-gas",
@@ -60,6 +56,12 @@ members = [
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
     "crates/aptos-network-checker",
+    "crates/aptos-node-api/context",
+    "crates/aptos-node-api/entrypoint",
+    "crates/aptos-node-api/test-context",
+    "crates/aptos-node-api/v1/core",
+    "crates/aptos-node-api/v1/openapi-spec-generator",
+    "crates/aptos-node-api/v1/types",
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
     "crates/aptos-proptest-helpers",
@@ -249,9 +251,12 @@ rust-version = "1.70"
 aptos = { path = "crates/aptos" }
 aptos-accumulator = { path = "storage/accumulator" }
 aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
-aptos-api = { path = "api" }
-aptos-api-test-context = { path = "api/test-context" }
-aptos-api-types = { path = "api/types" }
+aptos-node-api-context = { path = "crates/aptos-node-api/context" }
+aptos-node-api-entrypoint = { path = "crates/aptos-node-api/entrypoint" }
+aptos-node-api-v1-core = { path = "crates/aptos-node-api/v1/core" }
+aptos-node-api-v1-types = { path = "crates/aptos-node-api/v1/types" }
+aptos-node-api-v1-spec-generator = { path = "crates/aptos-node-api/v1/types" }
+aptos-node-api-test-context = { path = "crates/aptos-node-api/test-context" }
 aptos-backup-cli = { path = "storage/backup/backup-cli" }
 aptos-backup-service = { path = "storage/backup/backup-service" }
 aptos-bounded-executor = { path = "crates/bounded-executor" }

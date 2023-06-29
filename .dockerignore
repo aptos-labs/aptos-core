@@ -24,7 +24,7 @@
 !aptos-move/framework/
 !crates/aptos/src/move_tool/*.bpl
 !crates/aptos-faucet/doc/
-!api/doc/
+!crates/aptos-node-api/v1/doc/
 !crates/indexer/migrations/**/*.sql
 !ecosystem/indexer-grpc/indexer-grpc-parser/migrations/**/*.sql
 !terraform/helm/aptos-node/

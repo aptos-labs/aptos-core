@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::stream_coordinator::IndexerStreamCoordinator;
-use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
 use aptos_logger::{error, info};
 use aptos_mempool::MempoolClientSender;
 use aptos_moving_average::MovingAverage;
+use aptos_node_api_context::Context;
 use aptos_protos::internal::fullnode::v1::{
     fullnode_data_server::{FullnodeData, FullnodeDataServer},
     stream_status::StatusType,

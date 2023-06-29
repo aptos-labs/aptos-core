@@ -15,7 +15,7 @@ use crate::{
     schema::coin_activities,
     util::{parse_timestamp, standardize_address, truncate_str},
 };
-use aptos_api_types::{
+use aptos_node_api_v1_types::{
     Event as APIEvent, Transaction as APITransaction, TransactionInfo as APITransactionInfo,
     TransactionPayload, UserTransactionRequest, WriteSetChange as APIWriteSetChange,
 };

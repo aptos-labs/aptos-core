@@ -370,7 +370,7 @@ pub struct BlockIdentifier {
 
 impl BlockIdentifier {
     pub fn from_block(
-        block: &aptos_rest_client::aptos_api_types::BcsBlock,
+        block: &aptos_rest_client::aptos_node_api_v1_types::BcsBlock,
         chain_id: ChainId,
     ) -> BlockIdentifier {
         BlockIdentifier {

@@ -10,7 +10,7 @@ use crate::{
     schema::block_metadata_transactions,
     util::{parse_timestamp, standardize_address},
 };
-use aptos_api_types::BlockMetadataTransaction as APIBlockMetadataTransaction;
+use aptos_node_api_v1_types::BlockMetadataTransaction as APIBlockMetadataTransaction;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

@@ -10,7 +10,7 @@ use crate::{
     schema::token_activities,
     util::{parse_timestamp, standardize_address},
 };
-use aptos_api_types::{Event as APIEvent, Transaction as APITransaction};
+use aptos_node_api_v1_types::{Event as APIEvent, Transaction as APITransaction};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

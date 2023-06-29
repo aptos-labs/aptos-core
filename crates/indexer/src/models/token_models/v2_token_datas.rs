@@ -13,7 +13,9 @@ use crate::{
     schema::{current_token_datas_v2, token_datas_v2},
     util::standardize_address,
 };
-use aptos_api_types::{WriteResource as APIWriteResource, WriteTableItem as APIWriteTableItem};
+use aptos_node_api_v1_types::{
+    WriteResource as APIWriteResource, WriteTableItem as APIWriteTableItem,
+};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

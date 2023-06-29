@@ -17,7 +17,7 @@ use aptos_crypto::{
     PrivateKey, SigningKey,
 };
 use aptos_rest_client::{
-    aptos_api_types::{AptosError, AptosErrorCode},
+    aptos_node_api_v1_types::{AptosError, AptosErrorCode},
     error::{AptosErrorResponse, RestError},
     Client,
 };

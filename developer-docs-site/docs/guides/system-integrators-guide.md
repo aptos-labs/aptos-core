@@ -50,8 +50,8 @@ Either of these methods will expose a [REST API service](../integration/aptos-ap
 <Tabs groupId="networks">
   <TabItem value="devnet" label="Devnet">
     <ul>
-      <li>REST API: <a href="https://fullnode.devnet.aptoslabs.com/v1">https://fullnode.devnet.aptoslabs.com/v1</a></li>
-      <li>REST API Spec: <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">https://fullnode.devnet.aptoslabs.com/v1/spec#/</a></li>
+      <li>Node API v1: <a href="https://fullnode.devnet.aptoslabs.com/v1">https://fullnode.devnet.aptoslabs.com/v1</a></li>
+      <li>Node API v1 spec: <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">https://fullnode.devnet.aptoslabs.com/v1/spec#/</a></li>
       <li>Indexer API: <a href="https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
       <li>Faucet API: <a href="https://faucet.devnet.aptoslabs.com">https://faucet.devnet.aptoslabs.com</a></li>
       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
@@ -59,8 +59,8 @@ Either of these methods will expose a [REST API service](../integration/aptos-ap
   </TabItem>
   <TabItem value="testnet" label="Testnet">
     <ul>
-      <li>REST API: <a href="https://fullnode.testnet.aptoslabs.com/v1">https://fullnode.testnet.aptoslabs.com/v1</a></li>
-      <li>REST API Spec: <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">https://fullnode.testnet.aptoslabs.com/v1/spec#/</a></li>
+      <li>Node API v1: <a href="https://fullnode.testnet.aptoslabs.com/v1">https://fullnode.testnet.aptoslabs.com/v1</a></li>
+      <li>Node API v1 spec: <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">https://fullnode.testnet.aptoslabs.com/v1/spec#/</a></li>
       <li>Indexer API: <a href="https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
       <li>Faucet API: <a href="https://faucet.testnet.aptoslabs.com">https://faucet.testnet.aptoslabs.com</a></li>
       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
@@ -68,8 +68,8 @@ Either of these methods will expose a [REST API service](../integration/aptos-ap
   </TabItem>
   <TabItem value="mainnet" label="Mainnet">
     <ul>
-      <li>REST API: <a href="https://fullnode.mainnet.aptoslabs.com/v1">https://fullnode.mainnet.aptoslabs.com/v1</a></li>
-      <li>REST API Spec: <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">https://fullnode.mainnet.aptoslabs.com/v1/spec#/</a></li>
+      <li>Node API v1: <a href="https://fullnode.mainnet.aptoslabs.com/v1">https://fullnode.mainnet.aptoslabs.com/v1</a></li>
+      <li>Node API v1 spec: <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">https://fullnode.mainnet.aptoslabs.com/v1/spec#/</a></li>
       <li>Indexer API: <a href="https://indexer.mainnet.aptoslabs.com/v1/graphql">https://indexer.mainnet.aptoslabs.com/v1/graphql</a></li>
       <li>Faucet: N/A</li>
       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
@@ -111,9 +111,9 @@ Read more in [Transactions and States](../concepts/txns-states.md).
 Aptos supports two methods for constructing transactions:
 
 - Using the Aptos client libraries to generate native BCS transactions.
-- Constructing JSON-encoded objects and interacting with the REST API to generate native transactions.
+- Constructing JSON-encoded objects and interacting with the Node API to generate native transactions.
 
-The preferred approach is to directly generate native BCS transactions. Generating them via the REST API enables rapid development at the cost of trusting the fullnode to generate the transaction correctly.
+The preferred approach is to directly generate native BCS transactions. Generating them via the Node API enables rapid development at the cost of trusting the fullnode to generate the transaction correctly.
 
 #### BCS-encoded transactions
 
@@ -121,7 +121,7 @@ BCS-encoded transactions can be submitted to the `/transactions` endpoint but 
 
 #### JSON-encoded transactions
 
-JSON-encoded transactions can be generated via the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), following these steps:
+JSON-encoded transactions can be generated via the [Node API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), following these steps:
 
 1. First construct an appropriate JSON payload for the `/transactions/encode_submission` endpoint as demonstrated in the [Python SDK](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L128).
 1. The output of the above contains an object containing a `message` that must be signed with the sender’s private key locally.

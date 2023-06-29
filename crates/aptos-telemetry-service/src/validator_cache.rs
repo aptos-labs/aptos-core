@@ -183,7 +183,7 @@ mod tests {
         Uniform,
     };
     use aptos_infallible::RwLock;
-    use aptos_rest_client::aptos_api_types::*;
+    use aptos_rest_client::aptos_node_api_v1_types::*;
     use aptos_types::{
         chain_id::ChainId, network_address::NetworkAddress, on_chain_config::ValidatorSet,
         validator_config::ValidatorConfig, validator_info::ValidatorInfo, PeerId,

@@ -28,8 +28,8 @@ use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
 use crate::tests::{golden_output::GoldenOutputs, pretty};
-use aptos_api::{context::Context, index};
-use aptos_api_types::HexEncodedBytes;
+use aptos_node_api_v1_core::{context::Context, index};
+use aptos_node_api_v1_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_types::aggregated_signature::AggregatedSignature;

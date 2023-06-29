@@ -9,7 +9,7 @@ use crate::{
     schema::nft_points,
     util::{parse_timestamp, standardize_address},
 };
-use aptos_api_types::{Transaction as APITransaction, TransactionPayload};
+use aptos_node_api_v1_types::{Transaction as APITransaction, TransactionPayload};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 use field_count::FieldCount;

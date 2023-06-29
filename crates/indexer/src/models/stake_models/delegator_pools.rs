@@ -12,7 +12,7 @@ use crate::{
     },
     util::standardize_address,
 };
-use aptos_api_types::{Transaction, WriteResource, WriteSetChange, WriteTableItem};
+use aptos_node_api_v1_types::{Transaction, WriteResource, WriteSetChange, WriteTableItem};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

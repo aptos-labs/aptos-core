@@ -76,21 +76,21 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-node-api-v1-spec-generator -f yaml -o /specs/spec.yaml
 
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: generate-json-spec
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f json -o /specs/spec.json
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-node-api-v1-spec-generator -f json -o /specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
       - run: echo "If this step fails, run the following commands locally to fix it:"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/spec.yaml"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/spec.json"
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.yaml api/doc/spec.yaml
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/spec.json
+      - run: echo "cargo run -p aptos-node-api-v1-spec-generator -- -f yaml -o crates/aptos-node-api/v1/doc/spec.yaml"
+      - run: echo "cargo run -p aptos-node-api-v1-spec-generator -- -f json -o crates/aptos-node-api/v1/doc/spec.json"
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.yaml crates/aptos-node-api/v1/doc/spec.yaml
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json crates/aptos-node-api/v1/doc/spec.json
 
       # Run package install. If install fails, it probably means the lockfile
       # was not included in the commit.

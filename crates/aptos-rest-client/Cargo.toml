@@ -18,10 +18,10 @@ dpn = []
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-api-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-node-api-v1-types = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }

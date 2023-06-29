@@ -7,7 +7,7 @@ use crate::{
     types::{AccountIdentifier, Amount},
     AccountAddress, ApiResult,
 };
-use aptos_rest_client::aptos_api_types::{EntryFunctionId, ViewRequest};
+use aptos_rest_client::aptos_node_api_v1_types::{EntryFunctionId, ViewRequest};
 use aptos_types::stake_pool::StakePool;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};

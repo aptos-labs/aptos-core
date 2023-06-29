@@ -7,7 +7,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_forge::Swarm;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{
-    aptos_api_types::{EntryFunctionPayload, TransactionPayload},
+    aptos_node_api_v1_types::{EntryFunctionPayload, TransactionPayload},
     Transaction,
 };
 use aptos_sdk::{

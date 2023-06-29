@@ -5,7 +5,7 @@ use crate::{
     get_version_path_with_base, Client, DEFAULT_VERSION_PATH_BASE, X_APTOS_SDK_HEADER_VALUE,
 };
 use anyhow::Result;
-use aptos_api_types::X_APTOS_CLIENT;
+use aptos_node_api_v1_types::X_APTOS_CLIENT;
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Client as ReqwestClient, ClientBuilder as ReqwestClientBuilder,

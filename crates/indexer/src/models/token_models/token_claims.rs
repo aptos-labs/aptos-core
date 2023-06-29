@@ -7,7 +7,9 @@
 
 use super::{token_utils::TokenWriteSet, tokens::TableHandleToOwner};
 use crate::{schema::current_token_pending_claims, util::standardize_address};
-use aptos_api_types::{DeleteTableItem as APIDeleteTableItem, WriteTableItem as APIWriteTableItem};
+use aptos_node_api_v1_types::{
+    DeleteTableItem as APIDeleteTableItem, WriteTableItem as APIWriteTableItem,
+};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
