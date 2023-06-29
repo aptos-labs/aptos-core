@@ -67,11 +67,12 @@ impl From<LedgerHIDError> for AptosLedgerError {
 }
 
 #[derive(Debug)]
-/// Status code or retcode when communicating with ledger
-/// Most Aptos ones definted here https://github.com/aptos-labs/ledger-app-aptos/blob/main/doc/COMMANDS.md#status-words
+/// Status code returned when communicating with ledger
+/// Most Aptos ones defined here https://github.com/aptos-labs/ledger-app-aptos/blob/main/doc/COMMANDS.md#status-words
 /// Some of the ledger status code defined here - https://www.eftlab.com/knowledge-base/complete-list-of-apdu-responses
 pub enum AptosLedgerStatusCode {
-    // Aptos ledger app related status code
+    /// Aptos ledger app related status code
+
     /// Rejected by user
     Deny = 0x6985,
 
@@ -117,8 +118,9 @@ pub enum AptosLedgerStatusCode {
     /// Success
     Success = 0x9000,
 
-    // Ledger device related general status code
-    // There are more status code, but we only list the most common ones
+    /// Ledger device related general status code
+
+    /// There are more status code, but we only list the most common ones
     /// Ledger device is locked
     LedgerLocked = 0x5515,
 
