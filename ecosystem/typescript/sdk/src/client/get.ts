@@ -1,7 +1,7 @@
-import { AxiosResponse } from "axios";
-import { AptosRequest, aptosRequest } from "./core";
+import { aptosRequest } from "./core";
+import { AptosRequest, AptosResponse } from "./types";
 
-export type GetRequestOptions<Req> = Omit<AptosRequest<Req>, "body" | "method">;
+export type GetRequestOptions = Omit<AptosRequest, "body" | "method">;
 
 /**
  * Main function to do a Get request
@@ -9,7 +9,7 @@ export type GetRequestOptions<Req> = Omit<AptosRequest<Req>, "body" | "method">;
  * @param options GetRequestOptions
  * @returns
  */
-export async function get<Req, Res>(options: GetRequestOptions<Req>): Promise<AxiosResponse<Res, any>> {
-  const response: AxiosResponse = await aptosRequest<Req, Res>({ ...options, method: "GET" });
+export async function get<Req, Res>(options: GetRequestOptions): Promise<AptosResponse<Req, Res>> {
+  const response: AptosResponse<Req, Res> = await aptosRequest<Req, Res>({ ...options, method: "GET" });
   return response;
 }

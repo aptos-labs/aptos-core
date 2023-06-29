@@ -35,7 +35,7 @@ import {
   AnyNumber,
 } from "../bcs";
 import { Ed25519PublicKey, MultiEd25519PublicKey, RawTransaction } from "../aptos_types";
-import { AptosApiError, get, post, ClientConfig } from "../client";
+import { get, post, ClientConfig, AptosApiError } from "../client";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
@@ -1117,9 +1117,9 @@ function parseApiError(target: unknown, propertyKey: string, descriptor: Propert
       if (e instanceof AptosApiError) {
         throw new ApiError(
           e.status,
-          JSON.stringify({ message: e.message, ...e.body }),
-          e.body?.error_code,
-          e.body?.vm_error_code,
+          JSON.stringify({ message: e.message, ...e.data }),
+          e.data?.error_code,
+          e.data?.vm_error_code,
         );
       }
       throw e;

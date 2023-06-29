@@ -80,15 +80,17 @@ test("when server returns 400 status code", async () => {
     expect(error.url).toBe(`${NODE_URL}/transactions/by_hash/0x123`);
     expect(error.status).toBe(400);
     expect(error.statusText).toBe("Bad Request");
-    expect(error.body).toEqual({
+    expect(error.data).toEqual({
       message: 'failed to parse path `txn_hash`: failed to parse "string(HashValue)": unable to parse HashValue',
       error_code: "web_framework_error",
       vm_error_code: null,
     });
     expect(error.request).toEqual({
-      url: `${NODE_URL}/transactions/by_hash/0x123`,
+      url: `${NODE_URL}`,
       method: "GET",
       originMethod: "test 400 status",
+      endpoint: "transactions/by_hash/0x123",
+      body: null,
     });
   }
 });
@@ -128,16 +130,49 @@ test("when server returns 404 status code", async () => {
     );
     expect(error.status).toBe(404);
     expect(error.statusText).toBe("Not Found");
-    expect(error.body).toEqual({
+    expect(error.data).toEqual({
       message:
         "Transaction not found by Transaction hash(0x23851af73879128b541bafad4b49d0b6f1ac0d49ed2400632d247135fbca7bea)",
       error_code: "transaction_not_found",
       vm_error_code: null,
     });
     expect(error.request).toEqual({
-      url: `${NODE_URL}/transactions/by_hash/0x23851af73879128b541bafad4b49d0b6f1ac0d49ed2400632d247135fbca7bea`,
+      url: `${NODE_URL}`,
       method: "GET",
       originMethod: "test 404 status",
+      endpoint: "transactions/by_hash/0x23851af73879128b541bafad4b49d0b6f1ac0d49ed2400632d247135fbca7bea",
+      body: null,
+    });
+  }
+});
+
+test("when server returns transaction submission error", async () => {
+  try {
+    await aptosRequest({
+      url: `${NODE_URL}`,
+      method: "POST",
+      endpoint: "transactions",
+      body: new Uint8Array([1, 2, 3]),
+      originMethod: "test transaction submission error",
+      overrides: { HEADERS: { "content-type": "application/x.aptos.signed_transaction+bcs" } },
+    });
+  } catch (error: any) {
+    expect(error).toBeInstanceOf(AptosApiError);
+    expect(error.url).toBe(`${NODE_URL}/transactions`);
+    expect(error.status).toBe(400);
+    expect(error.statusText).toBe("Bad Request");
+    expect(error.data).toEqual({
+      message: "Failed to deserialize input into SignedTransaction: unexpected end of input",
+      error_code: "invalid_input",
+      vm_error_code: null,
+    });
+    expect(error.request).toEqual({
+      url: `${NODE_URL}`,
+      method: "POST",
+      originMethod: "test transaction submission error",
+      endpoint: "transactions",
+      body: new Uint8Array([1, 2, 3]),
+      overrides: { HEADERS: { "content-type": "application/x.aptos.signed_transaction+bcs" } },
     });
   }
 });

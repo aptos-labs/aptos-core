@@ -2,7 +2,7 @@ import { AptosClient } from "./aptos_client";
 import { IndexerClient } from "./indexer";
 
 import { CustomEndpoints, Network, NetworkToIndexerAPI, NetworkToNodeAPI } from "../utils";
-import { ClientConfig } from "../client/core";
+import { ClientConfig } from "../client";
 
 type NetworkWithCustom = Network | "CUSTOM";
 /**
