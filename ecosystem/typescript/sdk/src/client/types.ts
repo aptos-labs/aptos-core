@@ -4,9 +4,9 @@ import { AnyNumber } from "../bcs";
 /**
  * A configuration object we can pass with the request to the server.
  *
- * TOKEN - an auth token to send with the request
- * HEADERS - extra headers we want to send with the request
- * WITH_CREDENTIALS - whether to carry cookies. By default, it is set to true and cookies will be sent
+ * @param TOKEN - an auth token to send with the request
+ * @param HEADERS - extra headers we want to send with the request
+ * @param WITH_CREDENTIALS - whether to carry cookies. By default, it is set to true and cookies will be sent
  */
 export type ClientConfig = {
   TOKEN?: string;
