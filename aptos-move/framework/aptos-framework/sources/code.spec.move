@@ -31,7 +31,7 @@ spec aptos_framework::code {
     }
 
     spec publish_package_txn {
-        // TODO: Calls `publish_package`.`a
+        // TODO: Calls `publish_package`.
         pragma verify = false;
     }
 
