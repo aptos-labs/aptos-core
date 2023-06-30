@@ -135,7 +135,9 @@ where
             accumulated_fee_statement.storage_fee_used(),
             GasType::STORAGE_FEE,
         );
-        counters::PARALLEL_BLOCK_COMMITTED_TXNS.observe(num_committed as f64);
+        counters::BLOCK_COMMITTED_TXNS
+            .with_label_values(&[counters::Mode::PARALLEL])
+            .observe(num_committed as f64);
     }
 
     fn update_parallel_txn_gas_counters(&self, fee_statement: &FeeStatement) {
@@ -189,7 +191,9 @@ where
             accumulated_fee_statement.storage_fee_used(),
             GasType::STORAGE_FEE,
         );
-        counters::PARALLEL_BLOCK_COMMITTED_TXNS.observe(num_committed as f64);
+        counters::BLOCK_COMMITTED_TXNS
+            .with_label_values(&[counters::Mode::PARALLEL])
+            .observe(num_committed as f64);
     }
 
     fn update_sequential_txn_gas_counters(&self, fee_statement: &FeeStatement) {
@@ -424,7 +428,9 @@ where
                         accumulated_fee_statement,
                         (txn_idx + 1) as usize,
                     );
-                    counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                    counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
+                        .with_label_values(&[counters::Mode::PARALLEL])
+                        .inc();
                     info!("[BlockSTM]: Parallel execution early halted due to accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", accumulated_non_storage_gas, per_block_gas_limit, txn_idx);
                     break;
                 }
@@ -735,7 +741,9 @@ where
                 let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
                     + accumulated_fee_statement.io_gas_used();
                 if accumulated_non_storage_gas >= per_block_gas_limit {
-                    counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                    counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
+                        .with_label_values(&[counters::Mode::SEQUENTIAL])
+                        .inc();
                     info!("[Execution]: Sequential execution early halted due to accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", accumulated_non_storage_gas, per_block_gas_limit, ret.len());
                     break;
                 }
