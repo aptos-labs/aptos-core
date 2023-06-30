@@ -52,7 +52,7 @@ error: cyclic schema dependency: Cycle1 -> Cycle2 -> Cycle3 -> Cycle1
 80 │         include Cycle1;
    │                 ^^^^^^
 
-error: expected `bool` but found `u256` in expression
+error: expected `bool` but found `u256` in constant
    ┌─ tests/sources/schemas_err.move:84:17
    │
 84 │         include 22 ==> Condition;

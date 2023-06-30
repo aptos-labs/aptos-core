@@ -26,7 +26,9 @@ use crate::{
         INTRINSIC_PRAGMA, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
-    ty::{PrimitiveType, Type, TypeDisplayContext, TypeUnificationAdapter, Variance},
+    ty::{
+        PrimitiveType, ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
+    },
 };
 use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
 use codespan_reporting::{
@@ -996,7 +998,7 @@ impl GlobalEnv {
             }
             assert_eq!(key.inst.len(), memory.inst.len());
             let adapter = TypeUnificationAdapter::new_vec(&memory.inst, &key.inst, true, true);
-            let rel = adapter.unify(Variance::Allow, true);
+            let rel = adapter.unify(Variance::SpecVariance, true);
             if rel.is_some() {
                 inv_ids.extend(val.clone());
             }
@@ -2202,12 +2204,13 @@ impl<'env> ModuleEnv<'env> {
             SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
             SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
             SignatureToken::Reference(t) => Type::Reference(
-                false,
+                ReferenceKind::Immutable,
                 Box::new(self.internal_globalize_signature(module, t)),
             ),
-            SignatureToken::MutableReference(t) => {
-                Type::Reference(true, Box::new(self.internal_globalize_signature(module, t)))
-            },
+            SignatureToken::MutableReference(t) => Type::Reference(
+                ReferenceKind::Mutable,
+                Box::new(self.internal_globalize_signature(module, t)),
+            ),
             SignatureToken::TypeParameter(index) => Type::TypeParameter(*index),
             SignatureToken::Vector(bt) => {
                 Type::Vector(Box::new(self.internal_globalize_signature(module, bt)))
@@ -2903,7 +2906,6 @@ pub struct FunctionData {
 pub enum FunctionKind {
     Regular,
     Inline,
-    Macro,
     Entry,
 }
 

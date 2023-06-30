@@ -18,6 +18,7 @@ use move_model::{
     ast::Address,
     model::{FunctionEnv, GlobalEnv, ModuleEnv},
     ty,
+    ty::ReferenceKind,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, io::Read, path::PathBuf};
@@ -189,7 +190,7 @@ impl<'env> Abigen<'env> {
             .iter()
             .filter(|param| match &param.1 {
                 ty::Type::Primitive(ty::PrimitiveType::Signer) => false,
-                ty::Type::Reference(false, inner) => {
+                ty::Type::Reference(ReferenceKind::Immutable, inner) => {
                     !matches!(&**inner, ty::Type::Primitive(ty::PrimitiveType::Signer))
                 },
                 ty::Type::Struct(module_id, struct_id, _) => {

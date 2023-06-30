@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: mutability mismatch (& != &mut) in name expression
+  ┌─ tests/checking/typing/borrow_field_complex_root_expr.move:6:33
+  │
+6 │         (&(if (cond) s_mut else s).f: &u64);  // TODO: relax mutability mismatch?
+  │                                 ^
+
+error: mutability mismatch (&mut != &) in name expression
+  ┌─ tests/checking/typing/borrow_field_complex_root_expr.move:7:29
+  │
+7 │         (&(if (cond) s else s_mut).f: &u64);  // TODO: relax mutability mismatch?
+  │                             ^^^^^

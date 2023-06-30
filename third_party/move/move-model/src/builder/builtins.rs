@@ -8,7 +8,7 @@ use crate::{
     ast::{Operation, TraceKind, Value},
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
     model::{Parameter, TypeParameter},
-    ty::{PrimitiveType, Type},
+    ty::{PrimitiveType, ReferenceKind, Type},
 };
 use move_compiler::parser::ast::{self as PA};
 use move_core_types::u256::U256;
@@ -88,18 +88,41 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder<'_>) {
                 visibility,
             });
         };
-        use EntryVisibility::{Spec, SpecAndImpl};
+
+        // Numeric operations are individually defined for each integer type in the impl language.
+        // The spec language uses the unified arbitrary precision num type instead.
+        use EntryVisibility::{Impl, Spec, SpecAndImpl};
         use PA::BinOp_::*;
-        declare_bin(Add, Operation::Add, num_t, num_t, SpecAndImpl);
-        declare_bin(Sub, Operation::Sub, num_t, num_t, SpecAndImpl);
-        declare_bin(Mul, Operation::Mul, num_t, num_t, SpecAndImpl);
-        declare_bin(Mod, Operation::Mod, num_t, num_t, SpecAndImpl);
-        declare_bin(Div, Operation::Div, num_t, num_t, SpecAndImpl);
-        declare_bin(BitOr, Operation::BitOr, num_t, num_t, SpecAndImpl);
-        declare_bin(BitAnd, Operation::BitAnd, num_t, num_t, SpecAndImpl);
-        declare_bin(Xor, Operation::Xor, num_t, num_t, SpecAndImpl);
-        declare_bin(Shl, Operation::Shl, num_t, num_t, SpecAndImpl);
-        declare_bin(Shr, Operation::Shr, num_t, num_t, SpecAndImpl);
+        for prim_ty in [
+            PrimitiveType::U8,
+            PrimitiveType::U16,
+            PrimitiveType::U32,
+            PrimitiveType::U64,
+            PrimitiveType::U128,
+            PrimitiveType::U256,
+            PrimitiveType::Num,
+        ] {
+            let visibility = if prim_ty == PrimitiveType::Num {
+                Spec
+            } else {
+                Impl
+            };
+            let ty = Type::new_prim(prim_ty);
+            declare_bin(Add, Operation::Add, &ty, &ty, visibility);
+            declare_bin(Sub, Operation::Sub, &ty, &ty, visibility);
+            declare_bin(Mul, Operation::Mul, &ty, &ty, visibility);
+            declare_bin(Mod, Operation::Mod, &ty, &ty, visibility);
+            declare_bin(Div, Operation::Div, &ty, &ty, visibility);
+            declare_bin(BitOr, Operation::BitOr, &ty, &ty, visibility);
+            declare_bin(BitAnd, Operation::BitAnd, &ty, &ty, visibility);
+            declare_bin(Xor, Operation::Xor, &ty, &ty, visibility);
+            declare_bin(Shl, Operation::Shl, &ty, &ty, visibility);
+            declare_bin(Shr, Operation::Shr, &ty, &ty, visibility);
+            declare_bin(Lt, Operation::Lt, &ty, bool_t, visibility);
+            declare_bin(Le, Operation::Le, &ty, bool_t, visibility);
+            declare_bin(Gt, Operation::Gt, &ty, bool_t, visibility);
+            declare_bin(Ge, Operation::Ge, &ty, bool_t, visibility);
+        }
 
         declare_bin(Range, Operation::Range, num_t, range_t, Spec);
 
@@ -107,11 +130,6 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder<'_>) {
         declare_bin(Iff, Operation::Iff, bool_t, bool_t, Spec);
         declare_bin(And, Operation::And, bool_t, bool_t, SpecAndImpl);
         declare_bin(Or, Operation::Or, bool_t, bool_t, SpecAndImpl);
-
-        declare_bin(Lt, Operation::Lt, num_t, bool_t, SpecAndImpl);
-        declare_bin(Le, Operation::Le, num_t, bool_t, SpecAndImpl);
-        declare_bin(Gt, Operation::Gt, num_t, bool_t, SpecAndImpl);
-        declare_bin(Ge, Operation::Ge, num_t, bool_t, SpecAndImpl);
 
         // Eq and Neq have special treatment because they are generic.
         trans.define_spec_or_builtin_fun(
@@ -387,13 +405,13 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder<'_>) {
                 visibility: Spec,
             },
         );
-        let ref_param_t = Type::Reference(false, Box::new(param_t.clone()));
-        let mut_ref_param_t = Type::Reference(true, Box::new(param_t.clone()));
+        let ref_param_t = Type::Reference(ReferenceKind::Immutable, Box::new(param_t.clone()));
+        let mut_ref_param_t = Type::Reference(ReferenceKind::Mutable, Box::new(param_t.clone()));
         trans.define_spec_or_builtin_fun(
             trans.builtin_qualified_symbol("borrow_global"),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
-                oper: Operation::BorrowGlobal(false),
+                oper: Operation::BorrowGlobal(ReferenceKind::Immutable),
                 type_params: vec![param_t_decl.clone()],
                 params: vec![mk_param(trans, 1, address_t.clone())],
                 result_type: ref_param_t.clone(),
@@ -404,7 +422,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder<'_>) {
             trans.builtin_qualified_symbol("borrow_global_mut"),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
-                oper: Operation::BorrowGlobal(true),
+                oper: Operation::BorrowGlobal(ReferenceKind::Mutable),
                 type_params: vec![param_t_decl.clone()],
                 params: vec![mk_param(trans, 1, address_t.clone())],
                 result_type: mut_ref_param_t.clone(),
@@ -430,7 +448,14 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder<'_>) {
                 oper: Operation::MoveTo,
                 type_params: vec![param_t_decl.clone()],
                 params: vec![
-                    mk_param(trans, 1, Type::new_prim(PrimitiveType::Signer)),
+                    mk_param(
+                        trans,
+                        1,
+                        Type::Reference(
+                            ReferenceKind::Immutable,
+                            Box::new(Type::new_prim(PrimitiveType::Signer)),
+                        ),
+                    ),
                     mk_param(trans, 2, param_t.clone()),
                 ],
                 result_type: Type::unit(),

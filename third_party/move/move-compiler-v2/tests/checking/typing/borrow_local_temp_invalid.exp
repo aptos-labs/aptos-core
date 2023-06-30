@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: unable to infer type: `?4`
+  ┌─ tests/checking/typing/borrow_local_temp_invalid.move:4:11
+  │
+4 │         &(0, 1);
+  │           ^
+
+error: cannot borrow from a reference
+  ┌─ tests/checking/typing/borrow_local_temp_invalid.move:9:9
+  │
+9 │         &(&0);
+  │         ^^^^^
+
+error: cannot borrow from a reference
+   ┌─ tests/checking/typing/borrow_local_temp_invalid.move:10:9
+   │
+10 │         &(&mut 1);
+   │         ^^^^^^^^^
+
+error: cannot borrow from a reference
+   ┌─ tests/checking/typing/borrow_local_temp_invalid.move:11:9
+   │
+11 │         &mut &2;
+   │         ^^^^^^^
+
+error: cannot borrow from a reference
+   ┌─ tests/checking/typing/borrow_local_temp_invalid.move:12:9
+   │
+12 │         &mut &mut 3;
+   │         ^^^^^^^^^^^

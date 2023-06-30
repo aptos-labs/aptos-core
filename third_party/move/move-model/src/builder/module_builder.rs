@@ -320,13 +320,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .new_node(self.parent.to_loc(&v.loc), Type::Tuple(vec![]));
                 let v = match &v.value {
                     EA::AttributeValue_::Value(val) => {
-                        let val =
-                            if let Some((val, _)) = ExpTranslator::new(self).translate_value(val) {
-                                val
-                            } else {
-                                // Error reported
-                                Value::Bool(false)
-                            };
+                        let val = if let Some((val, _)) =
+                            ExpTranslator::new(self).translate_value_free(val)
+                        {
+                            val
+                        } else {
+                            // Error reported
+                            Value::Bool(false)
+                        };
                         AttributeValue::Value(value_node_id, val)
                     },
                     EA::AttributeValue_::Module(mident) => {
@@ -416,7 +417,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let mut et = ExpTranslator::new(self);
         let loc = et.to_loc(&def.loc);
         let ty = et.translate_type(&def.signature);
-        let value = if let Some(BytecodeModule {
+        let value = if !ty.is_valid_for_constant() {
+            et.error(&et.to_loc(&def.signature.loc), "invalid type for constant");
+            // Use dummy value. It does not matter its not matching the type, we never
+            // continue after type checking.
+            Value::Bool(false)
+        } else if let Some(BytecodeModule {
             compiled_module,
             source_map,
             ..
@@ -442,8 +448,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     &et.parent.parent.env.get_node_loc(exp.node_id()),
                     "expected a constant expression",
                 );
-                // Use dummy value. It does not matter its not matching the type, we never
-                // continue after type checking.
                 Value::Bool(false)
             }
         };
@@ -1096,7 +1100,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // Attempt to translate as specification function
             let mut et = ExpTranslator::new(self);
             let translated = body_translator(&mut et, true);
-            if !*et.errors_generated.borrow() {
+            if !et.had_errors {
                 // Rewrite all type annotations in expressions to skip references.
                 for node_id in translated.node_ids() {
                     let ty = et.get_node_type(node_id);
@@ -1405,7 +1409,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             None => PropertyValue::Value(Value::Bool(true)),
             Some(EA::PragmaValue::Literal(ev)) => {
                 let mut et = ExpTranslator::new(self);
-                match et.translate_value(ev) {
+                match et.translate_value_free(ev) {
                     None => {
                         // Error reported
                         return;

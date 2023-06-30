@@ -910,6 +910,8 @@ impl<'env> SpecTranslator<'env> {
             },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
+            | Operation::Borrow(..)
+            | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
             | Operation::Freeze
