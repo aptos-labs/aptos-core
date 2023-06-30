@@ -23,9 +23,9 @@ use aptos_api_types::{
     verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
     AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
     HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction, SubmitTransactionRequest,
-    Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
-    TransactionsBatchSubmissionResult, UserTransaction, VerifyInput, VerifyInputWithRecursion,
-    MAX_RECURSIVE_TYPES_ALLOWED, U64,
+    Transaction, TransactionData, TransactionOnChainData, TransactionPayload::FeePayerPayload,
+    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult, UserTransaction,
+    VerifyInput, VerifyInputWithRecursion, MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
 use aptos_types::{
@@ -852,7 +852,10 @@ impl TransactionsApi {
                         })?;
                 // Verify the signed transaction
                 match signed_transaction.payload() {
-                    TransactionPayload::EntryFunction(entry_function) => {
+                    TransactionPayload::MultiAgentWithFeePayer(
+                        MultisigTransactionPayload::EntryFunction(entry_function),
+                    )
+                    | TransactionPayload::EntryFunction(entry_function) => {
                         TransactionsApi::validate_entry_function_payload_format(
                             ledger_info,
                             entry_function,
@@ -1263,6 +1266,7 @@ impl TransactionsApi {
         let ledger_info = self.context.get_latest_ledger_info()?;
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let resolver = state_view.as_move_resolver();
+        let with_fee_payer = matches!(request.transaction.payload, FeePayerPayload(_));
         let raw_txn: RawTransaction = resolver
             .as_converter(self.context.db.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
@@ -1270,7 +1274,6 @@ impl TransactionsApi {
             .map_err(|err| {
                 BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput, &ledger_info)
             })?;
-
         let raw_message = match request.secondary_signers {
             Some(secondary_signer_addresses) => signing_message(
                 &RawTransactionWithData::new_multi_agent(
@@ -1279,7 +1282,7 @@ impl TransactionsApi {
                         .into_iter()
                         .map(|v| v.into())
                         .collect(),
-                    false, // TODO: This should be a parameter
+                    with_fee_payer,
                 ),
             )
             .context("Invalid transaction to generate signing message")

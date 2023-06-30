@@ -203,6 +203,7 @@ async fn test_multi_agent_signed_transaction() {
     let txn = root_account.sign_multi_agent_with_transaction_builder(
         vec![&secondary],
         factory.create_user_account(account.public_key()),
+        None, // no fee payer
     );
 
     let body = bcs::to_bytes(&txn).unwrap();
