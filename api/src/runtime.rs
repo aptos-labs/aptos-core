@@ -35,6 +35,7 @@ pub fn bootstrap(
     mp_sender: MempoolClientSender,
 ) -> anyhow::Result<Runtime> {
     let max_runtime_workers = get_max_runtime_workers(&config.api);
+    info!("DEVNET_TRACE: max_runtime_workers: {}", max_runtime_workers);
     let runtime = aptos_runtimes::spawn_named_runtime("api".into(), Some(max_runtime_workers));
 
     let context = Context::new(chain_id, db, mp_sender, config.clone());
