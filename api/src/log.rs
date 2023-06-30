@@ -93,6 +93,19 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
         );
     }
 
+    let operation_start = std::time::Instant::now();
+    if "operation_id_not_set"
+        == response
+            .data::<OperationId>()
+            .map(|operation_id| operation_id.0)
+            .unwrap_or("operation_id_not_set")
+    {
+        sample!(
+            SampleRate::Duration(Duration::from_secs(5)),
+            info!("DEVNET_TRACE (ms): operation_id_not_set: {}: {:?}", operation_start.elapsed().as_millis(), response.data::<OperationId>());
+        )
+    }
+
     // Push a counter based on the request source, sliced up by endpoint + method.
     REQUEST_SOURCE_CLIENT
         .with_label_values(&[
@@ -120,13 +133,28 @@ fn determine_request_source_client(aptos_client: &Option<String>) -> &str {
         None => return REQUEST_SOURCE_CLIENT_UNKNOWN,
     };
 
+    let determine_start = std::time::Instant::now();
     // If there were no matches, we can't determine the request source. If there are
     // multiple matches for some reason, instead of logging nothing, we use whatever
     // value we matched on last.
-    match REQUEST_SOURCE_CLIENT_REGEX.find_iter(aptos_client).last() {
+    let ret = match REQUEST_SOURCE_CLIENT_REGEX.find_iter(aptos_client).last() {
         Some(capture) => capture.as_str(),
         None => REQUEST_SOURCE_CLIENT_UNKNOWN,
+    };
+
+    let elapsed = determine_start.elapsed().as_millis();
+    sample!(
+        SampleRate::Duration(Duration::from_secs(5)),
+        info!("DEVNET_TRACE (ms): determine_request_source_client: {}: {}", determine_start.elapsed().as_millis(), aptos_client);
+    );
+    if elapsed > 100 {
+        sample!(
+            SampleRate::Duration(Duration::from_secs(5)),
+            info!("DEVNET_TRACE (ms) > 100: determine_request_source_client: {}: {}", determine_start.elapsed().as_millis(), aptos_client);
+        )
     }
+
+    ret
 }
 
 // TODO: Figure out how to have certain fields be borrowed, like in the
