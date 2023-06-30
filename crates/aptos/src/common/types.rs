@@ -33,8 +33,7 @@ use aptos_rest_client::{
 };
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{HardwareWalletAccount, HardwareWalletType},
-    types::{LocalAccount, TransactionSigner},
+    types::{HardwareWalletAccount, HardwareWalletType, LocalAccount, TransactionSigner},
 };
 use aptos_types::{
     chain_id::ChainId,
@@ -932,8 +931,8 @@ impl ExtractPublicKey for PrivateKeyInputOptions {
 
         // 2. Get the public key from the config profile
         // 3. Else error
-        if private_key.is_some() {
-            Ok(private_key.unwrap().public_key())
+        if let Some(key) = private_key {
+            Ok(key.public_key())
         } else if let Some(Some(public_key)) = CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
@@ -1649,7 +1648,7 @@ impl TransactionOptions {
                     .await
                     .map_err(|err| CliError::ApiError(err.to_string()))?;
 
-                return Ok(response.into_inner());
+                Ok(response.into_inner())
             },
             Ok(AccountType::HardwareWallet) => {
                 let sender_account = &mut HardwareWalletAccount::new(
@@ -1669,9 +1668,9 @@ impl TransactionOptions {
                     .await
                     .map_err(|err| CliError::ApiError(err.to_string()))?;
 
-                return Ok(response.into_inner());
+                Ok(response.into_inner())
             },
-            Err(err) => return Err(err),
+            Err(err) => Err(err),
         }
     }
 

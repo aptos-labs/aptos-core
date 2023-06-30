@@ -178,7 +178,7 @@ pub enum HardwareWalletType {
 }
 
 pub trait TransactionSigner {
-    fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction;
+    fn sign_transaction(&self, txn: RawTransaction) -> Result<SignedTransaction>;
 
     fn sign_with_transaction_builder(
         &mut self,
@@ -200,15 +200,17 @@ pub struct HardwareWalletAccount {
 }
 
 impl TransactionSigner for HardwareWalletAccount {
-    fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction {
-        let signature = self
-            .sign_arbitrary_message(
-                signing_message(&txn)
-                    .expect("Unable to convert txn to signing message.")
-                    .as_ref(),
-            )
-            .expect("Unable to sign transaction from hardware wallet.");
-        SignedTransaction::new(txn, self.public_key().clone(), signature)
+    fn sign_transaction(&self, txn: RawTransaction) -> Result<SignedTransaction> {
+        let signature = self.sign_arbitrary_message(
+            signing_message(&txn)
+                .expect("Unable to convert txn to signing message.")
+                .as_ref(),
+        )?;
+        Ok(SignedTransaction::new(
+            txn,
+            self.public_key().clone(),
+            signature,
+        ))
     }
 
     fn sign_with_transaction_builder(
@@ -216,10 +218,7 @@ impl TransactionSigner for HardwareWalletAccount {
         builder: TransactionBuilder,
     ) -> Result<SignedTransaction> {
         let two_minutes = Duration::from_secs(2 * 60);
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Failed to get system time")
-            + two_minutes;
+        let current_time = SystemTime::now().duration_since(UNIX_EPOCH)? + two_minutes;
         let seconds = current_time.as_secs();
 
         let raw_txn = builder
@@ -228,7 +227,7 @@ impl TransactionSigner for HardwareWalletAccount {
             .expiration_timestamp_secs(seconds)
             .build();
         *self.sequence_number_mut() += 1;
-        Ok(self.sign_transaction(raw_txn))
+        self.sign_transaction(raw_txn)
     }
 }
 
