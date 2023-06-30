@@ -4,7 +4,12 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-- Use amount greater than 0 in `getTokenOwnersData` query
+## 1.12.0 (2023-06-30)
+
+- Add token standard v2 support to `getTokenOwnersData` query
+  - `propertyVersion` parameter is optional to support fetching token v2 data
+- Introduce `getTokenCurrentOwnerData` to fetch the current owner of a token
+- Add `mintAptosSubdomain` and `setSubdomainAddress` functions to `AnsClient`
 
 ## 1.11.0 (2023-06-22)
 

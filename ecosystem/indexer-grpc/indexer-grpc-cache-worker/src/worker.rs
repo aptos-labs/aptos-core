@@ -92,9 +92,14 @@ impl Worker {
 
             // 1. Fetch metadata.
             let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store {
-                IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
-                    GcsFileStoreOperator::new(gcs_file_store.gcs_file_store_bucket_name.clone()),
-                ),
+                IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
+                    Box::new(GcsFileStoreOperator::new(
+                        gcs_file_store.gcs_file_store_bucket_name.clone(),
+                        gcs_file_store
+                            .gcs_file_store_service_account_key_path
+                            .clone(),
+                    ))
+                },
                 IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
                     LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
                 ),
