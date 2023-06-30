@@ -40,6 +40,15 @@ tests to run. If no pattern is provided, it will run all the benchmarks.
 cargo run --release PATTERN
 ```
 
+## Adding a benchmark
+
+```
+cd aptos-vm-benchmarks/samples
+mkdir proj-name
+cd proj-name
+cargo run -p aptos -- move init --name proj-name
+```
+
 ## Examples
 
 Two basics examples are included under the `/samples` directory to demonstrate how the 
