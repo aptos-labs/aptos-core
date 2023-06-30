@@ -59,7 +59,7 @@ static FAIL_WRONG_LAST_VERSION: &str = "Returned wrong block last version.";
 static FAIL_WRONG_TRANSACTIONS: &str = "Returned wrong transactions.";
 static SUCCESS: &str = "success";
 
-// Calls get_account on a newly created account on devnet. Requires faucet.
+/// Calls get_account on a newly created account on devnet. Requires faucet.
 async fn probe_getaccount_1() -> Result<&'static str> {
     // check faucet access
     if !HAS_FAUCET_ACCESS {
@@ -108,7 +108,7 @@ async fn probe_getaccount_1() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
-// Calls get_account on a static account on testnet.
+/// Calls get_account on a static account on testnet.
 async fn probe_getaccount_2() -> Result<&'static str> {
     // create the rest client
     let client = Client::new(TESTNET_NODE_URL.clone());
@@ -147,7 +147,7 @@ async fn probe_getaccount_2() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
-// Calls get_account_balance on a newly created account on devnet. Requires faucet.
+/// Calls get_account_balance on a newly created account on devnet. Requires faucet.
 async fn probe_getaccountbalance_1() -> Result<&'static str> {
     // check faucet access
     if !HAS_FAUCET_ACCESS {
@@ -193,7 +193,7 @@ async fn probe_getaccountbalance_1() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
-// Calls get_account_balance on a static account on testnet.
+/// Calls get_account_balance on a static account on testnet.
 async fn probe_getaccountbalance_2() -> Result<&'static str> {
     // create the rest client
     let client = Client::new(TESTNET_NODE_URL.clone());
@@ -219,7 +219,7 @@ async fn probe_getaccountbalance_2() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
-// Calls get_account_balance_at_version on a newly created account on devnet. Requires faucet.
+/// Calls get_account_balance_at_version on a newly created account on devnet. Requires faucet.
 async fn probe_getaccountbalanceatversion_1() -> Result<&'static str> {
     // check faucet access
     if !HAS_FAUCET_ACCESS {
@@ -315,7 +315,7 @@ async fn probe_getaccountbalanceatversion_1() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
-// Calls get_account_balance_at_version on a static account on testnet.
+/// Calls get_account_balance_at_version on a static account on testnet.
 async fn probe_getaccountbalanceatversion_2() -> Result<&'static str> {
     // create the rest client
     let client = Client::new(TESTNET_NODE_URL.clone());
@@ -396,7 +396,7 @@ async fn probe_getaccountbalanceatversion_2() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
-// Calls get_block_by_height by setting with_transactions=False on a fixed block on testnet.
+/// Calls get_block_by_height by setting with_transactions=False on a fixed block on testnet.
 async fn probe_getblockbyheight_1() -> Result<&'static str> {
     // create the rest client
     let client: Client = Client::new(TESTNET_NODE_URL.clone());
@@ -418,6 +418,78 @@ async fn probe_getblockbyheight_1() -> Result<&'static str> {
         block_timestamp: U64(1688146946653187),
         first_version: U64(565538916),
         last_version: U64(565538919),
+        transactions: None,
+    };
+
+    ensure!(
+        actual_block.block_height == expected_block.block_height,
+        "{} expected {}, got {}",
+        FAIL_WRONG_BLOCK_HEIGHT,
+        expected_block.block_height,
+        actual_block.block_height,
+    );
+    ensure!(
+        actual_block.block_hash == expected_block.block_hash,
+        "{} expected {}, got {}",
+        FAIL_WRONG_BLOCK_HASH,
+        expected_block.block_hash,
+        actual_block.block_hash,
+    );
+    ensure!(
+        actual_block.block_timestamp == expected_block.block_timestamp,
+        "{} expected {}, got {}",
+        FAIL_WRONG_BLOCK_TIMESTAMP,
+        expected_block.block_timestamp,
+        actual_block.block_timestamp,
+    );
+    ensure!(
+        actual_block.first_version == expected_block.first_version,
+        "{} expected {}, got {}",
+        FAIL_WRONG_FIRST_VERSION,
+        expected_block.first_version,
+        actual_block.first_version,
+    );
+    ensure!(
+        actual_block.last_version == expected_block.last_version,
+        "{} expected {}, got {}",
+        FAIL_WRONG_LAST_VERSION,
+        expected_block.last_version,
+        actual_block.last_version,
+    );
+    ensure!(
+        actual_block.transactions == expected_block.transactions,
+        "{} expected {:?}, got {:?}",
+        FAIL_WRONG_TRANSACTIONS,
+        expected_block.transactions,
+        actual_block.transactions,
+    );
+
+    Ok(SUCCESS)
+}
+
+/// Calls get_block_by_version by setting with_transactions=False on a fixed block on testnet.
+/// The version belongs to a user transaction inside the block.
+async fn probe_getblockbyversion_1() -> Result<&'static str> {
+    // create the rest client
+    let client: Client = Client::new(TESTNET_NODE_URL.clone());
+
+    // ask for block
+    let response = client
+        .get_block_by_version(565767993, false)
+        .await
+        .context(ERROR_CLIENT_RESPONSE)?;
+
+    // check block
+    let actual_block = response.inner();
+    let expected_block = Block {
+        block_height: U64(98764388),
+        block_hash: HashValue::from_str(
+            "f1fcfd799f88a2526d649d5a2cf227c14b77ef374b5daf6fb5d4987c430a91dd",
+        )
+        .context(ERROR_OTHER)?,
+        block_timestamp: U64(1688165648699603),
+        first_version: U64(565767992),
+        last_version: U64(565767994),
         transactions: None,
     };
 
@@ -494,6 +566,10 @@ async fn main() -> Result<()> {
         Err(e) => println!("{:?}", e),
     }
     match probe_getblockbyheight_1().await {
+        Ok(result) => println!("{:?}", result),
+        Err(e) => println!("{:?}", e),
+    }
+    match probe_getblockbyversion_1().await {
         Ok(result) => println!("{:?}", result),
         Err(e) => println!("{:?}", e),
     }
