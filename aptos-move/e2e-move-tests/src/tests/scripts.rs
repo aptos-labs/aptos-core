@@ -8,7 +8,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::CoinStoreResource,
     on_chain_config::FeatureFlag,
-    transaction::{EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionStatus},
+    transaction::{EntryFunction, Script, TransactionArgument, TransactionStatus},
 };
 use move_core_types::{move_resource::MoveStructType, vm_status::StatusCode};
 
@@ -128,9 +128,10 @@ fn test_two_to_two_transfer_gas_payer() {
     ]);
 
     let transaction = TransactionBuilder::new(alice.clone())
-        .secondary_signers(vec![bob.clone(), payer.clone()])
+        .secondary_signers(vec![bob.clone()])
+        .gas_payer(payer.clone())
         .script(script)
-        .sequence_number(h.sequence_number(alice.address()) | (1u64 << 63))
+        .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .sign_multi_agent();
@@ -152,61 +153,6 @@ fn test_two_to_two_transfer_gas_payer() {
     assert_eq!(david_start + amount_david, david_end);
     // Make sure payer pays
     assert_eq!(payer_start - output.gas_used(), payer_end);
-}
-
-#[test]
-fn test_two_to_two_transfer_gas_payer_without_gas_bit_set_fails() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
-
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-    let carol = h.new_account_at(AccountAddress::from_hex_literal("0xca501").unwrap());
-    let david = h.new_account_at(AccountAddress::from_hex_literal("0xda51d").unwrap());
-    let payer = h.new_account_at(AccountAddress::from_hex_literal("0xea51d").unwrap());
-
-    let amount_alice = 100;
-    let amount_bob = 200;
-    let amount_carol = 50;
-
-    let build_options = aptos_framework::BuildOptions {
-        with_srcs: false,
-        with_abis: false,
-        with_source_maps: false,
-        with_error_map: false,
-        ..aptos_framework::BuildOptions::default()
-    };
-
-    let package = aptos_framework::BuiltPackage::build(
-        common::test_dir_path("../../../move-examples/scripts/two_by_two_transfer"),
-        build_options,
-    )
-    .expect("building package must succeed");
-
-    let code = package.extract_script_code()[0].clone();
-    let script = Script::new(code, vec![], vec![
-        TransactionArgument::U64(amount_alice),
-        TransactionArgument::U64(amount_bob),
-        TransactionArgument::Address(*carol.address()),
-        TransactionArgument::Address(*david.address()),
-        TransactionArgument::U64(amount_carol),
-    ]);
-
-    let transaction = TransactionBuilder::new(alice.clone())
-        .secondary_signers(vec![bob, payer])
-        .script(script)
-        .sequence_number(h.sequence_number(alice.address()))
-        .max_gas_amount(1_000_000)
-        .gas_unit_price(1)
-        .sign_multi_agent();
-
-    let output = h.executor.execute_transaction(transaction);
-    println!("{:?}", output.status());
-    assert!(transaction_status_eq(
-        output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-            StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
-        )))
-    ));
 }
 
 #[test]
@@ -247,9 +193,10 @@ fn test_two_to_two_transfer_gas_payer_without_feature() {
     ]);
 
     let transaction = TransactionBuilder::new(alice.clone())
-        .secondary_signers(vec![bob, payer])
+        .secondary_signers(vec![bob])
+        .gas_payer(payer)
         .script(script)
-        .sequence_number(h.sequence_number(alice.address()) | (1u64 << 63))
+        .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .sign_multi_agent();
@@ -258,61 +205,6 @@ fn test_two_to_two_transfer_gas_payer_without_feature() {
     assert!(transaction_status_eq(
         output.status(),
         &TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_BIG)
-    ));
-}
-
-#[test]
-fn test_two_to_two_transfer_gas_payer_without_gas_payer() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
-
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-    let carol = h.new_account_at(AccountAddress::from_hex_literal("0xca501").unwrap());
-    let david = h.new_account_at(AccountAddress::from_hex_literal("0xda51d").unwrap());
-
-    let amount_alice = 100;
-    let amount_bob = 200;
-    let amount_carol = 50;
-
-    let build_options = aptos_framework::BuildOptions {
-        with_srcs: false,
-        with_abis: false,
-        with_source_maps: false,
-        with_error_map: false,
-        ..aptos_framework::BuildOptions::default()
-    };
-
-    let package = aptos_framework::BuiltPackage::build(
-        common::test_dir_path("../../../move-examples/scripts/two_by_two_transfer"),
-        build_options,
-    )
-    .expect("building package must succeed");
-
-    let code = package.extract_script_code()[0].clone();
-    let script = Script::new(code, vec![], vec![
-        TransactionArgument::U64(amount_alice),
-        TransactionArgument::U64(amount_bob),
-        TransactionArgument::Address(*carol.address()),
-        TransactionArgument::Address(*david.address()),
-        TransactionArgument::U64(amount_carol),
-    ]);
-
-    let transaction = TransactionBuilder::new(alice.clone())
-        .secondary_signers(vec![bob])
-        .script(script)
-        .sequence_number(h.sequence_number(alice.address()) | (1u64 << 63))
-        .max_gas_amount(1_000_000)
-        .gas_unit_price(1)
-        .sign_multi_agent();
-
-    let output = h.executor.execute_transaction(transaction);
-    // The last signer became the gas payer and thus, the execution errors with a mismatch
-    // between required signers as parameters and signers passed in.
-    assert!(transaction_status_eq(
-        output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-            StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
-        )))
     ));
 }
 
@@ -336,9 +228,9 @@ fn test_normal_tx_with_signer_with_gas_payer() {
     )
     .unwrap()]);
     let transaction = TransactionBuilder::new(alice.clone())
-        .secondary_signers(vec![bob.clone()])
+        .gas_payer(bob.clone())
         .entry_function(entry)
-        .sequence_number(h.sequence_number(alice.address()) | (1u64 << 63))
+        .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .sign_multi_agent();
@@ -373,9 +265,9 @@ fn test_normal_tx_without_signer_with_gas_payer() {
     let fun: MemberId = str::parse("0xcafe::test::nothing").unwrap();
     let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![]);
     let transaction = TransactionBuilder::new(alice.clone())
-        .secondary_signers(vec![bob.clone()])
+        .gas_payer(bob.clone())
         .entry_function(entry)
-        .sequence_number(h.sequence_number(alice.address()) | (1u64 << 63))
+        .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .sign_multi_agent();
@@ -407,9 +299,9 @@ fn test_normal_tx_with_gas_payer_insufficient_funds() {
     let fun: MemberId = str::parse("0xcafe::test::nothing").unwrap();
     let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![]);
     let transaction = TransactionBuilder::new(alice.clone())
-        .secondary_signers(vec![bob])
+        .gas_payer(bob)
         .entry_function(entry)
-        .sequence_number(h.sequence_number(alice.address()) | (1u64 << 63))
+        .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
         .sign_multi_agent();

@@ -250,10 +250,13 @@ impl RawTransaction {
         sender_private_key: &Ed25519PrivateKey,
         secondary_signers: Vec<AccountAddress>,
         secondary_private_keys: Vec<&Ed25519PrivateKey>,
-        is_multi_agent_with_fee_payer: bool,
+        with_fee_payer: bool,
     ) -> Result<SignatureCheckedTransaction> {
-        let message =
-            RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone());
+        let message = RawTransactionWithData::new_multi_agent(
+            self.clone(),
+            secondary_signers.clone(),
+            with_fee_payer,
+        );
         let sender_signature = sender_private_key.sign(&message)?;
         let sender_authenticator = AccountAuthenticator::ed25519(
             Ed25519PublicKey::from(sender_private_key),
@@ -280,7 +283,7 @@ impl RawTransaction {
                 sender_authenticator,
                 secondary_signers,
                 secondary_authenticators,
-                is_multi_agent_with_fee_payer,
+                with_fee_payer,
             ),
         ))
     }
@@ -378,20 +381,18 @@ impl RawTransactionWithData {
     pub fn new_multi_agent(
         raw_txn: RawTransaction,
         secondary_signer_addresses: Vec<AccountAddress>,
+        with_fee_payer: bool,
     ) -> Self {
-        Self::MultiAgent {
-            raw_txn,
-            secondary_signer_addresses,
-        }
-    }
-
-    pub fn new_multi_agent_with_fee_payer(
-        raw_txn: RawTransaction,
-        secondary_signer_addresses: Vec<AccountAddress>,
-    ) -> Self {
-        Self::MultiAgentWithFeePayer {
-            raw_txn,
-            secondary_signer_addresses,
+        if with_fee_payer {
+            Self::MultiAgentWithFeePayer {
+                raw_txn,
+                secondary_signer_addresses,
+            }
+        } else {
+            Self::MultiAgent {
+                raw_txn,
+                secondary_signer_addresses,
+            }
         }
     }
 }

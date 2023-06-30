@@ -1250,21 +1250,15 @@ impl From<TransactionAuthenticator> for TransactionSignature {
                 sender,
                 secondary_signer_addresses,
                 secondary_signers,
+                with_fee_payer,
             } => Self::MultiAgentSignature(
                 (
                     sender,
                     secondary_signer_addresses,
                     secondary_signers,
-                    &false,
+                    with_fee_payer,
                 )
                     .into(),
-            ),
-            MultiAgentWithFeePayer {
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            } => Self::MultiAgentSignature(
-                (sender, secondary_signer_addresses, secondary_signers, &true).into(),
             ),
         }
     }

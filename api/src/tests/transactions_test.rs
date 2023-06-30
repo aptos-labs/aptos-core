@@ -216,6 +216,7 @@ async fn test_multi_agent_signed_transaction() {
             sender,
             secondary_signer_addresses: _,
             secondary_signers,
+            with_fee_payer: _,
         } => (sender, secondary_signers),
         _ => panic!(
             "expecting TransactionAuthenticator::MultiAgent, but got: {:?}",

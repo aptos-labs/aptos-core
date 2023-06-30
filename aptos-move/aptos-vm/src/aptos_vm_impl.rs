@@ -347,6 +347,7 @@ impl AptosVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
+        let transaction_validation = self.transaction_validation();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_authentication_key = txn_data.authentication_key().to_vec();
         let txn_gas_price = txn_data.gas_unit_price();
@@ -482,9 +483,12 @@ impl AptosVMImpl {
         gas_remaining: Gas,
         txn_data: &TransactionMetadata,
     ) -> VMResult<()> {
-        let txn_sequence_number = txn_data.sequence_number();
+        let mut txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
+        if txn_data.with_gas_payer {
+            txn_sequence_number |= GAS_PAYER_FLAG_BIT;
+        }
         // We can unconditionally do this as this condition can only be true if the prologue
         // accepted it, in which case the gas payer feature is enabled.
         if txn_sequence_number & GAS_PAYER_FLAG_BIT == 0 {

@@ -1279,6 +1279,7 @@ impl TransactionsApi {
                         .into_iter()
                         .map(|v| v.into())
                         .collect(),
+                    false, // TODO: This should be a parameter
                 ),
             )
             .context("Invalid transaction to generate signing message")

@@ -17,6 +17,7 @@ pub struct TransactionMetadata {
     pub secondary_signers: Vec<AccountAddress>,
     pub secondary_authentication_keys: Vec<Vec<u8>>,
     pub sequence_number: u64,
+    pub with_gas_payer: bool,
     pub max_gas_amount: Gas,
     pub gas_unit_price: FeePerGasUnit,
     pub transaction_size: NumBytes,
@@ -39,6 +40,7 @@ impl TransactionMetadata {
                 .map(|account_auth| account_auth.authentication_key().to_vec())
                 .collect(),
             sequence_number: txn.sequence_number(),
+            with_gas_payer: txn.authenticator_ref().with_gas_payer(),
             max_gas_amount: txn.max_gas_amount().into(),
             gas_unit_price: txn.gas_unit_price().into(),
             transaction_size: (txn.raw_txn_bytes_len() as u64).into(),
@@ -115,6 +117,7 @@ impl Default for TransactionMetadata {
             secondary_signers: vec![],
             secondary_authentication_keys: vec![],
             sequence_number: 0,
+            with_gas_payer: false,
             max_gas_amount: 100_000_000.into(),
             gas_unit_price: 0.into(),
             transaction_size: 0.into(),

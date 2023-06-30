@@ -56,12 +56,7 @@ pub enum TransactionAuthenticator {
         sender: AccountAuthenticator,
         secondary_signer_addresses: Vec<AccountAddress>,
         secondary_signers: Vec<AccountAuthenticator>,
-    },
-    /// Multi-agent with fee payer transaction.
-    MultiAgentWithFeePayer {
-        sender: AccountAuthenticator,
-        secondary_signer_addresses: Vec<AccountAddress>,
-        secondary_signers: Vec<AccountAuthenticator>,
+        with_fee_payer: bool,
     },
 }
 
@@ -90,20 +85,13 @@ impl TransactionAuthenticator {
         sender: AccountAuthenticator,
         secondary_signer_addresses: Vec<AccountAddress>,
         secondary_signers: Vec<AccountAuthenticator>,
-        is_fee_payer: bool,
+        with_fee_payer: bool,
     ) -> Self {
-        if is_fee_payer {
-            Self::MultiAgentWithFeePayer {
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            }
-        } else {
-            Self::MultiAgent {
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            }
+        Self::MultiAgent {
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+            with_fee_payer,
         }
     }
 
@@ -131,25 +119,12 @@ impl TransactionAuthenticator {
                 sender,
                 secondary_signer_addresses,
                 secondary_signers,
+                with_fee_payer,
             } => {
                 let message = RawTransactionWithData::new_multi_agent(
                     raw_txn.clone(),
                     secondary_signer_addresses.clone(),
-                );
-                sender.verify(&message)?;
-                for signer in secondary_signers {
-                    signer.verify(&message)?;
-                }
-                Ok(())
-            },
-            Self::MultiAgentWithFeePayer {
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            } => {
-                let message = RawTransactionWithData::new_multi_agent_with_fee_payer(
-                    raw_txn.clone(),
-                    secondary_signer_addresses.clone(),
+                    *with_fee_payer,
                 );
                 sender.verify(&message)?;
                 for signer in secondary_signers {
@@ -174,7 +149,6 @@ impl TransactionAuthenticator {
                 signature,
             } => AccountAuthenticator::multi_ed25519(public_key.clone(), signature.clone()),
             Self::MultiAgent { sender, .. } => sender.clone(),
-            Self::MultiAgentWithFeePayer { sender, .. } => sender.clone(),
         }
     }
 
@@ -186,11 +160,6 @@ impl TransactionAuthenticator {
                 signature: _,
             } => vec![],
             Self::MultiAgent {
-                sender: _,
-                secondary_signer_addresses,
-                ..
-            } => secondary_signer_addresses.to_vec(),
-            Self::MultiAgentWithFeePayer {
                 sender: _,
                 secondary_signer_addresses,
                 ..
@@ -209,12 +178,24 @@ impl TransactionAuthenticator {
                 sender: _,
                 secondary_signer_addresses: _,
                 secondary_signers,
+                with_fee_payer: _,
             } => secondary_signers.to_vec(),
-            Self::MultiAgentWithFeePayer {
+        }
+    }
+
+    pub fn with_gas_payer(&self) -> bool {
+        match self {
+            Self::Ed25519 { .. }
+            | Self::MultiEd25519 {
+                public_key: _,
+                signature: _,
+            } => false,
+            Self::MultiAgent {
                 sender: _,
                 secondary_signer_addresses: _,
-                secondary_signers,
-            } => secondary_signers.to_vec(),
+                secondary_signers: _,
+                with_fee_payer,
+            } => *with_fee_payer,
         }
     }
 }
@@ -246,6 +227,7 @@ impl fmt::Display for TransactionAuthenticator {
                 sender,
                 secondary_signer_addresses,
                 secondary_signers,
+                with_fee_payer,
             } => {
                 let mut sec_addrs: String = "".to_string();
                 for sec_addr in secondary_signer_addresses {
@@ -260,32 +242,10 @@ impl fmt::Display for TransactionAuthenticator {
                     "TransactionAuthenticator[\n\
                         \tscheme: MultiAgent, \n\
                         \tsender: {}\n\
+                        \twith fee payer: {}\n\
                         \tsecondary signer addresses: {}\n\
                         \tsecondary signers: {}]",
-                    sender, sec_addrs, sec_signers,
-                )
-            },
-            Self::MultiAgentWithFeePayer {
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            } => {
-                let mut sec_addrs: String = "".to_string();
-                for sec_addr in secondary_signer_addresses {
-                    sec_addrs = format!("{}\n\t\t\t{:#?},", sec_addrs, sec_addr);
-                }
-                let mut sec_signers: String = "".to_string();
-                for sec_signer in secondary_signers {
-                    sec_signers = format!("{}\n\t\t\t{:#?},", sec_signers, sec_signer);
-                }
-                write!(
-                    f,
-                    "TransactionAuthenticator[\n\
-                        \tscheme: MultiAgentWithFeePayer, \n\
-                        \tsender: {}\n\
-                        \tsecondary signer addresses: {}\n\
-                        \tsecondary signers: {}]",
-                    sender, sec_addrs, sec_signers,
+                    sender, with_fee_payer, sec_addrs, sec_signers,
                 )
             },
         }

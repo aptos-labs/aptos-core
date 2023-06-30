@@ -158,6 +158,7 @@ impl Default for Account {
 pub struct TransactionBuilder {
     pub sender: Account,
     pub secondary_signers: Vec<Account>,
+    pub gas_payer: Option<Account>,
     pub sequence_number: Option<u64>,
     pub program: Option<TransactionPayload>,
     pub max_gas_amount: Option<u64>,
@@ -171,6 +172,7 @@ impl TransactionBuilder {
         Self {
             sender,
             secondary_signers: Vec::new(),
+            gas_payer: None,
             sequence_number: None,
             program: None,
             max_gas_amount: None,
@@ -182,6 +184,11 @@ impl TransactionBuilder {
 
     pub fn secondary_signers(mut self, secondary_signers: Vec<Account>) -> Self {
         self.secondary_signers = secondary_signers;
+        self
+    }
+
+    pub fn gas_payer(mut self, gas_payer: Account) -> Self {
+        self.gas_payer = Some(gas_payer);
         self
     }
 
@@ -258,16 +265,22 @@ impl TransactionBuilder {
     }
 
     pub fn sign_multi_agent(self) -> SignedTransaction {
-        let secondary_signer_addresses: Vec<AccountAddress> = self
+        let mut secondary_signer_addresses: Vec<AccountAddress> = self
             .secondary_signers
             .iter()
             .map(|signer| *signer.address())
             .collect();
-        let secondary_private_keys = self
+        let mut secondary_private_keys: Vec<&Ed25519PrivateKey> = self
             .secondary_signers
             .iter()
             .map(|signer| &signer.privkey)
             .collect();
+        let mut with_gas_payer = false;
+        if let Some(gas_payer) = &self.gas_payer {
+            with_gas_payer = true;
+            secondary_signer_addresses.push(*gas_payer.address());
+            secondary_private_keys.push(&gas_payer.privkey);
+        }
         RawTransaction::new(
             *self.sender.address(),
             self.sequence_number.expect("sequence number not set"),
@@ -281,7 +294,7 @@ impl TransactionBuilder {
             &self.sender.privkey,
             secondary_signer_addresses,
             secondary_private_keys,
-            false, // TODO add e2e for fee payer
+            with_gas_payer,
         )
         .unwrap()
         .into_inner()
