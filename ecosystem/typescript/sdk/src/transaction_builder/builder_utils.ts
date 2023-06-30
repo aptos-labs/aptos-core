@@ -72,6 +72,14 @@ export function ensureBigInt(val: number | bigint | string): bigint {
 }
 
 export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializer) {
+  serializeArgInner(argVal, argType, serializer, 0);
+}
+
+function serializeArgInner(argVal: any, argType: TypeTag, serializer: Serializer, depth: number) {
+  // TODO: Should check how this matches to BCS's limit on nesting
+  if (depth >= 8) {
+    throw new Error("Arguments are too nested, must be no greater than 8");
+  }
   if (argType instanceof TypeTagBool) {
     serializer.serializeBool(ensureBoolean(argVal));
   } else if (argType instanceof TypeTagU8) {
@@ -89,9 +97,9 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
   } else if (argType instanceof TypeTagAddress) {
     serializeAddress(argVal, serializer);
   } else if (argType instanceof TypeTagVector) {
-    serializeVector(argVal, argType, serializer);
+    serializeVector(argVal, argType, serializer, depth);
   } else if (argType instanceof TypeTagStruct) {
-    serializeStruct(argVal, argType, serializer);
+    serializeStruct(argVal, argType, serializer, depth);
   } else {
     throw new Error("Unsupported arg type.");
   }
@@ -109,7 +117,7 @@ function serializeAddress(argVal: any, serializer: Serializer) {
   addr.serialize(serializer);
 }
 
-function serializeVector(argVal: any, argType: TypeTagVector, serializer: Serializer) {
+function serializeVector(argVal: any, argType: TypeTagVector, serializer: Serializer, depth: number) {
   // We are serializing a vector<u8>
   if (argType.value instanceof TypeTagU8) {
     if (argVal instanceof Uint8Array) {
@@ -133,10 +141,10 @@ function serializeVector(argVal: any, argType: TypeTagVector, serializer: Serial
 
   serializer.serializeU32AsUleb128(argVal.length);
 
-  argVal.forEach((arg) => serializeArg(arg, argType.value, serializer));
+  argVal.forEach((arg) => serializeArgInner(arg, argType.value, serializer, depth + 1));
 }
 
-function serializeStruct(argVal: any, argType: TypeTag, serializer: Serializer) {
+function serializeStruct(argVal: any, argType: TypeTag, serializer: Serializer, depth: number) {
   const { address, module_name: moduleName, name, type_args: typeArgs } = (argType as TypeTagStruct).value;
   const structType = `${HexString.fromUint8Array(address.address).toShortString()}::${moduleName.value}::${name.value}`;
   if (structType === "0x1::string::String") {
@@ -148,13 +156,13 @@ function serializeStruct(argVal: any, argType: TypeTag, serializer: Serializer) 
     if (typeArgs.length !== 1) {
       throw new Error(`Option has the wrong number of type arguments ${typeArgs.length}`);
     }
-    serializeOption(argVal, typeArgs[0], serializer);
+    serializeOption(argVal, typeArgs[0], serializer, depth);
   } else {
     throw new Error("Unsupported struct type in function argument");
   }
 }
 
-function serializeOption(argVal: any, argType: TypeTag, serializer: Serializer) {
+function serializeOption(argVal: any, argType: TypeTag, serializer: Serializer, depth: number) {
   // For option, we determine if it's empty or not empty first
   // empty option is nothing, we specifically check for undefined to prevent fuzzy matching
   if (argVal === undefined) {
@@ -163,20 +171,8 @@ function serializeOption(argVal: any, argType: TypeTag, serializer: Serializer) 
     // Something means we need an array of 1
     serializer.serializeU32AsUleb128(1);
 
-    // Serialize the inner type arg
-    // Checking first to prevent loops and bad types TODO: possibly just do a count on nesting
-    if (argType instanceof TypeTagStruct) {
-      const { address: innerAddress, module_name: innerModule, name: innerName } = (argType as TypeTagStruct).value;
-
-      const innerStructType = `${HexString.fromUint8Array(innerAddress.address).toShortString()}::${
-        innerModule.value
-      }::${innerName.value}`;
-      if (innerStructType === "0x1::option::Option") {
-        throw new Error("Options can not be nested in options.");
-      }
-    }
-
-    serializeArg(argVal, argType, serializer);
+    // Serialize the inner type arg, ensuring that depth is tracked
+    serializeArgInner(argVal, argType, serializer, depth + 1);
   }
 }
 
