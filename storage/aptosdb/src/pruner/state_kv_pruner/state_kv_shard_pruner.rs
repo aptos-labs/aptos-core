@@ -10,6 +10,7 @@ use crate::{
     },
 };
 use anyhow::Result;
+use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_types::transaction::Version;
 use std::sync::Arc;
@@ -32,6 +33,11 @@ impl StateKvShardPruner {
         )?;
         let myself = Self { shard_id, db_shard };
 
+        info!(
+            progress = progress,
+            metadata_progress = metadata_progress,
+            "Catching up state kv shard {shard_id}."
+        );
         myself.prune(progress, metadata_progress)?;
 
         Ok(myself)
