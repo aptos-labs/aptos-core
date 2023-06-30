@@ -109,13 +109,13 @@ impl MoveVmExt {
                 sender: _,
                 sequence_number: _,
                 script_hash,
-            } |
-            SessionId::Prologue {
+            }
+            | SessionId::Prologue {
                 sender: _,
                 sequence_number: _,
                 script_hash,
-            } |
-            SessionId::Epilogue {
+            }
+            | SessionId::Epilogue {
                 sender: _,
                 sequence_number: _,
                 script_hash,

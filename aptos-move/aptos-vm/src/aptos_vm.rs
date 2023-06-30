@@ -1590,7 +1590,9 @@ impl VMValidator for AptosVM {
         };
 
         let resolver = self.as_move_resolver(state_view);
-        let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn), true);
+        let mut session = self
+            .0
+            .new_session(&resolver, SessionId::prologue(&txn), true);
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,
             &resolver,

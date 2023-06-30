@@ -130,7 +130,9 @@ impl SessionId {
 
     pub fn sender(&self) -> Option<AccountAddress> {
         match self {
-            SessionId::Txn { sender, .. } | SessionId::Prologue { sender, .. } | SessionId::Epilogue { sender, .. } => Some(*sender),
+            SessionId::Txn { sender, .. }
+            | SessionId::Prologue { sender, .. }
+            | SessionId::Epilogue { sender, .. } => Some(*sender),
             SessionId::BlockMeta { .. } | SessionId::Genesis { .. } | SessionId::Void => None,
         }
     }
