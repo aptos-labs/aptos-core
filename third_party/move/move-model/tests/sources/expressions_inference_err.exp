@@ -1,4 +1,4 @@
-error: unable to infer type: `?3`
+error: unable to infer type: `?2`
   ┌─ tests/sources/expressions_inference_err.move:7:16
   │
 7 │       let f = |x|x;

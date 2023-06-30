@@ -153,7 +153,7 @@ impl Analyzer {
                 }
                 let adapter =
                     TypeUnificationAdapter::new_vec(&fun_mem.inst, &inv_mem.inst, true, true);
-                let rel = adapter.unify(Variance::Allow, /* shallow_subst */ false);
+                let rel = adapter.unify(Variance::SpecVariance, /* shallow_subst */ false);
                 match rel {
                     None => continue,
                     Some((subs_fun, _)) => {
@@ -749,7 +749,7 @@ impl<'a> Instrumenter<'a> {
                     self.builder.global_env().display(inv_mem),
                     inv.loc.display(self.builder.global_env())
                 );
-                let rel = adapter.unify(Variance::Allow, /* shallow_subst */ false);
+                let rel = adapter.unify(Variance::SpecVariance, /* shallow_subst */ false);
                 match rel {
                     None => continue,
                     Some((_, subst_rhs)) => {

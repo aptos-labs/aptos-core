@@ -261,6 +261,8 @@ impl<'env> Generator<'env> {
             Operation::Pack(_, _)
             | Operation::Exists(_)
             | Operation::BorrowGlobal(_)
+            | Operation::Borrow(..)
+            | Operation::Deref
             | Operation::MoveFrom
             | Operation::MoveTo
             | Operation::Abort
