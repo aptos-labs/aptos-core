@@ -254,15 +254,6 @@ async fn probe_getaccountbalanceatversion_1() -> Result<&'static str> {
         return Ok(FAIL_WRONG_BALANCE_AT_VERSION);
     }
 
-<<<<<<< HEAD
-    // use the faucet to ensure that there exists a higher version number
-    faucet_client
-        .fund(giray.address(), 100_000_000)
-        .await
-        .context(ERROR_FAUCET_FUND)?;
-
-=======
->>>>>>> 84b40d670f (Add tests for get_account_balance_at_version)
     // ask for account balance with a higher version number
     let response = client
         .get_account_balance_at_version(giray2.address(), version + 1)
