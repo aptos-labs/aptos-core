@@ -12,16 +12,16 @@ use crate::{
         boogie_function_bv_name, boogie_function_name, boogie_make_vec_from_strings,
         boogie_modifies_memory_name, boogie_num_literal, boogie_num_type_base,
         boogie_num_type_string_capital, boogie_reflection_type_info, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_struct_name, boogie_temp, boogie_temp_from_suffix,
-        boogie_type, boogie_type_param, boogie_type_suffix, boogie_type_suffix_bv,
-        boogie_type_suffix_for_struct, boogie_well_formed_check, boogie_well_formed_expr_bv,
-        TypeIdentToken,
+        boogie_resource_memory_name, boogie_resource_memory_name_ty, boogie_resource_ty_name,
+        boogie_struct_name, boogie_temp, boogie_temp_from_suffix, boogie_type, boogie_type_param,
+        boogie_type_suffix, boogie_type_suffix_bv, boogie_type_suffix_for_struct,
+        boogie_well_formed_check, boogie_well_formed_expr_bv, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::SpecTranslator,
 };
 use codespan::LineIndex;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
 use move_compiler::interface_generator::NATIVE_INTERFACE;
@@ -850,13 +850,24 @@ impl<'env> FunctionTranslator<'env> {
             })
             .collect::<BTreeSet<_>>();
         for (lab, mem) in labels {
-            let mem = &mem.to_owned().instantiate(self.type_inst);
-            let name = boogie_resource_memory_name(env, mem, &Some(*lab));
+            let new_mem = if mem.is_left() {
+                Either::Left(
+                    mem.clone()
+                        .left()
+                        .unwrap()
+                        .to_owned()
+                        .instantiate(self.type_inst),
+                )
+            } else {
+                Either::Right(mem.clone().right().unwrap())
+            };
+
+            let name = boogie_resource_memory_name_ty(env, &new_mem, &Some(*lab));
             emitln!(
                 writer,
                 "var {}: $Memory {};",
                 name,
-                boogie_struct_name(&env.get_struct_qid(mem.to_qualified_id()), &mem.inst)
+                boogie_resource_ty_name(env, &new_mem)
             );
         }
 
@@ -1006,9 +1017,13 @@ impl<'env> FunctionTranslator<'env> {
         // Translate the bytecode instruction.
         match bytecode {
             SaveMem(_, label, mem) => {
-                let mem = &mem.to_owned().instantiate(self.type_inst);
-                let snapshot = boogie_resource_memory_name(env, mem, &Some(*label));
-                let current = boogie_resource_memory_name(env, mem, &None);
+                let new_mem = if mem.is_left() {
+                    Either::Left(mem.clone().left().unwrap().instantiate(self.type_inst))
+                } else {
+                    Either::Right(mem.clone().right().unwrap())
+                };
+                let snapshot = boogie_resource_memory_name_ty(env, &new_mem, &Some(*label));
+                let current = boogie_resource_memory_name_ty(env, &new_mem, &None);
                 emitln!(writer, "{} := {};", snapshot, current);
             },
             SaveSpecVar(_, _label, _var) => {

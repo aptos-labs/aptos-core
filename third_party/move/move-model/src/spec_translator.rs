@@ -21,7 +21,7 @@ use crate::{
     ty::{PrimitiveType, Type},
 };
 use codespan_reporting::diagnostic::Severity;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A helper which reduces specification conditions to assume/assert statements.
@@ -55,7 +55,7 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
 /// Represents a translated spec.
 #[derive(Default)]
 pub struct TranslatedSpec {
-    pub saved_memory: BTreeMap<QualifiedInstId<StructId>, MemoryLabel>,
+    pub saved_memory: BTreeMap<Either<QualifiedInstId<StructId>, u16>, MemoryLabel>,
     pub saved_spec_vars: BTreeMap<QualifiedInstId<SpecVarId>, MemoryLabel>,
     pub saved_params: BTreeMap<TempIndex, TempIndex>,
     pub debug_traces: Vec<(NodeId, TraceKind, Exp)>,
@@ -563,12 +563,12 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         }
     }
 
-    fn save_memory(&mut self, qid: QualifiedInstId<StructId>) -> MemoryLabel {
+    fn save_memory_ty(&mut self, ty: Either<QualifiedInstId<StructId>, u16>) -> MemoryLabel {
         let builder = &mut self.builder;
         *self
             .result
             .saved_memory
-            .entry(qid)
+            .entry(ty)
             .or_insert_with(|| builder.global_env().new_global_id())
     }
 
@@ -699,19 +699,25 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
             Global(None) if self.in_old => Some(
                 Call(
                     id,
-                    Global(Some(self.save_memory(self.builder.get_memory_of_node(id)))),
+                    Global(Some(
+                        self.save_memory_ty(self.builder.get_memory_of_node_opt(id)),
+                    )),
                     args.to_owned(),
                 )
                 .into_exp(),
             ),
-            Exists(None) if self.in_old => {
-                if let Some(mem) = self.builder.get_memory_of_node_opt(id) {
-                    Some(Call(id, Exists(Some(self.save_memory(mem))), args.to_owned()).into_exp())
-                } else {
-                    Some(Call(id, Exists(None), args.to_owned()).into_exp())
-                }
-            },
+            Exists(None) if self.in_old => Some(
+                Call(
+                    id,
+                    Exists(Some(
+                        self.save_memory_ty(self.builder.get_memory_of_node_opt(id)),
+                    )),
+                    args.to_owned(),
+                )
+                .into_exp(),
+            ),
             SpecFunction(mid, fid, None) if self.in_old => {
+                //println!("spec fun called");
                 let used_memory = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
@@ -722,8 +728,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                 let inst = self.builder.global_env().get_node_instantiation(id);
                 let mut labels = vec![];
                 for mem in used_memory {
-                    let mem = mem.instantiate(&inst);
-                    labels.push(self.save_memory(mem));
+                    let mem_inst = mem.instantiate(&inst);
+                    labels.push(self.save_memory_ty(Either::Left(mem_inst)));
                 }
                 Some(Call(id, SpecFunction(*mid, *fid, Some(labels)), args.to_owned()).into_exp())
             },

@@ -11,7 +11,7 @@ use crate::{
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
 };
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use move_core_types::account_address::AccountAddress;
 
 /// A trait that defines a generator for `Exp`.
@@ -395,16 +395,24 @@ pub trait ExpGenerator<'env> {
     /// if the the node is not typed as expected.
     fn get_memory_of_node(&self, node_id: NodeId) -> QualifiedInstId<StructId> {
         self.get_memory_of_node_opt(node_id)
+            .left()
             .expect("expected `Type::Struct`")
     }
 
-    fn get_memory_of_node_opt(&self, node_id: NodeId) -> Option<QualifiedInstId<StructId>> {
+    fn get_memory_of_node_opt(&self, node_id: NodeId) -> Either<QualifiedInstId<StructId>, u16> {
         // We do have a call `f<R<..>>` so extract the type from the function instantiation.
         let rty = &self.global_env().get_node_instantiation(node_id)[0];
-        if let Some((mid, sid, inst)) = rty.require_struct_opt() {
-            Some(mid.qualified_inst(sid, inst.to_owned()))
+        if let Type::Struct(_, _, _) = rty {
+            let (mid, sid, inst) = rty.require_struct();
+            Either::Left(mid.qualified_inst(sid, inst.to_owned()))
+        } else if let Type::TypeParameter(i) = rty {
+            Either::Right(*i)
         } else {
-            None
+            self.global_env().error(
+                &self.global_env().get_node_loc(node_id),
+                "expected `Type::Struct` or `Type::TypeParameter`",
+            );
+            Either::Right(0)
         }
     }
 }

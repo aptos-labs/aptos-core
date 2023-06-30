@@ -7,7 +7,7 @@
 // TODO(tengzhang): helpers specifically for bv types need to be refactored
 
 use crate::{options::BoogieOptions, COMPILED_MODULE_AVAILABLE};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use move_binary_format::file_format::TypeParameterIndex;
 use move_core_types::account_address::AccountAddress;
 use move_model::{
@@ -175,6 +175,31 @@ pub fn boogie_choice_fun_name(id: usize) -> String {
 pub fn boogie_modifies_memory_name(env: &GlobalEnv, memory: &QualifiedInstId<StructId>) -> String {
     let struct_env = &env.get_struct_qid(memory.to_qualified_id());
     format!("{}_$modifies", boogie_struct_name(struct_env, &memory.inst))
+}
+
+pub fn boogie_resource_ty_name(
+    env: &GlobalEnv,
+    memory: &Either<QualifiedInstId<StructId>, u16>,
+) -> String {
+    if let Either::Left(mem) = memory {
+        let struct_env = env.get_struct_qid(mem.to_qualified_id());
+        boogie_struct_name(&struct_env, &mem.inst)
+    } else {
+        format!("#{}", memory.clone().right().unwrap())
+    }
+}
+
+/// Creates the name of the resource memory.
+pub fn boogie_resource_memory_name_ty(
+    env: &GlobalEnv,
+    memory: &Either<QualifiedInstId<StructId>, u16>,
+    memory_label: &Option<MemoryLabel>,
+) -> String {
+    format!(
+        "{}_$memory{}",
+        boogie_resource_ty_name(env, memory),
+        boogie_memory_label(memory_label)
+    )
 }
 
 /// Creates the name of the resource memory for the given struct.

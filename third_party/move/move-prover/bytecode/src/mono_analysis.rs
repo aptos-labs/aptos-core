@@ -422,9 +422,13 @@ impl<'a> Analyzer<'a> {
             },
             Prop(_, _, exp) => self.analyze_exp(exp),
             SaveMem(_, _, mem) => {
-                let mem = self.instantiate_mem(mem.to_owned());
-                let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
-                self.add_struct(struct_env, &mem.inst);
+                if mem.is_left() {
+                    let mem = self.instantiate_mem(mem.clone().left().unwrap());
+                    let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
+                    self.add_struct(struct_env, &mem.inst)
+                } else {
+                    self.add_type(&Type::TypeParameter(mem.clone().right().unwrap()))
+                }
             },
             _ => {},
         }

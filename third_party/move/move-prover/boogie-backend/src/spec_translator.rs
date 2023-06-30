@@ -10,13 +10,13 @@ use crate::{
         boogie_choice_fun_name, boogie_declare_global, boogie_field_sel, boogie_inst_suffix,
         boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
         boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_type,
-        boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
-        boogie_well_formed_expr_bv,
+        boogie_resource_memory_name_ty, boogie_spec_fun_name, boogie_spec_var_name,
+        boogie_struct_name, boogie_type, boogie_type_suffix, boogie_type_suffix_bv,
+        boogie_value_blob, boogie_well_formed_expr, boogie_well_formed_expr_bv,
     },
     options::BoogieOptions,
 };
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_model::{
@@ -1155,15 +1155,26 @@ impl<'env> SpecTranslator<'env> {
 
     fn get_memory_inst_from_node(&self, node_id: NodeId) -> QualifiedInstId<StructId> {
         self.get_memory_inst_from_node_opt(node_id)
+            .left()
             .expect("expected `Type::Struct`")
     }
 
-    fn get_memory_inst_from_node_opt(&self, node_id: NodeId) -> Option<QualifiedInstId<StructId>> {
-        let mem_ty = &self.get_node_instantiation(node_id)[0];
-        if let Some((mid, sid, inst)) = mem_ty.require_struct_opt() {
-            Some(mid.qualified_inst(sid, inst.to_owned()))
+    fn get_memory_inst_from_node_opt(
+        &self,
+        node_id: NodeId,
+    ) -> Either<QualifiedInstId<StructId>, u16> {
+        let rty = &self.get_node_instantiation(node_id)[0];
+        if let Type::Struct(_, _, _) = rty {
+            let (mid, sid, inst) = rty.require_struct();
+            Either::Left(mid.qualified_inst(sid, inst.to_owned()))
+        } else if let Type::TypeParameter(i) = rty {
+            Either::Right(*i)
         } else {
-            None
+            self.env.error(
+                &self.env.get_node_loc(node_id),
+                "expected `Type::Struct` or `Type::TypeParameter`",
+            );
+            Either::Right(0)
         }
     }
 
@@ -1173,18 +1184,13 @@ impl<'env> SpecTranslator<'env> {
         args: &[Exp],
         memory_label: &Option<MemoryLabel>,
     ) {
-        let memory_opt = &self.get_memory_inst_from_node_opt(node_id);
-        let mut resource_name = "".to_string();
-        if let Some(memory) = memory_opt {
-            resource_name = boogie_resource_memory_name(self.env, memory, memory_label);
+        let mem = &self.get_memory_inst_from_node_opt(node_id);
+        let new_mem = if mem.is_left() {
+            Either::Left(mem.clone().left().unwrap())
         } else {
-            let mem_ty = &self.get_node_instantiation(node_id)[0];
-            if let Type::TypeParameter(arg) = mem_ty {
-                resource_name = format!("#{}_$memory", arg)
-            } else {
-                self.error(&self.env.get_node_loc(node_id), "incorrect type for exists");
-            }
-        }
+            Either::Right(mem.clone().right().unwrap())
+        };
+        let resource_name = boogie_resource_memory_name_ty(self.env, &new_mem, memory_label);
         emit!(self.writer, "$ResourceExists({}, ", resource_name);
         self.translate_exp(&args[0]);
         emit!(self.writer, ")");

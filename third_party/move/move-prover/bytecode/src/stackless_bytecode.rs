@@ -4,7 +4,7 @@
 
 use crate::function_target::FunctionTarget;
 use ethnum::U256;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use move_binary_format::file_format::CodeOffset;
 use move_core_types::u256;
 use move_model::{
@@ -12,7 +12,7 @@ use move_model::{
     ast::{Address, Exp, ExpData, MemoryLabel, TempIndex, TraceKind},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, GlobalEnv, ModuleId, NodeId, QualifiedInstId, SpecVarId, StructId},
-    ty::{Type, TypeDisplayContext},
+    ty::{Type, Type::TypeParameter, TypeDisplayContext},
 };
 use std::{collections::BTreeMap, fmt, fmt::Formatter};
 
@@ -371,7 +371,7 @@ pub enum Bytecode {
     Abort(AttrId, TempIndex),
     Nop(AttrId),
 
-    SaveMem(AttrId, MemoryLabel, QualifiedInstId<StructId>),
+    SaveMem(AttrId, MemoryLabel, Either<QualifiedInstId<StructId>, u16>),
     SaveSpecVar(AttrId, MemoryLabel, QualifiedInstId<SpecVarId>),
     Prop(AttrId, PropKind, Exp),
 }
@@ -657,7 +657,12 @@ impl Bytecode {
                 )
             },
             Self::SaveMem(attr_id, label, qid) => {
-                Self::SaveMem(*attr_id, *label, qid.instantiate_ref(params))
+                let mem = if qid.is_left() {
+                    Either::Left(qid.clone().left().unwrap().instantiate_ref(params))
+                } else {
+                    Either::Right(qid.clone().right().unwrap())
+                };
+                Self::SaveMem(*attr_id, *label, mem)
             },
             Self::SaveSpecVar(attr_id, label, qid) => {
                 Self::SaveSpecVar(*attr_id, *label, qid.instantiate_ref(params))
@@ -845,7 +850,21 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
             },
             SaveMem(_, label, qid) => {
                 let env = self.func_target.global_env();
-                write!(f, "@{} := save_mem({})", label.as_usize(), env.display(qid))?;
+                if qid.is_left() {
+                    write!(
+                        f,
+                        "@{} := save_mem({})",
+                        label.as_usize(),
+                        env.display(&qid.clone().left().unwrap())
+                    )?;
+                } else {
+                    write!(
+                        f,
+                        "@{} := save_mem({:?})",
+                        label.as_usize(),
+                        TypeParameter(qid.clone().right().unwrap())
+                    )?;
+                }
             },
             SaveSpecVar(_, label, qid) => {
                 let env = self.func_target.global_env();
