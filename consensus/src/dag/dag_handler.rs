@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use super::{reliable_broadcast::CertifiedNodeHandler, types::TDAGMessage};
 use crate::{
     dag::{
         dag_network::RpcHandler, dag_store::Dag, reliable_broadcast::NodeBroadcastHandler,
@@ -20,6 +21,8 @@ use std::sync::Arc;
 struct NetworkHandler {
     dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
     node_receiver: NodeBroadcastHandler,
+    certified_node_receiver: CertifiedNodeHandler,
+    epoch_state: Arc<EpochState>,
 }
 
 impl NetworkHandler {
@@ -31,7 +34,13 @@ impl NetworkHandler {
     ) -> Self {
         Self {
             dag_rpc_rx,
-            node_receiver: NodeBroadcastHandler::new(dag, signer, epoch_state.verifier.clone()),
+            node_receiver: NodeBroadcastHandler::new(
+                dag.clone(),
+                signer,
+                epoch_state.verifier.clone(),
+            ),
+            certified_node_receiver: CertifiedNodeHandler::new(dag),
+            epoch_state,
         }
     }
 
@@ -45,8 +54,16 @@ impl NetworkHandler {
 
     async fn process_rpc(&mut self, rpc_request: IncomingDAGRequest) -> anyhow::Result<()> {
         let dag_message: DAGMessage = TConsensusMsg::from_network_message(rpc_request.req)?;
+
         let response: anyhow::Result<DAGMessage> = match dag_message {
-            DAGMessage::NodeMsg(node) => self.node_receiver.process(node).map(|r| r.into()),
+            DAGMessage::NodeMsg(node) => node
+                .verify(&self.epoch_state.verifier)
+                .and_then(|_| self.node_receiver.process(node))
+                .map(|r| r.into()),
+            DAGMessage::CertifiedNodeMsg(node) => node
+                .verify(&self.epoch_state.verifier)
+                .and_then(|_| self.certified_node_receiver.process(node))
+                .map(|r| r.into()),
             _ => {
                 error!("unknown rpc message {:?}", dag_message);
                 Err(anyhow::anyhow!("unknown rpc message"))

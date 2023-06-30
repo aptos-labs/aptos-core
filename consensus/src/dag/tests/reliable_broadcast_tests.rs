@@ -6,24 +6,28 @@ use crate::{
         dag_network::DAGNetworkSender,
         dag_store::Dag,
         reliable_broadcast::{
-            BroadcastStatus, NodeBroadcastHandleError, NodeBroadcastHandler, ReliableBroadcast,
+            BroadcastStatus, CertifiedNodeHandleError, CertifiedNodeHandler,
+            NodeBroadcastHandleError, NodeBroadcastHandler, ReliableBroadcast,
         },
-        tests::dag_test::MockStorage,
-        types::{DAGMessage, Node, NodeCertificate, NodeDigestSignature, TestAck, TestMessage},
+        tests::{
+            dag_test::MockStorage,
+            helpers::{new_certified_node, new_node},
+        },
+        types::{DAGMessage, NodeCertificate, NodeDigestSignature, TestAck, TestMessage},
         RpcHandler,
     },
     network::TConsensusMsg,
     network_interface::ConsensusMsg,
 };
 use anyhow::bail;
-use aptos_consensus_types::common::{Author, Payload, Round};
+use aptos_consensus_types::common::Author;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     aggregate_signature::PartialSignatures, epoch_state::EpochState,
     validator_verifier::random_validator_verifier,
 };
 use async_trait::async_trait;
-use claims::assert_ok_eq;
+use claims::{assert_ok, assert_ok_eq};
 use futures::{
     future::{AbortHandle, Abortable},
     FutureExt,
@@ -278,6 +282,29 @@ async fn test_node_broadcast_receiver_failure() {
     );
 }
 
-fn new_node(round: Round, timestamp: u64, author: Author, parents: Vec<NodeCertificate>) -> Node {
-    Node::new(0, round, author, timestamp, Payload::empty(false), parents)
+#[test]
+fn test_certified_node_receiver() {
+    let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier,
+    });
+    let storage = Arc::new(MockStorage::new());
+    let dag = Arc::new(RwLock::new(Dag::new(epoch_state, storage)));
+
+    let node = new_certified_node(0, signers[0].author(), vec![]);
+
+    let mut rb_receiver = CertifiedNodeHandler::new(dag);
+
+    // expect an ack for a valid message
+    assert_ok!(rb_receiver.process(node.clone()));
+    // expect an ack again if the same message is sent again
+    assert_ok!(rb_receiver.process(node));
+
+    let parent_node = new_certified_node(0, signers[1].author(), vec![]);
+    let invalid_node = new_certified_node(1, signers[0].author(), vec![parent_node.certificate()]);
+    assert_eq!(
+        rb_receiver.process(invalid_node).unwrap_err().to_string(),
+        CertifiedNodeHandleError::MissingParents.to_string()
+    );
 }
