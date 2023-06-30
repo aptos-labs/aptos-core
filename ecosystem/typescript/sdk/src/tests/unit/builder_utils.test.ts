@@ -268,22 +268,34 @@ describe("BuilderUtils", () => {
     let serializer = new Serializer();
     serializeArg([255], new TypeTagVector(new TypeTagU8()), serializer);
     expect(serializer.getBytes()).toEqual(new Uint8Array([0x1, 0xff]));
+  });
 
-    serializer = new Serializer();
+  it("serializes a vector u8 arg from string characters", async () => {
+    let serializer = new Serializer();
     serializeArg("abc", new TypeTagVector(new TypeTagU8()), serializer);
     expect(serializer.getBytes()).toEqual(new Uint8Array([0x3, 0x61, 0x62, 0x63]));
+  });
 
-    serializer = new Serializer();
+  it("serializes a vector u8 arg from a hex string", async () => {
+    let serializer = new Serializer();
+    serializeArg(HexString.ensure("0x010203"), new TypeTagVector(new TypeTagU8()), serializer);
+    expect(serializer.getBytes()).toEqual(new Uint8Array([0x3, 0x01, 0x02, 0x03]));
+  });
+
+  it("serializes a vector u8 arg from a uint8array", async () => {
+    let serializer = new Serializer();
     serializeArg(new Uint8Array([0x61, 0x62, 0x63]), new TypeTagVector(new TypeTagU8()), serializer);
     expect(serializer.getBytes()).toEqual(new Uint8Array([0x3, 0x61, 0x62, 0x63]));
+  });
 
-    serializer = new Serializer();
+  it("throws error when serializing a mismatched type", async () => {
+    let serializer = new Serializer();
     expect(() => {
       serializeArg(123456, new TypeTagVector(new TypeTagU8()), serializer);
     }).toThrow("Invalid vector args.");
   });
 
-  it("serializes a struct arg", async () => {
+  it("serializes a string arg", async () => {
     let serializer = new Serializer();
     serializeArg(
       "abc",
@@ -293,8 +305,95 @@ describe("BuilderUtils", () => {
       serializer,
     );
     expect(serializer.getBytes()).toEqual(new Uint8Array([0x3, 0x61, 0x62, 0x63]));
+  });
 
-    serializer = new Serializer();
+  it("serializes an empty option arg", async () => {
+    let serializer = new Serializer();
+    serializeArg(
+      undefined,
+      new TypeTagStruct(
+        new StructTag(AccountAddress.fromHex("0x1"), new Identifier("option"), new Identifier("Option"), [
+          new TypeTagU8(),
+        ]),
+      ),
+      serializer,
+    );
+    expect(serializer.getBytes()).toEqual(new Uint8Array([0x0]));
+  });
+
+  it("serializes an option num arg", async () => {
+    let serializer = new Serializer();
+    serializeArg(
+      "1",
+      new TypeTagStruct(
+        new StructTag(AccountAddress.fromHex("0x1"), new Identifier("option"), new Identifier("Option"), [
+          new TypeTagU8(),
+        ]),
+      ),
+      serializer,
+    );
+    expect(serializer.getBytes()).toEqual(new Uint8Array([0x1, 0x1]));
+  });
+
+  it("serializes an option string arg", async () => {
+    let serializer = new Serializer();
+    serializeArg(
+      "abc",
+      new TypeTagStruct(
+        new StructTag(AccountAddress.fromHex("0x1"), new Identifier("option"), new Identifier("Option"), [
+          new TypeTagStruct(
+            new StructTag(AccountAddress.fromHex("0x1"), new Identifier("string"), new Identifier("String"), []),
+          ),
+        ]),
+      ),
+      serializer,
+    );
+    expect(serializer.getBytes()).toEqual(new Uint8Array([0x1, 0x3, 0x61, 0x62, 0x63]));
+  });
+
+  it("serializes a optional Object", async () => {
+    let serializer = new Serializer();
+    serializeArg(
+      "0x01",
+      new TypeTagStruct(
+        new StructTag(AccountAddress.fromHex("0x1"), new Identifier("option"), new Identifier("Option"), [
+          new TypeTagStruct(
+            new StructTag(AccountAddress.fromHex("0x1"), new Identifier("object"), new Identifier("Object"), []),
+          ),
+        ]),
+      ),
+      serializer,
+    );
+    //00 00 00 00 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+    expect(serializer.getBytes()).toEqual(
+      new Uint8Array([
+        0x1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+      ]),
+    );
+  });
+
+  it("throws when nested option", async () => {
+    let serializer = new Serializer();
+    expect(() => {
+      serializeArg(
+        "abc",
+        new TypeTagStruct(
+          new StructTag(AccountAddress.fromHex("0x1"), new Identifier("option"), new Identifier("Option"), [
+            new TypeTagStruct(
+              new StructTag(AccountAddress.fromHex("0x1"), new Identifier("option"), new Identifier("Option"), [
+                new TypeTagU8(),
+              ]),
+            ),
+          ]),
+        ),
+        serializer,
+      );
+    }).toThrow("Options can not be nested in options.");
+  });
+
+  it("throws when unsupported struct type", async () => {
+    let serializer = new Serializer();
     expect(() => {
       serializeArg(
         "abc",
@@ -303,7 +402,7 @@ describe("BuilderUtils", () => {
         ),
         serializer,
       );
-    }).toThrow("The only supported struct arg is of type 0x1::string::String");
+    }).toThrow("Unsupported struct type in function argument");
   });
 
   it("throws at unrecognized arg types", async () => {
