@@ -8,8 +8,7 @@ import subprocess
 import time
 
 import requests
-from common import (FAUCET_PORT, METRICS_PORT, NODE_PORT, Network,
-                    build_image_name)
+from common import FAUCET_PORT, METRICS_PORT, NODE_PORT, Network, build_image_name
 
 LOG = logging.getLogger(__name__)
 

@@ -11,8 +11,7 @@ import traceback
 from dataclasses import dataclass
 
 from aptos_sdk.client import RestClient
-from common import (METRICS_PORT, NODE_PORT, AccountInfo, Network,
-                    build_image_name)
+from common import METRICS_PORT, NODE_PORT, AccountInfo, Network, build_image_name
 
 LOG = logging.getLogger(__name__)
 
