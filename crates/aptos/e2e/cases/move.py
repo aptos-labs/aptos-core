@@ -152,8 +152,7 @@ def test_move_run(run_helper: RunHelper, test_name=None):
         ],
     )
 
-    response = json.loads(response.stdout)
-    if response["Result"].get("success") != True:
+    if '"success": true' not in response.stdout:
         raise TestError("Move run did not execute successfully")
 
     # Get what modules exist on chain.
