@@ -176,11 +176,9 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     storage: T,
     time_service: TimeService,
 ) -> Result<(), Error> {
-    // Remove all expired optimistic fetches
-    remove_expired_optimistic_fetches(config, optimistic_fetches.clone());
-
     // Identify the peers with ready optimistic fetches
     let peers_with_ready_optimistic_fetches = get_peers_with_ready_optimistic_fetches(
+        config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
         lru_response_cache.clone(),
@@ -244,6 +242,7 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 /// Returns the list of peers that made those optimistic fetches
 /// alongside the ledger info at the target version for the peer.
 pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>(
+    config: StorageServiceConfig,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
@@ -260,13 +259,20 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
     let highest_synced_version = highest_synced_ledger_info.ledger_info().version();
     let highest_synced_epoch = highest_synced_ledger_info.ledger_info().epoch();
 
-    // Identify the peers with ready optimistic fetches
-    let mut ready_optimistic_fetches = vec![];
-    let mut invalid_peer_optimistic_fetches = vec![];
+    // Identify the peers with expired, invalid and ready optimistic fetches
+    let mut peers_with_expired_optimistic_fetches = vec![];
+    let mut peers_with_invalid_optimistic_fetches = vec![];
+    let mut peers_with_ready_optimistic_fetches = vec![];
     for optimistic_fetch in optimistic_fetches.iter() {
         // Get the peer and the optimistic fetch request
         let peer = optimistic_fetch.key();
         let optimistic_fetch = optimistic_fetch.value();
+
+        // Ensure the optimistic fetch hasn't expired
+        if optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
+            peers_with_expired_optimistic_fetches.push(*peer);
+            continue;
+        }
 
         // Check if we have synced beyond the highest known version
         let highest_known_version = optimistic_fetch.highest_known_version();
@@ -288,19 +294,31 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
                 // Check that we haven't been sent an invalid optimistic fetch request
                 // (i.e., a request that does not respect an epoch boundary).
                 if epoch_ending_ledger_info.ledger_info().version() <= highest_known_version {
-                    invalid_peer_optimistic_fetches.push(*peer);
+                    peers_with_invalid_optimistic_fetches.push(*peer);
                 } else {
-                    ready_optimistic_fetches.push((*peer, epoch_ending_ledger_info));
+                    peers_with_ready_optimistic_fetches.push((*peer, epoch_ending_ledger_info));
                 }
             } else {
-                ready_optimistic_fetches.push((*peer, highest_synced_ledger_info.clone()));
+                peers_with_ready_optimistic_fetches
+                    .push((*peer, highest_synced_ledger_info.clone()));
             };
         }
     }
 
+    // Remove the expired optimistic fetches
+    for peer_network_id in peers_with_expired_optimistic_fetches {
+        if optimistic_fetches.remove(&peer_network_id).is_some() {
+            increment_counter(
+                &metrics::OPTIMISTIC_FETCH_EVENTS,
+                peer_network_id.network_id(),
+                OPTIMISTIC_FETCH_EXPIRE.into(),
+            );
+        }
+    }
+
     // Remove the invalid optimistic fetches
-    for peer in invalid_peer_optimistic_fetches {
-        if let Some((_, optimistic_fetch)) = optimistic_fetches.remove(&peer) {
+    for peer_network_id in peers_with_invalid_optimistic_fetches {
+        if let Some((_, optimistic_fetch)) = optimistic_fetches.remove(&peer_network_id) {
             warn!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
                 .error(&Error::InvalidRequest(
                     "Mismatch between known version and epoch!".into()
@@ -311,7 +329,7 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
     }
 
     // Return the ready optimistic fetches
-    Ok(ready_optimistic_fetches)
+    Ok(peers_with_ready_optimistic_fetches)
 }
 
 /// Gets the epoch ending ledger info at the given epoch
@@ -472,24 +490,4 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
         },
         Err(error) => Err(error),
     }
-}
-
-/// Removes all expired optimistic fetches
-pub(crate) fn remove_expired_optimistic_fetches(
-    config: StorageServiceConfig,
-    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-) {
-    optimistic_fetches.retain(|peer_network_id, optimistic_fetch| {
-        // Update the expired optimistic fetch metrics
-        if optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
-            increment_counter(
-                &metrics::OPTIMISTIC_FETCH_EVENTS,
-                peer_network_id.network_id(),
-                OPTIMISTIC_FETCH_EXPIRE.into(),
-            );
-        }
-
-        // Only retain non-expired optimistic fetches
-        !optimistic_fetch.is_expired(config.max_optimistic_fetch_period)
-    });
 }
