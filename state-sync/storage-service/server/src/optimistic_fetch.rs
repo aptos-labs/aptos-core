@@ -12,7 +12,10 @@ use crate::{
     LogEntry, LogSchema,
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
+use aptos_config::{
+    config::StorageServiceConfig,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_infallible::Mutex;
 use aptos_logger::warn;
 use aptos_storage_service_types::{
@@ -234,6 +237,9 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
                 .await;
         }
     }
+
+    // Update the number of active optimistic fetches
+    update_optimistic_fetch_metrics(optimistic_fetches);
 
     Ok(())
 }
@@ -490,4 +496,42 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
         },
         Err(error) => Err(error),
     }
+}
+
+/// Updates the active optimistic fetch metrics for each network
+fn update_optimistic_fetch_metrics(
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+) {
+    // Calculate the total number of optimistic fetches for each network
+    let mut num_validator_optimistic_fetches = 0;
+    let mut num_vfn_optimistic_fetches = 0;
+    let mut num_public_optimistic_fetches = 0;
+    for optimistic_fetch in optimistic_fetches.iter() {
+        // Get the peer network ID
+        let peer_network_id = optimistic_fetch.key();
+
+        // Increment the number of optimistic fetches for the peer's network
+        match peer_network_id.network_id() {
+            NetworkId::Validator => num_validator_optimistic_fetches += 1,
+            NetworkId::Vfn => num_vfn_optimistic_fetches += 1,
+            NetworkId::Public => num_public_optimistic_fetches += 1,
+        }
+    }
+
+    // Update the number of active optimistic fetches for each network
+    metrics::set_gauge(
+        &metrics::OPTIMISTIC_FETCH_COUNT,
+        NetworkId::Validator.as_str(),
+        num_validator_optimistic_fetches as u64,
+    );
+    metrics::set_gauge(
+        &metrics::OPTIMISTIC_FETCH_COUNT,
+        NetworkId::Vfn.as_str(),
+        num_vfn_optimistic_fetches as u64,
+    );
+    metrics::set_gauge(
+        &metrics::OPTIMISTIC_FETCH_COUNT,
+        NetworkId::Public.as_str(),
+        num_public_optimistic_fetches as u64,
+    );
 }
