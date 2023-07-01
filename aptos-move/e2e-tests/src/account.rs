@@ -275,9 +275,7 @@ impl TransactionBuilder {
             .iter()
             .map(|signer| &signer.privkey)
             .collect();
-        let mut with_gas_payer = false;
         if let Some(gas_payer) = &self.gas_payer {
-            with_gas_payer = true;
             secondary_signer_addresses.push(*gas_payer.address());
             secondary_private_keys.push(&gas_payer.privkey);
         }
@@ -294,7 +292,6 @@ impl TransactionBuilder {
             &self.sender.privkey,
             secondary_signer_addresses,
             secondary_private_keys,
-            with_gas_payer,
         )
         .unwrap()
         .into_inner()

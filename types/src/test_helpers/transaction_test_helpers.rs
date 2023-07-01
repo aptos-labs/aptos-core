@@ -198,7 +198,7 @@ pub fn get_test_unchecked_multi_agent_txn(
         ChainId::test(),
     );
     let message =
-        RawTransactionWithData::new_multi_agent(raw_txn.clone(), secondary_signers.clone(), false);
+        RawTransactionWithData::new_multi_agent(raw_txn.clone(), secondary_signers.clone());
 
     let sender_signature = sender_private_key.sign(&message).unwrap();
     let sender_authenticator = AccountAuthenticator::ed25519(sender_public_key, sender_signature);
@@ -217,7 +217,6 @@ pub fn get_test_unchecked_multi_agent_txn(
         sender_authenticator,
         secondary_signers,
         secondary_authenticators,
-        false, // TODO replicate for gas fee payer
     )
 }
 

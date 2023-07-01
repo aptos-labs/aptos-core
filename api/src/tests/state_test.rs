@@ -184,7 +184,6 @@ async fn test_merkle_leaves_with_nft_transfer() {
                 0,
                 1,
             )),
-        None, // no gas fee payer
     );
     ctx.commit_block(&vec![transfer_to_owner_txn]).await;
     let num_leaves_after_transfer_nft = ctx
@@ -206,7 +205,6 @@ async fn test_merkle_leaves_with_nft_transfer() {
                 0,
                 1,
             )),
-        None, // no gas fee payer
     );
     ctx.commit_block(&vec![transfer_to_creator_txn]).await;
     let num_leaves_after_return_nft = ctx

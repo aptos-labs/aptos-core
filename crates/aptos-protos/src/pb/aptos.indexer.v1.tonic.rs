@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated
 /// Generated client implementations.
 pub mod raw_data_client {

@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated
 impl serde::Serialize for AccountSignature {
     #[allow(deprecated)]
@@ -322,7 +320,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                             if height__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("height"));
                             }
-                            height__ =
+                            height__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -336,7 +334,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
+                            chain_id__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -490,7 +488,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                             if round__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("round"));
                             }
-                            round__ =
+                            round__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -504,7 +502,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                             if previous_block_votes_bitvec__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("previousBlockVotesBitvec"));
                             }
-                            previous_block_votes_bitvec__ =
+                            previous_block_votes_bitvec__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -518,7 +516,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                             if failed_proposer_indices__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("failedProposerIndices"));
                             }
-                            failed_proposer_indices__ =
+                            failed_proposer_indices__ = 
                                 Some(map.next_value::<Vec<::pbjson::private::NumberDeserialize<_>>>()?
                                     .into_iter().map(|x| x.0).collect())
                             ;
@@ -644,7 +642,7 @@ impl<'de> serde::Deserialize<'de> for DeleteModule {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
+                            state_key_hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -783,7 +781,7 @@ impl<'de> serde::Deserialize<'de> for DeleteResource {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
+                            state_key_hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -1031,7 +1029,7 @@ impl<'de> serde::Deserialize<'de> for DeleteTableItem {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
+                            state_key_hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -1265,7 +1263,7 @@ impl<'de> serde::Deserialize<'de> for Ed25519Signature {
                             if public_key__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("publicKey"));
                             }
-                            public_key__ =
+                            public_key__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -1273,7 +1271,7 @@ impl<'de> serde::Deserialize<'de> for Ed25519Signature {
                             if signature__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("signature"));
                             }
-                            signature__ =
+                            signature__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -1667,7 +1665,7 @@ impl<'de> serde::Deserialize<'de> for Event {
                             if sequence_number__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("sequenceNumber"));
                             }
-                            sequence_number__ =
+                            sequence_number__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -1794,7 +1792,7 @@ impl<'de> serde::Deserialize<'de> for EventKey {
                             if creation_number__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("creationNumber"));
                             }
-                            creation_number__ =
+                            creation_number__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -1905,6 +1903,169 @@ impl<'de> serde::Deserialize<'de> for FeePayerPayload {
             }
         }
         deserializer.deserialize_struct("aptos.transaction.v1.FeePayerPayload", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for FeePayerSignature {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.sender.is_some() {
+            len += 1;
+        }
+        if !self.secondary_signer_addresses.is_empty() {
+            len += 1;
+        }
+        if !self.secondary_signers.is_empty() {
+            len += 1;
+        }
+        if !self.fee_payer_address.is_empty() {
+            len += 1;
+        }
+        if self.fee_payer_signer.is_some() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.FeePayerSignature", len)?;
+        if let Some(v) = self.sender.as_ref() {
+            struct_ser.serialize_field("sender", v)?;
+        }
+        if !self.secondary_signer_addresses.is_empty() {
+            struct_ser.serialize_field("secondarySignerAddresses", &self.secondary_signer_addresses)?;
+        }
+        if !self.secondary_signers.is_empty() {
+            struct_ser.serialize_field("secondarySigners", &self.secondary_signers)?;
+        }
+        if !self.fee_payer_address.is_empty() {
+            struct_ser.serialize_field("feePayerAddress", &self.fee_payer_address)?;
+        }
+        if let Some(v) = self.fee_payer_signer.as_ref() {
+            struct_ser.serialize_field("feePayerSigner", v)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for FeePayerSignature {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "sender",
+            "secondary_signer_addresses",
+            "secondarySignerAddresses",
+            "secondary_signers",
+            "secondarySigners",
+            "fee_payer_address",
+            "feePayerAddress",
+            "fee_payer_signer",
+            "feePayerSigner",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Sender,
+            SecondarySignerAddresses,
+            SecondarySigners,
+            FeePayerAddress,
+            FeePayerSigner,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "sender" => Ok(GeneratedField::Sender),
+                            "secondarySignerAddresses" | "secondary_signer_addresses" => Ok(GeneratedField::SecondarySignerAddresses),
+                            "secondarySigners" | "secondary_signers" => Ok(GeneratedField::SecondarySigners),
+                            "feePayerAddress" | "fee_payer_address" => Ok(GeneratedField::FeePayerAddress),
+                            "feePayerSigner" | "fee_payer_signer" => Ok(GeneratedField::FeePayerSigner),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = FeePayerSignature;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.FeePayerSignature")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<FeePayerSignature, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut sender__ = None;
+                let mut secondary_signer_addresses__ = None;
+                let mut secondary_signers__ = None;
+                let mut fee_payer_address__ = None;
+                let mut fee_payer_signer__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::Sender => {
+                            if sender__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("sender"));
+                            }
+                            sender__ = map.next_value()?;
+                        }
+                        GeneratedField::SecondarySignerAddresses => {
+                            if secondary_signer_addresses__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("secondarySignerAddresses"));
+                            }
+                            secondary_signer_addresses__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::SecondarySigners => {
+                            if secondary_signers__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("secondarySigners"));
+                            }
+                            secondary_signers__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::FeePayerAddress => {
+                            if fee_payer_address__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("feePayerAddress"));
+                            }
+                            fee_payer_address__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::FeePayerSigner => {
+                            if fee_payer_signer__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("feePayerSigner"));
+                            }
+                            fee_payer_signer__ = map.next_value()?;
+                        }
+                    }
+                }
+                Ok(FeePayerSignature {
+                    sender: sender__,
+                    secondary_signer_addresses: secondary_signer_addresses__.unwrap_or_default(),
+                    secondary_signers: secondary_signers__.unwrap_or_default(),
+                    fee_payer_address: fee_payer_address__.unwrap_or_default(),
+                    fee_payer_signer: fee_payer_signer__,
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.FeePayerSignature", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for GenesisTransaction {
@@ -2791,7 +2952,7 @@ impl<'de> serde::Deserialize<'de> for MoveModuleBytecode {
                             if bytecode__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("bytecode"));
                             }
-                            bytecode__ =
+                            bytecode__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -3009,7 +3170,7 @@ impl<'de> serde::Deserialize<'de> for MoveScriptBytecode {
                             if bytecode__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("bytecode"));
                             }
-                            bytecode__ =
+                            bytecode__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -4183,7 +4344,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                             if public_keys__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("publicKeys"));
                             }
-                            public_keys__ =
+                            public_keys__ = 
                                 Some(map.next_value::<Vec<::pbjson::private::BytesDeserialize<_>>>()?
                                     .into_iter().map(|x| x.0).collect())
                             ;
@@ -4192,7 +4353,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                             if signatures__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("signatures"));
                             }
-                            signatures__ =
+                            signatures__ = 
                                 Some(map.next_value::<Vec<::pbjson::private::BytesDeserialize<_>>>()?
                                     .into_iter().map(|x| x.0).collect())
                             ;
@@ -4201,7 +4362,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                             if threshold__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("threshold"));
                             }
-                            threshold__ =
+                            threshold__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -4209,7 +4370,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                             if public_key_indices__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("publicKeyIndices"));
                             }
-                            public_key_indices__ =
+                            public_key_indices__ = 
                                 Some(map.next_value::<Vec<::pbjson::private::NumberDeserialize<_>>>()?
                                     .into_iter().map(|x| x.0).collect())
                             ;
@@ -4792,6 +4953,9 @@ impl serde::Serialize for Signature {
                 signature::Signature::MultiAgent(v) => {
                     struct_ser.serialize_field("multiAgent", v)?;
                 }
+                signature::Signature::FeePayer(v) => {
+                    struct_ser.serialize_field("feePayer", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -4810,6 +4974,8 @@ impl<'de> serde::Deserialize<'de> for Signature {
             "multiEd25519",
             "multi_agent",
             "multiAgent",
+            "fee_payer",
+            "feePayer",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -4818,6 +4984,7 @@ impl<'de> serde::Deserialize<'de> for Signature {
             Ed25519,
             MultiEd25519,
             MultiAgent,
+            FeePayer,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4843,6 +5010,7 @@ impl<'de> serde::Deserialize<'de> for Signature {
                             "ed25519" => Ok(GeneratedField::Ed25519),
                             "multiEd25519" | "multi_ed25519" => Ok(GeneratedField::MultiEd25519),
                             "multiAgent" | "multi_agent" => Ok(GeneratedField::MultiAgent),
+                            "feePayer" | "fee_payer" => Ok(GeneratedField::FeePayer),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4893,6 +5061,13 @@ impl<'de> serde::Deserialize<'de> for Signature {
                             signature__ = map.next_value::<::std::option::Option<_>>()?.map(signature::Signature::MultiAgent)
 ;
                         }
+                        GeneratedField::FeePayer => {
+                            if signature__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("feePayer"));
+                            }
+                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(signature::Signature::FeePayer)
+;
+                        }
                     }
                 }
                 Ok(Signature {
@@ -4915,6 +5090,7 @@ impl serde::Serialize for signature::Type {
             Self::Ed25519 => "TYPE_ED25519",
             Self::MultiEd25519 => "TYPE_MULTI_ED25519",
             Self::MultiAgent => "TYPE_MULTI_AGENT",
+            Self::FeePayer => "TYPE_FEE_PAYER",
         };
         serializer.serialize_str(variant)
     }
@@ -4930,6 +5106,7 @@ impl<'de> serde::Deserialize<'de> for signature::Type {
             "TYPE_ED25519",
             "TYPE_MULTI_ED25519",
             "TYPE_MULTI_AGENT",
+            "TYPE_FEE_PAYER",
         ];
 
         struct GeneratedVisitor;
@@ -4976,6 +5153,7 @@ impl<'de> serde::Deserialize<'de> for signature::Type {
                     "TYPE_ED25519" => Ok(signature::Type::Ed25519),
                     "TYPE_MULTI_ED25519" => Ok(signature::Type::MultiEd25519),
                     "TYPE_MULTI_AGENT" => Ok(signature::Type::MultiAgent),
+                    "TYPE_FEE_PAYER" => Ok(signature::Type::FeePayer),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -5226,7 +5404,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("version"));
                             }
-                            version__ =
+                            version__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -5240,7 +5418,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if epoch__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("epoch"));
                             }
-                            epoch__ =
+                            epoch__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -5248,7 +5426,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if block_height__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("blockHeight"));
                             }
-                            block_height__ =
+                            block_height__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -5549,7 +5727,7 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                             if hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("hash"));
                             }
-                            hash__ =
+                            hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -5557,7 +5735,7 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                             if state_change_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateChangeHash"));
                             }
-                            state_change_hash__ =
+                            state_change_hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -5565,7 +5743,7 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                             if event_root_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("eventRootHash"));
                             }
-                            event_root_hash__ =
+                            event_root_hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -5573,7 +5751,7 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                             if state_checkpoint_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateCheckpointHash"));
                             }
-                            state_checkpoint_hash__ =
+                            state_checkpoint_hash__ = 
                                 map.next_value::<::std::option::Option<::pbjson::private::BytesDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
@@ -5581,7 +5759,7 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                             if gas_used__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("gasUsed"));
                             }
-                            gas_used__ =
+                            gas_used__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -5601,7 +5779,7 @@ impl<'de> serde::Deserialize<'de> for TransactionInfo {
                             if accumulator_root_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("accumulatorRootHash"));
                             }
-                            accumulator_root_hash__ =
+                            accumulator_root_hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -6160,7 +6338,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                             if sequence_number__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("sequenceNumber"));
                             }
-                            sequence_number__ =
+                            sequence_number__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -6168,7 +6346,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                             if max_gas_amount__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("maxGasAmount"));
                             }
-                            max_gas_amount__ =
+                            max_gas_amount__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -6176,7 +6354,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionRequest {
                             if gas_unit_price__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("gasUnitPrice"));
                             }
-                            gas_unit_price__ =
+                            gas_unit_price__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -6320,7 +6498,7 @@ impl<'de> serde::Deserialize<'de> for WriteModule {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
+                            state_key_hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -6469,7 +6647,7 @@ impl<'de> serde::Deserialize<'de> for WriteResource {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
+                            state_key_hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -7332,7 +7510,7 @@ impl<'de> serde::Deserialize<'de> for WriteTableItem {
                             if state_key_hash__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stateKeyHash"));
                             }
-                            state_key_hash__ =
+                            state_key_hash__ = 
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }

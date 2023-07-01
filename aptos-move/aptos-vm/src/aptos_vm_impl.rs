@@ -33,7 +33,7 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::output::VMOutput;
 use fail::fail_point;
 use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
+    errors::VMResult,
     CompiledModule,
 };
 use move_core_types::{
@@ -46,7 +46,6 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
-pub const GAS_PAYER_FLAG_BIT: u64 = 1u64 << 63; // MSB of sequence number is used to flag a gas payer tx
 
 /// A wrapper to make VMRuntime standalone
 pub struct AptosVMImpl {
@@ -483,23 +482,19 @@ impl AptosVMImpl {
         gas_remaining: Gas,
         txn_data: &TransactionMetadata,
     ) -> VMResult<()> {
-        let mut txn_sequence_number = txn_data.sequence_number();
+        let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
-        if txn_data.with_gas_payer {
-            txn_sequence_number |= GAS_PAYER_FLAG_BIT;
-        }
         // We can unconditionally do this as this condition can only be true if the prologue
         // accepted it, in which case the gas payer feature is enabled.
-        if txn_sequence_number & GAS_PAYER_FLAG_BIT == 0 {
-            // Regular tx, run the normal epilogue
+        if let Some(gas_fee_payer) = txn_data.gas_fee_payer() {
             session.execute_function_bypass_visibility(
                 &APTOS_TRANSACTION_VALIDATION.module_id(),
-                &APTOS_TRANSACTION_VALIDATION.user_epilogue_name,
-                // TODO: Deprecate this once we remove gas currency on the Move side.
+                &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(gas_fee_payer),
                     MoveValue::U64(txn_sequence_number),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
@@ -508,19 +503,13 @@ impl AptosVMImpl {
                 &mut UnmeteredGasMeter,
             )
         } else {
-            // Gas payer tx
-            let gas_payer = *txn_data.secondary_signers.last().ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .finish(Location::Undefined)
-            })?;
+            // Regular tx, run the normal epilogue
             session.execute_function_bypass_visibility(
                 &APTOS_TRANSACTION_VALIDATION.module_id(),
-                &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
-                // TODO: Deprecate this once we remove gas currency on the Move side.
+                &APTOS_TRANSACTION_VALIDATION.user_epilogue_name,
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
-                    MoveValue::Address(gas_payer),
                     MoveValue::U64(txn_sequence_number),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),

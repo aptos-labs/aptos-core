@@ -23,7 +23,7 @@ use aptos_api_types::{
     verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
     AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
     HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction, SubmitTransactionRequest,
-    Transaction, TransactionData, TransactionOnChainData, TransactionPayload::FeePayerPayload,
+    Transaction, TransactionData, TransactionOnChainData,
     TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult, UserTransaction,
     VerifyInput, VerifyInputWithRecursion, MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
@@ -1266,7 +1266,6 @@ impl TransactionsApi {
         let ledger_info = self.context.get_latest_ledger_info()?;
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let resolver = state_view.as_move_resolver();
-        let with_fee_payer = matches!(request.transaction.payload, FeePayerPayload(_));
         let raw_txn: RawTransaction = resolver
             .as_converter(self.context.db.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
@@ -1282,7 +1281,6 @@ impl TransactionsApi {
                         .into_iter()
                         .map(|v| v.into())
                         .collect(),
-                    with_fee_payer,
                 ),
             )
             .context("Invalid transaction to generate signing message")

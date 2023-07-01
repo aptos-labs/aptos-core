@@ -89,14 +89,12 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                 MultiSigConfig::Random(_) => account.sign_multi_agent_with_transaction_builder(
                     additional_signers.as_ref().unwrap().iter().collect(),
                     builder,
-                    None, // TODO gas payer
                 ),
                 MultiSigConfig::Publisher => {
                     account.sign_multi_agent_with_transaction_builder(
                         vec![publisher],
                         builder,
-                        None,
-                    ) // TODO gas payer
+                    )
                 },
             }
         })

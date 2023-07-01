@@ -104,13 +104,12 @@ impl LocalAccount {
         &mut self,
         secondary_signers: Vec<&Self>,
         builder: TransactionBuilder,
-        gas_payer: Option<&Self>,
     ) -> SignedTransaction {
-        let mut secondary_signer_addresses: Vec<AccountAddress> = secondary_signers
+        let secondary_signer_addresses: Vec<AccountAddress> = secondary_signers
             .iter()
             .map(|signer| signer.address())
             .collect();
-        let mut secondary_signer_privkeys: Vec<&Ed25519PrivateKey> = secondary_signers
+        let secondary_signer_privkeys: Vec<&Ed25519PrivateKey> = secondary_signers
             .iter()
             .map(|signer| signer.private_key())
             .collect();
@@ -119,18 +118,11 @@ impl LocalAccount {
             .sequence_number(self.sequence_number())
             .build();
         *self.sequence_number_mut() += 1;
-        let mut with_gas_payer = false;
-        if let Some(gas_payer) = gas_payer {
-            with_gas_payer = true;
-            secondary_signer_addresses.push(gas_payer.address());
-            secondary_signer_privkeys.push(gas_payer.private_key());
-        }
         raw_txn
             .sign_multi_agent(
                 self.private_key(),
                 secondary_signer_addresses,
                 secondary_signer_privkeys,
-                with_gas_payer,
             )
             .expect("Signing multi agent txn failed")
             .into_inner()
