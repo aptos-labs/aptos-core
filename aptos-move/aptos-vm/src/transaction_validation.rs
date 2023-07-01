@@ -1,18 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_config::constants::CORE_CODE_ADDRESS;
+use aptos_types::account_config::constants::CORE_CODE_ADDRESS;
 use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
-    move_resource::{MoveResource, MoveStructType},
+    account_address::AccountAddress, ident_str, identifier::Identifier, language_storage::ModuleId,
     vm_status::AbortLocation,
 };
 use once_cell::sync::Lazy;
-#[cfg(any(test, feature = "fuzzing"))]
-use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
@@ -26,9 +20,8 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
     });
 
-/// A Rust representation of chain-specific account information
+/// On-chain functions used to validate transactions
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionValidation {
     pub module_addr: AccountAddress,
     pub module_name: Identifier,
@@ -53,10 +46,3 @@ impl TransactionValidation {
                 ))
     }
 }
-
-impl MoveStructType for TransactionValidation {
-    const MODULE_NAME: &'static IdentStr = ident_str!("transaction_validation");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("TransactionValidation");
-}
-
-impl MoveResource for TransactionValidation {}
