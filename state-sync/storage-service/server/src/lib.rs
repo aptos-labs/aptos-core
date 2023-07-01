@@ -10,7 +10,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
@@ -18,6 +18,7 @@ use aptos_storage_service_types::{
     responses::{ProtocolMetadata, StorageServerSummary, StorageServiceResponse},
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use arc_swap::ArcSwap;
 use error::Error;
 use futures::stream::StreamExt;
 use handler::Handler;
@@ -52,7 +53,7 @@ pub struct StorageServiceServer<T> {
 
     // A cached storage server summary to avoid hitting the DB for every
     // request. This is refreshed periodically.
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
 
     // An LRU cache for commonly requested data items.
     // Note: This is not just a database cache because it contains
@@ -77,7 +78,8 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     ) -> Self {
         let bounded_executor =
             BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
-        let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
+        let cached_storage_server_summary =
+            Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
         let optimistic_fetches = Arc::new(Mutex::new(HashMap::new()));
         let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
             config.max_lru_cache_size as usize,
@@ -277,7 +279,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
 /// Refreshes the cached storage server summary
 fn refresh_cached_storage_summary<T: StorageReaderInterface>(
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     storage: T,
     storage_config: StorageServiceConfig,
 ) -> Result<(), Error> {
@@ -299,7 +301,7 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
         protocol_metadata,
         data_summary,
     };
-    *cached_storage_server_summary.write() = storage_server_summary;
+    cached_storage_server_summary.store(Arc::new(storage_server_summary));
 
     Ok(())
 }

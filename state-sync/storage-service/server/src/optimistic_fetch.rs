@@ -12,7 +12,7 @@ use crate::{
     LogEntry, LogSchema,
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_logger::warn;
 use aptos_storage_service_types::{
     requests::{
@@ -24,6 +24,7 @@ use aptos_storage_service_types::{
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use arc_swap::ArcSwap;
 use lru::LruCache;
 use std::{cmp::min, collections::HashMap, sync::Arc, time::Instant};
 
@@ -164,7 +165,7 @@ impl OptimisticFetchRequest {
 
 /// Handles ready (and expired) optimistic fetches
 pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
@@ -228,7 +229,7 @@ pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 /// Returns the list of peers that made those optimistic fetches
 /// alongside the ledger info at the target version for the peer.
 pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>(
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
@@ -236,9 +237,9 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
     time_service: TimeService,
 ) -> aptos_storage_service_types::Result<Vec<(PeerNetworkId, LedgerInfoWithSignatures)>, Error> {
     // Fetch the latest storage summary and highest synced version
-    let latest_storage_summary = cached_storage_server_summary.read().clone();
-    let highest_synced_ledger_info = match latest_storage_summary.data_summary.synced_ledger_info {
-        Some(ledger_info) => ledger_info,
+    let latest_storage_summary = cached_storage_server_summary.load();
+    let highest_synced_ledger_info = match &latest_storage_summary.data_summary.synced_ledger_info {
+        Some(ledger_info) => ledger_info.clone(),
         None => return Ok(vec![]),
     };
     let highest_synced_version = highest_synced_ledger_info.ledger_info().version();
@@ -295,7 +296,7 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
 
 /// Gets the epoch ending ledger info at the given epoch
 fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
     epoch: u64,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
@@ -355,7 +356,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
 /// because: (i) each sub-part should already be checked; and (ii)
 /// optimistic fetch responses are best effort.
 fn notify_peer_of_new_data<T: StorageReaderInterface>(
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
