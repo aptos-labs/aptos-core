@@ -61,6 +61,10 @@ resource "google_container_cluster" "aptos" {
     provider = "CALICO"
   }
 
+  vertical_pod_autoscaling {
+    enabled = var.enable_vertical_pod_autoscaling
+  }
+
   cluster_autoscaling {
     enabled = var.gke_enable_node_autoprovisioning
 

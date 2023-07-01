@@ -23,6 +23,7 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
+        autoscaling.k8s.io/vertical-pod-autoscaler-enabled: "true"
     spec:
       terminationGracePeriodSeconds: 0
       containers:

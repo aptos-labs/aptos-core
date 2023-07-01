@@ -79,7 +79,8 @@ resource "helm_release" "fullnode" {
 
   values = [
     jsonencode({
-      imageTag     = var.image_tag
+      imageTag = var.image_tag
+      deploy = 1
       manageImages = var.manage_via_tf # if we're managing the entire deployment via terraform, override the images as well
       chain = {
         era  = var.era
@@ -124,6 +125,7 @@ resource "helm_release" "fullnode" {
           "iam.gke.io/gcp-service-account" = google_service_account.backup.email
         }
       }
+      verticalPodAutoscalingEnabled = var.enable_vertical_pod_autoscaling
     }),
     jsonencode(var.fullnode_helm_values),
     jsonencode(var.fullnode_helm_values_list == {} ? {} : var.fullnode_helm_values_list[count.index]),

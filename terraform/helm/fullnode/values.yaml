@@ -55,6 +55,8 @@ resources:
   requests:
     cpu: 14
     memory: 26Gi
+  
+verticalPodAutoscalingEnabled: true
 
 nodeSelector: {}
 tolerations: []

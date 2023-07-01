@@ -1,6 +1,8 @@
 # Security-related resources
 
-data "kubernetes_all_namespaces" "all" {}
+data "kubernetes_all_namespaces" "all" {
+  depends_on = [ google_container_cluster.aptos ]
+}
 
 locals {
   kubernetes_master_version = substr(google_container_cluster.aptos.master_version, 0, 4)

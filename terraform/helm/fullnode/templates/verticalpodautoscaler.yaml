@@ -1,0 +1,15 @@
+{{- if .Values.verticalPodAutoscalingEnabled -}}
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ include "aptos-fullnode.fullname" . }}
+  labels:
+    {{- include "aptos-fullnode.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    kind: StatefulSet
+    name: {{ include "aptos-fullnode.fullname" . }}
+  updatePolicy:
+    updateMode: "Auto"
+    minReplicas: 1
+{{- end -}}
