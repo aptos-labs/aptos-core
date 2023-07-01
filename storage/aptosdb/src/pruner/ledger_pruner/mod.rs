@@ -59,6 +59,11 @@ impl DBPruner for LedgerPruner {
             let current_batch_target_version =
                 min(progress + max_versions as Version, target_version);
 
+            info!(
+                progress = progress,
+                target_version = current_batch_target_version,
+                "Pruning ledger data."
+            );
             self.ledger_metadata_pruner
                 .prune(progress, current_batch_target_version)?;
 
@@ -69,6 +74,7 @@ impl DBPruner for LedgerPruner {
 
             progress = current_batch_target_version;
             self.record_progress(progress);
+            info!(progress = progress, "Pruning ledger data is done.");
         }
 
         Ok(target_version)
@@ -107,6 +113,11 @@ impl LedgerPruner {
         );
 
         let metadata_progress = ledger_metadata_pruner.progress()?;
+
+        info!(
+            metadata_progress = metadata_progress,
+            "Created ledger metadata pruner, start catching up all sub pruners."
+        );
 
         let transaction_store = Arc::new(TransactionStore::new(Arc::clone(&ledger_db)));
 
