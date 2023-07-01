@@ -68,7 +68,7 @@ pub struct StorageServiceServer<T> {
     request_moderator: Arc<RequestModerator>,
 }
 
-impl<T: StorageReaderInterface> StorageServiceServer<T> {
+impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     pub fn new(
         config: StorageServiceConfig,
         executor: Handle,
@@ -141,6 +141,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
     /// Spawns a non-terminating task that handles optimistic fetches
     async fn spawn_optimistic_fetch_handler(&mut self) {
+        let bounded_executor = self.bounded_executor.clone();
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
         let config = self.config;
         let optimistic_fetches = self.optimistic_fetches.clone();
@@ -163,6 +164,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
                     // Check and handle the active optimistic fetches
                     if let Err(error) = optimistic_fetch::handle_active_optimistic_fetches(
+                        bounded_executor.clone(),
                         cached_storage_server_summary.clone(),
                         config,
                         optimistic_fetches.clone(),
@@ -170,7 +172,9 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                         request_moderator.clone(),
                         storage.clone(),
                         time_service.clone(),
-                    ) {
+                    )
+                    .await
+                    {
                         error!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
                             .error(&error)
                             .message("Failed to handle active optimistic fetches!"));

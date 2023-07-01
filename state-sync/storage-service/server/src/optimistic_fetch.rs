@@ -11,6 +11,7 @@ use crate::{
     storage::StorageReaderInterface,
     LogEntry, LogSchema,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::Mutex;
 use aptos_logger::warn;
@@ -165,7 +166,8 @@ impl OptimisticFetchRequest {
 }
 
 /// Handles ready (and expired) optimistic fetches
-pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
+pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
+    bounded_executor: BoundedExecutor,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -189,37 +191,49 @@ pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 
     // Remove and handle the ready optimistic fetches
     for (peer, target_ledger_info) in peers_with_ready_optimistic_fetches {
-        if let Some((_, optimistic_fetch)) = optimistic_fetches.clone().remove(&peer) {
-            let optimistic_fetch_start_time = optimistic_fetch.fetch_start_time;
-            let optimistic_fetch_request = optimistic_fetch.request.clone();
+        if let Some((_, optimistic_fetch)) = optimistic_fetches.remove(&peer) {
+            let cached_storage_server_summary = cached_storage_server_summary.clone();
+            let optimistic_fetches = optimistic_fetches.clone();
+            let lru_response_cache = lru_response_cache.clone();
+            let request_moderator = request_moderator.clone();
+            let storage = storage.clone();
+            let time_service = time_service.clone();
 
-            // Notify the peer of the new data
-            if let Err(error) = notify_peer_of_new_data(
-                cached_storage_server_summary.clone(),
-                config,
-                optimistic_fetches.clone(),
-                lru_response_cache.clone(),
-                request_moderator.clone(),
-                storage.clone(),
-                time_service.clone(),
-                &peer,
-                optimistic_fetch,
-                target_ledger_info,
-            ) {
-                warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
-                    .error(&Error::UnexpectedErrorEncountered(error.to_string())));
-            }
+            // Spawn a blocking task to handle the optimistic fetch
+            bounded_executor
+                .spawn_blocking(move || {
+                    let optimistic_fetch_start_time = optimistic_fetch.fetch_start_time;
+                    let optimistic_fetch_request = optimistic_fetch.request.clone();
 
-            // Update the optimistic fetch latency metric
-            let optimistic_fetch_duration = time_service
-                .now()
-                .duration_since(optimistic_fetch_start_time);
-            metrics::observe_value_with_label(
-                &metrics::OPTIMISTIC_FETCH_LATENCIES,
-                peer.network_id(),
-                &optimistic_fetch_request.get_label(),
-                optimistic_fetch_duration.as_secs_f64(),
-            );
+                    // Notify the peer of the new data
+                    if let Err(error) = notify_peer_of_new_data(
+                        cached_storage_server_summary,
+                        config,
+                        optimistic_fetches,
+                        lru_response_cache,
+                        request_moderator,
+                        storage,
+                        time_service.clone(),
+                        &peer,
+                        optimistic_fetch,
+                        target_ledger_info,
+                    ) {
+                        warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
+                            .error(&Error::UnexpectedErrorEncountered(error.to_string())));
+                    }
+
+                    // Update the optimistic fetch latency metric
+                    let optimistic_fetch_duration = time_service
+                        .now()
+                        .duration_since(optimistic_fetch_start_time);
+                    metrics::observe_value_with_label(
+                        &metrics::OPTIMISTIC_FETCH_LATENCIES,
+                        peer.network_id(),
+                        &optimistic_fetch_request.get_label(),
+                        optimistic_fetch_duration.as_secs_f64(),
+                    );
+                })
+                .await;
         }
     }
 
