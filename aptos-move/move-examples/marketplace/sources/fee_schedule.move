@@ -2,9 +2,6 @@
 /// * Listing rate, the units charged for creating a listing.
 /// * Bidding rate, the units per bid made by a potential buyer.
 /// * Commission, the units transferred to the marketplace upon sale.
-///
-/// Note: this is ony a schedule, a higher layer needs to implement the type of asset class
-/// and the transferring of that asset for each scheduled event.
 module marketplace::fee_schedule {
     use std::error;
     use std::signer;
@@ -14,6 +11,8 @@ module marketplace::fee_schedule {
 
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
+
+    use marketplace::events;
 
     /// FeeSchedule does not exist.
     const ENO_FEE_SCHEDULE: u64 = 1;
@@ -74,7 +73,7 @@ module marketplace::fee_schedule {
     // Initializers
 
     /// Create a marketplace with a fixed bidding and listing rate and a percentage commission.
-    public entry fun init(
+    public entry fun init_entry(
         creator: &signer,
         fee_address: address,
         bidding_fee: u64,
@@ -82,7 +81,7 @@ module marketplace::fee_schedule {
         commission_denominator: u64,
         commission_numerator: u64,
     ) {
-        init_internal(
+        init(
             creator,
             fee_address,
             bidding_fee,
@@ -93,7 +92,7 @@ module marketplace::fee_schedule {
     }
 
 
-    public fun init_internal(
+    public fun init(
         creator: &signer,
         fee_address: address,
         bidding_fee: u64,
@@ -137,6 +136,7 @@ module marketplace::fee_schedule {
             mutation_events: object::new_event_handle(&fee_schedule_signer),
         };
         move_to(&fee_schedule_signer, marketplace);
+        events::init(&fee_schedule_signer);
 
         (constructor_ref, fee_schedule_signer)
     }
@@ -349,7 +349,7 @@ module marketplace::fee_schedule {
     ) acquires FeeSchedule, FixedRateBiddingFee, FixedRateCommission, FixedRateListingFee, PercentageRateCommission {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let obj = init_internal(creator, creator_addr, 0, 0, 1, 0);
+        let obj = init(creator, creator_addr, 0, 0, 1, 0);
 
         assert!(fee_address(obj) == creator_addr, 0);
         assert!(listing_fee(obj, 5) == 0, 0);
@@ -403,7 +403,7 @@ module marketplace::fee_schedule {
     fun test_non_creator_fee_address(creator: &signer, non_creator: &signer) acquires FeeSchedule {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let obj = init_internal(creator, creator_addr, 0, 0, 1, 0);
+        let obj = init(creator, creator_addr, 0, 0, 1, 0);
         set_fee_address(non_creator, obj, @0x0);
     }
 
@@ -415,7 +415,7 @@ module marketplace::fee_schedule {
     ) acquires FeeSchedule, FixedRateListingFee {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let obj = init_internal(creator, creator_addr, 0, 0, 1, 0);
+        let obj = init(creator, creator_addr, 0, 0, 1, 0);
         set_fixed_rate_listing_fee(non_creator, obj, 5);
     }
 
@@ -427,7 +427,7 @@ module marketplace::fee_schedule {
     ) acquires FeeSchedule, FixedRateBiddingFee {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let obj = init_internal(creator, creator_addr, 0, 0, 1, 0);
+        let obj = init(creator, creator_addr, 0, 0, 1, 0);
         set_fixed_rate_bidding_fee(non_creator, obj, 6);
     }
 
@@ -439,7 +439,7 @@ module marketplace::fee_schedule {
     ) acquires FeeSchedule, FixedRateCommission, PercentageRateCommission {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let obj = init_internal(creator, creator_addr, 0, 0, 1, 0);
+        let obj = init(creator, creator_addr, 0, 0, 1, 0);
         set_percentage_rate_commission(non_creator, obj, 10, 1);
     }
 
@@ -451,7 +451,7 @@ module marketplace::fee_schedule {
     ) acquires FeeSchedule, FixedRateCommission, PercentageRateCommission {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let obj = init_internal(creator, creator_addr, 0, 0, 1, 0);
+        let obj = init(creator, creator_addr, 0, 0, 1, 0);
         set_fixed_rate_commission(non_creator, obj, 8);
     }
 
@@ -460,7 +460,7 @@ module marketplace::fee_schedule {
     fun test_init_zero_denominator_percentage_commission(creator: &signer) {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        init_internal(creator, creator_addr, 0, 0, 0, 0);
+        init(creator, creator_addr, 0, 0, 0, 0);
     }
 
     #[test(creator = @0x123)]
@@ -470,7 +470,7 @@ module marketplace::fee_schedule {
     ) acquires FeeSchedule, FixedRateCommission, PercentageRateCommission {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let obj = init_internal(creator, creator_addr, 0, 0, 1, 0);
+        let obj = init(creator, creator_addr, 0, 0, 1, 0);
         set_percentage_rate_commission(creator, obj, 0, 0);
     }
 
@@ -479,7 +479,7 @@ module marketplace::fee_schedule {
     fun test_init_too_big_percentage_commission(creator: &signer) {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        init_internal(creator, creator_addr, 0, 0, 1, 2);
+        init(creator, creator_addr, 0, 0, 1, 2);
     }
 
     #[test(creator = @0x123)]
@@ -489,7 +489,7 @@ module marketplace::fee_schedule {
     ) acquires FeeSchedule, FixedRateCommission, PercentageRateCommission {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let obj = init_internal(creator, creator_addr, 0, 0, 1, 0);
+        let obj = init(creator, creator_addr, 0, 0, 1, 0);
         set_percentage_rate_commission(creator, obj, 1, 2);
     }
 }
