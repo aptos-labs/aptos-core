@@ -22,10 +22,11 @@ use aptos_storage_service_types::{
 use aptos_time_service::TimeService;
 use aptos_types::epoch_change::EpochChangeProof;
 use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use futures::channel::oneshot;
 use lru::LruCache;
 use rand::{rngs::OsRng, Rng};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn test_peers_with_ready_optimistic_fetches() {
@@ -41,13 +42,9 @@ async fn test_peers_with_ready_optimistic_fetches() {
         create_optimistic_fetch_request(time_service.clone(), Some(10), Some(1));
 
     // Insert the optimistic fetches into the pending map
-    let optimistic_fetches = Arc::new(Mutex::new(HashMap::new()));
-    optimistic_fetches
-        .lock()
-        .insert(peer_network_1, optimistic_fetch_1);
-    optimistic_fetches
-        .lock()
-        .insert(peer_network_2, optimistic_fetch_2);
+    let optimistic_fetches = Arc::new(DashMap::new());
+    optimistic_fetches.insert(peer_network_1, optimistic_fetch_1);
+    optimistic_fetches.insert(peer_network_2, optimistic_fetch_2);
 
     // Create epoch ending test data
     let epoch_ending_ledger_info = utils::create_epoch_ending_ledger_info(1, 5);
@@ -113,7 +110,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
     )]);
 
     // Manually remove optimistic fetch 1 from the map
-    optimistic_fetches.lock().remove(&peer_network_1);
+    optimistic_fetches.remove(&peer_network_1);
 
     // Update the storage server summary so that there is new data for optimistic fetch 2,
     // but the optimistic fetch is invalid because it doesn't respect an epoch boundary.
@@ -156,19 +153,14 @@ async fn test_remove_expired_optimistic_fetches() {
 
     // Create the first batch of test optimistic fetches
     let num_optimistic_fetches_in_batch = 10;
-    let optimistic_fetches = Arc::new(Mutex::new(HashMap::new()));
+    let optimistic_fetches = Arc::new(DashMap::new());
     for _ in 0..num_optimistic_fetches_in_batch {
         let optimistic_fetch = create_optimistic_fetch_request(time_service.clone(), None, None);
-        optimistic_fetches
-            .lock()
-            .insert(PeerNetworkId::random(), optimistic_fetch);
+        optimistic_fetches.insert(PeerNetworkId::random(), optimistic_fetch);
     }
 
     // Verify the number of active optimistic fetches
-    assert_eq!(
-        optimistic_fetches.lock().len(),
-        num_optimistic_fetches_in_batch
-    );
+    assert_eq!(optimistic_fetches.len(), num_optimistic_fetches_in_batch);
 
     // Elapse a small amount of time (not enough to expire the optimistic fetches)
     time_service
@@ -182,22 +174,17 @@ async fn test_remove_expired_optimistic_fetches() {
         storage_service_config,
         optimistic_fetches.clone(),
     );
-    assert_eq!(
-        optimistic_fetches.lock().len(),
-        num_optimistic_fetches_in_batch
-    );
+    assert_eq!(optimistic_fetches.len(), num_optimistic_fetches_in_batch);
 
     // Create another batch of optimistic fetches
     for _ in 0..num_optimistic_fetches_in_batch {
         let optimistic_fetch = create_optimistic_fetch_request(time_service.clone(), None, None);
-        optimistic_fetches
-            .lock()
-            .insert(PeerNetworkId::random(), optimistic_fetch);
+        optimistic_fetches.insert(PeerNetworkId::random(), optimistic_fetch);
     }
 
     // Verify the new number of active optimistic fetches
     assert_eq!(
-        optimistic_fetches.lock().len(),
+        optimistic_fetches.len(),
         num_optimistic_fetches_in_batch * 2
     );
 
@@ -213,10 +200,7 @@ async fn test_remove_expired_optimistic_fetches() {
         storage_service_config,
         optimistic_fetches.clone(),
     );
-    assert_eq!(
-        optimistic_fetches.lock().len(),
-        num_optimistic_fetches_in_batch
-    );
+    assert_eq!(optimistic_fetches.len(), num_optimistic_fetches_in_batch);
 
     // Elapse enough time to expire the second batch of optimistic fetches
     time_service
@@ -229,7 +213,7 @@ async fn test_remove_expired_optimistic_fetches() {
         storage_service_config,
         optimistic_fetches.clone(),
     );
-    assert!(optimistic_fetches.lock().is_empty());
+    assert!(optimistic_fetches.is_empty());
 }
 
 /// Creates a random request for optimistic fetch data

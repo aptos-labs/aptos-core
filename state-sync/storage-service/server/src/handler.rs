@@ -30,8 +30,9 @@ use aptos_storage_service_types::{
 use aptos_time_service::TimeService;
 use aptos_types::transaction::Version;
 use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use lru::LruCache;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 /// Storage server constants
 const INVALID_REQUEST_LOG_FREQUENCY_SECS: u64 = 5; // The frequency to log invalid requests (secs)
@@ -44,7 +45,7 @@ const SUMMARY_LOG_FREQUENCY_SECS: u64 = 5; // The frequency to log the storage s
 #[derive(Clone)]
 pub struct Handler<T> {
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
@@ -54,7 +55,7 @@ pub struct Handler<T> {
 impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
         cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
-        optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+        optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
         lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
         request_moderator: Arc<RequestModerator>,
         storage: T,
@@ -208,7 +209,6 @@ impl<T: StorageReaderInterface> Handler<T> {
         // Store the optimistic fetch and check if any existing fetches were found
         if self
             .optimistic_fetches
-            .lock()
             .insert(peer_network_id, optimistic_fetch)
             .is_some()
         {

@@ -25,8 +25,9 @@ use aptos_storage_service_types::{
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use lru::LruCache;
-use std::{cmp::min, collections::HashMap, sync::Arc, time::Instant};
+use std::{cmp::min, sync::Arc, time::Instant};
 
 /// An optimistic fetch request from a peer
 pub struct OptimisticFetchRequest {
@@ -167,7 +168,7 @@ impl OptimisticFetchRequest {
 pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
@@ -188,7 +189,7 @@ pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 
     // Remove and handle the ready optimistic fetches
     for (peer, target_ledger_info) in peers_with_ready_optimistic_fetches {
-        if let Some(optimistic_fetch) = optimistic_fetches.clone().lock().remove(&peer) {
+        if let Some((_, optimistic_fetch)) = optimistic_fetches.clone().remove(&peer) {
             let optimistic_fetch_start_time = optimistic_fetch.fetch_start_time;
             let optimistic_fetch_request = optimistic_fetch.request.clone();
 
@@ -230,7 +231,7 @@ pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 /// alongside the ledger info at the target version for the peer.
 pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
@@ -248,7 +249,12 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
     // Identify the peers with ready optimistic fetches
     let mut ready_optimistic_fetches = vec![];
     let mut invalid_peer_optimistic_fetches = vec![];
-    for (peer, optimistic_fetch) in optimistic_fetches.lock().iter() {
+    for optimistic_fetch in optimistic_fetches.iter() {
+        // Get the peer and the optimistic fetch request
+        let peer = optimistic_fetch.key();
+        let optimistic_fetch = optimistic_fetch.value();
+
+        // Check if we have synced beyond the highest known version
         let highest_known_version = optimistic_fetch.highest_known_version();
         if highest_known_version < highest_synced_version {
             let highest_known_epoch = optimistic_fetch.highest_known_epoch();
@@ -280,7 +286,7 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
 
     // Remove the invalid optimistic fetches
     for peer in invalid_peer_optimistic_fetches {
-        if let Some(optimistic_fetch) = optimistic_fetches.lock().remove(&peer) {
+        if let Some((_, optimistic_fetch)) = optimistic_fetches.remove(&peer) {
             warn!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
                 .error(&Error::InvalidRequest(
                     "Mismatch between known version and epoch!".into()
@@ -297,7 +303,7 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
 /// Gets the epoch ending ledger info at the given epoch
 fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     epoch: u64,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
@@ -358,7 +364,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
 fn notify_peer_of_new_data<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
@@ -457,21 +463,19 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
 /// Removes all expired optimistic fetches
 pub(crate) fn remove_expired_optimistic_fetches(
     config: StorageServiceConfig,
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
 ) {
-    optimistic_fetches
-        .lock()
-        .retain(|peer_network_id, optimistic_fetch| {
-            // Update the expired optimistic fetch metrics
-            if optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
-                increment_counter(
-                    &metrics::OPTIMISTIC_FETCH_EVENTS,
-                    peer_network_id.network_id(),
-                    OPTIMISTIC_FETCH_EXPIRE.into(),
-                );
-            }
+    optimistic_fetches.retain(|peer_network_id, optimistic_fetch| {
+        // Update the expired optimistic fetch metrics
+        if optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
+            increment_counter(
+                &metrics::OPTIMISTIC_FETCH_EVENTS,
+                peer_network_id.network_id(),
+                OPTIMISTIC_FETCH_EXPIRE.into(),
+            );
+        }
 
-            // Only retain non-expired optimistic fetches
-            !optimistic_fetch.is_expired(config.max_optimistic_fetch_period)
-        });
+        // Only retain non-expired optimistic fetches
+        !optimistic_fetch.is_expired(config.max_optimistic_fetch_period)
+    });
 }

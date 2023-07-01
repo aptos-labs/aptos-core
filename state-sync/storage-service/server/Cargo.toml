@@ -27,6 +27,7 @@ aptos-types = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+dashmap = { workspace = true }
 futures = { workspace = true }
 lru = { workspace = true }
 once_cell = { workspace = true }
