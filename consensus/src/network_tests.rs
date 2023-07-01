@@ -570,6 +570,8 @@ mod tests {
     #[test]
     fn test_network_api() {
         let runtime = consensus_runtime();
+        let _entered_runtime = runtime.enter();
+
         let num_nodes = 5;
         let mut receivers: Vec<NetworkReceivers> = Vec::new();
         let mut playground = NetworkPlayground::new(runtime.handle().clone());
@@ -680,6 +682,8 @@ mod tests {
     #[test]
     fn test_rpc() {
         let runtime = consensus_runtime();
+        let _entered_runtime = runtime.enter();
+
         let num_nodes = 2;
         let mut senders = Vec::new();
         let mut receivers: Vec<NetworkReceivers> = Vec::new();
@@ -793,6 +797,9 @@ mod tests {
 
     #[test]
     fn test_bad_message() {
+        let runtime = consensus_runtime();
+        let _entered_runtime = runtime.enter();
+
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_notifs_tx, connection_notifs_rx) =

@@ -186,6 +186,7 @@ impl NodeSetup {
         safety_rules_manager: SafetyRulesManager,
         id: usize,
     ) -> Self {
+        let _entered_runtime = executor.enter();
         let epoch_state = EpochState {
             epoch: 1,
             verifier: storage.get_validator_set().into(),

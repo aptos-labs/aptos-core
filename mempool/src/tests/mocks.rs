@@ -56,6 +56,7 @@ impl MockSharedMempool {
     /// and the channel through which shared mempool receives client events.
     pub fn new() -> Self {
         let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
+        let _entered_runtime = runtime.enter();
         let (ac_client, mempool, quorum_store_sender, mempool_notifier) = Self::start(
             runtime.handle(),
             &DbReaderWriter::new(MockDbReaderWriter),

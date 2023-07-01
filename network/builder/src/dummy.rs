@@ -65,7 +65,11 @@ pub struct DummyNetwork {
 
 /// The following sets up a 2 peer network and verifies connectivity.
 pub fn setup_network() -> DummyNetwork {
+    // Create and enter a runtime
     let runtime = Runtime::new().unwrap();
+    let _entered_runtime = runtime.enter();
+
+    // Create a new set of peers
     let role = RoleType::Validator;
     let network_id = NetworkId::Validator;
     let chain_id = ChainId::default();

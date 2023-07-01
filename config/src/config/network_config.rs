@@ -165,7 +165,7 @@ impl NetworkConfig {
         };
 
         // Configure the number of parallel deserialization tasks
-        config.configure_num_deseserialization_tasks();
+        config.configure_num_deserialization_tasks();
 
         // Prepare the identity based on the identity format
         config.prepare_identity();
@@ -176,7 +176,7 @@ impl NetworkConfig {
     /// Configures the number of parallel deserialization tasks
     /// based on the number of CPU cores of the machine. This is
     /// only done if the config does not specify a value.
-    fn configure_num_deseserialization_tasks(&mut self) {
+    fn configure_num_deserialization_tasks(&mut self) {
         if self.max_parallel_deserialization_tasks.is_none() {
             self.max_parallel_deserialization_tasks = Some(num_cpus::get());
         }
@@ -522,7 +522,7 @@ mod tests {
         };
 
         // Configure the number of deserialization tasks and verify that it is not overridden
-        network_config.configure_num_deseserialization_tasks();
+        network_config.configure_num_deserialization_tasks();
         assert_eq!(network_config.max_parallel_deserialization_tasks, Some(1));
     }
 }
