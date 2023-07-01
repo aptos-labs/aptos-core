@@ -28,13 +28,12 @@ use futures_util::FutureExt;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
-use tokio::runtime::Handle;
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
 
 // TODO: do we want to make this configurable?
-const MAX_DESERIALIZATION_QUEUE_SIZE_PER_PEER: usize = 30;
+const MAX_DESERIALIZATION_QUEUE_SIZE_PER_PEER: usize = 50;
 
 /// Events received by network clients in a validator
 ///
@@ -193,7 +192,7 @@ impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMes
         // network application) and send them to the receiver. Note: this
         // may cause out of order message delivery, but applications
         // should already be handling this.
-        Handle::current().spawn(async move {
+        tokio::spawn(async move {
             peer_mgr_notifs_rx
                 .for_each_concurrent(
                     max_parallel_deserialization_tasks,
@@ -203,22 +202,21 @@ impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMes
                         let peer_id_for_notification = peer_manager_notification.get_peer_id();
 
                         // Spawn a new blocking task to deserialize the message
-                        Handle::current()
-                            .spawn_blocking(move || {
-                                if let Some(deserialized_message) =
-                                    peer_mgr_notif_to_event(peer_manager_notification)
+                        tokio::task::spawn_blocking(move || {
+                            if let Some(deserialized_message) =
+                                peer_mgr_notif_to_event(peer_manager_notification)
+                            {
+                                if let Err(error) = deserialized_message_sender
+                                    .push(peer_id_for_notification, deserialized_message)
                                 {
-                                    if let Err(error) = deserialized_message_sender
-                                        .push(peer_id_for_notification, deserialized_message)
-                                    {
-                                        warn!(
-                                            "Failed to send deserialized message to receiver: {:?}",
-                                            error
-                                        );
-                                    }
+                                    warn!(
+                                        "Failed to send deserialized message to receiver: {:?}",
+                                        error
+                                    );
                                 }
-                            })
-                            .map(|_| ())
+                            }
+                        })
+                        .map(|_| ())
                     },
                 )
                 .await
