@@ -11,7 +11,6 @@ use crate::{
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::Mutex;
-use aptos_logger::Level;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, NewTransactionOutputsWithProofRequest,
@@ -135,11 +134,6 @@ async fn test_peers_with_ready_optimistic_fetches() {
 
 #[tokio::test]
 async fn test_remove_expired_optimistic_fetches() {
-    aptos_logger::Logger::builder()
-        .is_async(false)
-        .level(Level::Info)
-        .build();
-
     // Create a storage service config
     let max_optimistic_fetch_period = 100;
     let storage_service_config = StorageServiceConfig {
@@ -317,13 +311,20 @@ fn update_storage_server_summary(
     highest_synced_version: u64,
     highest_synced_epoch: u64,
 ) -> LedgerInfoWithSignatures {
+    // Create the storage server summary and synced ledger info
     let mut storage_server_summary = StorageServerSummary::default();
+    let highest_synced_ledger_info =
+        utils::create_test_ledger_info_with_sigs(highest_synced_epoch, highest_synced_version);
+
+    // Update the epoch ending ledger infos and synced ledger info
     storage_server_summary
         .data_summary
         .epoch_ending_ledger_infos = Some(CompleteDataRange::new(0, highest_synced_epoch).unwrap());
-    let synced_ledger_info =
-        utils::create_test_ledger_info_with_sigs(highest_synced_epoch, highest_synced_version);
-    storage_server_summary.data_summary.synced_ledger_info = Some(synced_ledger_info.clone());
+    storage_server_summary.data_summary.synced_ledger_info =
+        Some(highest_synced_ledger_info.clone());
+
+    // Update the cached storage server summary
     cached_storage_server_summary.store(Arc::new(storage_server_summary));
-    synced_ledger_info
+
+    highest_synced_ledger_info
 }
