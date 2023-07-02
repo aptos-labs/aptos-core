@@ -373,6 +373,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-logging",
  "aptos-vm-validator",
  "bcs 0.1.4",
  "bytes",
