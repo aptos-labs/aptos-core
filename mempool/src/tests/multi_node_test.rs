@@ -80,7 +80,7 @@ impl TestHarness {
     }
 
     /// Builds a fully functional network with Validators, attached VFNs, and full nodes
-    /// Note: None of these nodes are told about each other, and must manually be done afterwards
+    /// Note: None of these nodes are told about each other, and must manually be done afterwards.
     fn bootstrap_network(
         validator_nodes_count: u32,
         validator_mempool_config: Option<MempoolOverrideConfig>,
