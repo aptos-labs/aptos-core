@@ -436,7 +436,7 @@ public fun create_store<T: key>(
 
 It will turn make the newly created object a `FungibleStore`. Sometimes an object can be reused as a store. For example,
 a metadata object can also be a store to hold some FA of its own type or a liquidity pool object can be a store of the
-issued lp token/coin.
+issued liquidity pool's token/coin.
 
 ## Ownership of `FungibleStore`
 
