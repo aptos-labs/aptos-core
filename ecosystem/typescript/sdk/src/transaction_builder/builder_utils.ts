@@ -76,10 +76,6 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
 }
 
 function serializeArgInner(argVal: any, argType: TypeTag, serializer: Serializer, depth: number) {
-  // TODO: Should check how this matches to BCS's limit on nesting
-  if (depth >= 8) {
-    throw new Error("Arguments are too nested, must be no greater than 8");
-  }
   if (argType instanceof TypeTagBool) {
     serializer.serializeBool(ensureBoolean(argVal));
   } else if (argType instanceof TypeTagU8) {
