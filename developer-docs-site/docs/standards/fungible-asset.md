@@ -422,7 +422,7 @@ public entry fun transfer<T: key>(sender: &signer, metadata: Object<T>, recipien
 
 Secondary stores are not commonly used by normal users but prevailing for smart contracts to manage assets owned by
 contracts. For example, an asset pool may have to manage multiple fungible stores for one or more types of FA. Those
-stores do not necessarily have to have deterministic addresses and a user may have multiple stores for a given keind of
+stores do not necessarily have to have deterministic addresses and a user may have multiple stores for a given kind of
 FA. So primary fungible store is not a good fit for the needs where secondary store plays a vital role.
 
 The way to create secondary store is to create an object first and get its `ConstructorRef`. Then call:
