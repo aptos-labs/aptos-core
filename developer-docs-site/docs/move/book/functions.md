@@ -522,7 +522,7 @@ fun foo() { return () }
 ## Inline Functions
 
 Inline functions are functions which are expanded at caller side instead
-of compiled into Move bytecode. This allows to safe gas and may lead
+of compiled into Move bytecode. This allows to save gas and may lead
 to faster execution. For example, one can define an inline function
 
 ```move=
