@@ -4,6 +4,7 @@
 use crate::{
     accept_type::AcceptType,
     failpoint::fail_point_poem,
+    metrics::HANDLERS,
     response::{
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
     },
@@ -44,6 +45,8 @@ impl ViewFunctionApi {
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveValue>> {
+        let start = std::time::Instant::now();
+
         fail_point_poem("endpoint_view_function")?;
         self.context
             .check_api_output_enabled("View function", &accept_type)?;
@@ -89,7 +92,7 @@ impl ViewFunctionApi {
         .map_err(|err| {
             BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
         })?;
-        match accept_type {
+        let ret = match accept_type {
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((return_vals, &ledger_info, BasicResponseStatus::Ok))
             },
@@ -129,6 +132,11 @@ impl ViewFunctionApi {
 
                 BasicResponse::try_from_json((move_vals, &ledger_info, BasicResponseStatus::Ok))
             },
-        }
+        };
+
+        HANDLERS
+            .with_label_values(&["view"])
+            .observe(start.elapsed().as_secs_f64());
+        ret
     }
 }
