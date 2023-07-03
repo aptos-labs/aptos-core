@@ -22,6 +22,8 @@
     -  [Function `module_prologue`](#@Specification_1_module_prologue)
     -  [Function `script_prologue`](#@Specification_1_script_prologue)
     -  [Function `multi_agent_script_prologue`](#@Specification_1_multi_agent_script_prologue)
+    -  [Function `multi_agent_common_prologue`](#@Specification_1_multi_agent_common_prologue)
+    -  [Function `fee_payer_script_prologue`](#@Specification_1_fee_payer_script_prologue)
     -  [Function `epilogue`](#@Specification_1_epilogue)
     -  [Function `epilogue_gas_payer`](#@Specification_1_epilogue_gas_payer)
 
@@ -751,6 +753,24 @@ Give some constraints that may abort according to the conditions.
 
 
 
+
+<a name="0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="transaction_validation.md#0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf">MultiAgentPrologueCommonAbortsIf</a> {
+    secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;;
+    secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;;
+    <b>let</b> num_secondary_signers = len(secondary_signer_addresses);
+    <b>aborts_if</b> len(secondary_signer_public_key_hashes) != num_secondary_signers;
+    <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
+        !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i])
+            || secondary_signer_public_key_hashes[i] !=
+            <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[i]);
+}
+</code></pre>
+
+
+
 <a name="@Specification_1_multi_agent_script_prologue"></a>
 
 ### Function `multi_agent_script_prologue`
@@ -771,16 +791,57 @@ not equal the number of singers.
     txn_sequence_number,
     txn_authentication_key: txn_sender_public_key,
 };
-<b>let</b> num_secondary_signers = len(secondary_signer_addresses);
-<b>aborts_if</b> len(secondary_signer_public_key_hashes) != num_secondary_signers;
-<b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
-    !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i])
-        || secondary_signer_public_key_hashes[i] !=
-            <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[i]);
-<b>ensures</b> <b>forall</b> i in 0..num_secondary_signers:
-    <a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i])
-        && secondary_signer_public_key_hashes[i] ==
-            <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[i]);
+<b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf">MultiAgentPrologueCommonAbortsIf</a> {
+    secondary_signer_addresses,
+    secondary_signer_public_key_hashes,
+};
+</code></pre>
+
+
+
+<a name="@Specification_1_multi_agent_common_prologue"></a>
+
+### Function `multi_agent_common_prologue`
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_common_prologue">multi_agent_common_prologue</a>(secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf">MultiAgentPrologueCommonAbortsIf</a> {
+    secondary_signer_addresses,
+    secondary_signer_public_key_hashes,
+};
+</code></pre>
+
+
+
+<a name="@Specification_1_fee_payer_script_prologue"></a>
+
+### Function `fee_payer_script_prologue`
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_fee_payer_script_prologue">fee_payer_script_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, fee_payer_address: <b>address</b>, fee_payer_public_key_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>let</b> gas_payer = fee_payer_address;
+<b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
+    gas_payer,
+    txn_sequence_number,
+    txn_authentication_key: txn_sender_public_key,
+};
+<b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf">MultiAgentPrologueCommonAbortsIf</a> {
+    secondary_signer_addresses,
+    secondary_signer_public_key_hashes,
+};
+<b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(gas_payer);
+<b>aborts_if</b> !(fee_payer_public_key_hash == <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(gas_payer));
 </code></pre>
 
 

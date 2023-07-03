@@ -96,6 +96,31 @@ spec aptos_framework::transaction_validation {
         };
     }
 
+    spec schema MultiAgentPrologueCommonAbortsIf {
+        secondary_signer_addresses: vector<address>;
+        secondary_signer_public_key_hashes: vector<vector<u8>>;
+
+        // Vectors to be `zipped with` should be of equal length.
+        let num_secondary_signers = len(secondary_signer_addresses);
+        aborts_if len(secondary_signer_public_key_hashes) != num_secondary_signers;
+
+        // If any account does not exist, or public key hash does not match, abort.
+        aborts_if exists i in 0..num_secondary_signers:
+            !account::exists_at(secondary_signer_addresses[i])
+                || secondary_signer_public_key_hashes[i] !=
+                account::get_authentication_key(secondary_signer_addresses[i]);
+    }
+
+    spec multi_agent_common_prologue(
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<vector<u8>>,
+    ) {
+        include MultiAgentPrologueCommonAbortsIf {
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
+        };
+    }
+
     /// Aborts if length of public key hashed vector
     /// not equal the number of singers.
     spec multi_agent_script_prologue (
@@ -116,25 +141,42 @@ spec aptos_framework::transaction_validation {
             txn_sequence_number,
             txn_authentication_key: txn_sender_public_key,
         };
-
-        // Vectors to be `zipped with` should be of equal length.
-        let num_secondary_signers = len(secondary_signer_addresses);
-        aborts_if len(secondary_signer_public_key_hashes) != num_secondary_signers;
-
-        // If any account does not exist, or public key hash does not match, abort.
-        aborts_if exists i in 0..num_secondary_signers:
-            !account::exists_at(secondary_signer_addresses[i])
-                || secondary_signer_public_key_hashes[i] !=
-                    account::get_authentication_key(secondary_signer_addresses[i]);
-
-        // By the end, all secondary signers account should exist and public key hash should match.
-        ensures forall i in 0..num_secondary_signers:
-            account::exists_at(secondary_signer_addresses[i])
-                && secondary_signer_public_key_hashes[i] ==
-                    account::get_authentication_key(secondary_signer_addresses[i]);
+        include MultiAgentPrologueCommonAbortsIf {
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
+        };
     }
 
-    /// Abort according to the conditions.
+    spec fee_payer_script_prologue(
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_sender_public_key: vector<u8>,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        fee_payer_address: address,
+        fee_payer_public_key_hash: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+    ) {
+        pragma verify_duration_estimate = 120;
+        let gas_payer = fee_payer_address;
+        include PrologueCommonAbortsIf {
+            gas_payer,
+            txn_sequence_number,
+            txn_authentication_key: txn_sender_public_key,
+        };
+        include MultiAgentPrologueCommonAbortsIf {
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
+        };
+
+        aborts_if !account::exists_at(gas_payer);
+        aborts_if !(fee_payer_public_key_hash == account::get_authentication_key(gas_payer));
+    }
+
+        /// Abort according to the conditions.
     /// `AptosCoinCapabilities` and `CoinInfo` should exists.
     /// Skip transaction_fee::burn_fee verification.
     spec epilogue(
