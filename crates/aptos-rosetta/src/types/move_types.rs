@@ -80,7 +80,6 @@ pub struct Store {
     pub add_stake_events: EventHandle,
     pub request_commission_events: EventHandle,
     pub unlock_stake_events: EventHandle,
-    pub update_commission_events: EventHandle,
     pub switch_operator_events: EventHandle,
     pub add_distribution_events: EventHandle,
     pub distribute_events: EventHandle,
