@@ -46,14 +46,6 @@ pub enum TransactionAuthenticator {
         public_key: Ed25519PublicKey,
         signature: Ed25519Signature,
     },
-    /// Optional Multi-agent transaction with a fee payer.
-    FeePayer {
-        sender: AccountAuthenticator,
-        secondary_signer_addresses: Vec<AccountAddress>,
-        secondary_signers: Vec<AccountAuthenticator>,
-        fee_payer_address: AccountAddress,
-        fee_payer_signer: AccountAuthenticator,
-    },
     /// K-of-N multisignature
     MultiEd25519 {
         public_key: MultiEd25519PublicKey,
@@ -64,6 +56,14 @@ pub enum TransactionAuthenticator {
         sender: AccountAuthenticator,
         secondary_signer_addresses: Vec<AccountAddress>,
         secondary_signers: Vec<AccountAuthenticator>,
+    },
+    /// Optional Multi-agent transaction with a fee payer.
+    FeePayer {
+        sender: AccountAuthenticator,
+        secondary_signer_addresses: Vec<AccountAddress>,
+        secondary_signers: Vec<AccountAuthenticator>,
+        fee_payer_address: AccountAddress,
+        fee_payer_signer: AccountAuthenticator,
     },
 }
 
