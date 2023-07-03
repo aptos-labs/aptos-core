@@ -8,9 +8,6 @@ use move_core_types::account_address::AccountAddress;
 use move_table_extension::{TableHandle, TableResolver};
 use std::collections::{BTreeMap, BTreeSet};
 
-/// When `Addition` or `Subtraction` is performed after aggregator is freezed
-const EFREEZE_AGG: u64 = 0x02_0003;
-
 /// Describes the state of each aggregator instance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AggregatorState {
@@ -37,6 +34,13 @@ pub struct AggregatorID {
     // number of aggregators that were created by this transaction so far.
     pub key: AggregatorHandle,
 }
+
+/// Uniquely identifies each aggregator snapshot instance during the block execution.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AggregatorSnapshotID {
+    pub key: u128,
+}
+
 
 impl AggregatorID {
     pub fn new(handle: TableHandle, key: AggregatorHandle) -> Self {
@@ -105,11 +109,6 @@ impl History {
     }
 }
 
-pub struct Promise {
-    pub value: u128,
-    pub id: Option<AggregatorID>,
-}
-
 /// Internal aggregator data structure.
 #[derive(Debug)]
 pub struct Aggregator {
@@ -126,12 +125,24 @@ pub struct Aggregator {
     // Describes values seen by this aggregator. Note that if aggregator knows
     // its value, then storing history doesn't make sense.
     history: Option<History>,
-    // If this value is set, then further add/sub operations to the aggregator
-    // results in an error.
-    freeze_operations: bool,
-    // If this value is set to Some(agg), then this aggregator is a snapshot
-    // created from agg.
-    snapshot_of: Option<AggregatorID>,
+}
+
+/// Internal AggregatorSnapshot data structure.
+#[derive(Debug)]
+pub struct AggregatorSnapshot {
+    // Describes a value of an aggregator.
+    value: u128,
+    // Describes a state of an aggregator.
+    state: AggregatorState,
+    // Describes an upper bound of an aggregator. If `value` exceeds it, the
+    // aggregator overflows.
+    // TODO: Currently this is a single u128 value since we use 0 as a trivial
+    // lower bound. If we want to support custom lower bounds, or have more
+    // complex postconditions, we should factor this out in its own struct.
+    limit: u128,
+    // Describes values seen by this aggregator. Note that if aggregator knows
+    // its value, then storing history doesn't make sense.
+    history: Option<History>,
 }
 
 impl Aggregator {
@@ -151,12 +162,6 @@ impl Aggregator {
 
     /// Implements logic for adding to an aggregator.
     pub fn add(&mut self, value: u128) -> PartialVMResult<()> {
-        if self.freeze_operations {
-            return Err(abort_error(
-                "Cannot perform add operation after aggregator is frozen",
-                EFREEZE_AGG,
-            ));
-        }
         match self.state {
             AggregatorState::Data => {
                 // If aggregator knows the value, add directly and keep the state.
@@ -190,12 +195,6 @@ impl Aggregator {
 
     /// Implements logic for subtracting from an aggregator.
     pub fn sub(&mut self, value: u128) -> PartialVMResult<()> {
-        if self.freeze_operations {
-            return Err(abort_error(
-                "Cannot perform sub operation after aggregator is frozen",
-                EFREEZE_AGG,
-            ));
-        }
         match self.state {
             AggregatorState::Data => {
                 // Aggregator knows the value, therefore we can subtract
@@ -309,17 +308,13 @@ impl Aggregator {
         u128,
         AggregatorState,
         u128,
-        Option<History>,
-        bool,
-        Option<AggregatorID>,
+        Option<History>
     ) {
         (
             self.value,
             self.state,
             self.limit,
             self.history,
-            self.freeze_operations,
-            self.snapshot_of,
         )
     }
 }
@@ -336,6 +331,8 @@ pub struct AggregatorData {
     destroyed_aggregators: BTreeSet<AggregatorID>,
     // All aggregator instances that exist in the current transaction.
     aggregators: BTreeMap<AggregatorID, Aggregator>,
+    // All aggregatorsnapshot instances that exist in the current transaction.
+    aggregator_snapshots: BTreeMap<AggregatorSnapshotID, AggregatorSnapshot>,
 }
 
 impl AggregatorData {
@@ -359,9 +356,7 @@ impl AggregatorData {
             value: 0,
             state: AggregatorState::PositiveDelta,
             limit,
-            history: Some(History::new()),
-            freeze_operations: false,
-            snapshot_of: None,
+            history: Some(History::new())
         });
 
         if !aggregator_enabled {
@@ -383,9 +378,7 @@ impl AggregatorData {
             value: 0,
             state: AggregatorState::Data,
             limit,
-            history: None,
-            freeze_operations: false,
-            snapshot_of: None,
+            history: None
         };
         self.aggregators.insert(id, aggregator);
         self.new_aggregators.insert(id);
@@ -401,9 +394,7 @@ impl AggregatorData {
             value: aggregator.value,
             state: aggregator.state,
             history: aggregator.history.clone(),
-            limit: aggregator.limit,
-            freeze_operations: false,
-            snapshot_of: Some(id),
+            limit: aggregator.limit
         };
         let snapshot_id = AggregatorID {
             handle: TableHandle(AccountAddress::ZERO),
@@ -419,7 +410,6 @@ impl AggregatorData {
             .aggregators
             .get_mut(&id)
             .expect("Aggregator should exist to create a promise");
-        aggregator.freeze_operations = true;
         if aggregator.state == AggregatorState::Data {
             Promise {
                 value: aggregator.value,
