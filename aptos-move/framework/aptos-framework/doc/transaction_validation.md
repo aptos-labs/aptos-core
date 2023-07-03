@@ -12,6 +12,8 @@
 -  [Function `module_prologue`](#0x1_transaction_validation_module_prologue)
 -  [Function `script_prologue`](#0x1_transaction_validation_script_prologue)
 -  [Function `multi_agent_script_prologue`](#0x1_transaction_validation_multi_agent_script_prologue)
+-  [Function `multi_agent_common_prologue`](#0x1_transaction_validation_multi_agent_common_prologue)
+-  [Function `fee_payer_script_prologue`](#0x1_transaction_validation_fee_payer_script_prologue)
 -  [Function `epilogue`](#0x1_transaction_validation_epilogue)
 -  [Function `epilogue_gas_payer`](#0x1_transaction_validation_epilogue_gas_payer)
 -  [Specification](#@Specification_1)
@@ -104,6 +106,7 @@ correct chain-specific prologue and epilogue functions
 
 <a name="0x1_transaction_validation_MAX_U64"></a>
 
+MSB is used to indicate a gas payer tx
 
 
 <pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>: u128 = 18446744073709551615;
@@ -117,16 +120,6 @@ Transaction exceeded its allocated max gas
 
 
 <pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>: u64 = 6;
-</code></pre>
-
-
-
-<a name="0x1_transaction_validation_GAS_PAYER_FLAG_BIT"></a>
-
-MSB is used to indicate a gas payer tx
-
-
-<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>: u64 = 9223372036854775808;
 </code></pre>
 
 
@@ -154,15 +147,6 @@ MSB is used to indicate a gas payer tx
 
 
 <pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>: u64 = 1005;
-</code></pre>
-
-
-
-<a name="0x1_transaction_validation_PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING"></a>
-
-
-
-<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING">PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING</a>: u64 = 1010;
 </code></pre>
 
 
@@ -302,11 +286,6 @@ Only called during genesis to initialize system resources for this module.
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
     );
 
-    <b>assert</b>!(
-        txn_sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>)
-    );
-
     <b>let</b> account_sequence_number = <a href="account.md#0x1_account_get_sequence_number">account::get_sequence_number</a>(transaction_sender);
     <b>assert</b>!(
         txn_sequence_number &gt;= account_sequence_number,
@@ -427,17 +406,45 @@ Only called during genesis to initialize system resources for this module.
     txn_expiration_time: u64,
     <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
 ) {
-    <b>let</b> gas_payer = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender);
-    <b>let</b> num_secondary_signers = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&secondary_signer_addresses);
-    <b>if</b> (txn_sequence_number &gt;= <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>) {
-        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_gas_payer_enabled">features::gas_payer_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>));
-        <b>assert</b>!(num_secondary_signers &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING">PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING</a>));
-        gas_payer = *std::vector::borrow(&secondary_signer_addresses, std::vector::length(&secondary_signer_addresses) - 1);
-        // Clear the high bit <b>as</b> it's not part of the sequence number
-        txn_sequence_number = txn_sequence_number - <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>;
-    };
-    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender, gas_payer, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, <a href="chain_id.md#0x1_chain_id">chain_id</a>);
+    <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender);
+    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
+        sender,
+        sender_addr,
+        txn_sequence_number,
+        txn_sender_public_key,
+        txn_gas_price,
+        txn_max_gas_units,
+        txn_expiration_time,
+        <a href="chain_id.md#0x1_chain_id">chain_id</a>,
+    );
+    <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_common_prologue">multi_agent_common_prologue</a>(secondary_signer_addresses, secondary_signer_public_key_hashes);
+}
+</code></pre>
 
+
+
+</details>
+
+<a name="0x1_transaction_validation_multi_agent_common_prologue"></a>
+
+## Function `multi_agent_common_prologue`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_common_prologue">multi_agent_common_prologue</a>(secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_common_prologue">multi_agent_common_prologue</a>(
+    secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+) {
+    <b>let</b> num_secondary_signers = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&secondary_signer_addresses);
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&secondary_signer_public_key_hashes) == num_secondary_signers,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH">PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH</a>),
@@ -464,6 +471,56 @@ Only called during genesis to initialize system resources for this module.
         );
         i = i + 1;
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_transaction_validation_fee_payer_script_prologue"></a>
+
+## Function `fee_payer_script_prologue`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_fee_payer_script_prologue">fee_payer_script_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, fee_payer_address: <b>address</b>, fee_payer_public_key_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_fee_payer_script_prologue">fee_payer_script_prologue</a>(
+    sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    txn_sequence_number: u64,
+    txn_sender_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    secondary_signer_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    fee_payer_address: <b>address</b>,
+    fee_payer_public_key_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    txn_gas_price: u64,
+    txn_max_gas_units: u64,
+    txn_expiration_time: u64,
+    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
+) {
+    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
+        sender,
+        fee_payer_address,
+        txn_sequence_number,
+        txn_sender_public_key,
+        txn_gas_price,
+        txn_max_gas_units,
+        txn_expiration_time,
+        <a href="chain_id.md#0x1_chain_id">chain_id</a>,
+    );
+    <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_common_prologue">multi_agent_common_prologue</a>(secondary_signer_addresses, secondary_signer_public_key_hashes);
+    <b>assert</b>!(
+        fee_payer_public_key_hash == <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(fee_payer_address),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
+    );
 }
 </code></pre>
 
@@ -620,7 +677,6 @@ Give some constraints that may abort according to the conditions.
     <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender);
     <b>aborts_if</b> !(txn_sequence_number &gt;= <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number);
     <b>aborts_if</b> !(txn_authentication_key == <b>global</b>&lt;Account&gt;(transaction_sender).authentication_key);
-    <b>aborts_if</b> !(txn_sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>);
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
     <b>aborts_if</b> max_transaction_fee &gt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>;
     <b>aborts_if</b> !(txn_sequence_number == <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number);
@@ -699,22 +755,11 @@ not equal the number of singers.
 
 
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>let</b> gas_payer = <b>if</b> (txn_sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>) {
-    <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender)
-} <b>else</b> {
-    secondary_signer_addresses[len(secondary_signer_addresses) - 1]
-};
-<b>aborts_if</b> txn_sequence_number &gt;= <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a> && !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_gas_payer_enabled">features::spec_gas_payer_enabled</a>();
-<b>aborts_if</b> txn_sequence_number &gt;= <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a> && len(secondary_signer_addresses) == 0;
-<b>let</b> adjusted_txn_sequence_number = <b>if</b> (txn_sequence_number &gt;= <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>) {
-    txn_sequence_number - <a href="transaction_validation.md#0x1_transaction_validation_GAS_PAYER_FLAG_BIT">GAS_PAYER_FLAG_BIT</a>
-} <b>else</b> {
-    txn_sequence_number
-};
+<b>let</b> gas_payer = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
 <b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
     gas_payer,
-    txn_sequence_number: adjusted_txn_sequence_number,
-    txn_authentication_key: txn_sender_public_key
+    txn_sequence_number,
+    txn_authentication_key: txn_sender_public_key,
 };
 <b>let</b> num_secondary_signers = len(secondary_signer_addresses);
 <b>aborts_if</b> len(secondary_signer_public_key_hashes) != num_secondary_signers;

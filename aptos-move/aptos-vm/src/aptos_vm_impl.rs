@@ -346,7 +346,6 @@ impl AptosVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let transaction_validation = self.transaction_validation();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_authentication_key = txn_data.authentication_key().to_vec();
         let txn_gas_price = txn_data.gas_unit_price();

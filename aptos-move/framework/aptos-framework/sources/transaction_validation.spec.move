@@ -44,7 +44,6 @@ spec aptos_framework::transaction_validation {
         aborts_if !account::exists_at(transaction_sender);
         aborts_if !(txn_sequence_number >= global<Account>(transaction_sender).sequence_number);
         aborts_if !(txn_authentication_key == global<Account>(transaction_sender).authentication_key);
-        aborts_if !(txn_sequence_number < GAS_PAYER_FLAG_BIT);
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         aborts_if max_transaction_fee > MAX_U64;
@@ -111,22 +110,11 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
     ) {
         pragma verify_duration_estimate = 120;
-        let gas_payer = if (txn_sequence_number < GAS_PAYER_FLAG_BIT) {
-            signer::address_of(sender)
-        } else {
-            secondary_signer_addresses[len(secondary_signer_addresses) - 1]
-        };
-        aborts_if txn_sequence_number >= GAS_PAYER_FLAG_BIT && !features::spec_gas_payer_enabled();
-        aborts_if txn_sequence_number >= GAS_PAYER_FLAG_BIT && len(secondary_signer_addresses) == 0;
-        let adjusted_txn_sequence_number = if (txn_sequence_number >= GAS_PAYER_FLAG_BIT) {
-            txn_sequence_number - GAS_PAYER_FLAG_BIT
-        } else {
-            txn_sequence_number
-        };
+        let gas_payer = signer::address_of(sender);
         include PrologueCommonAbortsIf {
             gas_payer,
-            txn_sequence_number: adjusted_txn_sequence_number,
-            txn_authentication_key: txn_sender_public_key
+            txn_sequence_number,
+            txn_authentication_key: txn_sender_public_key,
         };
 
         // Vectors to be `zipped with` should be of equal length.
