@@ -17,7 +17,7 @@ use std::{collections::HashMap, convert::TryInto, fs::File, path::PathBuf};
 
 #[derive(Clone, Debug, Parser)]
 pub struct GetPublicFullNodes {
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub input_file: PathBuf,
 }
 

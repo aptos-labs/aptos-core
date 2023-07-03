@@ -2,9 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-//! Contains AST definitions for the specification language fragments of the Move language.
-//! Note that in this crate, specs are represented in AST form, whereas code is represented
-//! as bytecodes. Therefore we do not need an AST for the Move code itself.
+//! Contains definitions for the abstract syntax tree (AST) of the Move language.
 
 use crate::{
     exp_rewriter::ExpRewriterFunctions,
@@ -378,10 +376,10 @@ pub enum ExpData {
     Invalid(NodeId),
     /// Represents a value.
     Value(NodeId, Value),
-    /// Represents a reference to a local variable introduced by a specification construct,
-    /// e.g. a quantifier.
+    /// Represents a reference to a local variable introduced in the AST.
     LocalVar(NodeId, Symbol),
-    /// Represents a reference to a temporary used in bytecode.
+    /// Represents a reference to a temporary used in bytecode, if this expression is associated
+    /// with bytecode.
     Temporary(NodeId, TempIndex),
     /// Represents a call to an operation. The `Operation` enum covers all builtin functions
     /// (including operators, constants, ...) as well as user functions.
@@ -602,7 +600,7 @@ impl ExpData {
                     let (mid, sid, sinst) = inst[0].require_struct();
                     result.insert((mid.qualified_inst(sid, sinst.to_owned()), label.to_owned()));
                 },
-                Call(id, Function(mid, fid, labels), _) => {
+                Call(id, SpecFunction(mid, fid, labels), _) => {
                     let inst = &env.get_node_instantiation(*id);
                     let module = env.get_module(*mid);
                     let fun = module.get_spec_fun(*fid);
@@ -632,6 +630,18 @@ impl ExpData {
         };
         self.visit(&mut visitor);
         temps
+    }
+
+    /// Returns the Move functions called by this expression
+    pub fn called_funs(&self) -> BTreeSet<QualifiedId<FunId>> {
+        let mut called = BTreeSet::new();
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Call(_, Operation::MoveFunction(mid, fid), _) = e {
+                called.insert(mid.qualified(*fid));
+            }
+        };
+        self.visit(&mut visitor);
+        called
     }
 
     /// Visits expression, calling visitor on each sub-expression, depth first.
@@ -797,7 +807,10 @@ impl ExpData {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
-                    Function(mid, ..) | Pack(mid, ..) | Select(mid, ..) | UpdateField(mid, ..) => {
+                    SpecFunction(mid, ..)
+                    | Pack(mid, ..)
+                    | Select(mid, ..)
+                    | UpdateField(mid, ..) => {
                         usage.insert(*mid);
                     },
                     _ => {},
@@ -899,17 +912,23 @@ impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
-    Function(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
+    MoveFunction(ModuleId, FunId),
+    SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
     Pack(ModuleId, StructId),
     Tuple,
+
+    // Specification specific
     Select(ModuleId, StructId, FieldId),
     UpdateField(ModuleId, StructId, FieldId),
     Result(usize),
     Index,
     Slice,
+    Range,
+    Implies,
+    Iff,
+    Identical,
 
     // Binary operators
-    Range,
     Add,
     Sub,
     Mul,
@@ -920,12 +939,9 @@ pub enum Operation {
     Xor,
     Shl,
     Shr,
-    Implies,
-    Iff,
     And,
     Or,
     Eq,
-    Identical,
     Neq,
     Lt,
     Gt,
@@ -936,16 +952,26 @@ pub enum Operation {
     Not,
     Cast,
 
-    // Builtin functions
+    // Builtin functions (impl and spec)
+    Exists(Option<MemoryLabel>),
+
+    // Builtin functions (impl only)
+    BorrowGlobal(bool),
+    MoveTo,
+    MoveFrom,
+    Freeze,
+    Abort,
+
+    // Builtin functions (spec only)
     Len,
     TypeValue,
     TypeDomain,
     ResourceDomain,
     Global(Option<MemoryLabel>),
-    Exists(Option<MemoryLabel>),
     CanModify,
     Old,
     Trace(TraceKind),
+
     EmptyVec,
     SingleVec,
     UpdateVec,
@@ -1095,7 +1121,7 @@ impl Operation {
         use Operation::*;
         match self {
             Exists(_) | Global(_) => false,
-            Function(mid, fid, _) => check_pure(*mid, *fid),
+            SpecFunction(mid, fid, _) => check_pure(*mid, *fid),
             _ => true,
         }
     }
@@ -1134,7 +1160,7 @@ impl ExpData {
                 },
                 Call(_, oper, _) => match oper {
                     Exists(..) | Global(..) => is_pure = false,
-                    Function(mid, fid, _) => {
+                    SpecFunction(mid, fid, _) => {
                         let module = env.get_module(*mid);
                         let fun = module.get_spec_fun(*fid);
                         if !fun.used_memory.is_empty() {
@@ -1518,7 +1544,7 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         use Operation::*;
         match self.oper {
-            Function(mid, fid, labels_opt) => {
+            SpecFunction(mid, fid, labels_opt) => {
                 write!(f, "{}", self.fun_str(mid, fid))?;
                 if let Some(labels) = labels_opt {
                     write!(

@@ -16,7 +16,7 @@ called *silver coin* by using the [Aptos command line interface (CLI)](../../too
 ## Create a collection
 Token must belong to a collection. First, you can create a collection by running Aptos CLI:
 ```bash
-aptos move run --function-id 0x3::token::create_collection_script --args string:"Game Coins" string:"The collection of all in-game coins" string:"" u64:0 vector\<bool\>:false,false,false
+aptos move run --function-id 0x3::token::create_collection_script --args string:"Game Coins" string:"The collection of all in-game coins" string:"" u64:0 'bool:[false,false,false]'
 ```
 Parameters:
 - collection name: "Game Coins".
@@ -35,7 +35,7 @@ All the parameters could be adjusted as appropriate.
 The fungible token in Aptos has an unique `TokenId`, a set of creator, collection name, token name and property version.
 For fungible tokens, the property version is always 0. To create a token named "Silver Coin", you run:
 ```bash
-aptos move run --function-id 0x3::token::create_token_script --args string:"Game Coins" string:"Silver Coin" string:"The currency in my game" u64:100 u64:0 string:$TOKEN_URL address:$YOUR_ADDRESS u64:0 u64:0 vector\<bool\>:false,false,false,false,false raw:00 raw:00 raw:00
+aptos move run --function-id 0x3::token::create_token_script --args string:"Game Coins" string:"Silver Coin" string:"The currency in my game" u64:100 u64:0 string:$TOKEN_URL address:$YOUR_ADDRESS u64:0 u64:0 'bool:[false,false,false,false,false]' raw:00 raw:00 raw:00
 ```
 Parameters:
 - collection name: "Game Coins", same as the previous step.

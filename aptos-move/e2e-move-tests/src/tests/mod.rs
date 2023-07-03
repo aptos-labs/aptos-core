@@ -20,6 +20,7 @@ mod max_loop_depth;
 mod memory_quota;
 mod metadata;
 mod mint_nft;
+mod missing_gas_parameter;
 mod new_integer_types;
 mod nft_dao;
 mod offer_rotation_capability;

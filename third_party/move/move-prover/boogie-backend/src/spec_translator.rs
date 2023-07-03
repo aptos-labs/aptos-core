@@ -795,7 +795,7 @@ impl<'env> SpecTranslator<'env> {
             Operation::EventStoreIncludedIn => self.translate_event_store_included_in(args),
 
             // Regular expressions
-            Operation::Function(module_id, fun_id, memory_labels) => {
+            Operation::SpecFunction(module_id, fun_id, memory_labels) => {
                 self.translate_spec_fun_call(node_id, *module_id, *fun_id, args, memory_labels)
             },
             Operation::Pack(mid, sid) => self.translate_pack(node_id, *mid, *sid, args),
@@ -908,7 +908,15 @@ impl<'env> SpecTranslator<'env> {
                     "currently `TRACE(..)` cannot be used in spec functions or in lets",
                 )
             },
-            Operation::Old => panic!("operation unexpected: {:?}", oper),
+            Operation::MoveFunction(_, _)
+            | Operation::BorrowGlobal(_)
+            | Operation::MoveTo
+            | Operation::MoveFrom
+            | Operation::Freeze
+            | Operation::Abort
+            | Operation::Old => {
+                panic!("operation unexpected: {:?}", oper)
+            },
         }
     }
 

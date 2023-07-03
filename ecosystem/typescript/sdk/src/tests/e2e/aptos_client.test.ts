@@ -22,8 +22,6 @@ const account = "0x1::account::Account";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
-const coinTransferFunction = "0x1::coin::transfer";
-
 test("call should include x-aptos-client header", async () => {
   const client = new AptosClient(NODE_URL, { HEADERS: { my: "header" } });
   const heders = client.client.request.config.HEADERS;
@@ -97,18 +95,12 @@ test(
     expect((accountResource!.data as any).coin.value).toBe("100000000");
 
     const account2 = new AptosAccount();
-    await faucetClient.fundAccount(account2.address(), 0);
-    resources = await client.getAccountResources(account2.address());
-    accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("0");
-
-    const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
     const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
       TxnBuilderTypes.EntryFunction.natural(
-        "0x1::coin",
+        "0x1::aptos_account",
         "transfer",
-        [token],
+        [],
         [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account2.address())), bcsSerializeUint64(717)],
       ),
     );
@@ -190,31 +182,23 @@ test(
     const client = new AptosClient(NODE_URL);
     const faucetClient = getFaucetClient();
 
-    const account1 = new AptosAccount();
-    await faucetClient.fundAccount(account1.address(), 100_000_000);
-    let resources = await client.getAccountResources(account1.address());
+    const sender = new AptosAccount();
+    await faucetClient.fundAccount(sender.address(), 100_000_000);
+    let resources = await client.getAccountResources(sender.address());
     let accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("100000000");
 
-    const account2 = new AptosAccount();
-    await faucetClient.fundAccount(account2.address(), 0);
-    resources = await client.getAccountResources(account2.address());
-    accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("0");
+    const receiver = new AptosAccount();
 
-    const builder = new TransactionBuilderRemoteABI(client, { sender: account1.address() });
-    const rawTxn = await builder.build(
-      "0x1::coin::transfer",
-      ["0x1::aptos_coin::AptosCoin"],
-      [account2.address(), 400],
-    );
+    const builder = new TransactionBuilderRemoteABI(client, { sender: sender.address() });
+    const rawTxn = await builder.build("0x1::aptos_account::transfer", [], [receiver.address(), 400]);
 
-    const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
 
     await client.waitForTransaction(transactionRes.hash);
 
-    resources = await client.getAccountResources(account2.address());
+    resources = await client.getAccountResources(receiver.address());
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("400");
   },
@@ -249,18 +233,12 @@ test(
     expect((accountResource!.data as any).coin.value).toBe("50000000");
 
     const account4 = new AptosAccount();
-    await faucetClient.fundAccount(account4.address(), 0);
-    resources = await client.getAccountResources(account4.address());
-    accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("0");
-
-    const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
     const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
       TxnBuilderTypes.EntryFunction.natural(
-        "0x1::coin",
+        "0x1::aptos_account",
         "transfer",
-        [token],
+        [],
         [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account4.address())), bcsSerializeUint64(123)],
       ),
     );
@@ -314,25 +292,19 @@ test(
     const account1 = new AptosAccount();
     const account2 = new AptosAccount();
     const txns1 = await faucetClient.fundAccount(account1.address(), 1000000);
-    const txns2 = await faucetClient.fundAccount(account2.address(), 1000000);
     const tx1 = await client.getTransactionByHash(txns1[0]);
-    const tx2 = await client.getTransactionByHash(txns2[0]);
     expect(tx1.type).toBe("user_transaction");
-    expect(tx2.type).toBe("user_transaction");
     const checkAptosCoin = async () => {
       const resources1 = await client.getAccountResources(account1.address());
-      const resources2 = await client.getAccountResources(account2.address());
       const account1Resource = resources1.find((r) => r.type === aptosCoin);
-      const account2Resource = resources2.find((r) => r.type === aptosCoin);
       expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("1000000");
-      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("1000000");
     };
     await checkAptosCoin();
 
     const payload: Gen.TransactionPayload = {
       type: "entry_function_payload",
-      function: coinTransferFunction,
-      type_arguments: ["0x1::aptos_coin::AptosCoin"],
+      function: "0x1::aptos_account::transfer",
+      type_arguments: [],
       arguments: [account2.address().hex(), 100000],
     };
     const txnRequest = await client.generateTransaction(account1.address(), payload);
@@ -355,7 +327,7 @@ test(
         return (
           write.address === account2.address().hex() &&
           write.data.type === aptosCoin &&
-          (write.data.data as { coin: { value: string } }).coin.value === "1100000"
+          (write.data.data as { coin: { value: string } }).coin.value === "100000"
         );
       });
       expect(account2AptosCoin).toHaveLength(1);
@@ -371,53 +343,46 @@ test(
     const client = new AptosClient(NODE_URL);
     const faucetClient = getFaucetClient();
 
-    const account1 = new AptosAccount();
-    const account2 = new AptosAccount();
-    const txns1 = await faucetClient.fundAccount(account1.address(), 100_000_000);
-    const txns2 = await faucetClient.fundAccount(account2.address(), 100_000_000);
+    const sender = new AptosAccount();
+    const receiver = new AptosAccount();
+    const txns1 = await faucetClient.fundAccount(sender.address(), 100_000_000);
     const tx1 = await client.getTransactionByHash(txns1[0]);
-    const tx2 = await client.getTransactionByHash(txns2[0]);
     expect(tx1.type).toBe("user_transaction");
-    expect(tx2.type).toBe("user_transaction");
     const checkAptosCoin = async () => {
-      const resources1 = await client.getAccountResources(account1.address());
-      const resources2 = await client.getAccountResources(account2.address());
-      const account1Resource = resources1.find((r) => r.type === aptosCoin);
-      const account2Resource = resources2.find((r) => r.type === aptosCoin);
-      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("100000000");
-      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("100000000");
+      const resources1 = await client.getAccountResources(sender.address());
+      const senderResource = resources1.find((r) => r.type === aptosCoin);
+      expect((senderResource!.data as { coin: { value: string } }).coin.value).toBe("100000000");
     };
     await checkAptosCoin();
 
-    const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
     const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
       TxnBuilderTypes.EntryFunction.natural(
-        "0x1::coin",
+        "0x1::aptos_account",
         "transfer",
-        [token],
-        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account2.address())), bcsSerializeUint64(1000)],
+        [],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver.address())), bcsSerializeUint64(1000)],
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(sender.address(), entryFunctionPayload);
 
-    const bcsTxn = AptosClient.generateBCSSimulation(account1, rawTxn);
+    const bcsTxn = AptosClient.generateBCSSimulation(sender, rawTxn);
     const transactionRes = (await client.submitBCSSimulation(bcsTxn))[0];
     expect(parseInt(transactionRes.gas_used, 10) > 0);
     expect(transactionRes.success);
-    const account2AptosCoin = transactionRes.changes.filter((change) => {
+    const receiverAptosCoin = transactionRes.changes.filter((change) => {
       if (change.type !== "write_resource") {
         return false;
       }
       const write = change as Gen.WriteResource;
 
       return (
-        write.address === account2.address().toShortString() &&
+        write.address === receiver.address().toShortString() &&
         write.data.type === aptosCoin &&
-        (write.data.data as { coin: { value: string } }).coin.value === "100001000"
+        (write.data.data as { coin: { value: string } }).coin.value === "1000"
       );
     });
-    expect(account2AptosCoin).toHaveLength(1);
+    expect(receiverAptosCoin).toHaveLength(1);
     await checkAptosCoin();
   },
   longTestTimeout,
@@ -536,6 +501,40 @@ test(
 
     const txn = await client.getTransactionByHash(txnHash);
     expect((txn as any).success).toBeTruthy();
+  },
+  longTestTimeout,
+);
+
+test(
+  "create resource account and publish a package",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+
+    const account1 = new AptosAccount(
+      new HexString("0x883fdd67576e5fdceb370ba665b8af8856d0cae63fd808b8d16077c6b008ea8c").toUint8Array(),
+    );
+    await faucetClient.fundAccount(account1.address(), 100_000_000);
+    const seed = "3030";
+
+    const txnHash = await client.createResourceAccountAndPublishPackage(
+      account1,
+      new TextEncoder().encode(seed),
+      new HexString(
+        // eslint-disable-next-line max-len
+        "084578616d706c657301000000000000000040314137344146383742383132393043323533323938383036373846304137444637393737373637383734334431434345443230413446354345334238464446388f011f8b08000000000002ff3dccc10ac2300c06e07b9ea2f46ee70b78f0a02f31c6886d74a55d5b1a51417c7713c1915c927cf9c7863ee18d2628b89239187b7ae1da32b18507758eb5e872efa42cc088217462269e60a19ceb7cc9d527bf60fcb9594da0462550f151d9b1dd2b9fbba43f6b4f82de465e302b776e90befe8f03aadd6db3351ff802f2294cdfa100000001076d6573736167658f051f8b08000000000002ff95555d6bdb30147dcfafb8ed20d8c52c1d8c3194a6ec83b0be747be8dec6108a7d9d983a5226c94dc3f07f9f2cd98e6cc769e787884857e79e73bfb4154991236c30cf055de5227e8c372ce3846c5129b646f83b01f3150a41e984109452c879774f656b8e834d2d33be3e6eb29d168aa6926d712fe423212c8e45c175dfc27979c2ea64329b910b722b518942c6682d0d6e116bb877f4ee449ea0840d53f088879a6cf5d5f409381e843cd835ea1b5023979bc57a5404ec4ac8b25aee184f72bca95d7db586f6e0d6c19486df8d21d8f23b41d0bb65592652ec226323247a6c5329b6f445ca5a9cb7291d81d96c063f37681c640ab86894c2cef03434ac4d2cb8d2b0fcfe83de2f1f1e3e7f5b12283ebc87055ccf1dc8ae58e5590c69c1618dbaf11bb0249104aa5fb311f669008bff149939eaa5e728942985525f04f89c29ad6e3a66b7163d8cc0d618215c689a9a1249028f6718ce5bb0abe94a18d33d5de762c5f293686f6be67e806a6d2616f260152a5fa12b4b23cd5675345649a1857a51708e1a6a485a11322176c0a6015c14a94883696de289cb52082e46c2e4e185a1e7ccd6b57842aa450b198d52eb75423476d06f91264284e3de6dd2cd68a71ca575f1cbb0fd5b02e60a7bc4aab819c24d5ae8c6b15f4027e5745be8b3d1990f40fd56337057d3a197a666ba97ebc980db4c3bd5c1d47887f1ebddb845a726c230193ebd6146fc09108bdde174eeca9eec718a260003ada5df2a6f7e6954ba89a931ff74fdfc2efc3dd646dc60d398717aa6a3c25736cdff34cbd8e342482c9169a44d51a44252a7a85b1d27f846d0767ca1d38fc1eaf2ae7a2423f8d2be9297d5341acc362ff6fdd119c262f10a543f9ddeec6b776be2e5a49cfc0325c63f11c007000000000300000000000000000000000000000000000000000000000000000000000000010e4170746f734672616d65776f726b00000000000000000000000000000000000000000000000000000000000000010b4170746f735374646c696200000000000000000000000000000000000000000000000000000000000000010a4d6f76655374646c696200",
+      ).toUint8Array(),
+      [
+        new TxnBuilderTypes.Module(
+          new HexString(
+            // eslint-disable-next-line max-len
+            "a11ceb0b050000000c01000c020c12031e20043e04054228076ad50108bf024006ff020a108903450ace03150ce3035f0dc20404000001010102010301040105000606000007080005080700030e040106010009000100000a020300020f0404000410060000011106080106031209030106040705070105010802020c08020001030305080207080101060c010800010b0301090002070b030109000900076d657373616765076163636f756e74056572726f72056576656e74067369676e657206737472696e67124d6573736167654368616e67654576656e740d4d657373616765486f6c64657206537472696e670b6765745f6d6573736167650b7365745f6d6573736167650c66726f6d5f6d6573736167650a746f5f6d657373616765156d6573736167655f6368616e67655f6576656e74730b4576656e7448616e646c65096e6f745f666f756e640a616464726573735f6f66106e65775f6576656e745f68616e646c650a656d69745f6576656e746766284c3984add58e00d20ba272a40d33d5b4ea33c08a904254e28fdff97b9f000000000000000000000000000000000000000000000000000000000000000103080000000000000000126170746f733a3a6d657461646174615f7630310100000000000000000b454e4f5f4d4553534147451b5468657265206973206e6f206d6573736167652070726573656e740002020b08020c08020102020008020d0b030108000001000101030b0a002901030607001102270b002b0110001402010104010105210e0011030c020a022901200308050f0e000b010e00380012012d0105200b022a010c040a041000140c030a040f010b030a01120038010b010b040f0015020100010100",
+          ).toUint8Array(),
+        ),
+      ],
+    );
+
+    await client.waitForTransaction(txnHash, { checkSuccess: true });
   },
   longTestTimeout,
 );

@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: no function named `global_borrow` found
+  ┌─ tests/checking/naming/unbound_builtin.move:3:9
+  │
+3 │         global_borrow();
+  │         ^^^^^^^^^^^^^^^
+
+error: no function named `release` found
+  ┌─ tests/checking/naming/unbound_builtin.move:4:9
+  │
+4 │         release<u64>();
+  │         ^^^^^^^^^^^^^^
+
+error: no function named `sudo` found
+  ┌─ tests/checking/naming/unbound_builtin.move:5:9
+  │
+5 │         sudo(false);
+  │         ^^^^^^^^^^^
