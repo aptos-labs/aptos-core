@@ -28,6 +28,7 @@ EXPECTED_TPS = {
     ("modify-global-resource", False, 10): (10800.0, True),
     # seems to have changed, disabling as land_blocking, until recalibrated
     ("publish-package", False, 1): (120.0, False),
+    ("mix_publish_transfer", False, 1): (300.0, False),
     ("batch100-transfer", False, 1): (350, True),
     ("batch100-transfer", True, 1): (880, True),
     ("token-v1ft-mint-and-transfer", False, 1): (1650.0, True),
@@ -244,17 +245,24 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     results = []
 
-    for (transaction_type, use_native_executor, module_working_set_size), (
+    for (transaction_type_name, use_native_executor, module_working_set_size), (
         expected_tps,
         check_active,
     ) in EXPECTED_TPS.items():
-        print(f"Testing {transaction_type}")
+        print(f"Testing {transaction_type_name}")
+        if transaction_type_name == "mix_publish_transfer":
+            transaction_type = "publish-package coin-transfer"
+            transaction_weights = "1 1000"
+        else:
+            transaction_type = transaction_type_name
+            transaction_weights = "1"
+
         cur_block_size = int(min([expected_tps, BLOCK_SIZE]))
 
         executor_type = "native" if use_native_executor else "VM"
 
         use_native_executor_str = "--use-native-executor" if use_native_executor else ""
-        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage run-executor --transaction-type {transaction_type} --transaction-weights {transaction_weights} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         concurrency_level_results = {}
 
@@ -270,7 +278,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         output = execute_command(test_db_command)
 
         current_run_key = RunGroupKey(
-            transaction_type, module_working_set_size, executor_type
+            transaction_type_name, module_working_set_size, executor_type
         )
         single_node_result = extract_run_results(output, execution_only=False)
 
