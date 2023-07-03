@@ -156,7 +156,6 @@ pub fn convert_epilogue_error(
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
     let status = error.into_vm_status();
-    println!("{:?}", status);
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
         VMStatus::MoveAbort(location, code)
