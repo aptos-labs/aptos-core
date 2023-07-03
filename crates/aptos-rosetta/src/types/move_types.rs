@@ -24,6 +24,7 @@ pub const COIN_STORE_RESOURCE: &str = "CoinStore";
 pub const STAKE_POOL_RESOURCE: &str = "StakePool";
 pub const STAKING_CONTRACT_RESOURCE: &str = "StakingContract";
 pub const STORE_RESOURCE: &str = "Store";
+pub const STAKING_GROUP_UPDATE_COMMISSION_RESOURCE: &str = "StakingGroupUpdateCommissionEvent";
 pub const VESTING_RESOURCE: &str = "Vesting";
 pub const DELEGATION_POOL_RESOURCE: &str = "DelegationPool";
 
@@ -83,6 +84,19 @@ pub struct Store {
     pub switch_operator_events: EventHandle,
     pub add_distribution_events: EventHandle,
     pub distribute_events: EventHandle,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StakingGroupUpdateCommissionEvent {
+    pub update_commission_events: EventHandle,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateCommissionEvent {
+    pub staker: AccountAddress,
+    pub operator: AccountAddress,
+    pub old_commission_percentage: u64,
+    pub new_commission_percentage: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

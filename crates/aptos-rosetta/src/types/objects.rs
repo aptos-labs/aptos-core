@@ -1221,6 +1221,12 @@ async fn parse_operations_from_write_set(
             parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
                 .await
         },
+        (
+            AccountAddress::ONE,
+            STAKING_CONTRACT_MODULE,
+            STAKING_GROUP_UPDATE_COMMISSION_RESOURCE,
+            0,
+        ) => parse_update_commission(address, data, events, operation_index, changes).await,
         (AccountAddress::ONE, DELEGATION_POOL_MODULE, DELEGATION_POOL_RESOURCE, 0) => {
             parse_delegation_pool_resource_changes(address, data, events, operation_index, changes)
                 .await
@@ -1641,6 +1647,51 @@ async fn parse_staking_contract_resource_changes(
         }
     }
 
+    Ok(operations)
+}
+
+async fn parse_update_commission(
+    _owner_address: AccountAddress,
+    data: &[u8],
+    events: &[ContractEvent],
+    mut operation_index: u64,
+    _changes: &WriteSet,
+) -> ApiResult<Vec<Operation>> {
+    let mut operations = Vec::new();
+
+    // This only handles the voter events from the staking contract
+    // If there are direct events on the pool, they will be ignored
+    if let Ok(event_holder) = bcs::from_bytes::<StakingGroupUpdateCommissionEvent>(data) {
+        let update_commission_events = filter_events(
+            events,
+            event_holder.update_commission_events.key(),
+            |event_key, event| {
+                if let Ok(event) = bcs::from_bytes::<UpdateCommissionEvent>(event.event_data()) {
+                    Some(event)
+                } else {
+                    // If we can't parse the withdraw event, then there's nothing
+                    warn!(
+                        "Failed to parse update commission event!  Skipping for {}:{}",
+                        event_key.get_creator_address(),
+                        event_key.get_creation_number()
+                    );
+                    None
+                }
+            },
+        );
+
+        // For every distribute events, add staking reward operation
+        for event in update_commission_events {
+            operations.push(Operation::update_commission(
+                operation_index,
+                Some(OperationStatusType::Success),
+                event.staker,
+                Some(AccountIdentifier::base_account(event.operator)),
+                Some(event.new_commission_percentage),
+            ));
+            operation_index += 1;
+        }
+    }
     Ok(operations)
 }
 
