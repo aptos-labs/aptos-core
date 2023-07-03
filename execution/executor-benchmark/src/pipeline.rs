@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_partitioning::BlockPartitioningStage, TransactionCommitter, TransactionExecutor,
+    block_partitioning::BlockPartitioningStage, GasMesurement, TransactionCommitter,
+    TransactionExecutor,
 };
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
@@ -12,7 +13,6 @@ use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
     transaction::{Transaction, Version},
 };
-use aptos_vm::counters::TXN_GAS_USAGE;
 use std::{
     marker::PhantomData,
     sync::{
@@ -122,7 +122,7 @@ where
                     start_execution_rx.map(|rx| rx.recv());
                     let start_time = Instant::now();
                     let mut executed = 0;
-                    let start_gas = TXN_GAS_USAGE.get_sample_sum();
+                    let start_gas_measurement = GasMesurement::start();
                     while let Ok(msg) = executable_block_receiver.recv() {
                         let ExecuteBlockMessage {
                             current_block_start_time,
@@ -136,17 +136,22 @@ where
                         info!("Finished executing block");
                     }
 
-                    let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
+                    let (delta_gas, delta_gas_count) = start_gas_measurement.end();
 
-                    let elapsed = start_time.elapsed().as_secs_f32();
+                    let elapsed = start_time.elapsed().as_secs_f64();
                     info!(
                         "Overall execution TPS: {} txn/s (over {} txns)",
-                        executed as f32 / elapsed,
+                        executed as f64 / elapsed,
                         executed
                     );
                     info!(
                         "Overall execution GPS: {} gas/s (over {} txns)",
-                        delta_gas as f32 / elapsed,
+                        delta_gas / elapsed,
+                        executed
+                    );
+                    info!(
+                        "Overall execution GPT: {} gas/txn (over {} txns)",
+                        delta_gas / (delta_gas_count as f64).max(1.0),
                         executed
                     );
 
@@ -161,7 +166,7 @@ where
                     start_execution_rx.map(|rx| rx.recv());
                     let start_time = Instant::now();
                     let mut executed = 0;
-                    let start_gas = TXN_GAS_USAGE.get_sample_sum();
+                    let start_gas_measurement = GasMesurement::start();
                     while let Ok(raw_block) = raw_block_receiver.recv() {
                         info!(
                             "Received block of size {:?} to partition-then-execute.",
@@ -178,17 +183,22 @@ where
                         info!("Finished executing block");
                     }
 
-                    let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
+                    let (delta_gas, delta_gas_count) = start_gas_measurement.end();
 
-                    let elapsed = start_time.elapsed().as_secs_f32();
+                    let elapsed = start_time.elapsed().as_secs_f64();
                     info!(
                         "Overall execution TPS: {} txn/s (over {} txns)",
-                        executed as f32 / elapsed,
+                        executed as f64 / elapsed,
                         executed
                     );
                     info!(
                         "Overall execution GPS: {} gas/s (over {} txns)",
-                        delta_gas as f32 / elapsed,
+                        delta_gas / elapsed,
+                        executed
+                    );
+                    info!(
+                        "Overall execution GPT: {} gas/txn (over {} txns)",
+                        delta_gas / (delta_gas_count as f64).max(1.0),
                         executed
                     );
 
