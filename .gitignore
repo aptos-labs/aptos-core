@@ -113,7 +113,14 @@ __pycache__
 aptos-move/aptos-vm-profiling/**/*.log
 aptos-move/aptos-vm-profiling/**/*.txt
 
+# Gas profiler outputs
+aptos-move/e2e-move-tests/gas-profiling
+
 # replay-verify and module-verify script outputs
 metadata-cache
 /local/
 run_*
+
+# test files for indexer GRPC
+test_indexer_grpc_*.yaml
+test_indexer_grpc/*

@@ -43,7 +43,7 @@ pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
 pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
 pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
-pub const MAX_INBOUND_CONNECTIONS: usize = 30; /* At 5k TPS this could easily hit ~50MiB a second */
+pub const MAX_INBOUND_CONNECTIONS: usize = 100;
 pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
 pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
 pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
@@ -61,60 +61,66 @@ pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger sp
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkConfig {
-    // Maximum backoff delay for connecting outbound to peers
+    /// Maximum backoff delay for connecting outbound to peers
     pub max_connection_delay_ms: u64,
-    // Base for outbound connection backoff
+    /// Base for outbound connection backoff
     pub connection_backoff_base: u64,
-    // Rate to check connectivity to connected peers
+    /// Rate to check connectivity to connected peers
     pub connectivity_check_interval_ms: u64,
-    // Size of all network channels
+    /// Size of all network channels
     pub network_channel_size: usize,
-    // Maximum number of concurrent network requests
+    /// Maximum number of concurrent network requests
     pub max_concurrent_network_reqs: usize,
-    // Choose a protocol to discover and dial out to other peers on this network.
-    // `DiscoveryMethod::None` disables discovery and dialing out (unless you have
-    // seed peers configured).
+    /// Choose a protocol to discover and dial out to other peers on this network.
+    /// `DiscoveryMethod::None` disables discovery and dialing out (unless you have
+    /// seed peers configured).
     pub discovery_method: DiscoveryMethod,
+    /// Same as `discovery_method` but allows for multiple
     pub discovery_methods: Vec<DiscoveryMethod>,
+    /// Identity of this network
     pub identity: Identity,
     // TODO: Add support for multiple listen/advertised addresses in config.
-    // The address that this node is listening on for new connections.
+    /// The address that this node is listening on for new connections.
     pub listen_address: NetworkAddress,
-    // Select this to enforce that both peers should authenticate each other, otherwise
-    // authentication only occurs for outgoing connections.
+    /// Select this to enforce that both peers should authenticate each other, otherwise
+    /// authentication only occurs for outgoing connections.
     pub mutual_authentication: bool,
+    /// ID of the network to differentiate between networks
     pub network_id: NetworkId,
+    /// Number of threads to run for networking
     pub runtime_threads: Option<usize>,
     pub inbound_rx_buffer_size_bytes: Option<u32>,
     pub inbound_tx_buffer_size_bytes: Option<u32>,
     pub outbound_rx_buffer_size_bytes: Option<u32>,
     pub outbound_tx_buffer_size_bytes: Option<u32>,
-    // Addresses of initial peers to connect to. In a mutual_authentication network,
-    // we will extract the public keys from these addresses to set our initial
-    // trusted peers set.  TODO: Replace usage in configs with `seeds` this is for backwards compatibility
+    /// Addresses of initial peers to connect to. In a mutual_authentication network,
+    /// we will extract the public keys from these addresses to set our initial
+    /// trusted peers set.  TODO: Replace usage in configs with `seeds` this is for backwards compatibility
     pub seed_addrs: HashMap<PeerId, Vec<NetworkAddress>>,
-    // The initial peers to connect to prior to onchain discovery
+    /// The initial peers to connect to prior to onchain discovery
     pub seeds: PeerSet,
-    // The maximum size of an inbound or outbound request frame
+    /// The maximum size of an inbound or outbound request frame
     pub max_frame_size: usize,
-    // Enables proxy protocol on incoming connections to get original source addresses
+    /// Enables proxy protocol on incoming connections to get original source addresses
     pub enable_proxy_protocol: bool,
-    // Interval to send healthcheck pings to peers
+    /// Interval to send healthcheck pings to peers
     pub ping_interval_ms: u64,
-    // Timeout until a healthcheck ping is rejected
+    /// Timeout until a healthcheck ping is rejected
     pub ping_timeout_ms: u64,
-    // Number of failed healthcheck pings until a peer is marked unhealthy
+    /// Number of failed healthcheck pings until a peer is marked unhealthy
     pub ping_failures_tolerated: u64,
-    // Maximum number of outbound connections, limited by ConnectivityManager
+    /// Maximum number of outbound connections, limited by ConnectivityManager
     pub max_outbound_connections: usize,
-    // Maximum number of outbound connections, limited by PeerManager
+    /// Maximum number of outbound connections, limited by PeerManager
     pub max_inbound_connections: usize,
-    // Inbound rate limiting configuration, if not specified, no rate limiting
+    /// Inbound rate limiting configuration, if not specified, no rate limiting
     pub inbound_rate_limit_config: Option<RateLimitConfig>,
-    // Outbound rate limiting configuration, if not specified, no rate limiting
+    /// Outbound rate limiting configuration, if not specified, no rate limiting
     pub outbound_rate_limit_config: Option<RateLimitConfig>,
-    // The maximum size of an inbound or outbound message (it may be divided into multiple frame)
+    /// The maximum size of an inbound or outbound message (it may be divided into multiple frame)
     pub max_message_size: usize,
+    /// The maximum number of parallel message deserialization tasks that can run (per application)
+    pub max_parallel_deserialization_tasks: Option<usize>,
 }
 
 impl Default for NetworkConfig {
@@ -155,9 +161,25 @@ impl NetworkConfig {
             inbound_tx_buffer_size_bytes: Some(INBOUND_TCP_TX_BUFFER_SIZE),
             outbound_rx_buffer_size_bytes: Some(OUTBOUND_TCP_RX_BUFFER_SIZE),
             outbound_tx_buffer_size_bytes: Some(OUTBOUND_TCP_TX_BUFFER_SIZE),
+            max_parallel_deserialization_tasks: None,
         };
+
+        // Configure the number of parallel deserialization tasks
+        config.configure_num_deserialization_tasks();
+
+        // Prepare the identity based on the identity format
         config.prepare_identity();
+
         config
+    }
+
+    /// Configures the number of parallel deserialization tasks
+    /// based on the number of CPU cores of the machine. This is
+    /// only done if the config does not specify a value.
+    fn configure_num_deserialization_tasks(&mut self) {
+        if self.max_parallel_deserialization_tasks.is_none() {
+            self.max_parallel_deserialization_tasks = Some(num_cpus::get());
+        }
     }
 
     pub fn identity_key(&self) -> x25519::PrivateKey {
@@ -477,5 +499,30 @@ impl Peer {
             .filter_map(NetworkAddress::find_noise_proto)
             .collect();
         Peer::new(addresses, keys, role)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_num_parallel_deserialization_tasks() {
+        // Create a default network config and verify the number of deserialization tasks
+        let network_config = NetworkConfig::default();
+        assert_eq!(
+            network_config.max_parallel_deserialization_tasks,
+            Some(num_cpus::get())
+        );
+
+        // Create a network config with the number of deserialization tasks set to 1
+        let mut network_config = NetworkConfig {
+            max_parallel_deserialization_tasks: Some(1),
+            ..NetworkConfig::default()
+        };
+
+        // Configure the number of deserialization tasks and verify that it is not overridden
+        network_config.configure_num_deserialization_tasks();
+        assert_eq!(network_config.max_parallel_deserialization_tasks, Some(1));
     }
 }

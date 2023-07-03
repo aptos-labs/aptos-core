@@ -1,0 +1,6 @@
+#import "./CurrentTokenOwnershipFieldsFragment";
+query getTokenOwnedFromCollection($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int) {
+  current_token_ownerships_v2(where: $where_condition, offset: $offset, limit: $limit) {
+    ...CurrentTokenOwnershipFields
+  }
+}

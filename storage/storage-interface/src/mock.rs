@@ -54,6 +54,16 @@ impl DbReader for MockDbReaderWriter {
             _ => Err(anyhow!("Not supported state key type {:?}", state_key)),
         }
     }
+
+    fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        Ok(self
+            .get_state_value_by_version(state_key, version)?
+            .map(|value| (version, value)))
+    }
 }
 
 fn get_mock_account_state() -> AccountState {

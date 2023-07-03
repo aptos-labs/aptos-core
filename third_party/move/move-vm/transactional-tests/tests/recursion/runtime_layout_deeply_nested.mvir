@@ -71,10 +71,10 @@ import 0x42.M;
 
 main(account: signer) {
 label b0:
+    // hits VM_MAX_VALUE_DEPTH_REACHED
     M.publish_128(&account);
     return;
 }
-
 
 //# run --args @0x2
 import 0x42.M;
@@ -91,7 +91,6 @@ import 0x42.M;
 
 main(account: signer) {
 label b0:
-    // hits VM_MAX_VALUE_DEPTH_REACHED
     M.publish_257(&account);
     return;
 }

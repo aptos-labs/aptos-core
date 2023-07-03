@@ -39,7 +39,6 @@ pub enum AuthenticationError {
 /// the transaction hash is well-formed and whether the sha3 hash of the
 /// `AccountAuthenticator`'s `AuthenticationKeyPreimage` matches the `AuthenticationKey` stored
 /// under the participating signer's account address.
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum TransactionAuthenticator {
     /// Single signature
@@ -247,6 +246,8 @@ pub enum Scheme {
     /// resources accounts. This application serves to domain separate hashes. Without such
     /// separation, an adversary could create (and get a signer for) a these accounts
     /// when a their address matches matches an existing address of a MultiEd25519 wallet.
+    DeriveAuid = 251,
+    DeriveObjectAddressFromObject = 252,
     DeriveObjectAddressFromGuid = 253,
     DeriveObjectAddressFromSeed = 254,
     DeriveResourceAccountAddress = 255,
@@ -257,6 +258,8 @@ impl fmt::Display for Scheme {
         let display = match self {
             Scheme::Ed25519 => "Ed25519",
             Scheme::MultiEd25519 => "MultiEd25519",
+            Scheme::DeriveAuid => "DeriveAuid",
+            Scheme::DeriveObjectAddressFromObject => "DeriveObjectAddressFromObject",
             Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
             Scheme::DeriveObjectAddressFromSeed => "DeriveObjectAddressFromSeed",
             Scheme::DeriveResourceAccountAddress => "DeriveResourceAccountAddress",
@@ -458,6 +461,15 @@ impl AuthenticationKeyPreimage {
     /// Construct a preimage from a MultiEd25519 public key
     pub fn multi_ed25519(public_key: &MultiEd25519PublicKey) -> AuthenticationKeyPreimage {
         Self::new(public_key.to_bytes(), Scheme::MultiEd25519)
+    }
+
+    /// Construct a preimage from a transaction-derived AUID as (txn_hash || auid_scheme_id)
+    pub fn auid(txn_hash: Vec<u8>, auid_counter: u64) -> AuthenticationKeyPreimage {
+        let mut hash_arg = Vec::new();
+        hash_arg.extend(txn_hash);
+        hash_arg.extend(auid_counter.to_le_bytes().to_vec());
+        hash_arg.push(Scheme::DeriveAuid as u8);
+        Self(hash_arg)
     }
 
     /// Construct a vector from this authentication key

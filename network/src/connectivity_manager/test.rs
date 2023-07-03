@@ -5,7 +5,7 @@
 use super::*;
 use crate::{
     peer::DisconnectReason,
-    peer_manager::{conn_notifs_channel, ConnectionRequest},
+    peer_manager::{conn_notifs_channel, ConnectionNotification, ConnectionRequest},
     transport::ConnectionMetadata,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -25,6 +25,8 @@ const CONNECTIVITY_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const CONNECTION_DELAY: Duration = Duration::from_millis(100);
 const MAX_CONNECTION_DELAY: Duration = Duration::from_secs(60);
 const DEFAULT_BASE_ADDR: &str = "/ip4/127.0.0.1/tcp/9090";
+
+// TODO: the test code could use a lot of love.
 
 // TODO(philiphayes): just use `CONNECTION_DELAY + MAX_CONNNECTION_DELAY_JITTER`
 // when the const adds are stabilized, instead of this weird thing...
@@ -811,4 +813,96 @@ fn basic_update_discovered_peers() {
     // empty update again does nothing
     conn_mgr.handle_update_discovered_peers(DiscoverySource::Config, peers_empty.clone());
     assert_eq!(*trusted_peers.read(), peers_empty);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stale_peers_unknown_inbound() {
+    // Create a connectivity manager with mutual authentication disabled
+    let (mut mock, mut connectivity_manager) = TestHarness::new(HashMap::new());
+    connectivity_manager.mutual_authentication = false;
+
+    // Verify we have no trusted peers
+    let network_context = mock.network_context;
+    let trusted_peers = mock
+        .peers_and_metadata
+        .get_trusted_peers(&network_context.network_id())
+        .unwrap();
+    assert!(trusted_peers.read().is_empty());
+
+    // Create and connect peer 1 (an unknown outbound connection)
+    let peer_id_1 = PeerId::random();
+    let connection_metadata_1 = ConnectionMetadata::mock_with_role_and_origin(
+        peer_id_1,
+        PeerRole::Unknown,
+        ConnectionOrigin::Outbound,
+    );
+    let connection_notification =
+        ConnectionNotification::NewPeer(connection_metadata_1.clone(), network_context);
+    connectivity_manager.handle_control_notification(connection_notification);
+
+    // Create and connect peer 2 (an unknown inbound connection)
+    let peer_id_2 = PeerId::random();
+    let connection_metadata = ConnectionMetadata::mock_with_role_and_origin(
+        peer_id_2,
+        PeerRole::Unknown,
+        ConnectionOrigin::Inbound,
+    );
+    let connection_notification =
+        ConnectionNotification::NewPeer(connection_metadata, network_context);
+    connectivity_manager.handle_control_notification(connection_notification);
+
+    // Verify we have 2 peers
+    assert_eq!(connectivity_manager.get_connected_peers().len(), 2);
+
+    // Close the stale connections and verify that only peer 1 is disconnected
+    tokio::join!(
+        connectivity_manager.close_stale_connections(),
+        mock.expect_disconnect_fail(peer_id_1, connection_metadata_1.addr)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stale_peers_vfn_inbound() {
+    // Create a connectivity manager with mutual authentication disabled
+    let (mut mock, mut connectivity_manager) = TestHarness::new(HashMap::new());
+    connectivity_manager.mutual_authentication = false;
+
+    // Verify we have no trusted peers
+    let network_context = mock.network_context;
+    let trusted_peers = mock
+        .peers_and_metadata
+        .get_trusted_peers(&network_context.network_id())
+        .unwrap();
+    assert!(trusted_peers.read().is_empty());
+
+    // Create and connect peer 1 (a vfn inbound connection)
+    let peer_id_1 = PeerId::random();
+    let connection_metadata = ConnectionMetadata::mock_with_role_and_origin(
+        peer_id_1,
+        PeerRole::ValidatorFullNode,
+        ConnectionOrigin::Inbound,
+    );
+    let connection_notification =
+        ConnectionNotification::NewPeer(connection_metadata, network_context);
+    connectivity_manager.handle_control_notification(connection_notification);
+
+    // Create and connect peer 2 (a validator outbound connection)
+    let peer_id_2 = PeerId::random();
+    let connection_metadata_2 = ConnectionMetadata::mock_with_role_and_origin(
+        peer_id_2,
+        PeerRole::Validator,
+        ConnectionOrigin::Outbound,
+    );
+    let connection_notification =
+        ConnectionNotification::NewPeer(connection_metadata_2.clone(), network_context);
+    connectivity_manager.handle_control_notification(connection_notification);
+
+    // Verify we have 2 peers
+    assert_eq!(connectivity_manager.get_connected_peers().len(), 2);
+
+    // Close the stale connections and verify that only peer 2 is disconnected
+    tokio::join!(
+        connectivity_manager.close_stale_connections(),
+        mock.expect_disconnect_fail(peer_id_2, connection_metadata_2.addr)
+    );
 }

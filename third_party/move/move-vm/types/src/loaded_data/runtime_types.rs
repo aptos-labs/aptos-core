@@ -4,14 +4,110 @@
 
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
-    file_format::{AbilitySet, SignatureToken, StructDefinitionIndex, StructTypeParameter},
+    file_format::{
+        AbilitySet, SignatureToken, StructDefinitionIndex, StructTypeParameter, TypeParameterIndex,
+    },
 };
 use move_core_types::{
     gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
     vm_status::StatusCode,
 };
+use std::{cmp::max, collections::BTreeMap, fmt::Debug};
 
 pub const TYPE_DEPTH_MAX: usize = 256;
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
+/// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
+///
+/// It has the form of `max(CBase, T1 + C1, T2 + C2, ..)` where `Ti` is the depth of the ith type parameter
+/// and `Ci` is just some constant.
+///
+/// This form has a special property: when you compute the max of multiple formulae, you can normalize
+/// them into a single formula.
+pub struct DepthFormula {
+    pub terms: Vec<(TypeParameterIndex, u64)>, // Ti + Ci
+    pub constant: Option<u64>,                 // Cbase
+}
+
+impl DepthFormula {
+    pub fn constant(constant: u64) -> Self {
+        Self {
+            terms: vec![],
+            constant: Some(constant),
+        }
+    }
+
+    pub fn type_parameter(tparam: TypeParameterIndex) -> Self {
+        Self {
+            terms: vec![(tparam, 0)],
+            constant: None,
+        }
+    }
+
+    pub fn normalize(formulas: Vec<Self>) -> Self {
+        let mut var_map = BTreeMap::new();
+        let mut constant_acc = None;
+        for formula in formulas {
+            let Self { terms, constant } = formula;
+            for (var, cur_factor) in terms {
+                var_map
+                    .entry(var)
+                    .and_modify(|prev_factor| *prev_factor = max(cur_factor, *prev_factor))
+                    .or_insert(cur_factor);
+            }
+            match (constant_acc, constant) {
+                (_, None) => (),
+                (None, Some(_)) => constant_acc = constant,
+                (Some(c1), Some(c2)) => constant_acc = Some(max(c1, c2)),
+            }
+        }
+        Self {
+            terms: var_map.into_iter().collect(),
+            constant: constant_acc,
+        }
+    }
+
+    pub fn subst(
+        &self,
+        mut map: BTreeMap<TypeParameterIndex, DepthFormula>,
+    ) -> PartialVMResult<DepthFormula> {
+        let Self { terms, constant } = self;
+        let mut formulas = vec![];
+        if let Some(constant) = constant {
+            formulas.push(DepthFormula::constant(*constant))
+        }
+        for (t_i, c_i) in terms {
+            let Some(mut u_form) = map.remove(t_i) else {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("{t_i:?} missing mapping")),
+                );
+            };
+            u_form.scale(*c_i);
+            formulas.push(u_form)
+        }
+        Ok(DepthFormula::normalize(formulas))
+    }
+
+    pub fn solve(&self, tparam_depths: &[u64]) -> u64 {
+        let Self { terms, constant } = self;
+        let mut depth = constant.as_ref().copied().unwrap_or(0);
+        for (t_i, c_i) in terms {
+            depth = max(depth, tparam_depths[*t_i as usize].saturating_add(*c_i))
+        }
+        depth
+    }
+
+    pub fn scale(&mut self, c: u64) {
+        let Self { terms, constant } = self;
+        for (_t_i, c_i) in terms {
+            *c_i = (*c_i).saturating_add(c);
+        }
+        if let Some(cbase) = constant.as_mut() {
+            *cbase = (*cbase).saturating_add(c);
+        }
+    }
+}
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructType {
@@ -22,6 +118,7 @@ pub struct StructType {
     pub name: Identifier,
     pub module: ModuleId,
     pub struct_def: StructDefinitionIndex,
+    pub depth: Option<DepthFormula>,
 }
 
 impl StructType {
@@ -46,7 +143,7 @@ pub enum Type {
     StructInstantiation(CachedStructIndex, Vec<Type>),
     Reference(Box<Type>),
     MutableReference(Box<Type>),
-    TyParam(usize),
+    TyParam(u16),
     U16,
     U32,
     U256,
@@ -62,7 +159,7 @@ impl Type {
 
     fn apply_subst<F>(&self, subst: F, depth: usize) -> PartialVMResult<Type>
     where
-        F: Fn(usize, usize) -> PartialVMResult<Type> + Copy,
+        F: Fn(u16, usize) -> PartialVMResult<Type> + Copy,
     {
         if depth > TYPE_DEPTH_MAX {
             return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
@@ -97,7 +194,7 @@ impl Type {
 
     pub fn subst(&self, ty_args: &[Type]) -> PartialVMResult<Type> {
         self.apply_subst(
-            |idx, depth| match ty_args.get(idx) {
+            |idx, depth| match ty_args.get(idx as usize) {
                 Some(ty) => ty.clone_impl(depth),
                 None => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -173,7 +270,8 @@ impl Type {
                 },
                 _ => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("VecMutBorrow expects a vector reference".to_string()),
+                        .with_message("VecMutBorrow expects a vector reference".to_string())
+                        .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
                 ),
             },
             Type::Reference(inner) if !is_mut => match &**inner {
@@ -183,12 +281,14 @@ impl Type {
                 },
                 _ => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("VecMutBorrow expects a vector reference".to_string()),
+                        .with_message("VecMutBorrow expects a vector reference".to_string())
+                        .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
                 ),
             },
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("VecMutBorrow expects a vector reference".to_string()),
+                    .with_message("VecMutBorrow expects a vector reference".to_string())
+                    .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
             ),
         }
     }
@@ -196,9 +296,12 @@ impl Type {
     pub fn check_eq(&self, other: &Self) -> PartialVMResult<()> {
         if self != other {
             return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    format!("Type mismatch: expected {:?}, got {:?}", self, other),
-                ),
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!(
+                        "Type mismatch: expected {:?}, got {:?}",
+                        self, other
+                    ))
+                    .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
             );
         }
         Ok(())

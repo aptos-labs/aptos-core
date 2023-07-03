@@ -9,6 +9,7 @@ use crate::{
     monitor,
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
+    transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
@@ -49,7 +50,7 @@ impl LogicalTime {
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
 pub struct ExecutionProxy {
-    executor: Arc<dyn BlockExecutorTrait<Transaction>>,
+    executor: Arc<dyn BlockExecutorTrait>,
     txn_notifier: Arc<dyn TxnNotifier>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: aptos_channels::Sender<NotificationType>,
@@ -57,11 +58,13 @@ pub struct ExecutionProxy {
     write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
+    maybe_block_gas_limit: Mutex<Option<u64>>,
+    transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
 }
 
 impl ExecutionProxy {
     pub fn new(
-        executor: Arc<dyn BlockExecutorTrait<Transaction>>,
+        executor: Arc<dyn BlockExecutorTrait>,
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,
@@ -90,6 +93,8 @@ impl ExecutionProxy {
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             payload_manager: Mutex::new(None),
             transaction_shuffler: Mutex::new(None),
+            maybe_block_gas_limit: Mutex::new(None),
+            transaction_deduper: Mutex::new(None),
         }
     }
 }
@@ -117,21 +122,32 @@ impl StateComputer for ExecutionProxy {
         );
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txns = payload_manager.get_transactions(block).await?;
 
-        let shuffled_txns = txn_shuffler.shuffle(txns);
+        let deduped_txns = txn_deduper.dedup(txns);
+        let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
+
+        let block_gas_limit = *self.maybe_block_gas_limit.lock();
 
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
 
-        let transactions_to_execute =
-            block.transactions_to_execute(&self.validators.lock(), shuffled_txns.clone());
+        let transactions_to_execute = block.transactions_to_execute(
+            &self.validators.lock(),
+            shuffled_txns.clone(),
+            block_gas_limit,
+        );
 
         let compute_result = monitor!(
             "execute_block",
             tokio::task::spawn_blocking(move || {
-                executor.execute_block((block_id, transactions_to_execute), parent_block_id)
+                executor.execute_block(
+                    (block_id, transactions_to_execute).into(),
+                    parent_block_id,
+                    block_gas_limit,
+                )
             })
             .await
         )
@@ -172,7 +188,10 @@ impl StateComputer for ExecutionProxy {
         let block_timestamp = finality_proof.commit_info().timestamp_usecs();
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
+
+        let block_gas_limit = *self.maybe_block_gas_limit.lock();
 
         for block in blocks {
             block_ids.push(block.id());
@@ -182,9 +201,14 @@ impl StateComputer for ExecutionProxy {
             }
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
-            let shuffled_txns = txn_shuffler.shuffle(signed_txns);
+            let deduped_txns = txn_deduper.dedup(signed_txns);
+            let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
-            txns.extend(block.transactions_to_commit(&self.validators.lock(), shuffled_txns));
+            txns.extend(block.transactions_to_commit(
+                &self.validators.lock(),
+                shuffled_txns,
+                block_gas_limit,
+            ));
             reconfig_events.extend(block.reconfig_event());
         }
 
@@ -277,6 +301,8 @@ impl StateComputer for ExecutionProxy {
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
+        block_gas_limit: Option<u64>,
+        transaction_deduper: Arc<dyn TransactionDeduper>,
     ) {
         *self.validators.lock() = epoch_state
             .verifier
@@ -286,6 +312,8 @@ impl StateComputer for ExecutionProxy {
         self.transaction_shuffler
             .lock()
             .replace(transaction_shuffler);
+        *self.maybe_block_gas_limit.lock() = block_gas_limit;
+        self.transaction_deduper.lock().replace(transaction_deduper);
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
@@ -298,18 +326,25 @@ impl StateComputer for ExecutionProxy {
 
 #[tokio::test]
 async fn test_commit_sync_race() {
-    use crate::{error::MempoolError, transaction_shuffler::create_transaction_shuffler};
+    use crate::{
+        error::MempoolError, transaction_deduper::create_transaction_deduper,
+        transaction_shuffler::create_transaction_shuffler,
+    };
     use aptos_consensus_notifications::Error;
     use aptos_types::{
-        aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
-        on_chain_config::TransactionShufflerType, transaction::SignedTransaction,
+        aggregate_signature::AggregateSignature,
+        block_executor::partitioner::ExecutableBlock,
+        block_info::BlockInfo,
+        ledger_info::LedgerInfo,
+        on_chain_config::{TransactionDeduperType, TransactionShufflerType},
+        transaction::SignedTransaction,
     };
 
     struct RecordedCommit {
         time: Mutex<LogicalTime>,
     }
 
-    impl BlockExecutorTrait<Transaction> for RecordedCommit {
+    impl BlockExecutorTrait for RecordedCommit {
         fn committed_block_id(&self) -> HashValue {
             HashValue::zero()
         }
@@ -320,8 +355,9 @@ async fn test_commit_sync_race() {
 
         fn execute_block(
             &self,
-            _block: (HashValue, Vec<Transaction>),
+            _block: ExecutableBlock<Transaction>,
             _parent_block_id: HashValue,
+            _maybe_block_gas_limit: Option<u64>,
         ) -> Result<StateComputeResult, ExecutionError> {
             Ok(StateComputeResult::new_dummy())
         }
@@ -402,6 +438,8 @@ async fn test_commit_sync_race() {
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
+        None,
+        create_transaction_deduper(TransactionDeduperType::NoDedup),
     );
     executor
         .commit(&[], generate_li(1, 1), callback.clone())

@@ -5,26 +5,17 @@ slug: "testnet-release"
 
 # Latest Testnet Release
 
-The table below contains latest release information for each Aptos component in the testnet network. We also suggest you monitor the [#testnet-release](https://discord.com/channels/945856774056083548/1025614160555413545) channel of [Aptos Discord](https://discord.gg/aptoslabs) for ongoing updates.
+The table below contains latest release information for each Aptos component in the testnet network. We also suggest you monitor the [#testnet-release](https://discord.com/channels/945856774056083548/1025614160555413545) channel of [Aptos Discord](https://discord.gg/aptosnetwork) for ongoing updates.
 
 See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub notifications and more release-related information.
 
 ## Aptos Framework
 
-[Aptos Framework Release v1.3.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.3.0)
-
-## Aptos SDK
-
-Aptos SDK Release v1.7.2
-
-## Aptos CLI
-
-|Release | Git Tag | Commit Hash|
-|---|---|---|
-|[Aptos CLI Release v1.0.11](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.11)| `aptos-cli-v1.0.11` | `6b610f4fc36098662dd0742ecc16687b8b535bb3` |
+[Aptos Framework Release v1.5.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.5.0)
 
 ## Aptos Node
 
-|Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
-|---|---|---|---|---|
-|[Aptos Node Release v1.3.5](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.3.5)| [`aptos-node-v1.3.5`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.3.5/images/sha256-2c575d25db0ef1003d313cddc0d15b213bc694c490b5911f35b72c7a135692d5?context=explore) | `sha256:2c575d25db0ef1003d313cddc0d15b213bc694c490b5911f35b72c7a135692d5` | [aptos-node-v1.3.5](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.3.5)| `e80219926372ccd1c69654d7b6bb4ba21a0c9862` |
+|Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash| Type |
+|---|---|---|---|---|---|
+|[Aptos Node Release v1.5.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.5.0) | [`aptos-node-v1.5.0`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.5.0/images/sha256-3d9af9aadd4c1f2f866b3a6f79a3acaa2de372ef1fc3827757a6f4dc1803e557?context=explore) | `sha256:3d9af9aadd4c1f2f866b3a6f79a3acaa2de372ef1fc3827757a6f4dc1803e557` | [aptos-node-v1.5.0](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.5.0)| `4fbd3d72130c361f54ded13c734400e5ed170bc1` | Full Node and Validator  |
+|[Aptos Node Release v1.4.5](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.4.5)| [`aptos-node-v1.4.5`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.4.5/images/sha256-58c10b11ddd03c4fc998dda9ae08fdbbbca7dbe7ffea3d476bc38c2b6e54773c?context=explore) | `sha256:58c10b11ddd03c4fc998dda9ae08fdbbbca7dbe7ffea3d476bc38c2b6e54773c` | [aptos-node-v1.4.5](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.4.5)| `940cc56e77baee84c1d81609591693733fabe125` | Validator  |

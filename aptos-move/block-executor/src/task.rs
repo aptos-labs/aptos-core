@@ -7,6 +7,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
 use aptos_types::{
     executable::ModulePath,
+    fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
 use std::{fmt::Debug, hash::Hash};
@@ -24,11 +25,11 @@ pub enum ExecutionStatus<T, E> {
     SkipRest(T),
 }
 
-/// Trait that defines a transaction that could be parallel executed by the scheduler. Each
+/// Trait that defines a transaction type that can be executed by the block executor. A transaction
 /// transaction will write to a key value storage as their side effect.
-pub trait Transaction: Sync + Send + 'static {
+pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    type Value: Send + Sync + TransactionWrite;
+    type Value: Send + Sync + Clone + TransactionWrite;
 }
 
 /// Inference result of a transaction.
@@ -49,7 +50,7 @@ pub trait ExecutorTask: Sync {
     /// Type of error when the executor failed to process a transaction and needs to abort.
     type Error: Debug + Clone + Send + Sync + Eq + 'static;
 
-    /// Type to intialize the single thread transaction executor. Copy and Sync are required because
+    /// Type to initialize the single thread transaction executor. Copy and Sync are required because
     /// we will create an instance of executor on each individual thread.
     type Argument: Sync + Copy;
 
@@ -92,4 +93,10 @@ pub trait TransactionOutput: Send + Sync + Debug {
         &self,
         delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
     );
+
+    /// Return the amount of gas consumed by the transaction.
+    fn gas_used(&self) -> u64;
+
+    /// Return the fee statement of the transaction.
+    fn fee_statement(&self) -> FeeStatement;
 }

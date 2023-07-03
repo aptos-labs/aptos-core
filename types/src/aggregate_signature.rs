@@ -36,11 +36,11 @@ impl AggregateSignature {
         }
     }
 
-    pub fn get_voters_bitvec(&self) -> &BitVec {
+    pub fn get_signers_bitvec(&self) -> &BitVec {
         &self.validator_bitmask
     }
 
-    pub fn get_voter_addresses(
+    pub fn get_signers_addresses(
         &self,
         validator_addresses: &[AccountAddress],
     ) -> Vec<AccountAddress> {

@@ -8,9 +8,10 @@
 use crate::{
     common::{is_native_coin, native_coin, native_coin_tag},
     construction::{
-        parse_create_stake_pool_operation, parse_distribute_staking_rewards_operation,
-        parse_reset_lockup_operation, parse_set_operator_operation, parse_set_voter_operation,
-        parse_unlock_stake_operation,
+        parse_create_stake_pool_operation, parse_delegation_pool_add_stake_operation,
+        parse_delegation_pool_unlock_operation, parse_delegation_pool_withdraw_operation,
+        parse_distribute_staking_rewards_operation, parse_reset_lockup_operation,
+        parse_set_operator_operation, parse_set_voter_operation, parse_unlock_stake_operation,
     },
     error::ApiResult,
     types::{
@@ -91,6 +92,11 @@ impl Amount {
             currency: native_coin(),
         }
     }
+
+    pub fn value(&self) -> ApiResult<i128> {
+        i128::from_str(&self.value)
+            .map_err(|_| ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid")))
+    }
 }
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/BalanceExemption.html)
@@ -169,7 +175,6 @@ pub struct Operation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub account: Option<AccountIdentifier>,
     /// Amount in the operation
-    ///
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<Amount>,
     /// Operation specific metadata for any operation that's missing information it needs
@@ -407,6 +412,159 @@ impl Operation {
             )),
         )
     }
+
+    pub fn account(&self) -> Option<AccountAddress> {
+        self.account
+            .as_ref()
+            .and_then(|inner| inner.account_address().ok())
+    }
+
+    pub fn currency(&self) -> Option<&Currency> {
+        self.amount.as_ref().map(|inner| &inner.currency)
+    }
+
+    pub fn amount(&self) -> Option<i128> {
+        self.amount.as_ref().and_then(|inner| inner.value().ok())
+    }
+
+    pub fn status(&self) -> Option<OperationStatusType> {
+        self.status
+            .as_ref()
+            .and_then(|inner| OperationStatusType::from_str(inner).ok())
+    }
+
+    pub fn operation_type(&self) -> Option<OperationType> {
+        OperationType::from_str(&self.operation_type).ok()
+    }
+
+    pub fn operator(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .operator
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn old_operator(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .old_operator
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn new_operator(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .new_operator
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn sender(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .sender
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn staker(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .staker
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn new_voter(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .new_voter
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn metadata_amount(&self) -> Option<u64> {
+        self.metadata
+            .as_ref()
+            .and_then(|inner| inner.amount.map(|inner| inner.0))
+    }
+
+    pub fn staked_balance(&self) -> Option<u64> {
+        self.metadata
+            .as_ref()
+            .and_then(|inner| inner.staked_balance.map(|inner| inner.0))
+    }
+
+    pub fn commission_percentage(&self) -> Option<u64> {
+        self.metadata
+            .as_ref()
+            .and_then(|inner| inner.commission_percentage.map(|inner| inner.0))
+    }
+
+    pub fn add_delegated_stake(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        delegator: AccountAddress,
+        pool_address: AccountIdentifier,
+        amount: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::AddDelegatedStake,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(delegator),
+            None,
+            Some(OperationMetadata::add_delegated_stake(pool_address, amount)),
+        )
+    }
+
+    pub fn unlock_delegated_stake(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        delegator: AccountAddress,
+        pool_address: AccountIdentifier,
+        amount: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::UnlockDelegatedStake,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(delegator),
+            None,
+            Some(OperationMetadata::unlock_delegated_stake(
+                pool_address,
+                amount,
+            )),
+        )
+    }
+
+    pub fn withdraw_undelegated_stake(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        pool_address: AccountIdentifier,
+        amount: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::WithdrawUndelegatedFunds,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::withdraw_undelegated_stake(
+                pool_address,
+                amount,
+            )),
+        )
+    }
 }
 
 impl std::cmp::PartialOrd for Operation {
@@ -459,6 +617,8 @@ pub struct OperationMetadata {
     pub amount: Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub staker: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pool_address: Option<AccountIdentifier>,
 }
 
 impl OperationMetadata {
@@ -527,6 +687,33 @@ impl OperationMetadata {
         OperationMetadata {
             operator: Some(operator),
             staker: Some(staker),
+            ..Default::default()
+        }
+    }
+
+    pub fn add_delegated_stake(pool_address: AccountIdentifier, amount: Option<u64>) -> Self {
+        OperationMetadata {
+            pool_address: Some(pool_address),
+            amount: amount.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn unlock_delegated_stake(pool_address: AccountIdentifier, amount: Option<u64>) -> Self {
+        OperationMetadata {
+            pool_address: Some(pool_address),
+            amount: amount.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn withdraw_undelegated_stake(
+        pool_address: AccountIdentifier,
+        amount: Option<u64>,
+    ) -> Self {
+        OperationMetadata {
+            pool_address: Some(pool_address),
+            amount: amount.map(U64::from),
             ..Default::default()
         }
     }
@@ -853,6 +1040,39 @@ fn parse_failed_operations_from_txn_payload(
                     warn!("Failed to parse distribute staking rewards {:?}", inner);
                 }
             },
+            (AccountAddress::ONE, DELEGATION_POOL_MODULE, DELEGATION_POOL_ADD_STAKE_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_delegation_pool_add_stake_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse delegation_pool::add_stake {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, DELEGATION_POOL_MODULE, DELEGATION_POOL_WITHDRAW_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_delegation_pool_withdraw_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse delegation_pool::withdraw {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, DELEGATION_POOL_MODULE, DELEGATION_POOL_UNLOCK_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_delegation_pool_unlock_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse delegation_pool::unlock {:?}", inner);
+                }
+            },
             _ => {
                 // If we don't recognize the transaction payload, then we can't parse operations
             },
@@ -956,6 +1176,10 @@ async fn parse_operations_from_write_set(
         },
         (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE, 0) => {
             parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
+                .await
+        },
+        (AccountAddress::ONE, DELEGATION_POOL_MODULE, DELEGATION_POOL_RESOURCE, 0) => {
+            parse_delegation_pool_resource_changes(address, data, events, operation_index, changes)
                 .await
         },
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
@@ -1376,6 +1600,20 @@ async fn parse_staking_contract_resource_changes(
 
     Ok(operations)
 }
+
+// TODO: implement staking and withdrawals parsing
+async fn parse_delegation_pool_resource_changes(
+    _owner_address: AccountAddress,
+    _data: &[u8],
+    _events: &[ContractEvent],
+    _operation_index: u64,
+    _changes: &WriteSet,
+) -> ApiResult<Vec<Operation>> {
+    let operations = Vec::new();
+
+    Ok(operations)
+}
+
 async fn parse_coinstore_changes(
     currency: Currency,
     version: u64,
@@ -1453,6 +1691,7 @@ fn filter_events<F: Fn(&EventKey, &ContractEvent) -> Option<T>, T>(
         .filter_map(|event| parser(event_key, event))
         .collect()
 }
+
 /// An enum for processing which operation is in a transaction
 pub enum OperationDetails {
     CreateAccount,
@@ -1474,7 +1713,10 @@ pub enum InternalOperation {
     InitializeStakePool(InitializeStakePool),
     ResetLockup(ResetLockup),
     UnlockStake(UnlockStake),
+    WithdrawUndelegated(WithdrawUndelegated),
     DistributeStakingRewards(DistributeStakingRewards),
+    AddDelegatedStake(AddDelegatedStake),
+    UnlockDelegatedStake(UnlockDelegatedStake),
 }
 
 impl InternalOperation {
@@ -1638,6 +1880,57 @@ impl InternalOperation {
                                 ));
                             }
                         },
+                        Ok(OperationType::AddDelegatedStake) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    pool_address: Some(pool_address),
+                                    amount,
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::AddDelegatedStake(AddDelegatedStake {
+                                    delegator: account.account_address()?,
+                                    pool_address: pool_address.account_address()?,
+                                    amount: amount.map(u64::from).unwrap_or_default(),
+                                }));
+                            }
+                        },
+                        Ok(OperationType::UnlockDelegatedStake) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    pool_address: Some(pool_address),
+                                    amount,
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::UnlockDelegatedStake(UnlockDelegatedStake {
+                                    delegator: account.account_address()?,
+                                    pool_address: pool_address.account_address()?,
+                                    amount: amount.map(u64::from).unwrap_or_default(),
+                                }));
+                            }
+                        },
+                        Ok(OperationType::WithdrawUndelegatedFunds) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    pool_address: Some(pool_address),
+                                    amount,
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::WithdrawUndelegated(WithdrawUndelegated {
+                                    delegator: account.account_address()?,
+                                    amount_withdrawn: amount.map(u64::from).unwrap_or_default(),
+                                    pool_address: pool_address.account_address()?,
+                                }));
+                            }
+                        },
                         _ => {},
                     }
                 }
@@ -1666,7 +1959,10 @@ impl InternalOperation {
             Self::InitializeStakePool(inner) => inner.owner,
             Self::ResetLockup(inner) => inner.owner,
             Self::UnlockStake(inner) => inner.owner,
+            Self::WithdrawUndelegated(inner) => inner.delegator,
             Self::DistributeStakingRewards(inner) => inner.sender,
+            Self::AddDelegatedStake(inner) => inner.delegator,
+            Self::UnlockDelegatedStake(inner) => inner.delegator,
         }
     }
 
@@ -1740,6 +2036,27 @@ impl InternalOperation {
                     distribute_staking_rewards.operator,
                 ),
                 distribute_staking_rewards.sender,
+            ),
+            InternalOperation::AddDelegatedStake(add_delegated_stake) => (
+                aptos_stdlib::delegation_pool_add_stake(
+                    add_delegated_stake.pool_address,
+                    add_delegated_stake.amount,
+                ),
+                add_delegated_stake.delegator,
+            ),
+            InternalOperation::UnlockDelegatedStake(unlock_delegated_stake) => (
+                aptos_stdlib::delegation_pool_unlock(
+                    unlock_delegated_stake.pool_address,
+                    unlock_delegated_stake.amount,
+                ),
+                unlock_delegated_stake.delegator,
+            ),
+            InternalOperation::WithdrawUndelegated(withdraw_undelegated) => (
+                aptos_stdlib::delegation_pool_withdraw(
+                    withdraw_undelegated.pool_address,
+                    withdraw_undelegated.amount_withdrawn,
+                ),
+                withdraw_undelegated.delegator,
             ),
         })
     }
@@ -1908,8 +2225,29 @@ pub struct UnlockStake {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct WithdrawUndelegated {
+    pub delegator: AccountAddress,
+    pub pool_address: AccountAddress,
+    pub amount_withdrawn: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DistributeStakingRewards {
     pub sender: AccountAddress,
     pub operator: AccountAddress,
     pub staker: AccountAddress,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AddDelegatedStake {
+    pub delegator: AccountAddress,
+    pub pool_address: AccountAddress,
+    pub amount: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct UnlockDelegatedStake {
+    pub delegator: AccountAddress,
+    pub pool_address: AccountAddress,
+    pub amount: u64,
 }

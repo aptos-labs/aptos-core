@@ -1,14 +1,14 @@
 import axios from "axios";
 
 import { AnyNumber } from "../bcs/types";
-import { HexString, MaybeHexString } from "../utils";
+import { HexString, MaybeHexString, CUSTOM_REQUEST_HEADER } from "../utils";
 import {
   GetAccountTokensCountQuery,
   GetAccountCoinsDataQuery,
   GetAccountCurrentTokensQuery,
   GetAccountTransactionsCountQuery,
   GetAccountTransactionsDataQuery,
-  GetCurrentDelegatorBalancesCountQuery,
+  GetNumberOfDelegatorsQuery,
   GetDelegatedStakingActivitiesQuery,
   GetIndexerLedgerInfoQuery,
   GetTokenActivitiesCountQuery,
@@ -17,6 +17,11 @@ import {
   GetTokenOwnersDataQuery,
   GetTopUserTransactionsQuery,
   GetUserTransactionsQuery,
+  GetOwnedTokensQuery,
+  GetTokenOwnedFromCollectionQuery,
+  GetCollectionDataQuery,
+  GetCollectionsWithOwnedTokensQuery,
+  GetTokenCurrentOwnerDataQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -24,7 +29,7 @@ import {
   GetAccountCurrentTokens,
   GetAccountTransactionsCount,
   GetAccountTransactionsData,
-  GetCurrentDelegatorBalancesCount,
+  GetNumberOfDelegators,
   GetDelegatedStakingActivities,
   GetIndexerLedgerInfo,
   GetTokenActivities,
@@ -33,6 +38,11 @@ import {
   GetTokenOwnersData,
   GetTopUserTransactions,
   GetUserTransactions,
+  GetOwnedTokens,
+  GetTokenOwnedFromCollection,
+  GetCollectionData,
+  GetCollectionsWithOwnedTokens,
+  GetTokenCurrentOwnerData,
 } from "../indexer/generated/queries";
 
 /**
@@ -47,6 +57,8 @@ interface PaginationArgs {
   offset?: AnyNumber;
   limit?: number;
 }
+
+type TokenStandard = "v1" | "v2";
 
 type GraphqlQuery = {
   query: string;
@@ -74,7 +86,7 @@ export class IndexerClient {
    */
   static validateAddress(address: string): void {
     if (address.length < 66) {
-      throw new Error("Address needs to be 66 chars long.");
+      throw new Error(`${address} is less than 66 chars long.`);
     }
   }
 
@@ -84,7 +96,9 @@ export class IndexerClient {
    * @param graphqlQuery A GraphQL query to pass in the `data` axios call.
    */
   async queryIndexer<T>(graphqlQuery: GraphqlQuery): Promise<T> {
-    const { data } = await axios.post(this.endpoint, graphqlQuery);
+    const { data } = await axios.post(this.endpoint, graphqlQuery, {
+      headers: CUSTOM_REQUEST_HEADER,
+    });
     if (data.errors) {
       throw new Error(`Indexer data error ${JSON.stringify(data.errors, null, " ")}`);
     }
@@ -243,28 +257,105 @@ export class IndexerClient {
   /**
    * Queries token data
    *
-   * @param tokenId Token ID
+   * @param tokenId Token ID address
    * @returns GetTokenDataQuery response type
    */
-  async getTokenData(tokenId: string): Promise<GetTokenDataQuery> {
+  async getTokenData(
+    tokenId: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<GetTokenDataQuery> {
+    const tokenAddress = HexString.ensure(tokenId).hex();
+    IndexerClient.validateAddress(tokenAddress);
+
+    const whereCondition: any = {
+      token_data_id: { _eq: tokenAddress },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
     const graphqlQuery = {
       query: GetTokenData,
-      variables: { token_id: tokenId },
+      variables: { where_condition: whereCondition },
     };
     return this.queryIndexer(graphqlQuery);
   }
 
   /**
-   * Queries token owners data
+   * Queries token owners data. This query returns historical owners data
+   * To fetch token v2 standard, pass in the optional `tokenStandard` parameter and
+   * dont pass `propertyVersion` parameter (as propertyVersion only compatible with v1 standard)
    *
    * @param tokenId Token ID
-   * @param propertyVersion Property version
+   * @param propertyVersion Property version (optional) - only compatible with token v1 standard
    * @returns GetTokenOwnersDataQuery response type
    */
-  async getTokenOwnersData(tokenId: string, propertyVersion: number): Promise<GetTokenOwnersDataQuery> {
+  async getTokenOwnersData(
+    tokenId: string,
+    propertyVersion?: number,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<GetTokenOwnersDataQuery> {
+    const tokenAddress = HexString.ensure(tokenId).hex();
+    IndexerClient.validateAddress(tokenAddress);
+
+    const whereCondition: any = {
+      token_data_id: { _eq: tokenAddress },
+    };
+
+    if (propertyVersion) {
+      whereCondition.property_version_v1 = { _eq: propertyVersion };
+    }
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
     const graphqlQuery = {
       query: GetTokenOwnersData,
-      variables: { token_id: tokenId, property_version: propertyVersion },
+      variables: { where_condition: whereCondition },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries token current owner data. This query returns the current token owner data.
+   * To fetch token v2 standard, pass in the optional `tokenStandard` parameter and
+   * dont pass `propertyVersion` parameter (as propertyVersion only compatible with v1 standard)
+   *
+   * @param tokenId Token ID
+   * @param propertyVersion Property version (optional) - only compatible with token v1 standard
+   * @returns GetTokenCurrentOwnerDataQuery response type
+   */
+  async getTokenCurrentOwnerData(
+    tokenId: string,
+    propertyVersion?: number,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<GetTokenCurrentOwnerDataQuery> {
+    const tokenAddress = HexString.ensure(tokenId).hex();
+    IndexerClient.validateAddress(tokenAddress);
+
+    const whereCondition: any = {
+      token_data_id: { _eq: tokenAddress },
+      amount: { _gt: "0" },
+    };
+
+    if (propertyVersion) {
+      whereCondition.property_version_v1 = { _eq: propertyVersion };
+    }
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
+    const graphqlQuery = {
+      query: GetTokenCurrentOwnerData,
+      variables: { where_condition: whereCondition },
     };
     return this.queryIndexer(graphqlQuery);
   }
@@ -297,16 +388,218 @@ export class IndexerClient {
   }
 
   /**
-   * Queries current delegator balances count
+   * Queries current number of delegators in a pool
    *
-   * @returns GetCurrentDelegatorBalancesCountQuery response type
+   * @returns GetNumberOfDelegatorsQuery response type
    */
-  async getCurrentDelegatorBalancesCount(poolAddress: MaybeHexString): Promise<GetCurrentDelegatorBalancesCountQuery> {
+  async getNumberOfDelegators(poolAddress: MaybeHexString): Promise<GetNumberOfDelegatorsQuery> {
     const address = HexString.ensure(poolAddress).hex();
     IndexerClient.validateAddress(address);
     const graphqlQuery = {
-      query: GetCurrentDelegatorBalancesCount,
+      query: GetNumberOfDelegators,
       variables: { poolAddress: address },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries account's current owned tokens.
+   * This query returns all tokens (v1 and v2 standards) an account owns, including NFTs, fungible, soulbound, etc.
+   * If you want to get only the token from a specific standrd, you can pass an optional tokenStandard param
+   * @example An example of how to pass a specific token standard
+   * ```
+   * {
+   *    tokenStandard:"v2"
+   * }
+   * ```
+   * @param ownerAddress The token owner address we want to get the tokens for
+   * @returns GetOwnedTokensQuery response type
+   */
+  async getOwnedTokens(
+    ownerAddress: MaybeHexString,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetOwnedTokensQuery> {
+    const address = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(address);
+
+    const whereCondition: any = {
+      owner_address: { _eq: address },
+      amount: { _gt: 0 },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
+    const graphqlQuery = {
+      query: GetOwnedTokens,
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+      },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries all tokens of a specific collection that an account owns by the collection address
+   *
+   * @param ownerAddress owner address that owns the tokens
+   * @param collectionAddress the collection address
+   * @returns GetTokenOwnedFromCollectionQuery response type
+   */
+  async getTokenOwnedFromCollectionAddress(
+    ownerAddress: MaybeHexString,
+    collectionAddress: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetTokenOwnedFromCollectionQuery> {
+    const ownerHexAddress = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(ownerHexAddress);
+
+    const collectionHexAddress = HexString.ensure(collectionAddress).hex();
+    IndexerClient.validateAddress(collectionHexAddress);
+
+    const whereCondition: any = {
+      owner_address: { _eq: ownerHexAddress },
+      current_token_data: { collection_id: { _eq: collectionHexAddress } },
+      amount: { _gt: 0 },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
+    const graphqlQuery = {
+      query: GetTokenOwnedFromCollection,
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+      },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries all tokens of a specific collection that an account owns by the collection name and collection
+   * creator address
+   *
+   * @param ownerAddress owner address that owns the tokens
+   * @param collectionName the collection name
+   * @param creatorAddress the collection creator address
+   * @returns GetTokenOwnedFromCollectionQuery response type
+   */
+  async getTokenOwnedFromCollectionNameAndCreatorAddress(
+    ownerAddress: MaybeHexString,
+    collectionName: string,
+    creatorAddress: MaybeHexString,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetTokenOwnedFromCollectionQuery> {
+    const collectionAddress = await this.getCollectionAddress(creatorAddress, collectionName, extraArgs);
+    const tokens = await this.getTokenOwnedFromCollectionAddress(ownerAddress, collectionAddress, extraArgs);
+    return tokens;
+  }
+
+  /**
+   * Queries data of a specific collection by the collection creator address and the collection name.
+   *
+   * if, for some reason, a creator account has 2 collections with the same name in v1 and v2,
+   * can pass an optional `tokenStandard` parameter to query a specific standard
+   *
+   * @param creatorAddress the collection creator address
+   * @param collectionName the collection name
+   * @returns GetCollectionDataQuery response type
+   */
+  async getCollectionData(
+    creatorAddress: MaybeHexString,
+    collectionName: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetCollectionDataQuery> {
+    const address = HexString.ensure(creatorAddress).hex();
+    IndexerClient.validateAddress(address);
+
+    const whereCondition: any = {
+      collection_name: { _eq: collectionName },
+      creator_address: { _eq: address },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
+    const graphqlQuery = {
+      query: GetCollectionData,
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+      },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries a collection address.
+   *
+   * @param creatorAddress the collection creator address
+   * @param collectionName the collection name
+   * @returns the collection address
+   */
+  async getCollectionAddress(
+    creatorAddress: MaybeHexString,
+    collectionName: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<string> {
+    return (await this.getCollectionData(creatorAddress, collectionName, extraArgs)).current_collections_v2[0]
+      .collection_id;
+  }
+
+  /**
+   * Queries for all collections that an account has tokens for.
+   *
+   * @param ownerAddress the account address that owns the tokens
+   * @returns GetCollectionsWithOwnedTokensQuery response type
+   */
+  async getCollectionsWithOwnedTokens(
+    ownerAddress: MaybeHexString,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetCollectionsWithOwnedTokensQuery> {
+    const ownerHexAddress = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(ownerHexAddress);
+
+    const whereCondition: any = {
+      owner_address: { _eq: ownerHexAddress },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.current_collection = { token_standard: { _eq: extraArgs?.tokenStandard } };
+    }
+
+    const graphqlQuery = {
+      query: GetCollectionsWithOwnedTokens,
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+      },
     };
     return this.queryIndexer(graphqlQuery);
   }

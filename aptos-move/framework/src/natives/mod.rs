@@ -226,7 +226,11 @@ impl GasParameters {
                 },
             },
             transaction_context: transaction_context::GasParameters {
+                get_txn_hash: transaction_context::GetTxnHashGasParameters { base: 0.into() },
                 get_script_hash: transaction_context::GetScriptHashGasParameters { base: 0.into() },
+                generate_unique_address: transaction_context::GenerateUniqueAddressGasParameters {
+                    base: 0.into(),
+                },
             },
             code: code::GasParameters {
                 request_publish: code::RequestPublishGasParameters {
@@ -429,7 +433,10 @@ pub fn all_natives(
         "object",
         object::make_all(gas_params.object, timed_features.clone(), features.clone())
     );
-    add_natives_from_module!("debug", debug::make_all());
+    add_natives_from_module!(
+        "debug",
+        debug::make_all(timed_features.clone(), features.clone())
+    );
     add_natives_from_module!(
         "string_utils",
         string_utils::make_all(gas_params.string_utils, timed_features, features)

@@ -62,6 +62,7 @@ pub struct StateMerkleDb {
     state_merkle_metadata_db: Arc<DB>,
     // Stores sharded part of tree nodes.
     state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    enable_sharding: bool,
     enable_cache: bool,
     version_cache: VersionedNodeCache,
     lru_cache: LruNodeCache,
@@ -94,6 +95,7 @@ impl StateMerkleDb {
             return Ok(Self {
                 state_merkle_metadata_db: Arc::clone(&db),
                 state_merkle_db_shards: arr![Arc::clone(&db); 16],
+                enable_sharding: false,
                 enable_cache,
                 version_cache,
                 lru_cache,
@@ -137,13 +139,15 @@ impl StateMerkleDb {
         cp_root_path: impl AsRef<Path>,
         sharding: bool,
     ) -> Result<()> {
-        let state_merkle_db = Self::open(
+        let rocksdb_configs = RocksdbConfigs {
+            use_sharded_state_merkle_db: sharding,
+            ..Default::default()
+        };
+        let state_merkle_db = Self::new(
             db_root_path,
-            RocksdbConfig::default(),
-            false,
-            /*enable_cache=*/ false,
-            VersionedNodeCache::new(),
-            LruNodeCache::new(0),
+            rocksdb_configs,
+            /*readonly=*/ false,
+            /*max_nodes_per_lru_cache_shard=*/ 0,
         )?;
         let cp_state_merkle_db_path = cp_root_path.as_ref().join(STATE_MERKLE_DB_FOLDER_NAME);
 
@@ -176,8 +180,16 @@ impl StateMerkleDb {
         &self.state_merkle_metadata_db
     }
 
+    pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.state_merkle_metadata_db)
+    }
+
     pub(crate) fn db_shard(&self, shard_id: u8) -> &DB {
         &self.state_merkle_db_shards[shard_id as usize]
+    }
+
+    pub(crate) fn db_shard_arc(&self, shard_id: u8) -> Arc<DB> {
+        Arc::clone(&self.state_merkle_db_shards[shard_id as usize])
     }
 
     pub(crate) fn commit_top_levels(&self, version: Version, batch: SchemaBatch) -> Result<()> {
@@ -186,6 +198,7 @@ impl StateMerkleDb {
             &DbMetadataValue::Version(version),
         )?;
 
+        info!(version = version, "Committing StateMerkleDb.");
         self.state_merkle_metadata_db.write_schemas(batch)
     }
 
@@ -255,9 +268,18 @@ impl StateMerkleDb {
                 .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
             iter.seek_for_prev(&NodeKey::new_empty_path(max_possible_version))?;
             if let Some((key, _node)) = iter.next().transpose()? {
-                // TODO: If we break up a single update batch to multiple commits, we would need to
-                // deal with a partial version, which hasn't got the root committed.
-                return Ok(Some(key.version()));
+                let version = key.version();
+                if self
+                    .metadata_db()
+                    .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version))?
+                    .is_some()
+                {
+                    return Ok(Some(version));
+                }
+                // Since we split state merkle commit into multiple batches, it's possible that
+                // the root is not committed yet. In this case we need to look at the previous
+                // root.
+                return self.get_state_snapshot_version_before(version);
             }
         }
         // No version before genesis.
@@ -348,6 +370,10 @@ impl StateMerkleDb {
         Ok((top_levels_batch, sharded_batch, new_root_hash))
     }
 
+    pub(crate) fn sharding_enabled(&self) -> bool {
+        self.enable_sharding
+    }
+
     pub(crate) fn cache_enabled(&self) -> bool {
         self.enable_cache
     }
@@ -358,6 +384,17 @@ impl StateMerkleDb {
 
     pub(crate) fn lru_cache(&self) -> &LruNodeCache {
         &self.lru_cache
+    }
+
+    pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        self.state_merkle_metadata_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::StateMerklePrunerProgress,
+            &DbMetadataValue::Version(version),
+        )
+    }
+
+    pub(crate) fn num_shards(&self) -> u8 {
+        NUM_STATE_SHARDS as u8
     }
 
     fn db_by_key(&self, node_key: &NodeKey) -> &DB {
@@ -401,6 +438,7 @@ impl StateMerkleDb {
         let state_merkle_db = Self {
             state_merkle_metadata_db,
             state_merkle_db_shards,
+            enable_sharding: true,
             enable_cache,
             version_cache,
             lru_cache,

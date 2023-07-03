@@ -1,6 +1,7 @@
 {
   "name": "aptos",
   "description": "Aptos SDK",
+  "packageManager": "pnpm@8.3.1",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=11.0.0"
@@ -23,6 +24,8 @@
     "_build:node": "tsup --format cjs,esm --dts",
     "lint": "eslint \"**/*.ts\"",
     "test": "pnpm run publish-ans-contract && jest",
+    "test:ci": "pnpm run publish-ans-contract && jest --testPathIgnorePatterns=indexer.test.ts",
+    "test:indexer": "jest --collectCoverageFrom='./src/tests/e2e/indexer.test.ts' -- ./src/tests/e2e/indexer.test.ts",
     "_fmt": "prettier 'scripts/**/*.ts' 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
     "fmt": "pnpm _fmt --write",
     "fmt:check": "pnpm _fmt --check",
@@ -82,5 +85,5 @@
     "typedoc": "^0.23.20",
     "typescript": "4.8.2"
   },
-  "version": "1.8.4"
+  "version": "1.12.0"
 }

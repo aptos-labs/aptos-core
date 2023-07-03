@@ -1,39 +1,38 @@
-/*
- * Simple vesting contract that allows specifying how much APT coins should be vesting in each fixed-size period. The
- * vesting contract also comes with staking and allows shareholders to withdraw rewards anytime.
- *
- * Vesting schedule is represented as a vector of distributions. For example, a vesting schedule of
- * [3/48, 3/48, 1/48] means that after the vesting starts:
- * 1. The first and second periods will vest 3/48 of the total original grant.
- * 2. The third period will vest 1/48.
- * 3. All subsequent periods will also vest 1/48 (last distribution in the schedule) until the original grant runs out.
- *
- * Shareholder flow:
- * 1. Admin calls create_vesting_contract with a schedule of [3/48, 3/48, 1/48] with a vesting cliff of 1 year and
- * vesting period of 1 month.
- * 2. After a month, a shareholder calls unlock_rewards to request rewards. They can also call vest() which would also
- * unlocks rewards but since the 1 year cliff has not passed (vesting has not started), vest() would not release any of
- * the original grant.
- * 3. After the unlocked rewards become fully withdrawable (as it's subject to staking lockup), shareholders can call
- * distribute() to send all withdrawable funds to all shareholders based on the original grant's shares structure.
- * 4. After 1 year and 1 month, the vesting schedule now starts. Shareholders call vest() to unlock vested coins. vest()
- * checks the schedule and unlocks 3/48 of the original grant in addition to any accumulated rewards since last
- * unlock_rewards(). Once the unlocked coins become withdrawable, shareholders can call distribute().
- * 5. Assuming the shareholders forgot to call vest() for 2 months, when they call vest() again, they will unlock vested
- * tokens for the next period since last vest. This would be for the first month they missed. They can call vest() a
- * second time to unlock for the second month they missed.
- *
- * Admin flow:
- * 1. After creating the vesting contract, admin cannot change the vesting schedule.
- * 2. Admin can call update_voter, update_operator, or reset_lockup at any time to update the underlying staking
- * contract.
- * 3. Admin can also call update_beneficiary for any shareholder. This would send all distributions (rewards, vested
- * coins) of that shareholder to the beneficiary account. By defalt, if a beneficiary is not set, the distributions are
- * send directly to the shareholder account.
- * 4. Admin can call terminate_vesting_contract to terminate the vesting. This would first finish any distribution but
- * will prevent any further rewards or vesting distributions from being created. Once the locked up stake becomes
- * withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting contract's withdrawal address.
- */
+///
+/// Simple vesting contract that allows specifying how much APT coins should be vesting in each fixed-size period. The
+/// vesting contract also comes with staking and allows shareholders to withdraw rewards anytime.
+///
+/// Vesting schedule is represented as a vector of distributions. For example, a vesting schedule of
+/// [3/48, 3/48, 1/48] means that after the vesting starts:
+/// 1. The first and second periods will vest 3/48 of the total original grant.
+/// 2. The third period will vest 1/48.
+/// 3. All subsequent periods will also vest 1/48 (last distribution in the schedule) until the original grant runs out.
+///
+/// Shareholder flow:
+/// 1. Admin calls create_vesting_contract with a schedule of [3/48, 3/48, 1/48] with a vesting cliff of 1 year and
+/// vesting period of 1 month.
+/// 2. After a month, a shareholder calls unlock_rewards to request rewards. They can also call vest() which would also
+/// unlocks rewards but since the 1 year cliff has not passed (vesting has not started), vest() would not release any of
+/// the original grant.
+/// 3. After the unlocked rewards become fully withdrawable (as it's subject to staking lockup), shareholders can call
+/// distribute() to send all withdrawable funds to all shareholders based on the original grant's shares structure.
+/// 4. After 1 year and 1 month, the vesting schedule now starts. Shareholders call vest() to unlock vested coins. vest()
+/// checks the schedule and unlocks 3/48 of the original grant in addition to any accumulated rewards since last
+/// unlock_rewards(). Once the unlocked coins become withdrawable, shareholders can call distribute().
+/// 5. Assuming the shareholders forgot to call vest() for 2 months, when they call vest() again, they will unlock vested
+/// tokens for the next period since last vest. This would be for the first month they missed. They can call vest() a
+/// second time to unlock for the second month they missed.
+///
+/// Admin flow:
+/// 1. After creating the vesting contract, admin cannot change the vesting schedule.
+/// 2. Admin can call update_voter, update_operator, or reset_lockup at any time to update the underlying staking
+/// contract.
+/// 3. Admin can also call update_beneficiary for any shareholder. This would send all distributions (rewards, vested
+/// coins) of that shareholder to the beneficiary account. By defalt, if a beneficiary is not set, the distributions are
+/// send directly to the shareholder account.
+/// 4. Admin can call terminate_vesting_contract to terminate the vesting. This would first finish any distribution but
+/// will prevent any further rewards or vesting distributions from being created. Once the locked up stake becomes
+/// withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting contract's withdrawal address.
 module aptos_framework::vesting {
     use std::bcs;
     use std::error;
@@ -402,18 +401,17 @@ module aptos_framework::vesting {
             return shareholder_or_beneficiary
         };
         let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
-        let i = 0;
-        let len = vector::length(shareholders);
-        while (i < len) {
-            let shareholder = *vector::borrow(shareholders, i);
-            // This will still return the shareholder if shareholder == beneficiary.
-            if (shareholder_or_beneficiary == get_beneficiary(vesting_contract, shareholder)) {
-                return shareholder
-            };
-            i = i + 1;
-        };
+        let result = @0x0;
+        vector::any(shareholders, |shareholder| {
+            if (shareholder_or_beneficiary == get_beneficiary(vesting_contract, *shareholder)) {
+                result = *shareholder;
+                true
+            } else {
+                false
+            }
+        });
 
-        @0x0
+        result
     }
 
     /// Create a vesting schedule with the given schedule of distributions, a vesting start time and period duration.
@@ -465,22 +463,18 @@ module aptos_framework::vesting {
         let grant = coin::zero<AptosCoin>();
         let grant_amount = 0;
         let grant_pool = pool_u64::create(MAXIMUM_SHAREHOLDERS);
-        let len = vector::length(shareholders);
-        let i = 0;
-        while (i < len) {
-            let shareholder = *vector::borrow(shareholders, i);
+        vector::for_each_ref(shareholders, |shareholder| {
+            let shareholder: address = *shareholder;
             let (_, buy_in) = simple_map::remove(&mut buy_ins, &shareholder);
             let buy_in_amount = coin::value(&buy_in);
             coin::merge(&mut grant, buy_in);
             pool_u64::buy_in(
                 &mut grant_pool,
-                *vector::borrow(shareholders, i),
+                shareholder,
                 buy_in_amount,
             );
             grant_amount = grant_amount + buy_in_amount;
-
-            i = i + 1;
-        };
+        });
         assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
 
         // If this is the first time this admin account has created a vesting contract, initialize the admin store.
@@ -554,12 +548,10 @@ module aptos_framework::vesting {
 
         assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
 
-        let i = 0;
-        while (i < len) {
-            let contract_address = *vector::borrow(&contract_addresses, i);
+        vector::for_each_ref(&contract_addresses, |contract_address| {
+            let contract_address: address = *contract_address;
             unlock_rewards(contract_address);
-            i = i + 1;
-        };
+        });
     }
 
     /// Unlock any vested portion of the grant.
@@ -621,12 +613,10 @@ module aptos_framework::vesting {
 
         assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
 
-        let i = 0;
-        while (i < len) {
-            let contract_address = *vector::borrow(&contract_addresses, i);
+        vector::for_each_ref(&contract_addresses, |contract_address| {
+            let contract_address = *contract_address;
             vest(contract_address);
-            i = i + 1;
-        };
+        });
     }
 
     /// Distribute any withdrawable stake from the stake pool.
@@ -644,18 +634,14 @@ module aptos_framework::vesting {
         // Distribute coins to all shareholders in the vesting contract.
         let grant_pool = &vesting_contract.grant_pool;
         let shareholders = &pool_u64::shareholders(grant_pool);
-        let len = vector::length(shareholders);
-        let i = 0;
-        while (i < len) {
-            let shareholder = *vector::borrow(shareholders, i);
+        vector::for_each_ref(shareholders, |shareholder| {
+            let shareholder = *shareholder;
             let shares = pool_u64::shares(grant_pool, shareholder);
             let amount = pool_u64::shares_to_amount_with_total_coins(grant_pool, shares, total_distribution_amount);
             let share_of_coins = coin::extract(&mut coins, amount);
             let recipient_address = get_beneficiary(vesting_contract, shareholder);
             aptos_account::deposit_coins(recipient_address, share_of_coins);
-
-            i = i + 1;
-        };
+        });
 
         // Send any remaining "dust" (leftover due to rounding error) to the withdrawal address.
         if (coin::value(&coins) > 0) {
@@ -680,12 +666,10 @@ module aptos_framework::vesting {
 
         assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
 
-        let i = 0;
-        while (i < len) {
-            let contract_address = *vector::borrow(&contract_addresses, i);
+        vector::for_each_ref(&contract_addresses, |contract_address| {
+            let contract_address = *contract_address;
             distribute(contract_address);
-            i = i + 1;
-        };
+        });
     }
 
     /// Terminate the vesting contract and send all funds back to the withdrawal address.
@@ -926,8 +910,8 @@ module aptos_framework::vesting {
         account::create_signer_with_capability(&vesting_contract.signer_cap)
     }
 
-    // Create a salt for generating the resource accounts that will be holding the VestingContract.
-    // This address should be deterministic for the same admin and vesting contract creation nonce.
+    /// Create a salt for generating the resource accounts that will be holding the VestingContract.
+    /// This address should be deterministic for the same admin and vesting contract creation nonce.
     fun create_vesting_contract_account(
         admin: &signer,
         contract_creation_seed: vector<u8>,
@@ -1018,15 +1002,12 @@ module aptos_framework::vesting {
 
         stake::initialize_for_test_custom(aptos_framework, MIN_STAKE, GRANT_AMOUNT * 10, 3600, true, 10, 10000, 1000000);
 
-        let len = vector::length(accounts);
-        let i = 0;
-        while (i < len) {
-            let addr = *vector::borrow(accounts, i);
+        vector::for_each_ref(accounts, |addr| {
+            let addr: address = *addr;
             if (!account::exists_at(addr)) {
                 create_account(addr);
             };
-            i = i + 1;
-        };
+        });
     }
 
     #[test_only]
@@ -1059,13 +1040,9 @@ module aptos_framework::vesting {
         vesting_denominator: u64,
     ): address acquires AdminStore {
         let schedule = vector::empty<FixedPoint32>();
-        let i = 0;
-        let len = vector::length(vesting_numerators);
-        while (i < len) {
-            let num = *vector::borrow(vesting_numerators, i);
-            vector::push_back(&mut schedule, fixed_point32::create_from_rational(num, vesting_denominator));
-            i = i + 1;
-        };
+        vector::for_each_ref(vesting_numerators, |num| {
+            vector::push_back(&mut schedule, fixed_point32::create_from_rational(*num, vesting_denominator));
+        });
         let vesting_schedule = create_vesting_schedule(
             schedule,
             timestamp::now_seconds() + VESTING_SCHEDULE_CLIFF,
@@ -1074,13 +1051,10 @@ module aptos_framework::vesting {
 
         let admin_address = signer::address_of(admin);
         let buy_ins = simple_map::create<address, Coin<AptosCoin>>();
-        let i = 0;
-        let len = vector::length(shares);
-        while (i < len) {
+        vector::enumerate_ref(shares, |i, share| {
             let shareholder = *vector::borrow(shareholders, i);
-            simple_map::add(&mut buy_ins, shareholder, stake::mint_coins(*vector::borrow(shares, i)));
-            i = i + 1;
-        };
+            simple_map::add(&mut buy_ins, shareholder, stake::mint_coins(*share));
+        });
 
         create_vesting_contract(
             admin,

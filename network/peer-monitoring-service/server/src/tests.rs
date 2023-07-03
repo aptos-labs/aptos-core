@@ -53,11 +53,12 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionWithProof, Version,
+        AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
+        TransactionWithProof, Version,
     },
     PeerId,
 };
+use cfg_block::cfg_block;
 use futures::channel::oneshot;
 use maplit::btreemap;
 use mockall::mock;
@@ -112,7 +113,7 @@ async fn test_get_network_information_fullnode() {
     // Connect a new peer to the fullnode
     let peer_id_1 = PeerId::random();
     let peer_network_id_1 = PeerNetworkId::new(NetworkId::Public, peer_id_1);
-    let mut connection_metadata_1 = create_connection_metadata(peer_id_1);
+    let mut connection_metadata_1 = create_connection_metadata(peer_id_1, PeerRole::Unknown);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_1, connection_metadata_1.clone())
         .unwrap();
@@ -133,7 +134,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -153,7 +154,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -174,14 +175,14 @@ async fn test_get_network_information_fullnode() {
     let peer_id_2 = PeerId::random();
     let peer_network_id_2 = PeerNetworkId::new(NetworkId::Validator, peer_id_2);
     let peer_distance_2 = 0; // The peer is a validator
-    let connection_metadata_2 = create_connection_metadata(peer_id_2);
+    let connection_metadata_2 = create_connection_metadata(peer_id_2, PeerRole::Validator);
     let expected_peers = btreemap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2.clone()};
     let latest_network_info_response = NetworkInformationResponse {
         connected_peers: transform_connection_metadata(expected_peers),
         distance_from_validators: peer_distance_2,
     };
     let peer_monitoring_metadata_2 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
         .unwrap();
@@ -222,13 +223,19 @@ async fn test_get_network_information_validator() {
         MockClient::new(Some(base_config), None, None);
     tokio::spawn(service.start());
 
-    // Process a client request to fetch the network information and verify distance is 0
-    verify_network_information(&mut mock_client, BTreeMap::new(), 0).await;
+    // Process a client request to fetch the network information and verify
+    // the distance is the max (the server has no peers!).
+    verify_network_information(
+        &mut mock_client,
+        BTreeMap::new(),
+        MAX_DISTANCE_FROM_VALIDATORS,
+    )
+    .await;
 
     // Connect a new peer to the validator (another validator)
     let peer_id_1 = PeerId::random();
     let peer_network_id_1 = PeerNetworkId::new(NetworkId::Validator, peer_id_1);
-    let connection_metadata_1 = create_connection_metadata(peer_id_1);
+    let connection_metadata_1 = create_connection_metadata(peer_id_1, PeerRole::Validator);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_1, connection_metadata_1.clone())
         .unwrap();
@@ -238,13 +245,13 @@ async fn test_get_network_information_validator() {
     verify_network_information(&mut mock_client, expected_peers.clone(), 0).await;
 
     // Update the peer monitoring metadata for peer 1
-    let peer_distance_1 = 0; // Peer 1 now has other connections
+    let peer_distance_1 = 1; // Peer 1 now has other connections
     let latest_network_info_response = NetworkInformationResponse {
         connected_peers: transform_connection_metadata(expected_peers.clone()),
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -252,18 +259,18 @@ async fn test_get_network_information_validator() {
     // Process a client request to fetch the network information and verify the response
     verify_network_information(&mut mock_client, expected_peers, 0).await;
 
-    // Connect another peer to the validator
+    // Connect another peer to the validator (a VFN)
     let peer_id_2 = PeerId::random();
     let peer_network_id_2 = PeerNetworkId::new(NetworkId::Vfn, peer_id_2);
-    let peer_distance_2 = 1; // The peer is a VFN
-    let connection_metadata_2 = create_connection_metadata(peer_id_2);
+    let peer_distance_2 = 2; // The peer is a VFN
+    let connection_metadata_2 = create_connection_metadata(peer_id_2, PeerRole::ValidatorFullNode);
     let expected_peers = btreemap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2.clone()};
     let latest_network_info_response = NetworkInformationResponse {
         connected_peers: transform_connection_metadata(expected_peers.clone()),
         distance_from_validators: peer_distance_2,
     };
     let peer_monitoring_metadata_2 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
         .unwrap();
@@ -274,16 +281,16 @@ async fn test_get_network_information_validator() {
     // Process a client request to fetch the network information and verify the response
     verify_network_information(&mut mock_client, expected_peers, 0).await;
 
-    // Disconnect peer 2
+    // Disconnect peer 1
     peers_and_metadata
-        .update_connection_state(peer_network_id_2, ConnectionState::Disconnected)
+        .update_connection_state(peer_network_id_1, ConnectionState::Disconnected)
         .unwrap();
 
     // Process a request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        btreemap! {peer_network_id_1 => connection_metadata_1},
-        0,
+        btreemap! {peer_network_id_2 => connection_metadata_2},
+        peer_distance_2 + 1,
     )
     .await;
 }
@@ -378,8 +385,41 @@ async fn test_latency_ping_request() {
     }
 }
 
+cfg_block! {
+    #[cfg(feature = "network-perf-test")] { // Disabled by default
+        #[tokio::test]
+        async fn test_performance_monitoring_request() {
+            // Create the peer monitoring client and server
+            let (mut mock_client, service, _, _) = MockClient::new(None, None, None);
+            tokio::spawn(service.start());
+
+            // Process several performance monitoring requests
+            for i in 0..10 {
+                let request = PeerMonitoringServiceRequest::PerformanceMonitoringRequest(
+                    aptos_peer_monitoring_service_types::request::PerformanceMonitoringRequest {
+                        request_counter: i,
+                        data: [0; 100].to_vec(), // 100 bytes of zero's
+                    },
+                );
+                let response = mock_client.send_request(request).await.unwrap();
+                match response {
+                    PeerMonitoringServiceResponse::PerformanceMonitoring(
+                        performance_monitoring_response,
+                    ) => {
+                        assert_eq!(performance_monitoring_response.response_counter, i);
+                    },
+                    _ => panic!(
+                        "Expected performance monitoring response but got: {:?}",
+                        response
+                    ),
+                }
+            }
+        }
+    }
+}
+
 /// A simple utility function to create a new connection metadata for tests
-fn create_connection_metadata(peer_id: AccountAddress) -> ConnectionMetadata {
+fn create_connection_metadata(peer_id: AccountAddress, peer_role: PeerRole) -> ConnectionMetadata {
     ConnectionMetadata::new(
         peer_id,
         ConnectionId::default(),
@@ -387,7 +427,7 @@ fn create_connection_metadata(peer_id: AccountAddress) -> ConnectionMetadata {
         ConnectionOrigin::Inbound,
         MessagingProtocolVersion::V1,
         ProtocolIdSet::empty(),
-        PeerRole::Unknown,
+        peer_role,
     )
 }
 
@@ -503,6 +543,7 @@ impl MockClient {
             let network_events = NetworkEvents::new(
                 peer_manager_notification_receiver,
                 connection_notification_receiver,
+                None,
             );
             network_and_events.insert(network_id, network_events);
             peer_manager_notifiers.insert(network_id, peer_manager_notifier);
@@ -706,8 +747,6 @@ mock! {
         fn get_latest_executed_trees(&self) -> anyhow::Result<ExecutedTrees>;
 
         fn get_epoch_ending_ledger_info(&self, known_version: u64) -> anyhow::Result<LedgerInfoWithSignatures>;
-
-        fn get_latest_transaction_info_option(&self) -> anyhow::Result<Option<(Version, TransactionInfo)>>;
 
         fn get_accumulator_root_hash(&self, _version: Version) -> anyhow::Result<HashValue>;
 

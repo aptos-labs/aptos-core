@@ -3,8 +3,9 @@
 
 use crate::NetworkLoadTest;
 use aptos_forge::{
-    EmitJobMode, EmitJobRequest, EntryPoints, NetworkContext, NetworkTest, Result, Test,
-    TransactionType, TxnStats,
+    args::TransactionTypeArg,
+    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
+    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Test, TxnStats,
 };
 use aptos_logger::info;
 use rand::SeedableRng;
@@ -23,7 +24,7 @@ pub struct SingleRunStats {
 
 pub enum Workloads {
     TPS(&'static [usize]),
-    TRANSACTIONS(&'static [TransactinWorkload]),
+    TRANSACTIONS(&'static [TransactionWorkload]),
 }
 
 impl Workloads {
@@ -50,120 +51,43 @@ impl Workloads {
 }
 
 #[derive(Debug)]
-pub enum TransactinWorkload {
-    NoOp,
-    NoOpUnique,
-    LargeModuleWorkingSet,
-    WriteResourceSmall,
-    WriteResourceBig,
-    PublishPackages,
-    CoinTransfer,
-    CoinTransferUnique,
-    NftMint,
-    TokenV1,
+pub struct TransactionWorkload {
+    pub transaction_type: TransactionTypeArg,
+    pub num_modules: usize,
+    pub unique_senders: bool,
 }
 
-impl TransactinWorkload {
+impl TransactionWorkload {
     fn configure(&self, request: EmitJobRequest) -> EmitJobRequest {
-        let account_creation_type = TransactionType::AccountGeneration {
-            add_created_accounts_to_pool: true,
-            max_account_working_set: 10_000_000,
-            creation_balance: 200_000_000,
-        };
+        let account_creation_type =
+            TransactionTypeArg::AccountGenerationLargePool.materialize(1, false);
 
-        match self {
-            Self::NoOp => request.transaction_type(TransactionType::CallCustomModules {
-                entry_point: EntryPoints::Nop,
-                num_modules: 1,
-                use_account_pool: false,
-            }),
-            Self::LargeModuleWorkingSet => {
-                request.transaction_type(TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::Nop,
-                    num_modules: 1000,
-                    use_account_pool: false,
-                })
-            },
-            Self::WriteResourceSmall | Self::WriteResourceBig => {
-                let write_type = TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::BytesMakeOrChange {
-                        data_length: Some(
-                            if let Self::WriteResourceBig = self {
-                                1024
-                            } else {
-                                32
-                            },
-                        ),
-                    },
-                    num_modules: 1,
-                    use_account_pool: true,
-                };
-                request.transaction_mix_per_phase(vec![
-                    // warmup
-                    vec![(account_creation_type, 1)],
-                    vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
-                    // cooldown
-                    vec![(write_type, 1)],
-                ])
-            },
-            Self::PublishPackages => {
-                let write_type = TransactionType::PublishPackage {
-                    use_account_pool: true,
-                };
-                request.transaction_mix_per_phase(vec![
-                    // warmup
-                    vec![(account_creation_type, 1)],
-                    vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
-                    // cooldown
-                    vec![(write_type, 1)],
-                ])
-            },
-            Self::CoinTransfer => {
-                request.transaction_type(TransactionType::default_coin_transfer())
-            },
-            Self::NoOpUnique | Self::CoinTransferUnique => {
-                let write_type = if let Self::CoinTransferUnique = self {
-                    TransactionType::CoinTransfer {
-                        invalid_transaction_ratio: 0,
-                        sender_use_account_pool: true,
-                    }
-                } else {
-                    TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::Nop,
-                        num_modules: 1,
-                        use_account_pool: true,
-                    }
-                };
-                request.transaction_mix_per_phase(vec![
-                    // warmup
-                    vec![(account_creation_type, 1)],
-                    vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
-                    // cooldown
-                    vec![(write_type, 1)],
-                ])
-            },
-            Self::NftMint => request.transaction_type(TransactionType::NftMintAndTransfer),
-            Self::TokenV1 => request.transaction_type(TransactionType::CallCustomModules {
-                entry_point: EntryPoints::TokenV1MintAndTransferNFTParallel,
-                num_modules: 1,
-                use_account_pool: false,
-            }),
+        if self.unique_senders {
+            request.transaction_type(self.transaction_type.materialize(self.num_modules, false))
+        } else {
+            let write_type = self.transaction_type.materialize(self.num_modules, true);
+            request.transaction_mix_per_phase(vec![
+                // warmup
+                vec![(account_creation_type, 1)],
+                vec![(account_creation_type, 1)],
+                vec![(write_type, 1)],
+                // cooldown
+                vec![(write_type, 1)],
+            ])
         }
     }
 }
 
-impl Display for TransactinWorkload {
+impl Display for TransactionWorkload {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Debug::fmt(self, f)
     }
 }
 
 pub struct LoadVsPerfBenchmark {
-    pub test: &'static dyn NetworkLoadTest,
+    pub test: Box<dyn NetworkLoadTest>,
     pub workloads: Workloads,
+    pub criteria: Vec<SuccessCriteria>,
 }
 
 impl Test for LoadVsPerfBenchmark {
@@ -217,7 +141,14 @@ impl LoadVsPerfBenchmark {
 }
 
 impl NetworkTest for LoadVsPerfBenchmark {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+        assert!(
+            self.criteria.is_empty() || self.criteria.len() == self.workloads.len(),
+            "Invalid config, {} criteria and {} workloads given",
+            self.criteria.len(),
+            self.workloads.len(),
+        );
+
         let _runtime = Runtime::new().unwrap();
         let individual_with_buffer = ctx
             .global_duration
@@ -245,38 +176,65 @@ impl NetworkTest for LoadVsPerfBenchmark {
             // let mut aptos_info = ctx.swarm().aptos_public_info();
             // runtime.block_on(aptos_info.reconfig());
 
-            println!(
-                "{: <30} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
-                "workload",
-                "submitted/s",
-                "committed/s",
-                "expired/s",
-                "rejected/s",
-                "chain txn/s",
-                "latency",
-                "p50 lat",
-                "p90 lat",
-                "p99 lat",
-                "actual dur"
-            );
-            for result in &results {
-                let rate = result.stats.rate();
-                println!(
-                    "{: <30} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
-                    result.name,
-                    rate.submitted,
-                    rate.committed,
-                    rate.expired,
-                    rate.failed_submission,
-                    result.ledger_transactions / result.actual_duration.as_secs(),
-                    rate.latency,
-                    rate.p50_latency,
-                    rate.p90_latency,
-                    rate.p99_latency,
-                    result.actual_duration.as_secs()
-                )
+            let table = to_table(&results);
+            for line in table {
+                info!("{}", line);
+            }
+        }
+
+        let table = to_table(&results);
+        for line in table {
+            ctx.report.report_text(line);
+        }
+        for (index, result) in results.iter().enumerate() {
+            let rate = result.stats.rate();
+            if let Some(criteria) = self.criteria.get(index) {
+                SuccessCriteriaChecker::check_core_for_success(
+                    criteria,
+                    ctx.report,
+                    &rate,
+                    Some(result.name.clone()),
+                )?;
             }
         }
         Ok(())
     }
+}
+
+fn to_table(results: &[SingleRunStats]) -> Vec<String> {
+    let mut table = Vec::new();
+    table.push(format!(
+        "{: <30} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+        "workload",
+        "submitted/s",
+        "committed/s",
+        "expired/s",
+        "rejected/s",
+        "chain txn/s",
+        "latency",
+        "p50 lat",
+        "p90 lat",
+        "p99 lat",
+        "actual dur"
+    ));
+
+    for result in results {
+        let rate = result.stats.rate();
+        table.push(format!(
+            "{: <30} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+            result.name,
+            rate.submitted,
+            rate.committed,
+            rate.expired,
+            rate.failed_submission,
+            result.ledger_transactions / result.actual_duration.as_secs(),
+            rate.latency,
+            rate.p50_latency,
+            rate.p90_latency,
+            rate.p99_latency,
+            result.actual_duration.as_secs()
+        ));
+    }
+
+    table
 }

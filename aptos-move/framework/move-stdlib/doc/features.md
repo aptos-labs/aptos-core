@@ -6,6 +6,28 @@
 Defines feature flags for Aptos. Those are used in Aptos specific implementations of features in
 the Move stdlib, the Aptos stdlib, and the Aptos framework.
 
+============================================================================================
+Feature Flag Definitions
+
+Each feature flag should come with documentation which justifies the need of the flag.
+Introduction of a new feature flag requires approval of framework owners. Be frugal when
+introducing new feature flags, as too many can make it hard to understand the code.
+
+Each feature flag should come with a specification of a lifetime:
+
+- a *transient* feature flag is only needed until a related code rollout has happened. This
+is typically associated with the introduction of new native Move functions, and is only used
+from Move code. The owner of this feature is obliged to remove it once this can be done.
+
+- a *permanent* feature flag is required to stay around forever. Typically, those flags guard
+behavior in native code, and the behavior with or without the feature need to be preserved
+for playback.
+
+Note that removing a feature flag still requires the function which tests for the feature
+(like <code>code_dependency_check_enabled</code> below) to stay around for compatibility reasons, as it
+is a public function. However, once the feature flag is disabled, those functions can constantly
+return true.
+
 
 -  [Resource `Features`](#0x1_features_Features)
 -  [Constants](#@Constants_0)
@@ -37,6 +59,11 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `periodical_reward_rate_decrease_enabled`](#0x1_features_periodical_reward_rate_decrease_enabled)
 -  [Function `get_partial_governance_voting`](#0x1_features_get_partial_governance_voting)
 -  [Function `partial_governance_voting_enabled`](#0x1_features_partial_governance_voting_enabled)
+-  [Function `get_delegation_pool_partial_governance_voting`](#0x1_features_get_delegation_pool_partial_governance_voting)
+-  [Function `delegation_pool_partial_governance_voting_enabled`](#0x1_features_delegation_pool_partial_governance_voting_enabled)
+-  [Function `gas_payer_enabled`](#0x1_features_gas_payer_enabled)
+-  [Function `get_auids`](#0x1_features_get_auids)
+-  [Function `auids_enabled`](#0x1_features_auids_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -102,6 +129,17 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_APTOS_UNIQUE_IDENTIFIERS"></a>
+
+Whether enable MOVE functions to call create_auid method to create AUIDs.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a>: u64 = 23;
+</code></pre>
+
+
+
 <a name="0x1_features_BLAKE2B_256_NATIVE"></a>
 
 Whether the new BLAKE2B-256 hash function native is enabled.
@@ -122,6 +160,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>: u64 = 13;
+</code></pre>
+
+
+
+<a name="0x1_features_CHARGE_INVARIANT_VIOLATION"></a>
+
+Charge invariant violation error.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_CHARGE_INVARIANT_VIOLATION">CHARGE_INVARIANT_VIOLATION</a>: u64 = 20;
 </code></pre>
 
 
@@ -172,6 +221,17 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING"></a>
+
+Whether enable paritial governance voting on delegation_pool.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING">DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING</a>: u64 = 21;
+</code></pre>
+
+
+
 <a name="0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH"></a>
 
 Whether native_public_key_validate aborts when a public key of the wrong length is given
@@ -189,6 +249,17 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_features_GAS_PAYER_ENABLED"></a>
+
+Whether alternate gas payer is supported
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>: u64 = 22;
 </code></pre>
 
 
@@ -217,7 +288,7 @@ Lifetime: transient
 
 <a name="0x1_features_PARTIAL_GOVERNANCE_VOTING"></a>
 
-Whether enable paritial governance voting.
+Whether enable paritial governance voting on aptos_governance.
 Lifetime: transient
 
 
@@ -941,6 +1012,122 @@ Lifetime: transient
 
 </details>
 
+<a name="0x1_features_get_delegation_pool_partial_governance_voting"></a>
+
+## Function `get_delegation_pool_partial_governance_voting`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_partial_governance_voting">get_delegation_pool_partial_governance_voting</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_partial_governance_voting">get_delegation_pool_partial_governance_voting</a>(): u64 { <a href="features.md#0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING">DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_delegation_pool_partial_governance_voting_enabled"></a>
+
+## Function `delegation_pool_partial_governance_voting_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">delegation_pool_partial_governance_voting_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">delegation_pool_partial_governance_voting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING">DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_gas_payer_enabled"></a>
+
+## Function `gas_payer_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_gas_payer_enabled">gas_payer_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_gas_payer_enabled">gas_payer_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_auids"></a>
+
+## Function `get_auids`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_auids">get_auids</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_auids">get_auids</a>(): u64 { <a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_auids_enabled"></a>
+
+## Function `auids_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_auids_enabled">auids_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_auids_enabled">auids_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -964,18 +1151,12 @@ Function to enable and disable features. Can only be called by a signer of @std.
         <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a>{<a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[]})
     };
     <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
-    <b>let</b> i = 0;
-    <b>let</b> n = <a href="vector.md#0x1_vector_length">vector::length</a>(&enable);
-    <b>while</b> (i &lt; n) {
-        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *<a href="vector.md#0x1_vector_borrow">vector::borrow</a>(&enable, i), <b>true</b>);
-        i = i + 1
-    };
-    <b>let</b> i = 0;
-    <b>let</b> n = <a href="vector.md#0x1_vector_length">vector::length</a>(&disable);
-    <b>while</b> (i &lt; n) {
-        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *<a href="vector.md#0x1_vector_borrow">vector::borrow</a>(&disable, i), <b>false</b>);
-        i = i + 1
-    };
+    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
+    });
+    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&disable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
+    });
 }
 </code></pre>
 
@@ -1199,6 +1380,17 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">spec_periodical_reward_rate_decrease_enabled</a>(): bool {
    <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>)
+}
+</code></pre>
+
+
+
+
+<a name="0x1_features_spec_gas_payer_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_gas_payer_enabled">spec_gas_payer_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>)
 }
 </code></pre>
 

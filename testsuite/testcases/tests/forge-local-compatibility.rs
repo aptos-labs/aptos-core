@@ -12,9 +12,9 @@ fn main() -> Result<()> {
     let tests = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .with_initial_version(InitialVersion::Oldest)
-        .with_network_tests(vec![&SimpleValidatorUpgrade]);
+        .add_network_test(SimpleValidatorUpgrade);
 
-    let options = Options::from_args();
+    let options = Options::parse();
     forge_main(
         tests,
         LocalFactory::with_upstream_merge_base_and_workspace()?,

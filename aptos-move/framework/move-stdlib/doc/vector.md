@@ -36,9 +36,32 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `index_of`](#0x1_vector_index_of)
 -  [Function `insert`](#0x1_vector_insert)
 -  [Function `remove`](#0x1_vector_remove)
+-  [Function `remove_value`](#0x1_vector_remove_value)
 -  [Function `swap_remove`](#0x1_vector_swap_remove)
+-  [Function `for_each`](#0x1_vector_for_each)
+-  [Function `for_each_reverse`](#0x1_vector_for_each_reverse)
+-  [Function `for_each_ref`](#0x1_vector_for_each_ref)
+-  [Function `zip`](#0x1_vector_zip)
+-  [Function `zip_reverse`](#0x1_vector_zip_reverse)
+-  [Function `zip_ref`](#0x1_vector_zip_ref)
+-  [Function `enumerate_ref`](#0x1_vector_enumerate_ref)
+-  [Function `for_each_mut`](#0x1_vector_for_each_mut)
+-  [Function `zip_mut`](#0x1_vector_zip_mut)
+-  [Function `enumerate_mut`](#0x1_vector_enumerate_mut)
+-  [Function `fold`](#0x1_vector_fold)
+-  [Function `foldr`](#0x1_vector_foldr)
+-  [Function `map_ref`](#0x1_vector_map_ref)
+-  [Function `zip_map_ref`](#0x1_vector_zip_map_ref)
+-  [Function `map`](#0x1_vector_map)
+-  [Function `zip_map`](#0x1_vector_zip_map)
+-  [Function `filter`](#0x1_vector_filter)
+-  [Function `partition`](#0x1_vector_partition)
 -  [Function `rotate`](#0x1_vector_rotate)
 -  [Function `rotate_slice`](#0x1_vector_rotate_slice)
+-  [Function `stable_partition`](#0x1_vector_stable_partition)
+-  [Function `any`](#0x1_vector_any)
+-  [Function `all`](#0x1_vector_all)
+-  [Function `destroy`](#0x1_vector_destroy)
 -  [Specification](#@Specification_1)
     -  [Helper Functions](#@Helper_Functions_2)
     -  [Function `singleton`](#@Specification_1_singleton)
@@ -53,6 +76,7 @@ the return on investment didn't seem worth it for these simple functions.
     -  [Function `index_of`](#@Specification_1_index_of)
     -  [Function `insert`](#@Specification_1_insert)
     -  [Function `remove`](#@Specification_1_remove)
+    -  [Function `remove_value`](#@Specification_1_remove_value)
     -  [Function `swap_remove`](#@Specification_1_swap_remove)
     -  [Function `rotate`](#@Specification_1_rotate)
     -  [Function `rotate_slice`](#@Specification_1_rotate_slice)
@@ -87,6 +111,16 @@ The index into the vector is out of bounds
 
 
 
+<a name="0x1_vector_EVECTORS_LENGTH_MISMATCH"></a>
+
+The length of the vectors are not equal.
+
+
+<pre><code><b>const</b> <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a>: u64 = 131074;
+</code></pre>
+
+
+
 <a name="0x1_vector_empty"></a>
 
 ## Function `empty`
@@ -94,7 +128,8 @@ The index into the vector is out of bounds
 Create an empty vector.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_empty">empty</a>&lt;Element&gt;(): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_empty">empty</a>&lt;Element&gt;(): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
 </code></pre>
 
 
@@ -117,7 +152,8 @@ Create an empty vector.
 Return the length of the vector.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_length">length</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): u64
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_length">length</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): u64
 </code></pre>
 
 
@@ -141,7 +177,8 @@ Acquire an immutable reference to the <code>i</code>th element of the vector <co
 Aborts if <code>i</code> is out of bounds.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_borrow">borrow</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): &Element
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_borrow">borrow</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): &Element
 </code></pre>
 
 
@@ -164,7 +201,8 @@ Aborts if <code>i</code> is out of bounds.
 Add element <code>e</code> to the end of the vector <code>v</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_push_back">push_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element)
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_push_back">push_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element)
 </code></pre>
 
 
@@ -188,7 +226,8 @@ Return a mutable reference to the <code>i</code>th element in the vector <code>v
 Aborts if <code>i</code> is out of bounds.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): &<b>mut</b> Element
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): &<b>mut</b> Element
 </code></pre>
 
 
@@ -212,7 +251,8 @@ Pop an element from the end of vector <code>v</code>.
 Aborts if <code>v</code> is empty.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_pop_back">pop_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): Element
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_pop_back">pop_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): Element
 </code></pre>
 
 
@@ -236,7 +276,8 @@ Destroy the vector <code>v</code>.
 Aborts if <code>v</code> is not empty.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
 </code></pre>
 
 
@@ -260,7 +301,8 @@ Swaps the elements at the <code>i</code>th and <code>j</code>th indices in the v
 Aborts if <code>i</code> or <code>j</code> is out of bounds.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_swap">swap</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, j: u64)
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_swap">swap</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, j: u64)
 </code></pre>
 
 
@@ -629,6 +671,43 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
+<a name="0x1_vector_remove_value"></a>
+
+## Function `remove_value`
+
+Remove the first occurrence of a given value in the vector <code>v</code> and return it in a vector, shifting all
+subsequent elements.
+This is O(n) and preserves ordering of elements in the vector.
+This returns an empty vector if the value isn't present in the vector.
+Note that this cannot return an option as option uses vector and there'd be a circular dependency between option
+and vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_remove_value">remove_value</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, val: &Element): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_remove_value">remove_value</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, val: &Element): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
+    // This doesn't cost a O(2N) run time <b>as</b> index_of scans from left <b>to</b> right and stops when the element is found,
+    // <b>while</b> remove would <b>continue</b> from the identified index <b>to</b> the end of the <a href="vector.md#0x1_vector">vector</a>.
+    <b>let</b> (found, index) = <a href="vector.md#0x1_vector_index_of">index_of</a>(v, val);
+    <b>if</b> (found) {
+        <a href="vector.md#0x1_vector">vector</a>[<a href="vector.md#0x1_vector_remove">remove</a>(v, index)]
+    } <b>else</b> {
+       <a href="vector.md#0x1_vector">vector</a>[]
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vector_swap_remove"></a>
 
 ## Function `swap_remove`
@@ -652,6 +731,598 @@ Aborts if <code>i</code> is out of bounds.
     <b>let</b> last_idx = <a href="vector.md#0x1_vector_length">length</a>(v) - 1;
     <a href="vector.md#0x1_vector_swap">swap</a>(v, i, last_idx);
     <a href="vector.md#0x1_vector_pop_back">pop_back</a>(v)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_for_each"></a>
+
+## Function `for_each`
+
+Apply the function to each element in the vector, consuming it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each">for_each</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each">for_each</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|) {
+    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> v); // We need <b>to</b> reverse the <a href="vector.md#0x1_vector">vector</a> <b>to</b> consume it efficiently
+    <a href="vector.md#0x1_vector_for_each_reverse">for_each_reverse</a>(v, |e| f(e));
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_for_each_reverse"></a>
+
+## Function `for_each_reverse`
+
+Apply the function to each element in the vector, consuming it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each_reverse">for_each_reverse</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each_reverse">for_each_reverse</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|) {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(&v);
+    <b>while</b> (len &gt; 0) {
+        f(<a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> v));
+        len = len - 1;
+    };
+    <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>(v)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_for_each_ref"></a>
+
+## Function `for_each_ref`
+
+Apply the function to a reference of each element in the vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each_ref">for_each_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each_ref">for_each_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        f(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip"></a>
+
+## Function `zip`
+
+Apply the function to each pair of elements in the two given vectors, consuming them.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip">zip</a>&lt;Element1, Element2&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(Element1, Element2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip">zip</a>&lt;Element1, Element2&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |Element1, Element2|) {
+    // We need <b>to</b> reverse the vectors <b>to</b> consume it efficiently
+    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> v1);
+    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> v2);
+    <a href="vector.md#0x1_vector_zip_reverse">zip_reverse</a>(v1, v2, |e1, e2| f(e1, e2));
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_reverse"></a>
+
+## Function `zip_reverse`
+
+Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.
+This errors out if the vectors are not of the same length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_reverse">zip_reverse</a>&lt;Element1, Element2&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(Element1, Element2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_reverse">zip_reverse</a>&lt;Element1, Element2&gt;(
+    v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |Element1, Element2|,
+) {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(&v1);
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(len == <a href="vector.md#0x1_vector_length">length</a>(&v2), 0x20002);
+    <b>while</b> (len &gt; 0) {
+        f(<a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> v1), <a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> v2));
+        len = len - 1;
+    };
+    <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>(v1);
+    <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>(v2);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_ref"></a>
+
+## Function `zip_ref`
+
+Apply the function to the references of each pair of elements in the two given vectors.
+This errors out if the vectors are not of the same length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_ref">zip_ref</a>&lt;Element1, Element2&gt;(v1: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(&Element1, &Element2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_ref">zip_ref</a>&lt;Element1, Element2&gt;(
+    v1: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |&Element1, &Element2|,
+) {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v1);
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(len == <a href="vector.md#0x1_vector_length">length</a>(v2), 0x20002);
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; len) {
+        f(<a href="vector.md#0x1_vector_borrow">borrow</a>(v1, i), <a href="vector.md#0x1_vector_borrow">borrow</a>(v2, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_enumerate_ref"></a>
+
+## Function `enumerate_ref`
+
+Apply the function to a reference of each element in the vector with its index.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_ref">enumerate_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |(u64, &Element)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_enumerate_ref">enumerate_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |u64, &Element|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        f(i, <a href="vector.md#0x1_vector_borrow">borrow</a>(v, i));
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_for_each_mut"></a>
+
+## Function `for_each_mut`
+
+Apply the function to a mutable reference to each element in the vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each_mut">for_each_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&<b>mut</b> Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each_mut">for_each_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&<b>mut</b> Element|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        f(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_mut"></a>
+
+## Function `zip_mut`
+
+Apply the function to mutable references to each pair of elements in the two given vectors.
+This errors out if the vectors are not of the same length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_mut">zip_mut</a>&lt;Element1, Element2&gt;(v1: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(&<b>mut</b> Element1, &<b>mut</b> Element2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_mut">zip_mut</a>&lt;Element1, Element2&gt;(
+    v1: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |&<b>mut</b> Element1, &<b>mut</b> Element2|,
+) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v1);
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(len == <a href="vector.md#0x1_vector_length">length</a>(v2), 0x20002);
+    <b>while</b> (i &lt; len) {
+        f(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v1, i), <a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v2, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_enumerate_mut"></a>
+
+## Function `enumerate_mut`
+
+Apply the function to a mutable reference of each element in the vector with its index.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_mut">enumerate_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |(u64, &<b>mut</b> Element)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_enumerate_mut">enumerate_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |u64, &<b>mut</b> Element|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        f(i, <a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v, i));
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_fold"></a>
+
+## Function `fold`
+
+Fold the function over the elements. For example, <code><a href="vector.md#0x1_vector_fold">fold</a>(<a href="vector.md#0x1_vector">vector</a>[1,2,3], 0, f)</code> will execute
+<code>f(f(f(0, 1), 2), 3)</code>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_fold">fold</a>&lt;Accumulator, Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, init: Accumulator, f: |(Accumulator, Element)|Accumulator): Accumulator
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_fold">fold</a>&lt;Accumulator, Element&gt;(
+    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    init: Accumulator,
+    f: |Accumulator,Element|Accumulator
+): Accumulator {
+    <b>let</b> accu = init;
+    <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| accu = f(accu, elem));
+    accu
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_foldr"></a>
+
+## Function `foldr`
+
+Fold right like fold above but working right to left. For example, <code><a href="vector.md#0x1_vector_fold">fold</a>(<a href="vector.md#0x1_vector">vector</a>[1,2,3], 0, f)</code> will execute
+<code>f(1, f(2, f(3, 0)))</code>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_foldr">foldr</a>&lt;Accumulator, Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, init: Accumulator, f: |(Element, Accumulator)|Accumulator): Accumulator
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_foldr">foldr</a>&lt;Accumulator, Element&gt;(
+    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    init: Accumulator,
+    f: |Element, Accumulator|Accumulator
+): Accumulator {
+    <b>let</b> accu = init;
+    <a href="vector.md#0x1_vector_for_each_reverse">for_each_reverse</a>(v, |elem| accu = f(elem, accu));
+    accu
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_map_ref"></a>
+
+## Function `map_ref`
+
+Map the function over the references of the elements of the vector, producing a new vector without modifying the
+original vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_map_ref">map_ref</a>&lt;Element, NewElement&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_map_ref">map_ref</a>&lt;Element, NewElement&gt;(
+    v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    f: |&Element|NewElement
+): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
+    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
+    <a href="vector.md#0x1_vector_for_each_ref">for_each_ref</a>(v, |elem| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(elem)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_map_ref"></a>
+
+## Function `zip_map_ref`
+
+Map the function over the references of the element pairs of two vectors, producing a new vector from the return
+values without modifying the original vectors.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_map_ref">zip_map_ref</a>&lt;Element1, Element2, NewElement&gt;(v1: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(&Element1, &Element2)|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_map_ref">zip_map_ref</a>&lt;Element1, Element2, NewElement&gt;(
+    v1: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |&Element1, &Element2|NewElement
+): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(<a href="vector.md#0x1_vector_length">length</a>(v1) == <a href="vector.md#0x1_vector_length">length</a>(v2), 0x20002);
+
+    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
+    <a href="vector.md#0x1_vector_zip_ref">zip_ref</a>(v1, v2, |e1, e2| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(e1, e2)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_map"></a>
+
+## Function `map`
+
+Map the function over the elements of the vector, producing a new vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_map">map</a>&lt;Element, NewElement&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_map">map</a>&lt;Element, NewElement&gt;(
+    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    f: |Element|NewElement
+): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
+    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
+    <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(elem)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_map"></a>
+
+## Function `zip_map`
+
+Map the function over the element pairs of the two vectors, producing a new vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_map">zip_map</a>&lt;Element1, Element2, NewElement&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(Element1, Element2)|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_map">zip_map</a>&lt;Element1, Element2, NewElement&gt;(
+    v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |Element1, Element2|NewElement
+): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(<a href="vector.md#0x1_vector_length">length</a>(&v1) == <a href="vector.md#0x1_vector_length">length</a>(&v2), 0x20002);
+
+    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
+    <a href="vector.md#0x1_vector_zip">zip</a>(v1, v2, |e1, e2| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(e1, e2)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_filter"></a>
+
+## Function `filter`
+
+Filter the vector using the boolean function, removing all elements for which <code>p(e)</code> is not true.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_filter">filter</a>&lt;Element: drop&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, p: |&Element|bool): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_filter">filter</a>&lt;Element:drop&gt;(
+    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    p: |&Element|bool
+): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
+    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;[];
+    <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| {
+        <b>if</b> (p(&elem)) <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, elem);
+    });
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_partition"></a>
+
+## Function `partition`
+
+Partition, sorts all elements for which pred is true to the front.
+Preserves the relative order of the elements for which pred is true,
+BUT NOT for the elements for which pred is false.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_partition">partition</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, pred: |&Element|bool): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_partition">partition</a>&lt;Element&gt;(
+    v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    pred: |&Element|bool
+): u64 {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        <b>if</b> (!pred(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i))) <b>break</b>;
+        i = i + 1;
+    };
+    <b>let</b> p = i;
+    i = i + 1;
+    <b>while</b> (i &lt; len) {
+        <b>if</b> (pred(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i))) {
+            <a href="vector.md#0x1_vector_swap">swap</a>(v, p, i);
+            p = p + 1;
+        };
+        i = i + 1;
+    };
+    p
 }
 </code></pre>
 
@@ -716,6 +1387,153 @@ returns the
     <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, rot, right);
     <a href="vector.md#0x1_vector_reverse_slice">reverse_slice</a>(v, left, right);
     left + (right - rot)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_stable_partition"></a>
+
+## Function `stable_partition`
+
+Partition the array based on a predicate p, this routine is stable and thus
+preserves the relative order of the elements in the two partitions.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_stable_partition">stable_partition</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, p: |&Element|bool): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_stable_partition">stable_partition</a>&lt;Element&gt;(
+    v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    p: |&Element|bool
+): u64 {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>let</b> t = <a href="vector.md#0x1_vector_empty">empty</a>();
+    <b>let</b> f = <a href="vector.md#0x1_vector_empty">empty</a>();
+    <b>while</b> (len &gt; 0) {
+        <b>let</b> e = <a href="vector.md#0x1_vector_pop_back">pop_back</a>(v);
+        <b>if</b> (p(&e)) {
+            <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> t, e);
+        } <b>else</b> {
+            <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> f, e);
+        };
+        len = len - 1;
+    };
+    <b>let</b> pos = <a href="vector.md#0x1_vector_length">length</a>(&t);
+    <a href="vector.md#0x1_vector_reverse_append">reverse_append</a>(v, t);
+    <a href="vector.md#0x1_vector_reverse_append">reverse_append</a>(v, f);
+    pos
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_any"></a>
+
+## Function `any`
+
+Return true if any element in the vector satisfies the predicate.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_any">any</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, p: |&Element|bool): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_any">any</a>&lt;Element&gt;(
+    v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    p: |&Element|bool
+): bool {
+    <b>let</b> result = <b>false</b>;
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; <a href="vector.md#0x1_vector_length">length</a>(v)) {
+        result = p(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i));
+        <b>if</b> (result) {
+            <b>break</b>
+        };
+        i = i + 1
+    };
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_all"></a>
+
+## Function `all`
+
+Return true if all elements in the vector satisfy the predicate.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_all">all</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, p: |&Element|bool): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_all">all</a>&lt;Element&gt;(
+    v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    p: |&Element|bool
+): bool {
+    <b>let</b> result = <b>true</b>;
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; <a href="vector.md#0x1_vector_length">length</a>(v)) {
+        result = p(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i));
+        <b>if</b> (!result) {
+            <b>break</b>
+        };
+        i = i + 1
+    };
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_destroy"></a>
+
+## Function `destroy`
+
+Destroy a vector, just a wrapper around for_each_reverse with a descriptive name
+when used in the context of destroying a vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_destroy">destroy</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, d: |Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_destroy">destroy</a>&lt;Element&gt;(
+    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    d: |Element|
+) {
+    <a href="vector.md#0x1_vector_for_each_reverse">for_each_reverse</a>(v, |e| d(e))
 }
 </code></pre>
 
@@ -985,6 +1803,22 @@ Check if <code>v</code> contains <code>e</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_remove">remove</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): Element
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_remove_value"></a>
+
+### Function `remove_value`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_remove_value">remove_value</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, val: &Element): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
 </code></pre>
 
 

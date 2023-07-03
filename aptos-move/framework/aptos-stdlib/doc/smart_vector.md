@@ -7,6 +7,7 @@
 
 -  [Struct `SmartVector`](#0x1_smart_vector_SmartVector)
 -  [Constants](#@Constants_0)
+-  [Function `new`](#0x1_smart_vector_new)
 -  [Function `empty`](#0x1_smart_vector_empty)
 -  [Function `empty_with_config`](#0x1_smart_vector_empty_with_config)
 -  [Function `singleton`](#0x1_smart_vector_singleton)
@@ -30,7 +31,10 @@
     -  [Function `empty_with_config`](#@Specification_1_empty_with_config)
     -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
     -  [Function `borrow`](#@Specification_1_borrow)
+    -  [Function `append`](#@Specification_1_append)
+    -  [Function `push_back`](#@Specification_1_push_back)
     -  [Function `pop_back`](#@Specification_1_pop_back)
+    -  [Function `remove`](#@Specification_1_remove)
     -  [Function `swap_remove`](#@Specification_1_swap_remove)
     -  [Function `swap`](#@Specification_1_swap)
 
@@ -138,16 +142,44 @@ bucket_size cannot be 0
 
 
 
-<a name="0x1_smart_vector_empty"></a>
+<a name="0x1_smart_vector_new"></a>
 
-## Function `empty`
+## Function `new`
 
 Regular Vector API
 Create an empty vector using default logic to estimate <code>inline_capacity</code> and <code>bucket_size</code>, which may be
 inaccurate.
+This is exactly the same as empty() but is more standardized as all other data structures have new().
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_new">new</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_new">new</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt; {
+    <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_empty"></a>
+
+## Function `empty`
+
+Create an empty vector using default logic to estimate <code>inline_capacity</code> and <code>bucket_size</code>, which may be
+inaccurate.
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
 </code></pre>
 
 
@@ -814,7 +846,8 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 ### Function `empty`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
 </code></pre>
 
 
@@ -878,6 +911,38 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 
+<a name="@Specification_1_append"></a>
+
+### Function `append`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_append">append</a>&lt;T: store&gt;(lhs: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, other: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_push_back"></a>
+
+### Function `push_back`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>&lt;T: store&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, val: T)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_pop_back"></a>
 
 ### Function `pop_back`
@@ -889,7 +954,8 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 
-<pre><code><b>aborts_if</b>  <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec)
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>aborts_if</b>  <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec)
     &&
     (<a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec).buckets) == 0);
 <b>aborts_if</b> <a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>(v);
@@ -897,6 +963,22 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
     (<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
 );
 <b>ensures</b> <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v) == <a href="smart_vector.md#0x1_smart_vector_length">length</a>(<b>old</b>(v)) - 1;
+</code></pre>
+
+
+
+<a name="@Specification_1_remove"></a>
+
+### Function `remove`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_remove">remove</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, i: u64): T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

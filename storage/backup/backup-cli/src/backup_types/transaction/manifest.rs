@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 /// A chunk of a transaction backup manifest to represent the
 /// [`first_version`, `last_version`] range (right side inclusive).
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct TransactionChunk {
     pub first_version: Version,
     pub last_version: Version,

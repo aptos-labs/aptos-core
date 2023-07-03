@@ -8,22 +8,22 @@
 //! system, as well as type checking it and translating it to the spec language ast.
 
 use crate::{
-    ast::{Attribute, ModuleName, Operation, QualifiedSymbol, Spec, Value},
-    builder::spec_builtins,
+    ast::{Address, Attribute, ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FunId, FunctionVisibility, GlobalEnv, Loc, ModuleId, QualifiedId, SpecFunId, SpecVarId,
-        StructId,
+        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, SpecFunId,
+        SpecVarId, StructId, TypeParameter,
     },
-    project_2nd,
     symbol::Symbol,
     ty::Type,
 };
 use codespan_reporting::diagnostic::Severity;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
+use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
-use num::BigUint;
+use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A builder is used to enter a sequence of modules in acyclic dependency order into the model. The
@@ -36,7 +36,7 @@ pub(crate) struct ModelBuilder<'env> {
     pub env: &'env mut GlobalEnv,
     /// A symbol table for specification functions. Because of overloading, and entry can
     /// contain multiple functions.
-    pub spec_fun_table: BTreeMap<QualifiedSymbol, Vec<SpecFunEntry>>,
+    pub spec_fun_table: BTreeMap<QualifiedSymbol, Vec<SpecOrBuiltinFunEntry>>,
     /// A symbol table for specification variables.
     pub spec_var_table: BTreeMap<QualifiedSymbol, SpecVarEntry>,
     /// A symbol table for specification schemas.
@@ -60,14 +60,23 @@ pub(crate) struct ModelBuilder<'env> {
 }
 
 /// A declaration of a specification function or operator in the builders state.
+/// TODO(wrwg): we should unify this type with `FunEntry` using a new `FunctionKind::Spec` kind.
 #[derive(Debug, Clone)]
-pub(crate) struct SpecFunEntry {
+pub(crate) struct SpecOrBuiltinFunEntry {
     #[allow(dead_code)]
     pub loc: Loc,
     pub oper: Operation,
-    pub type_params: Vec<Type>,
-    pub arg_types: Vec<Type>,
+    pub type_params: Vec<TypeParameter>,
+    pub params: Vec<Parameter>,
     pub result_type: Type,
+    pub visibility: EntryVisibility,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum EntryVisibility {
+    Spec,
+    Impl,
+    SpecAndImpl,
 }
 
 /// A declaration of a specification variable in the builders state.
@@ -77,7 +86,7 @@ pub(crate) struct SpecVarEntry {
     pub module_id: ModuleId,
     #[allow(dead_code)]
     pub var_id: SpecVarId,
-    pub type_params: Vec<(Symbol, Type)>,
+    pub type_params: Vec<TypeParameter>,
     pub type_: Type,
 }
 
@@ -88,9 +97,9 @@ pub(crate) struct SpecSchemaEntry {
     #[allow(dead_code)]
     pub name: QualifiedSymbol,
     pub module_id: ModuleId,
-    pub type_params: Vec<(Symbol, Type)>,
+    pub type_params: Vec<TypeParameter>,
     // The local variables declared in the schema.
-    pub vars: Vec<(Symbol, Type)>,
+    pub vars: Vec<Parameter>,
     // The specifications in in this schema.
     pub spec: Spec,
     // All variables in scope of this schema, including those introduced by included schemas.
@@ -105,9 +114,8 @@ pub(crate) struct StructEntry {
     pub loc: Loc,
     pub module_id: ModuleId,
     pub struct_id: StructId,
-    #[allow(dead_code)]
-    pub is_resource: bool,
-    pub type_params: Vec<(Symbol, Type)>,
+    pub type_params: Vec<TypeParameter>,
+    pub abilities: AbilitySet,
     pub fields: Option<BTreeMap<Symbol, (usize, Type)>>,
     pub attributes: Vec<Attribute>,
 }
@@ -118,11 +126,11 @@ pub(crate) struct FunEntry {
     pub loc: Loc,
     pub module_id: ModuleId,
     pub fun_id: FunId,
-    pub visibility: FunctionVisibility,
-    pub is_entry: bool,
-    pub is_inline: bool,
-    pub type_params: Vec<(Symbol, Type)>,
-    pub params: Vec<(Symbol, Type)>,
+    pub visibility: Visibility,
+    pub is_native: bool,
+    pub kind: FunctionKind,
+    pub type_params: Vec<TypeParameter>,
+    pub params: Vec<Parameter>,
     pub result_type: Type,
     pub is_pure: bool,
     pub attributes: Vec<Attribute>,
@@ -130,10 +138,45 @@ pub(crate) struct FunEntry {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) enum AnyFunEntry {
+    SpecOrBuiltin(SpecOrBuiltinFunEntry),
+    UserFun(FunEntry),
+}
+
+impl AnyFunEntry {
+    pub fn get_signature(&self) -> (&[TypeParameter], &[Parameter], &Type) {
+        match self {
+            AnyFunEntry::SpecOrBuiltin(e) => (&e.type_params, &e.params, &e.result_type),
+            AnyFunEntry::UserFun(e) => (&e.type_params, &e.params, &e.result_type),
+        }
+    }
+
+    pub fn get_operation(&self) -> Operation {
+        match self {
+            AnyFunEntry::SpecOrBuiltin(e) => e.oper.clone(),
+            AnyFunEntry::UserFun(e) => Operation::MoveFunction(e.module_id, e.fun_id),
+        }
+    }
+}
+
+impl From<SpecOrBuiltinFunEntry> for AnyFunEntry {
+    fn from(value: SpecOrBuiltinFunEntry) -> Self {
+        Self::SpecOrBuiltin(value)
+    }
+}
+
+impl From<FunEntry> for AnyFunEntry {
+    fn from(value: FunEntry) -> Self {
+        Self::UserFun(value)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct ConstEntry {
     pub loc: Loc,
     pub ty: Type,
     pub value: Value,
+    pub visibility: EntryVisibility,
 }
 
 impl<'env> ModelBuilder<'env> {
@@ -152,7 +195,7 @@ impl<'env> ModelBuilder<'env> {
             move_fun_call_graph: BTreeMap::new(),
             intrinsics: Default::default(),
         };
-        spec_builtins::declare_spec_builtins(&mut translator);
+        builtins::declare_builtins(&mut translator);
         translator
     }
 
@@ -172,7 +215,11 @@ impl<'env> ModelBuilder<'env> {
     }
 
     /// Defines a spec function, adding it to the spec fun table.
-    pub fn define_spec_fun(&mut self, name: QualifiedSymbol, entry: SpecFunEntry) {
+    pub fn define_spec_or_builtin_fun(
+        &mut self,
+        name: QualifiedSymbol,
+        entry: SpecOrBuiltinFunEntry,
+    ) {
         // TODO: check whether overloads are distinguishable
         self.spec_fun_table
             .entry(name)
@@ -187,7 +234,7 @@ impl<'env> ModelBuilder<'env> {
         name: QualifiedSymbol,
         module_id: ModuleId,
         var_id: SpecVarId,
-        type_params: Vec<(Symbol, Type)>,
+        type_params: Vec<TypeParameter>,
         type_: Type,
     ) {
         let entry = SpecVarEntry {
@@ -198,7 +245,7 @@ impl<'env> ModelBuilder<'env> {
             type_,
         };
         if let Some(old) = self.spec_var_table.insert(name.clone(), entry) {
-            let var_name = name.display(self.env.symbol_pool());
+            let var_name = name.display(self.env);
             self.error(loc, &format!("duplicate declaration of `{}`", var_name));
             self.error(&old.loc, &format!("previous declaration of `{}`", var_name));
         }
@@ -210,8 +257,8 @@ impl<'env> ModelBuilder<'env> {
         loc: &Loc,
         name: QualifiedSymbol,
         module_id: ModuleId,
-        type_params: Vec<(Symbol, Type)>,
-        vars: Vec<(Symbol, Type)>,
+        type_params: Vec<TypeParameter>,
+        vars: Vec<Parameter>,
     ) {
         let entry = SpecSchemaEntry {
             loc: loc.clone(),
@@ -224,7 +271,7 @@ impl<'env> ModelBuilder<'env> {
             included_spec: Spec::default(),
         };
         if let Some(old) = self.spec_schema_table.insert(name.clone(), entry) {
-            let schema_display = name.display(self.env.symbol_pool());
+            let schema_display = name.display(self.env);
             self.error(
                 loc,
                 &format!("duplicate declaration of `{}`", schema_display),
@@ -245,8 +292,8 @@ impl<'env> ModelBuilder<'env> {
         name: QualifiedSymbol,
         module_id: ModuleId,
         struct_id: StructId,
-        is_resource: bool,
-        type_params: Vec<(Symbol, Type)>,
+        abilities: AbilitySet,
+        type_params: Vec<TypeParameter>,
         fields: Option<BTreeMap<Symbol, (usize, Type)>>,
     ) {
         let entry = StructEntry {
@@ -254,54 +301,23 @@ impl<'env> ModelBuilder<'env> {
             attributes,
             module_id,
             struct_id,
-            is_resource,
+            abilities,
             type_params,
             fields,
         };
-        // Duplicate declarations have been checked by the Move compiler.
-        assert!(self.struct_table.insert(name.clone(), entry).is_none());
+        self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
             .insert((module_id, struct_id), name);
     }
 
     /// Defines a function.
-    pub fn define_fun(
-        &mut self,
-        loc: Loc,
-        attributes: Vec<Attribute>,
-        name: QualifiedSymbol,
-        module_id: ModuleId,
-        fun_id: FunId,
-        visibility: FunctionVisibility,
-        is_entry: bool,
-        is_inline: bool,
-        type_params: Vec<(Symbol, Type)>,
-        params: Vec<(Symbol, Type)>,
-        result_type: Type,
-        inline_specs: BTreeMap<EA::SpecId, EA::SpecBlock>,
-    ) {
-        let entry = FunEntry {
-            loc,
-            attributes,
-            module_id,
-            fun_id,
-            visibility,
-            is_entry,
-            is_inline,
-            type_params,
-            params,
-            result_type,
-            is_pure: false,
-            inline_specs,
-        };
-        // Duplicate declarations have been checked by the Move compiler.
-        assert!(self.fun_table.insert(name, entry).is_none());
+    pub fn define_fun(&mut self, name: QualifiedSymbol, entry: FunEntry) {
+        self.fun_table.insert(name, entry);
     }
 
     /// Defines a constant.
     pub fn define_const(&mut self, name: QualifiedSymbol, entry: ConstEntry) {
-        // Duplicate declarations have been checked by the Move compiler.
-        assert!(self.const_table.insert(name, entry).is_none());
+        self.const_table.insert(name, entry);
     }
 
     pub fn resolve_address(&self, loc: &Loc, addr: &EA::Address) -> NumericalAddress {
@@ -319,11 +335,17 @@ impl<'env> ModelBuilder<'env> {
         self.struct_table
             .get(name)
             .cloned()
-            .map(|e| Type::Struct(e.module_id, e.struct_id, project_2nd(&e.type_params)))
+            .map(|e| {
+                Type::Struct(
+                    e.module_id,
+                    e.struct_id,
+                    TypeParameter::vec_to_formals(&e.type_params),
+                )
+            })
             .unwrap_or_else(|| {
                 self.error(
                     loc,
-                    &format!("undeclared `{}`", name.display_full(self.env.symbol_pool())),
+                    &format!("undeclared `{}`", name.display_full(self.env)),
                 );
                 Type::Error
             })
@@ -333,7 +355,7 @@ impl<'env> ModelBuilder<'env> {
     pub fn warn_unused_schemas(&self) {
         for name in &self.unused_schema_set {
             let entry = self.spec_schema_table.get(name).expect("schema defined");
-            let schema_name = name.display_simple(self.env.symbol_pool()).to_string();
+            let schema_name = name.display_simple(self.env).to_string();
             let module_env = self.env.get_module(entry.module_id);
             // Warn about unused schema only if the module is a target and schema name
             // does not start with 'UNUSED'
@@ -341,7 +363,7 @@ impl<'env> ModelBuilder<'env> {
                 self.env.diag(
                     Severity::Note,
                     &entry.loc,
-                    &format!("unused schema {}", name.display(self.env.symbol_pool())),
+                    &format!("unused schema {}", name.display(self.env)),
                 );
             }
         }
@@ -383,7 +405,10 @@ impl<'env> ModelBuilder<'env> {
 
     /// Returns the name for the pseudo builtin module.
     pub fn builtin_module(&self) -> ModuleName {
-        ModuleName::new(BigUint::default(), self.env.symbol_pool().make("$$"))
+        ModuleName::new(
+            Address::Numerical(AccountAddress::ZERO),
+            self.env.symbol_pool().make("$$"),
+        )
     }
 
     /// Adds a spec function to used_spec_funs set.

@@ -5,8 +5,12 @@ use crate::{
     errors::Error,
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
+use anyhow::anyhow;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
-use aptos_types::{access_path::AccessPath, executable::ModulePath, write_set::WriteOp};
+use aptos_types::{
+    access_path::AccessPath, executable::ModulePath, fee_statement::FeeStatement,
+    write_set::WriteOp,
+};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -178,7 +182,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         txn_idx: TxnIndex,
         input: Vec<ReadDescriptor<K>>,
         output: ExecutionStatus<T, Error<E>>,
-    ) {
+    ) -> anyhow::Result<()> {
         let read_modules: Vec<AccessPath> =
             input.iter().filter_map(|desc| desc.module_path()).collect();
         let written_modules: Vec<AccessPath> = match &output {
@@ -197,11 +201,16 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             {
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
+                return Err(anyhow!(
+                    "[BlockSTM]: Detect module r/w intersection, will fallback to sequential execution"
+                ));
             }
         }
 
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
+
+        Ok(())
     }
 
     pub(crate) fn module_publishing_may_race(&self) -> bool {
@@ -210,6 +219,28 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {
         self.inputs[txn_idx as usize].load_full()
+    }
+
+    /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
+    pub fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
+        match &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .output_status
+        {
+            ExecutionStatus::Success(output) => Some(output.fee_statement()),
+            _ => None,
+        }
+    }
+
+    pub fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
+        if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
+            self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
+                output_status: ExecutionStatus::SkipRest(output),
+            })));
+        } else {
+            unreachable!();
+        }
     }
 
     // Extracts a set of paths written or updated during execution from transaction
@@ -236,7 +267,10 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         usize,
         Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
     ) {
-        self.outputs[txn_idx as usize].load().as_ref().map_or(
+        let ret: (
+            usize,
+            Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
+        ) = self.outputs[txn_idx as usize].load().as_ref().map_or(
             (
                 0,
                 Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
@@ -251,7 +285,8 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
                     Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
                 ),
             },
-        )
+        );
+        ret
     }
 
     // Called when a transaction is committed to record WriteOps for materialized aggregator values
@@ -278,10 +313,10 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<T, Error<E>> {
         let owning_ptr = self.outputs[txn_idx as usize]
             .swap(None)
-            .expect("Output must be recorded after execution");
+            .expect("[BlockSTM]: Output must be recorded after execution");
 
         Arc::try_unwrap(owning_ptr)
             .map(|output| output.output_status)
-            .expect("Output should be uniquely owned after execution")
+            .expect("[BlockSTM]: Output should be uniquely owned after execution")
     }
 }

@@ -5,10 +5,12 @@
 // All modules should be declared below
 mod api_config;
 mod base_config;
+mod config_optimizer;
 mod config_sanitizer;
 mod consensus_config;
 mod error;
 mod execution_config;
+mod gas_estimation_config;
 mod identity_config;
 mod indexer_config;
 mod indexer_grpc_config;
@@ -33,6 +35,7 @@ pub use base_config::*;
 pub use consensus_config::*;
 pub use error::*;
 pub use execution_config::*;
+pub use gas_estimation_config::*;
 pub use identity_config::*;
 pub use indexer_config::*;
 pub use indexer_grpc_config::*;

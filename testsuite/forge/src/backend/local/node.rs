@@ -218,7 +218,7 @@ impl LocalNode {
         }
 
         self.inspection_client()
-            .get_node_metrics()
+            .get_forge_metrics()
             .await
             .map(|_| ())
             .map_err(HealthCheckError::Failure)?;

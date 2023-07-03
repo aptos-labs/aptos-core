@@ -1,0 +1,64 @@
+[package]
+name = "fuzzer-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+aptos-consensus = { workspace = true, features = ["fuzzing"] }
+aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
+aptos-types = { workspace = true }
+arbitrary = "1.3.0"
+bcs = { workspace = true }
+libfuzzer-sys = "0.4"
+move-binary-format = { workspace = true, features = ["fuzzing"] }
+move-bytecode-verifier = { workspace = true }
+move-core-types = { workspace = true, features = ["fuzzing"] }
+move-vm-runtime = { workspace = true }
+move-vm-test-utils = { workspace = true }
+move-vm-types = { workspace = true, features = ["fuzzing"] }
+
+[[bin]]
+name = "move_bytecode_verifier_code_unit"
+path = "fuzz_targets/move/bytecode_verifier_code_unit.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_bytecode_verifier_mixed"
+path = "fuzz_targets/move/bytecode_verifier_mixed.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_value_deserialize"
+path = "fuzz_targets/move/value_deserialize.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_move_value_deserialize"
+path = "fuzz_targets/move/move_value_deserialize.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_move_value_decorate"
+path = "fuzz_targets/move/move_value_decorate.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_execute_entry_function"
+path = "fuzz_targets/move/execute_entry_function.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "signed_transaction_deserialize"
+path = "fuzz_targets/signed_transaction_deserialize.rs"
+test = false
+doc = false

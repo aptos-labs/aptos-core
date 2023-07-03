@@ -6,10 +6,11 @@ use crate::loader::Loader;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChangeSet, ChangeSet, Event, Op},
+    effects::{AccountChanges, ChangeSet, Changes, Event, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
     resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -69,7 +70,24 @@ impl<'r> TransactionDataCache<'r> {
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
     pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<(ChangeSet, Vec<Event>)> {
-        let mut change_set = ChangeSet::new();
+        let resource_converter =
+            |value: Value, layout: MoveTypeLayout| -> PartialVMResult<Vec<u8>> {
+                value.simple_serialize(&layout).ok_or_else(|| {
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                        .with_message(format!("Error when serializing resource {}.", value))
+                })
+            };
+        self.into_custom_effects(&resource_converter, loader)
+    }
+
+    /// Same like `into_effects`, but also allows clients to select the format of
+    /// produced effects for resources.
+    pub(crate) fn into_custom_effects<Resource>(
+        self,
+        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
+        loader: &Loader,
+    ) -> PartialVMResult<(Changes<Vec<u8>, Resource>, Vec<Event>)> {
+        let mut change_set = Changes::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
             for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
@@ -83,39 +101,22 @@ impl<'r> TransactionDataCache<'r> {
 
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv)) in account_data_cache.data_map {
-                let op = match gv.into_effect() {
-                    Some(op) => op,
-                    None => continue,
-                };
-
-                let struct_tag = match loader.type_to_type_tag(&ty)? {
-                    TypeTag::Struct(struct_tag) => *struct_tag,
-                    _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
-                };
-
-                match op {
-                    Op::New(val) => {
-                        let resource_blob = val
-                            .simple_serialize(&layout)
-                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
-                        resources.insert(struct_tag, Op::New(resource_blob));
-                    },
-                    Op::Modify(val) => {
-                        let resource_blob = val
-                            .simple_serialize(&layout)
-                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
-                        resources.insert(struct_tag, Op::Modify(resource_blob));
-                    },
-                    Op::Delete => {
-                        resources.insert(struct_tag, Op::Delete);
-                    },
+                if let Some(op) = gv.into_effect_with_layout(layout) {
+                    let struct_tag = match loader.type_to_type_tag(&ty)? {
+                        TypeTag::Struct(struct_tag) => *struct_tag,
+                        _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
+                    };
+                    resources.insert(
+                        struct_tag,
+                        op.and_then(|(value, layout)| resource_converter(value, layout))?,
+                    );
                 }
             }
             if !modules.is_empty() || !resources.is_empty() {
                 change_set
                     .add_account_changeset(
                         addr,
-                        AccountChangeSet::from_modules_resources(modules, resources),
+                        AccountChanges::from_modules_resources(modules, resources),
                     )
                     .expect("accounts should be unique");
             }
@@ -156,7 +157,7 @@ impl<'r> TransactionDataCache<'r> {
         map.get_mut(k).unwrap()
     }
 
-    // Retrieve data from the local cache or loads it from the remote cache into the local cache.
+    // Retrieves data from the local cache or loads it from the remote cache into the local cache.
     // All operations on the global data are based on this API and they all load the data
     // into the cache.
     pub(crate) fn load_resource(
@@ -164,7 +165,7 @@ impl<'r> TransactionDataCache<'r> {
         loader: &Loader,
         addr: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())
         });
@@ -182,9 +183,23 @@ impl<'r> TransactionDataCache<'r> {
             // TODO(Gas): Shall we charge for this?
             let ty_layout = loader.type_to_type_layout(ty)?;
 
-            let gv = match self.remote.get_resource(&addr, &ty_tag) {
-                Ok(Some(blob)) => {
-                    load_res = Some(Some(NumBytes::new(blob.len() as u64)));
+            let module = loader.get_module(&ty_tag.module_id());
+            let metadata: &[Metadata] = match &module {
+                Some(module) => &module.module().metadata,
+                None => &[],
+            };
+
+            let (data, bytes_loaded) = self
+                .remote
+                .get_resource_with_metadata(&addr, &ty_tag, metadata)
+                .map_err(|err| {
+                    let msg = format!("Unexpected storage error: {:?}", err);
+                    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
+                })?;
+            load_res = Some(NumBytes::new(bytes_loaded as u64));
+
+            let gv = match data {
+                Some(blob) => {
                     let val = match Value::simple_deserialize(&blob, &ty_layout) {
                         Some(val) => val,
                         None => {
@@ -199,17 +214,7 @@ impl<'r> TransactionDataCache<'r> {
 
                     GlobalValue::cached(val)?
                 },
-                Ok(None) => {
-                    load_res = Some(None);
-                    GlobalValue::none()
-                },
-                Err(err) => {
-                    let msg = format!("Unexpected storage error: {:?}", err);
-                    return Err(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(msg),
-                    );
-                },
+                None => GlobalValue::none(),
             };
 
             account_cache.data_map.insert(ty.clone(), (ty_layout, gv));
@@ -238,11 +243,9 @@ impl<'r> TransactionDataCache<'r> {
                 .finish(Location::Undefined)),
             Err(err) => {
                 let msg = format!("Unexpected storage error: {:?}", err);
-                Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(msg)
-                        .finish(Location::Undefined),
-                )
+                Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined))
             },
         }
     }

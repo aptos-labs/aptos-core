@@ -13,7 +13,7 @@ use crate::{
     schema::{coin_balances, current_coin_balances},
     utils::util::standardize_address,
 };
-use aptos_protos::transaction::testing1::v1::WriteResource;
+use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

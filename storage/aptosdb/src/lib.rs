@@ -21,9 +21,11 @@ pub mod errors;
 pub mod metrics;
 pub mod schema;
 pub mod state_restore;
+pub mod utils;
 
 mod db_options;
 mod event_store;
+mod ledger_db;
 mod ledger_store;
 mod lru_node_cache;
 mod pruner;
@@ -31,7 +33,6 @@ mod state_kv_db;
 mod state_merkle_db;
 mod state_store;
 mod transaction_store;
-mod utils;
 mod versioned_node_cache;
 
 #[cfg(test)]
@@ -43,21 +44,16 @@ pub mod db_debugger;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    db_options::{gen_ledger_cfds, ledger_db_column_families, state_merkle_db_column_families},
+    db_options::{ledger_db_column_families, state_merkle_db_column_families},
     errors::AptosDbError,
     event_store::EventStore,
+    ledger_db::LedgerDb,
     ledger_store::LedgerStore,
     metrics::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::{
-        db_pruner::DBPruner, ledger_pruner_manager::LedgerPrunerManager,
-        ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
-        pruner_utils, state_kv_pruner::StateKvPruner,
-        state_kv_pruner_manager::StateKvPrunerManager,
-        state_merkle_pruner_manager::StateMerklePrunerManager, state_store::StateMerklePruner,
-    },
+    pruner::{LedgerPrunerManager, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     schema::*,
     stale_node_index::StaleNodeIndexSchema,
     stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
@@ -74,15 +70,14 @@ use aptos_config::config::{
 use aptos_config::config::{
     BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
-use aptos_crypto::hash::HashValue;
+use aptos_crypto::HashValue;
 use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
-    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
+    DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -99,11 +94,13 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        create_empty_sharded_state_updates,
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
+        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -114,10 +111,11 @@ use aptos_types::{
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use arr_macro::arr;
-use itertools::zip_eq;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use std::{
+    borrow::Borrow,
     collections::HashMap,
     fmt::{Debug, Formatter},
     iter::Iterator,
@@ -277,7 +275,7 @@ impl Drop for RocksdbPropertyReporter {
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
 pub struct AptosDB {
-    ledger_db: Arc<DB>,
+    ledger_db: Arc<LedgerDb>,
     state_merkle_db: Arc<StateMerkleDb>,
     state_kv_db: Arc<StateKvDb>,
     event_store: Arc<EventStore>,
@@ -288,17 +286,21 @@ pub struct AptosDB {
     _rocksdb_property_reporter: RocksdbPropertyReporter,
     ledger_commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
+    skip_index_and_usage: bool,
 }
 
 impl AptosDB {
     fn new_with_dbs(
-        ledger_rocksdb: Arc<DB>,
+        ledger_db: LedgerDb,
         state_merkle_db: StateMerkleDb,
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
+        empty_buffered_state_for_restore: bool,
+        skip_index_and_usage: bool,
     ) -> Self {
+        let ledger_db = Arc::new(ledger_db);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
@@ -312,7 +314,7 @@ impl AptosDB {
         let state_kv_pruner =
             StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
         let state_store = Arc::new(StateStore::new(
-            Arc::clone(&ledger_rocksdb),
+            Arc::clone(&ledger_db),
             Arc::clone(&state_merkle_db),
             Arc::clone(&state_kv_db),
             state_merkle_pruner,
@@ -320,33 +322,34 @@ impl AptosDB {
             state_kv_pruner,
             buffered_state_target_items,
             hack_for_tests,
+            empty_buffered_state_for_restore,
+            skip_index_and_usage,
         ));
 
-        let ledger_pruner = LedgerPrunerManager::new(
-            Arc::clone(&ledger_rocksdb),
-            pruner_config.ledger_pruner_config,
-        );
+        let ledger_pruner =
+            LedgerPrunerManager::new(Arc::clone(&ledger_db), pruner_config.ledger_pruner_config);
 
         AptosDB {
-            ledger_db: Arc::clone(&ledger_rocksdb),
+            ledger_db: Arc::clone(&ledger_db),
             state_merkle_db: Arc::clone(&state_merkle_db),
             state_kv_db: Arc::clone(&state_kv_db),
-            event_store: Arc::new(EventStore::new(Arc::clone(&ledger_rocksdb))),
-            ledger_store: Arc::new(LedgerStore::new(Arc::clone(&ledger_rocksdb))),
+            event_store: Arc::new(EventStore::new(ledger_db.event_db_arc())),
+            ledger_store: Arc::new(LedgerStore::new(Arc::clone(&ledger_db))),
             state_store,
-            transaction_store: Arc::new(TransactionStore::new(Arc::clone(&ledger_rocksdb))),
+            transaction_store: Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),
             ledger_pruner,
             // TODO(grao): Include other DBs.
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
-                Arc::clone(&ledger_rocksdb),
+                ledger_db.metadata_db_arc(),
                 Arc::clone(&state_merkle_db),
             ),
             ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
+            skip_index_and_usage,
         }
     }
 
-    pub fn open<P: AsRef<Path> + Clone>(
+    fn open_internal<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
         pruner_config: PrunerConfig,
@@ -354,6 +357,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        empty_buffered_state_for_restore: bool,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -374,6 +378,8 @@ impl AptosDB {
             pruner_config,
             buffered_state_target_items,
             readonly,
+            empty_buffered_state_for_restore,
+            rocksdb_configs.skip_index_and_usage,
         );
 
         if !readonly && enable_indexer {
@@ -383,38 +389,60 @@ impl AptosDB {
         Ok(myself)
     }
 
+    pub fn open<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        readonly: bool,
+        pruner_config: PrunerConfig,
+        rocksdb_configs: RocksdbConfigs,
+        enable_indexer: bool,
+        buffered_state_target_items: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
+    ) -> Result<Self> {
+        Self::open_internal(
+            db_root_path,
+            readonly,
+            pruner_config,
+            rocksdb_configs,
+            enable_indexer,
+            buffered_state_target_items,
+            max_num_nodes_per_lru_cache_shard,
+            false,
+        )
+    }
+
+    pub fn open_kv_only<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        readonly: bool,
+        pruner_config: PrunerConfig,
+        rocksdb_configs: RocksdbConfigs,
+        enable_indexer: bool,
+        buffered_state_target_items: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
+    ) -> Result<Self> {
+        Self::open_internal(
+            db_root_path,
+            readonly,
+            pruner_config,
+            rocksdb_configs,
+            enable_indexer,
+            buffered_state_target_items,
+            max_num_nodes_per_lru_cache_shard,
+            true,
+        )
+    }
+
     pub fn open_dbs<P: AsRef<Path> + Clone>(
         db_root_path: P,
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
-    ) -> Result<(Arc<DB>, StateMerkleDb, StateKvDb)> {
-        let instant = Instant::now();
-
-        let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
-
-        let ledger_db = if readonly {
-            DB::open_cf_readonly(
-                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
-                ledger_db_path.clone(),
-                LEDGER_DB_NAME,
-                ledger_db_column_families(),
-            )?
-        } else {
-            DB::open_cf(
-                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
-                ledger_db_path.clone(),
-                LEDGER_DB_NAME,
-                gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
-            )?
-        };
-
-        let ledger_db = Arc::new(ledger_db);
+    ) -> Result<(LedgerDb, StateMerkleDb, StateKvDb)> {
+        let ledger_db = LedgerDb::new(db_root_path.as_ref(), rocksdb_configs, readonly)?;
         let state_kv_db = StateKvDb::new(
             db_root_path.as_ref(),
             rocksdb_configs,
             readonly,
-            Arc::clone(&ledger_db),
+            ledger_db.metadata_db_arc(),
         )?;
         let state_merkle_db = StateMerkleDb::new(
             db_root_path,
@@ -422,12 +450,6 @@ impl AptosDB {
             readonly,
             max_num_nodes_per_lru_cache_shard,
         )?;
-
-        info!(
-            ledger_db_path = ledger_db_path,
-            time_ms = %instant.elapsed().as_millis(),
-            "Opened AptosDB.",
-        );
 
         Ok((ledger_db, state_merkle_db, state_kv_db))
     }
@@ -438,9 +460,7 @@ impl AptosDB {
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
-        let ledger_next_version = self
-            .get_latest_transaction_info_option()?
-            .map_or(0, |(v, _)| v + 1);
+        let ledger_next_version = self.get_latest_version().map_or(0, |v| v + 1);
         info!(
             indexer_next_version = indexer.next_version(),
             ledger_next_version = ledger_next_version,
@@ -560,7 +580,7 @@ impl AptosDB {
 
     /// This force the db to update rocksdb properties immediately.
     pub fn update_rocksdb_properties(&self) -> Result<()> {
-        update_rocksdb_properties(&self.ledger_db, &self.state_merkle_db)
+        update_rocksdb_properties(&self.ledger_db.metadata_db_arc(), &self.state_merkle_db)
     }
 
     /// Returns ledger infos reflecting epoch bumps starting with the given epoch. If there are no
@@ -671,27 +691,21 @@ impl AptosDB {
     pub fn create_checkpoint(
         db_path: impl AsRef<Path>,
         cp_path: impl AsRef<Path>,
+        use_split_ledger_db: bool,
         use_sharded_state_merkle_db: bool,
     ) -> Result<()> {
         let start = Instant::now();
-        let ledger_db_path = db_path.as_ref().join(LEDGER_DB_NAME);
-        let ledger_cp_path = cp_path.as_ref().join(LEDGER_DB_NAME);
 
-        info!("Creating ledger_db checkpoint at: {ledger_cp_path:?}");
+        info!(
+            use_split_ledger_db = use_split_ledger_db,
+            use_sharded_state_merkle_db = use_sharded_state_merkle_db,
+            "Creating checkpoint for AptosDB."
+        );
 
-        std::fs::remove_dir_all(&ledger_cp_path).unwrap_or(());
-
-        // Weird enough, checkpoint doesn't work with readonly or secondary mode (gets stuck).
-        // https://github.com/facebook/rocksdb/issues/11167
-        let ledger_db = aptos_schemadb::DB::open(
-            ledger_db_path,
-            LEDGER_DB_NAME,
-            ledger_db_column_families(),
-            &aptos_schemadb::Options::default(),
-        )?;
-        ledger_db.create_checkpoint(ledger_cp_path)?;
-
-        StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), use_split_ledger_db)?;
+        if use_split_ledger_db {
+            StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        }
         StateMerkleDb::create_checkpoint(
             db_path.as_ref(),
             cp_path.as_ref(),
@@ -774,121 +788,6 @@ impl AptosDB {
         Ok(events_with_version)
     }
 
-    fn save_ledger_info(
-        &self,
-        new_root_hash: HashValue,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        ledger_batch: &SchemaBatch,
-    ) -> Result<()> {
-        // If expected ledger info is provided, verify result root hash and save the ledger info.
-        if let Some(x) = ledger_info_with_sigs {
-            let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
-            ensure!(
-                new_root_hash == expected_root_hash,
-                "Root hash calculated doesn't match expected. {:?} vs {:?}",
-                new_root_hash,
-                expected_root_hash,
-            );
-            let current_epoch = self
-                .ledger_store
-                .get_latest_ledger_info_option()
-                .map_or(0, |li| li.ledger_info().next_block_epoch());
-            ensure!(
-                x.ledger_info().epoch() == current_epoch,
-                "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
-                x.ledger_info().epoch(),
-                current_epoch,
-            );
-
-            self.ledger_store.put_ledger_info(x, ledger_batch)?;
-        }
-        Ok(())
-    }
-
-    fn save_transactions_impl(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: u64,
-        expected_state_db_usage: StateStorageUsage,
-    ) -> Result<(SchemaBatch, ShardedStateKvSchemaBatch, HashValue)> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["save_transactions_impl"])
-            .start_timer();
-
-        let ledger_batch = SchemaBatch::new();
-        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
-
-        let last_version = first_version + txns_to_commit.len() as u64 - 1;
-
-        let new_root_hash = thread::scope(|s| {
-            let t0 = s.spawn(|| {
-                // Account state updates.
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_state"])
-                    .start_timer();
-
-                let state_updates_vec = txns_to_commit
-                    .iter()
-                    .map(|txn_to_commit| txn_to_commit.state_updates())
-                    .collect::<Vec<_>>();
-
-                self.state_store.put_value_sets(
-                    state_updates_vec,
-                    first_version,
-                    expected_state_db_usage,
-                    &ledger_batch,
-                    &sharded_state_kv_batches,
-                )
-            });
-
-            let t1 = s.spawn(|| {
-                // Event updates. Gather event accumulator root hashes.
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_events"])
-                    .start_timer();
-                zip_eq(first_version..=last_version, txns_to_commit)
-                    .map(|(ver, txn_to_commit)| {
-                        self.event_store
-                            .put_events(ver, txn_to_commit.events(), &ledger_batch)
-                    })
-                    .collect::<Result<Vec<_>>>()
-            });
-
-            let t2 = s.spawn(|| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_txn_infos"])
-                    .start_timer();
-                zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
-                    |(ver, txn_to_commit)| {
-                        // Transaction updates. Gather transaction hashes.
-                        self.transaction_store.put_transaction(
-                            ver,
-                            txn_to_commit.transaction(),
-                            &ledger_batch,
-                        )?;
-                        self.transaction_store.put_write_set(
-                            ver,
-                            txn_to_commit.write_set(),
-                            &ledger_batch,
-                        )
-                    },
-                )?;
-                // Transaction accumulator updates. Get result root hash.
-                let txn_infos: Vec<_> = txns_to_commit
-                    .iter()
-                    .map(|t| t.transaction_info())
-                    .cloned()
-                    .collect();
-                self.ledger_store
-                    .put_transaction_infos(first_version, &txn_infos, &ledger_batch)
-            });
-            t0.join().unwrap()?;
-            t1.join().unwrap()?;
-            t2.join().unwrap()
-        });
-        Ok((ledger_batch, sharded_state_kv_batches, new_root_hash?))
-    }
-
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match &self.indexer {
             Some(indexer) => indexer.get_table_info(handle),
@@ -900,12 +799,15 @@ impl AptosDB {
 
     fn save_transactions_validation(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         latest_in_memory_state: &StateDelta,
     ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["save_transactions_validation"])
+            .start_timer();
         let buffered_state = self.state_store.buffered_state().lock();
         ensure!(
             base_state_version == buffered_state.current_state().base_version,
@@ -922,10 +824,7 @@ impl AptosDB {
             .current_version
             .map(|version| version + 1)
             .unwrap_or(0);
-        let num_transactions_in_db = self
-            .get_latest_transaction_info_option()?
-            .map(|(version, _)| version + 1)
-            .unwrap_or(0);
+        let num_transactions_in_db = self.get_latest_version().map_or(0, |v| v + 1);
         ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
             "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
             first_version,
@@ -964,51 +863,301 @@ impl AptosDB {
         Ok(())
     }
 
-    fn commit_ledger_and_state_kv_db(
+    fn calculate_and_commit_ledger_and_state_kv(
         &self,
-        last_version: Version,
-        ledger_batch: SchemaBatch,
-        sharded_state_kv_batches: ShardedStateKvSchemaBatch,
-        new_root_hash: HashValue,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+        expected_state_db_usage: StateStorageUsage,
+        sharded_state_cache: Option<&ShardedStateCache>,
+        skip_index_and_usage: bool,
+    ) -> Result<HashValue> {
+        let new_root_hash = thread::scope(|s| {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["save_transactions__work"])
+                .start_timer();
+            // TODO(grao): Write progress for each of the following databases, and handle the
+            // inconsistency at the startup time.
+            let t0 =
+                s.spawn(|| self.commit_events(txns_to_commit, first_version, skip_index_and_usage));
+            let t1 = s.spawn(|| self.commit_write_sets(txns_to_commit, first_version));
+            let t2 = s.spawn(|| {
+                self.commit_transactions(txns_to_commit, first_version, skip_index_and_usage)
+            });
+            let t3 = s.spawn(|| {
+                self.commit_state_kv_and_ledger_metadata(
+                    txns_to_commit,
+                    first_version,
+                    expected_state_db_usage,
+                    sharded_state_cache,
+                    skip_index_and_usage,
+                )
+            });
+            let t4 = s.spawn(|| self.commit_transaction_infos(txns_to_commit, first_version));
+            let t5 = s.spawn(|| self.commit_transaction_accumulator(txns_to_commit, first_version));
+            // TODO(grao): Consider propagating the error instead of panic, if necessary.
+            t0.join().unwrap()?;
+            t1.join().unwrap()?;
+            t2.join().unwrap()?;
+            t3.join().unwrap()?;
+            t4.join().unwrap()?;
+            t5.join().unwrap()
+        })?;
+
+        Ok(new_root_hash)
+    }
+
+    fn commit_state_kv_and_ledger_metadata(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+        expected_state_db_usage: StateStorageUsage,
+        sharded_state_cache: Option<&ShardedStateCache>,
+        skip_index_and_usage: bool,
     ) -> Result<()> {
-        // Commit multiple batches for different DBs in parallel, then write the overall
-        // progress.
         let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["save_transactions_commit"])
+            .with_label_values(&["commit_state_kv_and_ledger_metadata"])
             .start_timer();
-        ledger_batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::LedgerCommitProgress,
-            &DbMetadataValue::Version(last_version),
+        let state_updates_vec = txns_to_commit
+            .iter()
+            .map(|txn_to_commit| txn_to_commit.borrow().state_updates())
+            .collect::<Vec<_>>();
+
+        let ledger_metadata_batch = SchemaBatch::new();
+        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
+        let state_kv_metadata_batch = SchemaBatch::new();
+
+        // TODO(grao): Make state_store take sharded state updates.
+        self.state_store.put_value_sets(
+            state_updates_vec,
+            first_version,
+            expected_state_db_usage,
+            sharded_state_cache,
+            &ledger_metadata_batch,
+            &sharded_state_kv_batches,
+            &state_kv_metadata_batch,
+            self.state_store.state_kv_db.enabled_sharding() && !skip_index_and_usage,
+            skip_index_and_usage,
         )?;
 
-        COMMIT_POOL.scope(|s| {
-            // TODO(grao): Consider propagating the error instead of panic, if necessary.
-            s.spawn(|_| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit___state_kv_commit"])
-                    .start_timer();
-                self.state_kv_db
-                    .commit(last_version, sharded_state_kv_batches)
+        let last_version = first_version + txns_to_commit.len() as u64 - 1;
+        ledger_metadata_batch
+            .put::<DbMetadataSchema>(
+                &DbMetadataKey::LedgerCommitProgress,
+                &DbMetadataValue::Version(last_version),
+            )
+            .unwrap();
+
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_state_kv_and_ledger_metadata___commit"])
+            .start_timer();
+        thread::scope(|s| {
+            s.spawn(|| {
+                self.ledger_db
+                    .metadata_db()
+                    .write_schemas(ledger_metadata_batch)
                     .unwrap();
             });
-            // To the best of our current understanding, these tasks are scheduled in
-            // LIFO order, so put the ledger commit at the end since it's slower.
-            s.spawn(|_| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit___ledger_commit"])
-                    .start_timer();
-                self.ledger_db.write_schemas(ledger_batch).unwrap();
+            s.spawn(|| {
+                self.state_kv_db
+                    .commit(
+                        last_version,
+                        state_kv_metadata_batch,
+                        sharded_state_kv_batches,
+                    )
+                    .unwrap();
             });
         });
 
+        Ok(())
+    }
+
+    fn commit_events(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+        skip_index: bool,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_events"])
+            .start_timer();
+        let batch = SchemaBatch::new();
+        txns_to_commit
+            .par_iter()
+            .with_min_len(128)
+            .enumerate()
+            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+                self.event_store.put_events(
+                    first_version + i as u64,
+                    txn_to_commit.borrow().events(),
+                    skip_index,
+                    &batch,
+                )?;
+
+                Ok(())
+            })?;
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_events___commit"])
+            .start_timer();
+        self.ledger_db.event_db().write_schemas(batch)
+    }
+
+    fn commit_transactions(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+        skip_index: bool,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transactions"])
+            .start_timer();
+        let chunk_size = 512;
+        txns_to_commit
+            .par_chunks(chunk_size)
+            .enumerate()
+            .try_for_each(|(chunk_index, txns_in_chunk)| -> Result<()> {
+                let batch = SchemaBatch::new();
+                let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
+                txns_in_chunk.iter().enumerate().try_for_each(
+                    |(i, txn_to_commit)| -> Result<()> {
+                        self.transaction_store.put_transaction(
+                            chunk_first_version + i as u64,
+                            txn_to_commit.borrow().transaction(),
+                            skip_index,
+                            &batch,
+                        )?;
+
+                        Ok(())
+                    },
+                )?;
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["commit_transactions___commit"])
+                    .start_timer();
+                self.ledger_db.transaction_db().write_schemas(batch)
+            })
+    }
+
+    fn commit_transaction_accumulator(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: u64,
+    ) -> Result<HashValue> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_accumulator"])
+            .start_timer();
+
+        let batch = SchemaBatch::new();
+        let root_hash =
+            self.ledger_store
+                .put_transaction_accumulator(first_version, txns_to_commit, &batch)?;
+
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_accumulator___commit"])
+            .start_timer();
+        self.ledger_db
+            .transaction_accumulator_db()
+            .write_schemas(batch)?;
+
+        Ok(root_hash)
+    }
+
+    fn commit_transaction_infos(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: u64,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_infos"])
+            .start_timer();
+        let batch = SchemaBatch::new();
+        txns_to_commit
+            .par_iter()
+            .with_min_len(128)
+            .enumerate()
+            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+                let version = first_version + i as u64;
+                self.ledger_store.put_transaction_info(
+                    version,
+                    txn_to_commit.borrow().transaction_info(),
+                    &batch,
+                )?;
+
+                Ok(())
+            })?;
+
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_infos___commit"])
+            .start_timer();
+        self.ledger_db.transaction_info_db().write_schemas(batch)
+    }
+
+    fn commit_write_sets(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_write_sets"])
+            .start_timer();
+        let batch = SchemaBatch::new();
+        txns_to_commit
+            .par_iter()
+            .with_min_len(128)
+            .enumerate()
+            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+                self.transaction_store.put_write_set(
+                    first_version + i as u64,
+                    txn_to_commit.borrow().write_set(),
+                    &batch,
+                )?;
+
+                Ok(())
+            })?;
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_write_sets___commit"])
+            .start_timer();
+        self.ledger_db.write_set_db().write_schemas(batch)
+    }
+
+    fn commit_ledger_info(
+        &self,
+        last_version: Version,
+        new_root_hash: HashValue,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_ledger_info"])
+            .start_timer();
+
         let ledger_batch = SchemaBatch::new();
-        self.save_ledger_info(new_root_hash, ledger_info_with_sigs, &ledger_batch)?;
+
+        // If expected ledger info is provided, verify result root hash and save the ledger info.
+        if let Some(x) = ledger_info_with_sigs {
+            let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
+            ensure!(
+                new_root_hash == expected_root_hash,
+                "Root hash calculated doesn't match expected. {:?} vs {:?}",
+                new_root_hash,
+                expected_root_hash,
+            );
+            let current_epoch = self
+                .ledger_store
+                .get_latest_ledger_info_option()
+                .map_or(0, |li| li.ledger_info().next_block_epoch());
+            ensure!(
+                x.ledger_info().epoch() == current_epoch,
+                "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
+                x.ledger_info().epoch(),
+                current_epoch,
+            );
+
+            self.ledger_store.put_ledger_info(x, &ledger_batch)?;
+        }
+
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(last_version),
         )?;
-        self.ledger_db.write_schemas(ledger_batch)
+        self.ledger_db.metadata_db().write_schemas(ledger_batch)
     }
 
     fn maybe_commit_state_merkle_db(
@@ -1034,12 +1183,16 @@ impl AptosDB {
                             first_version + idx as u64
                         );
                     end_with_reconfig = txns_to_commit[idx].is_reconfig();
-                    Some(
-                        txns_to_commit[..=idx]
-                            .iter()
-                            .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
-                            .collect(),
-                    )
+                    let mut sharded_state_updates = create_empty_sharded_state_updates();
+                    sharded_state_updates.par_iter_mut().enumerate().for_each(
+                        |(shard_id, state_updates_shard)| {
+                            txns_to_commit[..=idx].iter().for_each(|txn_to_commit| {
+                                state_updates_shard
+                                    .extend(txn_to_commit.state_updates()[shard_id].clone());
+                            })
+                        },
+                    );
+                    Some(sharded_state_updates)
                 } else {
                     None
                 }
@@ -1060,7 +1213,7 @@ impl AptosDB {
 
     fn post_commit(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
@@ -1087,7 +1240,10 @@ impl AptosDB {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["indexer_index"])
                 .start_timer();
-            let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
+            let write_sets: Vec<_> = txns_to_commit
+                .iter()
+                .map(|txn| txn.borrow().write_set())
+                .collect();
             indexer.index(self.state_store.clone(), first_version, &write_sets)?;
         }
 
@@ -1188,6 +1344,12 @@ impl DbReader for AptosDB {
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
         gauged_api("get_latest_ledger_info_option", || {
             Ok(self.ledger_store.get_latest_ledger_info_option())
+        })
+    }
+
+    fn get_latest_version(&self) -> Result<Version> {
+        gauged_api("get_latest_version", || {
+            self.ledger_store.get_latest_version()
         })
     }
 
@@ -1319,38 +1481,6 @@ impl DbReader for AptosDB {
                 Some(start_version),
                 proof,
             ))
-        })
-    }
-
-    fn get_gas_prices(
-        &self,
-        start_version: Version,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<u64>> {
-        const MAX_GAS_LOOKUP: u64 = 100_000;
-        gauged_api("get_gas_prices", || {
-            error_if_too_many_requested(limit, MAX_GAS_LOOKUP)?;
-
-            if start_version > ledger_version || limit == 0 {
-                return Ok(vec![]);
-            }
-
-            // This is just an estimation, so we cna just skip over errors
-            let limit = std::cmp::min(limit, ledger_version - start_version + 1);
-            let txns = self
-                .transaction_store
-                .get_transaction_iter(start_version, limit as usize)?;
-            let gas_prices: Vec<_> = txns
-                .filter_map(|txn| {
-                    txn.as_ref()
-                        .ok()
-                        .and_then(|t| t.try_as_signed_user_txn())
-                        .map(|t| t.gas_unit_price())
-                })
-                .collect();
-
-            Ok(gas_prices)
         })
     }
 
@@ -1583,6 +1713,19 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        gauged_api("get_state_value_with_version_by_version", || {
+            self.error_if_state_kv_pruned("StateValue", version)?;
+
+            self.state_store
+                .get_state_value_with_version_by_version(state_key, version)
+        })
+    }
+
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
@@ -1725,12 +1868,6 @@ impl DbReader for AptosDB {
         gauged_api("get_last_version_before_timestamp", || {
             self.event_store
                 .get_last_version_before_timestamp(timestamp, ledger_version)
-        })
-    }
-
-    fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>> {
-        gauged_api("get_latest_transaction_info_option", || {
-            self.ledger_store.get_latest_transaction_info_option()
         })
     }
 
@@ -1891,23 +2028,19 @@ impl DbWriter for AptosDB {
                 &latest_in_memory_state,
             )?;
 
-            let (ledger_batch, sharded_state_kv_batches, new_root_hash) = self
-                .save_transactions_impl(
-                    txns_to_commit,
-                    first_version,
-                    latest_in_memory_state.current.usage(),
-                )?;
+            let new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
+                txns_to_commit,
+                first_version,
+                latest_in_memory_state.current.usage(),
+                None,
+                /*skip_index_and_usage=*/ false,
+            )?;
 
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 let last_version = first_version + txns_to_commit.len() as u64 - 1;
-                self.commit_ledger_and_state_kv_db(
-                    last_version,
-                    ledger_batch,
-                    sharded_state_kv_batches,
-                    new_root_hash,
-                    ledger_info_with_sigs,
-                )?;
+
+                self.commit_ledger_info(last_version, new_root_hash, ledger_info_with_sigs)?;
 
                 self.maybe_commit_state_merkle_db(
                     &mut buffered_state,
@@ -1916,6 +2049,74 @@ impl DbWriter for AptosDB {
                     latest_in_memory_state,
                     sync_commit,
                 )?;
+            }
+
+            self.post_commit(txns_to_commit, first_version, ledger_info_with_sigs)
+        })
+    }
+
+    /// Same as save_transactions, but only for a whole block.
+    fn save_transaction_block(
+        &self,
+        txns_to_commit: &[Arc<TransactionToCommit>],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
+        // TODO(grao): Consider remove this.
+        latest_in_memory_state: StateDelta,
+        block_state_updates: ShardedStateUpdates,
+        sharded_state_cache: &ShardedStateCache,
+    ) -> Result<()> {
+        gauged_api("save_transaction_block", || {
+            // Executing and committing from more than one threads not allowed -- consensus and
+            // state sync must hand over to each other after all pending execution and committing
+            // complete.
+            let _lock = self
+                .ledger_commit_lock
+                .try_lock()
+                .expect("Concurrent committing detected.");
+
+            // For reconfig suffix.
+            if ledger_info_with_sigs.is_none() && txns_to_commit.is_empty() {
+                return Ok(());
+            }
+
+            self.save_transactions_validation(
+                txns_to_commit,
+                first_version,
+                base_state_version,
+                ledger_info_with_sigs,
+                &latest_in_memory_state,
+            )?;
+
+            let new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
+                txns_to_commit,
+                first_version,
+                latest_in_memory_state.current.usage(),
+                Some(sharded_state_cache),
+                self.skip_index_and_usage,
+            )?;
+
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["save_transactions__others"])
+                .start_timer();
+            {
+                let mut buffered_state = self.state_store.buffered_state().lock();
+                let last_version = first_version + txns_to_commit.len() as u64 - 1;
+
+                self.commit_ledger_info(last_version, new_root_hash, ledger_info_with_sigs)?;
+
+                if !txns_to_commit.is_empty() {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["buffered_state___update"])
+                        .start_timer();
+                    buffered_state.update(
+                        Some(block_state_updates),
+                        latest_in_memory_state,
+                        sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
+                    )?;
+                }
             }
 
             self.post_commit(txns_to_commit, first_version, ledger_info_with_sigs)
@@ -1940,6 +2141,8 @@ impl DbWriter for AptosDB {
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         gauged_api("finalize_state_snapshot", || {
+            // TODO(grao): Support splitted ledger DBs in this function.
+
             // Ensure the output with proof only contains a single transaction output and info
             let num_transaction_outputs = output_with_proof.transactions_and_outputs.len();
             let num_transaction_infos = output_with_proof.proof.transaction_infos.len();
@@ -1963,7 +2166,7 @@ impl DbWriter for AptosDB {
                 .ledger_info_to_transaction_infos_proof
                 .left_siblings();
             restore_utils::confirm_or_save_frozen_subtrees(
-                self.ledger_db.clone(),
+                self.ledger_db.transaction_accumulator_db(),
                 version,
                 frozen_subtrees,
                 None,
@@ -1971,7 +2174,8 @@ impl DbWriter for AptosDB {
 
             // Create a single change set for all further write operations
             let mut batch = SchemaBatch::new();
-
+            let mut sharded_kv_batch = new_sharded_kv_schema_batch();
+            let state_kv_metadata_batch = SchemaBatch::new();
             // Save the target transactions, outputs, infos and events
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
                 output_with_proof
@@ -1988,29 +2192,28 @@ impl DbWriter for AptosDB {
                 .map(|output| output.write_set().clone())
                 .collect();
             let transaction_infos = output_with_proof.proof.transaction_infos;
+            // We should not save the key value since the value is already recovered for this version
             restore_utils::save_transactions(
-                self.ledger_db.clone(),
                 self.ledger_store.clone(),
                 self.transaction_store.clone(),
                 self.event_store.clone(),
+                self.state_store.clone(),
                 version,
                 &transactions,
                 &transaction_infos,
                 &events,
                 wsets,
-                Some(&mut batch),
+                Option::Some((&mut batch, &mut sharded_kv_batch, &state_kv_metadata_batch)),
+                false,
             )?;
 
             // Save the epoch ending ledger infos
             restore_utils::save_ledger_infos(
-                self.ledger_db.clone(),
+                self.ledger_db.metadata_db(),
                 self.ledger_store.clone(),
                 ledger_infos,
                 Some(&mut batch),
             )?;
-
-            // Delete the genesis transaction
-            LedgerPruner::prune_genesis(self.ledger_db.clone(), &mut batch)?;
 
             batch.put::<DbMetadataSchema>(
                 &DbMetadataKey::LedgerCommitProgress,
@@ -2021,58 +2224,24 @@ impl DbWriter for AptosDB {
                 &DbMetadataValue::Version(version),
             )?;
 
-            self.ledger_pruner
-                .pruner()
-                .save_min_readable_version(version, &batch)?;
-
-            let mut state_merkle_batch = SchemaBatch::new();
-            StateMerklePruner::prune_genesis(
-                self.state_merkle_db.clone(),
-                &mut state_merkle_batch,
-            )?;
-
-            self.state_store
-                .state_merkle_pruner
-                .pruner()
-                .save_min_readable_version(version, &state_merkle_batch)?;
-            self.state_store
-                .epoch_snapshot_pruner
-                .pruner()
-                .save_min_readable_version(version, &state_merkle_batch)?;
-
-            let mut state_kv_batch = SchemaBatch::new();
-            StateKvPruner::prune_genesis(
-                self.state_store.state_kv_db.clone(),
-                &mut state_kv_batch,
-            )?;
-            self.state_store
-                .state_kv_pruner
-                .pruner()
-                .save_min_readable_version(version, &state_kv_batch)?;
-
             // Apply the change set writes to the database (atomically) and update in-memory state
             //
             // TODO(grao): Support sharding here.
-            self.state_merkle_db
-                .metadata_db()
-                .write_schemas(state_merkle_batch)?;
-            self.state_kv_db
-                .clone()
-                .commit_nonsharded(version, state_kv_batch)?;
-            self.ledger_db.clone().write_schemas(batch)?;
+            self.ledger_db.metadata_db().write_schemas(batch)?;
+
+            self.ledger_pruner.save_min_readable_version(version)?;
+            self.state_store
+                .state_merkle_pruner
+                .save_min_readable_version(version)?;
+            self.state_store
+                .epoch_snapshot_pruner
+                .save_min_readable_version(version)?;
+            self.state_store
+                .state_kv_pruner
+                .save_min_readable_version(version)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
             self.state_store.reset();
-
-            self.ledger_pruner.pruner().record_progress(version);
-            self.state_store
-                .state_merkle_pruner
-                .pruner()
-                .record_progress(version);
-            self.state_store
-                .epoch_snapshot_pruner
-                .pruner()
-                .record_progress(version);
 
             Ok(())
         })
@@ -2100,7 +2269,6 @@ pub trait GetRestoreHandler {
 impl GetRestoreHandler for Arc<AptosDB> {
     fn get_restore_handler(&self) -> RestoreHandler {
         RestoreHandler::new(
-            Arc::clone(&self.ledger_db),
             Arc::clone(self),
             Arc::clone(&self.ledger_store),
             Arc::clone(&self.transaction_store),

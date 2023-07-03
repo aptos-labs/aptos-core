@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: undeclared `0x8675309::M::S`
+  ┌─ tests/checking/naming/unresolved_type_no_args.move:3:16
+  │
+3 │     fun foo(x: S): G {
+  │                ^
+
+error: undeclared `0x8675309::M::G`
+  ┌─ tests/checking/naming/unresolved_type_no_args.move:3:20
+  │
+3 │     fun foo(x: S): G {
+  │                    ^
+
+error: undeclared `0x8675309::M::A`
+  ┌─ tests/checking/naming/unresolved_type_no_args.move:2:22
+  │
+2 │     struct Mine { f: A }
+  │                      ^
+
+error: undeclared `0x8675309::M::B`
+  ┌─ tests/checking/naming/unresolved_type_no_args.move:4:16
+  │
+4 │         let _: B = (0: P);
+  │                ^
+
+error: undeclared `0x8675309::M::P`
+  ┌─ tests/checking/naming/unresolved_type_no_args.move:4:24
+  │
+4 │         let _: B = (0: P);
+  │                        ^

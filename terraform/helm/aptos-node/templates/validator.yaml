@@ -6,12 +6,16 @@ metadata:
   name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
+    {{- include "aptos-validator.multiclusterLabels" (tuple $ $i) | nindent 4 }} 
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
     app.kubernetes.io/name: validator
     app.kubernetes.io/instance: validator-{{$i}}
   type: {{ $.Values.service.validator.internal.type }}
+  {{- if $.Values.service.validator.internal.headless }}
+  clusterIP: None
+  {{- end }}
   ports:
   - name: validator
     port: 6180
@@ -55,6 +59,7 @@ metadata:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
     app.kubernetes.io/name: validator
     app.kubernetes.io/instance: validator-{{$i}}
+    {{- include "aptos-validator.multiclusterLabels" (tuple $ $i) | nindent 4 }}  
 spec:
   serviceName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator
   replicas: 1
@@ -86,20 +91,7 @@ spec:
         {{- end }}
       {{- with $.Values.validator }}
         imagePullPolicy: {{ .image.pullPolicy }}
-        {{- if not $.Values.pyroscope.enabled }}
         command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
-        {{- else }}
-        command: ["/bin/bash", "-c"]
-        args:
-        - |
-          set -e
-          export PYROSCOPE_APPLICATION_NAME="aptos-node{namespace=${KUBERNETES_NAMESPACE},pod_name=${KUBERNETES_POD_NAME},chain_name={{ $.Values.chain.chain_name | default $.Values.chain.name }}}"
-          # to wrap an existing program and profile it
-          # TODO: this does not seem to work yet
-          # pyroscope exec /usr/local/bin/aptos-node -f /opt/aptos/etc/validator.yaml
-          # to profile the entire system
-          pyroscope ebpf & /usr/local/bin/aptos-node -f /opt/aptos/etc/validator.yaml
-        {{- end }}
         resources:
           {{- toYaml .resources | nindent 10 }}
         env:
@@ -113,33 +105,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        - name: KUBERNETES_POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
         - name: RUST_BACKTRACE
           value: "0"
-        {{- if $.Values.pyroscope.enabled }}
-        - name: PYROSCOPE_SERVER_ADDRESS
-          valueFrom:
-            secretKeyRef:
-              name: {{ $.Values.pyroscope.secretName }}
-              key: PYROSCOPE_SERVER_ADDRESS
-        - name: PYROSCOPE_AUTH_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: {{ $.Values.pyroscope.secretName }}
-              key: PYROSCOPE_AUTH_TOKEN
-        - name: PYROSCOPE_SPY_NAME
-          valueFrom:
-            secretKeyRef:
-              name: {{ $.Values.pyroscope.secretName }}
-              key: PYROSCOPE_SPY_NAME
-        - name: PYROSCOPE_SAMPLE_RATE
-          value: "24"
-        - name: PYROSCOPE_LOG_LEVEL
-          value: error
-        {{- end }}
       {{- end }}
         volumeMounts:
         - name: aptos-config

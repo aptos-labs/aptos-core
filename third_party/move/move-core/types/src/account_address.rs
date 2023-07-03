@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use hex::FromHex;
+use num::BigUint;
 use rand::{rngs::OsRng, Rng};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr};
@@ -62,6 +63,10 @@ impl AccountAddress {
         } else {
             hex_str
         }
+    }
+
+    pub fn to_big_uint(self) -> BigUint {
+        BigUint::from_bytes_be(&self.into_bytes())
     }
 
     pub fn to_vec(&self) -> Vec<u8> {
@@ -431,6 +436,7 @@ mod tests {
         }
 
         #[test]
+        #[allow(clippy::redundant_clone)] // Required to work around prop_assert_eq! limitations
         fn test_address_protobuf_roundtrip(addr in any::<AccountAddress>()) {
             let bytes = addr.to_vec();
             prop_assert_eq!(bytes.clone(), addr.as_ref());

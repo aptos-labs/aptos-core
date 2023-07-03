@@ -4,24 +4,24 @@
 # Module `0x1::pool_u64`
 
 
-* Simple module for tracking and calculating shares of a pool of coins. The shares are worth more as the total coins in
-* the pool increases. New shareholder can buy more shares or redeem their existing shares.
-*
-* Example flow:
-* 1. Pool start outs empty.
-* 2. Shareholder A buys in with 1000 coins. A will receive 1000 shares in the pool. Pool now has 1000 total coins and
-* 1000 total shares.
-* 3. Pool appreciates in value from rewards and now has 2000 coins. A's 1000 shares are now worth 2000 coins.
-* 4. Shareholder B now buys in with 1000 coins. Since before the buy in, each existing share is worth 2 coins, B will
-* receive 500 shares in exchange for 1000 coins. Pool now has 1500 shares and 3000 coins.
-* 5. Pool appreciates in value from rewards and now has 6000 coins.
-* 6. A redeems 500 shares. Each share is worth 6000 / 1500 = 4. A receives 2000 coins. Pool has 4000 coins and 1000
-* shares left.
+Simple module for tracking and calculating shares of a pool of coins. The shares are worth more as the total coins in
+the pool increases. New shareholder can buy more shares or redeem their existing shares.
 
+Example flow:
+1. Pool start outs empty.
+2. Shareholder A buys in with 1000 coins. A will receive 1000 shares in the pool. Pool now has 1000 total coins and
+1000 total shares.
+3. Pool appreciates in value from rewards and now has 2000 coins. A's 1000 shares are now worth 2000 coins.
+4. Shareholder B now buys in with 1000 coins. Since before the buy in, each existing share is worth 2 coins, B will
+receive 500 shares in exchange for 1000 coins. Pool now has 1500 shares and 3000 coins.
+5. Pool appreciates in value from rewards and now has 6000 coins.
+6. A redeems 500 shares. Each share is worth 6000 / 1500 = 4. A receives 2000 coins. Pool has 4000 coins and 1000
+shares left.
 
 
 -  [Struct `Pool`](#0x1_pool_u64_Pool)
 -  [Constants](#@Constants_0)
+-  [Function `new`](#0x1_pool_u64_new)
 -  [Function `create`](#0x1_pool_u64_create)
 -  [Function `create_with_scaling_factor`](#0x1_pool_u64_create_with_scaling_factor)
 -  [Function `destroy_empty`](#0x1_pool_u64_destroy_empty)
@@ -207,14 +207,42 @@ There are too many shareholders in the pool.
 
 
 
-<a name="0x1_pool_u64_create"></a>
+<a name="0x1_pool_u64_new"></a>
 
-## Function `create`
+## Function `new`
 
 Create a new pool.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_create">create</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_new">new</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_new">new</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a> {
+    // Default <b>to</b> a scaling factor of 1 (effectively no scaling).
+    <a href="pool_u64.md#0x1_pool_u64_create_with_scaling_factor">create_with_scaling_factor</a>(shareholders_limit, 1)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_pool_u64_create"></a>
+
+## Function `create`
+
+Deprecated. Use <code>new</code> instead.
+Create a new pool.
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_create">create</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>
 </code></pre>
 
 
@@ -224,8 +252,7 @@ Create a new pool.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_create">create</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a> {
-    // Default <b>to</b> a scaling factor of 1 (effectively no scaling).
-    <a href="pool_u64.md#0x1_pool_u64_create_with_scaling_factor">create_with_scaling_factor</a>(shareholders_limit, 1)
+    <a href="pool_u64.md#0x1_pool_u64_new">new</a>(shareholders_limit)
 }
 </code></pre>
 

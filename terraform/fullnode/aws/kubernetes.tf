@@ -51,7 +51,8 @@ resource "helm_release" "fullnode" {
 
   values = [
     jsonencode({
-      imageTag = var.image_tag
+      imageTag     = var.image_tag
+      manageImages = var.manage_via_tf # if we're managing the entire deployment via terraform, override the images as well
       chain = {
         era  = var.era
         name = var.chain_name

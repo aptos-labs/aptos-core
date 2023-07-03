@@ -166,8 +166,9 @@ impl fmt::Display for ConnectionMetadata {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "[{},{},{},{},{:?},{:?}]",
+            "[{},{:?},{},{},{},{:?},{:?}]",
             self.remote_peer_id,
+            self.connection_id,
             self.addr,
             self.origin,
             self.messaging_protocol,
@@ -343,9 +344,14 @@ pub async fn upgrade_outbound<T: TSocket>(
     let socket = fut_socket.await?;
 
     // noise handshake
-    let mut socket = ctxt
+    let (mut socket, peer_role) = ctxt
         .noise
-        .upgrade_outbound(socket, remote_pubkey, AntiReplayTimestamps::now)
+        .upgrade_outbound(
+            socket,
+            remote_peer_id,
+            remote_pubkey,
+            AntiReplayTimestamps::now,
+        )
         .await
         .map_err(|err| {
             if err.should_security_log() {
@@ -395,7 +401,7 @@ pub async fn upgrade_outbound<T: TSocket>(
             origin,
             messaging_protocol,
             application_protocols,
-            PeerRole::Unknown,
+            peer_role,
         ),
     })
 }

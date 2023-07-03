@@ -14,23 +14,26 @@ use crate::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_channels::aptos_channel;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
-    future,
-    stream::{FilterMap, FusedStream, Map, Select, Stream, StreamExt},
+    stream::{FusedStream, Map, Select, Stream, StreamExt},
     task::{Context, Poll},
 };
+use futures_util::FutureExt;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
+
+// TODO: do we want to make this configurable?
+const MAX_DESERIALIZATION_QUEUE_SIZE_PER_PEER: usize = 50;
 
 /// Events received by network clients in a validator
 ///
@@ -154,11 +157,7 @@ impl NetworkApplicationConfig {
 pub struct NetworkEvents<TMessage> {
     #[pin]
     event_stream: Select<
-        FilterMap<
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-            future::Ready<Option<Event<TMessage>>>,
-            fn(PeerManagerNotification) -> future::Ready<Option<Event<TMessage>>>,
-        >,
+        aptos_channel::Receiver<PeerId, Event<TMessage>>,
         Map<
             aptos_channel::Receiver<PeerId, ConnectionNotification>,
             fn(ConnectionNotification) -> Event<TMessage>,
@@ -172,22 +171,66 @@ pub trait NewNetworkEvents {
     fn new(
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
+        max_parallel_deserialization_tasks: Option<usize>,
     ) -> Self;
 }
 
-impl<TMessage: Message> NewNetworkEvents for NetworkEvents<TMessage> {
+impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
+        max_parallel_deserialization_tasks: Option<usize>,
     ) -> Self {
-        let data_event_stream = peer_mgr_notifs_rx.filter_map(
-            peer_mgr_notif_to_event
-                as fn(PeerManagerNotification) -> future::Ready<Option<Event<TMessage>>>,
+        // Create a channel for deserialized messages
+        let (deserialized_message_sender, deserialized_message_receiver) = aptos_channel::new(
+            QueueStyle::FIFO,
+            MAX_DESERIALIZATION_QUEUE_SIZE_PER_PEER,
+            None,
         );
+
+        // Deserialize the peer manager notifications in parallel (for each
+        // network application) and send them to the receiver. Note: this
+        // may cause out of order message delivery, but applications
+        // should already be handling this.
+        tokio::spawn(async move {
+            peer_mgr_notifs_rx
+                .for_each_concurrent(
+                    max_parallel_deserialization_tasks,
+                    move |peer_manager_notification| {
+                        // Get the peer ID for the notification
+                        let deserialized_message_sender = deserialized_message_sender.clone();
+                        let peer_id_for_notification = peer_manager_notification.get_peer_id();
+
+                        // Spawn a new blocking task to deserialize the message
+                        tokio::task::spawn_blocking(move || {
+                            if let Some(deserialized_message) =
+                                peer_mgr_notif_to_event(peer_manager_notification)
+                            {
+                                if let Err(error) = deserialized_message_sender
+                                    .push(peer_id_for_notification, deserialized_message)
+                                {
+                                    warn!(
+                                        "Failed to send deserialized message to receiver: {:?}",
+                                        error
+                                    );
+                                }
+                            }
+                        })
+                        .map(|_| ())
+                    },
+                )
+                .await
+        });
+
+        // Process the control messages
         let control_event_stream = connection_notifs_rx
             .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
+
         Self {
-            event_stream: ::futures::stream::select(data_event_stream, control_event_stream),
+            event_stream: ::futures::stream::select(
+                deserialized_message_receiver,
+                control_event_stream,
+            ),
             _marker: PhantomData,
         }
     }
@@ -208,9 +251,9 @@ impl<TMessage> Stream for NetworkEvents<TMessage> {
 /// Deserialize inbound direct send and rpc messages into the application `TMessage`
 /// type, logging and dropping messages that fail to deserialize.
 fn peer_mgr_notif_to_event<TMessage: Message>(
-    notif: PeerManagerNotification,
-) -> future::Ready<Option<Event<TMessage>>> {
-    let maybe_event = match notif {
+    notification: PeerManagerNotification,
+) -> Option<Event<TMessage>> {
+    match notification {
         PeerManagerNotification::RecvRpc(peer_id, rpc_req) => {
             request_to_network_event(peer_id, &rpc_req)
                 .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_req.res_tx))
@@ -218,8 +261,7 @@ fn peer_mgr_notif_to_event<TMessage: Message>(
         PeerManagerNotification::RecvMessage(peer_id, request) => {
             request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
         },
-    };
-    future::ready(maybe_event)
+    }
 }
 
 /// Converts a `SerializedRequest` into a network `Event` for sending to other nodes

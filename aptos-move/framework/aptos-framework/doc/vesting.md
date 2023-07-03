@@ -4,6 +4,41 @@
 # Module `0x1::vesting`
 
 
+Simple vesting contract that allows specifying how much APT coins should be vesting in each fixed-size period. The
+vesting contract also comes with staking and allows shareholders to withdraw rewards anytime.
+
+Vesting schedule is represented as a vector of distributions. For example, a vesting schedule of
+[3/48, 3/48, 1/48] means that after the vesting starts:
+1. The first and second periods will vest 3/48 of the total original grant.
+2. The third period will vest 1/48.
+3. All subsequent periods will also vest 1/48 (last distribution in the schedule) until the original grant runs out.
+
+Shareholder flow:
+1. Admin calls create_vesting_contract with a schedule of [3/48, 3/48, 1/48] with a vesting cliff of 1 year and
+vesting period of 1 month.
+2. After a month, a shareholder calls unlock_rewards to request rewards. They can also call vest() which would also
+unlocks rewards but since the 1 year cliff has not passed (vesting has not started), vest() would not release any of
+the original grant.
+3. After the unlocked rewards become fully withdrawable (as it's subject to staking lockup), shareholders can call
+distribute() to send all withdrawable funds to all shareholders based on the original grant's shares structure.
+4. After 1 year and 1 month, the vesting schedule now starts. Shareholders call vest() to unlock vested coins. vest()
+checks the schedule and unlocks 3/48 of the original grant in addition to any accumulated rewards since last
+unlock_rewards(). Once the unlocked coins become withdrawable, shareholders can call distribute().
+5. Assuming the shareholders forgot to call vest() for 2 months, when they call vest() again, they will unlock vested
+tokens for the next period since last vest. This would be for the first month they missed. They can call vest() a
+second time to unlock for the second month they missed.
+
+Admin flow:
+1. After creating the vesting contract, admin cannot change the vesting schedule.
+2. Admin can call update_voter, update_operator, or reset_lockup at any time to update the underlying staking
+contract.
+3. Admin can also call update_beneficiary for any shareholder. This would send all distributions (rewards, vested
+coins) of that shareholder to the beneficiary account. By defalt, if a beneficiary is not set, the distributions are
+send directly to the shareholder account.
+4. Admin can call terminate_vesting_contract to terminate the vesting. This would first finish any distribution but
+will prevent any further rewards or vesting distributions from being created. Once the locked up stake becomes
+withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting contract's withdrawal address.
+
 
 -  [Struct `VestingSchedule`](#0x1_vesting_VestingSchedule)
 -  [Struct `StakingInfo`](#0x1_vesting_StakingInfo)
@@ -1113,7 +1148,8 @@ Return the address of the underlying stake pool (separate resource account) of t
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_stake_pool_address">stake_pool_address</a>(vesting_contract_address: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_stake_pool_address">stake_pool_address</a>(vesting_contract_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1142,7 +1178,8 @@ Vesting will start at this time, and once a full period has passed, the first ve
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_start_secs">vesting_start_secs</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_start_secs">vesting_start_secs</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1171,7 +1208,8 @@ Each vest is released after one full period has started, starting from the speci
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_period_duration_secs">period_duration_secs</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_period_duration_secs">period_duration_secs</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1202,7 +1240,8 @@ according to the vesting schedule.
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_remaining_grant">remaining_grant</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_remaining_grant">remaining_grant</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1231,7 +1270,8 @@ This is the same as the shareholder address by default and only different if it'
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_beneficiary">beneficiary</a>(vesting_contract_address: <b>address</b>, shareholder: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_beneficiary">beneficiary</a>(vesting_contract_address: <b>address</b>, shareholder: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1259,7 +1299,8 @@ Return the percentage of accumulated rewards that is paid to the operator as com
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_operator_commission_percentage">operator_commission_percentage</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_operator_commission_percentage">operator_commission_percentage</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1285,7 +1326,8 @@ This errors out if the vesting contract with the provided address doesn't exist.
 Return all the vesting contracts a given address is an admin of.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_contracts">vesting_contracts</a>(admin: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_contracts">vesting_contracts</a>(admin: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
 </code></pre>
 
 
@@ -1316,7 +1358,8 @@ Return the operator who runs the validator for the vesting contract.
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_operator">operator</a>(vesting_contract_address: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_operator">operator</a>(vesting_contract_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1345,7 +1388,8 @@ pool.
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_voter">voter</a>(vesting_contract_address: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_voter">voter</a>(vesting_contract_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1379,7 +1423,8 @@ So 268435456 = 0.0625.
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_schedule">vesting_schedule</a>(vesting_contract_address: <b>address</b>): <a href="vesting.md#0x1_vesting_VestingSchedule">vesting::VestingSchedule</a>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_schedule">vesting_schedule</a>(vesting_contract_address: <b>address</b>): <a href="vesting.md#0x1_vesting_VestingSchedule">vesting::VestingSchedule</a>
 </code></pre>
 
 
@@ -1408,7 +1453,8 @@ This excludes any unpaid commission that the operator has not collected.
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_total_accumulated_rewards">total_accumulated_rewards</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_total_accumulated_rewards">total_accumulated_rewards</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1441,7 +1487,8 @@ the beneficiary address instead of shareholder address.
 This errors out if the vesting contract with the provided address doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_accumulated_rewards">accumulated_rewards</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_accumulated_rewards">accumulated_rewards</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): u64
 </code></pre>
 
 
@@ -1473,7 +1520,8 @@ This errors out if the vesting contract with the provided address doesn't exist.
 Return the list of all shareholders in the vesting contract.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholders">shareholders</a>(vesting_contract_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholders">shareholders</a>(vesting_contract_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
 </code></pre>
 
 
@@ -1505,7 +1553,8 @@ address is actually a shareholder address, just return the address back.
 This returns 0x0 if no shareholder is found for the given beneficiary / the address is not a shareholder itself.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1522,18 +1571,17 @@ This returns 0x0 if no shareholder is found for the given beneficiary / the addr
         <b>return</b> shareholder_or_beneficiary
     };
     <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
-    <b>let</b> i = 0;
-    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders);
-    <b>while</b> (i &lt; len) {
-        <b>let</b> shareholder = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(shareholders, i);
-        // This will still <b>return</b> the shareholder <b>if</b> shareholder == beneficiary.
-        <b>if</b> (shareholder_or_beneficiary == <a href="vesting.md#0x1_vesting_get_beneficiary">get_beneficiary</a>(vesting_contract, shareholder)) {
-            <b>return</b> shareholder
-        };
-        i = i + 1;
-    };
+    <b>let</b> result = @0x0;
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(shareholders, |shareholder| {
+        <b>if</b> (shareholder_or_beneficiary == <a href="vesting.md#0x1_vesting_get_beneficiary">get_beneficiary</a>(vesting_contract, *shareholder)) {
+            result = *shareholder;
+            <b>true</b>
+        } <b>else</b> {
+            <b>false</b>
+        }
+    });
 
-    @0x0
+    result
 }
 </code></pre>
 
@@ -1625,22 +1673,18 @@ Create a vesting contract with a given configurations.
     <b>let</b> grant = <a href="coin.md#0x1_coin_zero">coin::zero</a>&lt;AptosCoin&gt;();
     <b>let</b> grant_amount = 0;
     <b>let</b> grant_pool = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_create">pool_u64::create</a>(<a href="vesting.md#0x1_vesting_MAXIMUM_SHAREHOLDERS">MAXIMUM_SHAREHOLDERS</a>);
-    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders);
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> shareholder = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(shareholders, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(shareholders, |shareholder| {
+        <b>let</b> shareholder: <b>address</b> = *shareholder;
         <b>let</b> (_, buy_in) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_remove">simple_map::remove</a>(&<b>mut</b> buy_ins, &shareholder);
         <b>let</b> buy_in_amount = <a href="coin.md#0x1_coin_value">coin::value</a>(&buy_in);
         <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> grant, buy_in);
         <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_buy_in">pool_u64::buy_in</a>(
             &<b>mut</b> grant_pool,
-            *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(shareholders, i),
+            shareholder,
             buy_in_amount,
         );
         grant_amount = grant_amount + buy_in_amount;
-
-        i = i + 1;
-    };
+    });
     <b>assert</b>!(grant_amount &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EZERO_GRANT">EZERO_GRANT</a>));
 
     // If this is the first time this admin <a href="account.md#0x1_account">account</a> <b>has</b> created a <a href="vesting.md#0x1_vesting">vesting</a> contract, initialize the admin store.
@@ -1754,12 +1798,10 @@ Call <code>unlock_rewards</code> for many vesting contracts.
 
     <b>assert</b>!(len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>));
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> contract_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&contract_addresses, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&contract_addresses, |contract_address| {
+        <b>let</b> contract_address: <b>address</b> = *contract_address;
         <a href="vesting.md#0x1_vesting_unlock_rewards">unlock_rewards</a>(contract_address);
-        i = i + 1;
-    };
+    });
 }
 </code></pre>
 
@@ -1861,12 +1903,10 @@ Call <code>vest</code> for many vesting contracts.
 
     <b>assert</b>!(len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>));
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> contract_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&contract_addresses, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&contract_addresses, |contract_address| {
+        <b>let</b> contract_address = *contract_address;
         <a href="vesting.md#0x1_vesting_vest">vest</a>(contract_address);
-        i = i + 1;
-    };
+    });
 }
 </code></pre>
 
@@ -1904,18 +1944,14 @@ Distribute any withdrawable stake from the stake pool.
     // Distribute coins <b>to</b> all shareholders in the <a href="vesting.md#0x1_vesting">vesting</a> contract.
     <b>let</b> grant_pool = &vesting_contract.grant_pool;
     <b>let</b> shareholders = &<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shareholders">pool_u64::shareholders</a>(grant_pool);
-    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders);
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> shareholder = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(shareholders, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(shareholders, |shareholder| {
+        <b>let</b> shareholder = *shareholder;
         <b>let</b> shares = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares">pool_u64::shares</a>(grant_pool, shareholder);
         <b>let</b> amount = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount_with_total_coins">pool_u64::shares_to_amount_with_total_coins</a>(grant_pool, shares, total_distribution_amount);
         <b>let</b> share_of_coins = <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> coins, amount);
         <b>let</b> recipient_address = <a href="vesting.md#0x1_vesting_get_beneficiary">get_beneficiary</a>(vesting_contract, shareholder);
         <a href="aptos_account.md#0x1_aptos_account_deposit_coins">aptos_account::deposit_coins</a>(recipient_address, share_of_coins);
-
-        i = i + 1;
-    };
+    });
 
     // Send <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> remaining "dust" (leftover due <b>to</b> rounding <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a>) <b>to</b> the withdrawal <b>address</b>.
     <b>if</b> (<a href="coin.md#0x1_coin_value">coin::value</a>(&coins) &gt; 0) {
@@ -1960,12 +1996,10 @@ Call <code>distribute</code> for many vesting contracts.
 
     <b>assert</b>!(len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>));
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> contract_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&contract_addresses, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&contract_addresses, |contract_address| {
+        <b>let</b> contract_address = *contract_address;
         <a href="vesting.md#0x1_vesting_distribute">distribute</a>(contract_address);
-        i = i + 1;
-    };
+    });
 }
 </code></pre>
 
@@ -2475,6 +2509,8 @@ staking_contract and stake modules.
 
 ## Function `create_vesting_contract_account`
 
+Create a salt for generating the resource accounts that will be holding the VestingContract.
+This address should be deterministic for the same admin and vesting contract creation nonce.
 
 
 <pre><code><b>fun</b> <a href="vesting.md#0x1_vesting_create_vesting_contract_account">create_vesting_contract_account</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>)
@@ -2686,7 +2722,8 @@ staking_contract and stake modules.
 ### Function `stake_pool_address`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_stake_pool_address">stake_pool_address</a>(vesting_contract_address: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_stake_pool_address">stake_pool_address</a>(vesting_contract_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -2702,7 +2739,8 @@ staking_contract and stake modules.
 ### Function `vesting_start_secs`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_start_secs">vesting_start_secs</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_start_secs">vesting_start_secs</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -2718,7 +2756,8 @@ staking_contract and stake modules.
 ### Function `period_duration_secs`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_period_duration_secs">period_duration_secs</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_period_duration_secs">period_duration_secs</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -2734,7 +2773,8 @@ staking_contract and stake modules.
 ### Function `remaining_grant`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_remaining_grant">remaining_grant</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_remaining_grant">remaining_grant</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -2750,7 +2790,8 @@ staking_contract and stake modules.
 ### Function `beneficiary`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_beneficiary">beneficiary</a>(vesting_contract_address: <b>address</b>, shareholder: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_beneficiary">beneficiary</a>(vesting_contract_address: <b>address</b>, shareholder: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -2766,7 +2807,8 @@ staking_contract and stake modules.
 ### Function `operator_commission_percentage`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_operator_commission_percentage">operator_commission_percentage</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_operator_commission_percentage">operator_commission_percentage</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -2782,7 +2824,8 @@ staking_contract and stake modules.
 ### Function `vesting_contracts`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_contracts">vesting_contracts</a>(admin: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_contracts">vesting_contracts</a>(admin: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
 </code></pre>
 
 
@@ -2798,7 +2841,8 @@ staking_contract and stake modules.
 ### Function `operator`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_operator">operator</a>(vesting_contract_address: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_operator">operator</a>(vesting_contract_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -2814,7 +2858,8 @@ staking_contract and stake modules.
 ### Function `voter`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_voter">voter</a>(vesting_contract_address: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_voter">voter</a>(vesting_contract_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -2830,7 +2875,8 @@ staking_contract and stake modules.
 ### Function `vesting_schedule`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_schedule">vesting_schedule</a>(vesting_contract_address: <b>address</b>): <a href="vesting.md#0x1_vesting_VestingSchedule">vesting::VestingSchedule</a>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_vesting_schedule">vesting_schedule</a>(vesting_contract_address: <b>address</b>): <a href="vesting.md#0x1_vesting_VestingSchedule">vesting::VestingSchedule</a>
 </code></pre>
 
 
@@ -2846,7 +2892,8 @@ staking_contract and stake modules.
 ### Function `total_accumulated_rewards`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_total_accumulated_rewards">total_accumulated_rewards</a>(vesting_contract_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_total_accumulated_rewards">total_accumulated_rewards</a>(vesting_contract_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -2882,7 +2929,8 @@ staking_contract and stake modules.
 ### Function `accumulated_rewards`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_accumulated_rewards">accumulated_rewards</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_accumulated_rewards">accumulated_rewards</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): u64
 </code></pre>
 
 
@@ -2898,7 +2946,8 @@ staking_contract and stake modules.
 ### Function `shareholders`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholders">shareholders</a>(vesting_contract_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholders">shareholders</a>(vesting_contract_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
 </code></pre>
 
 
@@ -2914,7 +2963,8 @@ staking_contract and stake modules.
 ### Function `shareholder`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): <b>address</b>
 </code></pre>
 
 

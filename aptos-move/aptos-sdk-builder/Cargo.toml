@@ -1,7 +1,7 @@
 [package]
 name = "aptos-sdk-builder"
 description = "Aptos transaction-builder"
-version = "0.1.0"
+version = "0.2.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+clap = { workspace = true }
 heck = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
@@ -23,7 +24,6 @@ regex = { workspace = true }
 serde-generate = { workspace = true }
 serde-reflection = { workspace = true }
 serde_yaml = { workspace = true }
-structopt = { workspace = true }
 textwrap = { workspace = true }
 
 [dev-dependencies]

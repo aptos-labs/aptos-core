@@ -15,6 +15,8 @@ use once_cell::sync::Lazy;
 pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
 /// Transaction commit failed (will not be retried)
 pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
+/// Transaction commit failed (will not be retried) because of a duplicate
+pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
@@ -49,6 +51,15 @@ pub static LAST_COMMITTED_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_consensus_last_committed_version",
         "The counter corresponds to the version of the last committed ledger info."
+    )
+    .unwrap()
+});
+
+/// Count of the committed failed rounds since last restart.
+pub static COMMITTED_FAILED_ROUNDS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_committed_failed_rounds_count",
+        "Count of the committed failed rounds since last restart."
     )
     .unwrap()
 });
@@ -111,10 +122,30 @@ pub static TXN_SHUFFLE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         // metric name
         "aptos_execution_transaction_shuffle_seconds",
         // metric description
-        "The time spent in seconds in initializing the VM in the block executor",
+        "The time spent in seconds in shuffle of transactions",
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
+});
+
+/// Transaction dedup call latency
+pub static TXN_DEDUP_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_execution_transaction_dedup_seconds",
+        // metric description
+        "The time spent in seconds in dedup of transaction",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Transaction dedup number of filtered
+pub static TXN_DEDUP_FILTERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_execution_transaction_dedup_filtered",
+        "The number of duplicates filtered per block",
+    )
 });
 
 /// Number of rounds we were collecting votes for proposer

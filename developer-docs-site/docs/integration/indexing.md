@@ -72,7 +72,7 @@ Getting all tokens currently in account.
 query CurrentTokens($owner_address: String, $offset: Int) {
   current_token_ownerships(
     where: {owner_address: {_eq: $owner_address}, amount: {_gt: "0"}, table_type: {_eq: "0x3::token::TokenStore"}}
-    order_by: {last_transaction_version: desc}
+    order_by: [{last_transaction_version: desc}, {token_data_id: desc}]
     offset: $offset
   ) {
     token_data_id_hash
@@ -103,7 +103,7 @@ query TokenActivities($token_id_hash: String, $offset: Int) {
   token_activities(
     where: {token_data_id_hash: {_eq: $token_id_hash}}
     # Needed for pagination
-    order_by: {transaction_version: desc}
+    order_by: [{last_transaction_version: desc}, {event_index: asc}]
     # Optional for pagination
     offset: $offset
   ) {
@@ -137,7 +137,7 @@ query CurrentOffers($to_address: String, $offset: Int) {
   current_token_pending_claims(
     where: {to_address: {_eq: $to_address}, amount: {_gt: "0"}}
     # Needed for pagination
-    order_by: {last_transaction_version: desc}
+    order_by: [{last_transaction_version: desc}, {token_data_id: desc}]
     # Optional for pagination
     offset: $offset
   ) {
@@ -171,7 +171,7 @@ query CoinActivity($owner_address: String, $offset: Int) {
   coin_activities(
     where: {owner_address: {_eq: $owner_address}}
     # Needed for pagination
-    order_by: {transaction_version: desc}
+    order_by: [{last_transaction_version: desc}, {event_index: asc}]
     # Optional for pagination
     offset: $offset
   ) {
@@ -204,7 +204,7 @@ query CurrentBalances($owner_address: String, $offset: Int)Ï {
   current_coin_balances(
     where: {owner_address: {_eq: $owner_address}}
     # Needed for pagination
-    order_by: {last_transaction_version: desc}
+    order_by: [{last_transaction_version: desc}, {token_data_id: desc}]
     # Optional for pagination
     offset: $offset
   ) {
@@ -251,7 +251,7 @@ query UserTransactions($limit: Int) {
 
 The following rate limit applies for this Aptos-provided indexing service:
 
-- For a web application that calls this Aptos-provided indexer API directly from the client (for example, wallet or explorer), the rate limit is currently 1000 requests per five minutes by IP address. **Note that this limit can change with or without prior notice.** 
+- For a web application that calls this Aptos-provided indexer API directly from the client (for example, wallet or explorer), the rate limit is currently 5000 requests per five minutes by IP address. **Note that this limit can change with or without prior notice.** 
 
 If you are running a backend (server-side) application and want to call the indexer programmatically then you should run an indexer-enabled fullnode. 
 

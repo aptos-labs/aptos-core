@@ -75,6 +75,7 @@ async fn test_connection_limiting() {
                 peer_set,
             ),
         )
+        .await
         .unwrap();
     swarm
         .fullnode_mut(pfn_peer_id)
@@ -115,6 +116,7 @@ async fn test_connection_limiting() {
                 peer_set,
             ),
         )
+        .await
         .unwrap();
 
     // This node should fail to connect
@@ -155,7 +157,10 @@ async fn test_rest_discovery() {
 
     // Start a new node that should connect to the previous node only via REST
     // The startup wait time should check if it connects successfully
-    swarm.add_full_node(&version, full_node_config).unwrap();
+    swarm
+        .add_full_node(&version, full_node_config)
+        .await
+        .unwrap();
 }
 
 // Currently this test seems flaky: https://github.com/aptos-labs/aptos-core/issues/670
@@ -211,11 +216,34 @@ async fn test_peer_monitoring_service_enabled() {
         .build()
         .await;
 
-    // Create a fullnode config that with peer monitoring enabled
-    let mut vfn_config = NodeConfig::get_default_vfn_config();
-    vfn_config
-        .peer_monitoring_service
-        .enable_peer_monitoring_client = true;
+    // Test the ability of the validators to sync
+    test_all_validator_failures(swarm).await;
+}
+
+#[ignore]
+#[tokio::test]
+// Requires that the network-perf-test feature is enabled
+async fn test_network_performance_monitoring() {
+    // Create a swarm of 4 validators with peer monitoring enabled
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.peer_monitoring_service.enable_peer_monitoring_client = true;
+            config
+                .peer_monitoring_service
+                .performance_monitoring
+                .enable_rpc_testing = true;
+            config
+                .peer_monitoring_service
+                .performance_monitoring
+                .rpc_interval_usec = 1_000_000; // 1 sec
+            config
+                .peer_monitoring_service
+                .performance_monitoring
+                .rpc_data_size = 1024; // 1 KB
+        }))
+        .build()
+        .await;
 
     // Test the ability of the validators to sync
     test_all_validator_failures(swarm).await;

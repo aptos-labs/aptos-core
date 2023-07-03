@@ -7,7 +7,7 @@
 use crate::{
     ast::QualifiedSymbol,
     model::{GlobalEnv, ModuleId, QualifiedInstId, StructEnv, StructId},
-    symbol::{Symbol, SymbolPool},
+    symbol::Symbol,
 };
 use move_binary_format::{file_format::TypeParameterIndex, normalized::Type as MType};
 use move_core_types::language_storage::{StructTag, TypeTag};
@@ -105,6 +105,11 @@ impl Type {
     /// Create a new primitive type
     pub fn new_prim(p: PrimitiveType) -> Type {
         Type::Primitive(p)
+    }
+
+    /// Create a new type parameter
+    pub fn new_param(pos: usize) -> Type {
+        Type::TypeParameter(pos as u16)
     }
 
     /// Creates a unit type
@@ -306,7 +311,7 @@ impl Type {
 
     /// Convert a partial assignment for type parameters into an instantiation.
     pub fn type_param_map_to_inst(arity: usize, map: BTreeMap<u16, Type>) -> Vec<Type> {
-        let mut inst: Vec<_> = (0..arity).map(|i| Type::TypeParameter(i as u16)).collect();
+        let mut inst: Vec<_> = (0..arity).map(Type::new_param).collect();
         for (idx, ty) in map {
             inst[idx as usize] = ty;
         }
@@ -547,6 +552,11 @@ impl Type {
         }
     }
 
+    /// If this is a tuple and it has zero elements (the 'unit' type), return true.
+    pub fn is_unit(&self) -> bool {
+        matches!(self, Type::Tuple(ts) if ts.is_empty())
+    }
+
     /// If this is a vector of more than one type, make a tuple out of it, otherwise return the
     /// type.
     pub fn tuple(mut tys: Vec<Type>) -> Type {
@@ -770,24 +780,15 @@ impl Substitution {
                     Ok(Some(self.unify(variance, &s1, t2)?))
                 };
             }
-            let is_t1_var = |t: &Type| {
-                if let Type::Var(v2) = t {
-                    v1 == v2
-                } else {
-                    false
-                }
-            };
             // Skip the cycle check if we are unifying the same two variables.
-            if is_t1_var(t2) {
+            if t1 == t2 {
                 return Ok(Some(t1.clone()));
             }
             // Cycle check.
-            if !t2.contains(&is_t1_var) {
+            if !self.occurs_check(t2, *v1) {
                 self.subs.insert(*v1, t2.clone());
                 Ok(Some(t2.clone()))
             } else {
-                // It is not clear to me whether this can ever occur given we do no global
-                // unification with recursion, but to be on the save side, we have it.
                 Err(TypeUnificationError::CyclicSubstitution(
                     self.specialize(t1),
                     self.specialize(t2),
@@ -796,6 +797,21 @@ impl Substitution {
         } else {
             Ok(None)
         }
+    }
+
+    /// Check whether the variables occurs in the type, or in any assignment to variables in the
+    /// type.
+    fn occurs_check(&self, ty: &Type, var: u16) -> bool {
+        ty.get_vars().iter().any(|v| {
+            if v == &var {
+                return true;
+            }
+            if let Some(sty) = self.subs.get(v) {
+                self.occurs_check(sty, var)
+            } else {
+                false
+            }
+        })
     }
 }
 
@@ -1116,9 +1132,7 @@ impl TypeInstantiationDerivation {
     where
         I: Iterator<Item = &'a Type> + Clone,
     {
-        let initial_param_insts: Vec<_> = (0..params_arity)
-            .map(|idx| Type::TypeParameter(idx as TypeParameterIndex))
-            .collect();
+        let initial_param_insts: Vec<_> = (0..params_arity).map(Type::new_param).collect();
 
         let mut work_queue = VecDeque::new();
         work_queue.push_back(initial_param_insts);
@@ -1162,7 +1176,7 @@ impl TypeInstantiationDerivation {
                     let irrelevant_type = if mark_irrelevant_param_as_error {
                         Type::Error
                     } else {
-                        Type::TypeParameter(target_param_index as TypeParameterIndex)
+                        Type::new_param(target_param_index)
                     };
                     target_param_insts.insert(irrelevant_type);
                 }
@@ -1183,22 +1197,31 @@ impl TypeInstantiationDerivation {
 }
 
 /// Data providing context for displaying types.
-pub enum TypeDisplayContext<'a> {
-    WithoutEnv {
-        symbol_pool: &'a SymbolPool,
-        reverse_struct_table: &'a BTreeMap<(ModuleId, StructId), QualifiedSymbol>,
-    },
-    WithEnv {
-        env: &'a GlobalEnv,
-        type_param_names: Option<Vec<Symbol>>,
-    },
+pub struct TypeDisplayContext<'a> {
+    pub env: &'a GlobalEnv,
+    pub type_param_names: Option<Vec<Symbol>>,
+    // During type checking, the env might not contain the types yet of the currently checked
+    // module. This field allows to access symbolic information in this case.
+    pub builder_struct_table: Option<&'a BTreeMap<(ModuleId, StructId), QualifiedSymbol>>,
 }
 
 impl<'a> TypeDisplayContext<'a> {
-    pub fn symbol_pool(&self) -> &SymbolPool {
-        match self {
-            TypeDisplayContext::WithEnv { env, .. } => env.symbol_pool(),
-            TypeDisplayContext::WithoutEnv { symbol_pool, .. } => symbol_pool,
+    pub fn new(env: &'a GlobalEnv) -> TypeDisplayContext<'a> {
+        Self {
+            env,
+            type_param_names: None,
+            builder_struct_table: None,
+        }
+    }
+
+    pub fn new_with_params(
+        env: &'a GlobalEnv,
+        type_param_names: Vec<Symbol>,
+    ) -> TypeDisplayContext<'a> {
+        Self {
+            env,
+            type_param_names: Some(type_param_names),
+            builder_struct_table: None,
         }
     }
 }
@@ -1274,14 +1297,10 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 write!(f, "{}", t.display(self.context))
             },
             TypeParameter(idx) => {
-                if let TypeDisplayContext::WithEnv {
-                    env,
-                    type_param_names: Some(names),
-                } = self.context
-                {
+                if let Some(names) = &self.context.type_param_names {
                     let idx = *idx as usize;
                     if idx < names.len() {
-                        write!(f, "{}", names[idx].display(env.symbol_pool()))
+                        write!(f, "{}", names[idx].display(self.context.env.symbol_pool()))
                     } else {
                         write!(f, "#{}", idx)
                     }
@@ -1297,25 +1316,17 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
 
 impl<'a> TypeDisplay<'a> {
     fn struct_str(&self, mid: ModuleId, sid: StructId) -> String {
-        match self.context {
-            TypeDisplayContext::WithoutEnv {
-                symbol_pool,
-                reverse_struct_table,
-            } => {
-                if let Some(sym) = reverse_struct_table.get(&(mid, sid)) {
-                    sym.display(symbol_pool).to_string()
-                } else {
-                    "??unknown??".to_string()
-                }
-            },
-            TypeDisplayContext::WithEnv { env, .. } => {
-                let struct_env = env.get_module(mid).into_struct(sid);
-                format!(
-                    "{}::{}",
-                    struct_env.module_env.get_name().display(env.symbol_pool()),
-                    struct_env.get_name().display(env.symbol_pool())
-                )
-            },
+        let env = self.context.env;
+        if let Some(builder_table) = self.context.builder_struct_table {
+            let qsym = builder_table.get(&(mid, sid)).expect("type known");
+            qsym.display(self.context.env).to_string()
+        } else {
+            let struct_env = env.get_module(mid).into_struct(sid);
+            format!(
+                "{}::{}",
+                struct_env.module_env.get_name().display(env),
+                struct_env.get_name().display(env.symbol_pool())
+            )
         }
     }
 }

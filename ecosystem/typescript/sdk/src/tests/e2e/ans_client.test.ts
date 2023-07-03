@@ -1,14 +1,16 @@
 import { AptosAccount } from "../../account";
+import { AccountAddress } from "../../aptos_types";
 import { AnsClient } from "../../plugins/ans_client";
 import { Provider } from "../../providers";
 import { HexString, Network } from "../../utils";
 import { ANS_OWNER_ADDRESS, ANS_OWNER_PK, getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
 
 const alice = new AptosAccount();
-const ACCOUNT_ADDRESS = alice.address().hex();
+const ACCOUNT_ADDRESS = AccountAddress.standardizeAddress(alice.address().hex());
 // generate random name so we can run the test against local tesnet without the need to re-run it each time.
 // This will produce a string anywhere between zero and 12 characters long, usually 11 characters, only lower-case and numbers
 const DOMAIN_NAME = Math.random().toString(36).slice(2);
+const SUBDOMAIN_NAME = Math.random().toString(36).slice(2);
 
 describe("ANS", () => {
   beforeAll(async () => {
@@ -64,6 +66,21 @@ describe("ANS", () => {
   );
 
   test(
+    "mint subdomain name",
+    async () => {
+      const provider = new Provider({ fullnodeUrl: NODE_URL, indexerUrl: NODE_URL });
+      const ans = new AnsClient(provider, ANS_OWNER_ADDRESS);
+
+      const txnHash = await ans.mintAptosSubdomain(alice, SUBDOMAIN_NAME, DOMAIN_NAME);
+      await provider.waitForTransactionWithResult(txnHash, { checkSuccess: true });
+
+      const txnHashForSet = await ans.setSubdomainAddress(alice, SUBDOMAIN_NAME, DOMAIN_NAME, ACCOUNT_ADDRESS);
+      await provider.waitForTransactionWithResult(txnHashForSet, { checkSuccess: true });
+    },
+    longTestTimeout,
+  );
+
+  test(
     "get name by address",
     async () => {
       const provider = new Provider({ fullnodeUrl: NODE_URL, indexerUrl: NODE_URL });
@@ -82,7 +99,8 @@ describe("ANS", () => {
       const ans = new AnsClient(provider, ANS_OWNER_ADDRESS);
 
       const address = await ans.getAddressByName(DOMAIN_NAME);
-      expect(address).toEqual(ACCOUNT_ADDRESS);
+      const standardizeAddress = AccountAddress.standardizeAddress(address as string);
+      expect(standardizeAddress).toEqual(ACCOUNT_ADDRESS);
     },
     longTestTimeout,
   );
@@ -94,7 +112,8 @@ describe("ANS", () => {
       const ans = new AnsClient(provider, ANS_OWNER_ADDRESS);
 
       const address = await ans.getAddressByName(`${DOMAIN_NAME}.apt`);
-      expect(address).toEqual(ACCOUNT_ADDRESS);
+      const standardizeAddress = AccountAddress.standardizeAddress(address as string);
+      expect(standardizeAddress).toEqual(ACCOUNT_ADDRESS);
     },
     longTestTimeout,
   );
@@ -105,8 +124,9 @@ describe("ANS", () => {
       const provider = new Provider({ fullnodeUrl: NODE_URL, indexerUrl: NODE_URL });
       const ans = new AnsClient(provider, ANS_OWNER_ADDRESS);
 
-      const address = await ans.getAddressByName(`sub.${DOMAIN_NAME}`);
-      expect(address).toBeNull;
+      const address = await ans.getAddressByName(`${SUBDOMAIN_NAME}.${DOMAIN_NAME}`);
+      const standardizeAddress = AccountAddress.standardizeAddress(address as string);
+      expect(standardizeAddress).toEqual(ACCOUNT_ADDRESS);
     },
     longTestTimeout,
   );
@@ -117,8 +137,9 @@ describe("ANS", () => {
       const provider = new Provider({ fullnodeUrl: NODE_URL, indexerUrl: NODE_URL });
       const ans = new AnsClient(provider, ANS_OWNER_ADDRESS);
 
-      const address = await ans.getAddressByName(`sub.${DOMAIN_NAME}.apt`);
-      expect(address).toBeNull;
+      const address = await ans.getAddressByName(`${SUBDOMAIN_NAME}.${DOMAIN_NAME}.apt`);
+      const standardizeAddress = AccountAddress.standardizeAddress(address as string);
+      expect(standardizeAddress).toEqual(ACCOUNT_ADDRESS);
     },
     longTestTimeout,
   );
@@ -141,7 +162,7 @@ describe("ANS", () => {
       const provider = new Provider({ fullnodeUrl: NODE_URL, indexerUrl: NODE_URL });
       const ans = new AnsClient(provider, ANS_OWNER_ADDRESS);
 
-      const address = await ans.getAddressByName(`sub.${DOMAIN_NAME}.apt-`);
+      const address = await ans.getAddressByName(`${SUBDOMAIN_NAME}.${DOMAIN_NAME}.apt-`);
       expect(address).toBeNull;
     },
     longTestTimeout,

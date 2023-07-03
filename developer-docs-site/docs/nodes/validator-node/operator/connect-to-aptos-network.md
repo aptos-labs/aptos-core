@@ -16,7 +16,7 @@ The current required minimum for staking is 1M APT tokens.
 Before joining the network, make sure the validator node is bootstrapped with the correct [genesis blob and waypoint](../../node-files-all-networks/node-files.md) for the corresponding network. To bootstrap your node, first you need to know the pool address to use:
 
 :::tip 
-The command below uses the network you set for the account when [initializing the CLI](../../../nodes/validator-node/owner/index.md#initialize-cli).
+The command below uses the network you set for the account when [initializing the CLI](../../../nodes/validator-node/operator/staking-pool-operations.md#initialize-cli).
 :::
 
 ```bash

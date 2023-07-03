@@ -1,0 +1,10 @@
+[package]
+name = "CliArgs"
+version = "0.1.0"
+upgrade_policy = "compatible"
+
+[addresses]
+test_account = "_"
+
+[dependencies.AptosFramework]
+local = "../../framework/aptos-framework"

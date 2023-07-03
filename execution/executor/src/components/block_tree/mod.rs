@@ -7,23 +7,29 @@
 #[cfg(test)]
 mod test;
 
-use crate::logging::{LogEntry, LogSchema};
+use crate::{
+    logging::{LogEntry, LogSchema},
+    metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS,
+};
 use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error, ExecutedChunk};
+use aptos_executor_types::{Error, ExecutedBlock};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::DbReader;
 use aptos_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
 use std::{
     collections::{hash_map::Entry, HashMap},
-    sync::{Arc, Weak},
+    sync::{
+        mpsc::{channel, Receiver},
+        Arc, Weak,
+    },
 };
 
 pub struct Block {
     pub id: HashValue,
-    pub output: ExecutedChunk,
+    pub output: ExecutedBlock,
     children: Mutex<Vec<Arc<Block>>>,
     block_lookup: Arc<BlockLookup>,
 }
@@ -88,7 +94,7 @@ impl BlockLookupInner {
     fn fetch_or_add_block(
         &mut self,
         id: HashValue,
-        output: ExecutedChunk,
+        output: ExecutedBlock,
         parent_id: Option<HashValue>,
         block_lookup: &Arc<BlockLookup>,
     ) -> Result<(Arc<Block>, bool, Option<Arc<Block>>)> {
@@ -147,7 +153,7 @@ impl BlockLookup {
     fn fetch_or_add_block(
         self: &Arc<Self>,
         id: HashValue,
-        output: ExecutedChunk,
+        output: ExecutedBlock,
         parent_id: Option<HashValue>,
     ) -> Result<Arc<Block>> {
         let (block, existing, parent_block) = self
@@ -223,10 +229,15 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        block_lookup.fetch_or_add_block(id, ExecutedChunk::new_empty(ledger_view), None)
+        block_lookup.fetch_or_add_block(id, ExecutedBlock::new_empty(ledger_view), None)
     }
 
-    pub fn prune(&self, ledger_info: &LedgerInfo) -> Result<()> {
+    // Set the root to be at `ledger_info`, drop blocks that are no longer descendants of the
+    // new root.
+    //
+    // Dropping happens asynchronously in another thread. A receiver is returned to the caller
+    // to wait for the dropping to fully complete (useful for tests).
+    pub fn prune(&self, ledger_info: &LedgerInfo) -> Result<Receiver<()>> {
         let committed_block_id = ledger_info.consensus_block_id();
         let last_committed_block = self.get_block(committed_block_id)?;
 
@@ -240,7 +251,7 @@ impl BlockTree {
             );
             self.block_lookup.fetch_or_add_block(
                 epoch_genesis_id,
-                ExecutedChunk::new_empty(last_committed_block.output.result_view.clone()),
+                ExecutedBlock::new_empty(last_committed_block.output.result_view.clone()),
                 None,
             )?
         } else {
@@ -250,15 +261,33 @@ impl BlockTree {
             );
             last_committed_block
         };
-        *self.root.lock() = root;
-        Ok(())
+        let old_root = {
+            let mut root_locked = self.root.lock();
+            // send old root to async task to drop it
+            let old_root = root_locked.clone();
+            *root_locked = root;
+            old_root
+        };
+        // This should be the last reference to old root, spawning a drop to a different thread
+        // guarantees that the drop will not happen in the current thread
+        let (tx, rx) = channel::<()>();
+        rayon::spawn(move || {
+            let _timeer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["drop_old_root"])
+                .start_timer();
+            drop(old_root);
+            // Error is ignored, since the caller might not care about dropping completion and
+            // has discarded the receiver already.
+            tx.send(()).ok();
+        });
+        Ok(rx)
     }
 
     pub fn add_block(
         &self,
         parent_block_id: HashValue,
         id: HashValue,
-        output: ExecutedChunk,
+        output: ExecutedBlock,
     ) -> Result<Arc<Block>> {
         self.block_lookup
             .fetch_or_add_block(id, output, Some(parent_block_id))

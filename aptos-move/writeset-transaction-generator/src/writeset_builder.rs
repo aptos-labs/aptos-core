@@ -17,7 +17,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     data_cache::StorageAdapter,
-    move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use move_core_types::{
     identifier::Identifier,
@@ -28,9 +28,9 @@ use move_core_types::{
 use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
 
-pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
+pub struct GenesisSession<'r, 'l>(SessionExt<'r, 'l>);
 
-impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
+impl<'r, 'l> GenesisSession<'r, 'l> {
     pub fn exec_func(
         &mut self,
         module_name: &str,
@@ -109,7 +109,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
 
 pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
 where
-    F: FnOnce(&mut GenesisSession<StorageAdapter<S>>),
+    F: FnOnce(&mut GenesisSession),
 {
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
@@ -121,12 +121,14 @@ where
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);
-    let change_set_ext = {
+    let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
-        let mut session = GenesisSession(
-            move_vm.new_session(&state_view_storage, SessionId::genesis(genesis_id)),
-        );
+        let mut session = GenesisSession(move_vm.new_session(
+            &state_view_storage,
+            SessionId::genesis(genesis_id),
+            true,
+        ));
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
@@ -141,6 +143,8 @@ where
     };
 
     // Genesis never produces the delta change set.
-    let (_delta_change_set, change_set) = change_set_ext.into_inner();
-    change_set
+    assert!(change_set.delta_change_set().is_empty());
+
+    let (write_set, _delta_change_set, events) = change_set.unpack();
+    ChangeSet::new(write_set, events)
 }
