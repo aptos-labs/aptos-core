@@ -786,10 +786,10 @@ export class AptosClient {
   }
 
   /**
-   * Publishes a move packages by creating a resource account. 
+   * Publishes a move packages by creating a resource account.
    * The package cannot be upgraded since it is deployed by resource account
    * `packageMetadata` and `modules` can be generated with command
-   * `aptos move compile --save-metadata [ --included-artifacts=<...> ]`. 
+   * `aptos move compile --save-metadata [ --included-artifacts=<...> ]`.
    * @param sender
    * @param seed seeds for creation of resource address
    * @param packageMetadata package metadata bytes
@@ -812,14 +812,12 @@ export class AptosClient {
         "0x1::resource_account",
         "create_resource_account_and_publish_package",
         [],
-        [bcsSerializeBytes(seed) ,bcsSerializeBytes(packageMetadata), codeSerializer.getBytes()],
+        [bcsSerializeBytes(seed), bcsSerializeBytes(packageMetadata), codeSerializer.getBytes()],
       ),
     );
 
     return this.generateSignSubmitTransaction(sender, payload, extraArgs);
   }
-
-
 
   /**
    * Helper for generating, submitting, and waiting for a transaction, and then

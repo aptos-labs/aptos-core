@@ -534,7 +534,7 @@ test(
       ],
     );
 
-    await client.waitForTransaction(txnHash,{ checkSuccess: true });
+    await client.waitForTransaction(txnHash, { checkSuccess: true });
   },
   longTestTimeout,
 );
