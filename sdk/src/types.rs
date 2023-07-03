@@ -105,11 +105,11 @@ impl LocalAccount {
         secondary_signers: Vec<&Self>,
         builder: TransactionBuilder,
     ) -> SignedTransaction {
-        let secondary_signer_addresses: Vec<AccountAddress> = secondary_signers
+        let secondary_signer_addresses = secondary_signers
             .iter()
             .map(|signer| signer.address())
             .collect();
-        let secondary_signer_privkeys: Vec<&Ed25519PrivateKey> = secondary_signers
+        let secondary_signer_privkeys = secondary_signers
             .iter()
             .map(|signer| signer.private_key())
             .collect();
