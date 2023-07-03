@@ -55,6 +55,11 @@ impl DBPruner for StateKvPruner {
             let current_batch_target_version =
                 min(progress + max_versions as Version, target_version);
 
+            info!(
+                progress = progress,
+                target_version = current_batch_target_version,
+                "Pruning state kv data."
+            );
             self.metadata_pruner
                 .prune(progress, current_batch_target_version)?;
 
@@ -65,6 +70,7 @@ impl DBPruner for StateKvPruner {
 
             progress = current_batch_target_version;
             self.record_progress(progress);
+            info!(progress = progress, "Pruning state kv data is done.");
         }
 
         Ok(target_version)
@@ -100,6 +106,11 @@ impl StateKvPruner {
         let metadata_pruner = StateKvMetadataPruner::new(Arc::clone(&state_kv_db));
 
         let metadata_progress = metadata_pruner.progress()?;
+
+        info!(
+            metadata_progress = metadata_progress,
+            "Created state kv metadata pruner, start catching up all shards."
+        );
 
         let shard_pruners = if state_kv_db.enabled_sharding() {
             let num_shards = state_kv_db.num_shards();

@@ -21,6 +21,7 @@ import {
   GetTokenOwnedFromCollectionQuery,
   GetCollectionDataQuery,
   GetCollectionsWithOwnedTokensQuery,
+  GetTokenCurrentOwnerDataQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -41,6 +42,7 @@ import {
   GetTokenOwnedFromCollection,
   GetCollectionData,
   GetCollectionsWithOwnedTokens,
+  GetTokenCurrentOwnerData,
 } from "../indexer/generated/queries";
 
 /**
@@ -282,16 +284,78 @@ export class IndexerClient {
   }
 
   /**
-   * Queries token owners data
+   * Queries token owners data. This query returns historical owners data
+   * To fetch token v2 standard, pass in the optional `tokenStandard` parameter and
+   * dont pass `propertyVersion` parameter (as propertyVersion only compatible with v1 standard)
    *
    * @param tokenId Token ID
-   * @param propertyVersion Property version
+   * @param propertyVersion Property version (optional) - only compatible with token v1 standard
    * @returns GetTokenOwnersDataQuery response type
    */
-  async getTokenOwnersData(tokenId: string, propertyVersion: number): Promise<GetTokenOwnersDataQuery> {
+  async getTokenOwnersData(
+    tokenId: string,
+    propertyVersion?: number,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<GetTokenOwnersDataQuery> {
+    const tokenAddress = HexString.ensure(tokenId).hex();
+    IndexerClient.validateAddress(tokenAddress);
+
+    const whereCondition: any = {
+      token_data_id: { _eq: tokenAddress },
+    };
+
+    if (propertyVersion) {
+      whereCondition.property_version_v1 = { _eq: propertyVersion };
+    }
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
     const graphqlQuery = {
       query: GetTokenOwnersData,
-      variables: { token_id: tokenId, property_version: propertyVersion },
+      variables: { where_condition: whereCondition },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries token current owner data. This query returns the current token owner data.
+   * To fetch token v2 standard, pass in the optional `tokenStandard` parameter and
+   * dont pass `propertyVersion` parameter (as propertyVersion only compatible with v1 standard)
+   *
+   * @param tokenId Token ID
+   * @param propertyVersion Property version (optional) - only compatible with token v1 standard
+   * @returns GetTokenCurrentOwnerDataQuery response type
+   */
+  async getTokenCurrentOwnerData(
+    tokenId: string,
+    propertyVersion?: number,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<GetTokenCurrentOwnerDataQuery> {
+    const tokenAddress = HexString.ensure(tokenId).hex();
+    IndexerClient.validateAddress(tokenAddress);
+
+    const whereCondition: any = {
+      token_data_id: { _eq: tokenAddress },
+      amount: { _gt: "0" },
+    };
+
+    if (propertyVersion) {
+      whereCondition.property_version_v1 = { _eq: propertyVersion };
+    }
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
+    const graphqlQuery = {
+      query: GetTokenCurrentOwnerData,
+      variables: { where_condition: whereCondition },
     };
     return this.queryIndexer(graphqlQuery);
   }

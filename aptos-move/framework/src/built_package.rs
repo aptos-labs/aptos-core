@@ -253,6 +253,17 @@ impl BuiltPackage {
             })
     }
 
+    /// Returns an iterator for all compiled proper (non-script) modules, including
+    /// modules that are dependencies of the root modules.
+    pub fn all_modules(&self) -> impl Iterator<Item = &CompiledModule> {
+        self.package
+            .all_modules()
+            .filter_map(|unit| match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module),
+                CompiledUnit::Script(_) => None,
+            })
+    }
+
     /// Returns the number of scripts in the package.
     pub fn script_count(&self) -> usize {
         self.package.scripts().count()

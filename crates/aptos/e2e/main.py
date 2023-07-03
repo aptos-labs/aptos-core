@@ -41,6 +41,7 @@ from cases.move import (
     test_move_compile_script,
     test_move_publish,
     test_move_run,
+    test_move_view,
 )
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
@@ -125,6 +126,7 @@ def run_tests(run_helper):
     test_aptos_header_included(run_helper)
 
     # Run move subcommand group tests.
+    test_move_view(run_helper)
     test_move_compile(run_helper)
     test_move_compile_script(run_helper)
     test_move_publish(run_helper)

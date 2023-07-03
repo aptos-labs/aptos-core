@@ -15,10 +15,10 @@ module coin_listing {
     use std::string::String;
 
     use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::object::{Self, ConstructorRef, Object, ObjectCore};
     use aptos_framework::timestamp;
 
+    use marketplace::events;
     use marketplace::fee_schedule::{Self, FeeSchedule};
     use marketplace::listing::{Self, Listing};
 
@@ -45,8 +45,6 @@ module coin_listing {
     struct FixedPriceListing<phantom CoinType> has key {
         /// The price to purchase the item up for listing.
         price: u64,
-        /// Purchase event -- as it is only ever executed once.
-        purchase_event: EventHandle<PurchaseEvent>,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -65,36 +63,12 @@ module coin_listing {
         minimum_bid_time_before_end: u64,
         /// Buy it now price, ends auction immediately.
         buy_it_now_price: Option<u64>,
-        /// Bid events
-        bid_events: EventHandle<BidEvent>,
-        /// Purchase event -- as it is only ever executed once.
-        purchase_event: EventHandle<PurchaseEvent>,
     }
 
     /// Represents a single bid within this auction house.
     struct Bid<phantom CoinType> has store {
         bidder: address,
         coins: Coin<CoinType>,
-    }
-
-    /// An event triggered upon each bid.
-    struct BidEvent has drop, store {
-        new_bidder: address,
-        new_bid: u64,
-        new_end_time: u64,
-        previous_bidder: Option<address>,
-        previous_bid: Option<u64>,
-        previous_end_time: u64,
-    }
-
-    /// An event triggered upon the sale of an item. Note, the amount given to the seller is the
-    /// price - commission - royalties. In the case there was no sale, purchaser is equal to seller
-    /// and the amounts will all be zero.
-    struct PurchaseEvent has drop, store {
-        purchaser: address,
-        price: u64,
-        commission: u64,
-        royalties: u64,
     }
 
     // Init functions
@@ -126,11 +100,20 @@ module coin_listing {
 
         let fixed_price_listing = FixedPriceListing<CoinType> {
             price,
-            purchase_event: object::new_event_handle(&listing_signer),
         };
         move_to(&listing_signer, fixed_price_listing);
 
-        object::object_from_constructor_ref(&constructor_ref)
+        let listing = object::object_from_constructor_ref(&constructor_ref);
+
+        events::emit_listing_placed(
+            fee_schedule,
+            object::object_address(&listing),
+            signer::address_of(seller),
+            price,
+            listing::token_metadata(listing),
+        );
+
+        listing
     }
 
     public entry fun init_fixed_price_for_tokenv1<CoinType>(
@@ -231,11 +214,19 @@ module coin_listing {
             auction_end_time,
             minimum_bid_time_before_end,
             buy_it_now_price,
-            bid_events: object::new_event_handle(&listing_signer),
-            purchase_event: object::new_event_handle(&listing_signer),
         };
         move_to(&listing_signer, auction_listing);
-        object::object_from_constructor_ref(&constructor_ref)
+        let listing = object::object_from_constructor_ref(&constructor_ref);
+
+        events::emit_listing_placed(
+            fee_schedule,
+            object::object_address(&listing),
+            signer::address_of(seller),
+            starting_bid,
+            listing::token_metadata(listing),
+        );
+
+        listing
     }
 
     public entry fun init_auction_for_tokenv1<CoinType>(
@@ -328,7 +319,7 @@ module coin_listing {
         let listing_addr = listing::assert_started(&object);
 
         // Retrieve the purchase price if the auction has buy it now or this is a fixed listing.
-        let (price, purchase_event) = if (exists<AuctionListing<CoinType>>(listing_addr)) {
+        let price = if (exists<AuctionListing<CoinType>>(listing_addr)) {
             let AuctionListing {
                 starting_bid: _,
                 bid_increment: _,
@@ -336,8 +327,6 @@ module coin_listing {
                 auction_end_time,
                 minimum_bid_time_before_end: _,
                 buy_it_now_price,
-                bid_events,
-                purchase_event,
             } = move_from<AuctionListing<CoinType>>(listing_addr);
 
             let now = timestamp::now_seconds();
@@ -350,22 +339,20 @@ module coin_listing {
             } else {
                 option::destroy_none(current_bid);
             };
-            event::destroy_handle(bid_events);
-            (option::destroy_some(buy_it_now_price), purchase_event)
+            option::destroy_some(buy_it_now_price)
         } else if (exists<FixedPriceListing<CoinType>>(listing_addr)) {
             let FixedPriceListing {
                 price,
-                purchase_event,
             } = move_from<FixedPriceListing<CoinType>>(listing_addr);
-            (price, purchase_event)
+            price
         } else {
             // This should just be an abort but the compiler errors.
-            abort(error::not_found(ENO_LISTING))
+            abort (error::not_found(ENO_LISTING))
         };
 
         let coins = coin::withdraw<CoinType>(purchaser, price);
 
-        complete_purchase(signer::address_of(purchaser), object, purchase_event, coins)
+        complete_purchase(signer::address_of(purchaser), object, coins)
     }
 
     /// End a fixed price listing early.
@@ -373,25 +360,25 @@ module coin_listing {
         seller: &signer,
         object: Object<Listing>,
     ) acquires FixedPriceListing {
+        let token_metadata = listing::token_metadata(object);
+
         let expected_seller_addr = signer::address_of(seller);
-        let (actual_seller_addr, _fee_schedule) = listing::close(object, expected_seller_addr);
+        let (actual_seller_addr, fee_schedule) = listing::close(object, expected_seller_addr);
         assert!(expected_seller_addr == actual_seller_addr, error::permission_denied(ENOT_SELLER));
 
         let listing_addr = object::object_address(&object);
         assert!(exists<FixedPriceListing<CoinType>>(listing_addr), error::not_found(ENO_LISTING));
         let FixedPriceListing {
-            price: _,
-            purchase_event,
+            price,
         } = move_from<FixedPriceListing<CoinType>>(listing_addr);
 
-        let purchase_event_data = PurchaseEvent {
-            purchaser: expected_seller_addr,
-            price: 0,
-            commission: 0,
-            royalties: 0,
-        };
-        event::emit_event(&mut purchase_event, purchase_event_data);
-        event::destroy_handle(purchase_event);
+        events::emit_listing_canceled(
+            fee_schedule,
+            listing_addr,
+            actual_seller_addr,
+            price,
+            token_metadata,
+        );
     }
 
     /// Make a bid on a listing. If the listing comes in near the end of an auction, the auction
@@ -440,15 +427,17 @@ module coin_listing {
             auction_listing.auction_end_time = minimum_end_time
         };
 
-        let bid_event_data = BidEvent {
-            new_bidder: signer::address_of(bidder),
-            new_bid: bid_amount,
-            new_end_time: auction_listing.auction_end_time,
+        events::emit_bid_event(
+            fee_schedule,
+            listing_addr,
+            signer::address_of(bidder),
+            bid_amount,
+            auction_listing.auction_end_time,
             previous_bidder,
             previous_bid,
-            previous_end_time: current_end_time,
-        };
-        event::emit_event(&mut auction_listing.bid_events, bid_event_data);
+            current_end_time,
+            listing::token_metadata(object),
+        );
     }
 
     /// Once the current time has elapsed the auctions run time, allow the auction to be settled by
@@ -467,8 +456,6 @@ module coin_listing {
             auction_end_time,
             minimum_bid_time_before_end: _,
             buy_it_now_price: _,
-            bid_events,
-            purchase_event,
         } = move_from<AuctionListing<CoinType>>(listing_addr);
 
         let now = timestamp::now_seconds();
@@ -476,7 +463,7 @@ module coin_listing {
 
         let seller = listing::seller(object);
 
-        let (purchaser, coins)  = if (option::is_some(&current_bid)) {
+        let (purchaser, coins) = if (option::is_some(&current_bid)) {
             let Bid { bidder, coins } = option::destroy_some(current_bid);
             (bidder, coins)
         } else {
@@ -484,16 +471,16 @@ module coin_listing {
             (seller, coin::zero<CoinType>())
         };
 
-        complete_purchase(purchaser, object, purchase_event, coins);
-        event::destroy_handle(bid_events);
+        complete_purchase(purchaser, object, coins);
     }
 
     inline fun complete_purchase<CoinType>(
         purchaser_addr: address,
         object: Object<Listing>,
-        purchase_event: EventHandle<PurchaseEvent>,
         coins: Coin<CoinType>,
     ) {
+        let token_metadata = listing::token_metadata(object);
+
         let price = coin::value(&coins);
         let (royalty_addr, royalty_charge) = listing::compute_royalty(object, price);
         let (seller, fee_schedule) = listing::close(object, purchaser_addr);
@@ -509,14 +496,16 @@ module coin_listing {
 
         coin::deposit(seller, coins);
 
-        let purchase_event_data = PurchaseEvent {
-            purchaser: purchaser_addr,
+        events::emit_listing_filled(
+            fee_schedule,
+            object::object_address(&object),
+            seller,
+            purchaser_addr,
             price,
-            commission: commission_charge,
-            royalties: royalty_charge,
-        };
-        event::emit_event(&mut purchase_event, purchase_event_data);
-        event::destroy_handle(purchase_event);
+            commission_charge,
+            royalty_charge,
+            token_metadata,
+        );
     }
 
     // View
@@ -892,7 +881,7 @@ module listing_tests {
         seller: &signer,
         purchaser: &signer,
     ) {
-         test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
 
         let token = test_utils::mint_tokenv2(seller);
         let fee_schedule = test_utils::fee_schedule(marketplace);

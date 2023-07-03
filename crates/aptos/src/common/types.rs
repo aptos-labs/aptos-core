@@ -1606,7 +1606,10 @@ impl TransactionOptions {
 
         // Generate the execution & IO flamegraph.
         println!();
-        match gas_log.to_flamegraph(format!("Transaction {} -- Execution & IO", hash))? {
+        match gas_log
+            .exec_io
+            .to_flamegraph(format!("Transaction {} -- Execution & IO", hash))?
+        {
             Some(graph_bytes) => {
                 create_dir!();
                 let graph_file_path = Path::join(dir, format!("{}.exec_io.svg", raw_file_name));

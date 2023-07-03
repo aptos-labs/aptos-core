@@ -49,7 +49,7 @@ module marketplace::test_utils {
     }
 
     public fun fee_schedule(seller: &signer): Object<FeeSchedule> {
-        fee_schedule::init_internal(
+        fee_schedule::init(
             seller,
             signer::address_of(seller),
             2,

@@ -542,7 +542,7 @@ impl Options {
                        configuration file instead."
                 ));
             }
-            let value = matches.get_one::<&str>("config").unwrap();
+            let value = matches.get_one::<String>("config").unwrap();
             if value.is_empty() {
                 Self::default()
             } else {

@@ -916,14 +916,19 @@ pub enum Operation {
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
     Pack(ModuleId, StructId),
     Tuple,
+
+    // Specification specific
     Select(ModuleId, StructId, FieldId),
     UpdateField(ModuleId, StructId, FieldId),
     Result(usize),
     Index,
     Slice,
+    Range,
+    Implies,
+    Iff,
+    Identical,
 
     // Binary operators
-    Range,
     Add,
     Sub,
     Mul,
@@ -934,12 +939,9 @@ pub enum Operation {
     Xor,
     Shl,
     Shr,
-    Implies,
-    Iff,
     And,
     Or,
     Eq,
-    Identical,
     Neq,
     Lt,
     Gt,
@@ -950,17 +952,26 @@ pub enum Operation {
     Not,
     Cast,
 
-    // Builtin functions
+    // Builtin functions (impl and spec)
+    Exists(Option<MemoryLabel>),
+
+    // Builtin functions (impl only)
+    BorrowGlobal(bool),
+    MoveTo,
+    MoveFrom,
+    Freeze,
+    Abort,
+
+    // Builtin functions (spec only)
     Len,
     TypeValue,
     TypeDomain,
     ResourceDomain,
     Global(Option<MemoryLabel>),
-    Exists(Option<MemoryLabel>),
-    BorrowGlobal(bool),
     CanModify,
     Old,
     Trace(TraceKind),
+
     EmptyVec,
     SingleVec,
     UpdateVec,

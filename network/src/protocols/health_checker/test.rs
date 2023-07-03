@@ -19,7 +19,7 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_time_service::{MockTimeService, TimeService};
-use futures::{executor::block_on, future};
+use futures::future;
 use maplit::hashmap;
 use std::sync::Arc;
 
@@ -54,7 +54,7 @@ impl TestHarness {
             ConnectionRequestSender::new(connection_reqs_tx),
         );
         let hc_network_rx =
-            HealthCheckerNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
+            HealthCheckerNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx, None);
 
         let network_context = NetworkContext::mock();
         let peers_and_metadata = PeersAndMetadata::new(&[network_context.network_id()]);
@@ -197,8 +197,8 @@ async fn expect_pong(res_rx: oneshot::Receiver<Result<Bytes, RpcError>>) {
     };
 }
 
-#[test]
-fn outbound() {
+#[tokio::test]
+async fn outbound() {
     let (mut harness, health_checker) = TestHarness::new_strict();
 
     let test = async move {
@@ -215,11 +215,11 @@ fn outbound() {
         // Health Checker should attempt to ping the new peer.
         harness.expect_ping_send_ok().await;
     };
-    block_on(future::join(health_checker.start(), test));
+    future::join(health_checker.start(), test).await;
 }
 
-#[test]
-fn inbound() {
+#[tokio::test]
+async fn inbound() {
     let (mut harness, health_checker) = TestHarness::new_strict();
 
     let test = async move {
@@ -233,11 +233,11 @@ fn inbound() {
         // HealthChecker should respond with a pong.
         expect_pong(res_rx).await;
     };
-    block_on(future::join(health_checker.start(), test));
+    future::join(health_checker.start(), test).await;
 }
 
-#[test]
-fn outbound_failure_permissive() {
+#[tokio::test]
+async fn outbound_failure_permissive() {
     let ping_failures_tolerated = 10;
     let (mut harness, health_checker) = TestHarness::new_permissive(ping_failures_tolerated);
 
@@ -260,11 +260,11 @@ fn outbound_failure_permissive() {
         // Health checker should disconnect from peer after tolerated number of failures
         harness.expect_disconnect(peer_id).await;
     };
-    block_on(future::join(health_checker.start(), test));
+    future::join(health_checker.start(), test).await;
 }
 
-#[test]
-fn ping_success_resets_fail_counter() {
+#[tokio::test]
+async fn ping_success_resets_fail_counter() {
     let failures_triggered = 10;
     let ping_failures_tolerated = 2 * 10;
     let (mut harness, health_checker) = TestHarness::new_permissive(ping_failures_tolerated);
@@ -307,11 +307,11 @@ fn ping_success_resets_fail_counter() {
         // Health checker should disconnect from peer after tolerated number of failures
         harness.expect_disconnect(peer_id).await;
     };
-    block_on(future::join(health_checker.start(), test));
+    future::join(health_checker.start(), test).await;
 }
 
-#[test]
-fn outbound_failure_strict() {
+#[tokio::test]
+async fn outbound_failure_strict() {
     let (mut harness, health_checker) = TestHarness::new_strict();
 
     let test = async move {
@@ -331,5 +331,5 @@ fn outbound_failure_strict() {
         // Health checker should disconnect from peer.
         harness.expect_disconnect(peer_id).await;
     };
-    block_on(future::join(health_checker.start(), test));
+    future::join(health_checker.start(), test).await;
 }
