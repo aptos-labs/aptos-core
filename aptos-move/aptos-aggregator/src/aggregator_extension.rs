@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_change_set::{abort_error, addition, deserialize, subtraction};
+use crate::delta_change_set::{addition, deserialize, subtraction};
 use aptos_types::vm_status::StatusCode;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
@@ -384,48 +384,23 @@ impl AggregatorData {
         self.new_aggregators.insert(id);
     }
 
-    fn create_aggregator_snapshot(&mut self, id: AggregatorID) -> PartialVMResult<AggregatorID> {
-        // TODO: Are we sure that id is in `self.aggregators` before calling `create_aggregator_snapshot`?
+    pub fn deferred_read(&mut self, id: AggregatorID) -> PartialVMResult<AggregatorSnapshotID> {
         let aggregator = self
             .aggregators
             .get(&id)
             .expect("Aggregator should exist to create a snapshot");
-        let snapshot = Aggregator {
+        let snapshot = AggregatorSnapshot {
             value: aggregator.value,
             state: aggregator.state,
             history: aggregator.history.clone(),
             limit: aggregator.limit
         };
-        let snapshot_id = AggregatorID {
-            handle: TableHandle(AccountAddress::ZERO),
-            // TODO: Generate a random key
-            key: AggregatorHandle(AccountAddress::ZERO),
+        // TODO: Use an atomic counter for snapshot_id
+        let snapshot_id = AggregatorSnapshotID {
+            key: 0
         };
-        self.aggregators.insert(snapshot_id, snapshot);
+        self.aggregator_snapshots.insert(snapshot_id, snapshot);
         Ok(snapshot_id)
-    }
-
-    fn create_promise(&mut self, id: AggregatorID) -> Promise {
-        let aggregator = self
-            .aggregators
-            .get_mut(&id)
-            .expect("Aggregator should exist to create a promise");
-        if aggregator.state == AggregatorState::Data {
-            Promise {
-                value: aggregator.value,
-                id: None,
-            }
-        } else {
-            Promise {
-                value: 0,
-                id: Some(id),
-            }
-        }
-    }
-
-    pub fn deferred_read(&mut self, id: AggregatorID) -> PartialVMResult<Promise> {
-        let snapshot_id = self.create_aggregator_snapshot(id)?;
-        Ok(self.create_promise(snapshot_id))
     }
 
     /// If aggregator has been used in this transaction, it is removed. Otherwise,
