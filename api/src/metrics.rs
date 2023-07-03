@@ -54,3 +54,13 @@ pub static HANDLERS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static MIDDLEWARE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_api_middleware",
+        "API middleware latency",
+        &["middleware"],
+        SUB_MS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});

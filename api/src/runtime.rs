@@ -3,9 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    accounts::AccountsApi, basic::BasicApi, blocks::BlocksApi, check_size::PostSizeLimit,
-    context::Context, error_converter::convert_error, events::EventsApi, index::IndexApi,
-    log::middleware_log, set_failpoints, state::StateApi, transactions::TransactionsApi,
+    accounts::AccountsApi,
+    basic::BasicApi,
+    blocks::BlocksApi,
+    check_size::PostSizeLimit,
+    context::Context,
+    error_converter::convert_error,
+    events::EventsApi,
+    index::IndexApi,
+    log::{cors_log, middleware_log, nest_log, post_size_limit_log},
+    set_failpoints,
+    state::StateApi,
+    transactions::TransactionsApi,
     view_function::ViewFunctionApi,
 };
 use anyhow::Context as AnyhowContext;
@@ -191,8 +200,11 @@ pub fn attach_poem_to_runtime(
                         poem::get(set_failpoints::set_failpoint_poem).data(context.clone()),
                     ),
             )
+            .around(nest_log)
             .with(cors)
+            .around(cors_log)
             .with(PostSizeLimit::new(size_limit))
+            .around(post_size_limit_log)
             // NOTE: Make sure to keep this after all the `with` middleware.
             .catch_all_error(convert_error)
             .around(middleware_log);
