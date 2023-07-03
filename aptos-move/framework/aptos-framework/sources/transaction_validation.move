@@ -43,6 +43,8 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
+    const PROLOGUE_EFEE_PAYER_NOT_ENABLED: u64 = 1010;
+
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(
@@ -207,6 +209,7 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
+        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
         prologue_common(
             sender,
             fee_payer_address,

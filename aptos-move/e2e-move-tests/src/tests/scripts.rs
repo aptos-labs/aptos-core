@@ -84,7 +84,7 @@ fn read_coin(h: &MoveHarness, account: &AccountAddress) -> u64 {
 }
 
 #[test]
-fn test_two_to_two_transfer_gas_payer() {
+fn test_two_to_two_transfer_fee_payer() {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
@@ -129,12 +129,12 @@ fn test_two_to_two_transfer_gas_payer() {
 
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob.clone()])
-        .gas_payer(payer.clone())
+        .fee_payer(payer.clone())
         .script(script)
         .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign_multi_agent();
+        .sign_fee_payer();
 
     let output = h.executor.execute_transaction(transaction);
     assert_success!(output.status().to_owned());
@@ -156,7 +156,7 @@ fn test_two_to_two_transfer_gas_payer() {
 }
 
 #[test]
-fn test_two_to_two_transfer_gas_payer_without_feature() {
+fn test_two_to_two_transfer_fee_payer_without_feature() {
     let mut h = MoveHarness::new();
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
@@ -194,22 +194,22 @@ fn test_two_to_two_transfer_gas_payer_without_feature() {
 
     let transaction = TransactionBuilder::new(alice.clone())
         .secondary_signers(vec![bob])
-        .gas_payer(payer)
+        .fee_payer(payer)
         .script(script)
         .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign_multi_agent();
+        .sign_fee_payer();
 
     let output = h.executor.execute_transaction(transaction);
     assert!(transaction_status_eq(
         output.status(),
-        &TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_BIG)
+        &TransactionStatus::Discard(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
     ));
 }
 
 #[test]
-fn test_normal_tx_with_signer_with_gas_payer() {
+fn test_normal_tx_with_signer_with_fee_payer() {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
@@ -228,12 +228,12 @@ fn test_normal_tx_with_signer_with_gas_payer() {
     )
     .unwrap()]);
     let transaction = TransactionBuilder::new(alice.clone())
-        .gas_payer(bob.clone())
+        .fee_payer(bob.clone())
         .entry_function(entry)
         .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign_multi_agent();
+        .sign_fee_payer();
 
     let output = h.executor.execute_transaction(transaction);
     // The last signer became the gas payer and thus, the execution errors with a mismatch
@@ -249,7 +249,7 @@ fn test_normal_tx_with_signer_with_gas_payer() {
 }
 
 #[test]
-fn test_normal_tx_without_signer_with_gas_payer() {
+fn test_normal_tx_without_signer_with_fee_payer() {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
@@ -265,12 +265,12 @@ fn test_normal_tx_without_signer_with_gas_payer() {
     let fun: MemberId = str::parse("0xcafe::test::nothing").unwrap();
     let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![]);
     let transaction = TransactionBuilder::new(alice.clone())
-        .gas_payer(bob.clone())
+        .fee_payer(bob.clone())
         .entry_function(entry)
         .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign_multi_agent();
+        .sign_fee_payer();
 
     let output = h.executor.execute_transaction(transaction);
     // The last signer became the gas payer and thus, the execution errors with a mismatch
@@ -286,7 +286,7 @@ fn test_normal_tx_without_signer_with_gas_payer() {
 }
 
 #[test]
-fn test_normal_tx_with_gas_payer_insufficient_funds() {
+fn test_normal_tx_with_fee_payer_insufficient_funds() {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
@@ -299,12 +299,12 @@ fn test_normal_tx_with_gas_payer_insufficient_funds() {
     let fun: MemberId = str::parse("0xcafe::test::nothing").unwrap();
     let entry = EntryFunction::new(fun.module_id, fun.member_id, vec![], vec![]);
     let transaction = TransactionBuilder::new(alice.clone())
-        .gas_payer(bob)
+        .fee_payer(bob)
         .entry_function(entry)
         .sequence_number(h.sequence_number(alice.address()))
         .max_gas_amount(1_000_000)
         .gas_unit_price(1)
-        .sign_multi_agent();
+        .sign_fee_payer();
 
     let output = h.executor.execute_transaction(transaction);
     assert!(transaction_status_eq(

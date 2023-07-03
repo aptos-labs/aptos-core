@@ -158,7 +158,7 @@ impl Default for Account {
 pub struct TransactionBuilder {
     pub sender: Account,
     pub secondary_signers: Vec<Account>,
-    pub gas_payer: Option<Account>,
+    pub fee_payer: Option<Account>,
     pub sequence_number: Option<u64>,
     pub program: Option<TransactionPayload>,
     pub max_gas_amount: Option<u64>,
@@ -172,7 +172,7 @@ impl TransactionBuilder {
         Self {
             sender,
             secondary_signers: Vec::new(),
-            gas_payer: None,
+            fee_payer: None,
             sequence_number: None,
             program: None,
             max_gas_amount: None,
@@ -187,8 +187,8 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn gas_payer(mut self, gas_payer: Account) -> Self {
-        self.gas_payer = Some(gas_payer);
+    pub fn fee_payer(mut self, fee_payer: Account) -> Self {
+        self.fee_payer = Some(fee_payer);
         self
     }
 
@@ -265,20 +265,16 @@ impl TransactionBuilder {
     }
 
     pub fn sign_multi_agent(self) -> SignedTransaction {
-        let mut secondary_signer_addresses: Vec<AccountAddress> = self
+        let secondary_signer_addresses: Vec<AccountAddress> = self
             .secondary_signers
             .iter()
             .map(|signer| *signer.address())
             .collect();
-        let mut secondary_private_keys: Vec<&Ed25519PrivateKey> = self
+        let secondary_private_keys: Vec<&Ed25519PrivateKey> = self
             .secondary_signers
             .iter()
             .map(|signer| &signer.privkey)
             .collect();
-        if let Some(gas_payer) = &self.gas_payer {
-            secondary_signer_addresses.push(*gas_payer.address());
-            secondary_private_keys.push(&gas_payer.privkey);
-        }
         RawTransaction::new(
             *self.sender.address(),
             self.sequence_number.expect("sequence number not set"),
@@ -292,6 +288,38 @@ impl TransactionBuilder {
             &self.sender.privkey,
             secondary_signer_addresses,
             secondary_private_keys,
+        )
+        .unwrap()
+        .into_inner()
+    }
+
+    pub fn sign_fee_payer(self) -> SignedTransaction {
+        let secondary_signer_addresses: Vec<AccountAddress> = self
+            .secondary_signers
+            .iter()
+            .map(|signer| *signer.address())
+            .collect();
+        let secondary_private_keys: Vec<&Ed25519PrivateKey> = self
+            .secondary_signers
+            .iter()
+            .map(|signer| &signer.privkey)
+            .collect();
+        let fee_payer = self.fee_payer.unwrap();
+        RawTransaction::new(
+            *self.sender.address(),
+            self.sequence_number.expect("sequence number not set"),
+            self.program.expect("transaction payload not set"),
+            self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
+            self.gas_unit_price.unwrap_or(0),
+            self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
+            ChainId::test(),
+        )
+        .sign_fee_payer(
+            &self.sender.privkey,
+            secondary_signer_addresses,
+            secondary_private_keys,
+            *fee_payer.address(),
+            &fee_payer.privkey,
         )
         .unwrap()
         .into_inner()

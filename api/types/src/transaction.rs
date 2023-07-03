@@ -1335,12 +1335,7 @@ impl From<TransactionAuthenticator> for TransactionSignature {
                 secondary_signer_addresses,
                 secondary_signers,
             } => Self::MultiAgentSignature(
-                (
-                    sender,
-                    secondary_signer_addresses,
-                    secondary_signers,
-                )
-                    .into(),
+                (sender, secondary_signer_addresses, secondary_signers).into(),
             ),
             FeePayer {
                 sender,

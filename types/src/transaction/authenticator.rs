@@ -235,9 +235,7 @@ impl TransactionAuthenticator {
 
     pub fn fee_payer_address(&self) -> Option<AccountAddress> {
         match self {
-            Self::Ed25519 { .. }
-            | Self::MultiEd25519 { .. }
-            | Self::MultiAgent { .. } => None,
+            Self::Ed25519 { .. } | Self::MultiEd25519 { .. } | Self::MultiAgent { .. } => None,
             Self::FeePayer {
                 sender: _,
                 secondary_signer_addresses: _,
@@ -250,9 +248,7 @@ impl TransactionAuthenticator {
 
     pub fn fee_payer_signer(&self) -> Option<AccountAuthenticator> {
         match self {
-            Self::Ed25519 { .. }
-            | Self::MultiEd25519 { .. }
-            | Self::MultiAgent { .. } => None,
+            Self::Ed25519 { .. } | Self::MultiEd25519 { .. } | Self::MultiAgent { .. } => None,
             Self::FeePayer {
                 sender: _,
                 secondary_signer_addresses: _,

@@ -6,8 +6,7 @@ use crate::{models::transactions::Transaction, schema::signatures, util::standar
 use anyhow::{Context, Result};
 use aptos_api_types::{
     AccountSignature as APIAccountSignature, Ed25519Signature as APIEd25519Signature,
-    FeePayerSignature as APIFeePayerSignature,
-    MultiAgentSignature as APIMultiAgentSignature,
+    FeePayerSignature as APIFeePayerSignature, MultiAgentSignature as APIMultiAgentSignature,
     MultiEd25519Signature as APIMultiEd25519Signature,
     TransactionSignature as APITransactionSignature,
 };
@@ -93,9 +92,7 @@ impl Signature {
             APITransactionSignature::MultiAgentSignature(_) => {
                 String::from("multi_agent_signature")
             },
-            APITransactionSignature::FeePayerSignature(_) => {
-                String::from("fee_payer_signature")
-            },
+            APITransactionSignature::FeePayerSignature(_) => String::from("fee_payer_signature"),
         }
     }
 

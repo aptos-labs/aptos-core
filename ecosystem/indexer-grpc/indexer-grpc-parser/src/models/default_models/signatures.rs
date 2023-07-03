@@ -9,8 +9,7 @@ use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{
     account_signature::Signature as AccountSignatureEnum, signature::Signature as SignatureEnum,
     AccountSignature as ProtoAccountSignature, Ed25519Signature as Ed25519SignaturePB,
-    FeePayerSignature as ProtoFeePayerSignature,
-    MultiAgentSignature as ProtoMultiAgentSignature,
+    FeePayerSignature as ProtoFeePayerSignature, MultiAgentSignature as ProtoMultiAgentSignature,
     MultiEd25519Signature as ProtoMultiEd25519Signature, Signature as TransactionSignaturePB,
 };
 use field_count::FieldCount;
