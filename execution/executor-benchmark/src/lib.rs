@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod account_generator;
+pub mod block_partitioning;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
@@ -17,6 +18,7 @@ use crate::{
     pipeline::Pipeline, transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
+use aptos_block_executor::counters as block_executor_counters;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
@@ -30,13 +32,13 @@ use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
 use aptos_logger::{info, warn};
+use aptos_metrics_core::Histogram;
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
     TransactionType::NonConflictingCoinTransfer,
 };
-use aptos_vm::counters::TXN_GAS_USAGE;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use pipeline::PipelineConfig;
 use std::{
@@ -73,6 +75,7 @@ where
 fn create_checkpoint(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
+    split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
 ) {
     // Create rocksdb checkpoint.
@@ -81,8 +84,13 @@ fn create_checkpoint(
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
-    AptosDB::create_checkpoint(source_dir, checkpoint_dir, use_sharded_state_merkle_db)
-        .expect("db checkpoint creation fails.");
+    AptosDB::create_checkpoint(
+        source_dir,
+        checkpoint_dir,
+        split_ledger_db,
+        use_sharded_state_merkle_db,
+    )
+    .expect("db checkpoint creation fails.");
 }
 
 /// Runs the benchmark with given parameters.
@@ -98,8 +106,9 @@ pub fn run_benchmark<V>(
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
+    skip_index_and_usage: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -107,14 +116,16 @@ pub fn run_benchmark<V>(
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
+        split_ledger_db,
         use_sharded_state_merkle_db,
     );
 
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
-    config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
+    config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
+    config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
     let transaction_generator_creator = transaction_type.map(|transaction_type| {
@@ -153,6 +164,8 @@ pub fn run_benchmark<V>(
                 skip_commit: false,
                 allow_discards: false,
                 allow_aborts: false,
+                num_executor_shards: 1,
+                async_partitioning: false,
             },
         )
     });
@@ -186,7 +199,7 @@ pub fn run_benchmark<V>(
     );
 
     let mut start_time = Instant::now();
-    let start_gas = TXN_GAS_USAGE.get_sample_sum();
+    let start_gas_measurement = GasMesurement::start();
 
     let start_execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     let start_vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
@@ -238,7 +251,8 @@ pub fn run_benchmark<V>(
 
     let elapsed = start_time.elapsed().as_secs_f64();
     let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
-    let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
+    let (delta_gas, delta_gas_count) = start_gas_measurement.end();
+
     let delta_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_time;
     info!(
         "VM execution TPS {} txn/s",
@@ -254,6 +268,10 @@ pub fn run_benchmark<V>(
     );
     info!("Overall TPS: {} txn/s", delta_v / elapsed);
     info!("Overall GPS: {} gas/s", delta_gas / elapsed);
+    info!(
+        "Overall GPT: {} gas/txn",
+        delta_gas / (delta_gas_count as f64).max(1.0)
+    );
 
     let time_in_execution =
         APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_execution_total;
@@ -349,8 +367,9 @@ pub fn add_accounts<V>(
     checkpoint_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
+    skip_index_and_usage: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -359,6 +378,7 @@ pub fn add_accounts<V>(
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
+        split_ledger_db,
         use_sharded_state_merkle_db,
     );
     add_accounts_impl::<V>(
@@ -369,8 +389,9 @@ pub fn add_accounts<V>(
         checkpoint_dir,
         pruner_config,
         verify_sequence_numbers,
-        use_state_kv_db,
+        split_ledger_db,
         use_sharded_state_merkle_db,
+        skip_index_and_usage,
         pipeline_config,
     );
 }
@@ -383,8 +404,9 @@ fn add_accounts_impl<V>(
     output_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
+    skip_index_and_usage: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -392,8 +414,9 @@ fn add_accounts_impl<V>(
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
-    config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
+    config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
+    config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
     let version = db.reader.get_latest_version().unwrap();
@@ -491,12 +514,15 @@ mod tests {
             verify_sequence_numbers,
             false,
             false,
+            false,
             PipelineConfig {
                 delay_execution_start: false,
                 split_stages: false,
                 skip_commit: false,
                 allow_discards: false,
                 allow_aborts: false,
+                num_executor_shards: 1,
+                async_partitioning: false,
             },
         );
 
@@ -515,12 +541,15 @@ mod tests {
             NO_OP_STORAGE_PRUNER_CONFIG,
             false,
             false,
+            false,
             PipelineConfig {
                 delay_execution_start: false,
                 split_stages: true,
                 skip_commit: false,
                 allow_discards: false,
                 allow_aborts: false,
+                num_executor_shards: 1,
+                async_partitioning: false,
             },
         );
     }
@@ -539,5 +568,48 @@ mod tests {
     fn test_native_benchmark() {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<NativeExecutor>(None, false);
+    }
+}
+
+struct GasMesurement {
+    start_gas: f64,
+    start_gas_count: u64,
+}
+
+impl GasMesurement {
+    pub fn sequential_gas_counter() -> Histogram {
+        block_executor_counters::TXN_GAS.with_label_values(&[
+            block_executor_counters::Mode::SEQUENTIAL,
+            block_executor_counters::GasType::NON_STORAGE_GAS,
+        ])
+    }
+
+    pub fn parallel_gas_counter() -> Histogram {
+        block_executor_counters::TXN_GAS.with_label_values(&[
+            block_executor_counters::Mode::PARALLEL,
+            block_executor_counters::GasType::NON_STORAGE_GAS,
+        ])
+    }
+
+    pub fn start() -> Self {
+        let start_gas = Self::sequential_gas_counter().get_sample_sum()
+            + Self::parallel_gas_counter().get_sample_sum();
+        let start_gas_count = Self::sequential_gas_counter().get_sample_count()
+            + Self::parallel_gas_counter().get_sample_count();
+
+        Self {
+            start_gas,
+            start_gas_count,
+        }
+    }
+
+    pub fn end(self) -> (f64, u64) {
+        let delta_gas = (Self::sequential_gas_counter().get_sample_sum()
+            + Self::parallel_gas_counter().get_sample_sum())
+            - self.start_gas;
+        let delta_gas_count = (Self::sequential_gas_counter().get_sample_count()
+            + Self::parallel_gas_counter().get_sample_count())
+            - self.start_gas_count;
+        (delta_gas, delta_gas_count)
     }
 }

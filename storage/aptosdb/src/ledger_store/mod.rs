@@ -9,13 +9,16 @@ use crate::{
     errors::AptosDbError,
     ledger_db::LedgerDb,
     schema::{
-        epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
-        transaction_accumulator::TransactionAccumulatorSchema,
+        db_metadata::DbMetadataKey, epoch_by_version::EpochByVersionSchema,
+        ledger_info::LedgerInfoSchema, transaction_accumulator::TransactionAccumulatorSchema,
         transaction_info::TransactionInfoSchema,
     },
-    utils::iterators::{EpochEndingLedgerInfoIter, ExpectContinuousVersions},
+    utils::{
+        get_progress,
+        iterators::{EpochEndingLedgerInfoIter, ExpectContinuousVersions},
+    },
 };
-use anyhow::{ensure, format_err, Result};
+use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher},
@@ -29,11 +32,11 @@ use aptos_types::{
         definition::LeafCount, position::Position, AccumulatorConsistencyProof,
         TransactionAccumulatorProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof,
     },
-    transaction::{TransactionInfo, Version},
+    transaction::{TransactionInfo, TransactionToCommit, Version},
 };
 use arc_swap::ArcSwap;
 use itertools::Itertools;
-use std::{ops::Deref, sync::Arc};
+use std::{borrow::Borrow, ops::Deref, sync::Arc};
 
 #[derive(Debug)]
 pub struct LedgerStore {
@@ -177,20 +180,12 @@ impl LedgerStore {
             .ok_or_else(|| format_err!("No TransactionInfo at version {}", version))
     }
 
-    pub fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>> {
-        let mut iter = self
-            .ledger_db
-            .transaction_info_db()
-            .iter::<TransactionInfoSchema>(ReadOptions::default())?;
-        iter.seek_to_last();
-        iter.next().transpose()
-    }
-
-    /// Get latest transaction info together with its version. Note that during node syncing, this
-    /// version can be greater than what's in the latest LedgerInfo.
-    pub fn get_latest_transaction_info(&self) -> Result<(Version, TransactionInfo)> {
-        self.get_latest_transaction_info_option()?
-            .ok_or_else(|| AptosDbError::NotFound(String::from("Genesis TransactionInfo.")).into())
+    pub fn get_latest_version(&self) -> Result<Version> {
+        get_progress(
+            self.ledger_db.metadata_db(),
+            &DbMetadataKey::OverallCommitProgress,
+        )?
+        .ok_or(anyhow!("No progress in db."))
     }
 
     /// Gets an iterator that yields `num_transaction_infos` transaction infos starting from
@@ -288,7 +283,8 @@ impl LedgerStore {
         &self,
         first_version: u64,
         txn_infos: &[TransactionInfo],
-        // TODO(grao): Consider split this function to two functions.
+        // TODO(grao): Consider remove this function and migrate all callers to use the two functions
+        // below.
         transaction_info_batch: &SchemaBatch,
         transaction_accumulator_batch: &SchemaBatch,
     ) -> Result<HashValue> {
@@ -310,6 +306,38 @@ impl LedgerStore {
             transaction_accumulator_batch.put::<TransactionAccumulatorSchema>(pos, hash)
         })?;
         Ok(root_hash)
+    }
+
+    pub fn put_transaction_accumulator(
+        &self,
+        first_version: Version,
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
+        transaction_accumulator_batch: &SchemaBatch,
+    ) -> Result<HashValue> {
+        let txn_hashes: Vec<_> = txns_to_commit
+            .iter()
+            .map(|t| t.borrow().transaction_info().hash())
+            .collect();
+
+        let (root_hash, writes) = Accumulator::append(
+            self,
+            first_version, /* num_existing_leaves */
+            &txn_hashes,
+        )?;
+        writes.iter().try_for_each(|(pos, hash)| {
+            transaction_accumulator_batch.put::<TransactionAccumulatorSchema>(pos, hash)
+        })?;
+
+        Ok(root_hash)
+    }
+
+    pub fn put_transaction_info(
+        &self,
+        version: Version,
+        transaction_info: &TransactionInfo,
+        transaction_info_batch: &SchemaBatch,
+    ) -> Result<()> {
+        transaction_info_batch.put::<TransactionInfoSchema>(&version, transaction_info)
     }
 
     /// Write `ledger_info_with_sigs` to `batch`.

@@ -1,14 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::StateStore;
-///! This file contains utilities that are helpful for performing
-///! database restore operations, as required by restore and
-///! state sync v2.
+//! This file contains utilities that are helpful for performing
+//! database restore operations, as required by restore and
+//! state sync v2.
 use crate::{
-    event_store::EventStore, ledger_store::LedgerStore, new_sharded_kv_schema_batch,
-    schema::transaction_accumulator::TransactionAccumulatorSchema,
-    transaction_store::TransactionStore, ShardedStateKvSchemaBatch,
+    event_store::EventStore,
+    ledger_store::LedgerStore,
+    new_sharded_kv_schema_batch,
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction_accumulator::TransactionAccumulatorSchema,
+    },
+    state_store::StateStore,
+    transaction_store::TransactionStore,
+    ShardedStateKvSchemaBatch,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
@@ -112,12 +118,14 @@ pub(crate) fn save_transactions(
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
     write_sets: Vec<WriteSet>,
-    existing_batch: Option<(&mut SchemaBatch, &mut ShardedStateKvSchemaBatch)>,
+    existing_batch: Option<(
+        &mut SchemaBatch,
+        &mut ShardedStateKvSchemaBatch,
+        &SchemaBatch,
+    )>,
     kv_replay: bool,
 ) -> Result<()> {
-    if let Some(existing_batch) = existing_batch {
-        let batch = existing_batch.0;
-        let state_kv_batches = existing_batch.1;
+    if let Some((batch, state_kv_batches, state_kv_metadata_batch)) = existing_batch {
         save_transactions_impl(
             Arc::clone(&ledger_store),
             transaction_store,
@@ -130,11 +138,13 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             batch,
             state_kv_batches,
+            state_kv_metadata_batch,
             kv_replay,
         )?;
     } else {
         let mut batch = SchemaBatch::new();
         let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
+        let state_kv_metadata_batch = SchemaBatch::new();
         save_transactions_impl(
             Arc::clone(&ledger_store),
             transaction_store,
@@ -147,15 +157,17 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             &mut batch,
             &mut sharded_kv_schema_batch,
+            &state_kv_metadata_batch,
             kv_replay,
         )?;
         // get the last version and commit to the state kv db
         // commit the state kv before ledger in case of failure happens
         let last_version = first_version + txns.len() as u64 - 1;
-        state_store
-            .state_db
-            .state_kv_db
-            .commit(last_version, sharded_kv_schema_batch)?;
+        state_store.state_db.state_kv_db.commit(
+            last_version,
+            state_kv_metadata_batch,
+            sharded_kv_schema_batch,
+        )?;
 
         // TODO(grao): Support splitted ledger DBs here.
         ledger_store.ledger_db.metadata_db().write_schemas(batch)?;
@@ -221,11 +233,17 @@ pub(crate) fn save_transactions_impl(
     write_sets: &[WriteSet],
     batch: &mut SchemaBatch,
     state_kv_batches: &mut ShardedStateKvSchemaBatch,
+    state_kv_metadata_batch: &SchemaBatch,
     kv_replay: bool,
 ) -> Result<()> {
     // TODO(grao): Support splited ledger db here.
     for (idx, txn) in txns.iter().enumerate() {
-        transaction_store.put_transaction(first_version + idx as Version, txn, batch)?;
+        transaction_store.put_transaction(
+            first_version + idx as Version,
+            txn,
+            /*skip_index=*/ false,
+            batch,
+        )?;
     }
     ledger_store.put_transaction_infos(first_version, txn_infos, batch, batch)?;
     event_store.put_events_multiple_versions(first_version, events, batch)?;
@@ -235,8 +253,25 @@ pub(crate) fn save_transactions_impl(
     }
 
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
-        state_store.put_write_sets(write_sets.to_vec(), first_version, batch, state_kv_batches)?;
+        state_store.put_write_sets(
+            write_sets.to_vec(),
+            first_version,
+            batch,
+            state_kv_batches,
+            state_kv_metadata_batch,
+            state_store.state_kv_db.enabled_sharding(),
+        )?;
     }
+
+    let last_version = first_version + txns.len() as u64 - 1;
+    batch.put::<DbMetadataSchema>(
+        &DbMetadataKey::LedgerCommitProgress,
+        &DbMetadataValue::Version(last_version),
+    )?;
+    batch.put::<DbMetadataSchema>(
+        &DbMetadataKey::OverallCommitProgress,
+        &DbMetadataValue::Version(last_version),
+    )?;
 
     Ok(())
 }

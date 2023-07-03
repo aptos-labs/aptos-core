@@ -4,13 +4,13 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use aptos_block_partitioner::types::SubBlock;
 use aptos_crypto::{
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
+    block_executor::partitioner::ExecutableBlock,
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -90,7 +90,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// Executes a block.
     fn execute_block(
         &self,
-        block: ExecutableBlock,
+        block: ExecutableBlock<Transaction>,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error>;
@@ -125,48 +125,6 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
-}
-
-pub struct ExecutableBlock {
-    pub block_id: HashValue,
-    pub transactions: ExecutableTransactions,
-}
-
-impl ExecutableBlock {
-    pub fn new(block_id: HashValue, transactions: ExecutableTransactions) -> Self {
-        Self {
-            block_id,
-            transactions,
-        }
-    }
-}
-
-impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
-    fn from((block_id, transactions): (HashValue, Vec<Transaction>)) -> Self {
-        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
-    }
-}
-
-pub enum ExecutableTransactions {
-    Unsharded(Vec<Transaction>),
-    Sharded(Vec<SubBlock>),
-}
-
-impl ExecutableTransactions {
-    pub fn num_transactions(&self) -> usize {
-        match self {
-            ExecutableTransactions::Unsharded(transactions) => transactions.len(),
-            ExecutableTransactions::Sharded(sub_blocks) => {
-                sub_blocks.iter().map(|sub_block| sub_block.len()).sum()
-            },
-        }
-    }
-}
-
-impl From<Vec<Transaction>> for ExecutableTransactions {
-    fn from(txns: Vec<Transaction>) -> Self {
-        Self::Unsharded(txns)
-    }
 }
 
 #[derive(Clone)]

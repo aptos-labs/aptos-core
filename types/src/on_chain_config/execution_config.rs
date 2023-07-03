@@ -76,7 +76,7 @@ pub struct ExecutionConfigV1 {
 impl Default for ExecutionConfigV1 {
     fn default() -> Self {
         Self {
-            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
         }
     }
 }

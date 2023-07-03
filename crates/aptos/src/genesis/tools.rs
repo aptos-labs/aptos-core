@@ -32,7 +32,7 @@ const EMPLOYEE_POOL_ADDRESSES: &str = "employee-pool-addresses.yaml";
 #[derive(Parser)]
 pub struct PoolAddresses {
     /// Output directory for pool addresses
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     output_dir: Option<PathBuf>,
 
     #[clap(flatten)]

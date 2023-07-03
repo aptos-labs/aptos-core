@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    event::EventSchema, ledger_info::LedgerInfoSchema, state_value::StateValueSchema,
-    transaction_by_account::TransactionByAccountSchema,
+    schema::{
+        event::EventSchema, ledger_info::LedgerInfoSchema, state_value::StateValueSchema,
+        state_value_index::StateValueIndexSchema,
+        transaction_by_account::TransactionByAccountSchema,
+    },
+    state_kv_db::StateKvDb,
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_schemadb::{iterator::SchemaIterator, ReadOptions, DB};
+use aptos_schemadb::{iterator::SchemaIterator, ReadOptions};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
@@ -18,6 +22,7 @@ use std::{iter::Peekable, marker::PhantomData};
 
 pub struct ContinuousVersionIter<I, T> {
     inner: I,
+    first_version: Version,
     expected_next_version: Version,
     end_version: Version,
     _phantom: PhantomData<T>,
@@ -36,8 +41,9 @@ where
             Some((version, transaction)) => {
                 ensure!(
                     version == self.expected_next_version,
-                    "{} iterator: expecting version {}, got {} from underlying iterator.",
+                    "{} iterator: first version {}, expecting version {}, got {} from underlying iterator.",
                     std::any::type_name::<T>(),
+                    self.first_version,
                     self.expected_next_version,
                     version,
                 );
@@ -81,6 +87,7 @@ where
     ) -> Result<ContinuousVersionIter<Self, T>> {
         Ok(ContinuousVersionIter {
             inner: self,
+            first_version,
             expected_next_version: first_version,
             end_version: first_version
                 .checked_add(limit as u64)
@@ -91,19 +98,23 @@ where
 }
 
 pub struct PrefixedStateValueIterator<'a> {
-    inner: SchemaIterator<'a, StateValueSchema>,
+    db: &'a StateKvDb,
+    kv_iter: Option<SchemaIterator<'a, StateValueSchema>>,
+    index_iter: Option<SchemaIterator<'a, StateValueIndexSchema>>,
     key_prefix: StateKeyPrefix,
     prev_key: Option<StateKey>,
     desired_version: Version,
     is_finished: bool,
+    use_index: bool,
 }
 
 impl<'a> PrefixedStateValueIterator<'a> {
     pub fn new(
-        db: &'a DB,
+        db: &'a StateKvDb,
         key_prefix: StateKeyPrefix,
         first_key: Option<StateKey>,
         desired_version: Version,
+        use_index: bool,
     ) -> Result<Self> {
         let mut read_opts = ReadOptions::default();
         // Without this, iterators are not guaranteed a total order of all keys, but only keys for the same prefix.
@@ -116,26 +127,39 @@ impl<'a> PrefixedStateValueIterator<'a> {
         // here will stick with prefix `aptos/abc` and return `None` or any arbitrary result after visited all the
         // keys starting with `aptos/abc`.
         read_opts.set_total_order_seek(true);
-        let mut iter = db.iter::<StateValueSchema>(read_opts)?;
-        if let Some(first_key) = &first_key {
-            iter.seek(&(first_key.clone(), u64::MAX))?;
+        let (kv_iter, index_iter) = if use_index {
+            let mut index_iter = db.metadata_db().iter::<StateValueIndexSchema>(read_opts)?;
+            if let Some(first_key) = &first_key {
+                index_iter.seek(&(first_key.clone(), u64::MAX))?;
+            } else {
+                index_iter.seek(&&key_prefix)?;
+            };
+            (None, Some(index_iter))
         } else {
-            iter.seek(&&key_prefix)?;
+            let mut kv_iter = db.metadata_db().iter::<StateValueSchema>(read_opts)?;
+            if let Some(first_key) = &first_key {
+                kv_iter.seek(&(first_key.clone(), u64::MAX))?;
+            } else {
+                kv_iter.seek(&&key_prefix)?;
+            };
+            (Some(kv_iter), None)
         };
         Ok(Self {
-            inner: iter,
+            db,
+            kv_iter,
+            index_iter,
             key_prefix,
             prev_key: None,
             desired_version,
             is_finished: false,
+            use_index,
         })
     }
 
-    fn next_impl(&mut self) -> Result<Option<(StateKey, StateValue)>> {
+    fn next_by_kv(&mut self) -> Result<Option<(StateKey, StateValue)>> {
+        let iter = self.kv_iter.as_mut().unwrap();
         if !self.is_finished {
-            while let Some(((state_key, version), state_value_opt)) =
-                self.inner.next().transpose()?
-            {
+            while let Some(((state_key, version), state_value_opt)) = iter.next().transpose()? {
                 // In case the previous seek() ends on the same key with version 0.
                 if Some(&state_key) == self.prev_key.as_ref() {
                     continue;
@@ -149,16 +173,55 @@ impl<'a> PrefixedStateValueIterator<'a> {
                 }
 
                 if version > self.desired_version {
-                    self.inner
-                        .seek(&(state_key.clone(), self.desired_version))?;
+                    iter.seek(&(state_key.clone(), self.desired_version))?;
                     continue;
                 }
 
                 self.prev_key = Some(state_key.clone());
                 // Seek to the next key - this can be done by seeking to the current key with version 0
-                self.inner.seek(&(state_key.clone(), 0))?;
+                iter.seek(&(state_key.clone(), 0))?;
 
                 if let Some(state_value) = state_value_opt {
+                    return Ok(Some((state_key, state_value)));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    fn next_by_index(&mut self) -> Result<Option<(StateKey, StateValue)>> {
+        let iter = self.index_iter.as_mut().unwrap();
+        if !self.is_finished {
+            while let Some(((state_key, version), _)) = iter.next().transpose()? {
+                // In case the previous seek() ends on the same key with version 0.
+                if Some(&state_key) == self.prev_key.as_ref() {
+                    continue;
+                }
+                // Cursor is currently at the first available version of the state key.
+                // Check if the key_prefix is a valid prefix of the state_key we got from DB.
+                if !self.key_prefix.is_prefix(&state_key)? {
+                    // No more keys matching the key_prefix, we can return the result.
+                    self.is_finished = true;
+                    break;
+                }
+
+                if version > self.desired_version {
+                    iter.seek(&(state_key.clone(), self.desired_version))?;
+                    continue;
+                }
+
+                self.prev_key = Some(state_key.clone());
+                // Seek to the next key - this can be done by seeking to the current key with version 0
+                iter.seek(&(state_key.clone(), 0))?;
+
+                if let Some(state_value) = self
+                    .db
+                    .db_shard(state_key.get_shard_id())
+                    .get::<StateValueSchema>(&(state_key.clone(), version))?
+                    .ok_or_else(|| {
+                        anyhow!("Key {state_key:?} is not found at version {version}.")
+                    })?
+                {
                     return Ok(Some((state_key, state_value)));
                 }
             }
@@ -171,7 +234,11 @@ impl<'a> Iterator for PrefixedStateValueIterator<'a> {
     type Item = Result<(StateKey, StateValue)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_impl().transpose()
+        if self.use_index {
+            self.next_by_index().transpose()
+        } else {
+            self.next_by_kv().transpose()
+        }
     }
 }
 

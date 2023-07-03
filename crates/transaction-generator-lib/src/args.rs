@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{EntryPoints, TransactionType};
-use clap::{ArgEnum, Parser};
+use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 /// Utility class for specifying transaction type with predefined configurations through CLI
-#[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
+#[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
     NoOp,
     NoOp2Signers,
     NoOp5Signers,
+    #[default]
     CoinTransfer,
     CoinTransferWithInvalid,
     NonConflictingCoinTransfer,
@@ -29,12 +30,6 @@ pub enum TransactionTypeArg {
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
     TokenV2AmbassadorMint,
-}
-
-impl Default for TransactionTypeArg {
-    fn default() -> Self {
-        TransactionTypeArg::CoinTransfer
-    }
 }
 
 impl TransactionTypeArg {

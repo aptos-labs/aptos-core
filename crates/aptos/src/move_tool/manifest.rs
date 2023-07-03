@@ -13,12 +13,13 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MovePackageManifest {
     pub package: PackageInfo,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub addresses: BTreeMap<String, ManifestNamedAddress>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(rename = "dev-addresses")]
+    pub dev_addresses: BTreeMap<String, ManifestNamedAddress>,
     pub dependencies: BTreeMap<String, Dependency>,
+    #[serde(rename = "dev-dependencies")]
+    pub dev_dependencies: BTreeMap<String, Dependency>,
 }
-
 /// Representation of an option address so we can print it as "_"
 #[derive(Debug, Clone)]
 pub struct ManifestNamedAddress {
@@ -85,6 +86,7 @@ pub struct Dependency {
 pub struct PackageInfo {
     pub name: String,
     pub version: String,
+    pub authors: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub author: Option<String>,
+    pub license: Option<String>,
 }

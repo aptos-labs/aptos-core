@@ -162,6 +162,7 @@ resource "helm_release" "testnet-addons" {
         }
       }
     }),
+    jsonencode(var.testnet_addons_helm_values)
   ]
   dynamic "set" {
     for_each = var.manage_via_tf ? toset([""]) : toset([])

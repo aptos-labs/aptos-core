@@ -32,11 +32,11 @@ impl ShowTool {
 pub struct ShowAbi {
     /// If provided, only show items from the given Move modules. These should be module
     /// names, not file paths. For example, `coin`.
-    #[clap(long, multiple_values = true)]
+    #[clap(long, num_args = 0..)]
     modules: Vec<String>,
 
     /// If provided, only show items with the given names. For example, `transfer`.
-    #[clap(long, multiple_values = true)]
+    #[clap(long, num_args = 0..)]
     names: Vec<String>,
 
     #[clap(flatten)]
@@ -60,6 +60,7 @@ impl CliCommand<Vec<EntryABI>> for ShowAbi {
                 .included_artifacts_args
                 .included_artifacts
                 .build_options(
+                    self.move_options.dev,
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
                     self.move_options.bytecode_version,

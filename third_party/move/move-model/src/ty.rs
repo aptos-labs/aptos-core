@@ -780,24 +780,15 @@ impl Substitution {
                     Ok(Some(self.unify(variance, &s1, t2)?))
                 };
             }
-            let is_t1_var = |t: &Type| {
-                if let Type::Var(v2) = t {
-                    v1 == v2
-                } else {
-                    false
-                }
-            };
             // Skip the cycle check if we are unifying the same two variables.
-            if is_t1_var(t2) {
+            if t1 == t2 {
                 return Ok(Some(t1.clone()));
             }
             // Cycle check.
-            if !t2.contains(&is_t1_var) {
+            if !self.occurs_check(t2, *v1) {
                 self.subs.insert(*v1, t2.clone());
                 Ok(Some(t2.clone()))
             } else {
-                // It is not clear to me whether this can ever occur given we do no global
-                // unification with recursion, but to be on the save side, we have it.
                 Err(TypeUnificationError::CyclicSubstitution(
                     self.specialize(t1),
                     self.specialize(t2),
@@ -806,6 +797,21 @@ impl Substitution {
         } else {
             Ok(None)
         }
+    }
+
+    /// Check whether the variables occurs in the type, or in any assignment to variables in the
+    /// type.
+    fn occurs_check(&self, ty: &Type, var: u16) -> bool {
+        ty.get_vars().iter().any(|v| {
+            if v == &var {
+                return true;
+            }
+            if let Some(sty) = self.subs.get(v) {
+                self.occurs_check(sty, var)
+            } else {
+                false
+            }
+        })
     }
 }
 

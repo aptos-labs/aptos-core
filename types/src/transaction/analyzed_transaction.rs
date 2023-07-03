@@ -14,6 +14,7 @@ pub use move_core_types::abi::{
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, move_resource::MoveStructType,
 };
+use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug)]
@@ -32,7 +33,7 @@ pub struct AnalyzedTransaction {
     hash: HashValue,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 // TODO(skedia): Evaluate if we need to cache the HashValue for efficiency reasons.
 pub enum StorageLocation {
     // A specific storage location denoted by an address and a struct tag.
@@ -68,7 +69,7 @@ impl AnalyzedTransaction {
         AnalyzedTransaction::new(transaction, vec![], vec![])
     }
 
-    pub fn into_inner(self) -> Transaction {
+    pub fn into_txn(self) -> Transaction {
         self.transaction
     }
 
@@ -120,14 +121,14 @@ impl AnalyzedTransaction {
         )
     }
 
-    fn account_resource_location(address: AccountAddress) -> StorageLocation {
+    pub fn account_resource_location(address: AccountAddress) -> StorageLocation {
         StorageLocation::Specific(StateKey::access_path(AccessPath::new(
             address,
             AccountResource::struct_tag().access_vector(),
         )))
     }
 
-    fn coin_store_location(address: AccountAddress) -> StorageLocation {
+    pub fn coin_store_location(address: AccountAddress) -> StorageLocation {
         StorageLocation::Specific(StateKey::access_path(AccessPath::new(
             address,
             CoinStoreResource::struct_tag().access_vector(),

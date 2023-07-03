@@ -2,14 +2,17 @@
 
 use crate::block_executor::BlockAptosVM;
 use aptos_state_view::StateView;
-use aptos_types::transaction::{Transaction, TransactionOutput};
+use aptos_types::{
+    block_executor::partitioner::{BlockExecutorTransactions, SubBlocksForShard},
+    transaction::{Transaction, TransactionOutput},
+};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
 pub trait BlockExecutorClient {
     fn execute_block<S: StateView + Sync>(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: SubBlocksForShard<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
@@ -19,14 +22,14 @@ pub trait BlockExecutorClient {
 impl BlockExecutorClient for LocalExecutorClient {
     fn execute_block<S: StateView + Sync>(
         &self,
-        transactions: Vec<Transaction>,
+        sub_blocks: SubBlocksForShard<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block(
             self.executor_thread_pool.clone(),
-            transactions,
+            BlockExecutorTransactions::Sharded(sub_blocks),
             state_view,
             concurrency_level,
             maybe_block_gas_limit,

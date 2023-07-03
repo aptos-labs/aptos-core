@@ -497,6 +497,18 @@ fn get_k8s_node_from_stateful_set(
         service_name = format!("{}.{}.svc", &service_name, &namespace);
     }
 
+    // Append the cluster name if its a multi-cluster deployment
+    let service_name = if let Some(target_cluster_name) = sts
+        .metadata
+        .labels
+        .as_ref()
+        .and_then(|labels| labels.get("multicluster/targetcluster"))
+    {
+        format!("{}.{}", &service_name, &target_cluster_name)
+    } else {
+        service_name
+    };
+
     // If HAProxy is enabled, use the port on its Service. Otherwise use the port on the validator Service
     let mut rest_api_port = if enable_haproxy {
         REST_API_HAPROXY_SERVICE_PORT

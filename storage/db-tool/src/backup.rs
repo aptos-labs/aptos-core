@@ -133,7 +133,7 @@ pub struct VerifyOpt {
     concurrent_downloads: ConcurrentDownloadsOpt,
     #[clap(
         long,
-        parse(try_from_str = parse_maxable_u64),
+        value_parser = parse_maxable_u64,
         help = "The first transaction version required to be verified. Pass \"max\" to skip \
         transaction verification. [Defaults to 0]"
     )]
@@ -159,7 +159,7 @@ pub struct VerifyOpt {
     validate_modules: bool,
     #[clap(
         long,
-        parse(from_os_str),
+        value_parser,
         help = "Optionally, while verifying transactions, output analysis files to specified dir."
     )]
     output_transaction_analysis: Option<PathBuf>,

@@ -26,6 +26,7 @@ use aptos_network::{
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use rand::{rngs::StdRng, SeedableRng};
 use std::collections::HashMap;
+use tokio::runtime::Runtime;
 
 /// A struct holding a list of overriding configurations for mempool
 #[derive(Clone, Copy)]
@@ -66,7 +67,12 @@ impl TestHarness {
     fn bootstrap_validator_network(
         validator_nodes_count: u32,
         validator_mempool_config: Option<MempoolOverrideConfig>,
-    ) -> (TestHarness, Vec<NodeId>) {
+    ) -> (TestHarness, Vec<NodeId>, Runtime) {
+        // Create and enter a new runtime
+        let runtime = Runtime::new().unwrap();
+        let _entered_runtime = runtime.enter();
+
+        // Bootstrap the network
         let (harness, mut peers) = Self::bootstrap_network(
             validator_nodes_count,
             validator_mempool_config,
@@ -76,7 +82,8 @@ impl TestHarness {
             None,
         );
         let validators = peers.remove(&PeerRole::Validator).unwrap();
-        (harness, validators)
+
+        (harness, validators, runtime)
     }
 
     /// Builds a fully functional network with Validators, attached VFNs, and full nodes
@@ -483,7 +490,7 @@ fn test_max_broadcast_limit() {
     validator_mempool_config.ack_timeout_ms = Some(u64::MAX);
     validator_mempool_config.backoff_interval_ms = Some(50);
 
-    let (mut harness, validators) =
+    let (mut harness, validators, _runtime) =
         TestHarness::bootstrap_validator_network(2, Some(validator_mempool_config));
     let (v_a, v_b) = (validators.first().unwrap(), validators.get(1).unwrap());
 
@@ -556,7 +563,7 @@ fn test_max_batch_size() {
         validator_mempool_config.broadcast_batch_size = Some(broadcast_batch_size);
         validator_mempool_config.ack_timeout_ms = Some(u64::MAX);
 
-        let (mut harness, validators) =
+        let (mut harness, validators, _runtime) =
             TestHarness::bootstrap_validator_network(2, Some(validator_mempool_config));
         let (v_a, v_b) = (validators.first().unwrap(), validators.get(1).unwrap());
 
@@ -599,7 +606,7 @@ fn test_max_network_byte_size() {
         let max_broadcast_batch_size =
             test_transactions_with_byte_limit(0, max_broadcast_batch_bytes).len();
 
-        let (mut harness, validators) =
+        let (mut harness, validators, _runtime) =
             TestHarness::bootstrap_validator_network(2, Some(validator_mempool_config));
         let (v_a, v_b) = (validators.first().unwrap(), validators.get(1).unwrap());
 

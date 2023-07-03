@@ -10,6 +10,7 @@ use crate::{
 };
 use anyhow::{bail, format_err, Error, Result};
 use aptos_framework::ReleaseBundle;
+use clap::{Parser, ValueEnum};
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::{
     fmt::{Display, Formatter},
@@ -20,82 +21,74 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use structopt::{clap::arg_enum, StructOpt};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
 
 const KUBERNETES_SERVICE_HOST: &str = "KUBERNETES_SERVICE_HOST";
 pub const FORGE_RUNNER_MODE: &str = "FORGE_RUNNER_MODE";
 
-#[derive(Debug, StructOpt)]
-#[structopt(about = "Forged in Fire")]
+#[derive(Debug, Parser)]
+#[clap(about = "Forged in Fire", styles = aptos_cli_common::aptos_cli_style())]
 pub struct Options {
     /// The FILTER string is tested against the name of all tests, and only those tests whose names
     /// contain the filter are run.
     filter: Option<String>,
-    #[structopt(long = "exact")]
+    #[clap(long = "exact")]
     /// Exactly match filters rather than by substring
     filter_exact: bool,
     #[allow(dead_code)]
-    #[structopt(long, default_value = "1", env = "RUST_TEST_THREADS")]
+    #[clap(long, default_value = "1", env = "RUST_TEST_THREADS")]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     /// Number of threads used for running tests in parallel
     test_threads: NonZeroUsize,
     #[allow(dead_code)]
-    #[structopt(short = "q", long)]
+    #[clap(short = 'q', long)]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     quiet: bool,
     #[allow(dead_code)]
-    #[structopt(long)]
+    #[clap(long)]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     nocapture: bool,
-    #[structopt(long)]
+    #[clap(long)]
     /// List all tests
     pub list: bool,
-    #[structopt(long)]
+    #[clap(long)]
     /// List or run ignored tests
     ignored: bool,
-    #[structopt(long)]
+    #[clap(long)]
     /// Include ignored tests when listing or running tests
     include_ignored: bool,
     /// Configure formatting of output:
     ///   pretty = Print verbose output;
     ///   terse = Display one character per test;
     ///   (json is unsupported, exists for compatibility with the default test harness)
-    #[structopt(long, possible_values = &Format::variants(), default_value, case_insensitive = true)]
+    #[clap(long, value_enum, ignore_case = true, default_value_t = Format::Pretty)]
     format: Format,
     #[allow(dead_code)]
-    #[structopt(short = "Z")]
+    #[clap(short = 'Z')]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     /// -Z unstable-options Enable nightly-only flags:
     ///                     unstable-options = Allow use of experimental features
     z_unstable_options: Option<String>,
     #[allow(dead_code)]
-    #[structopt(long)]
+    #[clap(long)]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     /// Show captured stdout of successful tests
     show_output: bool,
 }
 
 impl Options {
-    pub fn from_args() -> Self {
-        StructOpt::from_args()
+    pub fn parse() -> Self {
+        Parser::parse()
     }
 }
 
-arg_enum! {
-    #[derive(Debug, Eq, PartialEq)]
-    pub enum Format {
-        Pretty,
-        Terse,
-        Json,
-    }
-}
-
-impl Default for Format {
-    fn default() -> Self {
-        Format::Pretty
-    }
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+pub enum Format {
+    #[default]
+    Pretty,
+    Terse,
+    Json,
 }
 
 pub fn forge_main<F: Factory>(tests: ForgeConfig, factory: F, options: &Options) -> Result<()> {
@@ -720,4 +713,10 @@ mod test {
             "Invalid runner mode: durian"
         );
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Options::command().debug_assert()
 }

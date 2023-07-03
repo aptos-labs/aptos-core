@@ -8,13 +8,13 @@ mod mock_vm_test;
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_executor_types::ExecutableTransactions;
 use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
+    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
@@ -60,7 +60,7 @@ pub struct MockVM;
 
 impl TransactionBlockExecutor for MockVM {
     fn execute_transaction_block(
-        transactions: ExecutableTransactions,
+        transactions: ExecutableTransactions<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
@@ -119,7 +119,7 @@ impl VMExecutor for MockVM {
                 read_state_value_from_storage(
                     state_view,
                     &access_path_for_config(ValidatorSet::CONFIG_ID)
-                        .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES, None))?,
+                        .map_err(|_| VMStatus::error(StatusCode::TOO_MANY_TYPE_NODES, None))?,
                 );
                 read_state_value_from_storage(
                     state_view,
@@ -209,7 +209,7 @@ impl VMExecutor for MockVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _transactions: Vec<Transaction>,
+        _block: Vec<SubBlocksForShard<Transaction>>,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
