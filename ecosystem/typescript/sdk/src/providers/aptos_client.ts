@@ -786,6 +786,40 @@ export class AptosClient {
   }
 
   /**
+   * Publishes a move packages by creating a resource account.
+   * The package cannot be upgraded since it is deployed by resource account
+   * `packageMetadata` and `modules` can be generated with command
+   * `aptos move compile --save-metadata [ --included-artifacts=<...> ]`.
+   * @param sender
+   * @param seed seeds for creation of resource address
+   * @param packageMetadata package metadata bytes
+   * @param modules bytecodes of modules
+   * @param extraArgs
+   * @returns Transaction hash
+   */
+  async createResourceAccountAndPublishPackage(
+    sender: AptosAccount,
+    seed: Bytes,
+    packageMetadata: Bytes,
+    modules: Seq<TxnBuilderTypes.Module>,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    const codeSerializer = new Serializer();
+    serializeVector(modules, codeSerializer);
+
+    const payload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x1::resource_account",
+        "create_resource_account_and_publish_package",
+        [],
+        [bcsSerializeBytes(seed), bcsSerializeBytes(packageMetadata), codeSerializer.getBytes()],
+      ),
+    );
+
+    return this.generateSignSubmitTransaction(sender, payload, extraArgs);
+  }
+
+  /**
    * Helper for generating, submitting, and waiting for a transaction, and then
    * checking whether it was committed successfully. Under the hood this is just
    * `generateSignSubmitTransaction` and then `waitForTransactionWithResult`, see
