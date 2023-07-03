@@ -9,6 +9,7 @@ use crate::{
     context::Context,
     failpoint::fail_point_poem,
     generate_error_response, generate_success_response,
+    metrics::HANDLERS,
     page::Page,
     response::{
         api_disabled, api_forbidden, transaction_not_found_by_hash,
@@ -297,6 +298,8 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
+        let start = std::time::Instant::now();
+
         data.verify()
             .context("Submitted transaction invalid'")
             .map_err(|err| {
@@ -313,8 +316,14 @@ impl TransactionsApi {
             .check_api_output_enabled("Submit transaction", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
-        self.create(&accept_type, &ledger_info, signed_transaction)
-            .await
+        let ret = self
+            .create(&accept_type, &ledger_info, signed_transaction)
+            .await;
+
+        HANDLERS
+            .with_label_values(&["submit_transaction"])
+            .observe(start.elapsed().as_secs_f64());
+        ret
     }
 
     /// Submit batch transactions
@@ -556,6 +565,8 @@ impl TransactionsApi {
         data: Json<EncodeSubmissionRequest>,
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
+        let start = std::time::Instant::now();
+
         data.0
             .verify()
             .context("'UserTransactionRequest' invalid")
@@ -571,7 +582,12 @@ impl TransactionsApi {
         }
         self.context
             .check_api_output_enabled("Encode submission", &accept_type)?;
-        self.get_signing_message(&accept_type, data.0)
+        let ret = self.get_signing_message(&accept_type, data.0);
+
+        HANDLERS
+            .with_label_values(&["submit_transaction"])
+            .observe(start.elapsed().as_secs_f64());
+        ret
     }
 
     /// Estimate gas price

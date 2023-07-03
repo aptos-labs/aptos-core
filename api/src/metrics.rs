@@ -44,3 +44,13 @@ pub static REQUEST_SOURCE_CLIENT: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static HANDLERS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_api_handlers",
+        "API handler latency grouped by handler name",
+        &["handler"],
+        SUB_MS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
