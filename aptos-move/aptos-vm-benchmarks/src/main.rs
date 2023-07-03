@@ -11,8 +11,10 @@ use move_binary_format::CompiledModule;
 use std::fs::read_dir;
 use std::path::PathBuf;
 
+//// CONSTANTS
 const PREFIX: &str = "benchmark";
 
+//// CLI options
 #[derive(Parser, Debug)]
 struct Cli {
     #[clap(default_value = "")]
@@ -36,12 +38,14 @@ fn main() {
     //// Go over all Move projects
     //// TODO: refactor logic into separate components
     for dir in dirs {
+        // validate path is directory
         let entry = dir.unwrap();
         if !entry.path().is_dir() {
             continue;
         }
         let dir_path = entry.path();
 
+        // configure and build Move package
         let build_options = BuildOptions {
             with_srcs: true,
             with_abis: true,
@@ -52,6 +56,7 @@ fn main() {
         let package =
             BuiltPackage::build(dir_path, build_options).expect("build package must succeed");
 
+        // iterate over all Move package code
         let codes = package.extract_code();
         for code in codes {
             // avoid SEQUENCE_NUMBER_TOO_NEW error
@@ -77,24 +82,25 @@ fn main() {
 
             let mut func_identifiers = Vec::new();
             for func in funcs {
+                // check if function is marked as entry, if not skip it
                 let is_entry = func.is_entry;
                 if !is_entry {
                     continue;
                 }
 
+                // extract some info from the function
                 let func_idx: usize = func.function.0.into();
                 let handle = &func_handles[func_idx];
-
                 let func_identifier_idx: usize = handle.name.0.into();
                 let func_identifier = &func_identifier_pool[func_identifier_idx];
 
-                // skip if it doesn't start with "benchmark"
+                // check if it doesn't start with "benchmark", if not skip it
                 let func_name = func_identifier.as_str();
                 if !func_name.starts_with(PREFIX) {
                     continue;
                 }
 
-                // skip if it doesn't match pattern
+                // check if it doesn't match pattern, if not skip it
                 let fully_qualified_path = format!("{}::{}::{}", address, identifier, func_name);
                 if !fully_qualified_path.contains(pattern) && !pattern.is_empty() {
                     continue;
@@ -112,12 +118,14 @@ fn main() {
                     continue;
                 }
 
+                // save function to later run benchmark for it
                 func_identifiers.push(func_name);
             }
 
             //// publish test-package under module address
             let creator = executor.new_account_at(**address);
 
+            //// iterate over all the functions that satisfied the requirements above
             for func_identifier in func_identifiers {
                 println!(
                     "Executing {}::{}::{}",
