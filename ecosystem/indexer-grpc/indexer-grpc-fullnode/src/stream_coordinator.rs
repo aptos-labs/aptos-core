@@ -87,7 +87,7 @@ impl IndexerStreamCoordinator {
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
-                api_txns.first().map(record_fetched_transaction_latency);
+                api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {

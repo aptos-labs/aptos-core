@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
-    ERROR_COUNT, LATEST_PROCESSED_VERSION, PROCESSED_BATCH_SIZE, PROCESSED_LATENCY_IN_SECS,
-    PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
+    CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION, PROCESSED_BATCH_SIZE,
+    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
+    SHORT_CONNECTION_COUNT,
 };
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
@@ -52,6 +53,8 @@ const MAX_RESPONSE_CHANNEL_SIZE: usize = 40;
 // The server will retry to send the response to the client and give up after RESPONSE_CHANNEL_SEND_TIMEOUT.
 // This is to prevent the server from being occupied by a slow client.
 const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
+
+const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
@@ -102,6 +105,7 @@ impl RawData for RawDataServerWrapper {
             Ok(request_metadata) => request_metadata,
             _ => return Result::Err(Status::aborted("Invalid request token")),
         };
+        CONNECTION_COUNT.inc();
         let request = req.into_inner();
 
         let transactions_count = request.transactions_count;
@@ -143,13 +147,15 @@ impl RawData for RawDataServerWrapper {
         let redis_client = self.redis_client.clone();
         tokio::spawn(
             async move {
+                let mut connection_start_time = Some(std::time::Instant::now());
                 let mut transactions_count = transactions_count;
-                let conn = match redis_client.get_async_connection().await {
+                let conn = match redis_client.get_tokio_connection_manager().await {
                     Ok(conn) => conn,
                     Err(e) => {
                         ERROR_COUNT
                             .with_label_values(&["redis_connection_failed"])
                             .inc();
+                        SHORT_CONNECTION_COUNT.inc();
                         // Connection will be dropped anyway, so we ignore the error here.
                         let _result = tx
                             .send_timeout(
@@ -175,6 +181,7 @@ impl RawData for RawDataServerWrapper {
                         ERROR_COUNT
                             .with_label_values(&["redis_get_chain_id_failed"])
                             .inc();
+                        SHORT_CONNECTION_COUNT.inc();
                         // Connection will be dropped anyway, so we ignore the error here.
                         let _result = tx
                             .send_timeout(
@@ -230,6 +237,8 @@ impl RawData for RawDataServerWrapper {
                     if let Some(count) = transactions_count {
                         if count == 0 {
                             // End the data stream.
+                            // Since the client receives all the data it requested, we don't count it as a short conneciton.
+                            connection_start_time = None;
                             break;
                         } else if (count as usize) < transaction_data.len() {
                             // Trim the data to the requested size.
@@ -317,6 +326,11 @@ impl RawData for RawDataServerWrapper {
                     );
                 }
                 info!("[Indexer Data] Client disconnected.");
+                if let Some(start_time) = connection_start_time {
+                    if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
+                        SHORT_CONNECTION_COUNT.inc();
+                    }
+                }
             }
             .instrument(serving_span),
         );
@@ -350,7 +364,7 @@ fn get_transactions_response_builder(
 /// Otherwise, it returns the status of the data fetching.
 async fn data_fetch(
     starting_version: u64,
-    cache_operator: &mut CacheOperator<redis::aio::Connection>,
+    cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: &dyn FileStoreOperator,
 ) -> anyhow::Result<TransactionsDataStatus> {
     let batch_get_result = cache_operator
