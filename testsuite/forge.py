@@ -156,15 +156,19 @@ class ForgeResult:
         assert self._end_time is not None, "end_time is not set"
         return self._end_time
 
+    @property
+    def duration(self) -> float:
+        return (self.end_time - self.start_time).total_seconds()
+
     @classmethod
-    def from_args(cls, state: ForgeState, output: str) -> "ForgeResult":
+    def from_args(cls, state: ForgeState, output: str) -> ForgeResult:
         result = cls()
         result.state = state
         result.output = output
         return result
 
     @classmethod
-    def empty(cls) -> "ForgeResult":
+    def empty(cls) -> ForgeResult:
         return cls.from_args(ForgeState.EMPTY, "")
 
     @classmethod
@@ -212,7 +216,7 @@ class ForgeResult:
         self.debugging_output = output
 
     def format(self, context: ForgeContext) -> str:
-        output_lines = []
+        output_lines: List[str] = []
         if not self.succeeded():
             output_lines.append(self.debugging_output)
         output_lines.extend(
@@ -221,6 +225,13 @@ class ForgeResult:
                 f"Forge {self.state.value.lower()}ed",
             ]
         )
+        if self.state == ForgeState.FAIL and self.duration > 3600:
+            output_lines.append(
+                "Forge took longer than 1 hour to run. This can cause the job to"
+                " fail even when the test is successful because of gcp + github"
+                " auth expiration. If you think this is the case please check the"
+                " GCP_AUTH_DURATION in the github workflow."
+            )
         return "\n".join(output_lines)
 
     def succeeded(self) -> bool:
@@ -977,8 +988,14 @@ def image_exists(
 
 def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> str:
     """
-    Sanitize the intended forge resource name to be a valid k8s resource name
+    Sanitize the intended forge resource name to be a valid k8s resource name.
+    Resource names must be: (i) 63 characters or less; (ii) contain characters
+    that are alphanumeric, '-', or '.'; (iii) start and end with an alphanumeric
+    character; and (iv) start with "forge-".
     """
+    if not forge_resource.startswith("forge-"):
+        raise Exception("Forge resource name must start with 'forge-'")
+
     sanitized_namespace = ""
     for i, c in enumerate(forge_resource):
         if i >= max_length:
@@ -986,9 +1003,13 @@ def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> s
         if c.isalnum():
             sanitized_namespace += c
         else:
-            sanitized_namespace += "-"
-    if not forge_resource.startswith("forge-"):
-        raise Exception("Forge resource name must start with 'forge-'")
+            sanitized_namespace += "-"  # Replace the invalid character with a '-'
+
+    if sanitized_namespace.endswith("-"):
+        sanitized_namespace = (
+            sanitized_namespace[:-1] + "0"
+        )  # Set the last character to '0'
+
     return sanitized_namespace
 
 

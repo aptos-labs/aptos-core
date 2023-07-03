@@ -368,7 +368,7 @@ impl AggregateSignatureWithRounds {
         &self,
         ordered_validator_addresses: &[AccountAddress],
     ) -> Vec<AccountAddress> {
-        self.sig.get_voter_addresses(ordered_validator_addresses)
+        self.sig.get_signers_addresses(ordered_validator_addresses)
     }
 
     pub fn get_voters_and_rounds(
@@ -376,7 +376,7 @@ impl AggregateSignatureWithRounds {
         ordered_validator_addresses: &[AccountAddress],
     ) -> Vec<(AccountAddress, Round)> {
         self.sig
-            .get_voter_addresses(ordered_validator_addresses)
+            .get_signers_addresses(ordered_validator_addresses)
             .into_iter()
             .zip(self.rounds.clone())
             .collect()

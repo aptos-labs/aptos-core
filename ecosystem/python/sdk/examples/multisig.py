@@ -59,9 +59,7 @@ if __name__ == "__main__":
         [alice.public_key(), bob.public_key(), chad.public_key()], threshold
     )
 
-    multisig_address = AccountAddress.from_multisig_schema(
-        [alice.public_key(), bob.public_key(), chad.public_key()], threshold
-    )
+    multisig_address = AccountAddress.from_multi_ed25519(multisig_public_key)
 
     print("\n=== 2-of-3 Multisig account ===")
     print(f"Account public key: {multisig_public_key}")

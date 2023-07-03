@@ -347,8 +347,12 @@ impl Node {
     pub fn new(node: NodeInfo, config: NodeConfig) -> Node {
         let (network_interfaces, network_client, network_service_events, peers_and_metadata) =
             setup_node_network_interfaces(&node);
-        let (mempool, runtime, subscriber) =
-            start_node_mempool(config, network_client, network_service_events);
+        let (mempool, runtime, subscriber) = start_node_mempool(
+            config,
+            network_client,
+            network_service_events,
+            peers_and_metadata.clone(),
+        );
 
         Node {
             node_info: node,
@@ -415,7 +419,10 @@ impl Node {
             return;
         }
 
-        panic!("Failed to get expected event '{:?}'", expected)
+        panic!(
+            "Failed to get expected event '{:?}', instead: '{:?}'",
+            expected, event
+        )
     }
 
     /// Checks that there are no `SharedMempoolNotification`s on the subscriber
@@ -554,6 +561,7 @@ fn setup_node_network_interfaces(
 fn setup_node_network_interface(
     peer_network_id: PeerNetworkId,
 ) -> (NodeNetworkInterface, MempoolNetworkHandle) {
+    // Create the network sender and events receiver
     static MAX_QUEUE_SIZE: usize = 8;
     let (network_reqs_tx, network_reqs_rx) =
         aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
@@ -565,7 +573,7 @@ fn setup_node_network_interface(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
-    let network_events = NetworkEvents::new(network_notifs_rx, conn_status_rx);
+    let network_events = NetworkEvents::new(network_notifs_rx, conn_status_rx, None);
 
     (
         NodeNetworkInterface {
@@ -582,6 +590,7 @@ fn start_node_mempool(
     config: NodeConfig,
     network_client: NetworkClient<MempoolSyncMsg>,
     network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Arc<Mutex<CoreMempool>>,
     Runtime,
@@ -618,6 +627,7 @@ fn start_node_mempool(
         Arc::new(MockDbReaderWriter),
         Arc::new(RwLock::new(MockVMValidator)),
         vec![sender],
+        peers_and_metadata,
     );
 
     (mempool, runtime, subscriber)

@@ -20,7 +20,6 @@ aptos-types = { workspace = true }
 bitvec = { workspace = true }
 criterion = { workspace = true, optional = true }
 itertools = { workspace = true }
-jemallocator = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 rayon = { workspace = true }
@@ -32,6 +31,9 @@ bitvec = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+jemallocator = { workspace = true }
 
 [features]
 fuzzing = ["aptos-types/fuzzing", "proptest"]

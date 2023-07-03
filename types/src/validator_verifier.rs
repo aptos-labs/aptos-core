@@ -231,10 +231,10 @@ impl ValidatorVerifier {
         multi_signature: &AggregateSignature,
     ) -> std::result::Result<(), VerifyError> {
         // Verify the number of signature is not greater than expected.
-        Self::check_num_of_voters(self.len() as u16, multi_signature.get_voters_bitvec())?;
+        Self::check_num_of_voters(self.len() as u16, multi_signature.get_signers_bitvec())?;
         let mut pub_keys = vec![];
         let mut authors = vec![];
-        for index in multi_signature.get_voters_bitvec().iter_ones() {
+        for index in multi_signature.get_signers_bitvec().iter_ones() {
             let validator = self
                 .validator_infos
                 .get(index)
@@ -274,10 +274,10 @@ impl ValidatorVerifier {
         aggregated_signature: &AggregateSignature,
     ) -> std::result::Result<(), VerifyError> {
         // Verify the number of signature is not greater than expected.
-        Self::check_num_of_voters(self.len() as u16, aggregated_signature.get_voters_bitvec())?;
+        Self::check_num_of_voters(self.len() as u16, aggregated_signature.get_signers_bitvec())?;
         let mut pub_keys = vec![];
         let mut authors = vec![];
-        for index in aggregated_signature.get_voters_bitvec().iter_ones() {
+        for index in aggregated_signature.get_signers_bitvec().iter_ones() {
             let validator = self
                 .validator_infos
                 .get(index)
@@ -679,7 +679,7 @@ mod tests {
             .aggregate_signatures(&partial_signature)
             .unwrap();
         assert_eq!(
-            aggregated_signature.get_voters_bitvec().num_buckets(),
+            aggregated_signature.get_signers_bitvec().num_buckets(),
             BitVec::required_buckets(validator_verifier.validator_infos.len() as u16)
         );
         // Check against signatures == N; this will pass.
@@ -709,7 +709,7 @@ mod tests {
             .aggregate_signatures(&partial_signature)
             .unwrap();
         assert_eq!(
-            aggregated_signature.get_voters_bitvec().num_buckets(),
+            aggregated_signature.get_signers_bitvec().num_buckets(),
             BitVec::required_buckets(validator_verifier.validator_infos.len() as u16)
         );
         assert_eq!(
@@ -737,7 +737,7 @@ mod tests {
             .aggregate_signatures(&partial_signature)
             .unwrap();
         assert_eq!(
-            aggregated_signature.get_voters_bitvec().num_buckets(),
+            aggregated_signature.get_signers_bitvec().num_buckets(),
             BitVec::required_buckets(validator_verifier.validator_infos.len() as u16)
         );
         assert_eq!(

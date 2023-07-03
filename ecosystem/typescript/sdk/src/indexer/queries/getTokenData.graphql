@@ -1,16 +1,22 @@
-query getTokenData($token_id: String) {
-  current_token_datas(where: { token_data_id_hash: { _eq: $token_id } }) {
-    token_data_id_hash
-    name
-    collection_name
-    creator_address
-    default_properties
-    largest_property_version
+query getTokenData($where_condition: current_token_datas_v2_bool_exp) {
+  current_token_datas_v2(where: $where_condition) {
+    token_data_id
+    token_name
+    token_uri
+    token_properties
+    token_standard
+    largest_property_version_v1
     maximum
-    metadata_uri
-    payee_address
-    royalty_points_denominator
-    royalty_points_numerator
+    is_fungible_v2
     supply
+    last_transaction_version
+    last_transaction_timestamp
+    current_collection {
+      collection_id
+      collection_name
+      creator_address
+      uri
+      current_supply
+    }
   }
 }

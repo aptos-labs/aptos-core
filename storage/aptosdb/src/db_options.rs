@@ -104,6 +104,7 @@ pub(super) fn state_kv_db_column_families() -> Vec<ColumnFamilyName> {
         DB_METADATA_CF_NAME,
         STALE_STATE_VALUE_INDEX_CF_NAME,
         STATE_VALUE_CF_NAME,
+        STATE_VALUE_INDEX_CF_NAME,
     ]
 }
 

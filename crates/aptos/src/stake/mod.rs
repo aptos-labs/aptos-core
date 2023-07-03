@@ -314,11 +314,11 @@ pub struct InitializeStakeOwner {
     pub initial_stake_amount: u64,
 
     /// Account Address of delegated operator
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub operator_address: Option<AccountAddress>,
 
     /// Account address of delegated voter
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub voter_address: Option<AccountAddress>,
 
     #[clap(flatten)]
@@ -353,7 +353,7 @@ pub struct SetOperator {
     /// Account Address of delegated operator
     ///
     /// If not specified, it will be the same as the owner
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub operator_address: AccountAddress,
 
     #[clap(flatten)]
@@ -429,7 +429,7 @@ pub struct SetDelegatedVoter {
     /// Account Address of delegated voter
     ///
     /// If not specified, it will be the same as the owner
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub voter_address: AccountAddress,
 
     #[clap(flatten)]
@@ -498,11 +498,11 @@ impl CliCommand<Vec<TransactionSummary>> for SetDelegatedVoter {
 #[derive(Parser)]
 pub struct CreateStakingContract {
     /// Account Address of operator
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub operator: AccountAddress,
 
     /// Account Address of delegated voter
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub voter: AccountAddress,
 
     /// Amount to create the staking contract with
@@ -556,7 +556,7 @@ impl CliCommand<TransactionSummary> for CreateStakingContract {
 #[derive(Parser)]
 pub struct DistributeVestedCoins {
     /// Address of the vesting contract's admin.
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub admin_address: AccountAddress,
 
     #[clap(flatten)]
@@ -589,7 +589,7 @@ impl CliCommand<TransactionSummary> for DistributeVestedCoins {
 #[derive(Parser)]
 pub struct UnlockVestedCoins {
     /// Address of the vesting contract's admin.
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub admin_address: AccountAddress,
 
     #[clap(flatten)]
@@ -619,11 +619,11 @@ impl CliCommand<TransactionSummary> for UnlockVestedCoins {
 #[derive(Parser)]
 pub struct RequestCommission {
     /// Address of the owner of the stake pool
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub owner_address: AccountAddress,
 
     /// Address of the operator of the stake pool
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub operator_address: AccountAddress,
 
     #[clap(flatten)]

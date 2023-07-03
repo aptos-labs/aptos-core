@@ -65,7 +65,11 @@ pub struct DummyNetwork {
 
 /// The following sets up a 2 peer network and verifies connectivity.
 pub fn setup_network() -> DummyNetwork {
+    // Create and enter a runtime
     let runtime = Runtime::new().unwrap();
+    let _entered_runtime = runtime.enter();
+
+    // Create a new set of peers
     let role = RoleType::Validator;
     let network_id = NetworkId::Validator;
     let chain_id = ChainId::default();
@@ -106,8 +110,8 @@ pub fn setup_network() -> DummyNetwork {
         peers_and_metadata.clone(),
     );
 
-    let (listener_sender, mut listener_events) =
-        network_builder.add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config());
+    let (listener_sender, mut listener_events) = network_builder
+        .add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config(), None);
     network_builder.build(runtime.handle().clone()).start();
     let listener_network_client = NetworkClient::new(
         vec![TEST_DIRECT_SEND_PROTOCOL],
@@ -139,8 +143,8 @@ pub fn setup_network() -> DummyNetwork {
         peers_and_metadata.clone(),
     );
 
-    let (dialer_sender, mut dialer_events) =
-        network_builder.add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config());
+    let (dialer_sender, mut dialer_events) = network_builder
+        .add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config(), None);
     network_builder.build(runtime.handle().clone()).start();
     let dialer_network_client = NetworkClient::new(
         vec![TEST_DIRECT_SEND_PROTOCOL],

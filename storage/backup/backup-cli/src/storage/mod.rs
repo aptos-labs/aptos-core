@@ -213,7 +213,7 @@ impl StorageOpt {
 #[clap(group(
     ArgGroup::new("storage")
     .required(true)
-    .args(&["local-fs-dir", "command-adapter-config"]),
+    .args(&["local_fs_dir", "command_adapter_config"]),
 ))]
 pub struct DBToolStorageOpt {
     #[clap(

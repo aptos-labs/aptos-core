@@ -237,7 +237,7 @@ pub trait ExpGenerator<'env> {
         let val = self.mk_call_with_inst(
             val_ty,
             vec![key_ty.clone(), val_ty.clone()],
-            Operation::Function(spec_fun_get.module_id, spec_fun_get.id, None),
+            Operation::SpecFunction(spec_fun_get.module_id, spec_fun_get.id, None),
             vec![map.clone(), key.clone()],
         );
         if let Some(body) = self.mk_join_opt_bool(Operation::And, f(key), f(val)) {

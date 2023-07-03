@@ -7,11 +7,9 @@ pub mod coin_info;
 pub mod coin_store;
 pub mod core_account;
 pub mod object;
-pub mod transaction_validation;
 
 pub use chain_id::*;
 pub use coin_info::*;
 pub use coin_store::*;
 pub use core_account::*;
 pub use object::*;
-pub use transaction_validation::*;

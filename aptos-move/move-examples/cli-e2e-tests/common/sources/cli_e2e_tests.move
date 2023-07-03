@@ -62,7 +62,7 @@ module addr::cli_e2e_tests {
     }
 
     fun init_module(account: &signer) {
-        let collection = string::utf8(b"Hero Quest!");
+        let collection = string::utf8(b"Hero Quest");
         collection::create_unlimited_collection(
             account,
             string::utf8(b"collection description"),
@@ -72,7 +72,7 @@ module addr::cli_e2e_tests {
         );
 
         let on_chain_config = OnChainConfig {
-            collection: string::utf8(b"Hero Quest!"),
+            collection: string::utf8(b"Hero Quest"),
         };
         move_to(account, on_chain_config);
     }
@@ -195,7 +195,7 @@ module addr::cli_e2e_tests {
 
     // Entry functions
 
-    entry fun mint_hero(
+    public entry fun mint_hero(
         account: &signer,
         description: String,
         gender: String,
@@ -206,7 +206,7 @@ module addr::cli_e2e_tests {
         create_hero(account, description, gender, name, race, uri);
     }
 
-    entry fun set_hero_description(
+    public entry fun set_hero_description(
         creator: &signer,
         collection: String,
         name: String,
@@ -224,7 +224,7 @@ module addr::cli_e2e_tests {
 
     // View functions
     #[view]
-    fun view_hero(creator: address, collection: String, name: String): Hero acquires Hero {
+    public fun view_hero(creator: address, collection: String, name: String): Hero acquires Hero {
         let token_address = token::create_token_address(
             &creator,
             &collection,
@@ -234,13 +234,13 @@ module addr::cli_e2e_tests {
     }
 
     #[view]
-    fun view_hero_by_object(hero_obj: Object<Hero>): Hero acquires Hero {
+    public fun view_hero_by_object(hero_obj: Object<Hero>): Hero acquires Hero {
         let token_address = object::object_address(&hero_obj);
         move_from<Hero>(token_address)
     }
 
     #[view]
-    fun view_object<T: key>(obj: Object<T>): String acquires Armor, Gem, Hero, Shield, Weapon {
+    public fun view_object<T: key>(obj: Object<T>): String acquires Armor, Gem, Hero, Shield, Weapon {
         let token_address = object::object_address(&obj);
         if (exists<Armor>(token_address)) {
             string_utils::to_string(borrow_global<Armor>(token_address))

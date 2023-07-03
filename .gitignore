@@ -113,6 +113,9 @@ __pycache__
 aptos-move/aptos-vm-profiling/**/*.log
 aptos-move/aptos-vm-profiling/**/*.txt
 
+# Gas profiler outputs
+aptos-move/e2e-move-tests/gas-profiling
+
 # replay-verify and module-verify script outputs
 metadata-cache
 /local/
