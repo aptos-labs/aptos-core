@@ -179,6 +179,9 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     storage: T,
     time_service: TimeService,
 ) -> Result<(), Error> {
+    // Update the number of active optimistic fetches
+    update_optimistic_fetch_metrics(optimistic_fetches.clone());
+
     // Identify the peers with ready optimistic fetches
     let peers_with_ready_optimistic_fetches = get_peers_with_ready_optimistic_fetches(
         config,
@@ -195,7 +198,7 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
         bounded_executor,
         cached_storage_server_summary,
         config,
-        optimistic_fetches.clone(),
+        optimistic_fetches,
         lru_response_cache,
         request_moderator,
         storage,
@@ -203,9 +206,6 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
         peers_with_ready_optimistic_fetches,
     )
     .await;
-
-    // Update the number of active optimistic fetches
-    update_optimistic_fetch_metrics(optimistic_fetches);
 
     Ok(())
 }

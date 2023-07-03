@@ -278,7 +278,7 @@ impl Default for AptosDataClientConfig {
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             response_timeout_ms: 10000,    // 10 seconds
             subscription_timeout_ms: 5000, // 5 seconds
-            summary_poll_loop_interval_ms: 200,
+            summary_poll_loop_interval_ms: 100,
             use_compression: true,
         }
     }
