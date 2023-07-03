@@ -17,10 +17,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
-    transaction::{
-        ExecutionStatus, MultisigTransactionPayload, Transaction, TransactionOutput,
-        TransactionStatus,
-    },
+    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{
     sharded_block_executor::{block_executor_client::LocalExecutorClient, ShardedBlockExecutor},
@@ -341,10 +338,7 @@ pub fn update_counters_for_processed_chunk(
                         .with_label_values(&[process_type, "script", state])
                         .inc();
                 },
-                aptos_types::transaction::TransactionPayload::MultiAgentWithFeePayer(
-                    MultisigTransactionPayload::EntryFunction(function),
-                )
-                | aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
+                aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
                         .with_label_values(&[process_type, "function", state])
                         .inc();

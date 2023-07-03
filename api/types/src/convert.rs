@@ -189,10 +189,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         use aptos_types::transaction::TransactionPayload::*;
         let ret = match payload {
             Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
-            MultiAgentWithFeePayer(
-                aptos_types::transaction::MultisigTransactionPayload::EntryFunction(fun),
-            )
-            | EntryFunction(fun) => {
+            EntryFunction(fun) => {
                 let (module, function, ty_args, args) = fun.into_inner();
                 let func_args = self
                     .inner

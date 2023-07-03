@@ -15,8 +15,8 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeatures},
     transaction::{
-        MultisigTransactionPayload, SignedTransaction, Transaction, TransactionInfo,
-        TransactionOutput, TransactionPayload, Version,
+        SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
+        Version,
     },
     vm_status::VMStatus,
 };
@@ -87,17 +87,12 @@ impl AptosDebugger {
                     );
                     let gas_profiler = match txn.payload() {
                         TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                        TransactionPayload::MultiAgentWithFeePayer(
-                            MultisigTransactionPayload::EntryFunction(entry_func),
-                        )
-                        | TransactionPayload::EntryFunction(entry_func) => {
-                            GasProfiler::new_function(
-                                gas_meter,
-                                entry_func.module().clone(),
-                                entry_func.function().to_owned(),
-                                entry_func.ty_args().to_vec(),
-                            )
-                        },
+                        TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        ),
                         TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
                         TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
                     };

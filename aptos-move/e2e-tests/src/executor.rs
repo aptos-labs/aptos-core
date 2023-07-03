@@ -520,9 +520,6 @@ impl FakeExecutor {
                         ),
                         TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
                         TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-                        TransactionPayload::MultiAgentWithFeePayer(..) => {
-                            unimplemented!("not supported yet")
-                        },
                     };
                     Ok(gas_profiler)
                 },

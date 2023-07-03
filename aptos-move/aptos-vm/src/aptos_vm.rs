@@ -1053,8 +1053,7 @@ impl AptosVM {
         let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
-            | payload @ TransactionPayload::EntryFunction(_)
-            | payload @ TransactionPayload::MultiAgentWithFeePayer(_) => self
+            | payload @ TransactionPayload::EntryFunction(_) => self
                 .execute_script_or_entry_function(
                     resolver,
                     session,
@@ -1447,8 +1446,7 @@ impl AptosVM {
                 self.0.check_gas(resolver, txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
             },
-            TransactionPayload::EntryFunction(_)
-            | TransactionPayload::MultiAgentWithFeePayer(_) => {
+            TransactionPayload::EntryFunction(_) => {
                 // NOTE: Script and EntryFunction shares the same prologue
                 self.0.check_gas(resolver, txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
@@ -1843,8 +1841,7 @@ impl AptosSimulationVM {
         let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
-            | payload @ TransactionPayload::EntryFunction(_)
-            | payload @ TransactionPayload::MultiAgentWithFeePayer(_) => {
+            | payload @ TransactionPayload::EntryFunction(_) => {
                 self.0.execute_script_or_entry_function(
                     resolver,
                     session,

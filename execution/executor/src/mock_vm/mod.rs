@@ -423,10 +423,6 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
         TransactionPayload::Multisig(_) => {
             unimplemented!("MockVM does not support multisig transaction payload.")
         },
-        TransactionPayload::MultiAgentWithFeePayer(_) => {
-            unimplemented!("MockVM does not support multi-agent transaction payload.")
-        },
-
         // Deprecated. Will be removed in the future.
         TransactionPayload::ModuleBundle(_) => {
             unimplemented!("MockVM does not support Module transaction payload.")

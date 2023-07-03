@@ -852,10 +852,7 @@ impl TransactionsApi {
                         })?;
                 // Verify the signed transaction
                 match signed_transaction.payload() {
-                    TransactionPayload::MultiAgentWithFeePayer(
-                        MultisigTransactionPayload::EntryFunction(entry_function),
-                    )
-                    | TransactionPayload::EntryFunction(entry_function) => {
+                    TransactionPayload::EntryFunction(entry_function) => {
                         TransactionsApi::validate_entry_function_payload_format(
                             ledger_info,
                             entry_function,

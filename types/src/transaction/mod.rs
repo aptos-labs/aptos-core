@@ -373,12 +373,6 @@ impl RawTransaction {
                 ),
                 vec![],
             ),
-            TransactionPayload::MultiAgentWithFeePayer(
-                MultisigTransactionPayload::EntryFunction(script_fn),
-            ) => (
-                format!("{}::{}", script_fn.module(), script_fn.function()),
-                script_fn.args().to_vec(),
-            ),
             TransactionPayload::ModuleBundle(_) => ("module publishing".to_string(), vec![]),
         };
         let mut f_args: String = "".to_string();
@@ -472,7 +466,6 @@ pub enum TransactionPayload {
     /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
     /// transaction as the multisig account.
     Multisig(Multisig),
-    MultiAgentWithFeePayer(MultisigTransactionPayload),
 }
 
 impl TransactionPayload {
