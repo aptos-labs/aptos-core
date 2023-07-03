@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{HISTOGRAM, REQUEST_SOURCE_CLIENT, RESPONSE_STATUS};
+use crate::metrics::{HISTOGRAM, MIDDLEWARE, REQUEST_SOURCE_CLIENT, RESPONSE_STATUS};
 use aptos_api_types::X_APTOS_CLIENT;
 use aptos_logger::{
     debug, info,
@@ -18,6 +18,36 @@ use std::time::Duration;
 const REQUEST_SOURCE_CLIENT_UNKNOWN: &str = "unknown";
 static REQUEST_SOURCE_CLIENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"aptos-[a-zA-Z\-]+/[0-9A-Za-z\.\-]+").unwrap());
+
+pub async fn nest_log<E: Endpoint>(next: E, request: Request) -> Result<Response> {
+    let start = std::time::Instant::now();
+    let response = next.get_response(request).await;
+    let elapsed = start.elapsed();
+    MIDDLEWARE
+        .with_label_values(&["nest"])
+        .observe(elapsed.as_secs_f64());
+    Ok(response)
+}
+
+pub async fn cors_log<E: Endpoint>(next: E, request: Request) -> Result<Response> {
+    let start = std::time::Instant::now();
+    let response = next.get_response(request).await;
+    let elapsed = start.elapsed();
+    MIDDLEWARE
+        .with_label_values(&["cors"])
+        .observe(elapsed.as_secs_f64());
+    Ok(response)
+}
+
+pub async fn post_size_limit_log<E: Endpoint>(next: E, request: Request) -> Result<Response> {
+    let start = std::time::Instant::now();
+    let response = next.get_response(request).await;
+    let elapsed = start.elapsed();
+    MIDDLEWARE
+        .with_label_values(&["post_size"])
+        .observe(elapsed.as_secs_f64());
+    Ok(response)
+}
 
 /// Logs information about the request and response if the response status code
 /// is >= 500, to help us debug since this will be an error on our side.
