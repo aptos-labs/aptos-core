@@ -54,6 +54,7 @@ members = [
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
+    "crates/aptos-iuchild",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
     "crates/aptos-log-derive",
