@@ -255,28 +255,23 @@ impl NodeCertificate {
     }
 }
 
-impl From<CertifiedNode> for NodeCertificate {
-    fn from(node: CertifiedNode) -> Self {
-        Self {
-            metadata: node.metadata.clone(),
-            signatures: node.certificate.signatures.clone(),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CertifiedNode {
     node: Node,
-    certificate: NodeCertificate,
+    signatures: AggregateSignature,
 }
 
 impl CertifiedNode {
-    pub fn new(node: Node, certificate: NodeCertificate) -> Self {
-        Self { node, certificate }
+    pub fn new(node: Node, signatures: AggregateSignature) -> Self {
+        Self { node, signatures }
     }
 
-    pub fn certificate(&self) -> &NodeCertificate {
-        &self.certificate
+    pub fn signatures(&self) -> &AggregateSignature {
+        &self.signatures
+    }
+
+    pub fn certificate(&self) -> NodeCertificate {
+        NodeCertificate::new(self.node.metadata.clone(), self.signatures.clone())
     }
 }
 

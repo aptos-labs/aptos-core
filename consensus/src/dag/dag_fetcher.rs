@@ -28,7 +28,9 @@ impl LocalFetchRequest {
     pub fn responders(&self, validators: &[Author]) -> Vec<Author> {
         match self {
             LocalFetchRequest::Node(node, _) => vec![*node.author()],
-            LocalFetchRequest::CertifiedNode(node, _) => node.certificate().signers(validators),
+            LocalFetchRequest::CertifiedNode(node, _) => {
+                node.signatures().get_signers_addresses(validators)
+            },
         }
     }
 
