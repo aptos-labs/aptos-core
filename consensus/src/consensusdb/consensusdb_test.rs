@@ -3,8 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use aptos_consensus_types::block::block_test_utils::certificate_for_genesis;
+use aptos_consensus_types::{
+    block::block_test_utils::certificate_for_genesis,
+    common::{Author, Payload},
+};
 use aptos_temppath::TempPath;
+use aptos_types::aggregate_signature::AggregateSignature;
 
 #[test]
 fn test_put_get() {
@@ -69,4 +73,27 @@ fn test_delete_block_and_qc() {
         .unwrap();
     assert_eq!(db.get_blocks().unwrap().len(), 0);
     assert_eq!(db.get_quorum_certificates().unwrap().len(), 0);
+}
+
+#[test]
+fn test_dag() {
+    let tmp_dir = TempPath::new();
+    let db = ConsensusDB::new(&tmp_dir);
+    assert_eq!(db.get_certified_nodes().unwrap().len(), 0);
+
+    let node = Node::new(1, 1, Author::random(), 123, Payload::empty(false), vec![]);
+
+    db.save_node(&node).unwrap();
+
+    let certified_node = CertifiedNode::new(node, AggregateSignature::empty());
+
+    db.save_certified_node(&certified_node).unwrap();
+
+    let mut from_db = db.get_certified_nodes().unwrap();
+
+    assert_eq!(from_db.len(), 1);
+
+    let certified_node_from_db = from_db.remove(certified_node.metadata().digest()).unwrap();
+
+    assert_eq!(certified_node, certified_node_from_db);
 }

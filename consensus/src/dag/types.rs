@@ -79,7 +79,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
 }
 
 /// Represents the metadata about the node, without payload and parents from Node
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct NodeMetadata {
     epoch: u64,
     round: Round,
@@ -126,7 +126,7 @@ impl CryptoHash for NodeDigest {
 }
 
 /// Node representation in the DAG, parents contain 2f+1 strong links (links to previous round)
-#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug)]
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct Node {
     metadata: NodeMetadata,
     payload: Payload,
@@ -228,7 +228,7 @@ impl TDAGMessage for Node {
 }
 
 /// Quorum signatures over the node digest
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct NodeCertificate {
     metadata: NodeMetadata,
     signatures: AggregateSignature,
@@ -255,7 +255,7 @@ impl NodeCertificate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct CertifiedNode {
     node: Node,
     signatures: AggregateSignature,

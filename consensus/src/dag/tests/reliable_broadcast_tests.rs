@@ -8,6 +8,7 @@ use crate::{
         reliable_broadcast::{
             BroadcastStatus, NodeBroadcastHandleError, NodeBroadcastHandler, ReliableBroadcast,
         },
+        tests::dag_test::MockStorage,
         types::{DAGMessage, Node, NodeCertificate, NodeDigestSignature, TestAck, TestMessage},
         RpcHandler,
     },
@@ -18,7 +19,8 @@ use anyhow::bail;
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
-    aggregate_signature::PartialSignatures, validator_verifier::random_validator_verifier,
+    aggregate_signature::PartialSignatures, epoch_state::EpochState,
+    validator_verifier::random_validator_verifier,
 };
 use async_trait::async_trait;
 use claims::assert_ok_eq;
@@ -182,8 +184,12 @@ async fn test_abort_reliable_broadcast() {
 #[tokio::test]
 async fn test_node_broadcast_receiver_succeed() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
-    let author_to_index = validator_verifier.address_to_validator_index().clone();
-    let dag = Arc::new(RwLock::new(Dag::new(author_to_index, 0)));
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier.clone(),
+    });
+    let storage = Arc::new(MockStorage::new());
+    let dag = Arc::new(RwLock::new(Dag::new(epoch_state, storage)));
 
     let wellformed_node = new_node(0, 10, signers[0].author(), vec![]);
     let equivocating_node = new_node(0, 20, signers[0].author(), vec![]);
@@ -206,12 +212,16 @@ async fn test_node_broadcast_receiver_succeed() {
 #[tokio::test]
 async fn test_node_broadcast_receiver_failure() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
-    let author_to_index = validator_verifier.address_to_validator_index().clone();
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier.clone(),
+    });
 
     let mut rb_receivers: Vec<NodeBroadcastHandler> = signers
         .iter()
         .map(|signer| {
-            let dag = Arc::new(RwLock::new(Dag::new(author_to_index.clone(), 0)));
+            let storage = Arc::new(MockStorage::new());
+            let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage)));
 
             NodeBroadcastHandler::new(dag, signer.clone(), validator_verifier.clone())
         })

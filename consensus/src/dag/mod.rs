@@ -8,9 +8,10 @@ mod dag_handler;
 mod dag_network;
 mod dag_store;
 mod reliable_broadcast;
+mod storage;
 #[cfg(test)]
 mod tests;
 mod types;
 
 pub use dag_network::RpcHandler;
-pub use types::DAGNetworkMessage;
+pub use types::{CertifiedNode, DAGNetworkMessage, Node};
