@@ -3,18 +3,66 @@
 
 use crate::dag::{
     dag_store::Dag,
+    storage::DAGStorage,
     types::{CertifiedNode, Node, NodeCertificate},
 };
 use aptos_consensus_types::common::{Author, Payload, Round};
+use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_types::{
-    aggregate_signature::AggregateSignature, validator_verifier::random_validator_verifier,
+    aggregate_signature::AggregateSignature, epoch_state::EpochState,
+    validator_verifier::random_validator_verifier,
 };
+use std::{collections::HashMap, sync::Arc};
+
+pub struct MockStorage {
+    node_data: Mutex<HashMap<HashValue, Node>>,
+    certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
+}
+
+impl MockStorage {
+    pub fn new() -> Self {
+        Self {
+            node_data: Mutex::new(HashMap::new()),
+            certified_node_data: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+impl DAGStorage for MockStorage {
+    fn save_node(&self, node: &Node) -> anyhow::Result<()> {
+        self.node_data.lock().insert(node.digest(), node.clone());
+        Ok(())
+    }
+
+    fn save_certified_node(&self, node: &CertifiedNode) -> anyhow::Result<()> {
+        self.certified_node_data
+            .lock()
+            .insert(node.digest(), node.clone());
+        Ok(())
+    }
+
+    fn get_certified_nodes(&self) -> anyhow::Result<HashMap<HashValue, CertifiedNode>> {
+        Ok(self.certified_node_data.lock().clone())
+    }
+
+    fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> anyhow::Result<()> {
+        for digest in digests {
+            self.certified_node_data.lock().remove(&digest);
+        }
+        Ok(())
+    }
+}
 
 #[test]
 fn test_dag_insertion_succeed() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
-    let author_to_index = validator_verifier.address_to_validator_index().clone();
-    let mut dag = Dag::new(author_to_index, 0);
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier.clone(),
+    });
+    let storage = Arc::new(MockStorage::new());
+    let mut dag = Dag::new(epoch_state, storage);
 
     // Round 1 - nodes 0, 1, 2 links to vec![]
     for signer in &signers[0..3] {
@@ -50,8 +98,12 @@ fn test_dag_insertion_succeed() {
 #[test]
 fn test_dag_insertion_failure() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
-    let author_to_index = validator_verifier.address_to_validator_index().clone();
-    let mut dag = Dag::new(author_to_index, 0);
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier.clone(),
+    });
+    let storage = Arc::new(MockStorage::new());
+    let mut dag = Dag::new(epoch_state, storage);
 
     // Round 1 - nodes 0, 1, 2 links to vec![]
     for signer in &signers[0..3] {
@@ -82,11 +134,48 @@ fn test_dag_insertion_failure() {
     assert!(dag.add_node(node).is_err());
 }
 
+#[test]
+fn test_dag_recover_from_storage() {
+    let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier.clone(),
+    });
+    let storage = Arc::new(MockStorage::new());
+    let mut dag = Dag::new(epoch_state.clone(), storage.clone());
+
+    let mut digests = vec![];
+
+    for round in 1..10 {
+        let parents = dag
+            .get_strong_links_for_round(round, &validator_verifier)
+            .unwrap_or_default();
+        for signer in &signers[0..3] {
+            let node = new_certified_node(round, signer.author(), parents.clone());
+            digests.push(node.digest());
+            assert!(dag.add_node(node).is_ok());
+        }
+    }
+    let new_dag = Dag::new(epoch_state, storage.clone());
+
+    for digest in &digests {
+        assert!(new_dag.exists(digest));
+    }
+
+    let new_epoch_state = Arc::new(EpochState {
+        epoch: 2,
+        verifier: validator_verifier,
+    });
+
+    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone());
+    assert!(storage.certified_node_data.lock().is_empty());
+}
+
 fn new_certified_node(
     round: Round,
     author: Author,
     parents: Vec<NodeCertificate>,
 ) -> CertifiedNode {
     let node = Node::new(1, round, author, 0, Payload::empty(false), parents);
-    CertifiedNode::new(node.clone(), AggregateSignature::empty())
+    CertifiedNode::new(node, AggregateSignature::empty())
 }
