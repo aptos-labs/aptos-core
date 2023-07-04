@@ -28,6 +28,8 @@ mod profiling;
 mod cpu_flamegraph;
 mod memory_svg;
 mod memory_text;
+mod thread_dump;
+mod thread_dump_result;
 
 pub mod utils;
 
@@ -49,6 +51,10 @@ pub const CPU_FLAMEGRAPH_PATH: &str = "/cpu_flamegraph";
 pub const PROFILING_DASHBOARD: &str = "/profiling";
 pub const MEMORY_SVG_PATH: &str = "/memory_svg";
 pub const MEMORY_TXT_PATH: &str = "/memory_txt";
+pub const THREAD_DUMP_PATH: &str = "/thread_dump_start/{status}";
+pub const THREAD_DUMP_RESULT_PATH: &str = "/thread_dump_results";
+
+
 
 
 // Useful string constants
@@ -111,6 +117,7 @@ async fn serve_requests(
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> Result<Response<Body>, hyper::Error> {
     // Process the request and get the response components
+
     let (status_code, body, content_type) = match req.uri().path() {
         CONFIGURATION_PATH => {
             // /configuration
@@ -173,6 +180,34 @@ async fn serve_requests(
             //profiling dashboard
             memory_text::handle_memory_txt_request()
         },
+        path if path.starts_with("/thread_dump_start") => {
+            let mut parts = path.split('/');
+            let _ = parts.next(); // Ignore the first empty part
+            let _ = parts.next();
+            let status = parts.next().unwrap_or("");
+            println!("
+
+
+
+
+
+
+            {}
+
+
+
+
+
+
+            ", status);
+            //profiling dashboard
+            thread_dump::handle_thread_dump_request(status)
+        },
+        THREAD_DUMP_RESULT_PATH => {
+            //profiling dashboard
+            thread_dump_result::handle_thread_dump_result_request()
+        },
+
         _ => {
             // Handle the invalid path
             (
