@@ -471,6 +471,109 @@ test(
 );
 
 test(
+    "submits multiagent transaction with fee payer",
+    async () => {
+        const client = new AptosClient(NODE_URL);
+        const faucetClient = getFaucetClient();
+        const tokenClient = new TokenClient(client);
+
+        const alice = new AptosAccount();
+        const bob = new AptosAccount();
+
+        // Fund both Alice's and Bob's Account
+        await faucetClient.fundAccount(alice.address(), 100000000);
+        await faucetClient.fundAccount(bob.address(), 100000000);
+
+        const collectionName = "AliceCollection";
+        const tokenName = "Alice Token";
+
+        async function ensureTxnSuccess(txnHashPromise: Promise<string>) {
+            const txnHash = await txnHashPromise;
+            const txn = await client.waitForTransactionWithResult(txnHash);
+            expect((txn as any)?.success).toBe(true);
+        }
+
+        // Create collection and token on Alice's account
+        await ensureTxnSuccess(
+            tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+        );
+
+        await ensureTxnSuccess(
+            tokenClient.createToken(
+                alice,
+                collectionName,
+                tokenName,
+                "Alice's simple token",
+                1,
+                "https://aptos.dev/img/nyan.jpeg",
+                1000,
+                alice.address(),
+                0,
+                0,
+                ["key"],
+                ["2"],
+                ["u64"],
+            ),
+        );
+
+        const propertyVersion = 0;
+        const tokenId = {
+            token_data_id: {
+                creator: alice.address().hex(),
+                collection: collectionName,
+                name: tokenName,
+            },
+            property_version: `${propertyVersion}`,
+        };
+
+        // Transfer Token from Alice's Account to Bob's Account with bob paying the fee
+        await tokenClient.getCollectionData(alice.address().hex(), collectionName);
+        let aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
+        expect(aliceBalance.amount).toBe("1");
+
+        let aliceBefore = undefined;
+        {
+            const resources = await client.getAccountResources(alice.address());
+            let accountResource = resources.find((r) => r.type === aptosCoin);
+            aliceBefore = (accountResource!.data as any).coin.value;
+        }
+
+        const txnHash = await tokenClient.directTransferToken(
+            alice,
+            bob,
+            alice.address(),
+            collectionName,
+            tokenName,
+            1,
+            propertyVersion,
+            undefined,
+            bob,
+        );
+
+        await client.waitForTransaction(txnHash, { checkSuccess: true });
+
+        aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
+        expect(aliceBalance.amount).toBe("0");
+
+        const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
+        expect(bobBalance.amount).toBe("1");
+
+        // Check that Alice did not pay the fee
+        {
+            const resources = await client.getAccountResources(alice.address());
+            let accountResource = resources.find((r) => r.type === aptosCoin);
+            expect((accountResource!.data as any).coin.value).toBe(aliceBefore);
+        }
+
+        {
+            const resources = await client.getAccountResources(bob.address());
+            let accountResource = resources.find((r) => r.type === aptosCoin);
+            expect(BigInt((accountResource!.data as any).coin.value)).toBeLessThan(100000000);
+        }
+    },
+    longTestTimeout,
+);
+test(
   "publishes a package",
   async () => {
     const client = new AptosClient(NODE_URL);

@@ -371,6 +371,8 @@ export abstract class RawTransactionWithData {
     switch (index) {
       case 0:
         return MultiAgentRawTransaction.load(deserializer);
+      case 1:
+        return MultiAgentRawTransaction.load_fee_payer(deserializer);
       default:
         throw new Error(`Unknown variant index for RawTransactionWithData: ${index}`);
     }
@@ -381,15 +383,24 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
   constructor(
     public readonly raw_txn: RawTransaction,
     public readonly secondary_signer_addresses: Seq<AccountAddress>,
+    public readonly fee_payer_address?: AccountAddress,
   ) {
     super();
   }
 
   serialize(serializer: Serializer): void {
-    // enum variant index
-    serializer.serializeU32AsUleb128(0);
-    this.raw_txn.serialize(serializer);
-    serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
+    if (this.fee_payer_address === undefined) {
+      // enum variant index
+      serializer.serializeU32AsUleb128(0);
+      this.raw_txn.serialize(serializer);
+      serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
+    } else {
+        // enum variant index
+        serializer.serializeU32AsUleb128(1);
+        this.raw_txn.serialize(serializer);
+        serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
+        this.fee_payer_address.serialize(serializer);
+    }
   }
 
   static load(deserializer: Deserializer): MultiAgentRawTransaction {
@@ -397,6 +408,14 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
     const secondarySignerAddresses = deserializeVector(deserializer, AccountAddress);
 
     return new MultiAgentRawTransaction(rawTxn, secondarySignerAddresses);
+  }
+
+  static load_fee_payer(deserializer: Deserializer): MultiAgentRawTransaction {
+    const rawTxn = RawTransaction.deserialize(deserializer);
+    const secondarySignerAddresses = deserializeVector(deserializer, AccountAddress);
+    const feePayerAddress = AccountAddress.deserialize(deserializer);
+
+    return new MultiAgentRawTransaction(rawTxn, secondarySignerAddresses, feePayerAddress);
   }
 }
 
