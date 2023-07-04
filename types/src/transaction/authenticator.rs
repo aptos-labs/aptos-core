@@ -140,6 +140,8 @@ impl TransactionAuthenticator {
                 fee_payer_address,
                 fee_payer_signer,
             } => {
+                // We need to include the fee payer and other signer addresses in the payload data
+                // to sign.
                 let message = RawTransactionWithData::new_fee_payer(
                     raw_txn.clone(),
                     secondary_signer_addresses.clone(),
