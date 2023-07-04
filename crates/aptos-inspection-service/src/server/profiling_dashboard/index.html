@@ -40,6 +40,7 @@
         <button id="clearButton">Clear Saved Rows</button>
 
 
+
         <table id="resultsTable">
             <tr>
                 <th>Profiling ID</th>
@@ -56,15 +57,44 @@
     </div>
 
     <script>
+
+        function downloadFile(type) {
+
+            // Create a new a-element
+            let a = document.createElement('a');
+
+            // Set the href to the file URL
+            switch(type) {
+                    case 'heap':
+                        a.href = 'http://localhost:1234/memory_txt';
+                        // Use the download attribute to prompt a file download
+                        a.download = 'memory.txt'; // Optional: you can set a custom file name
+                        break;
+                    case 'cpu':
+                        a.href = 'http://localhost:1234/cpu_flamegraph';
+                        // Use the download attribute to prompt a file download
+                        a.download = 'cpu_flamegraph.svg'; // Optional: you can set a custom file name
+                        break;
+                    case 'thread':
+                        a.href = 'http://localhost:1234/thread_dump_results';
+                        // Use the download attribute to prompt a file download
+                        a.download = 'thread_dump.txt'; // Optional: you can set a custom file name
+                        break;
+                }
+            
+
+            // Trigger the download by simulating a click
+            a.click();
+}
         document.getElementById('saveButton').onclick = function() {
-            var table = document.getElementById('resultsTable');
-            var rows = table.getElementsByTagName('tr');
-            var savedRows = '';
-            for(var i = 1; i < rows.length; i++) {
-                savedRows += rows[i].outerHTML;
-            }
-            localStorage.setItem('savedRows', savedRows);
-            document.getElementById('clearButton').disabled = false;
+        var table = document.getElementById('resultsTable');
+        var rows = table.getElementsByTagName('tr');
+        var savedRows = '';
+        for(var i = 1; i < rows.length; i++) {
+            savedRows += rows[i].outerHTML;
+        }
+        localStorage.setItem('savedRows', savedRows);
+        document.getElementById('clearButton').disabled = false;
 
         }
 
@@ -111,81 +141,112 @@
                 case 'heap':
                     endpoint = 'http://localhost:1234/memory_profiling';
                     break;
+                 case 'thread':
+                    endpoint = 'http://localhost:1234/thread_dump_start/a'
             }
-            // make the API call
-            fetch(endpoint)
-                .then(response => response.json())
-                .then(data => {
-                    // data is a JavaScript object representing the JSON response
-                    // you can access fields of the response object like so:
-                    var id = data.id; // Assign the value of the id field to the variable id
-                    var type = document.getElementById('profilingType').value;
-                    var dateTime = new Date().toLocaleString();
-                    var status = "In progress";
-
-                    var table = document.getElementById('resultsTable');
-                    var row = table.insertRow(1); // Insert a new row at position 1 (after the header)
-
-                    // Now insert the cells
-                    var cell1 = row.insertCell(0);
-                    var cell2 = row.insertCell(1);
-                    var cell3 = row.insertCell(2);
-                    var cell4 = row.insertCell(3);
-                    var cell5 = row.insertCell(4);
-
-                    // Fill the cells with data
-                    cell1.innerHTML = id;
-                    cell2.innerHTML = type;
-                    cell3.innerHTML = dateTime;
-                    cell4.innerHTML = status;
-                })
-
-                .catch(error => {
-                    // Handle any errors
-                });
-
 
             
 
+
+            var id = Math.floor(Math.random() * 1000000);
+            var type = document.getElementById('profilingType').value;
+            var dateTime = new Date().toLocaleString();
+            var statusCell;
+
+            var table = document.getElementById('resultsTable');
+            var row = table.insertRow(1); // Insert a new row at position 1 (after the header)
+
+            // Now insert the cells
+            var cell1 = row.insertCell(0);
+            var cell2 = row.insertCell(1);
+            var cell3 = row.insertCell(2);
+            var cell4 = row.insertCell(3);
+            var cell5 = row.insertCell(4);
+
+            // Fill the cells with data
+            cell1.innerHTML = id;
+            cell2.innerHTML = type;
+            cell3.innerHTML = dateTime;
+            cell4.innerHTML = 'In progress';
+
             var viewResultsButton = document.createElement('button');
             viewResultsButton.textContent = 'View Graph';
+            //viewResultsButton.disabled = true;
+            
+            if (type == "cpu" || type == "heap") {
+                var resultEndpoint;
+                switch(type) {
+                    case 'cpu':
+                        resultEndpoint = 'http://localhost:1234/cpu_flamegraph';
+                        break;
+                    case 'heap':
+                        resultEndpoint = 'http://localhost:1234/memory_svg';
+                        break;
+                    
+                }
+                viewResultsButton.addEventListener('click', function() {
+                    window.open(resultEndpoint, '_blank');
+                });
 
-            var resultEndpoint;
-            switch(type) {
-                case 'cpu':
-                    resultEndpoint = 'http://localhost:1234/cpu_flamegraph';
-                    break;
-                case 'heap':
-                    resultEndpoint = 'http://localhost:1234/memory_svg';
-                    break;
+                cell5.appendChild(viewResultsButton);
             }
-            viewResultsButton.addEventListener('click', function() {
-                window.open(resultEndpoint, '_blank');
-            });
-
-            cell5.appendChild(viewResultsButton);
+            
 
             var viewResultsTextButton = document.createElement('button');
             viewResultsTextButton.textContent = 'View Text';
-            switch(type) {
-                case 'cpu':
-                    resultEndpoint1 = 'http://localhost:1234/cpu_flamegraph';
-                    break;
-                case 'heap':
-                    resultEndpoint1 = 'http://localhost:1234/memory_txt';
-                    break;
-            }
-            viewResultsTextButton.addEventListener('click', function() {
-                window.open(resultEndpoint1, '_blank');
-            });
+            //viewResultsTextButton.disabled = true;
+            if (type == "thread" || type == "heap") {
+                var resultEndpoint1;
 
-            cell5.appendChild(viewResultsTextButton);
+                switch(type) {
+                    case 'heap':
+                        resultEndpoint1 = 'http://localhost:1234/memory_txt';
+                        break;
+                    case 'thread':
+                        resultEndpoint1 = 'http://localhost:1234/thread_dump_results';
+                        break;
+                }
+                viewResultsTextButton.addEventListener('click', function() {
+                    window.open(resultEndpoint1, '_blank');
+                });
+
+                cell5.appendChild(viewResultsTextButton);
+            }
+
+
+            var downloadResultsButton = document.createElement('button');
+            downloadResultsButton.textContent = 'Download Result';
+            //downloadResultsButton.disabled = true;
+
+            downloadResultsButton.addEventListener('click', function() {
+                    downloadFile(type);
+                });
+
+            cell5.appendChild(downloadResultsButton);
+
             document.getElementById('saveButton').disabled = false;
 
-        }
+            // make the API call
+            fetch(endpoint)
+                .then(response => {
+                if (response.ok) {
+                    statusCell.innerHTML = 'Complete'; // Update the status to "Complete"
+                    viewResultsTextButton.disabled = false;
+                    viewResultsButton.disabled = false;
+                    downloadResultsButton.disabled = false;
+
+
+                    return response.json();
+            }})
+
+                .catch(error => {
+                    // Handle any errors
+                    console.error('Error:', error);
+                });
+            statusCell = cell4;
+            }
 
                     
         </script>
 </body>
 </html>
-
