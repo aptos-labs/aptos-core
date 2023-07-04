@@ -61,7 +61,7 @@ struct ExecuteOpt {
     #[clap(long, default_value_t = 100000)]
     pub num_accounts: usize,
 
-    #[clap(long, default_value_t = 5)]
+    #[clap(long, default_value_t = 10)]
     pub num_warmups: usize,
 
     #[clap(long, default_value_t = 10000)]

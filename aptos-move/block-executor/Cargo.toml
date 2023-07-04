@@ -28,6 +28,7 @@ claims = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
+futures = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 num_cpus = { workspace = true }
@@ -36,6 +37,7 @@ parking_lot = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rayon = { workspace = true }
+thread_local = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
