@@ -109,24 +109,6 @@ pub fn get_entry_function_from_user_request(
 /// Part of the json comes escaped from the protobuf so we need to unescape in a safe way
 pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<Value> {
     match payload.payload.as_ref().unwrap() {
-        PayloadType::FeePayerPayload(inner) => {
-            if let Some(inner) = inner.transaction_payload.as_ref() {
-                match inner.payload.as_ref().unwrap() {
-                    MultisigPayloadType::EntryFunctionPayload(payload) => {
-                        let clean = get_clean_entry_function_payload(payload, version);
-                        Some(serde_json::to_value(clean).unwrap_or_else(|_| {
-                            tracing::error!(
-                                version = version,
-                                "Unable to serialize payload into value"
-                            );
-                            panic!()
-                        }))
-                    },
-                }
-            } else {
-                None
-            }
-        },
         PayloadType::EntryFunctionPayload(inner) => {
             let clean = get_clean_entry_function_payload(inner, version);
             Some(serde_json::to_value(clean).unwrap_or_else(|_| {

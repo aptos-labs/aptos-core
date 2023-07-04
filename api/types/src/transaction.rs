@@ -586,7 +586,6 @@ pub enum TransactionPayload {
     // Deprecated. Will be removed in the future.
     ModuleBundlePayload(ModuleBundlePayload),
     MultisigPayload(MultisigPayload),
-    FeePayerPayload(MultisigTransactionPayload),
 }
 
 impl VerifyInput for TransactionPayload {
@@ -595,9 +594,6 @@ impl VerifyInput for TransactionPayload {
             TransactionPayload::EntryFunctionPayload(inner) => inner.verify(),
             TransactionPayload::ScriptPayload(inner) => inner.verify(),
             TransactionPayload::MultisigPayload(inner) => inner.verify(),
-            TransactionPayload::FeePayerPayload(
-                MultisigTransactionPayload::EntryFunctionPayload(inner),
-            ) => inner.function.verify(),
             // Deprecated. Will be removed in the future.
             TransactionPayload::ModuleBundlePayload(inner) => inner.verify(),
         }

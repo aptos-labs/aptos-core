@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
-use aptos_language_e2e_tests::{account::TransactionBuilder};
+use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CoinStoreResource,
     transaction::{Script, TransactionArgument},
 };
-use move_core_types::{move_resource::MoveStructType};
+use move_core_types::move_resource::MoveStructType;
 
 #[test]
 fn test_two_to_two_transfer() {

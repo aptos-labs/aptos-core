@@ -163,23 +163,6 @@ pub fn convert_transaction_payload(
                 convert_multisig_payload(mp),
             )),
         },
-        TransactionPayload::FeePayerPayload(MultisigTransactionPayload::EntryFunctionPayload(sfp)) => {
-            transaction::TransactionPayload {
-                r#type: transaction::transaction_payload::Type::FeePayerPayload as i32,
-                payload: Some(transaction::transaction_payload::Payload::FeePayerPayload(
-                    aptos_protos::transaction::v1::FeePayerPayload { transaction_payload: Some(
-                        transaction::MultisigTransactionPayload {
-                            r#type: transaction::multisig_transaction_payload::Type::EntryFunctionPayload
-                                as i32,
-                            payload: Some(
-                                transaction::multisig_transaction_payload::Payload::EntryFunctionPayload(
-                                    convert_entry_function_payload(sfp),
-                                ),
-                            ),
-                        }) }
-                )),
-            }
-        }
 
         // Deprecated. Will be removed in the future.
         TransactionPayload::ModuleBundlePayload(mbp) => transaction::TransactionPayload {

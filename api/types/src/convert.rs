@@ -581,10 +581,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         use aptos_types::transaction::TransactionPayload as Target;
 
         let ret = match payload {
-            TransactionPayload::EntryFunctionPayload(entry_func_payload)
-            | TransactionPayload::FeePayerPayload(
-                MultisigTransactionPayload::EntryFunctionPayload(entry_func_payload),
-            ) => {
+            TransactionPayload::EntryFunctionPayload(entry_func_payload) => {
                 let EntryFunctionPayload {
                     function,
                     type_arguments,
