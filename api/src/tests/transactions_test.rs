@@ -250,7 +250,7 @@ async fn test_multi_agent_signed_transaction() {
         .post("/transactions", resp)
         .await;
 }
-/*
+/* works when feature is enabled
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_fee_payer_signed_transaction() {
     let mut context = new_test_context(current_function_name!());
@@ -292,26 +292,26 @@ async fn test_fee_payer_signed_transaction() {
     assert_json(
         resp["signature"].clone(),
         json!({
-            "type": "multi_agent_signature",
+            "type": "fee_payer_signature",
             "sender": {
                 "type": "ed25519_signature",
                 "public_key": format!("0x{}", hex::encode(sender.public_key_bytes())),
                 "signature": format!("0x{}", hex::encode(sender.signature_bytes())),
             },
             "secondary_signer_addresses": [
-                secondary.address().to_hex_literal(),
             ],
             "secondary_signers": [
-                {
-                    "type": "ed25519_signature",
-                    "public_key": format!("0x{}",hex::encode(secondary_signers[0].public_key_bytes())),
-                    "signature": format!("0x{}", hex::encode(secondary_signers[0].signature_bytes())),
-                }
-            ]
+            ],
+            "fee_payer_address": secondary.address().to_hex_literal(),
+            "fee_payer_signer": {
+                "type": "ed25519_signature",
+                "public_key": format!("0x{}",hex::encode(fee_payer_signer.public_key_bytes())),
+                "signature": format!("0x{}", hex::encode(fee_payer_signer.signature_bytes())),
+            },
         }),
     );
 
-    // ensure multi agent txns can be submitted into mempool by JSON format
+    // ensure fee payer txns can be submitted into mempool by JSON format
     context
         .expect_status_code(202)
         .post("/transactions", resp)
