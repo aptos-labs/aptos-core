@@ -475,20 +475,24 @@ impl ContinuousTransactionStreamEngine {
         let first_version = known_version
             .checked_add(1)
             .ok_or_else(|| Error::IntegerOverflow("First version has overflown!".into()))?;
-        let (num_versions, target_ledger_info) = match &client_response_payload {
+        let (num_versions, target_ledger_info, _id) = match &client_response_payload {
             ResponsePayload::NewTransactionsWithProof((
                 transactions_with_proof,
                 target_ledger_info,
+                id,
             )) => (
                 transactions_with_proof.transactions.len(),
                 target_ledger_info.clone(),
+                id,
             ),
             ResponsePayload::NewTransactionOutputsWithProof((
                 outputs_with_proof,
                 target_ledger_info,
+                id,
             )) => (
                 outputs_with_proof.transactions_and_outputs.len(),
                 target_ledger_info.clone(),
+                id,
             ),
             response_payload => {
                 // TODO(joshlind): eventually we want to notify the data client of the bad response
@@ -1559,12 +1563,13 @@ fn create_data_notification(
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
         },
-        ResponsePayload::NewTransactionsWithProof((transactions_chunk, target_ledger_info)) => {
+        ResponsePayload::NewTransactionsWithProof((transactions_chunk, target_ledger_info, id)) => {
             match stream_engine {
                 StreamEngine::ContinuousTransactionStreamEngine(_) => {
                     DataPayload::ContinuousTransactionsWithProof(
                         target_ledger_info,
                         transactions_chunk,
+                        id,
                     )
                 },
                 _ => invalid_response_type!(client_response_type),
@@ -1573,11 +1578,13 @@ fn create_data_notification(
         ResponsePayload::NewTransactionOutputsWithProof((
             transactions_output_chunk,
             target_ledger_info,
+            id,
         )) => match stream_engine {
             StreamEngine::ContinuousTransactionStreamEngine(_) => {
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     target_ledger_info,
                     transactions_output_chunk,
+                    id,
                 )
             },
             _ => invalid_response_type!(client_response_type),
@@ -1589,7 +1596,11 @@ fn create_data_notification(
                         "The target ledger info was not provided".into(),
                     )
                 })?;
-                DataPayload::ContinuousTransactionsWithProof(target_ledger_info, transactions_chunk)
+                DataPayload::ContinuousTransactionsWithProof(
+                    target_ledger_info,
+                    transactions_chunk,
+                    None,
+                )
             },
             StreamEngine::TransactionStreamEngine(_) => {
                 DataPayload::TransactionsWithProof(transactions_chunk)
@@ -1607,6 +1618,7 @@ fn create_data_notification(
                     DataPayload::ContinuousTransactionOutputsWithProof(
                         target_ledger_info,
                         transactions_output_chunk,
+                        None,
                     )
                 },
                 StreamEngine::TransactionStreamEngine(_) => {

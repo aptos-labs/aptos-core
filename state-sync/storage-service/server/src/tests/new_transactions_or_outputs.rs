@@ -546,6 +546,7 @@ async fn verify_new_transactions_or_outputs_with_proof(
         DataResponse::NewTransactionsOrOutputsWithProof((
             transactions_or_outputs_with_proof,
             ledger_info,
+            _,
         )) => {
             let (transactions_with_proof, outputs_with_proof) = transactions_or_outputs_with_proof;
             if let Some(transactions_with_proof) = transactions_with_proof {

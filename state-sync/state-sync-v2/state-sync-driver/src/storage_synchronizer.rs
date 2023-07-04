@@ -42,6 +42,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{
     runtime::{Handle, Runtime},
@@ -61,6 +62,7 @@ pub trait StorageSynchronizerInterface {
         output_list_with_proof: TransactionOutputListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+        id: Option<u64>,
     ) -> Result<(), Error>;
 
     /// Executes a batch of transactions.
@@ -72,6 +74,7 @@ pub trait StorageSynchronizerInterface {
         transaction_list_with_proof: TransactionListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+        id: Option<u64>,
     ) -> Result<(), Error>;
 
     /// Initializes a state synchronizer with the specified
@@ -262,12 +265,14 @@ impl<
         output_list_with_proof: TransactionOutputListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+        id: Option<u64>,
     ) -> Result<(), Error> {
         let storage_data_chunk = StorageDataChunk::TransactionOutputs(
             notification_id,
             output_list_with_proof,
             target_ledger_info,
             end_of_epoch_ledger_info,
+            id,
         );
         self.notify_executor(storage_data_chunk).await
     }
@@ -278,12 +283,14 @@ impl<
         transaction_list_with_proof: TransactionListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+        id: Option<u64>,
     ) -> Result<(), Error> {
         let storage_data_chunk = StorageDataChunk::Transactions(
             notification_id,
             transaction_list_with_proof,
             target_ledger_info,
             end_of_epoch_ledger_info,
+            id,
         );
         self.notify_executor(storage_data_chunk).await
     }
@@ -368,12 +375,14 @@ enum StorageDataChunk {
         TransactionListWithProof,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
+        Option<u64>,
     ),
     TransactionOutputs(
         NotificationId,
         TransactionOutputListWithProof,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
+        Option<u64>,
     ),
 }
 
@@ -382,7 +391,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
-    mut committer_notifier: mpsc::Sender<NotificationId>,
+    mut committer_notifier: mpsc::Sender<(NotificationId, LedgerInfoWithSignatures, Option<u64>)>,
     pending_transaction_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
@@ -390,12 +399,13 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     let executor = async move {
         while let Some(storage_data_chunk) = executor_listener.next().await {
             // Execute/apply the storage data chunk
-            let (notification_id, result) = match storage_data_chunk {
+            let (notification_id, result, li, id) = match storage_data_chunk {
                 StorageDataChunk::Transactions(
                     notification_id,
                     transactions_with_proof,
                     target_ledger_info,
                     end_of_epoch_ledger_info,
+                    id,
                 ) => {
                     let timer = metrics::start_timer(
                         &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
@@ -405,7 +415,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     let result = execute_transaction_chunk(
                         chunk_executor.clone(),
                         transactions_with_proof,
-                        target_ledger_info,
+                        target_ledger_info.clone(),
                         end_of_epoch_ledger_info,
                     )
                     .await;
@@ -432,13 +442,14 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         );
                     }
                     drop(timer);
-                    (notification_id, result)
+                    (notification_id, result, target_ledger_info, id)
                 },
                 StorageDataChunk::TransactionOutputs(
                     notification_id,
                     outputs_with_proof,
                     target_ledger_info,
                     end_of_epoch_ledger_info,
+                    id,
                 ) => {
                     let timer = metrics::start_timer(
                         &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
@@ -448,7 +459,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     let result = apply_output_chunk(
                         chunk_executor.clone(),
                         outputs_with_proof,
-                        target_ledger_info,
+                        target_ledger_info.clone(),
                         end_of_epoch_ledger_info,
                     )
                     .await;
@@ -475,7 +486,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         );
                     }
                     drop(timer);
-                    (notification_id, result)
+                    (notification_id, result, target_ledger_info, id)
                 },
                 storage_data_chunk => {
                     error!(
@@ -491,7 +502,30 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
             // Notify the committer of new executed chunks
             match result {
                 Ok(()) => {
-                    if let Err(error) = committer_notifier.send(notification_id).await {
+                    // Executed/Applied the chunk successfully. Going to notify the committer.
+                    if let Some(id) = id {
+                        // Get the current time (in microseconds since the UNIX epoch)
+                        let current_time_usecs = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_micros() as u64;
+
+                        // Get the block timestamp for the block
+                        let block_timestamp_usecs = li.ledger_info().timestamp_usecs();
+
+                        // Calculate the duration from proposal to now
+                        let duration_from_propose_to_now =
+                            Duration::from_micros(current_time_usecs - block_timestamp_usecs);
+                        let duration_in_secs = duration_from_propose_to_now.as_secs_f64();
+
+                        // Log the duration in seconds
+                        info!(
+                            "LATENCY TRACKING FOR {:?}. DURATION FROM PROPOSE TO EXECUTED/APPLIED (SECS): {:?}. BLOCK TIMESTAMP: {:?}",
+                            id, duration_in_secs, block_timestamp_usecs
+                        );
+                    }
+
+                    if let Err(error) = committer_notifier.send((notification_id, li, id)).await {
                         let error = format!("Failed to notify the committer! Error: {:?}", error);
                         send_storage_synchronizer_error(
                             error_notification_sender.clone(),
@@ -529,7 +563,7 @@ fn spawn_committer<
     MempoolNotifier: MempoolNotificationSender,
 >(
     chunk_executor: Arc<ChunkExecutor>,
-    mut committer_listener: mpsc::Receiver<NotificationId>,
+    mut committer_listener: mpsc::Receiver<(NotificationId, LedgerInfoWithSignatures, Option<u64>)>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
     mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
@@ -539,7 +573,7 @@ fn spawn_committer<
 ) -> JoinHandle<()> {
     // Create a committer
     let committer = async move {
-        while let Some(notification_id) = committer_listener.next().await {
+        while let Some((notification_id, li, id)) = committer_listener.next().await {
             // Commit the executed chunk
             let timer = metrics::start_timer(
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
@@ -564,6 +598,29 @@ fn spawn_committer<
                     );
                     if notification.reconfiguration_occurred {
                         utils::update_new_epoch_metrics();
+                    }
+
+                    // Committed the chunk!
+                    if let Some(id) = id {
+                        // Get the current time (in microseconds since the UNIX epoch)
+                        let current_time_usecs = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_micros() as u64;
+
+                        // Get the block timestamp for the block
+                        let block_timestamp_usecs = li.ledger_info().timestamp_usecs();
+
+                        // Calculate the duration from proposal to now
+                        let duration_from_propose_to_now =
+                            Duration::from_micros(current_time_usecs - block_timestamp_usecs);
+                        let duration_in_secs = duration_from_propose_to_now.as_secs_f64();
+
+                        // Log the duration in seconds
+                        info!(
+                            "LATENCY TRACKING FOR {:?}. DURATION FROM PROPOSE TO COMMITTED (SECS): {:?}. BLOCK TIMESTAMP: {:?}",
+                            id, duration_in_secs, block_timestamp_usecs
+                        );
                     }
 
                     // Handle the committed transaction notification (e.g., notify mempool).

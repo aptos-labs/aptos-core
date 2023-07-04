@@ -124,15 +124,33 @@ pub type TransactionOrOutputListWithProof = (
 #[allow(clippy::large_enum_variant)]
 pub enum DataResponse {
     EpochEndingLedgerInfos(EpochChangeProof),
-    NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
-    NewTransactionsWithProof((TransactionListWithProof, LedgerInfoWithSignatures)),
+    NewTransactionOutputsWithProof(
+        (
+            TransactionOutputListWithProof,
+            LedgerInfoWithSignatures,
+            Option<u64>,
+        ),
+    ),
+    NewTransactionsWithProof(
+        (
+            TransactionListWithProof,
+            LedgerInfoWithSignatures,
+            Option<u64>,
+        ),
+    ),
     NumberOfStatesAtVersion(u64),
     ServerProtocolVersion(ServerProtocolVersion),
     StateValueChunkWithProof(StateValueChunkWithProof),
     StorageServerSummary(StorageServerSummary),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
-    NewTransactionsOrOutputsWithProof((TransactionOrOutputListWithProof, LedgerInfoWithSignatures)),
+    NewTransactionsOrOutputsWithProof(
+        (
+            TransactionOrOutputListWithProof,
+            LedgerInfoWithSignatures,
+            Option<u64>,
+        ),
+    ),
     TransactionsOrOutputsWithProof(TransactionOrOutputListWithProof),
 }
 
@@ -204,7 +222,11 @@ impl TryFrom<StorageServiceResponse> for EpochChangeProof {
 }
 
 impl TryFrom<StorageServiceResponse>
-    for (TransactionOutputListWithProof, LedgerInfoWithSignatures)
+    for (
+        TransactionOutputListWithProof,
+        LedgerInfoWithSignatures,
+        Option<u64>,
+    )
 {
     type Error = crate::responses::Error;
 
@@ -220,7 +242,13 @@ impl TryFrom<StorageServiceResponse>
     }
 }
 
-impl TryFrom<StorageServiceResponse> for (TransactionListWithProof, LedgerInfoWithSignatures) {
+impl TryFrom<StorageServiceResponse>
+    for (
+        TransactionListWithProof,
+        LedgerInfoWithSignatures,
+        Option<u64>,
+    )
+{
     type Error = crate::responses::Error;
 
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
@@ -311,7 +339,11 @@ impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
 }
 
 impl TryFrom<StorageServiceResponse>
-    for (TransactionOrOutputListWithProof, LedgerInfoWithSignatures)
+    for (
+        TransactionOrOutputListWithProof,
+        LedgerInfoWithSignatures,
+        Option<u64>,
+    )
 {
     type Error = crate::responses::Error;
 

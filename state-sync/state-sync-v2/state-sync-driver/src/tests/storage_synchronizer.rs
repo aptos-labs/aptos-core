@@ -78,6 +78,7 @@ async fn test_apply_transaction_outputs() {
             create_output_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -114,6 +115,7 @@ async fn test_apply_transaction_outputs_error() {
             create_output_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -146,6 +148,7 @@ async fn test_commit_chunk_error() {
             notification_id,
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
+            None,
             None,
         )
         .await
@@ -194,6 +197,7 @@ async fn test_execute_transactions() {
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -229,6 +233,7 @@ async fn test_execute_transactions_error() {
             notification_id,
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
+            None,
             None,
         )
         .await

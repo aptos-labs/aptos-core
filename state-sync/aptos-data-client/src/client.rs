@@ -45,7 +45,11 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use rand::prelude::SliceRandom;
-use std::{fmt, sync::Arc, time::Duration};
+use std::{
+    fmt,
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::runtime::Handle;
 
 // Useful constants
@@ -540,15 +544,58 @@ impl AptosDataClientInterface for AptosDataClient {
         known_version: Version,
         known_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>
-    {
+    ) -> crate::error::Result<
+        Response<(
+            TransactionOutputListWithProof,
+            LedgerInfoWithSignatures,
+            Option<u64>,
+        )>,
+    > {
         let data_request =
             DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
                 known_version,
                 known_epoch,
             });
-        self.create_and_send_storage_request(request_timeout_ms, data_request)
-            .await
+        let response: crate::error::Result<
+            Response<(
+                TransactionOutputListWithProof,
+                LedgerInfoWithSignatures,
+                Option<u64>,
+            )>,
+        > = self
+            .create_and_send_storage_request(request_timeout_ms, data_request)
+            .await;
+
+        if let Ok(response) = &response {
+            let (_, li, id): (
+                TransactionOutputListWithProof,
+                LedgerInfoWithSignatures,
+                Option<u64>,
+            ) = response.payload.clone();
+            if let Some(id) = id {
+                // Get the current time (in microseconds since the UNIX epoch)
+                let current_time_usecs = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_micros() as u64;
+
+                // Get the block timestamp for the block
+                let block_timestamp_usecs = li.ledger_info().timestamp_usecs();
+
+                // Calculate the duration from proposal to now
+                let duration_from_propose_to_now =
+                    Duration::from_micros(current_time_usecs - block_timestamp_usecs);
+                let duration_in_secs = duration_from_propose_to_now.as_secs_f64();
+
+                // Log the duration in seconds
+                info!(
+                    "LATENCY TRACKING FOR {:?}. DURATION FROM PROPOSE TO APTOS DATA CLIENT RECEIVED (SECS): {:?}. BLOCK TIMESTAMP: {:?}",
+                    id, duration_in_secs, block_timestamp_usecs
+                );
+            }
+        }
+
+        response
     }
 
     async fn get_new_transactions_with_proof(
@@ -557,7 +604,13 @@ impl AptosDataClientInterface for AptosDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
+    ) -> crate::error::Result<
+        Response<(
+            TransactionListWithProof,
+            LedgerInfoWithSignatures,
+            Option<u64>,
+        )>,
+    > {
         let data_request =
             DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
                 known_version,
@@ -574,8 +627,13 @@ impl AptosDataClientInterface for AptosDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>
-    {
+    ) -> crate::error::Result<
+        Response<(
+            TransactionOrOutputListWithProof,
+            LedgerInfoWithSignatures,
+            Option<u64>,
+        )>,
+    > {
         let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
             NewTransactionsOrOutputsWithProofRequest {
                 known_version,

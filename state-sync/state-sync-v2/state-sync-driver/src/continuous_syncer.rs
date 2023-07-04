@@ -25,7 +25,10 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 /// A simple component that manages the continuous syncing of the node
 pub struct ContinuousSyncer<StorageSyncer, StreamingClient> {
@@ -214,7 +217,31 @@ impl<
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     ledger_info_with_sigs,
                     transaction_outputs_with_proof,
+                    id,
                 ) => {
+                    if let Some(id) = id {
+                        // Get the current time (in microseconds since the UNIX epoch)
+                        let current_time_usecs = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_micros() as u64;
+
+                        // Get the block timestamp for the block
+                        let block_timestamp_usecs =
+                            ledger_info_with_sigs.ledger_info().timestamp_usecs();
+
+                        // Calculate the duration from proposal to now
+                        let duration_from_propose_to_now =
+                            Duration::from_micros(current_time_usecs - block_timestamp_usecs);
+                        let duration_in_secs = duration_from_propose_to_now.as_secs_f64();
+
+                        // Log the duration in seconds
+                        info!(
+                            "LATENCY TRACKING FOR {:?}. DURATION FROM PROPOSE TO DRIVER RECEIVED (SECS): {:?}. BLOCK TIMESTAMP: {:?}",
+                            id, duration_in_secs, block_timestamp_usecs
+                        );
+                    }
+
                     let payload_start_version =
                         transaction_outputs_with_proof.first_transaction_output_version;
                     self.process_transaction_or_output_payload(
@@ -224,12 +251,14 @@ impl<
                         None,
                         Some(transaction_outputs_with_proof),
                         payload_start_version,
+                        id,
                     )
                     .await?;
                 },
                 DataPayload::ContinuousTransactionsWithProof(
                     ledger_info_with_sigs,
                     transactions_with_proof,
+                    id,
                 ) => {
                     let payload_start_version = transactions_with_proof.first_transaction_version;
                     self.process_transaction_or_output_payload(
@@ -239,6 +268,7 @@ impl<
                         Some(transactions_with_proof),
                         None,
                         payload_start_version,
+                        id,
                     )
                     .await?;
                 },
@@ -275,6 +305,7 @@ impl<
         transaction_list_with_proof: Option<TransactionListWithProof>,
         transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
         payload_start_version: Option<Version>,
+        id: Option<Version>,
     ) -> Result<(), Error> {
         // Verify the payload starting version
         let payload_start_version = self
@@ -299,6 +330,7 @@ impl<
                         ledger_info_with_signatures.clone(),
                         None,
                         transaction_outputs_with_proof,
+                        id,
                     )
                     .await?
                 } else {
@@ -320,6 +352,7 @@ impl<
                         ledger_info_with_signatures.clone(),
                         None,
                         transaction_list_with_proof,
+                        id,
                     )
                     .await?
                 } else {
@@ -341,6 +374,7 @@ impl<
                         ledger_info_with_signatures.clone(),
                         None,
                         transaction_list_with_proof,
+                        id,
                     )
                     .await?
                 } else if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof
@@ -351,6 +385,7 @@ impl<
                         ledger_info_with_signatures.clone(),
                         None,
                         transaction_outputs_with_proof,
+                        id,
                     )
                     .await?
                 } else {
@@ -371,7 +406,29 @@ impl<
             .ok_or_else(|| Error::IntegerOverflow("The synced version has overflown!".into()))?;
         let speculative_stream_state = self.get_speculative_stream_state()?;
         speculative_stream_state.update_synced_version(synced_version);
-        speculative_stream_state.maybe_update_epoch_state(ledger_info_with_signatures);
+        speculative_stream_state.maybe_update_epoch_state(ledger_info_with_signatures.clone());
+
+        if let Some(id) = id {
+            // Get the current time (in microseconds since the UNIX epoch)
+            let current_time_usecs = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as u64;
+
+            // Get the block timestamp for the block
+            let block_timestamp_usecs = ledger_info_with_signatures.ledger_info().timestamp_usecs();
+
+            // Calculate the duration from proposal to now
+            let duration_from_propose_to_now =
+                Duration::from_micros(current_time_usecs - block_timestamp_usecs);
+            let duration_in_secs = duration_from_propose_to_now.as_secs_f64();
+
+            // Log the duration in seconds
+            info!(
+                "LATENCY TRACKING FOR {:?}. DURATION FROM PROPOSE TO STORAGE SYNCHRONIZER SEND (SECS): {:?}. BLOCK TIMESTAMP: {:?}",
+                id, duration_in_secs, block_timestamp_usecs
+            );
+        }
 
         Ok(())
     }

@@ -388,7 +388,7 @@ async fn verify_new_transactions_with_proof(
         .get_data_response()
         .unwrap()
     {
-        DataResponse::NewTransactionsWithProof((transactions_with_proof, ledger_info)) => {
+        DataResponse::NewTransactionsWithProof((transactions_with_proof, ledger_info, _)) => {
             assert_eq!(transactions_with_proof, expected_transactions_with_proof);
             assert_eq!(ledger_info, expected_ledger_info);
         },

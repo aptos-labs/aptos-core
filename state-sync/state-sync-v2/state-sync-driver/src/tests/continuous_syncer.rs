@@ -176,6 +176,7 @@ async fn test_data_stream_transactions_with_target() {
         data_payload: DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
             TransactionOutputListWithProof::new_empty(),
+            None,
         ),
     };
     notification_sender_1.send(data_notification).await.unwrap();
@@ -255,6 +256,7 @@ async fn test_data_stream_transaction_outputs() {
         data_payload: DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
             transaction_output_with_proof,
+            None,
         ),
     };
     notification_sender_1.send(data_notification).await.unwrap();
@@ -336,6 +338,7 @@ async fn test_data_stream_transactions_or_outputs_with_target() {
         data_payload: DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
             TransactionOutputListWithProof::new_empty(),
+            None,
         ),
     };
     notification_sender_1.send(data_notification).await.unwrap();

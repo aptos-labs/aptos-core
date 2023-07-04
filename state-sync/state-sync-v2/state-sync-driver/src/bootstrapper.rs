@@ -1139,6 +1139,7 @@ impl<
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
                         transaction_outputs_with_proof,
+                        None,
                     )
                     .await?
                 } else {
@@ -1160,6 +1161,7 @@ impl<
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
                         transaction_list_with_proof,
+                        None,
                     )
                     .await?
                 } else {
@@ -1181,6 +1183,7 @@ impl<
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
                         transaction_list_with_proof,
+                        None,
                     )
                     .await?
                 } else if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof
@@ -1191,6 +1194,7 @@ impl<
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
                         transaction_outputs_with_proof,
+                        None,
                     )
                     .await?
                 } else {

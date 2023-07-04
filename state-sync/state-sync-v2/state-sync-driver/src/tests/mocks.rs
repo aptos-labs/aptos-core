@@ -425,6 +425,7 @@ mock! {
             output_list_with_proof: TransactionOutputListWithProof,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+            id: Option<u64>,
         ) -> Result<(), crate::error::Error>;
 
         async fn execute_transactions(
@@ -433,6 +434,7 @@ mock! {
             transaction_list_with_proof: TransactionListWithProof,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+            id: Option<u64>,
         ) -> Result<(), crate::error::Error>;
 
         fn initialize_state_synchronizer(

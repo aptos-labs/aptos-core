@@ -25,8 +25,16 @@ pub struct DataNotification {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum DataPayload {
-    ContinuousTransactionOutputsWithProof(LedgerInfoWithSignatures, TransactionOutputListWithProof),
-    ContinuousTransactionsWithProof(LedgerInfoWithSignatures, TransactionListWithProof),
+    ContinuousTransactionOutputsWithProof(
+        LedgerInfoWithSignatures,
+        TransactionOutputListWithProof,
+        Option<u64>,
+    ),
+    ContinuousTransactionsWithProof(
+        LedgerInfoWithSignatures,
+        TransactionListWithProof,
+        Option<u64>,
+    ),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     EndOfStream,
     StateValuesWithProof(StateValueChunkWithProof),

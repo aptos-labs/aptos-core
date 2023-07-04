@@ -368,6 +368,9 @@ pub fn create_mock_db_for_optimistic_fetch(
         .expect_is_state_merkle_pruner_enabled()
         .returning(move || Ok(true));
     db_reader
+        .expect_get_block_timestamp()
+        .returning(move |_| Ok(0));
+    db_reader
 }
 
 /// Creates a mock database reader

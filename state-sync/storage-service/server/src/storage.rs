@@ -88,6 +88,10 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         start_index: u64,
         end_index: u64,
     ) -> aptos_storage_service_types::Result<StateValueChunkWithProof, Error>;
+
+    fn get_block_timestamp_usecs(&self, _version: u64) -> u64 {
+        unimplemented!("get_block_timestamp_usecs not implemented")
+    }
 }
 
 /// The underlying implementation of the StorageReaderInterface, used by the
@@ -493,6 +497,10 @@ impl StorageReaderInterface for StorageReader {
             start index: {:?}, end index: {:?}. The data cannot fit into a single network frame!",
             version, start_index, end_index
         )))
+    }
+
+    fn get_block_timestamp_usecs(&self, version: u64) -> u64 {
+        self.storage.get_block_timestamp(version).unwrap()
     }
 }
 

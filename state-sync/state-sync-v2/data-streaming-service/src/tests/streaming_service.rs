@@ -198,6 +198,7 @@ async fn test_notifications_continuous_outputs() {
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     ledger_info_with_sigs,
                     outputs_with_proofs,
+                    None,
                 ) => {
                     let ledger_info = ledger_info_with_sigs.ledger_info();
                     // Verify the epoch of the ledger info
@@ -251,6 +252,7 @@ async fn test_notifications_continuous_outputs_target() {
             DataPayload::ContinuousTransactionOutputsWithProof(
                 ledger_info_with_sigs,
                 outputs_with_proofs,
+                None,
             ) => {
                 let ledger_info = ledger_info_with_sigs.ledger_info();
                 // Verify the epoch of the ledger info
@@ -302,6 +304,7 @@ async fn test_notifications_continuous_outputs_limited_chunks() {
             DataPayload::ContinuousTransactionOutputsWithProof(
                 ledger_info_with_sigs,
                 outputs_with_proofs,
+                None,
             ) => {
                 let first_output_version = outputs_with_proofs
                     .first_transaction_output_version
@@ -380,6 +383,7 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
             DataPayload::ContinuousTransactionOutputsWithProof(
                 ledger_info_with_sigs,
                 outputs_with_proofs,
+                None,
             ) => {
                 let first_output_version = outputs_with_proofs.first_transaction_output_version;
                 assert_eq!(Some(next_expected_version), first_output_version);
@@ -449,6 +453,7 @@ async fn test_notifications_continuous_transactions() {
                 DataPayload::ContinuousTransactionsWithProof(
                     ledger_info_with_sigs,
                     transactions_with_proof,
+                    _id,
                 ) => {
                     let ledger_info = ledger_info_with_sigs.ledger_info();
                     // Verify the epoch of the ledger info
@@ -508,6 +513,7 @@ async fn test_notifications_continuous_transactions_limited_chunks() {
             DataPayload::ContinuousTransactionsWithProof(
                 ledger_info_with_sigs,
                 transactions_with_proofs,
+                _id,
             ) => {
                 let first_transaction_version =
                     transactions_with_proofs.first_transaction_version.unwrap();
@@ -589,6 +595,7 @@ async fn test_notifications_continuous_transactions_target() {
             DataPayload::ContinuousTransactionsWithProof(
                 ledger_info_with_sigs,
                 transactions_with_proof,
+                _id,
             ) => {
                 let ledger_info = ledger_info_with_sigs.ledger_info();
                 // Verify the epoch of the ledger info
@@ -778,6 +785,7 @@ async fn test_notifications_subscribe_outputs() {
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     ledger_info_with_sigs,
                     outputs_with_proofs,
+                    None,
                 ) => {
                     let ledger_info = ledger_info_with_sigs.ledger_info();
                     // Verify the epoch of the ledger info
@@ -830,6 +838,7 @@ async fn test_notifications_subscribe_transactions() {
                 DataPayload::ContinuousTransactionsWithProof(
                     ledger_info_with_sigs,
                     transactions_with_proofs,
+                    _id,
                 ) => {
                     let ledger_info = ledger_info_with_sigs.ledger_info();
                     // Verify the epoch of the ledger info

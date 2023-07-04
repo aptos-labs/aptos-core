@@ -366,6 +366,7 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + 
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     transaction_list_with_proof: TransactionListWithProof,
+    id: Option<u64>,
 ) -> Result<usize, Error> {
     let num_transactions = transaction_list_with_proof.transactions.len();
     storage_synchronizer
@@ -374,6 +375,7 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + 
             transaction_list_with_proof,
             proof_ledger_info,
             end_of_epoch_ledger_info,
+            id,
         )
         .await?;
     Ok(num_transactions)
@@ -387,6 +389,7 @@ pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterfa
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     transaction_outputs_with_proof: TransactionOutputListWithProof,
+    id: Option<u64>,
 ) -> Result<usize, Error> {
     let num_transaction_outputs = transaction_outputs_with_proof
         .transactions_and_outputs
@@ -397,6 +400,7 @@ pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterfa
             transaction_outputs_with_proof,
             proof_ledger_info,
             end_of_epoch_ledger_info,
+            id,
         )
         .await?;
     Ok(num_transaction_outputs)

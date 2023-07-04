@@ -213,7 +213,7 @@ mock! {
             known_version: Version,
             known_epoch: Epoch,
             request_timeout_ms: u64,
-        ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+        ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures, Option<u64>)>>;
 
         async fn get_new_transactions_with_proof(
             &self,
@@ -221,7 +221,7 @@ mock! {
             known_epoch: Epoch,
             include_events: bool,
             request_timeout_ms: u64,
-        ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+        ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures, Option<u64>)>>;
 
         async fn get_new_transactions_or_outputs_with_proof(
             &self,
@@ -229,7 +229,7 @@ mock! {
             known_epoch: Epoch,
             include_events: bool,
             request_timeout_ms: u64,
-        ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+        ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures, Option<u64>)>>;
 
         async fn get_number_of_states(
             &self,

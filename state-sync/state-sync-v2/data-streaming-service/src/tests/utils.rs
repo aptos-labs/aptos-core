@@ -321,7 +321,11 @@ impl AptosDataClientInterface for MockAptosDataClient {
         known_epoch: Epoch,
         request_timeout_ms: u64,
     ) -> Result<
-        Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
+        Response<(
+            TransactionOutputListWithProof,
+            LedgerInfoWithSignatures,
+            Option<u64>,
+        )>,
         aptos_data_client::error::Error,
     > {
         self.verify_request_timeout(
@@ -369,6 +373,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
             Ok(create_data_client_response((
                 outputs_with_proof,
                 target_ledger_info,
+                None,
             )))
         } else {
             Err(self.emulate_subscription_expiration())
@@ -382,7 +387,11 @@ impl AptosDataClientInterface for MockAptosDataClient {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> Result<
-        Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
+        Response<(
+            TransactionListWithProof,
+            LedgerInfoWithSignatures,
+            Option<u64>,
+        )>,
         aptos_data_client::error::Error,
     > {
         self.verify_request_timeout(
@@ -432,6 +441,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
             Ok(create_data_client_response((
                 transactions_with_proof,
                 target_ledger_info,
+                None,
             )))
         } else {
             Err(self.emulate_subscription_expiration())
@@ -445,7 +455,11 @@ impl AptosDataClientInterface for MockAptosDataClient {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> aptos_data_client::error::Result<
-        Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
+        Response<(
+            TransactionOrOutputListWithProof,
+            LedgerInfoWithSignatures,
+            Option<u64>,
+        )>,
     > {
         self.verify_request_timeout(
             request_timeout_ms,
@@ -467,7 +481,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
 
         // Get the new transactions or outputs response
         let response = if return_transactions_instead_of_outputs() {
-            let (transactions, ledger_info) = aptos_data_client
+            let (transactions, ledger_info, _id) = aptos_data_client
                 .get_new_transactions_with_proof(
                     known_version,
                     known_epoch,
@@ -476,9 +490,9 @@ impl AptosDataClientInterface for MockAptosDataClient {
                 )
                 .await?
                 .payload;
-            ((Some(transactions), None), ledger_info)
+            ((Some(transactions), None), ledger_info, None)
         } else {
-            let (outputs, ledger_info) = aptos_data_client
+            let (outputs, ledger_info, _id) = aptos_data_client
                 .get_new_transaction_outputs_with_proof(
                     known_version,
                     known_epoch,
@@ -486,7 +500,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
                 )
                 .await?
                 .payload;
-            ((None, Some(outputs)), ledger_info)
+            ((None, Some(outputs)), ledger_info, None)
         };
         Ok(create_data_client_response(response))
     }

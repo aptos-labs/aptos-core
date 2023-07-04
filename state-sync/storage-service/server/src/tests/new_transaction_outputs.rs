@@ -336,7 +336,7 @@ async fn verify_new_transaction_outputs_with_proof(
         .get_data_response()
         .unwrap()
     {
-        DataResponse::NewTransactionOutputsWithProof((outputs_with_proof, ledger_info)) => {
+        DataResponse::NewTransactionOutputsWithProof((outputs_with_proof, ledger_info, _)) => {
             assert_eq!(outputs_with_proof, output_list_with_proof);
             assert_eq!(ledger_info, expected_ledger_info);
         },

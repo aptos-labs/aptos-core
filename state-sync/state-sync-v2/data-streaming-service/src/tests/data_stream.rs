@@ -1153,6 +1153,7 @@ fn set_subscription_response_in_queue(
             ResponsePayload::NewTransactionsWithProof((
                 create_transaction_list_with_proof(single_data_version, single_data_version, false),
                 create_ledger_info(single_data_version, MAX_ADVERTISED_EPOCH_END, false),
+                None,
             )),
         )))
     } else {
@@ -1160,6 +1161,7 @@ fn set_subscription_response_in_queue(
             ResponsePayload::NewTransactionOutputsWithProof((
                 create_output_list_with_proof(single_data_version, single_data_version),
                 create_ledger_info(single_data_version, MAX_ADVERTISED_EPOCH_END, false),
+                None,
             )),
         )))
     };

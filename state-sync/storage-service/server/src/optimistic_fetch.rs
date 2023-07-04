@@ -17,7 +17,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::Mutex;
-use aptos_logger::warn;
+use aptos_logger::{info, warn};
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, StorageServiceRequest,
@@ -31,13 +31,19 @@ use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use lru::LruCache;
-use std::{cmp::min, sync::Arc, time::Instant};
+use rand::{rngs::OsRng, Rng};
+use std::{
+    cmp::min,
+    sync::Arc,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 
 /// An optimistic fetch request from a peer
 pub struct OptimisticFetchRequest {
     request: StorageServiceRequest,
     response_sender: ResponseSender,
     fetch_start_time: Instant,
+    fetch_start_time_usecs: u64,
     time_service: TimeService,
 }
 
@@ -51,6 +57,10 @@ impl OptimisticFetchRequest {
             request,
             response_sender,
             fetch_start_time: time_service.now(),
+            fetch_start_time_usecs: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as u64,
             time_service,
         }
     }
@@ -387,6 +397,7 @@ async fn handle_ready_optimistic_fetches<T: StorageReaderInterface>(
             bounded_executor
                 .spawn_blocking(move || {
                     let optimistic_fetch_start_time = optimistic_fetch.fetch_start_time;
+                    let optimistic_fetch_start_time_usecs = optimistic_fetch.fetch_start_time_usecs;
                     let optimistic_fetch_request = optimistic_fetch.request.clone();
 
                     // Notify the peer of the new data
@@ -401,6 +412,7 @@ async fn handle_ready_optimistic_fetches<T: StorageReaderInterface>(
                         &peer_network_id,
                         optimistic_fetch,
                         target_ledger_info,
+                        optimistic_fetch_start_time_usecs,
                     ) {
                         warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
                             .error(&Error::UnexpectedErrorEncountered(error.to_string())));
@@ -438,6 +450,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
     peer_network_id: &PeerNetworkId,
     optimistic_fetch: OptimisticFetchRequest,
     target_ledger_info: LedgerInfoWithSignatures,
+    optimistic_fetch_start_time_usecs: u64,
 ) -> aptos_storage_service_types::Result<(), Error> {
     match optimistic_fetch.get_storage_request_for_missing_data(config, &target_ledger_info) {
         Ok(storage_request) => {
@@ -448,7 +461,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                 optimistic_fetches,
                 lru_response_cache,
                 request_moderator,
-                storage,
+                storage.clone(),
                 time_service,
             );
             let storage_response =
@@ -458,15 +471,37 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
             let transformed_data_response = match storage_response {
                 Ok(storage_response) => match storage_response.get_data_response() {
                     Ok(DataResponse::TransactionsWithProof(transactions_with_proof)) => {
+                        let first_transaction_version =
+                            transactions_with_proof.first_transaction_version.unwrap();
+                        let number_of_items = transactions_with_proof.transactions.len();
+                        let latency_tracking_id = start_latency_tracking(
+                            first_transaction_version,
+                            storage,
+                            number_of_items,
+                            optimistic_fetch_start_time_usecs,
+                        );
+
                         DataResponse::NewTransactionsWithProof((
                             transactions_with_proof,
                             target_ledger_info.clone(),
+                            Some(latency_tracking_id),
                         ))
                     },
                     Ok(DataResponse::TransactionOutputsWithProof(outputs_with_proof)) => {
+                        let first_transaction_version =
+                            outputs_with_proof.first_transaction_output_version.unwrap();
+                        let number_of_items = outputs_with_proof.transactions_and_outputs.len();
+                        let latency_tracking_id = start_latency_tracking(
+                            first_transaction_version,
+                            storage,
+                            number_of_items,
+                            optimistic_fetch_start_time_usecs,
+                        );
+
                         DataResponse::NewTransactionOutputsWithProof((
                             outputs_with_proof,
                             target_ledger_info.clone(),
+                            Some(latency_tracking_id),
                         ))
                     },
                     Ok(DataResponse::TransactionsOrOutputsWithProof((
@@ -474,14 +509,36 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                         outputs_with_proof,
                     ))) => {
                         if let Some(transactions_with_proof) = transactions_with_proof {
+                            let first_transaction_version =
+                                transactions_with_proof.first_transaction_version.unwrap();
+                            let number_of_items = transactions_with_proof.transactions.len();
+                            let latency_tracking_id = start_latency_tracking(
+                                first_transaction_version,
+                                storage,
+                                number_of_items,
+                                optimistic_fetch_start_time_usecs,
+                            );
+
                             DataResponse::NewTransactionsOrOutputsWithProof((
                                 (Some(transactions_with_proof), None),
                                 target_ledger_info.clone(),
+                                Some(latency_tracking_id),
                             ))
                         } else if let Some(outputs_with_proof) = outputs_with_proof {
+                            let first_transaction_version =
+                                outputs_with_proof.first_transaction_output_version.unwrap();
+                            let number_of_items = outputs_with_proof.transactions_and_outputs.len();
+                            let latency_tracking_id = start_latency_tracking(
+                                first_transaction_version,
+                                storage,
+                                number_of_items,
+                                optimistic_fetch_start_time_usecs,
+                            );
+
                             DataResponse::NewTransactionsOrOutputsWithProof((
                                 (None, Some(outputs_with_proof)),
                                 target_ledger_info.clone(),
+                                Some(latency_tracking_id),
                             ))
                         } else {
                             return Err(Error::UnexpectedErrorEncountered(
@@ -503,6 +560,8 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                     )))
                 },
             };
+
+            // Create the storage response
             let storage_response =
                 match StorageServiceResponse::new(transformed_data_response, use_compression) {
                     Ok(storage_response) => storage_response,
@@ -524,6 +583,52 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
         },
         Err(error) => Err(error),
     }
+}
+
+/// Logs the time since the block proposal for a given transaction version
+fn start_latency_tracking<T: StorageReaderInterface>(
+    first_transaction_version: u64,
+    storage: T,
+    number_of_items: usize,
+    optimistic_fetch_start_time_usecs: u64,
+) -> u64 {
+    // Generate a random number
+    let random_number: u64 = OsRng.gen();
+
+    // Get the current time (in microseconds since the UNIX epoch)
+    let current_time_usecs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as u64;
+
+    // Get the block timestamp for the first transaction version
+    let block_timestamp_usecs = storage.get_block_timestamp_usecs(first_transaction_version);
+
+    // Get the duration from proposal to fetch start time
+    let duration_diff = if block_timestamp_usecs > optimistic_fetch_start_time_usecs {
+        block_timestamp_usecs - optimistic_fetch_start_time_usecs
+    } else {
+        optimistic_fetch_start_time_usecs - block_timestamp_usecs
+    };
+    let duration_from_propose_to_fetch_start = Duration::from_micros(duration_diff);
+    let duration_until_fetch_start = if block_timestamp_usecs > optimistic_fetch_start_time_usecs {
+        -1.0 * duration_from_propose_to_fetch_start.as_secs_f64()
+    } else {
+        duration_from_propose_to_fetch_start.as_secs_f64()
+    };
+
+    // Calculate the duration from proposal to now
+    let duration_from_propose_to_now =
+        Duration::from_micros(current_time_usecs - block_timestamp_usecs);
+    let duration_until_now = duration_from_propose_to_now.as_secs_f64();
+
+    // Log the duration in seconds
+    info!(
+        "LATENCY TRACKING FOR {:?}. DURATION FROM PROPOSE TO OPTIMISTIC RESPONSE (SECS): {:?}. CHUNK SIZE: {:?}, DURATION FROM PROPOSE TO START TIME (SECS): {:?}, BLOCK TIMESTAMP: {:?}",
+        random_number, duration_until_now, number_of_items, duration_until_fetch_start, block_timestamp_usecs
+    );
+
+    random_number
 }
 
 /// Updates the active optimistic fetch metrics for each network

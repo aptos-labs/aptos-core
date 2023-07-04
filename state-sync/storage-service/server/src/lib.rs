@@ -26,7 +26,10 @@ use handler::Handler;
 use lru::LruCache;
 use moderator::RequestModerator;
 use optimistic_fetch::OptimisticFetchRequest;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use storage::StorageReaderInterface;
 use thiserror::Error;
 use tokio::runtime::Handle;
@@ -293,6 +296,14 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
         .get_data_summary()
         .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
 
+    // Get the block timestamp for the block
+    let block_timestamp_usecs = data_summary
+        .synced_ledger_info
+        .clone()
+        .unwrap()
+        .ledger_info()
+        .timestamp_usecs();
+
     // Initialize the protocol metadata
     let protocol_metadata = ProtocolMetadata {
         max_epoch_chunk_size: storage_config.max_epoch_chunk_size,
@@ -307,6 +318,23 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
         data_summary,
     };
     cached_storage_server_summary.store(Arc::new(storage_server_summary));
+
+    // Print out the latency tracking information
+    let current_time_usecs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as u64;
+
+    // Calculate the duration from proposal to now
+    let duration_from_propose_to_now =
+        Duration::from_micros(current_time_usecs - block_timestamp_usecs);
+    let duration_in_secs = duration_from_propose_to_now.as_secs_f64();
+
+    // Log the duration in seconds
+    info!(
+        "LATENCY TRACKING FOR CACHE. DURATION FROM PROPOSE TO CACHED STORAGE SUMMARY UPDATE (SECS): {:?}. BLOCK TIMESTAMP: {:?}",
+        duration_in_secs, block_timestamp_usecs
+    );
 
     Ok(())
 }
