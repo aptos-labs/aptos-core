@@ -12,7 +12,6 @@ use aptos_types::{
     account_config::CoinInfoResource,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        table::TableHandle as AptosTableHandle,
     },
     transaction::ChangeSet,
     write_set::{TransactionWrite, WriteSet},
@@ -22,7 +21,6 @@ use aptos_vm_genesis::{
     GenesisOptions,
 };
 use move_core_types::language_storage::ModuleId;
-use move_table_extension::{TableHandle, TableResolver};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -136,17 +134,5 @@ impl TStateView for FakeDataStore {
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
         InMemoryStateView::new(self.state_data.clone())
-    }
-}
-
-// This is used by aggregator tests.
-impl TableResolver for FakeDataStore {
-    fn resolve_table_entry(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
-        let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
-        self.get_state_value_bytes(&state_key)
     }
 }

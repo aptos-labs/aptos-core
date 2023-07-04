@@ -9,6 +9,9 @@ use crate::{
 };
 #[allow(unused_imports)]
 use anyhow::Error;
+use aptos_aggregator::{
+    aggregator_extension::AggregatorID, delta_change_set::deserialize, resolver::AggregatorResolver,
+};
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -203,6 +206,21 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
         self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
+    }
+}
+
+impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
+    fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<Option<u128>, Error> {
+        match id {
+            AggregatorID::Legacy { handle, key } => {
+                // Table-based aggregator is a separate state item.
+                self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.0.to_vec()))
+                    .map(|maybe_bytes| maybe_bytes.map(|bytes| deserialize(&bytes)))
+            },
+            AggregatorID::Ephemeral(_) => {
+                unreachable!("Ephemeral identifiers are not yet implemented.")
+            },
+        }
     }
 }
 

@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(feature = "testing")]
+use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
+#[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 #[cfg(feature = "testing")]
@@ -21,12 +23,21 @@ use {
         transaction_context::NativeTransactionContext,
     },
     move_vm_runtime::native_extensions::NativeContextExtensions,
-    move_vm_test_utils::BlankStorage,
     once_cell::sync::Lazy,
 };
 
 #[cfg(feature = "testing")]
-static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
+struct AptosBlankStorage;
+
+#[cfg(feature = "testing")]
+impl AggregatorResolver for AptosBlankStorage {
+    fn resolve_aggregator_value(&self, _id: &AggregatorID) -> Result<Option<u128>, anyhow::Error> {
+        Ok(None)
+    }
+}
+
+#[cfg(feature = "testing")]
+static DUMMY_RESOLVER: Lazy<AptosBlankStorage> = Lazy::new(|| AptosBlankStorage);
 
 pub fn aptos_natives(
     gas_params: NativeGasParameters,

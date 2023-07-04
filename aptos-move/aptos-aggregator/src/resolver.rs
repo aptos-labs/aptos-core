@@ -1,0 +1,76 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::aggregator_extension::AggregatorID;
+
+/// Returns a value of an aggregator from cache or global storage.
+///   - Ok(Some(..)) if the data exists
+///   - Ok(None)     if the data does not exist, only applies to Aggregator V1
+///                  which is a separate state item.
+///   - Err(..)      only when something really wrong happens.
+pub trait AggregatorResolver {
+    fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<Option<u128>, anyhow::Error>;
+}
+
+// Utils to store aggregator values in data store. Here, we
+// only care about aggregators which are state items.
+#[cfg(any(test, feature = "testing"))]
+pub mod test_utils {
+    use super::*;
+    use crate::delta_change_set::{deserialize, serialize};
+    use aptos_state_view::TStateView;
+    use aptos_types::state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    };
+    use std::collections::HashMap;
+
+    #[derive(Default)]
+    pub struct AggregatorStore(HashMap<StateKey, StateValue>);
+
+    impl AggregatorStore {
+        pub fn set_from_id(&mut self, id: AggregatorID, value: u128) {
+            let state_key = id
+                .into_state_key()
+                .expect("Only table-based IDs are tested.");
+            self.set_from_state_key(state_key, value);
+        }
+
+        pub fn set_from_state_key(&mut self, state_key: StateKey, value: u128) {
+            self.0
+                .insert(state_key, StateValue::new_legacy(serialize(&value)));
+        }
+    }
+
+    impl AggregatorResolver for AggregatorStore {
+        fn resolve_aggregator_value(
+            &self,
+            id: &AggregatorID,
+        ) -> Result<Option<u128>, anyhow::Error> {
+            let state_key = id
+                .into_state_key()
+                .expect("Only table-based IDs can be accessed in tests.");
+            let maybe_bytes = self.get_state_value_bytes(&state_key)?;
+            Ok(maybe_bytes.map(|bytes| deserialize(&bytes)))
+        }
+    }
+
+    impl TStateView for AggregatorStore {
+        type Key = StateKey;
+
+        fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+            Ok(self.0.get(state_key).cloned())
+        }
+
+        fn is_genesis(&self) -> bool {
+            self.0.is_empty()
+        }
+
+        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+            let mut usage = StateStorageUsage::new_untracked();
+            for (k, v) in self.0.iter() {
+                usage.add_item(k.size() + v.size())
+            }
+            Ok(usage)
+        }
+    }
+}
