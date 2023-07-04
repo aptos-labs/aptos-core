@@ -19,7 +19,7 @@ const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
 
 /// Processor tails the data in cache and stores the data in file store.
 pub struct Processor {
-    cache_operator: Option<CacheOperator<redis::aio::Connection>>,
+    cache_operator: Option<CacheOperator<redis::aio::ConnectionManager>>,
     file_store_processor: Option<Box<dyn FileStoreOperator>>,
     cache_chain_id: Option<u64>,
     redis_main_instance_address: String,
@@ -45,7 +45,7 @@ impl Processor {
         // Connection to redis is a hard dependency for file store processor.
         let conn = redis::Client::open(format!("redis://{}", self.redis_main_instance_address))
             .expect("Create redis client failed.")
-            .get_async_connection()
+            .get_tokio_connection_manager()
             .await
             .expect("Create redis connection failed.");
 
