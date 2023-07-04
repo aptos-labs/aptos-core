@@ -65,7 +65,7 @@ fn test_dag_insertion_failure() {
     let mut parents = dag
         .get_strong_links_for_round(1, &validator_verifier)
         .unwrap();
-    parents.push(missing_node.into());
+    parents.push(missing_node.certificate());
 
     let node = new_certified_node(2, signers[0].author(), parents.clone());
     // parents not exist
@@ -88,8 +88,5 @@ fn new_certified_node(
     parents: Vec<NodeCertificate>,
 ) -> CertifiedNode {
     let node = Node::new(1, round, author, 0, Payload::empty(false), parents);
-    CertifiedNode::new(
-        node.clone(),
-        NodeCertificate::new(node.metadata().clone(), AggregateSignature::empty()),
-    )
+    CertifiedNode::new(node.clone(), AggregateSignature::empty())
 }

@@ -104,16 +104,7 @@ impl Dag {
             )
             .is_ok()
         {
-            Some(
-                all_nodes_in_round
-                    .map(|node| {
-                        NodeCertificate::new(
-                            node.metadata().clone(),
-                            node.certificate().signatures().clone(),
-                        )
-                    })
-                    .collect(),
-            )
+            Some(all_nodes_in_round.map(|node| node.certificate()).collect())
         } else {
             None
         }
