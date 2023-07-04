@@ -3,34 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod sharded_block_partitioner;
+pub mod simple_partitioner;
+pub mod no_op;
+
 pub mod test_utils;
 
+use aptos_types::block_executor::partitioner::SubBlocksForShard;
 use aptos_types::transaction::Transaction;
 
-pub trait BlockPartitioner: Send + Sync {
-    fn partition(&self, transactions: Vec<Transaction>, num_shards: usize)
-        -> Vec<Vec<Transaction>>;
+pub trait BlockPartitioner: Send {
+    fn partition(&self, transactions: Vec<Transaction>, num_executor_shards: usize)
+        -> Vec<SubBlocksForShard<Transaction>>;
 }
 
 /// An implementation of partitioner that splits the transactions into equal-sized chunks.
 pub struct UniformPartitioner {}
-
-impl BlockPartitioner for UniformPartitioner {
-    fn partition(
-        &self,
-        transactions: Vec<Transaction>,
-        num_shards: usize,
-    ) -> Vec<Vec<Transaction>> {
-        let total_txns = transactions.len();
-        if total_txns == 0 {
-            return vec![];
-        }
-        let txns_per_shard = (total_txns as f64 / num_shards as f64).ceil() as usize;
-
-        let mut result = Vec::new();
-        for chunk in transactions.chunks(txns_per_shard) {
-            result.push(chunk.to_vec());
-        }
-        result
-    }
-}

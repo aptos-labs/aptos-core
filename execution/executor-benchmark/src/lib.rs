@@ -48,6 +48,7 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
+use crate::pipeline::PartitionerImpl;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -164,6 +165,7 @@ pub fn run_benchmark<V>(
                 allow_discards: false,
                 allow_aborts: false,
                 num_executor_shards: 1,
+                partitioner_impl: PartitionerImpl::NoOp,
                 async_partitioning: false,
             },
         )

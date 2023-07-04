@@ -22,6 +22,17 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
+use aptos_block_partitioner::BlockPartitioner;
+use aptos_block_partitioner::no_op::NoOpPartitioner;
+use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_block_partitioner::simple_partitioner::SimplePartitioner;
+
+#[derive(Clone, Debug)]
+pub enum PartitionerImpl {
+    NoOp,
+    Simple,
+    Sharded(usize),
+}
 
 #[derive(Clone, Debug)]
 pub struct PipelineConfig {
@@ -31,6 +42,7 @@ pub struct PipelineConfig {
     pub allow_discards: bool,
     pub allow_aborts: bool,
     pub num_executor_shards: usize,
+    pub partitioner_impl: PartitionerImpl,
     pub async_partitioning: bool,
 }
 
@@ -63,9 +75,6 @@ where
             }, /* bound */
         );
 
-        // Assume the distributed executor and the distributed partitioner share the same worker set.
-        let num_partitioner_shards = config.num_executor_shards;
-
         let (commit_sender, commit_receiver) = mpsc::sync_channel::<CommitBlockMessage>(
             if config.split_stages || config.skip_commit {
                 (num_blocks.unwrap() + 1).max(3)
@@ -90,8 +99,6 @@ where
 
         let mut join_handles = vec![];
 
-        let mut partitioning_stage = BlockPartitioningStage::new(num_partitioner_shards);
-
         let mut exe = TransactionExecutor::new(
             executor_1,
             parent_block_id,
@@ -108,6 +115,12 @@ where
             let partitioning_thread = std::thread::Builder::new()
                 .name("block_partitioning".to_string())
                 .spawn(move || {
+                    let partitioner: Arc<dyn BlockPartitioner> = match config.partitioner_impl {
+                        PartitionerImpl::NoOp => Arc::new(NoOpPartitioner {}),
+                        PartitionerImpl::Simple => Arc::new(SimplePartitioner {}),
+                        PartitionerImpl::Sharded(concurrency_level) => Arc::new(ShardedBlockPartitioner::new(concurrency_level)),
+                    };
+                    let mut partitioning_stage = BlockPartitioningStage::new(config.num_executor_shards, partitioner);
                     while let Ok(txns) = raw_block_receiver.recv() {
                         let exe_block_msg = partitioning_stage.process(txns);
                         executable_block_sender.send(exe_block_msg).unwrap();
@@ -158,6 +171,12 @@ where
             let par_exe_thread = std::thread::Builder::new()
                 .name("txn_partitioner_executor".to_string())
                 .spawn(move || {
+                    let partitioner: Arc<dyn BlockPartitioner> = match config.partitioner_impl {
+                        PartitionerImpl::NoOp => Arc::new(NoOpPartitioner {}),
+                        PartitionerImpl::Simple => Arc::new(SimplePartitioner {}),
+                        PartitionerImpl::Sharded(concurrency_level) => Arc::new(ShardedBlockPartitioner::new(concurrency_level)),
+                    };
+                    let mut partitioning_stage = BlockPartitioningStage::new(config.num_executor_shards, partitioner);
                     start_execution_rx.map(|rx| rx.recv());
                     let start_time = Instant::now();
                     let mut executed = 0;

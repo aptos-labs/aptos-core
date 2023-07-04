@@ -29,6 +29,7 @@ use std::{
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::state_store::state_key::StateKey;
+use crate::BlockPartitioner;
 
 mod conflict_detector;
 mod cross_shard_messages;
@@ -380,6 +381,13 @@ impl ShardedBlockPartitioner {
     }
 }
 
+impl BlockPartitioner for ShardedBlockPartitioner {
+    fn partition(&self, transactions: Vec<Transaction>, num_executor_shards: usize) -> Vec<SubBlocksForShard<Transaction>> {
+        assert_eq!(self.num_shards, num_executor_shards);
+        let analyzed_transactions = transactions.into_iter().map(|t| t.into()).collect();
+        self.partition(analyzed_transactions, 1)
+    }
+}
 impl Drop for ShardedBlockPartitioner {
     /// Best effort stops all the executor shards and waits for the thread to finish.
     fn drop(&mut self) {
