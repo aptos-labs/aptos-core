@@ -44,6 +44,7 @@ spec aptos_framework::transaction_validation {
         aborts_if !account::exists_at(transaction_sender);
         aborts_if !(txn_sequence_number >= global<Account>(transaction_sender).sequence_number);
         aborts_if !(txn_authentication_key == global<Account>(transaction_sender).authentication_key);
+        aborts_if !(txn_sequence_number < (1u64 << 63));
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         aborts_if max_transaction_fee > MAX_U64;

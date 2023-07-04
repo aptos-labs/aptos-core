@@ -694,6 +694,7 @@ Give some constraints that may abort according to the conditions.
     <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender);
     <b>aborts_if</b> !(txn_sequence_number &gt;= <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number);
     <b>aborts_if</b> !(txn_authentication_key == <b>global</b>&lt;Account&gt;(transaction_sender).authentication_key);
+    <b>aborts_if</b> !(txn_sequence_number &lt; (1u64 &lt;&lt; 63));
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
     <b>aborts_if</b> max_transaction_fee &gt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>;
     <b>aborts_if</b> !(txn_sequence_number == <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number);
