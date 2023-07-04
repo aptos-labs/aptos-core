@@ -848,6 +848,7 @@ pub enum TransactionSignature {
     Ed25519Signature(Ed25519Signature),
     MultiEd25519Signature(MultiEd25519Signature),
     MultiAgentSignature(MultiAgentSignature),
+    FeePayerSignature(FeePayerSignature),
 }
 
 impl VerifyInput for TransactionSignature {
@@ -856,6 +857,7 @@ impl VerifyInput for TransactionSignature {
             TransactionSignature::Ed25519Signature(inner) => inner.verify(),
             TransactionSignature::MultiEd25519Signature(inner) => inner.verify(),
             TransactionSignature::MultiAgentSignature(inner) => inner.verify(),
+            TransactionSignature::FeePayerSignature(inner) => inner.verify(),
         }
     }
 }
@@ -868,6 +870,7 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
             TransactionSignature::Ed25519Signature(sig) => sig.try_into()?,
             TransactionSignature::MultiEd25519Signature(sig) => sig.try_into()?,
             TransactionSignature::MultiAgentSignature(sig) => sig.try_into()?,
+            TransactionSignature::FeePayerSignature(sig) => sig.try_into()?,
         })
     }
 }
@@ -1228,6 +1231,89 @@ impl
     }
 }
 
+/// Fee payer signature for fee payer transactions
+///
+/// This allows you to have transactions across multiple accounts and with a fee payer
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct FeePayerSignature {
+    pub sender: AccountSignature,
+    /// The other involved parties' addresses
+    pub secondary_signer_addresses: Vec<Address>,
+    /// The associated signatures, in the same order as the secondary addresses
+    pub secondary_signers: Vec<AccountSignature>,
+    /// The address of the paying party
+    pub fee_payer_address: Address,
+    /// The signature of the fee payer
+    pub fee_payer_signer: AccountSignature,
+}
+
+impl VerifyInput for FeePayerSignature {
+    fn verify(&self) -> anyhow::Result<()> {
+        self.sender.verify()?;
+
+        for signer in self.secondary_signers.iter() {
+            signer.verify()?;
+        }
+        self.fee_payer_signer.verify()?;
+        Ok(())
+    }
+}
+
+impl TryFrom<FeePayerSignature> for TransactionAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(value: FeePayerSignature) -> Result<Self, Self::Error> {
+        let FeePayerSignature {
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+            fee_payer_address,
+            fee_payer_signer,
+        } = value;
+        Ok(TransactionAuthenticator::fee_payer(
+            sender.try_into()?,
+            secondary_signer_addresses
+                .into_iter()
+                .map(|a| a.into())
+                .collect(),
+            secondary_signers
+                .into_iter()
+                .map(|s| s.try_into())
+                .collect::<anyhow::Result<_>>()?,
+            fee_payer_address.into(),
+            fee_payer_signer.try_into()?,
+        ))
+    }
+}
+
+impl
+    From<(
+        &AccountAuthenticator,
+        &Vec<AccountAddress>,
+        &Vec<AccountAuthenticator>,
+        &AccountAddress,
+        &AccountAuthenticator,
+    )> for FeePayerSignature
+{
+    fn from(
+        (sender, addresses, signers, fee_payer_address, fee_payer_signer): (
+            &AccountAuthenticator,
+            &Vec<AccountAddress>,
+            &Vec<AccountAuthenticator>,
+            &AccountAddress,
+            &AccountAuthenticator,
+        ),
+    ) -> Self {
+        Self {
+            sender: sender.into(),
+            secondary_signer_addresses: addresses.iter().map(|address| (*address).into()).collect(),
+            secondary_signers: signers.iter().map(|s| s.into()).collect(),
+            fee_payer_address: (*fee_payer_address).into(),
+            fee_payer_signer: fee_payer_signer.into(),
+        }
+    }
+}
+
 impl From<TransactionAuthenticator> for TransactionSignature {
     fn from(auth: TransactionAuthenticator) -> Self {
         use TransactionAuthenticator::*;
@@ -1246,6 +1332,22 @@ impl From<TransactionAuthenticator> for TransactionSignature {
                 secondary_signers,
             } => Self::MultiAgentSignature(
                 (sender, secondary_signer_addresses, secondary_signers).into(),
+            ),
+            FeePayer {
+                sender,
+                secondary_signer_addresses,
+                secondary_signers,
+                fee_payer_address,
+                fee_payer_signer,
+            } => Self::FeePayerSignature(
+                (
+                    sender,
+                    secondary_signer_addresses,
+                    secondary_signers,
+                    fee_payer_address,
+                    fee_payer_signer,
+                )
+                    .into(),
             ),
         }
     }

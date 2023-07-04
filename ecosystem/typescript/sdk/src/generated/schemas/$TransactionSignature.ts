@@ -10,5 +10,7 @@ export const $TransactionSignature = {
         type: 'TransactionSignature_MultiEd25519Signature',
     }, {
         type: 'TransactionSignature_MultiAgentSignature',
+    }, {
+        type: 'TransactionSignature_FeePayerSignature',
     }],
 } as const;
