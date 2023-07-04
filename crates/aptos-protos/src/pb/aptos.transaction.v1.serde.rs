@@ -1815,98 +1815,6 @@ impl<'de> serde::Deserialize<'de> for EventKey {
         deserializer.deserialize_struct("aptos.transaction.v1.EventKey", FIELDS, GeneratedVisitor)
     }
 }
-impl serde::Serialize for FeePayerPayload {
-    #[allow(deprecated)]
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut len = 0;
-        if self.transaction_payload.is_some() {
-            len += 1;
-        }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.FeePayerPayload", len)?;
-        if let Some(v) = self.transaction_payload.as_ref() {
-            struct_ser.serialize_field("transactionPayload", v)?;
-        }
-        struct_ser.end()
-    }
-}
-impl<'de> serde::Deserialize<'de> for FeePayerPayload {
-    #[allow(deprecated)]
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        const FIELDS: &[&str] = &[
-            "transaction_payload",
-            "transactionPayload",
-        ];
-
-        #[allow(clippy::enum_variant_names)]
-        enum GeneratedField {
-            TransactionPayload,
-        }
-        impl<'de> serde::Deserialize<'de> for GeneratedField {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                struct GeneratedVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-                    type Value = GeneratedField;
-
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        write!(formatter, "expected one of: {:?}", &FIELDS)
-                    }
-
-                    #[allow(unused_variables)]
-                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        match value {
-                            "transactionPayload" | "transaction_payload" => Ok(GeneratedField::TransactionPayload),
-                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-                deserializer.deserialize_identifier(GeneratedVisitor)
-            }
-        }
-        struct GeneratedVisitor;
-        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = FeePayerPayload;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.FeePayerPayload")
-            }
-
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<FeePayerPayload, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
-            {
-                let mut transaction_payload__ = None;
-                while let Some(k) = map.next_key()? {
-                    match k {
-                        GeneratedField::TransactionPayload => {
-                            if transaction_payload__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("transactionPayload"));
-                            }
-                            transaction_payload__ = map.next_value()?;
-                        }
-                    }
-                }
-                Ok(FeePayerPayload {
-                    transaction_payload: transaction_payload__,
-                })
-            }
-        }
-        deserializer.deserialize_struct("aptos.transaction.v1.FeePayerPayload", FIELDS, GeneratedVisitor)
-    }
-}
 impl serde::Serialize for FeePayerSignature {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -5846,9 +5754,6 @@ impl serde::Serialize for TransactionPayload {
                 transaction_payload::Payload::MultisigPayload(v) => {
                     struct_ser.serialize_field("multisigPayload", v)?;
                 }
-                transaction_payload::Payload::FeePayerPayload(v) => {
-                    struct_ser.serialize_field("feePayerPayload", v)?;
-                }
             }
         }
         struct_ser.end()
@@ -5872,8 +5777,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             "writeSetPayload",
             "multisig_payload",
             "multisigPayload",
-            "fee_payer_payload",
-            "feePayerPayload",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -5884,7 +5787,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             ModuleBundlePayload,
             WriteSetPayload,
             MultisigPayload,
-            FeePayerPayload,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -5912,7 +5814,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             "moduleBundlePayload" | "module_bundle_payload" => Ok(GeneratedField::ModuleBundlePayload),
                             "writeSetPayload" | "write_set_payload" => Ok(GeneratedField::WriteSetPayload),
                             "multisigPayload" | "multisig_payload" => Ok(GeneratedField::MultisigPayload),
-                            "feePayerPayload" | "fee_payer_payload" => Ok(GeneratedField::FeePayerPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -5977,13 +5878,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::MultisigPayload)
 ;
                         }
-                        GeneratedField::FeePayerPayload => {
-                            if payload__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("feePayerPayload"));
-                            }
-                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::FeePayerPayload)
-;
-                        }
                     }
                 }
                 Ok(TransactionPayload {
@@ -6008,7 +5902,6 @@ impl serde::Serialize for transaction_payload::Type {
             Self::ModuleBundlePayload => "TYPE_MODULE_BUNDLE_PAYLOAD",
             Self::WriteSetPayload => "TYPE_WRITE_SET_PAYLOAD",
             Self::MultisigPayload => "TYPE_MULTISIG_PAYLOAD",
-            Self::FeePayerPayload => "TYPE_FEE_PAYER_PAYLOAD",
         };
         serializer.serialize_str(variant)
     }
@@ -6026,7 +5919,6 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
             "TYPE_MODULE_BUNDLE_PAYLOAD",
             "TYPE_WRITE_SET_PAYLOAD",
             "TYPE_MULTISIG_PAYLOAD",
-            "TYPE_FEE_PAYER_PAYLOAD",
         ];
 
         struct GeneratedVisitor;
@@ -6075,7 +5967,6 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
                     "TYPE_MODULE_BUNDLE_PAYLOAD" => Ok(transaction_payload::Type::ModuleBundlePayload),
                     "TYPE_WRITE_SET_PAYLOAD" => Ok(transaction_payload::Type::WriteSetPayload),
                     "TYPE_MULTISIG_PAYLOAD" => Ok(transaction_payload::Type::MultisigPayload),
-                    "TYPE_FEE_PAYER_PAYLOAD" => Ok(transaction_payload::Type::FeePayerPayload),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
