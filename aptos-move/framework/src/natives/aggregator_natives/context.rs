@@ -155,7 +155,7 @@ impl AggregatorChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::{aggregator_extension::aggregator_id_for_test, AggregatorStore};
+    use aptos_aggregator::{aggregator_id_for_test, AggregatorStore};
     use claims::{assert_matches, assert_ok};
 
     fn get_test_resolver() -> AggregatorStore {

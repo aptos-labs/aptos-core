@@ -17,12 +17,27 @@ pub trait AggregatorResolver {
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils {
     use super::*;
-    use crate::delta_change_set::{deserialize, serialize};
+    use crate::{
+        aggregator_extension::AggregatorHandle,
+        delta_change_set::{deserialize, serialize},
+    };
     use aptos_state_view::TStateView;
     use aptos_types::state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     };
+    use move_core_types::account_address::AccountAddress;
+    use move_table_extension::TableHandle;
     use std::collections::HashMap;
+
+    /// Generates a dummy id for aggregator based on the given key. Only used for testing.
+    pub fn aggregator_id_for_test(key: u128) -> AggregatorID {
+        let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
+            .iter()
+            .flat_map(|b| b.to_vec())
+            .collect();
+        let key = AggregatorHandle(AccountAddress::from_bytes(bytes).unwrap());
+        AggregatorID::legacy(TableHandle(AccountAddress::ZERO), key)
+    }
 
     #[derive(Default)]
     pub struct AggregatorStore(HashMap<StateKey, StateValue>);

@@ -60,16 +60,6 @@ impl AggregatorID {
     }
 }
 
-/// Generates a dummy id for aggregator based on the given key. Only used for testing.
-pub fn aggregator_id_for_test(key: u128) -> AggregatorID {
-    let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
-        .iter()
-        .flat_map(|b| b.to_vec())
-        .collect();
-    let key = AggregatorHandle(AccountAddress::from_bytes(bytes).unwrap());
-    AggregatorID::legacy(TableHandle(AccountAddress::ZERO), key)
-}
-
 /// Tracks values seen by aggregator. In particular, stores information about
 /// the biggest and the smallest deltas seen during execution in the VM. This
 /// information can be used by the executor to check if delta should have
@@ -401,7 +391,7 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::AggregatorStore;
+    use crate::{aggregator_id_for_test, AggregatorStore};
     use claims::{assert_err, assert_ok};
     use once_cell::sync::Lazy;
 

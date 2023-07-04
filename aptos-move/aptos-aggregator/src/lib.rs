@@ -8,4 +8,4 @@ pub mod resolver;
 pub mod transaction;
 
 #[cfg(any(test, feature = "testing"))]
-pub use resolver::test_utils::AggregatorStore;
+pub use resolver::test_utils::{aggregator_id_for_test, AggregatorStore};
