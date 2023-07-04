@@ -89,6 +89,11 @@ module aptos_framework::transaction_validation {
             error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
         );
 
+        assert!(
+            txn_sequence_number < (1u64 << 63),
+            error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
+        );
+
         let account_sequence_number = account::get_sequence_number(transaction_sender);
         assert!(
             txn_sequence_number >= account_sequence_number,
