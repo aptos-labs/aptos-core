@@ -1270,6 +1270,7 @@ impl TransactionsApi {
             .map_err(|err| {
                 BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput, &ledger_info)
             })?;
+
         let raw_message = match request.secondary_signers {
             Some(secondary_signer_addresses) => signing_message(
                 &RawTransactionWithData::new_multi_agent(

@@ -695,6 +695,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     transaction_payload,
                 })
             },
+
             // Deprecated. Will be removed in the future.
             TransactionPayload::ModuleBundlePayload(payload) => {
                 Target::ModuleBundle(ModuleBundle::new(
