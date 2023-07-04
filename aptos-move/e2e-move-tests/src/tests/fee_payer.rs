@@ -3,7 +3,6 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos::move_tool::MemberId;
-use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_language_e2e_tests::{account::TransactionBuilder, transaction_status_eq};
 use aptos_types::{
     account_address::AccountAddress,
@@ -11,8 +10,6 @@ use aptos_types::{
     on_chain_config::FeatureFlag,
     transaction::{EntryFunction, Script, TransactionArgument, TransactionStatus},
 };
-use aptos_types::transaction::authenticator::AccountAuthenticator;
-use aptos_types::transaction::SignedTransaction;
 use move_core_types::{move_resource::MoveStructType, vm_status::StatusCode};
 
 fn read_coin(h: &MoveHarness, account: &AccountAddress) -> u64 {
