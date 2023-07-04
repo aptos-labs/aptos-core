@@ -117,7 +117,7 @@ fn test_two_to_two_transfer_fee_payer_is_sender() {
         common::test_dir_path("../../../move-examples/scripts/two_by_two_transfer"),
         build_options,
     )
-        .expect("building package must succeed");
+    .expect("building package must succeed");
 
     let alice_start = read_coin(&h, alice.address());
     let bob_start = read_coin(&h, bob.address());
