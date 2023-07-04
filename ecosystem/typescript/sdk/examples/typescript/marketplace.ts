@@ -40,13 +40,13 @@ export class Marketplace {
   }
 
   // Coin listing operations
-  async buildInitFixedPriceListing(
+  initFixedPriceListing(
     object: MaybeHexString,
     feeSchedule: MaybeHexString,
     startTime: bigint,
     price: bigint,
     coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       COIN_LISTING,
       "init_fixed_price",
@@ -55,7 +55,7 @@ export class Marketplace {
     );
   }
 
-  async initAuctionListing(
+  initAuctionListing(
     object: MaybeHexString,
     feeSchedule: MaybeHexString,
     startTime: bigint,
@@ -65,7 +65,7 @@ export class Marketplace {
     minimumBidTimeBeforeEnd: bigint,
     buyItNowPrice?: bigint,
     coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       COIN_LISTING,
       "init_auction",
@@ -83,7 +83,7 @@ export class Marketplace {
     );
   }
 
-  async initFixedPriceListingForTokenv1(
+  initFixedPriceListingForTokenv1(
     tokenCreator: MaybeHexString,
     tokenCollection: string,
     tokenName: string,
@@ -92,7 +92,7 @@ export class Marketplace {
     startTime: bigint,
     price: bigint,
     coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       COIN_LISTING,
       "init_fixed_price_for_tokenv1",
@@ -109,10 +109,11 @@ export class Marketplace {
     );
   }
 
-  async initAuctionListingForTokenv1(
+  initAuctionListingForTokenv1(
     tokenCreator: MaybeHexString,
     tokenCollection: string,
     tokenName: string,
+    tokenPropertyVersion: bigint,
     feeSchedule: MaybeHexString,
     startTime: bigint,
     startingBid: bigint,
@@ -121,7 +122,7 @@ export class Marketplace {
     minimumBidTimeBeforeEnd: bigint,
     buyItNowPrice?: bigint,
     coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       COIN_LISTING,
       "init_auction_for_tokenv1",
@@ -130,6 +131,7 @@ export class Marketplace {
         HexString.ensure(tokenCreator).hex(),
         tokenCollection,
         tokenName,
+        tokenPropertyVersion.toString(10),
         HexString.ensure(feeSchedule).hex(),
         startTime.toString(10),
         startingBid.toString(10),
@@ -141,20 +143,20 @@ export class Marketplace {
     );
   }
 
-  async purchaseListing(listing: MaybeHexString, coin: string = APTOS_COIN): Promise<TransactionPayload> {
+  purchaseListing(listing: MaybeHexString, coin: string = APTOS_COIN): TransactionPayload {
     return this.buildTransactionPayload(COIN_LISTING, "purchase", [coin], [HexString.ensure(listing).hex()]);
   }
 
-  async endFixedPriceListing(listing: MaybeHexString, coin: string = APTOS_COIN): Promise<TransactionPayload> {
+  endFixedPriceListing(listing: MaybeHexString, coin: string = APTOS_COIN): TransactionPayload {
     return this.buildTransactionPayload(COIN_LISTING, "end_fixed_price", [coin], [HexString.ensure(listing).hex()]);
   }
 
-  async bidAuctionListing(
+  bidAuctionListing(
     bidder: MaybeHexString,
     listing: MaybeHexString,
     bid_amount: bigint,
     coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       COIN_LISTING,
       "bid",
@@ -163,22 +165,18 @@ export class Marketplace {
     );
   }
 
-  async completeAuctionListing(
-    listing: MaybeHexString,
-    bid_amount: bigint,
-    coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  completeAuctionListing(listing: MaybeHexString, bid_amount: bigint, coin: string = APTOS_COIN): TransactionPayload {
     return this.buildTransactionPayload(COIN_LISTING, "complete_auction", [coin], [HexString.ensure(listing).hex()]);
   }
 
   // Listing operations
-  async extract_tokenv1(object: MaybeHexString): Promise<TransactionPayload> {
+  extract_tokenv1(object: MaybeHexString): TransactionPayload {
     return this.buildTransactionPayload(LISTING, "extract_tokenv1", [], [HexString.ensure(object).hex()]);
   }
 
   // Collection offer operations
 
-  async initCollectionOfferForTokenv1(
+  initCollectionOfferForTokenv1(
     tokenCreator: MaybeHexString,
     tokenCollection: string,
     feeSchedule: MaybeHexString,
@@ -186,7 +184,7 @@ export class Marketplace {
     amount: bigint,
     expiration_time: bigint, // TODO: convert to time?
     coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       COLLECTION_OFFER,
       "init_for_tokenv1_entry",
@@ -202,14 +200,14 @@ export class Marketplace {
     );
   }
 
-  async initCollectionOfferForTokenv2(
+  initCollectionOfferForTokenv2(
     collection: MaybeHexString,
     feeSchedule: MaybeHexString,
     price: bigint,
     amount: bigint,
     expiration_time: bigint, // TODO: convert to time?
     coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       COLLECTION_OFFER,
       "init_for_tokenv2_entry",
@@ -218,16 +216,16 @@ export class Marketplace {
     );
   }
 
-  async cancelCollectionOffer(collectionOffer: MaybeHexString, coin: string = APTOS_COIN): Promise<TransactionPayload> {
+  cancelCollectionOffer(collectionOffer: MaybeHexString, coin: string = APTOS_COIN): TransactionPayload {
     return this.buildTransactionPayload(COLLECTION_OFFER, "cancel", [coin], [HexString.ensure(collectionOffer).hex()]);
   }
 
-  async fillCollectionOfferForTokenv1(
+  fillCollectionOfferForTokenv1(
     collectionOffer: MaybeHexString,
     tokenName: string,
     propertyVersion: bigint,
     coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       COLLECTION_OFFER,
       "sell_tokenv1_entry",
@@ -236,11 +234,11 @@ export class Marketplace {
     );
   }
 
-  async fillCollectionOfferForTokenv2(
+  fillCollectionOfferForTokenv2(
     collectionOffer: MaybeHexString,
     token: MaybeHexString,
     coin: string = APTOS_COIN,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       COLLECTION_OFFER,
       "sell_tokenv1",
@@ -251,16 +249,16 @@ export class Marketplace {
 
   // Fee schedule operations
 
-  async initFeeSchedule(
+  initFeeSchedule(
     feeAddress: MaybeHexString,
     biddingFee: bigint,
     listingFee: bigint,
     commissionDenominator: bigint,
     commissionNumerator: bigint,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       FEE_SCHEDULE,
-      "init",
+      "init_entry",
       [],
       [
         HexString.ensure(feeAddress).hex(),
@@ -272,11 +270,11 @@ export class Marketplace {
     );
   }
 
-  async initEmptyFeeSchedule(feeAddress: MaybeHexString): Promise<TransactionPayload> {
+  initEmptyFeeSchedule(feeAddress: MaybeHexString): TransactionPayload {
     return this.buildTransactionPayload(FEE_SCHEDULE, "empty", [], [HexString.ensure(feeAddress).hex()]);
   }
 
-  async setFeeAddress(feeSchedule: MaybeHexString, feeAddress: MaybeHexString): Promise<TransactionPayload> {
+  setFeeAddress(feeSchedule: MaybeHexString, feeAddress: MaybeHexString): TransactionPayload {
     return this.buildTransactionPayload(
       FEE_SCHEDULE,
       "set_fee_address",
@@ -285,7 +283,7 @@ export class Marketplace {
     );
   }
 
-  async setFixedRateListingFee(feeSchedule: MaybeHexString, fee: bigint): Promise<TransactionPayload> {
+  setFixedRateListingFee(feeSchedule: MaybeHexString, fee: bigint): TransactionPayload {
     return this.buildTransactionPayload(
       FEE_SCHEDULE,
       "set_fixed_rate_listing_fee",
@@ -294,7 +292,7 @@ export class Marketplace {
     );
   }
 
-  async setFixedRateBiddingFee(feeSchedule: MaybeHexString, fee: bigint): Promise<TransactionPayload> {
+  setFixedRateBiddingFee(feeSchedule: MaybeHexString, fee: bigint): TransactionPayload {
     return this.buildTransactionPayload(
       FEE_SCHEDULE,
       "set_fixed_rate_bidding_fee",
@@ -303,7 +301,7 @@ export class Marketplace {
     );
   }
 
-  async setFixedRateCommission(feeSchedule: MaybeHexString, commission: bigint): Promise<TransactionPayload> {
+  setFixedRateCommission(feeSchedule: MaybeHexString, commission: bigint): TransactionPayload {
     return this.buildTransactionPayload(
       FEE_SCHEDULE,
       "set_fixed_rate_commission",
@@ -312,11 +310,11 @@ export class Marketplace {
     );
   }
 
-  async setPercentageRateCommission(
+  setPercentageRateCommission(
     feeSchedule: MaybeHexString,
     commissionDenominator: bigint,
     commissionNumerator: bigint,
-  ): Promise<TransactionPayload> {
+  ): TransactionPayload {
     return this.buildTransactionPayload(
       FEE_SCHEDULE,
       "set_percentage_rate_commission",
@@ -370,7 +368,7 @@ export class Marketplace {
   buildTransactionPayload(module: string, func: string, type: string[], args: any[]): TransactionPayload {
     return {
       type: "entry_function_payload",
-      function: func,
+      function: `${this.code_location}::${module}::${func}`,
       type_arguments: type,
       arguments: args,
     };
