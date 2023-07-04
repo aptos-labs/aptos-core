@@ -250,7 +250,7 @@ async fn test_multi_agent_signed_transaction() {
         .post("/transactions", resp)
         .await;
 }
-/* works when feature is enabled
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_fee_payer_signed_transaction() {
     let mut context = new_test_context(current_function_name!());
@@ -317,7 +317,7 @@ async fn test_fee_payer_signed_transaction() {
         .post("/transactions", resp)
         .await;
 }
-*/
+
 #[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multi_ed25519_signed_transaction() {
