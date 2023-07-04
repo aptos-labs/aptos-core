@@ -16,7 +16,8 @@ use crate::{
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_block_executor::{
     errors::Error,
-    executor::BlockExecutor,
+    executor::BlockSTMExecutor,
+    executor_common::BlockExecutor,
     task::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
@@ -180,7 +181,7 @@ impl BlockAptosVM {
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
-        let executor = BlockExecutor::<
+        let executor = BlockSTMExecutor::<
             PreprocessedTransaction,
             AptosExecutorTask<S>,
             S,
