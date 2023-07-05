@@ -9,7 +9,7 @@ use std::fs;
 
 pub fn handle_cpu_flamegraph_request() -> (StatusCode, Body, String) {
 
-    let content = fs::read_to_string("./crates/aptos-inspection-service/src/server/profiling_dashboard/flamegraph.svg").expect("Failed to read input");
+    let content = fs::read_to_string("./flamegraph.svg").expect("Failed to read input");
 
 
     (
