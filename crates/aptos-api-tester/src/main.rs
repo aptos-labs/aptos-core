@@ -25,6 +25,8 @@ static DEVNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
 static TESTNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
+static TESTNET_FAUCET_URL: Lazy<Url> =
+    Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
 
 // static accounts to use
 // don't send coins to TEST_ACCOUNT_1
@@ -539,6 +541,33 @@ async fn probe_getblockbyversion_1() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
+/// Tests if transactions created on the spot are returned by the API.
+async fn testnet_1() -> Result<&'static str> {
+    // create clients
+    let client: Client = Client::new(TESTNET_NODE_URL.clone());
+    let faucet_client = FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone());
+    let coin_client = CoinClient::new(&client);
+
+    // Step 1: Test new account creation
+    let mut giray = LocalAccount::generate(&mut rand::rngs::OsRng);
+    faucet_client
+        .fund(giray.address(), 100_000_000)
+        .await
+        .context(ERROR_FAUCET_FUND)?;
+
+    // Step 2: Test coin transfer
+    let txn_hash = coin_client
+        .transfer(&mut giray, *TEST_ACCOUNT_2, 1_000, None)
+        .await
+        .context(ERROR_COIN_TRANSFER)?;
+    let _ = client
+        .wait_for_transaction(&txn_hash)
+        .await
+        .context(ERROR_COIN_TRANSFER)?;
+
+    Ok(SUCCESS)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     match probe_getaccount_1().await {
@@ -570,6 +599,10 @@ async fn main() -> Result<()> {
         Err(e) => println!("{:?}", e),
     }
     match probe_getblockbyversion_1().await {
+        Ok(result) => println!("{:?}", result),
+        Err(e) => println!("{:?}", e),
+    }
+    match testnet_1().await {
         Ok(result) => println!("{:?}", result),
         Err(e) => println!("{:?}", e),
     }
