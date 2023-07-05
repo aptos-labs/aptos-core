@@ -382,7 +382,7 @@ fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 /// Refreshes the cached storage server summary and sends
 /// a notification via the given channel. If an error
 /// occurs, it is logged.
-fn refresh_cached_storage_summary<T: StorageReaderInterface>(
+pub(crate) fn refresh_cached_storage_summary<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     storage: T,
     storage_config: StorageServiceConfig,
