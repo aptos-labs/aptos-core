@@ -237,47 +237,41 @@ impl Aggregator {
         // In theory, any delta will be applied to existing value. However,
         // something may go wrong, so we guard by throwing an error in
         // extension.
-        resolver
+        let value_from_storage = resolver
             .resolve_aggregator_value(id)
-            .map_err(|_| extension_error("could not find the value of the aggregator"))?
-            .map_or(
-                Err(extension_error(
-                    "could not find the value of the aggregator",
-                )),
-                |value_from_storage| {
-                    // Sanity checks.
-                    debug_assert!(
-                        self.history.is_some(),
-                        "resolving aggregator with no history"
-                    );
-                    let history = self.history.as_ref().unwrap();
+            .map_err(|_| extension_error("could not find the value of the aggregator"))?;
 
-                    // Validate history of the aggregator, ensure that there
-                    // was no violation of postcondition. We can do it by
-                    // emulating addition and subtraction.
-                    addition(value_from_storage, history.max_positive, self.limit)?;
-                    subtraction(value_from_storage, history.min_negative)?;
+        // Sanity checks.
+        debug_assert!(
+            self.history.is_some(),
+            "resolving aggregator with no history"
+        );
+        let history = self.history.as_ref().unwrap();
 
-                    // Validation succeeded, and now we can actually apply the delta.
-                    match self.state {
-                        AggregatorState::PositiveDelta => {
-                            self.value = addition(value_from_storage, self.value, self.limit)?;
-                        },
-                        AggregatorState::NegativeDelta => {
-                            self.value = subtraction(value_from_storage, self.value)?;
-                        },
-                        AggregatorState::Data => {
-                            unreachable!("history is not tracked when aggregator knows its value")
-                        },
-                    }
+        // Validate history of the aggregator, ensure that there
+        // was no violation of postcondition. We can do it by
+        // emulating addition and subtraction.
+        addition(value_from_storage, history.max_positive, self.limit)?;
+        subtraction(value_from_storage, history.min_negative)?;
 
-                    // Change the state and return the new value. Also, make
-                    // sure history is no longer tracked.
-                    self.state = AggregatorState::Data;
-                    self.history = None;
-                    Ok(self.value)
-                },
-            )
+        // Validation succeeded, and now we can actually apply the delta.
+        match self.state {
+            AggregatorState::PositiveDelta => {
+                self.value = addition(value_from_storage, self.value, self.limit)?;
+            },
+            AggregatorState::NegativeDelta => {
+                self.value = subtraction(value_from_storage, self.value)?;
+            },
+            AggregatorState::Data => {
+                unreachable!("history is not tracked when aggregator knows its value")
+            },
+        }
+
+        // Change the state and return the new value. Also, make
+        // sure history is no longer tracked.
+        self.state = AggregatorState::Data;
+        self.history = None;
+        Ok(self.value)
     }
 
     /// Unpacks aggregator into its fields.

@@ -4,12 +4,10 @@
 use crate::aggregator_extension::AggregatorID;
 
 /// Returns a value of an aggregator from cache or global storage.
-///   - Ok(Some(..)) if the data exists
-///   - Ok(None)     if the data does not exist, only applies to Aggregator V1
-///                  which is a separate state item.
-///   - Err(..)      only when something really wrong happens.
+///   - Ok(..)       if aggregator value exists
+///   - Err(..)      otherwise.
 pub trait AggregatorResolver {
-    fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<Option<u128>, anyhow::Error>;
+    fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<u128, anyhow::Error>;
 }
 
 // Utils to store aggregator values in data store. Here, we
@@ -57,15 +55,16 @@ pub mod test_utils {
     }
 
     impl AggregatorResolver for AggregatorStore {
-        fn resolve_aggregator_value(
-            &self,
-            id: &AggregatorID,
-        ) -> Result<Option<u128>, anyhow::Error> {
+        fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<u128, anyhow::Error> {
             let state_key = id
                 .into_state_key()
                 .expect("Only table-based IDs can be accessed in tests.");
-            let maybe_bytes = self.get_state_value_bytes(&state_key)?;
-            Ok(maybe_bytes.map(|bytes| deserialize(&bytes)))
+            match self.get_state_value_bytes(&state_key)? {
+                Some(bytes) => Ok(deserialize(&bytes)),
+                None => {
+                    anyhow::bail!("Could not find the value of the aggregator")
+                },
+            }
         }
     }
 
