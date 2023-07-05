@@ -349,7 +349,8 @@ impl ShardedBlockPartitioner {
                 return frozen_sub_blocks;
             }
         }
-
+        let num_discarded_txns = txns_to_partition.iter().map(|txns|txns.len()).sum();
+        info!("num_discarded_txns={num_discarded_txns}");
         // We just add cross shard dependencies for remaining transactions.
         let (frozen_sub_blocks, _, rejected_txns) = self.add_cross_shard_dependencies(
             current_round_start_index,
