@@ -2431,6 +2431,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-storage-interface",
  "aptos-storage-service-client",
+ "aptos-storage-service-notifications",
  "aptos-storage-service-server",
  "aptos-storage-service-types",
  "aptos-telemetry",
@@ -3021,6 +3022,7 @@ dependencies = [
  "aptos-scratchpad",
  "aptos-storage-interface",
  "aptos-storage-service-client",
+ "aptos-storage-service-notifications",
  "aptos-storage-service-types",
  "aptos-temppath",
  "aptos-time-service",
@@ -3096,6 +3098,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-storage-service-notifications"
+version = "0.1.0"
+dependencies = [
+ "aptos-channels",
+ "aptos-crypto",
+ "async-trait",
+ "claims",
+ "futures",
+ "serde 1.0.149",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-storage-service-server"
 version = "0.1.0"
 dependencies = [
@@ -3111,6 +3127,7 @@ dependencies = [
  "aptos-netcore",
  "aptos-network",
  "aptos-storage-interface",
+ "aptos-storage-service-notifications",
  "aptos-storage-service-types",
  "aptos-time-service",
  "aptos-types",
