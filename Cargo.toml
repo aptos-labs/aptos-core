@@ -594,6 +594,7 @@ tempfile = "3.3.0"
 termcolor = "1.1.2"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
+thread_local = "1.1.7"
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.34"
