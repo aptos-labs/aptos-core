@@ -1898,8 +1898,6 @@ dependencies = [
  "pprof",
  "prometheus",
  "reqwest",
- "rstack",
- "rstack-self",
  "rusty-fork",
  "serde_json",
  "sysinfo",
