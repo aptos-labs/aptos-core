@@ -43,12 +43,12 @@ impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitListener<T>
     fn on_transaction_committed(
         &self,
         _txn_idx: TxnIndex,
-        _execution_status: &Self::ExecutionStatus
+        _execution_status: &Self::ExecutionStatus,
     ) {
         // no-op
     }
 
-    fn send_remote_update_for_success(&self, txn_idx: TxnIndex, txn_output: &T) {
+    fn send_remote_update_for_success(&self, _txn_idx: TxnIndex, _txn_output: &T) {
         //no-op
     }
 }

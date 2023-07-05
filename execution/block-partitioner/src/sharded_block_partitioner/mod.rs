@@ -1,24 +1,25 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_partitioner::{
-    cross_shard_messages::CrossShardMsg,
-    dependency_analysis::WriteSetWithTxnIndex,
-    messages::{
-        AddWithCrossShardDep, ControlMsg,
-        ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
-        DiscardCrossShardDep, PartitioningResp,
+use crate::{
+    sharded_block_partitioner::{
+        cross_shard_messages::CrossShardMsg,
+        dependency_analysis::WriteSetWithTxnIndex,
+        messages::{
+            AddWithCrossShardDep, ControlMsg,
+            ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
+            DiscardCrossShardDep, PartitioningResp,
+        },
+        partitioning_shard::PartitioningShard,
     },
-    partitioning_shard::PartitioningShard,
+    BlockPartitioner,
 };
 use aptos_logger::{error, info};
-use aptos_metrics_core::{exponential_buckets, register_histogram, Histogram};
 use aptos_types::{
     block_executor::partitioner::{ShardId, SubBlocksForShard, TxnIndex},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
     sync::{
@@ -27,9 +28,6 @@ use std::{
     },
     thread,
 };
-use aptos_crypto::hash::CryptoHash;
-use aptos_types::state_store::state_key::StateKey;
-use crate::BlockPartitioner;
 
 mod conflict_detector;
 mod cross_shard_messages;
@@ -301,7 +299,6 @@ impl ShardedBlockPartitioner {
         transactions: Vec<AnalyzedTransaction>,
         num_partitioning_round: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
-        let _timer = APTOS_BLOCK_PARTITIONER_SECONDS.start_timer();
         let total_txns = transactions.len();
         if total_txns == 0 {
             return vec![];
@@ -382,7 +379,11 @@ impl ShardedBlockPartitioner {
 }
 
 impl BlockPartitioner for ShardedBlockPartitioner {
-    fn partition(&self, transactions: Vec<Transaction>, num_executor_shards: usize) -> Vec<SubBlocksForShard<Transaction>> {
+    fn partition(
+        &self,
+        transactions: Vec<Transaction>,
+        num_executor_shards: usize,
+    ) -> Vec<SubBlocksForShard<Transaction>> {
         assert_eq!(self.num_shards, num_executor_shards);
         let analyzed_transactions = transactions.into_iter().map(|t| t.into()).collect();
         self.partition(analyzed_transactions, 1)
@@ -800,14 +801,3 @@ mod tests {
         }
     }
 }
-
-pub static APTOS_BLOCK_PARTITIONER_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        // metric name
-        "aptos_block_partitioner_seconds",
-        // metric description
-        "The total time spent in seconds of block partitioning in the sharded block partitioner.",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    )
-    .unwrap()
-});

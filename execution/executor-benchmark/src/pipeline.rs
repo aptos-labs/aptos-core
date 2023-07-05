@@ -4,6 +4,10 @@
 use crate::{
     block_partitioning::BlockPartitioningStage, TransactionCommitter, TransactionExecutor,
 };
+use aptos_block_partitioner::{
+    no_op::NoOpPartitioner, sharded_block_partitioner::ShardedBlockPartitioner,
+    simple_partitioner::SimplePartitioner, BlockPartitioner,
+};
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
@@ -22,10 +26,6 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
-use aptos_block_partitioner::BlockPartitioner;
-use aptos_block_partitioner::no_op::NoOpPartitioner;
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
-use aptos_block_partitioner::simple_partitioner::SimplePartitioner;
 
 #[derive(Clone, Debug)]
 pub enum PartitionerImpl {
@@ -118,9 +118,12 @@ where
                     let partitioner: Arc<dyn BlockPartitioner> = match config.partitioner_impl {
                         PartitionerImpl::NoOp => Arc::new(NoOpPartitioner {}),
                         PartitionerImpl::Simple => Arc::new(SimplePartitioner {}),
-                        PartitionerImpl::Sharded(concurrency_level) => Arc::new(ShardedBlockPartitioner::new(concurrency_level)),
+                        PartitionerImpl::Sharded(concurrency_level) => {
+                            Arc::new(ShardedBlockPartitioner::new(concurrency_level))
+                        },
                     };
-                    let mut partitioning_stage = BlockPartitioningStage::new(config.num_executor_shards, partitioner);
+                    let mut partitioning_stage =
+                        BlockPartitioningStage::new(config.num_executor_shards, partitioner);
                     while let Ok(txns) = raw_block_receiver.recv() {
                         let exe_block_msg = partitioning_stage.process(txns);
                         executable_block_sender.send(exe_block_msg).unwrap();
@@ -174,9 +177,12 @@ where
                     let partitioner: Arc<dyn BlockPartitioner> = match config.partitioner_impl {
                         PartitionerImpl::NoOp => Arc::new(NoOpPartitioner {}),
                         PartitionerImpl::Simple => Arc::new(SimplePartitioner {}),
-                        PartitionerImpl::Sharded(concurrency_level) => Arc::new(ShardedBlockPartitioner::new(concurrency_level)),
+                        PartitionerImpl::Sharded(concurrency_level) => {
+                            Arc::new(ShardedBlockPartitioner::new(concurrency_level))
+                        },
                     };
-                    let mut partitioning_stage = BlockPartitioningStage::new(config.num_executor_shards, partitioner);
+                    let mut partitioning_stage =
+                        BlockPartitioningStage::new(config.num_executor_shards, partitioner);
                     start_execution_rx.map(|rx| rx.recv());
                     let start_time = Instant::now();
                     let mut executed = 0;

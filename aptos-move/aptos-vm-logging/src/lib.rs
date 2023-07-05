@@ -135,9 +135,7 @@ pub fn flush_speculative_logs(num_to_flush: usize) {
         },
         None => {
             // Alert only if speculation is not disabled.
-            speculative_alert!(
-                "Clear all logs called on uninitialized speculative log storage"
-            );
+            speculative_alert!("Clear all logs called on uninitialized speculative log storage");
         },
     }
 }
@@ -155,9 +153,7 @@ pub fn clear_speculative_txn_logs(txn_idx: usize) {
             };
         },
         None => {
-            speculative_alert!(
-                "Clear all logs called on uninitialized speculative log storage"
-            );
+            speculative_alert!("Clear all logs called on uninitialized speculative log storage");
         },
     }
 }

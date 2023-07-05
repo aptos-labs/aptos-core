@@ -41,7 +41,6 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::sync::Arc;
-use aptos_block_executor::task::ExecutionStatus;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -202,7 +201,10 @@ impl BlockAptosVM {
 
     pub fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitListener<AptosTransactionOutput, ExecutionStatus = BlockExecutorExecutionStatus<AptosTransactionOutput, Error<VMStatus>>,>,
+        L: TransactionCommitListener<
+            AptosTransactionOutput,
+            ExecutionStatus = BlockExecutorExecutionStatus<AptosTransactionOutput, Error<VMStatus>>,
+        >,
     >(
         executor_thread_pool: Arc<ThreadPool>,
         transactions: BlockExecutorTransactions<Transaction>,

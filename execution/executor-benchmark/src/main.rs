@@ -6,7 +6,10 @@ use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
-use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
+use aptos_executor_benchmark::{
+    native_executor::NativeExecutor,
+    pipeline::{PartitionerImpl, PipelineConfig},
+};
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::args::TransactionTypeArg;
@@ -17,7 +20,6 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-use aptos_executor_benchmark::pipeline::PartitionerImpl;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -114,7 +116,7 @@ impl PipelineOpt {
                 0 => PartitionerImpl::NoOp,
                 1 => PartitionerImpl::Simple,
                 2 => PartitionerImpl::Sharded(self.num_executor_shards),
-                _ => unreachable!()
+                _ => unreachable!(),
             },
             async_partitioning: self.async_partitioning,
         }

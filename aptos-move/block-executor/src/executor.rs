@@ -85,7 +85,10 @@ where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitListener<E::Output, ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>>,
+    L: TransactionCommitListener<
+        E::Output,
+        ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>,
+    >,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should

@@ -12,11 +12,10 @@ use aptos_types::{
     },
 };
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{hash_map::DefaultHasher, HashSet},
     hash::{Hash, Hasher},
     sync::Arc,
 };
-use std::collections::HashSet;
 
 pub struct CrossShardConflictDetector {
     shard_id: ShardId,
@@ -48,8 +47,12 @@ impl CrossShardConflictDetector {
         let mut rejected_txns = Vec::new();
         let mut discarded_senders = HashSet::new();
         for (_, txn) in txns.into_iter().enumerate() {
-            let sender_was_discarded = txn.sender().map_or(false, |sender| discarded_senders.contains(&sender));
-            if sender_was_discarded || self.check_for_cross_shard_conflict(self.shard_id, &txn, cross_shard_rw_set) {
+            let sender_was_discarded = txn
+                .sender()
+                .map_or(false, |sender| discarded_senders.contains(&sender));
+            if sender_was_discarded
+                || self.check_for_cross_shard_conflict(self.shard_id, &txn, cross_shard_rw_set)
+            {
                 if let Some(sender) = txn.sender() {
                     discarded_senders.insert(sender);
                 }

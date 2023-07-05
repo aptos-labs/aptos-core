@@ -521,6 +521,10 @@ where
     fn fee_statement(&self) -> FeeStatement {
         FeeStatement::new(1, 1, 0, 0, 0)
     }
+
+    fn committed_output(&self) -> Option<&aptos_types::transaction::TransactionOutput> {
+        unimplemented!()
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////

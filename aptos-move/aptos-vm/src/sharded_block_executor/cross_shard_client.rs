@@ -8,9 +8,11 @@ use crate::{
     },
 };
 use aptos_block_executor::{
-    errors::Error, task::ExecutionStatus, txn_commit_listener::TransactionCommitListener,
+    errors::Error,
+    task::{ExecutionStatus, TransactionOutput},
+    txn_commit_listener::TransactionCommitListener,
 };
-use aptos_logger::{info, trace};
+use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -27,8 +29,6 @@ use std::{
         Arc, Mutex,
     },
 };
-use aptos_block_executor::task::TransactionOutput;
-use aptos_crypto::hash::CryptoHash;
 
 pub struct CrossShardCommitReceiver {}
 
@@ -118,6 +118,7 @@ impl<TO: TransactionOutput> TransactionCommitListener<TO> for CrossShardCommitSe
         txn_idx: TxnIndex,
         execution_status: &Self::ExecutionStatus,
     ) {
+        assert!(self.shard_id < usize::MAX);
         let global_txn_idx = txn_idx + self.index_offset;
         if self.dependent_edges.contains_key(&global_txn_idx) {
             match execution_status {
@@ -134,11 +135,7 @@ impl<TO: TransactionOutput> TransactionCommitListener<TO> for CrossShardCommitSe
         }
     }
 
-    fn send_remote_update_for_success(
-        &self,
-        txn_idx: TxnIndex,
-        txn_output: &TO,
-    ) {
+    fn send_remote_update_for_success(&self, txn_idx: TxnIndex, txn_output: &TO) {
         let txn_idx = self.index_offset + txn_idx;
         if !self.dependent_edges.contains_key(&txn_idx) {
             return;

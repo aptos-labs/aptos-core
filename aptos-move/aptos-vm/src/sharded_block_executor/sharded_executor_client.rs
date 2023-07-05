@@ -9,7 +9,7 @@ use crate::{
         messages::CrossShardMsg,
     },
 };
-use aptos_logger::{info, trace};
+use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
@@ -17,6 +17,7 @@ use aptos_types::{
     },
     transaction::{Transaction, TransactionOutput},
 };
+use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::{
@@ -26,8 +27,6 @@ use std::{
         Arc, Mutex,
     },
 };
-use aptos_crypto::hash::CryptoHash;
-use aptos_vm_logging::disable_speculative_logging;
 
 pub struct ShardedExecutorClient {
     shard_id: ShardId,
@@ -93,8 +92,9 @@ impl ShardedExecutorClient {
         sub_block: &SubBlock<Transaction>,
     ) -> CrossShardStateView<'a, S> {
         let mut cross_shard_state_key = HashSet::new();
-        for (local_tid, txn) in sub_block.transactions.iter().enumerate() {
-            for (src_txn, storage_locations) in txn.cross_shard_dependencies.required_edges_iter() {
+        for (_local_tid, txn) in sub_block.transactions.iter().enumerate() {
+            for (_src_txn, storage_locations) in txn.cross_shard_dependencies.required_edges_iter()
+            {
                 for storage_location in storage_locations {
                     let state_key = storage_location.clone().into_state_key();
                     // let key_str = state_key.hash().to_hex();

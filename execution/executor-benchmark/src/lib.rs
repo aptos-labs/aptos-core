@@ -15,8 +15,10 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
-    pipeline::Pipeline, transaction_committer::TransactionCommitter,
-    transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
+    pipeline::{PartitionerImpl, Pipeline},
+    transaction_committer::TransactionCommitter,
+    transaction_executor::TransactionExecutor,
+    transaction_generator::TransactionGenerator,
 };
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
@@ -48,7 +50,6 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
-use crate::pipeline::PartitionerImpl;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -480,7 +481,7 @@ fn add_accounts_impl<V>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{native_executor::NativeExecutor, pipeline::PipelineConfig};
+    use crate::{native_executor::NativeExecutor, pipeline::PipelineConfig, PartitionerImpl};
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
@@ -518,6 +519,7 @@ mod tests {
                 allow_discards: false,
                 allow_aborts: false,
                 num_executor_shards: 1,
+                partitioner_impl: PartitionerImpl::NoOp,
                 async_partitioning: false,
             },
         );
@@ -545,6 +547,7 @@ mod tests {
                 allow_discards: false,
                 allow_aborts: false,
                 num_executor_shards: 1,
+                partitioner_impl: PartitionerImpl::NoOp,
                 async_partitioning: false,
             },
         );
