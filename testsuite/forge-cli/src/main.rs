@@ -42,7 +42,7 @@ use aptos_testcases::{
     CompositeNetworkTest,
 };
 use clap::{Parser, Subcommand};
-use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+
 use std::{
     env,
     num::NonZeroUsize,
@@ -57,7 +57,7 @@ use std::{
 use tokio::runtime::Runtime;
 use url::Url;
 
-use aptos_forge_cli::commands::operator::OperatorCommand;
+use aptos_forge_cli::{commands::operator::OperatorCommand, utils::generate_random_namespace};
 
 #[cfg(unix)]
 #[global_allocator]
@@ -151,16 +151,6 @@ struct K8sSwarm {
     enable_haproxy: bool,
 }
 
-/// Make an easy to remember random namespace for your testnet
-fn random_namespace<R: Rng>(dictionary: Vec<String>, rng: &mut R) -> Result<String> {
-    // Pick four random words
-    let random_words = dictionary
-        .choose_multiple(rng, 4)
-        .cloned()
-        .collect::<Vec<String>>();
-    Ok(format!("forge-{}", random_words.join("-")))
-}
-
 fn main() -> Result<()> {
     let mut logger = aptos_logger::Logger::new();
     logger.channel_size(1000).is_async(false).level(Level::Info);
@@ -221,22 +211,10 @@ fn main() -> Result<()> {
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
                         test_suite = test_suite.with_genesis_modules_path(move_modules_dir.clone());
                     }
-                    let namespace = if k8s.namespace.is_none() {
-                        let mut rng: ThreadRng = rand::thread_rng();
-                        // Lets pick some four letter words ;)
-                        let words = random_word::all_len(4)
-                            .ok_or_else(|| {
-                                format_err!(
-                                    "Failed to get namespace, rerun with --namespace <namespace>"
-                                )
-                            })?
-                            .to_vec()
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect::<Vec<String>>();
-                        random_namespace(words, &mut rng)?
+                    let namespace = if let Some(namespace) = k8s.namespace.clone() {
+                        namespace
                     } else {
-                        k8s.namespace.clone().unwrap()
+                        generate_random_namespace().unwrap()
                     };
                     let forge_runner_mode =
                         ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s);
@@ -2005,18 +1983,6 @@ impl NetworkTest for EmitTransaction {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn test_random_namespace() {
-        let mut rng = rand::rngs::mock::StepRng::new(100, 1);
-        let words = ["apple", "banana", "carrot", "durian", "eggplant", "fig"]
-            .to_vec()
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>();
-        let namespace = random_namespace(words, &mut rng).unwrap();
-        assert_eq!(namespace, "forge-durian-eggplant-fig-apple");
-    }
 
     #[test]
     fn verify_tool() {

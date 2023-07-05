@@ -2,12 +2,17 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{time::Duration, num::NonZeroUsize};
+
 use anyhow::Result;
 use aptos_forge::{
     cleanup_cluster_with_management, install_testnet_resources, set_stateful_set_image_tag,
-    uninstall_testnet_resources,
+    uninstall_testnet_resources, K8sFactory, NAMESPACE_CLEANUP_DURATION_BUFFER_SECS, Factory,
 };
 use clap::{Parser, Subcommand};
+use rand::{SeedableRng, rngs::OsRng, Rng};
+
+use crate::utils::generate_random_namespace;
 
 #[derive(Subcommand, Debug)]
 pub enum OperatorCommand {
@@ -17,6 +22,8 @@ pub enum OperatorCommand {
     CleanUp(CleanUp),
     /// Resize an existing cluster
     Resize(Resize),
+    /// Create a new cluster
+    Create(Create),
 }
 
 impl OperatorCommand {
@@ -53,6 +60,54 @@ impl OperatorCommand {
                 )
                 .await?;
             },
+            OperatorCommand::Create(_) => {
+                let namespace = generate_random_namespace()?;
+                let image_tag = "aptos-node-v1.5.1".to_string();
+                let upgrade_image_tag = "aptos-node-v1.5.1".to_string();
+                let port_forward = true;
+                let reuse = false;
+                let keep = true;
+                let enable_haproxy = false;
+
+                let factory = K8sFactory::new(
+                    namespace,
+                    image_tag,
+                    upgrade_image_tag,
+                    // We want to port forward if we're running locally because local means we're not in cluster
+                    port_forward,
+                    reuse,
+                    keep,
+                    enable_haproxy,
+                )?;
+
+                let versions = factory.versions();
+
+                let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
+                let initial_validator_count: NonZeroUsize = NonZeroUsize::new(5).unwrap();
+                let initial_fullnode_count: usize = 5;
+                let initial_version = versions.max().unwrap();
+                let genesis_version = initial_version.clone();
+                let genesis_config = None;
+                let global_duration = Duration::from_secs(300 + NAMESPACE_CLEANUP_DURATION_BUFFER_SECS);
+                let genesis_helm_config_fn = None;
+                let node_helm_config_fn = None;
+                let existing_db_tag = None;
+
+                let mut swarm = factory.launch_swarm(
+                    &mut rng,
+                    initial_validator_count,
+                    initial_fullnode_count,
+                    &initial_version,
+                    &genesis_version,
+                    genesis_config.as_ref(),
+                    global_duration,
+                    genesis_helm_config_fn.clone(),
+                    node_helm_config_fn.clone(),
+                    existing_db_tag.clone(),
+                ).await?;
+
+                swarm.health_check().await?;
+            }
         }
         Ok(())
     }
@@ -111,4 +166,8 @@ pub struct Resize {
     connect_directly: bool,
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
+}
+
+#[derive(Parser, Debug)]
+pub struct Create {
 }
