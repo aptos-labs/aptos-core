@@ -283,7 +283,7 @@ impl AptosVM {
     ) -> (VMStatus, VMOutput) {
         let mut session = self
             .0
-            .new_session(resolver, SessionId::txn_meta(txn_data), true);
+            .new_session(resolver, SessionId::epilogue_meta(txn_data), true);
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -497,7 +497,7 @@ impl AptosVM {
         )?;
 
         // TODO(Gas): Charge for aggregator writes
-        let session_id = SessionId::txn_meta(txn_data);
+        let session_id = SessionId::epilogue_meta(txn_data);
         RespawnedSession::spawn(&self.0, session_id, resolver, change_set)
     }
 
@@ -701,7 +701,7 @@ impl AptosVM {
         // the inner function call earlier (since it failed).
         let mut respawned_session = RespawnedSession::spawn(
             &self.0,
-            SessionId::txn_meta(txn_data),
+            SessionId::epilogue_meta(txn_data),
             resolver,
             VMChangeSet::empty(),
         )?;
@@ -1022,7 +1022,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
-        let mut session = self.0.new_session(resolver, SessionId::txn(txn), true);
+        let mut session = self.0.new_session(resolver, SessionId::prologue(txn), true);
         if let Err(err) = self.validate_signature_checked_transaction(
             &mut session,
             resolver,
@@ -1581,7 +1581,9 @@ impl VMValidator for AptosVM {
         };
 
         let resolver = self.as_move_resolver(state_view);
-        let mut session = self.0.new_session(&resolver, SessionId::txn(&txn), true);
+        let mut session = self
+            .0
+            .new_session(&resolver, SessionId::prologue(&txn), true);
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,
             &resolver,
