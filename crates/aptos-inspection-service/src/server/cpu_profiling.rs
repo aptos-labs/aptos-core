@@ -15,7 +15,7 @@ pub fn handle_cpu_profiling_request() -> (StatusCode, Body, String) {
     thread::sleep(five_secs);
 
     if let Ok(report) = guard.report().build() {
-        let file = File::create("/home/yunusozer/aptos-core/crates/aptos-inspection-service/src/server/profiling_dashboard/flamegraph.svg").unwrap();
+        let file = File::create("./crates/aptos-inspection-service/src/server/profiling_dashboard/flamegraph.svg").unwrap();
         report.flamegraph(file).unwrap();
 
         println!("report: {:?}", &report);

@@ -29,7 +29,7 @@ pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
 
         let handle = thread::spawn(move || {
             // Sleep for 15 seconds
-            thread::sleep(Duration::from_secs(30));
+            thread::sleep(Duration::from_secs(120));
 
             // Disable the profiling
             let mut prof_active: bool = false;
