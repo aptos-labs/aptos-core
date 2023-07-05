@@ -266,7 +266,8 @@ async fn test_fee_payer_signed_transaction() {
 
     // Create a new account with a multi-agent signer
     let txn = root_account.sign_fee_payer_with_transaction_builder(
-        vec![], &secondary,
+        vec![],
+        &secondary,
         factory.create_user_account(account.public_key()),
     );
 
@@ -282,7 +283,7 @@ async fn test_fee_payer_signed_transaction() {
             secondary_signer_addresses: _,
             secondary_signers,
             fee_payer_address: _,
-            fee_payer_signer
+            fee_payer_signer,
         } => (sender, secondary_signers, fee_payer_signer),
         _ => panic!(
             "expecting TransactionAuthenticator::MultiAgent, but got: {:?}",
