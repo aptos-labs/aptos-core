@@ -62,8 +62,17 @@ impl AptosTransactionOutput {
         }
     }
 
-    pub(crate) fn committed_output(&self) -> Option<&TransactionOutput> {
-        self.committed_output.get()
+    pub(crate) fn get_cloned_output(&self) -> TransactionOutput {
+        if let Some(output) = self.committed_output.get() {
+            output.clone()
+        } else {
+            self.vm_output
+                .lock()
+                .as_ref()
+                .expect("Output to be set")
+                .clone()
+                .output_with_delta_writes(vec![])
+        }
     }
 
     fn take_output(mut self) -> TransactionOutput {
