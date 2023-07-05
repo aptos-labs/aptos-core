@@ -185,23 +185,8 @@ async fn serve_requests(
             let _ = parts.next(); // Ignore the first empty part
             let _ = parts.next();
             let status = parts.next().unwrap_or("");
-            println!("
-
-
-
-
-
-
-            {}
-
-
-
-
-
-
-            ", status);
             //profiling dashboard
-            thread_dump::handle_thread_dump_request(status)
+            cpu_flamegraph::handle_cpu_flamegraph_request()
         },
         THREAD_DUMP_RESULT_PATH => {
             //profiling dashboard
