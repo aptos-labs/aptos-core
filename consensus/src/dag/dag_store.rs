@@ -15,10 +15,16 @@ use std::{
     sync::Arc,
 };
 
+enum NodeStatus {
+    Unordered(Arc<CertifiedNode>),
+    Ordered(Arc<CertifiedNode>),
+    Committed(Arc<CertifiedNode>),
+}
+
 /// Data structure that stores the DAG representation, it maintains both hash based index and
 /// round based index.
 pub struct Dag {
-    nodes_by_digest: HashMap<HashValue, Arc<CertifiedNode>>,
+    nodes_by_digest: HashMap<HashValue, NodeStatus>,
     nodes_by_round: BTreeMap<Round, Vec<Option<Arc<CertifiedNode>>>>,
     /// Map between peer id to vector index
     author_to_index: HashMap<Author, usize>,
@@ -37,7 +43,7 @@ impl Dag {
         for (digest, certified_node) in all_nodes {
             if certified_node.metadata().epoch() == epoch {
                 let arc_node = Arc::new(certified_node);
-                nodes_by_digest.insert(digest, arc_node.clone());
+                nodes_by_digest.insert(digest, NodeStatus::Unordered(arc_node.clone()));
                 let index = *author_to_index
                     .get(arc_node.metadata().author())
                     .expect("Author from certified node should exist");
@@ -91,7 +97,7 @@ impl Dag {
         self.storage.save_certified_node(&node)?;
         ensure!(
             self.nodes_by_digest
-                .insert(node.digest(), node.clone())
+                .insert(node.digest(), NodeStatus::Unordered(node.clone()))
                 .is_none(),
             "duplicate node"
         );
@@ -116,7 +122,11 @@ impl Dag {
     }
 
     pub fn get_node(&self, digest: &HashValue) -> Option<Arc<CertifiedNode>> {
-        self.nodes_by_digest.get(digest).cloned()
+        match self.nodes_by_digest.get(digest)? {
+            NodeStatus::Unordered(node)
+            | NodeStatus::Ordered(node)
+            | NodeStatus::Committed(node) => Some(node.clone()),
+        }
     }
 
     pub fn get_strong_links_for_round(
