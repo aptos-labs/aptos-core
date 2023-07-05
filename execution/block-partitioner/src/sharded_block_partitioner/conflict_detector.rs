@@ -3,8 +3,8 @@
 use crate::sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex};
 use aptos_types::{
     block_executor::partitioner::{
-        CrossShardDependencies, ShardId, SubBlock, TransactionWithDependencies, TxnIdxWithShardId,
-        TxnIndex,
+        CrossShardDependencies, RoundId, ShardId, ShardedTxnIdx, SubBlock,
+        TransactionWithDependencies, TxnIndex,
     },
     transaction::{
         analyzed_transaction::{AnalyzedTransaction, StorageLocation},
@@ -20,13 +20,15 @@ use std::{
 pub struct CrossShardConflictDetector {
     shard_id: ShardId,
     num_shards: usize,
+    round_id: RoundId,
 }
 
 impl CrossShardConflictDetector {
-    pub fn new(shard_id: ShardId, num_shards: usize) -> Self {
+    pub fn new(shard_id: ShardId, num_shards: usize, round_id: RoundId) -> Self {
         Self {
             shard_id,
             num_shards,
+            round_id,
         }
     }
 
@@ -81,9 +83,9 @@ impl CrossShardConflictDetector {
         current_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         prev_rounds_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> CrossShardDependencies {
-        if current_round_rw_set_with_index.is_empty() && prev_rounds_rw_set_with_index.is_empty() {
-            return CrossShardDependencies::default();
-        }
+        assert_eq!(self.num_shards, current_round_rw_set_with_index.len());
+        assert_eq!(0, current_round_rw_set_with_index.len() % self.num_shards);
+
         // Iterate through the frozen dependencies and add the max transaction index for each storage location
         let mut cross_shard_dependencies = CrossShardDependencies::default();
         for storage_location in frozen_txn
@@ -95,14 +97,17 @@ impl CrossShardConflictDetector {
             // and find the first shard id that has taken a write lock on the storage location. This ensures that we find the highest txn index that is conflicting
             // with the current transaction. Please note that since we use a multi-version database, there is no conflict if any previous txn index has taken
             // a read lock on the storage location.
-            let mut current_shard_id = self.shard_id; // current shard id - 1 in a wrapping fashion
+            let mut current_shard_id = self.shard_id;
+            let mut current_round = self.round_id;
             for rw_set_with_index in current_round_rw_set_with_index
                 .iter()
                 .take(self.shard_id)
                 .rev()
                 .chain(prev_rounds_rw_set_with_index.iter().rev())
             {
+                // Move the cursor backward.
                 if current_shard_id == 0 {
+                    current_round -= 1;
                     current_shard_id = self.num_shards - 1;
                 } else {
                     current_shard_id -= 1;
@@ -110,9 +115,10 @@ impl CrossShardConflictDetector {
 
                 if rw_set_with_index.has_write_lock(storage_location) {
                     cross_shard_dependencies.add_required_edge(
-                        TxnIdxWithShardId::new(
+                        ShardedTxnIdx::new(
                             rw_set_with_index.get_write_lock_txn_index(storage_location),
                             current_shard_id,
+                            current_round,
                         ),
                         storage_location.clone(),
                     );
