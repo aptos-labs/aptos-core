@@ -52,7 +52,7 @@ fn main() {
         for code in codes {
             let compiled_module = CompiledModule::deserialize(&code).unwrap();
             let module_id = compiled_module.self_id();
-            let identifier = module_id.name().to_string();
+            let identifier = &module_id.name().to_string();
 
             //// get module address
             let address = module_id.address();
@@ -60,7 +60,7 @@ fn main() {
             //// get all benchmark tagged functions
             let func_identifiers = helper::get_functional_identifiers(
                 compiled_module,
-                identifier.clone(),
+                identifier,
                 *address,
                 pattern.clone(),
             );

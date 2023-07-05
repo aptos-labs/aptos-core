@@ -63,9 +63,9 @@ pub fn sign_module_txn(
 }
 
 //// sign user transaction and only records the body of the transaction
-pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
+pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &String) {
     let start = Instant::now();
-    executor.exec_module(module_name, function_name, vec![], vec![]);
+    executor.exec_module(module_name, &function_name.as_str(), vec![], vec![]);
     let elapsed = start.elapsed();
     println!("running time (microseconds): {}", elapsed.as_micros());
 }
@@ -76,7 +76,7 @@ pub fn publish(
     executor: &mut FakeExecutor,
     func_identifiers: Vec<String>,
     address: AccountAddress,
-    identifier: String,
+    identifier: &String,
 ) {
     //// publish test-package under module address
     let creator = executor.new_account_at(address);
@@ -88,29 +88,40 @@ pub fn publish(
             "Executing {}::{}::{}",
             address.to_string(),
             identifier,
-            func_identifier,
+            func_identifier.clone(),
         );
 
         // publish package similar to create_publish_package in harness.rs
-        let module_payload = generate_module_payload(package);
         print!("Signing txn for module... ");
+        let module_payload = generate_module_payload(package);
         sign_module_txn(executor, &creator, module_payload, sequence_num_counter);
         sequence_num_counter = sequence_num_counter + 1;
 
         //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
         print!("Signing user txn... ");
-        let MemberId {
-            module_id,
-            member_id: _function_id,
-        } = str::parse(&format!(
-            "0x{}::{}::{}",
-            address.to_string(),
-            identifier,
-            func_identifier,
-        ))
-        .unwrap();
-        sign_user_txn(executor, &module_id, func_identifier.as_str());
+        let module_name = get_module_name(address, identifier, &func_identifier);
+        sign_user_txn(executor, &module_name, &func_identifier);
     }
+}
+
+//// get module name
+pub fn get_module_name(
+    address: AccountAddress,
+    identifier: &String,
+    func_identifier: &String,
+) -> ModuleId {
+    let MemberId {
+        module_id,
+        member_id: _function_id,
+    } = str::parse(&format!(
+        "0x{}::{}::{}",
+        address.to_string(),
+        identifier,
+        func_identifier,
+    ))
+    .unwrap();
+
+    module_id
 }
 
 //// get all directories of Move projects
@@ -130,7 +141,7 @@ pub fn get_dir_paths(dirs: ReadDir) -> Vec<PathBuf> {
 //// get functional identifiers
 pub fn get_functional_identifiers(
     cm: CompiledModule,
-    identifier: String,
+    identifier: &String,
     address: AccountAddress,
     pattern: String,
 ) -> Vec<String> {
