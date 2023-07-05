@@ -231,6 +231,7 @@ pub struct ProfileConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub faucet_url: Option<String>,
     /// Derivation path index of the account on ledger
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub derivation_path: Option<String>,
 }
 
