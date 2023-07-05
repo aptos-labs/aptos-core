@@ -2,7 +2,7 @@
 cognitive-complexity-threshold = 100
 # types are used for safety encoding
 type-complexity-threshold = 10000
-# manipulating complex states machines in consensus
-too-many-arguments-threshold = 13
+# The state sync driver requires a lot of wiring and channel handles
+too-many-arguments-threshold = 14
 # Reasonably large enum variants are okay
 enum-variant-size-threshold = 1000

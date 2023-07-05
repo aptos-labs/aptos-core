@@ -23,6 +23,7 @@ use aptos_state_sync_driver::{
 };
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_storage_service_client::StorageServiceClient;
+use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_storage_service_server::{
     network::StorageServiceNetworkEvents, storage::StorageReader, StorageServiceServer,
 };
@@ -88,16 +89,8 @@ pub fn start_state_sync_and_get_notification_handles(
     let network_client = storage_network_interfaces.network_client;
     let network_service_events = storage_network_interfaces.network_service_events;
 
-    // Start the state sync storage service
-    let peers_and_metadata = network_client.get_peers_and_metadata();
-    let storage_service_runtime = setup_state_sync_storage_service(
-        node_config.state_sync.storage_service,
-        peers_and_metadata,
-        network_service_events,
-        &db_rw,
-    )?;
-
     // Start the data client
+    let peers_and_metadata = network_client.get_peers_and_metadata();
     let (aptos_data_client, aptos_data_client_runtime) =
         setup_aptos_data_client(node_config, network_client, db_rw.reader.clone())?;
 
@@ -109,7 +102,7 @@ pub fn start_state_sync_and_get_notification_handles(
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
     let metadata_storage = PersistentMetadataStorage::new(&node_config.storage.dir());
 
-    // Create notification senders and listeners for mempool and consensus
+    // Create notification senders and listeners for mempool, consensus and the storage service
     let (mempool_notifier, mempool_listener) =
         aptos_mempool_notifications::new_mempool_notifier_listener_pair();
     let (consensus_notifier, consensus_listener) =
@@ -119,6 +112,17 @@ pub fn start_state_sync_and_get_notification_handles(
                 .state_sync_driver
                 .commit_notification_timeout_ms,
         );
+    let (storage_service_notifier, storage_service_listener) =
+        aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
+
+    // Start the state sync storage service
+    let storage_service_runtime = setup_state_sync_storage_service(
+        node_config.state_sync.storage_service,
+        peers_and_metadata,
+        network_service_events,
+        &db_rw,
+        storage_service_listener,
+    )?;
 
     // Create the state sync driver factory
     let state_sync = DriverFactory::create_and_spawn_driver(
@@ -128,6 +132,7 @@ pub fn start_state_sync_and_get_notification_handles(
         db_rw,
         chunk_executor,
         mempool_notifier,
+        storage_service_notifier,
         metadata_storage,
         consensus_listener,
         event_subscription_service,
@@ -201,6 +206,7 @@ fn setup_state_sync_storage_service(
     peers_and_metadata: Arc<PeersAndMetadata>,
     network_service_events: NetworkServiceEvents<StorageServiceMessage>,
     db_rw: &DbReaderWriter,
+    storage_service_listener: StorageServiceNotificationListener,
 ) -> anyhow::Result<Runtime> {
     // Create a new state sync storage service runtime
     let storage_service_runtime = aptos_runtimes::spawn_named_runtime("stor-server".into(), None);
@@ -214,6 +220,7 @@ fn setup_state_sync_storage_service(
         TimeService::real(),
         peers_and_metadata,
         StorageServiceNetworkEvents::new(network_service_events),
+        storage_service_listener,
     );
     storage_service_runtime.spawn(service.start());
 
