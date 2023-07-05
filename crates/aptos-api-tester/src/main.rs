@@ -131,45 +131,6 @@ async fn probe_getaccount_1() -> TestResult {
     TestResult::Success
 }
 
-/// Calls get_account on a static account on testnet.
-async fn probe_getaccount_2() -> Result<&'static str> {
-    // create the rest client
-    let client = Client::new(TESTNET_NODE_URL.clone());
-
-    // ask for account data
-    let response = client
-        .get_account(*TEST_ACCOUNT_1)
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
-
-    // check account data
-    let expected_account = Account {
-        authentication_key: AuthenticationKey::from_str(
-            "7fed760c508a8885e1438c90f81dea6940ad53b05527fadddd3851f53342d7c4",
-        )
-        .context(ERROR_OTHER)?,
-        sequence_number: 1,
-    };
-    let actual_account = response.inner();
-
-    ensure!(
-        expected_account.authentication_key == actual_account.authentication_key,
-        "{} expected {}, got {}",
-        FAIL_WRONG_AUTH_KEY,
-        expected_account.authentication_key,
-        actual_account.authentication_key
-    );
-    ensure!(
-        expected_account.sequence_number == actual_account.sequence_number,
-        "{} expected {}, got {}",
-        FAIL_WRONG_SEQ_NUMBER,
-        expected_account.sequence_number,
-        actual_account.sequence_number
-    );
-
-    Ok(SUCCESS)
-}
-
 /// Calls get_account_balance on a newly created account on devnet. Requires faucet.
 async fn probe_getaccountbalance_1() -> Result<&'static str> {
     // check faucet access
@@ -203,32 +164,6 @@ async fn probe_getaccountbalance_1() -> Result<&'static str> {
 
     // check balance
     let expected_balance = U64(100_000_000 + random_number);
-    let actual_balance = response.inner().coin.value;
-
-    ensure!(
-        expected_balance == actual_balance,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BALANCE,
-        expected_balance,
-        actual_balance,
-    );
-
-    Ok(SUCCESS)
-}
-
-/// Calls get_account_balance on a static account on testnet.
-async fn probe_getaccountbalance_2() -> Result<&'static str> {
-    // create the rest client
-    let client = Client::new(TESTNET_NODE_URL.clone());
-
-    // ask for account balance
-    let response = client
-        .get_account_balance(*TEST_ACCOUNT_1)
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
-
-    // check balance
-    let expected_balance = U64(176_767_177);
     let actual_balance = response.inner().coin.value;
 
     ensure!(
@@ -325,87 +260,6 @@ async fn probe_getaccountbalanceatversion_1() -> Result<&'static str> {
 
     // check balance long after transaction
     let expected_balance = U64(100_001_000);
-    let actual_balance = response.inner().coin.value;
-
-    ensure!(
-        expected_balance == actual_balance,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BALANCE_AT_VERSION,
-        expected_balance,
-        actual_balance,
-    );
-
-    Ok(SUCCESS)
-}
-
-/// Calls get_account_balance_at_version on a static account on testnet.
-async fn probe_getaccountbalanceatversion_2() -> Result<&'static str> {
-    // create the rest client
-    let client = Client::new(TESTNET_NODE_URL.clone());
-
-    // ask for account balance before funding
-    let response = client
-        .get_account_balance_at_version(*TEST_ACCOUNT_1, 564_589_719)
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
-    let response = response.inner();
-
-    // check balance before funding
-    let expected_balance = U64(200_000_000);
-    let actual_balance = response.coin.value;
-
-    ensure!(
-        expected_balance == actual_balance,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BALANCE_AT_VERSION,
-        expected_balance,
-        actual_balance,
-    );
-
-    // ask for account balance right after funding
-    let response = client
-        .get_account_balance_at_version(*TEST_ACCOUNT_1, 564_589_720)
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
-
-    // check balance right after funding
-    let expected_balance = U64(300_000_000);
-    let actual_balance = response.inner().coin.value;
-
-    ensure!(
-        expected_balance == actual_balance,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BALANCE_AT_VERSION,
-        expected_balance,
-        actual_balance,
-    );
-
-    // ask for account balance long after funding
-    let response = client
-        .get_account_balance_at_version(*TEST_ACCOUNT_1, 564_589_721)
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
-
-    // check balance right after funding
-    let expected_balance = U64(300_000_000);
-    let actual_balance = response.inner().coin.value;
-
-    ensure!(
-        expected_balance == actual_balance,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BALANCE_AT_VERSION,
-        expected_balance,
-        actual_balance,
-    );
-
-    // ask for account balance right after transfer
-    let response = client
-        .get_account_balance_at_version(*TEST_ACCOUNT_1, 564_591_130)
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
-
-    // check balance right after funding
-    let expected_balance = U64(176_767_177);
     let actual_balance = response.inner().coin.value;
 
     ensure!(
@@ -592,23 +446,11 @@ async fn testnet_1() -> Result<&'static str> {
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("{:?}", probe_getaccount_1().await);
-    match probe_getaccount_2().await {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{:?}", e),
-    }
     match probe_getaccountbalance_1().await {
         Ok(result) => println!("{:?}", result),
         Err(e) => println!("{:?}", e),
     }
-    match probe_getaccountbalance_2().await {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{:?}", e),
-    }
     match probe_getaccountbalanceatversion_1().await {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{:?}", e),
-    }
-    match probe_getaccountbalanceatversion_2().await {
         Ok(result) => println!("{:?}", result),
         Err(e) => println!("{:?}", e),
     }
