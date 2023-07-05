@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(dead_code)]
 
+mod anchor_election;
+mod commit_rule;
 mod dag_driver;
 mod dag_fetcher;
 mod dag_handler;
