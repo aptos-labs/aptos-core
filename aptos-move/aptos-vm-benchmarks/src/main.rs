@@ -35,16 +35,11 @@ fn main() {
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
 
-    //// Go over all Move projects
-    //// TODO: refactor logic into separate components
-    for dir in dirs {
-        // validate path is directory
-        let entry = dir.unwrap();
-        if !entry.path().is_dir() {
-            continue;
-        }
-        let dir_path = entry.path();
+    //// get all paths for Move projects
+    let dir_paths = helper::get_dir_paths(dirs);
 
+    //// Go over all Move projects
+    for dir_path in dir_paths {
         // configure and build Move package
         let build_options = BuildOptions {
             with_srcs: true,

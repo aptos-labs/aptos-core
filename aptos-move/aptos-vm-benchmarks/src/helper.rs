@@ -6,7 +6,7 @@ use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::TransactionPayload;
 use move_core_types::language_storage::ModuleId;
-use std::time::Instant;
+use std::{fs::ReadDir, path::PathBuf, time::Instant};
 
 //// generate a TransactionPayload for modules
 pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
@@ -61,4 +61,18 @@ pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, functi
     executor.exec_module(module_name, function_name, vec![], vec![]);
     let elapsed = start.elapsed();
     println!("running time (microseconds): {}", elapsed.as_micros());
+}
+
+//// get all directories of Move projects
+pub fn get_dir_paths(dirs: ReadDir) -> Vec<PathBuf> {
+    let mut dir_paths = Vec::new();
+    for dir in dirs {
+        // validate path is directory
+        let entry = dir.unwrap();
+        if !entry.path().is_dir() {
+            continue;
+        }
+        dir_paths.push(entry.path());
+    }
+    dir_paths
 }
