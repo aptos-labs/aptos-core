@@ -117,7 +117,8 @@ export class TransactionAuthenticatorMultiAgent extends TransactionAuthenticator
     const secondary_signers = deserializeVector(deserializer, AccountAuthenticator);
     const address = AccountAddress.deserialize(deserializer);
     const authenticator = AccountAuthenticator.deserialize(deserializer);
-    return new TransactionAuthenticatorMultiAgent(sender, secondary_signer_addresses, secondary_signers, {address, authenticator});
+    const fee_payer = { address, authenticator };
+    return new TransactionAuthenticatorMultiAgent(sender, secondary_signer_addresses, secondary_signers, fee_payer);
   }
 }
 

@@ -276,7 +276,7 @@ async fn test_fee_payer_signed_transaction() {
         .post_bcs_txn("/transactions", body)
         .await;
 
-    let (sender, secondary_signers,fee_payer_signer) = match txn.authenticator() {
+    let (sender, _, fee_payer_signer) = match txn.authenticator() {
         TransactionAuthenticator::FeePayer {
             sender,
             secondary_signer_addresses: _,

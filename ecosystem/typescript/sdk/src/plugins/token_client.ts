@@ -341,7 +341,7 @@ export class TokenClient {
       receiverSignature,
     );
 
-    let feePayer: {address: AccountAddress, authenticator: AccountAuthenticator } | undefined = undefined;
+    let feePayer: {address: AccountAddress, authenticator: AccountAuthenticator } | undefined;
     if (fee_payer) {
       const feePayerSignature = new TxnBuilderTypes.Ed25519Signature(
           fee_payer.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
