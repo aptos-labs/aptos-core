@@ -13,7 +13,9 @@ use crate::{
             dag_test::MockStorage,
             helpers::{new_certified_node, new_node},
         },
-        types::{DAGMessage, NodeCertificate, NodeDigestSignature, TestAck, TestMessage},
+        types::{
+            CertifiedAck, DAGMessage, NodeCertificate, NodeDigestSignature, TestAck, TestMessage,
+        },
         RpcHandler,
     },
     network::TConsensusMsg,
@@ -221,7 +223,7 @@ async fn test_node_broadcast_receiver_failure() {
         verifier: validator_verifier.clone(),
     });
 
-    let mut rb_receivers: Vec<NodeBroadcastHandler> = signers
+    let mut rb_receivers: Vec<_> = signers
         .iter()
         .map(|signer| {
             let storage = Arc::new(MockStorage::new());
@@ -235,7 +237,7 @@ async fn test_node_broadcast_receiver_failure() {
     let node = new_node(0, 10, signers[0].author(), vec![]);
     let node_sig = rb_receivers[1].process(node.clone()).unwrap();
 
-    // Round 1 without enough parents
+    // Round 1 with invalid parent
     let partial_sigs = PartialSignatures::new(BTreeMap::from([(
         signers[1].author(),
         node_sig.signature().clone(),
@@ -249,7 +251,7 @@ async fn test_node_broadcast_receiver_failure() {
     let node = new_node(1, 20, signers[0].author(), vec![node_cert]);
     assert_eq!(
         rb_receivers[1].process(node).unwrap_err().to_string(),
-        "not enough voting power"
+        NodeBroadcastHandleError::InvalidParent.to_string(),
     );
 
     // Round 0 - add all nodes
@@ -292,14 +294,14 @@ fn test_certified_node_receiver() {
     let storage = Arc::new(MockStorage::new());
     let dag = Arc::new(RwLock::new(Dag::new(epoch_state, storage)));
 
-    let node = new_certified_node(0, signers[0].author(), vec![]);
+    let zeroth_round_node = new_certified_node(0, signers[0].author(), vec![]);
 
     let mut rb_receiver = CertifiedNodeHandler::new(dag);
 
     // expect an ack for a valid message
-    assert_ok!(rb_receiver.process(node.clone()));
-    // expect an ack again if the same message is sent again
-    assert_ok!(rb_receiver.process(node));
+    assert_ok!(rb_receiver.process(zeroth_round_node.clone()));
+    // expect an ack if the same message is sent again
+    assert_ok_eq!(rb_receiver.process(zeroth_round_node), CertifiedAck::new(1));
 
     let parent_node = new_certified_node(0, signers[1].author(), vec![]);
     let invalid_node = new_certified_node(1, signers[0].author(), vec![parent_node.certificate()]);

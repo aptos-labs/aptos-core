@@ -85,6 +85,23 @@ pub struct NodeMetadata {
 }
 
 impl NodeMetadata {
+    #[cfg(test)]
+    pub fn new_for_test(
+        epoch: u64,
+        round: Round,
+        author: Author,
+        timestamp: u64,
+        digest: HashValue,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            author,
+            timestamp,
+            digest,
+        }
+    }
+
     pub fn digest(&self) -> &HashValue {
         &self.digest
     }
@@ -138,7 +155,8 @@ impl Node {
         payload: Payload,
         parents: Vec<NodeCertificate>,
     ) -> Self {
-        let digest = Self::calculate_digest(epoch, round, author, timestamp, &payload, &parents);
+        let digest =
+            Self::calculate_digest_internal(epoch, round, author, timestamp, &payload, &parents);
 
         Self {
             metadata: NodeMetadata {
@@ -153,8 +171,21 @@ impl Node {
         }
     }
 
+    #[cfg(test)]
+    pub fn new_for_test(
+        metadata: NodeMetadata,
+        payload: Payload,
+        parents: Vec<NodeCertificate>,
+    ) -> Self {
+        Self {
+            metadata,
+            payload,
+            parents,
+        }
+    }
+
     /// Calculate the node digest based on all fields in the node
-    fn calculate_digest(
+    fn calculate_digest_internal(
         epoch: u64,
         round: Round,
         author: Author,
@@ -171,6 +202,17 @@ impl Node {
             parents,
         };
         node_with_out_digest.hash()
+    }
+
+    fn calculate_digest(&self) -> HashValue {
+        Self::calculate_digest_internal(
+            self.metadata.epoch,
+            self.metadata.round,
+            self.metadata.author,
+            self.metadata.timestamp,
+            &self.payload,
+            &self.parents,
+        )
     }
 
     pub fn digest(&self) -> HashValue {
@@ -197,7 +239,15 @@ impl Node {
 
 impl TDAGMessage for Node {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        // TODO: move this check to rpc process logic to delay it as much as possible for performance
+        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
+
         let current_round = self.metadata().round();
+
+        if current_round == 0 {
+            ensure!(self.parents().is_empty(), "invalid parents for round 0");
+            return Ok(());
+        }
 
         let prev_round = current_round - 1;
         // check if the parents' round is the node's round - 1
@@ -216,8 +266,10 @@ impl TDAGMessage for Node {
                         .map(|parent| parent.metadata().author())
                 )
                 .is_ok(),
-            "not enough voting power"
+            "not enough parents to satisfy voting power"
         );
+
+        // TODO: validate timestamp
 
         Ok(())
     }
@@ -281,6 +333,8 @@ impl Deref for CertifiedNode {
 
 impl TDAGMessage for CertifiedNode {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
+
         let node_digest = NodeDigest::new(self.digest());
 
         verifier
@@ -364,7 +418,7 @@ impl CertificateAckState {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CertifiedAck {
     epoch: u64,
 }
@@ -508,7 +562,7 @@ impl TDAGMessage for TestMessage {
 }
 
 #[cfg(test)]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TestAck(pub Vec<u8>);
 
 #[cfg(test)]
