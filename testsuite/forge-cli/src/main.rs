@@ -550,9 +550,7 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig>
 
 fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetworkTest {
     CompositeNetworkTest::new_with_two_wrappers(
-        MultiRegionNetworkEmulationTest {
-            override_config: None,
-        },
+        MultiRegionNetworkEmulationTest::default(),
         CpuChaosTest {
             override_config: None,
         },
@@ -1511,9 +1509,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         // something to potentially improve upon.
         // So having VFNs for all validators
         .with_initial_fullnode_count(12)
-        .add_network_test(MultiRegionNetworkEmulationTest {
-            override_config: None,
-        })
+        .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
             mempool_backlog: 150000,
         }))
@@ -1787,9 +1783,7 @@ fn mainnet_like_simulation_test() -> ForgeConfig {
                 .txn_expiration_time_secs(5 * 60),
         )
         .add_network_test(CompositeNetworkTest::new(
-            MultiRegionNetworkEmulationTest {
-                override_config: None,
-            },
+            MultiRegionNetworkEmulationTest::default(),
             CpuChaosTest {
                 override_config: None,
             },
