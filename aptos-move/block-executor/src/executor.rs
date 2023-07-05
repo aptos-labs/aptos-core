@@ -739,8 +739,8 @@ where
                 ExecutionStatus::Abort(err) => ExecutionStatus::Abort(Error::UserError(err)),
             };
 
-            if let Some(listener) = &self.transaction_commit_hook {
-                listener.on_transaction_committed(idx as TxnIndex, &res);
+            if let Some(commit_hook) = &self.transaction_commit_hook {
+                commit_hook.on_transaction_committed(idx as TxnIndex, &res);
             }
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));

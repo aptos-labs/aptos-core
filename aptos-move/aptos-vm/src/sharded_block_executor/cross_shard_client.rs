@@ -113,6 +113,7 @@ impl CrossShardCommitSender {
         txn_output: &AptosTransactionOutput,
     ) {
         let edges = self.dependent_edges.get(&txn_idx).unwrap();
+        // TODO(skedia): This doesn't work for sequantial execution - fix it.
         let write_set = txn_output.committed_output().unwrap().write_set();
 
         for (state_key, write_op) in write_set.iter() {
