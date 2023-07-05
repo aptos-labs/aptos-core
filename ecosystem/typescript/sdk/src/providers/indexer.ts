@@ -1,7 +1,5 @@
-import axios from "axios";
-
 import { AnyNumber } from "../bcs/types";
-import { HexString, MaybeHexString, CUSTOM_REQUEST_HEADER } from "../utils";
+import { HexString, MaybeHexString } from "../utils";
 import {
   GetAccountTokensCountQuery,
   GetAccountCoinsDataQuery,
@@ -44,6 +42,8 @@ import {
   GetCollectionsWithOwnedTokens,
   GetTokenCurrentOwnerData,
 } from "../indexer/generated/queries";
+import { ClientConfig, post } from "../client";
+import { ApiError } from "./aptos_client";
 
 /**
  * Controls the number of results that are returned and the starting position of those results.
@@ -70,13 +70,16 @@ type GraphqlQuery = {
  * {@link https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql}
  */
 export class IndexerClient {
-  endpoint: string;
+  readonly endpoint: string;
+
+  readonly config: ClientConfig | undefined;
 
   /**
    * @param endpoint URL of the Aptos Indexer API endpoint.
    */
-  constructor(endpoint: string) {
+  constructor(endpoint: string, config?: ClientConfig) {
     this.endpoint = endpoint;
+    this.config = config;
   }
 
   /**
@@ -91,18 +94,26 @@ export class IndexerClient {
   }
 
   /**
-   * Builds a axios client call to fetch data from Aptos Indexer.
+   * Makes axios client call to fetch data from Aptos Indexer.
    *
    * @param graphqlQuery A GraphQL query to pass in the `data` axios call.
    */
   async queryIndexer<T>(graphqlQuery: GraphqlQuery): Promise<T> {
-    const { data } = await axios.post(this.endpoint, graphqlQuery, {
-      headers: CUSTOM_REQUEST_HEADER,
+    const response = await post<GraphqlQuery, any>({
+      url: this.endpoint,
+      body: graphqlQuery,
+      overrides: { ...this.config },
     });
-    if (data.errors) {
-      throw new Error(`Indexer data error ${JSON.stringify(data.errors, null, " ")}`);
+    if (response.data.errors) {
+      throw new ApiError(
+        response.data.errors[0].extensions.code,
+        JSON.stringify({
+          message: response.data.errors[0].message,
+          error_code: response.data.errors[0].extensions.code,
+        }),
+      );
     }
-    return data.data;
+    return response.data.data;
   }
 
   /**

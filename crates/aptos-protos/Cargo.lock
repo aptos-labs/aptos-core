@@ -16,7 +16,7 @@ checksum = "a26fa4d7e3f2eebadf743988fc8aec9fa9a9e82611acafd77c1462ed6262440a"
 
 [[package]]
 name = "aptos-protos"
-version = "0.1.2"
+version = "1.0.0"
 dependencies = [
  "pbjson",
  "prost",

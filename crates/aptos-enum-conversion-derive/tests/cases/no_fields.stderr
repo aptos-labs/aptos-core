@@ -1,0 +1,7 @@
+error: enum variant must have exactly one field
+ --> tests/cases/no_fields.rs:6:1
+  |
+6 | / enum Messages {
+7 | |     Test
+8 | | }
+  | |_^

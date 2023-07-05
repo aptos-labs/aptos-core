@@ -908,7 +908,13 @@ impl<'env> SpecTranslator<'env> {
                     "currently `TRACE(..)` cannot be used in spec functions or in lets",
                 )
             },
-            Operation::MoveFunction(_, _) | Operation::BorrowGlobal(_) | Operation::Old => {
+            Operation::MoveFunction(_, _)
+            | Operation::BorrowGlobal(_)
+            | Operation::MoveTo
+            | Operation::MoveFrom
+            | Operation::Freeze
+            | Operation::Abort
+            | Operation::Old => {
                 panic!("operation unexpected: {:?}", oper)
             },
         }

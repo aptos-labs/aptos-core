@@ -26,7 +26,6 @@ module aptos_framework::transaction_validation {
     }
 
     /// MSB is used to indicate a gas payer tx
-    const GAS_PAYER_FLAG_BIT: u64 = 1u64 << 63;
     const MAX_U64: u128 = 18446744073709551615;
 
     /// Transaction exceeded its allocated max gas
@@ -44,7 +43,8 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
-    const PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING: u64 = 1010;
+    const PROLOGUE_EFEE_PAYER_NOT_ENABLED: u64 = 1010;
+
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(
@@ -90,7 +90,7 @@ module aptos_framework::transaction_validation {
         );
 
         assert!(
-            txn_sequence_number < GAS_PAYER_FLAG_BIT,
+            txn_sequence_number < (1u64 << 63),
             error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
         );
 
@@ -154,17 +154,25 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        let gas_payer = signer::address_of(&sender);
-        let num_secondary_signers = vector::length(&secondary_signer_addresses);
-        if (txn_sequence_number >= GAS_PAYER_FLAG_BIT) {
-            assert!(features::gas_payer_enabled(), error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG));
-            assert!(num_secondary_signers > 0, error::invalid_argument(PROLOGUE_EGAS_PAYER_ACCOUNT_MISSING));
-            gas_payer = *std::vector::borrow(&secondary_signer_addresses, std::vector::length(&secondary_signer_addresses) - 1);
-            // Clear the high bit as it's not part of the sequence number
-            txn_sequence_number = txn_sequence_number - GAS_PAYER_FLAG_BIT;
-        };
-        prologue_common(sender, gas_payer, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id);
+        let sender_addr = signer::address_of(&sender);
+        prologue_common(
+            sender,
+            sender_addr,
+            txn_sequence_number,
+            txn_sender_public_key,
+            txn_gas_price,
+            txn_max_gas_units,
+            txn_expiration_time,
+            chain_id,
+        );
+        multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes);
+    }
 
+    fun multi_agent_common_prologue(
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<vector<u8>>,
+    ) {
+        let num_secondary_signers = vector::length(&secondary_signer_addresses);
         assert!(
             vector::length(&secondary_signer_public_key_hashes) == num_secondary_signers,
             error::invalid_argument(PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH),
@@ -191,6 +199,37 @@ module aptos_framework::transaction_validation {
             );
             i = i + 1;
         }
+    }
+
+    fun fee_payer_script_prologue(
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_sender_public_key: vector<u8>,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        fee_payer_address: address,
+        fee_payer_public_key_hash: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+    ) {
+        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
+        prologue_common(
+            sender,
+            fee_payer_address,
+            txn_sequence_number,
+            txn_sender_public_key,
+            txn_gas_price,
+            txn_max_gas_units,
+            txn_expiration_time,
+            chain_id,
+        );
+        multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes);
+        assert!(
+            fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
+            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+        );
     }
 
     /// Epilogue function is run after a transaction is successfully executed.
