@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod helper;
-use aptos::move_tool::MemberId;
 use aptos_framework::BuildOptions;
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::executor::FakeExecutor;
@@ -51,9 +50,6 @@ fn main() {
         // iterate over all Move package code
         let codes = package.extract_code();
         for code in codes {
-            // avoid SEQUENCE_NUMBER_TOO_NEW error
-            let mut sequence_num_counter = 0;
-
             let compiled_module = CompiledModule::deserialize(&code).unwrap();
             let module_id = compiled_module.self_id();
             let identifier = module_id.name().to_string();
@@ -69,43 +65,13 @@ fn main() {
                 pattern.clone(),
             );
 
-            //// publish test-package under module address
-            let creator = executor.new_account_at(*address);
-
-            //// iterate over all the functions that satisfied the requirements above
-            for func_identifier in func_identifiers {
-                println!(
-                    "Executing {}::{}::{}",
-                    address.to_string(),
-                    identifier,
-                    func_identifier,
-                );
-
-                // publish package similar to create_publish_package in harness.rs
-                let module_payload = helper::generate_module_payload(&package);
-                print!("Signing txn for module... ");
-                helper::sign_module_txn(
-                    &mut executor,
-                    &creator,
-                    module_payload,
-                    sequence_num_counter,
-                );
-                sequence_num_counter = sequence_num_counter + 1;
-
-                //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
-                print!("Signing user txn... ");
-                let MemberId {
-                    module_id,
-                    member_id: _function_id,
-                } = str::parse(&format!(
-                    "0x{}::{}::{}",
-                    address.to_string(),
-                    identifier,
-                    func_identifier,
-                ))
-                .unwrap();
-                helper::sign_user_txn(&mut executor, &module_id, func_identifier.as_str());
-            }
+            helper::publish(
+                &package,
+                &mut executor,
+                func_identifiers,
+                *address,
+                identifier,
+            )
         }
     }
 }

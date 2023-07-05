@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
@@ -67,6 +68,49 @@ pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, functi
     executor.exec_module(module_name, function_name, vec![], vec![]);
     let elapsed = start.elapsed();
     println!("running time (microseconds): {}", elapsed.as_micros());
+}
+
+//// publish module under user and sign user transaction
+pub fn publish(
+    package: &BuiltPackage,
+    executor: &mut FakeExecutor,
+    func_identifiers: Vec<String>,
+    address: AccountAddress,
+    identifier: String,
+) {
+    //// publish test-package under module address
+    let creator = executor.new_account_at(address);
+
+    //// iterate over all the functions that satisfied the requirements above
+    let mut sequence_num_counter = 0;
+    for func_identifier in func_identifiers {
+        println!(
+            "Executing {}::{}::{}",
+            address.to_string(),
+            identifier,
+            func_identifier,
+        );
+
+        // publish package similar to create_publish_package in harness.rs
+        let module_payload = generate_module_payload(package);
+        print!("Signing txn for module... ");
+        sign_module_txn(executor, &creator, module_payload, sequence_num_counter);
+        sequence_num_counter = sequence_num_counter + 1;
+
+        //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
+        print!("Signing user txn... ");
+        let MemberId {
+            module_id,
+            member_id: _function_id,
+        } = str::parse(&format!(
+            "0x{}::{}::{}",
+            address.to_string(),
+            identifier,
+            func_identifier,
+        ))
+        .unwrap();
+        sign_user_txn(executor, &module_id, func_identifier.as_str());
+    }
 }
 
 //// get all directories of Move projects
