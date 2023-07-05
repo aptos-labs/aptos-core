@@ -661,6 +661,8 @@ impl FakeExecutor {
         self.block_time / 1_000_000
     }
 
+    //// exec_module is like exec(), however, we can run a Module published under
+    //// the creator address instead of 0x1, as what is currently done in exec.
     pub fn exec_module(
         &mut self,
         module: &ModuleId,
