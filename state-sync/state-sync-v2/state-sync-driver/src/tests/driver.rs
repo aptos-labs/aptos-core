@@ -287,6 +287,10 @@ async fn create_driver_for_tests(
     let (mempool_notifier, mempool_listener) =
         aptos_mempool_notifications::new_mempool_notifier_listener_pair();
 
+    // Create the storage service notifier and listener
+    let (storage_service_notifier, _storage_service_listener) =
+        aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
+
     // Create the chunk executor
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
 
@@ -321,6 +325,7 @@ async fn create_driver_for_tests(
         db_rw,
         chunk_executor,
         mempool_notifier,
+        storage_service_notifier,
         metadata_storage,
         consensus_listener,
         event_subscription_service,
