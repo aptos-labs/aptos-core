@@ -21,7 +21,10 @@ use aptos_types::event::EventKey;
 pub use aptos_types::*;
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
-use std::str::FromStr;
+use std::{
+    str::FromStr,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 /// LocalAccount represents an account on the Aptos blockchain. Internally it
 /// holds the private / public key pair and the address of the account. You can
@@ -208,7 +211,10 @@ pub enum HardwareWalletType {
 pub trait TransactionSigner {
     fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction;
 
-    fn sign_with_transaction_builder(&mut self, builder: TransactionBuilder) -> SignedTransaction;
+    fn sign_with_transaction_builder(
+        &mut self,
+        builder: TransactionBuilder,
+    ) -> Result<SignedTransaction>;
 }
 
 /// Similar to LocalAccount, but for hardware wallets.
@@ -218,7 +224,6 @@ pub trait TransactionSigner {
 pub struct HardwareWalletAccount {
     address: AccountAddress,
     public_key: Ed25519PublicKey,
-    authentication_key: AuthenticationKey,
     derivation_path: String,
     hardware_wallet_type: HardwareWalletType,
     /// Same as LocalAccount's sequence_number.
@@ -237,13 +242,24 @@ impl TransactionSigner for HardwareWalletAccount {
         SignedTransaction::new(txn, self.public_key().clone(), signature)
     }
 
-    fn sign_with_transaction_builder(&mut self, builder: TransactionBuilder) -> SignedTransaction {
+    fn sign_with_transaction_builder(
+        &mut self,
+        builder: TransactionBuilder,
+    ) -> Result<SignedTransaction> {
+        let two_minutes = Duration::from_secs(2 * 60);
+        let current_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            + two_minutes;
+        let seconds = current_time.as_secs();
+
         let raw_txn = builder
             .sender(self.address())
             .sequence_number(self.sequence_number())
+            .expiration_timestamp_secs(seconds)
             .build();
         *self.sequence_number_mut() += 1;
-        self.sign_transaction(raw_txn)
+        Ok(self.sign_transaction(raw_txn))
     }
 }
 
@@ -251,7 +267,6 @@ impl HardwareWalletAccount {
     pub fn new(
         address: AccountAddress,
         public_key: Ed25519PublicKey,
-        authentication_key: AuthenticationKey,
         derivation_path: String,
         hardware_wallet_type: HardwareWalletType,
         sequence_number: u64,
@@ -259,7 +274,6 @@ impl HardwareWalletAccount {
         Self {
             address,
             public_key,
-            authentication_key,
             derivation_path,
             hardware_wallet_type,
             sequence_number,
@@ -279,7 +293,6 @@ impl HardwareWalletAccount {
         Ok(Self::new(
             address,
             public_key,
-            authentication_key,
             derivation_path,
             HardwareWalletType::Ledger,
             sequence_number,
@@ -292,10 +305,6 @@ impl HardwareWalletAccount {
 
     pub fn public_key(&self) -> &Ed25519PublicKey {
         &self.public_key
-    }
-
-    pub fn authentication_key(&self) -> &AuthenticationKey {
-        &self.authentication_key
     }
 
     pub fn derivation_path(&self) -> &str {
