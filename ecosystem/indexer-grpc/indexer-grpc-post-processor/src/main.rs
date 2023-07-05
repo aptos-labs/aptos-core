@@ -15,7 +15,10 @@ use tracing::info;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcPFNCheckerConfig {
-    pub public_fullnode_address: String,
+    // List of public fullnode addresses.
+    pub public_fullnode_addresses: Vec<String>,
+    pub indexer_grpc_address: String,
+    pub indexer_grpc_auth_token: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -41,12 +44,24 @@ impl RunnableConfig for IndexerGrpcPostProcessorConfig {
             tasks.push(tokio::spawn({
                 let config = config.clone();
                 async move {
-                    let public_fullnode_address = config.public_fullnode_address.clone();
+                    let public_fullnode_addresses = config.public_fullnode_addresses.clone();
                     loop {
-                        let checker = PfnLedgerChecker::new(public_fullnode_address.clone());
-                        info!("Starting PfnLedgerChecker");
-                        if let Err(err) = checker.run().await {
-                            tracing::error!("PfnLedgerChecker failed: {:?}", err);
+                        if let Ok(checker) = PfnLedgerChecker::new(
+                            public_fullnode_addresses.clone(),
+                            config.indexer_grpc_address.clone(),
+                            config.indexer_grpc_auth_token.clone(),
+                        )
+                        .await
+                        {
+                            info!("Starting PfnLedgerChecker");
+                            if let Err(err) = checker.run().await {
+                                tracing::error!("PfnLedgerChecker failed: {:?}", err);
+                                TASK_FAILURE_COUNT
+                                    .with_label_values(&["pfn_ledger_checker"])
+                                    .inc();
+                            }
+                        } else {
+                            tracing::error!("PfnLedgerChecker failed to initialize");
                             TASK_FAILURE_COUNT
                                 .with_label_values(&["pfn_ledger_checker"])
                                 .inc();

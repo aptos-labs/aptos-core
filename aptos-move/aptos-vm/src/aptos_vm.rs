@@ -6,7 +6,7 @@ use crate::{
     adapter_common::{
         discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
     },
-    aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals, GAS_PAYER_FLAG_BIT},
+    aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::BlockAptosVM,
     counters::*,
     data_cache::StorageAdapter,
@@ -394,18 +394,6 @@ impl AptosVM {
         )?)
     }
 
-    fn get_senders(txn_data: &TransactionMetadata) -> Vec<AccountAddress> {
-        let mut res = vec![txn_data.sender];
-        res.extend(txn_data.secondary_signers());
-        if txn_data.sequence_number & GAS_PAYER_FLAG_BIT != 0 {
-            // In a gas payer tx, the last multi-agent signer of the secondary signers is in
-            // fact the gas payer and not to be part of the tx parameters. So we remove the last
-            // signer.
-            res.pop();
-        }
-        res
-    }
-
     fn execute_script_or_entry_function(
         &self,
         resolver: &impl MoveResolverExt,
@@ -431,13 +419,12 @@ impl AptosVM {
 
             match payload {
                 TransactionPayload::Script(script) => {
-                    let senders = Self::get_senders(txn_data);
                     let loaded_func =
                         session.load_script(script.code(), script.ty_args().to_vec())?;
                     let args =
                         verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                             &mut session,
-                            senders,
+                            txn_data.senders(),
                             convert_txn_args(script.args()),
                             &loaded_func,
                             self.0
@@ -452,11 +439,10 @@ impl AptosVM {
                     )?;
                 },
                 TransactionPayload::EntryFunction(script_fn) => {
-                    let senders = Self::get_senders(txn_data);
                     self.validate_and_execute_entry_function(
                         &mut session,
                         gas_meter,
-                        senders,
+                        txn_data.senders(),
                         script_fn,
                     )?;
                 },

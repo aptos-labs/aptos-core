@@ -7,6 +7,7 @@ use crate::{
     TransactionStore,
 };
 use anyhow::Result;
+use aptos_logger::info;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_types::transaction::Version;
 use std::sync::Arc;
@@ -50,6 +51,11 @@ impl TransactionAccumulatorPruner {
             transaction_accumulator_db,
         };
 
+        info!(
+            progress = progress,
+            metadata_progress = metadata_progress,
+            "Catching up TransactionAccumulatorPruner."
+        );
         myself.prune(progress, metadata_progress)?;
 
         Ok(myself)

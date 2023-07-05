@@ -84,10 +84,9 @@ impl Worker {
         loop {
             let conn = self
                 .redis_client
-                .get_tokio_connection()
+                .get_tokio_connection_manager()
                 .await
                 .expect("Get redis connection failed.");
-
             let mut rpc_client = create_grpc_client(self.fullnode_grpc_address.clone()).await;
 
             // 1. Fetch metadata.
@@ -132,7 +131,7 @@ impl Worker {
 
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
-    cache_operator: &mut CacheOperator<redis::aio::Connection>,
+    cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
 ) -> anyhow::Result<GrpcDataStatus> {
     match response.response.unwrap() {
         Response::Status(status) => {
@@ -198,10 +197,10 @@ async fn process_transactions_from_node_response(
 
 /// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
 async fn setup_cache_with_init_signal(
-    conn: redis::aio::Connection,
+    conn: redis::aio::ConnectionManager,
     init_signal: TransactionsFromNodeResponse,
 ) -> (
-    CacheOperator<redis::aio::Connection>,
+    CacheOperator<redis::aio::ConnectionManager>,
     ChainID,
     StartingVersion,
 ) {
@@ -232,7 +231,7 @@ async fn setup_cache_with_init_signal(
 
 // Infinite streaming processing. Retry if error happens; crash if fatal.
 async fn process_streaming_response(
-    conn: redis::aio::Connection,
+    conn: redis::aio::ConnectionManager,
     file_store_metadata: Option<FileStoreMetadata>,
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,

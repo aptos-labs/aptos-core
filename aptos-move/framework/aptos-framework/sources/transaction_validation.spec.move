@@ -44,7 +44,7 @@ spec aptos_framework::transaction_validation {
         aborts_if !account::exists_at(transaction_sender);
         aborts_if !(txn_sequence_number >= global<Account>(transaction_sender).sequence_number);
         aborts_if !(txn_authentication_key == global<Account>(transaction_sender).authentication_key);
-        aborts_if !(txn_sequence_number < GAS_PAYER_FLAG_BIT);
+        aborts_if !(txn_sequence_number < (1u64 << 63));
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         aborts_if max_transaction_fee > MAX_U64;
@@ -97,6 +97,31 @@ spec aptos_framework::transaction_validation {
         };
     }
 
+    spec schema MultiAgentPrologueCommonAbortsIf {
+        secondary_signer_addresses: vector<address>;
+        secondary_signer_public_key_hashes: vector<vector<u8>>;
+
+        // Vectors to be `zipped with` should be of equal length.
+        let num_secondary_signers = len(secondary_signer_addresses);
+        aborts_if len(secondary_signer_public_key_hashes) != num_secondary_signers;
+
+        // If any account does not exist, or public key hash does not match, abort.
+        aborts_if exists i in 0..num_secondary_signers:
+            !account::exists_at(secondary_signer_addresses[i])
+                || secondary_signer_public_key_hashes[i] !=
+                account::get_authentication_key(secondary_signer_addresses[i]);
+    }
+
+    spec multi_agent_common_prologue(
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<vector<u8>>,
+    ) {
+        include MultiAgentPrologueCommonAbortsIf {
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
+        };
+    }
+
     /// Aborts if length of public key hashed vector
     /// not equal the number of singers.
     spec multi_agent_script_prologue (
@@ -111,42 +136,48 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
     ) {
         pragma verify_duration_estimate = 120;
-        let gas_payer = if (txn_sequence_number < GAS_PAYER_FLAG_BIT) {
-            signer::address_of(sender)
-        } else {
-            secondary_signer_addresses[len(secondary_signer_addresses) - 1]
-        };
-        aborts_if txn_sequence_number >= GAS_PAYER_FLAG_BIT && !features::spec_gas_payer_enabled();
-        aborts_if txn_sequence_number >= GAS_PAYER_FLAG_BIT && len(secondary_signer_addresses) == 0;
-        let adjusted_txn_sequence_number = if (txn_sequence_number >= GAS_PAYER_FLAG_BIT) {
-            txn_sequence_number - GAS_PAYER_FLAG_BIT
-        } else {
-            txn_sequence_number
-        };
+        let gas_payer = signer::address_of(sender);
         include PrologueCommonAbortsIf {
             gas_payer,
-            txn_sequence_number: adjusted_txn_sequence_number,
-            txn_authentication_key: txn_sender_public_key
+            txn_sequence_number,
+            txn_authentication_key: txn_sender_public_key,
         };
-
-        // Vectors to be `zipped with` should be of equal length.
-        let num_secondary_signers = len(secondary_signer_addresses);
-        aborts_if len(secondary_signer_public_key_hashes) != num_secondary_signers;
-
-        // If any account does not exist, or public key hash does not match, abort.
-        aborts_if exists i in 0..num_secondary_signers:
-            !account::exists_at(secondary_signer_addresses[i])
-                || secondary_signer_public_key_hashes[i] !=
-                    account::get_authentication_key(secondary_signer_addresses[i]);
-
-        // By the end, all secondary signers account should exist and public key hash should match.
-        ensures forall i in 0..num_secondary_signers:
-            account::exists_at(secondary_signer_addresses[i])
-                && secondary_signer_public_key_hashes[i] ==
-                    account::get_authentication_key(secondary_signer_addresses[i]);
+        include MultiAgentPrologueCommonAbortsIf {
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
+        };
     }
 
-    /// Abort according to the conditions.
+    spec fee_payer_script_prologue(
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_sender_public_key: vector<u8>,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        fee_payer_address: address,
+        fee_payer_public_key_hash: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+    ) {
+        pragma verify_duration_estimate = 120;
+        let gas_payer = fee_payer_address;
+        include PrologueCommonAbortsIf {
+            gas_payer,
+            txn_sequence_number,
+            txn_authentication_key: txn_sender_public_key,
+        };
+        include MultiAgentPrologueCommonAbortsIf {
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
+        };
+
+        aborts_if !account::exists_at(gas_payer);
+        aborts_if !(fee_payer_public_key_hash == account::get_authentication_key(gas_payer));
+    }
+
+        /// Abort according to the conditions.
     /// `AptosCoinCapabilities` and `CoinInfo` should exists.
     /// Skip transaction_fee::burn_fee verification.
     spec epilogue(

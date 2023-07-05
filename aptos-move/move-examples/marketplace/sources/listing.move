@@ -20,6 +20,7 @@ module marketplace::listing {
     use aptos_token_objects::token as tokenv2;
     use aptos_token_objects::royalty;
 
+    use marketplace::events;
     use marketplace::fee_schedule::FeeSchedule;
 
     friend marketplace::coin_listing;
@@ -261,6 +262,22 @@ module marketplace::listing {
             } else {
                 (@0x0, 0)
             }
+        }
+    }
+
+    #[view]
+    /// Produce a events::TokenMetadata for a listing
+    public fun token_metadata(
+        object: Object<Listing>,
+    ): events::TokenMetadata acquires Listing, TokenV1Container {
+        let listing = borrow_listing(object);
+        let obj_addr = object::object_address(&listing.object);
+        if (exists<TokenV1Container>(obj_addr)) {
+            let token_container = borrow_global<TokenV1Container>(obj_addr);
+            let token_id = tokenv1::get_token_id(&token_container.token);
+            events::token_metadata_for_tokenv1(token_id)
+        } else {
+            events::token_metadata_for_tokenv2(object::convert(listing.object))
         }
     }
 

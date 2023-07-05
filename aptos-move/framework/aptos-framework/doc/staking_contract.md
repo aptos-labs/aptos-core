@@ -52,6 +52,7 @@ pool.
 -  [Function `staking_contract_amounts`](#0x1_staking_contract_staking_contract_amounts)
 -  [Function `pending_distribution_counts`](#0x1_staking_contract_pending_distribution_counts)
 -  [Function `staking_contract_exists`](#0x1_staking_contract_staking_contract_exists)
+-  [Function `get_expected_stake_pool_address`](#0x1_staking_contract_get_expected_stake_pool_address)
 -  [Function `create_staking_contract`](#0x1_staking_contract_create_staking_contract)
 -  [Function `create_staking_contract_with_coins`](#0x1_staking_contract_create_staking_contract_with_coins)
 -  [Function `add_stake`](#0x1_staking_contract_add_stake)
@@ -71,6 +72,7 @@ pool.
 -  [Function `get_staking_contract_amounts_internal`](#0x1_staking_contract_get_staking_contract_amounts_internal)
 -  [Function `create_stake_pool`](#0x1_staking_contract_create_stake_pool)
 -  [Function `update_distribution_pool`](#0x1_staking_contract_update_distribution_pool)
+-  [Function `create_resource_account_seed`](#0x1_staking_contract_create_resource_account_seed)
 -  [Function `new_staking_contracts_holder`](#0x1_staking_contract_new_staking_contracts_holder)
 -  [Specification](#@Specification_1)
     -  [Function `stake_pool_address`](#@Specification_1_stake_pool_address)
@@ -1029,6 +1031,37 @@ Return true if the staking contract between the provided staker and operator exi
 
 </details>
 
+<a name="0x1_staking_contract_get_expected_stake_pool_address"></a>
+
+## Function `get_expected_stake_pool_address`
+
+Return the address of the stake pool to be created with the provided staker, operator and seed.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_get_expected_stake_pool_address">get_expected_stake_pool_address</a>(staker: <b>address</b>, operator: <b>address</b>, contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_get_expected_stake_pool_address">get_expected_stake_pool_address</a>(
+    staker: <b>address</b>,
+    operator: <b>address</b>,
+    contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+): <b>address</b> {
+    <b>let</b> seed = <a href="staking_contract.md#0x1_staking_contract_create_resource_account_seed">create_resource_account_seed</a>(staker, operator, contract_creation_seed);
+    <a href="account.md#0x1_account_create_resource_address">account::create_resource_address</a>(&staker, seed)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_staking_contract_create_staking_contract"></a>
 
 ## Function `create_staking_contract`
@@ -1821,13 +1854,8 @@ Calculate accumulated rewards and commissions since last update.
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ): (<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, SignerCapability, OwnerCapability) {
     // Generate a seed that will be used <b>to</b> create the resource <a href="account.md#0x1_account">account</a> that hosts the staking contract.
-    <b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&operator));
-    // Include a salt <b>to</b> avoid conflicts <b>with</b> <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> other modules out there that might also generate
-    // deterministic resource accounts for the same staker + operator addresses.
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, <a href="staking_contract.md#0x1_staking_contract_SALT">SALT</a>);
-    // Add an extra salt given by the staker in case an <a href="account.md#0x1_account">account</a> <b>with</b> the same <b>address</b> <b>has</b> already been created.
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, contract_creation_seed);
+    <b>let</b> seed = <a href="staking_contract.md#0x1_staking_contract_create_resource_account_seed">create_resource_account_seed</a>(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker), operator, contract_creation_seed);
 
     <b>let</b> (stake_pool_signer, stake_pool_signer_cap) = <a href="account.md#0x1_account_create_resource_account">account::create_resource_account</a>(staker, seed);
     <a href="stake.md#0x1_stake_initialize_stake_owner">stake::initialize_stake_owner</a>(&stake_pool_signer, 0, operator, voter);
@@ -1891,6 +1919,42 @@ Calculate accumulated rewards and commissions since last update.
     });
 
     <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_update_total_coins">pool_u64::update_total_coins</a>(distribution_pool, updated_total_coins);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_staking_contract_create_resource_account_seed"></a>
+
+## Function `create_resource_account_seed`
+
+Create the seed to derive the resource account address.
+
+
+<pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_create_resource_account_seed">create_resource_account_seed</a>(staker: <b>address</b>, operator: <b>address</b>, contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_create_resource_account_seed">create_resource_account_seed</a>(
+    staker: <b>address</b>,
+    operator: <b>address</b>,
+    contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>let</b> seed = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&staker);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&operator));
+    // Include a salt <b>to</b> avoid conflicts <b>with</b> <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> other modules out there that might also generate
+    // deterministic resource accounts for the same staker + operator addresses.
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, <a href="staking_contract.md#0x1_staking_contract_SALT">SALT</a>);
+    // Add an extra salt given by the staker in case an <a href="account.md#0x1_account">account</a> <b>with</b> the same <b>address</b> <b>has</b> already been created.
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> seed, contract_creation_seed);
+    seed
 }
 </code></pre>
 

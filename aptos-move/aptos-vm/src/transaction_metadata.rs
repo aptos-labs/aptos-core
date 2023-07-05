@@ -17,6 +17,8 @@ pub struct TransactionMetadata {
     pub secondary_signers: Vec<AccountAddress>,
     pub secondary_authentication_keys: Vec<Vec<u8>>,
     pub sequence_number: u64,
+    pub fee_payer: Option<AccountAddress>,
+    pub fee_payer_authentication_key: Option<Vec<u8>>,
     pub max_gas_amount: Gas,
     pub gas_unit_price: FeePerGasUnit,
     pub transaction_size: NumBytes,
@@ -39,6 +41,11 @@ impl TransactionMetadata {
                 .map(|account_auth| account_auth.authentication_key().to_vec())
                 .collect(),
             sequence_number: txn.sequence_number(),
+            fee_payer: txn.authenticator_ref().fee_payer_address(),
+            fee_payer_authentication_key: txn
+                .authenticator()
+                .fee_payer_signer()
+                .map(|signer| signer.authentication_key().to_vec()),
             max_gas_amount: txn.max_gas_amount().into(),
             gas_unit_price: txn.gas_unit_price().into(),
             transaction_size: (txn.raw_txn_bytes_len() as u64).into(),
@@ -67,6 +74,10 @@ impl TransactionMetadata {
         self.gas_unit_price
     }
 
+    pub fn fee_payer(&self) -> Option<AccountAddress> {
+        self.fee_payer.to_owned()
+    }
+
     pub fn script_size(&self) -> NumBytes {
         self.script_size
     }
@@ -77,6 +88,12 @@ impl TransactionMetadata {
 
     pub fn secondary_signers(&self) -> Vec<AccountAddress> {
         self.secondary_signers.to_owned()
+    }
+
+    pub fn senders(&self) -> Vec<AccountAddress> {
+        let mut senders = vec![self.sender()];
+        senders.extend(self.secondary_signers());
+        senders
     }
 
     pub fn authentication_key(&self) -> &[u8] {
@@ -100,7 +117,7 @@ impl TransactionMetadata {
     }
 
     pub fn is_multi_agent(&self) -> bool {
-        !self.secondary_signers.is_empty()
+        !(self.secondary_signers.is_empty() && self.fee_payer.is_none())
     }
 }
 
@@ -115,6 +132,8 @@ impl Default for TransactionMetadata {
             secondary_signers: vec![],
             secondary_authentication_keys: vec![],
             sequence_number: 0,
+            fee_payer: None,
+            fee_payer_authentication_key: None,
             max_gas_amount: 100_000_000.into(),
             gas_unit_price: 0.into(),
             transaction_size: 0.into(),

@@ -13,6 +13,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
+use aptos_logger::info;
 use aptos_schemadb::{schema::KeyCodec, SchemaBatch, DB};
 use aptos_types::transaction::Version;
 use std::{marker::PhantomData, sync::Arc};
@@ -43,6 +44,12 @@ where
             _phantom: PhantomData,
         };
 
+        info!(
+            progress = progress,
+            metadata_progress = metadata_progress,
+            "Catching up {} shard {shard_id}.",
+            S::name(),
+        );
         myself.prune(progress, metadata_progress)?;
 
         Ok(myself)

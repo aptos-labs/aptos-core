@@ -2,9 +2,34 @@
 
 This guide explains how to build a transaction management harness that can scale on the Aptos blockchain.
 
+## Background
+
+In Aptos, transactions are mapped back to an account both in terms of the entity that signs or authorizes that transaction as well as a providing an account-based sequence number. When Aptos network receives a new transaction several rules are followed with respect to the this:
+
+- The transaction sent from an account must be authorized correctly by that account.
+- The current time as defined by the most recent ledger update must be before the expiration timestamp of the transaction.
+- The transactions sequence number must be equal to or greater than the sequence number on-chain for that account.
+
+Once the initial node has accepted a transaction, the transaction makes its way through the system by an additional rule. If a transactions sequence number is higher than the current on-chain sequence number, it can only progress toward consensus if every node in the path has seen a transaction with the sequence number between the on-chain state and the current sequence number.
+
+Example:
+
+Alice owns an account who’s current on-chain sequence number is 5.
+
+Alice submits a transaction to node Bob with sequence number 6.
+
+Bob the node accepts the transaction but does not forward it, because Bob has not seen 5.
+
+In order to make progress, Alice must either send Bob transaction number 5 or Bob must be notified from consensus that 5 was committed. In the latter, Alice submitted the transaction through another node.
+
+Beyond this there are two remaining principles:
+
+- A single account can have at most 100 uncommitted transactions submitted to the blockchain. Any more than that and the transactions will be rejected. This can happen silently if Alice submits the first 100 to Bob the node and the next 100 to Carol the node. If both those nodes share a common upstream, then that upstream will accept Alice's 100 sent via Bob but silently reject Alice's 100 sent via Carol.
+- Submitting to distinct transactions to multiple nodes will result in slow resolution as transactions will not make progress from the submitted node until the submitted knows that all preceding transactions have been committed. For example, if Alice sends the first 50 via Bob and the next 50 via Carol.
+
 ## Building a Transaction Manager
 
-This section covers the major aspects of building a transaction management harness. This consists of the following core components:
+Now that we understand the nuances of transactions, let's dig into building a robust transaction manager. This consists of the following core components:
 
 - A sequence number generator that allocates and manages available sequence numbers for a single account.
 - A transaction manager that receives payloads from an application or a user, sequence numbers from the sequence number generator, and has access to the account key to combine the three pieces together into a viable signed transaction. It then also takes the responsibility for pushing the transaction to the blockchain.
@@ -80,28 +105,3 @@ In this model, each worker has access to the `SignerCap` of the shared account, 
 Another model, if viable, is to decouple the `signer` altogether away from permissions and to make an application specific capability. Then this capability can be given to each worker that let’s them operate on the shared infrastructure.
 
 Note that parallelization on the shared infrastructure can be limited if any transaction would have any read, write or write, write conflicts. This won’t prevent multiple transactions from executing within a block, but can impact maximum blockchain performance.
-
-## Background
-
-In Aptos, transactions are mapped back to an account both in terms of the entity that signs or authorizes that transaction as well as a providing an account-based sequence number. When Aptos receives a new transaction several rules are followed with respect to the this:
-
-- The transaction sent from an account must be authorized correctly by that account.
-- The current time must be before the expiration timestamp.
-- The transactions sequence number must be equal to or greater than the sequence number on-chain.
-
-Once the initial node has accepted a transaction, the transaction makes its way through the system by an additional rule. If a transactions sequence number is higher than the current on-chain sequence number, it can only progress toward consensus if every node in the path has seen a transaction with the sequence number between the on-chain state and the current sequence number.
-
-Example:
-
-Alice’s current on-chain sequence number is 5.
-
-Alice submits a transaction to node Bob with sequence number 6.
-
-Bob accepts the transaction but does not forward it, because Bob has not seen 5.
-
-In order to make progress, Alice must either send Bob transaction number 5 or Bob must be notified from consensus that 5 was committed. In the latter, Alice submitted the transaction through another node.
-
-Beyond this there are two remaining principles:
-
-- A single account can have at most 100 uncommitted transactions submitted to the blockchain. Any more than that and the transactions will be rejected. This can happen silently if Alice submits the first 100 to Bob and the next 100 to Carol. If both those nodes share a common upstream, then that upstream will accept Bob’s 100 but silently reject Carol’s 100.
-- Submitting to distinct transactions to multiple nodes will result in slow resolution as transactions will not make progress from the submitted node until the submitted knows that all preceding transactions have been committed.

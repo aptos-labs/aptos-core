@@ -106,7 +106,6 @@ where
     }
 
     fn update_parallel_block_gas_counters(
-        &self,
         accumulated_fee_statement: &FeeStatement,
         num_committed: usize,
     ) {
@@ -135,32 +134,41 @@ where
             accumulated_fee_statement.storage_fee_used(),
             GasType::STORAGE_FEE,
         );
-        counters::PARALLEL_BLOCK_COMMITTED_TXNS.observe(num_committed as f64);
+        counters::BLOCK_COMMITTED_TXNS
+            .with_label_values(&[counters::Mode::PARALLEL])
+            .observe(num_committed as f64);
     }
 
-    fn update_parallel_txn_gas_counters(&self, fee_statement: &FeeStatement) {
-        counters::observe_parallel_execution_txn_gas(fee_statement.gas_used(), GasType::TOTAL_GAS);
-        counters::observe_parallel_execution_txn_gas(
-            fee_statement.execution_gas_used(),
-            GasType::EXECUTION_GAS,
-        );
-        counters::observe_parallel_execution_txn_gas(fee_statement.io_gas_used(), GasType::IO_GAS);
-        counters::observe_parallel_execution_txn_gas(
-            fee_statement.storage_gas_used(),
-            GasType::STORAGE_GAS,
-        );
-        counters::observe_parallel_execution_txn_gas(
-            fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
-            GasType::NON_STORAGE_GAS,
-        );
-        counters::observe_parallel_execution_txn_gas(
-            fee_statement.storage_fee_used(),
-            GasType::STORAGE_FEE,
-        );
+    fn update_parallel_txn_gas_counters(txn_fee_statements: &Vec<FeeStatement>) {
+        for fee_statement in txn_fee_statements {
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.gas_used(),
+                GasType::TOTAL_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.execution_gas_used(),
+                GasType::EXECUTION_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.io_gas_used(),
+                GasType::IO_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.storage_gas_used(),
+                GasType::STORAGE_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
+                GasType::NON_STORAGE_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.storage_fee_used(),
+                GasType::STORAGE_FEE,
+            );
+        }
     }
 
     fn update_sequential_block_gas_counters(
-        &self,
         accumulated_fee_statement: &FeeStatement,
         num_committed: usize,
     ) {
@@ -189,10 +197,12 @@ where
             accumulated_fee_statement.storage_fee_used(),
             GasType::STORAGE_FEE,
         );
-        counters::PARALLEL_BLOCK_COMMITTED_TXNS.observe(num_committed as f64);
+        counters::BLOCK_COMMITTED_TXNS
+            .with_label_values(&[counters::Mode::PARALLEL])
+            .observe(num_committed as f64);
     }
 
-    fn update_sequential_txn_gas_counters(&self, fee_statement: &FeeStatement) {
+    fn update_sequential_txn_gas_counters(fee_statement: &FeeStatement) {
         counters::observe_sequential_execution_txn_gas(
             fee_statement.gas_used(),
             GasType::TOTAL_GAS,
@@ -368,6 +378,7 @@ where
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         accumulated_fee_statement: &mut FeeStatement,
+        txn_fee_statements: &mut Vec<FeeStatement>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
@@ -380,10 +391,11 @@ where
             if txn_idx as usize + 1 == scheduler.num_txns() as usize {
                 *scheduler_task = SchedulerTask::Done;
 
-                self.update_parallel_block_gas_counters(
+                Self::update_parallel_block_gas_counters(
                     accumulated_fee_statement,
                     (txn_idx + 1) as usize,
                 );
+                Self::update_parallel_txn_gas_counters(txn_fee_statements);
                 info!(
                     "[BlockSTM]: Parallel execution completed, all {} txns committed.",
                     txn_idx + 1
@@ -396,15 +408,16 @@ where
             match last_input_output.fee_statement(txn_idx) {
                 Some(fee_statement) => {
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
-                    self.update_parallel_txn_gas_counters(&fee_statement);
+                    txn_fee_statements.push(fee_statement);
                 },
                 None => {
                     scheduler.halt();
 
-                    self.update_parallel_block_gas_counters(
+                    Self::update_parallel_block_gas_counters(
                         accumulated_fee_statement,
                         (txn_idx + 1) as usize,
                     );
+                    Self::update_parallel_txn_gas_counters(txn_fee_statements);
                     info!("[BlockSTM]: Parallel execution early halted due to Abort or SkipRest txn, {} txns committed.", txn_idx + 1);
                     break;
                 },
@@ -420,11 +433,14 @@ where
                     last_input_output.update_to_skip_rest(txn_idx);
                     scheduler.halt();
 
-                    self.update_parallel_block_gas_counters(
+                    Self::update_parallel_block_gas_counters(
                         accumulated_fee_statement,
                         (txn_idx + 1) as usize,
                     );
-                    counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                    Self::update_parallel_txn_gas_counters(txn_fee_statements);
+                    counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
+                        .with_label_values(&[counters::Mode::PARALLEL])
+                        .inc();
                     info!("[BlockSTM]: Parallel execution early halted due to accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", accumulated_non_storage_gas, per_block_gas_limit, txn_idx);
                     break;
                 }
@@ -505,6 +521,7 @@ where
         let mut worker_idx = 0;
 
         let mut accumulated_fee_statement = FeeStatement::zero();
+        let mut txn_fee_statements = Vec::with_capacity(block.len());
         loop {
             // Only one thread does try_commit to avoid contention.
             match &role {
@@ -517,6 +534,7 @@ where
                         &mut scheduler_task,
                         last_input_output,
                         &mut accumulated_fee_statement,
+                        &mut txn_fee_statements,
                     );
                 },
                 CommitRole::Worker(rx) => {
@@ -714,7 +732,7 @@ where
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
-                    self.update_sequential_txn_gas_counters(&accumulated_fee_statement);
+                    Self::update_sequential_txn_gas_counters(&fee_statement);
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
@@ -735,7 +753,9 @@ where
                 let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
                     + accumulated_fee_statement.io_gas_used();
                 if accumulated_non_storage_gas >= per_block_gas_limit {
-                    counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                    counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
+                        .with_label_values(&[counters::Mode::SEQUENTIAL])
+                        .inc();
                     info!("[Execution]: Sequential execution early halted due to accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", accumulated_non_storage_gas, per_block_gas_limit, ret.len());
                     break;
                 }
@@ -749,7 +769,7 @@ where
             );
         }
 
-        self.update_sequential_block_gas_counters(&accumulated_fee_statement, ret.len());
+        Self::update_sequential_block_gas_counters(&accumulated_fee_statement, ret.len());
         ret.resize_with(num_txns, E::Output::skip_output);
         Ok(ret)
     }
