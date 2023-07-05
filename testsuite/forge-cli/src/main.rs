@@ -57,6 +57,8 @@ use std::{
 use tokio::runtime::Runtime;
 use url::Url;
 
+use aptos_forge_cli::commands::operator::OperatorCommand;
+
 #[cfg(unix)]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -103,16 +105,6 @@ enum TestCommand {
     K8sSwarm(K8sSwarm),
 }
 
-#[derive(Subcommand, Debug)]
-enum OperatorCommand {
-    /// Set the image tag for a node in the cluster
-    SetNodeImageTag(SetNodeImageTag),
-    /// Clean up an existing cluster
-    CleanUp(CleanUp),
-    /// Resize an existing cluster
-    Resize(Resize),
-}
-
 #[derive(Parser, Debug)]
 struct LocalSwarm {
     #[clap(long, help = "directory to build local swarm under")]
@@ -155,61 +147,6 @@ struct K8sSwarm {
         help = "If set, keeps the forge testnet active in the specified namespace"
     )]
     keep: bool,
-    #[clap(long, help = "If set, enables HAProxy for each of the validators")]
-    enable_haproxy: bool,
-}
-
-#[derive(Parser, Debug)]
-struct SetNodeImageTag {
-    #[clap(long, help = "The name of the node StatefulSet to update")]
-    stateful_set_name: String,
-    #[clap(long, help = "The name of the container to update")]
-    container_name: String,
-    #[clap(long, help = "The docker image tag to use for the node")]
-    image_tag: String,
-    #[clap(long, help = "The kubernetes namespace to clean up")]
-    namespace: String,
-}
-
-#[derive(Parser, Debug)]
-struct CleanUp {
-    #[clap(
-        long,
-        help = "The kubernetes namespace to clean up. If unset, attemps to cleanup all by using forge-management configmaps"
-    )]
-    namespace: Option<String>,
-}
-
-#[derive(Parser, Debug)]
-struct Resize {
-    #[clap(long, help = "The kubernetes namespace to resize")]
-    namespace: String,
-    #[clap(long, default_value_t = 30)]
-    num_validators: usize,
-    #[clap(long, default_value_t = 1)]
-    num_fullnodes: usize,
-    #[clap(
-        long,
-        help = "Override the image tag used for validators",
-        default_value = "devnet"
-    )]
-    validator_image_tag: String,
-    #[clap(
-        long,
-        help = "Override the image tag used for testnet-specific components",
-        default_value = "devnet"
-    )]
-    testnet_image_tag: String,
-    #[clap(
-        long,
-        help = "Path to flattened directory containing compiled Move modules"
-    )]
-    move_modules_dir: Option<String>,
-    #[clap(
-        long,
-        help = "If set, dont use kubectl port forward to access the cluster"
-    )]
-    connect_directly: bool,
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
 }
@@ -325,40 +262,7 @@ fn main() -> Result<()> {
             }
         },
         // cmd input for cluster operations
-        CliCommand::Operator(op_cmd) => match op_cmd {
-            OperatorCommand::SetNodeImageTag(set_stateful_set_image_tag_config) => {
-                runtime.block_on(set_stateful_set_image_tag(
-                    set_stateful_set_image_tag_config.stateful_set_name,
-                    set_stateful_set_image_tag_config.container_name,
-                    set_stateful_set_image_tag_config.image_tag,
-                    set_stateful_set_image_tag_config.namespace,
-                ))?;
-                Ok(())
-            },
-            OperatorCommand::CleanUp(cleanup) => {
-                if let Some(namespace) = cleanup.namespace {
-                    runtime.block_on(uninstall_testnet_resources(namespace))?;
-                } else {
-                    runtime.block_on(cleanup_cluster_with_management())?;
-                }
-                Ok(())
-            },
-            OperatorCommand::Resize(resize) => {
-                runtime.block_on(install_testnet_resources(
-                    resize.namespace,
-                    resize.num_validators,
-                    resize.num_fullnodes,
-                    resize.validator_image_tag,
-                    resize.testnet_image_tag,
-                    resize.move_modules_dir,
-                    !resize.connect_directly,
-                    resize.enable_haproxy,
-                    None,
-                    None,
-                ))?;
-                Ok(())
-            },
-        },
+        CliCommand::Operator(op_cmd) => runtime.block_on(op_cmd.run()),
     }
 }
 
