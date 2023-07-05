@@ -313,6 +313,9 @@ aborts if StateStorageUsage already exists.
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+<b>let</b> <b>post</b> state_usage = <b>global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+<b>ensures</b> state_usage.epoch == 0 && state_usage.usage.bytes == 0 && state_usage.usage.items == 0;
 </code></pre>
 
 
@@ -330,6 +333,7 @@ aborts if StateStorageUsage already exists.
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>aborts_if</b> <b>false</b>;
+<b>ensures</b> epoch == <b>global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework).epoch;
 </code></pre>
 
 

@@ -34,6 +34,10 @@ spec aptos_framework::voting {
 
         requires chain_status::is_operating();
         include CreateProposalAbortsIf<ProposalType>{is_multi_step_proposal: false};
+        ensures result == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id;
+        ensures global<VotingForum<ProposalType>>(voting_forum_address).next_proposal_id
+            == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id + 1;
+        ensures  table::spec_contains(global<VotingForum<ProposalType>>(voting_forum_address).proposals, result);
     }
 
     // The min_vote_threshold lower thanearly_resolution_vote_threshold.
@@ -57,6 +61,11 @@ spec aptos_framework::voting {
 
         requires chain_status::is_operating();
         include CreateProposalAbortsIf<ProposalType>;
+        ensures result == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id;
+        ensures global<VotingForum<ProposalType>>(voting_forum_address).next_proposal_id
+            == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id + 1;
+        ensures table::spec_contains(global<VotingForum<ProposalType>>(voting_forum_address).proposals, result);
+        ensures  table::spec_contains(global<VotingForum<ProposalType>>(voting_forum_address).proposals, result);
     }
 
     spec schema CreateProposalAbortsIf<ProposalType> {
