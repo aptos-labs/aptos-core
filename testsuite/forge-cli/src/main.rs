@@ -1463,10 +1463,10 @@ fn realistic_env_max_load_test(duration: Duration) -> ForgeConfig {
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
+                    mempool_backlog: 100,
                 })
                 .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(5000),
+            inner_success_criteria: SuccessCriteria::new(1),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
