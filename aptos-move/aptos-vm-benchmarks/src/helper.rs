@@ -5,8 +5,14 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::TransactionPayload;
+use move_binary_format::CompiledModule;
+use move_core_types::account_address::AccountAddress;
 use move_core_types::language_storage::ModuleId;
+use std::string::String;
 use std::{fs::ReadDir, path::PathBuf, time::Instant};
+
+//// CONSTANTS
+const PREFIX: &str = "benchmark";
 
 //// generate a TransactionPayload for modules
 pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
@@ -75,4 +81,65 @@ pub fn get_dir_paths(dirs: ReadDir) -> Vec<PathBuf> {
         dir_paths.push(entry.path());
     }
     dir_paths
+}
+
+//// get functional identifiers
+pub fn get_functional_identifiers(
+    cm: CompiledModule,
+    identifier: String,
+    address: AccountAddress,
+    pattern: String,
+) -> Vec<String> {
+    // find non-entry functions and ignore them
+    // keep entry function names in func_identifiers vector
+    let funcs = cm.function_defs;
+    let func_handles = cm.function_handles;
+    let func_identifier_pool = cm.identifiers;
+
+    // find # of params in each func if it is entry function
+    let signature_pool = cm.signatures;
+
+    let mut func_identifiers: Vec<String> = Vec::new();
+    for func in funcs {
+        // check if function is marked as entry, if not skip it
+        let is_entry = func.is_entry;
+        if !is_entry {
+            continue;
+        }
+
+        // extract some info from the function
+        let func_idx: usize = func.function.0.into();
+        let handle = &func_handles[func_idx];
+        let func_identifier_idx: usize = handle.name.0.into();
+        let func_identifier = &func_identifier_pool[func_identifier_idx];
+
+        // check if it doesn't start with "benchmark", if not skip it
+        let func_name = func_identifier.to_string();
+        if !func_name.starts_with(PREFIX) {
+            continue;
+        }
+
+        // check if it doesn't match pattern, if not skip it
+        let fully_qualified_path = format!("{}::{}::{}", address, identifier, func_name);
+        if !fully_qualified_path.contains(&pattern) && !pattern.is_empty() {
+            continue;
+        }
+
+        // if it does, ensure no params in benchmark function
+        let signature_idx: usize = handle.parameters.0.into();
+        let func_params = &signature_pool[signature_idx];
+        if func_params.len() != 0 {
+            eprintln!(
+                "\n[WARNING] benchmark function should not have parameters: {}\n",
+                func_name,
+            );
+            // TODO: should we exit instead of continuing with the benchmark
+            continue;
+        }
+
+        // save function to later run benchmark for it
+        func_identifiers.push(func_name);
+    }
+
+    func_identifiers
 }
