@@ -7,7 +7,7 @@ use crate::{
         discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
-    block_executor::BlockAptosVM,
+    block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
     data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
@@ -19,6 +19,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::{
@@ -1506,12 +1507,16 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
-        let ret = BlockAptosVM::execute_block(
+        let ret = BlockAptosVM::execute_block::<
+            _,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+        >(
             Arc::clone(&RAYON_EXEC_POOL),
             BlockExecutorTransactions::Unsharded(transactions),
             state_view,
             Self::get_concurrency_level(),
             maybe_block_gas_limit,
+            None,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
