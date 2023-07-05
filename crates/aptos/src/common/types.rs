@@ -33,8 +33,7 @@ use aptos_rest_client::{
 };
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{HardwareWalletAccount, HardwareWalletType},
-    types::{LocalAccount, TransactionSigner},
+    types::{HardwareWalletAccount, HardwareWalletType, LocalAccount, TransactionSigner},
 };
 use aptos_types::{
     chain_id::ChainId,
@@ -431,9 +430,9 @@ impl ProfileOptions {
         ))
     }
 
-    pub fn derivative_path(&self) -> CliTypedResult<Option<String>> {
+    pub fn derivation_path(&self) -> CliTypedResult<Option<String>> {
         let profile = self.profile()?;
-        Ok(profile.derivative_path)
+        Ok(profile.derivation_path)
     }
 
     pub fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
@@ -932,8 +931,8 @@ impl ExtractPublicKey for PrivateKeyInputOptions {
 
         // 2. Get the public key from the config profile
         // 3. Else error
-        if private_key.is_some() {
-            Ok(private_key.unwrap().public_key())
+        if let Some(key) = private_key {
+            Ok(key.public_key())
         } else if let Some(Some(public_key)) = CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
@@ -1639,7 +1638,6 @@ impl TransactionOptions {
 
         match self.get_transaction_account_type() {
             Ok(AccountType::Local) => {
-                println!("Local account");
                 let (private_key, _) = self.get_key_and_address()?;
                 let sender_account =
                     &mut LocalAccount::new(sender_address, private_key, sequence_number);
@@ -1650,15 +1648,15 @@ impl TransactionOptions {
                     .await
                     .map_err(|err| CliError::ApiError(err.to_string()))?;
 
-                return Ok(response.into_inner());
+                Ok(response.into_inner())
             },
             Ok(AccountType::HardwareWallet) => {
                 let sender_account = &mut HardwareWalletAccount::new(
                     sender_address,
                     sender_public_key,
                     self.profile_options
-                        .derivative_path()
-                        .expect("derivative path is required")
+                        .derivation_path()
+                        .expect("derivative path is missing from profile")
                         .unwrap(),
                     HardwareWalletType::Ledger,
                     sequence_number,
@@ -1670,9 +1668,9 @@ impl TransactionOptions {
                     .await
                     .map_err(|err| CliError::ApiError(err.to_string()))?;
 
-                return Ok(response.into_inner());
+                Ok(response.into_inner())
             },
-            Err(err) => return Err(err),
+            Err(err) => Err(err),
         }
     }
 
