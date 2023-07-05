@@ -65,17 +65,23 @@ pub fn run_inlining(env: &mut CompilationEnv, prog: &mut Program) {
 impl<'l> Inliner<'l> {
     fn run(&mut self, prog: &mut Program) {
         // First collect all definitions of inlined functions so we can expand them later in the AST.
-        self.visit_functions(prog, VisitingMode::All, &mut |ctx, _, fdef| {
+        self.visit_functions(prog, VisitingMode::All, &mut |ctx, fname, fdef| {
             if let Some(mid) = ctx.current_module {
                 let global_name = (mid, ctx.current_function);
                 ctx.visibilities
                     .insert(global_name, fdef.visibility.clone());
                 if fdef.inline {
-                    assert!(
-                        matches!(fdef.body.value, FunctionBody_::Defined(_)),
-                        "ICE inline function without body"
-                    );
-                    ctx.inline_defs.insert(global_name, fdef.clone());
+                    if !matches!(fdef.body.value, FunctionBody_::Defined(_)) {
+                        ctx.env.add_diag(diag!(
+                            Inlining::Unsupported,
+                            (
+                                fdef.body.loc,
+                                format!("inline function {} must not be native", fname)
+                            )
+                        ));
+                    } else {
+                        ctx.inline_defs.insert(global_name, fdef.clone());
+                    }
                 }
             }
         });
