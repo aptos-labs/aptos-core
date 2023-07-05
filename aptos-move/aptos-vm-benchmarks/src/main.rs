@@ -65,6 +65,8 @@ fn main() {
                 pattern.clone(),
             );
 
+            //// publish module and sign user transaction
+            //// the benchmark happens when in signing user txn
             helper::publish(
                 &package,
                 &mut executor,

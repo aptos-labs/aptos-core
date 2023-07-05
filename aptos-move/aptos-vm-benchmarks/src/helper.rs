@@ -104,6 +104,11 @@ pub fn publish(
     }
 }
 
+/*
+ *
+ * GETTER FUNCTIONS
+ *
+ */
 //// get module name
 pub fn get_module_name(
     address: AccountAddress,
