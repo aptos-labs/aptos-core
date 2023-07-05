@@ -74,7 +74,7 @@ async fn test_get_new_transactions_or_outputs() {
                 &output_list_with_proof,
                 &transaction_list_with_proof,
             );
-            let (mut mock_client, service, mock_time, _) =
+            let (mut mock_client, service, storage_service_notifier, mock_time, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
             let active_optimistic_fetches = service.get_optimistic_fetches();
             tokio::spawn(service.start());
@@ -95,8 +95,13 @@ async fn test_get_new_transactions_or_outputs() {
             // Verify no optimistic fetch response has been received yet
             assert_none!(response_receiver.try_recv().unwrap());
 
-            // Elapse enough time to force the optimistic fetch thread to work
-            utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
+            // Force the optimistic fetch handler to work
+            utils::force_optimistic_fetch_handler_to_run(
+                &mut mock_client,
+                &mock_time,
+                &storage_service_notifier,
+            )
+            .await;
 
             // Verify a response is received and that it contains the correct data
             if fallback_to_transactions {
@@ -198,7 +203,7 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                 &output_list_with_proof_1,
                 &transaction_list_with_proof,
             );
-            let (mut mock_client, service, mock_time, _) =
+            let (mut mock_client, service, storage_service_notifier, mock_time, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
             let active_optimistic_fetches = service.get_optimistic_fetches();
             tokio::spawn(service.start());
@@ -235,8 +240,13 @@ async fn test_get_new_transactions_or_outputs_different_network() {
             assert_none!(response_receiver_1.try_recv().unwrap());
             assert_none!(response_receiver_2.try_recv().unwrap());
 
-            // Elapse enough time to force the optimistic fetch thread to work
-            utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
+            // Force the optimistic fetch handler to work
+            utils::force_optimistic_fetch_handler_to_run(
+                &mut mock_client,
+                &mock_time,
+                &storage_service_notifier,
+            )
+            .await;
 
             // Verify a response is received and that it contains the correct data
             if fallback_to_transactions {
@@ -343,7 +353,7 @@ async fn test_get_new_transactions_or_outputs_epoch_change() {
             &output_list_with_proof,
             &transaction_list_with_proof,
         );
-        let (mut mock_client, service, mock_time, _) =
+        let (mut mock_client, service, storage_service_notifier, mock_time, _) =
             MockClient::new(Some(db_reader), Some(storage_config));
         let active_optimistic_fetches = service.get_optimistic_fetches();
         tokio::spawn(service.start());
@@ -361,8 +371,13 @@ async fn test_get_new_transactions_or_outputs_epoch_change() {
         // Wait until the optimistic fetch is active
         utils::wait_for_active_optimistic_fetches(active_optimistic_fetches.clone(), 1).await;
 
-        // Elapse enough time to force the optimistic fetch thread to work
-        utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
+        // Force the optimistic fetch handler to work
+        utils::force_optimistic_fetch_handler_to_run(
+            &mut mock_client,
+            &mock_time,
+            &storage_service_notifier,
+        )
+        .await;
 
         // Verify a response is received and that it contains the correct data
         if fallback_to_transactions {
@@ -442,7 +457,7 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
             &output_list_with_proof,
             &transaction_list_with_proof,
         );
-        let (mut mock_client, service, mock_time, _) =
+        let (mut mock_client, service, storage_service_notifier, mock_time, _) =
             MockClient::new(Some(db_reader), Some(storage_config));
         let active_optimistic_fetches = service.get_optimistic_fetches();
         tokio::spawn(service.start());
@@ -460,8 +475,13 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
         // Wait until the optimistic fetch is active
         utils::wait_for_active_optimistic_fetches(active_optimistic_fetches.clone(), 1).await;
 
-        // Elapse enough time to force the optimistic fetch thread to work
-        utils::wait_for_optimistic_fetch_service_to_refresh(&mut mock_client, &mock_time).await;
+        // Force the optimistic fetch handler to work
+        utils::force_optimistic_fetch_handler_to_run(
+            &mut mock_client,
+            &mock_time,
+            &storage_service_notifier,
+        )
+        .await;
 
         // Verify a response is received and that it contains the correct data
         if fallback_to_transactions {
