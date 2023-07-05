@@ -13,7 +13,7 @@ import { MAX_U64_BIG_INT } from "../bcs/consts";
 import { AnyNumber, bcsToBytes, Bytes } from "../bcs";
 import { getPropertyValueRaw, PropertyMap } from "../utils/property_map_serde";
 import { Token, TokenData } from "../aptos_types/token_types";
-import {AccountAddress, AccountAuthenticator} from "../aptos_types";
+import { AccountAddress, AccountAuthenticator } from "../aptos_types";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -319,8 +319,10 @@ export class TokenClient {
       [creator, collectionName, name, propertyVersion, amount],
     );
 
-    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
-      TxnBuilderTypes.AccountAddress.fromHex(receiver.address())], fee_payer ? TxnBuilderTypes.AccountAddress.fromHex(fee_payer.address()) : undefined
+    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(
+      rawTxn,
+      [TxnBuilderTypes.AccountAddress.fromHex(receiver.address())],
+      fee_payer ? TxnBuilderTypes.AccountAddress.fromHex(fee_payer.address()) : undefined,
     );
 
     const senderSignature = new TxnBuilderTypes.Ed25519Signature(
@@ -341,24 +343,27 @@ export class TokenClient {
       receiverSignature,
     );
 
-    let feePayer: {address: AccountAddress, authenticator: AccountAuthenticator } | undefined;
+    let feePayer: { address: AccountAddress; authenticator: AccountAuthenticator } | undefined;
     if (fee_payer) {
       const feePayerSignature = new TxnBuilderTypes.Ed25519Signature(
-          fee_payer.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
+        fee_payer.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
       );
 
       const feePayerAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
-          new TxnBuilderTypes.Ed25519PublicKey(fee_payer.signingKey.publicKey),
-          feePayerSignature,
+        new TxnBuilderTypes.Ed25519PublicKey(fee_payer.signingKey.publicKey),
+        feePayerSignature,
       );
-      feePayer = { address: TxnBuilderTypes.AccountAddress.fromHex(fee_payer.address()), authenticator: feePayerAuthenticator}
+      feePayer = {
+        address: TxnBuilderTypes.AccountAddress.fromHex(fee_payer.address()),
+        authenticator: feePayerAuthenticator,
+      };
     }
 
     const multiAgentAuthenticator = new TxnBuilderTypes.TransactionAuthenticatorMultiAgent(
       senderAuthenticator,
       [TxnBuilderTypes.AccountAddress.fromHex(receiver.address())], // Secondary signer addresses
       [receiverAuthenticator], // Secondary signer authenticators
-        feePayer,
+      feePayer,
     );
 
     const bcsTxn = bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, multiAgentAuthenticator));

@@ -395,11 +395,11 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
       this.raw_txn.serialize(serializer);
       serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
     } else {
-        // enum variant index
-        serializer.serializeU32AsUleb128(1);
-        this.raw_txn.serialize(serializer);
-        serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
-        this.fee_payer_address.serialize(serializer);
+      // enum variant index
+      serializer.serializeU32AsUleb128(1);
+      this.raw_txn.serialize(serializer);
+      serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
+      this.fee_payer_address.serialize(serializer);
     }
   }
 
