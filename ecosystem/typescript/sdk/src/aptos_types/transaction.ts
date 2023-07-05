@@ -389,7 +389,7 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
   }
 
   serialize(serializer: Serializer): void {
-    if (this.fee_payer_address === undefined) {
+    if (!this.fee_payer_address) {
       // enum variant index
       serializer.serializeU32AsUleb128(0);
       this.raw_txn.serialize(serializer);
