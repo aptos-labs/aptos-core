@@ -5,6 +5,7 @@
 
 use anyhow::{ensure, Context, Result};
 use aptos_api_types::{Block, HashValue, U64};
+use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::coin_client::CoinClient;
 use aptos_sdk::types::LocalAccount;
@@ -61,11 +62,40 @@ static FAIL_WRONG_LAST_VERSION: &str = "Returned wrong block last version.";
 static FAIL_WRONG_TRANSACTIONS: &str = "Returned wrong transactions.";
 static SUCCESS: &str = "success";
 
+#[derive(Debug)]
+enum TestResult {
+    Success,
+    Skip,
+    Fail(Failure),
+    Error(Error),
+}
+
+#[derive(Debug)]
+enum Failure {
+    WrongAuthKey,
+    WrongSeqNumber,
+    WrongBalance,
+    WrongBalanceAtVersion,
+    WrongBlockHeight,
+    WrongBlockHash,
+    WrongBlockTimestamp,
+    WrongFirstVersion,
+    WrongLastVersion,
+    WrongTransactions,
+}
+
+#[derive(Debug)]
+enum Error {
+    ClientResponse(RestError),
+    FaucetFund(anyhow::Error),
+    Other(anyhow::Error),
+}
+
 /// Calls get_account on a newly created account on devnet. Requires faucet.
-async fn probe_getaccount_1() -> Result<&'static str> {
+async fn probe_getaccount_1() -> TestResult {
     // check faucet access
     if !HAS_FAUCET_ACCESS {
-        return Ok(SKIP_NO_FAUCET_ACCESS);
+        return TestResult::Skip;
     }
 
     // create the rest client
@@ -74,16 +104,15 @@ async fn probe_getaccount_1() -> Result<&'static str> {
 
     // create and fund an account
     let giray = LocalAccount::generate(&mut rand::rngs::OsRng);
-    faucet_client
-        .fund(giray.address(), 100_000_000)
-        .await
-        .context(ERROR_FAUCET_FUND)?;
+    if let Err(e) = faucet_client.fund(giray.address(), 100_000_000).await {
+        return TestResult::Error(Error::FaucetFund(e));
+    }
 
     // ask for account data
-    let response = client
-        .get_account(giray.address())
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
+    let response = match client.get_account(giray.address()).await {
+        Ok(response) => response,
+        Err(e) => return TestResult::Error(Error::ClientResponse(e)),
+    };
 
     // check account data
     let expected_account = Account {
@@ -92,22 +121,14 @@ async fn probe_getaccount_1() -> Result<&'static str> {
     };
     let actual_account = response.inner();
 
-    ensure!(
-        expected_account.authentication_key == actual_account.authentication_key,
-        "{} expected {}, got {}",
-        FAIL_WRONG_AUTH_KEY,
-        expected_account.authentication_key,
-        actual_account.authentication_key
-    );
-    ensure!(
-        expected_account.sequence_number == actual_account.sequence_number,
-        "{} expected {}, got {}",
-        FAIL_WRONG_SEQ_NUMBER,
-        expected_account.sequence_number,
-        actual_account.sequence_number
-    );
+    if !(expected_account.authentication_key == actual_account.authentication_key) {
+        return TestResult::Fail(Failure::WrongAuthKey);
+    }
+    if !(expected_account.sequence_number == actual_account.sequence_number) {
+        return TestResult::Fail(Failure::WrongSeqNumber);
+    }
 
-    Ok(SUCCESS)
+    TestResult::Success
 }
 
 /// Calls get_account on a static account on testnet.
@@ -570,10 +591,7 @@ async fn testnet_1() -> Result<&'static str> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    match probe_getaccount_1().await {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{:?}", e),
-    }
+    println!("{:?}", probe_getaccount_1().await);
     match probe_getaccount_2().await {
         Ok(result) => println!("{:?}", result),
         Err(e) => println!("{:?}", e),
