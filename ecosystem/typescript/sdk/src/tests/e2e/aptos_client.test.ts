@@ -531,12 +531,14 @@ test(
     let aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
-    let aliceBefore = undefined;
-    {
-      const resources = await client.getAccountResources(alice.address());
-      let accountResource = resources.find((r) => r.type === aptosCoin);
-      aliceBefore = (accountResource!.data as any).coin.value;
+    const getBalance = async (account: AptosAccount) => {
+        const resources = await client.getAccountResources(account.address().hex());
+        let accountResource = resources.find((r) => r.type === aptosCoin);
+        return BigInt((accountResource!.data as any).coin.value);
     }
+
+    const aliceBefore = await getBalance(alice);
+    const bobBefore = await getBalance(bob);
 
     const txnHash = await tokenClient.directTransferToken(
       alice,
@@ -559,17 +561,9 @@ test(
     expect(bobBalance.amount).toBe("1");
 
     // Check that Alice did not pay the fee
-    {
-      const resources = await client.getAccountResources(alice.address());
-      let accountResource = resources.find((r) => r.type === aptosCoin);
-      expect((accountResource!.data as any).coin.value).toBe(aliceBefore);
-    }
-
-    {
-      const resources = await client.getAccountResources(bob.address());
-      let accountResource = resources.find((r) => r.type === aptosCoin);
-      expect(BigInt((accountResource!.data as any).coin.value)).toBeLessThan(100000000);
-    }
+    expect(await getBalance(alice)).toBe(aliceBefore);
+    // Check that Bob paid the fee
+    expect(await getBalance(bob)).toBeLessThan(bobBefore);
   },
   longTestTimeout,
 );
