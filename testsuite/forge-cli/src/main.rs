@@ -623,62 +623,102 @@ fn state_sync_slow_processing_catching_up() -> ForgeConfig {
 }
 
 fn different_node_speed_and_reliability_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 70, 50, true, false, ChangingWorkingQuorumTest {
-        min_tps: 30,
-        always_healthy_nodes: 6,
-        max_down_nodes: 5,
-        num_large_validators: 3,
-        add_execution_delay: true,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        20,
+        120,
+        70,
+        50,
+        true,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 30,
+            always_healthy_nodes: 6,
+            max_down_nodes: 5,
+            num_large_validators: 3,
+            add_execution_delay: true,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn large_test_only_few_nodes_down() -> ForgeConfig {
-    changing_working_quorum_test_helper(60, 120, 100, 70, false, false, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 40,
-        max_down_nodes: 10,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        60,
+        120,
+        100,
+        70,
+        false,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 40,
+            max_down_nodes: 10,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn changing_working_quorum_test_high_load() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 500, 300, true, true, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 0,
-        max_down_nodes: 20,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        20,
+        120,
+        500,
+        300,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 0,
+            max_down_nodes: 20,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn changing_working_quorum_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 100, 70, true, true, ChangingWorkingQuorumTest {
-        min_tps: 15,
-        always_healthy_nodes: 0,
-        max_down_nodes: 20,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        20,
+        120,
+        100,
+        70,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 15,
+            always_healthy_nodes: 0,
+            max_down_nodes: 20,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn consensus_stress_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(10, 60, 100, 80, true, false, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 10,
-        max_down_nodes: 0,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        10,
+        60,
+        100,
+        80,
+        true,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 10,
+            max_down_nodes: 0,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
@@ -1009,39 +1049,35 @@ fn individual_workload_tests(test_name: String) -> ForgeConfig {
             helm_values["validator"]["config"]["execution"]
                 ["processed_transactions_detailed_counters"] = true.into();
         }))
-        .with_emit_job(
-            if test_name == "write_new_resource" {
-                let account_creation_type = TransactionType::AccountGeneration {
-                    add_created_accounts_to_pool: true,
-                    max_account_working_set: 20_000_000,
-                    creation_balance: 200_000_000,
-                };
-                let write_type = TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::BytesMakeOrChange {
-                        data_length: Some(32),
-                    },
-                    num_modules: 1,
-                    use_account_pool: true,
-                };
-                job.transaction_mix_per_phase(vec![
-                    // warmup
-                    vec![(account_creation_type, 1)],
-                    vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
-                    // cooldown
-                    vec![(write_type, 1)],
-                ])
-            } else {
-                job.transaction_type(match test_name.as_str() {
-                    "account_creation" => {
-                        TransactionTypeArg::AccountGeneration.materialize_default()
-                    },
-                    "publishing" => TransactionTypeArg::PublishPackage.materialize_default(),
-                    "module_loading" => TransactionTypeArg::NoOp.materialize(1000, false),
-                    _ => unreachable!("{}", test_name),
-                })
-            },
-        )
+        .with_emit_job(if test_name == "write_new_resource" {
+            let account_creation_type = TransactionType::AccountGeneration {
+                add_created_accounts_to_pool: true,
+                max_account_working_set: 20_000_000,
+                creation_balance: 200_000_000,
+            };
+            let write_type = TransactionType::CallCustomModules {
+                entry_point: EntryPoints::BytesMakeOrChange {
+                    data_length: Some(32),
+                },
+                num_modules: 1,
+                use_account_pool: true,
+            };
+            job.transaction_mix_per_phase(vec![
+                // warmup
+                vec![(account_creation_type, 1)],
+                vec![(account_creation_type, 1)],
+                vec![(write_type, 1)],
+                // cooldown
+                vec![(write_type, 1)],
+            ])
+        } else {
+            job.transaction_type(match test_name.as_str() {
+                "account_creation" => TransactionTypeArg::AccountGeneration.materialize_default(),
+                "publishing" => TransactionTypeArg::PublishPackage.materialize_default(),
+                "module_loading" => TransactionTypeArg::NoOp.materialize(1000, false),
+                _ => unreachable!("{}", test_name),
+            })
+        })
         .with_success_criteria(
             SuccessCriteria::new(match test_name.as_str() {
                 "account_creation" => 3600,
@@ -1333,13 +1369,11 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(
-                if duration.as_secs() > 1200 {
-                    4500
-                } else {
-                    5000
-                },
-            )
+            SuccessCriteria::new(if duration.as_secs() > 1200 {
+                4500
+            } else {
+                5000
+            })
             .add_no_restarts()
             .add_wait_for_catchup_s(
                 // Give at least 60s for catchup, give 10% of the run for longer durations.
@@ -1480,13 +1514,11 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig {
         .add_network_test(ThreeRegionSameCloudSimulationTest)
         .add_network_test(NetworkLossTest)
         .with_success_criteria(
-            SuccessCriteria::new(
-                if duration > Duration::from_secs(1200) {
-                    100
-                } else {
-                    1000
-                },
-            )
+            SuccessCriteria::new(if duration > Duration::from_secs(1200) {
+                100
+            } else {
+                1000
+            })
             .add_no_restarts()
             .add_system_metrics_threshold(SystemMetricsThreshold::new(
                 // Check that we don't use more than 12 CPU cores for 30% of the time.
@@ -1511,13 +1543,11 @@ fn changing_working_quorum_test_helper(
     let max_down_nodes = test.max_down_nodes;
     config
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(
-            if max_down_nodes == 0 {
-                0
-            } else {
-                std::cmp::max(2, target_tps / 1000)
-            },
-        )
+        .with_initial_fullnode_count(if max_down_nodes == 0 {
+            0
+        } else {
+            std::cmp::max(2, target_tps / 1000)
+        })
         .add_network_test(test)
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();
