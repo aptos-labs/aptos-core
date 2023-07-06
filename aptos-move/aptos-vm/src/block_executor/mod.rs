@@ -67,7 +67,15 @@ impl AptosTransactionOutput {
     }
 
     fn take_output(mut self) -> TransactionOutput {
-        self.committed_output.take().unwrap()
+        match self.committed_output.take() {
+            Some(output) => output,
+            None => self
+                .vm_output
+                .lock()
+                .take()
+                .expect("Output must be set")
+                .output_with_delta_writes(vec![]),
+        }
     }
 }
 
