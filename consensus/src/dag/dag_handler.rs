@@ -56,7 +56,10 @@ impl NetworkHandler {
     async fn process_rpc(&mut self, rpc_request: IncomingDAGRequest) -> anyhow::Result<()> {
         let dag_message: DAGMessage = rpc_request.req.try_into()?;
 
-        if dag_message.author()? != rpc_request.sender {
+        let author = dag_message
+            .author()
+            .map_err(|_| anyhow::anyhow!("unexpected rpc message {:?}", dag_message))?;
+        if author != rpc_request.sender {
             bail!("message author and network author mismatch");
         }
 

@@ -5,7 +5,7 @@ use crate::{
     dag::reliable_broadcast::BroadcastStatus, network::TConsensusMsg,
     network_interface::ConsensusMsg,
 };
-use anyhow::{ensure, bail};
+use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
     bls12381,
