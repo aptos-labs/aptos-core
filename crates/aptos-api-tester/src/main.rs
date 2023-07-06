@@ -168,10 +168,10 @@ async fn test_accountdata(client: &Client, account: &LocalAccount) -> TestResult
     };
     let actual_account = response.inner();
 
-    if !(expected_account.authentication_key == actual_account.authentication_key) {
+    if expected_account.authentication_key != actual_account.authentication_key {
         return TestResult::Fail("wrong authentication key");
     }
-    if !(expected_account.sequence_number == actual_account.sequence_number) {
+    if expected_account.sequence_number != actual_account.sequence_number {
         return TestResult::Fail("wrong sequence number");
     }
 
@@ -194,7 +194,7 @@ async fn test_accountbalance(
     let expected_balance = U64(expected_balance);
     let actual_balance = response.inner().coin.value;
 
-    if !(expected_balance == actual_balance) {
+    if expected_balance != actual_balance {
         return TestResult::Fail("wrong balance");
     }
 
@@ -220,7 +220,7 @@ async fn test_cointransfer(
         Ok(txn) => txn,
         Err(e) => return TestResult::Error(e),
     };
-    let response = match client.wait_for_transaction(&txn_hash).await {
+    let _ = match client.wait_for_transaction(&txn_hash).await {
         Ok(response) => response,
         Err(e) => return TestResult::Error(e.into()),
     };
@@ -232,7 +232,7 @@ async fn test_cointransfer(
         Err(e) => return TestResult::Error(e.into()),
     };
 
-    if !(expected_receiver_balance == actual_receiver_balance) {
+    if expected_receiver_balance != actual_receiver_balance {
         return TestResult::Fail("wrong balance after coin transfer");
     }
 
