@@ -11,6 +11,7 @@ use move_core_types::{
     vm_status::{self, StatusCode, StatusType, VMStatus},
 };
 use std::fmt;
+use backtrace::trace;
 
 pub type VMResult<T> = ::std::result::Result<T, VMError>;
 pub type BinaryLoaderResult<T> = ::std::result::Result<T, PartialVMError>;
@@ -332,6 +333,28 @@ impl PartialVMError {
     pub fn new(major_status: StatusCode) -> Self {
         debug_assert!(major_status != StatusCode::EXECUTED);
         let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+            let mut len = 5;
+            let mut trace: String = "Unknown invariant violation generated:\n".to_string();
+            backtrace::trace(|f| {
+                backtrace::resolve(f.ip(), |symbol| {
+                    let mut function_name = "<unknown>";
+                    if let Some(name) = symbol.name() {
+                        if let Some(name) = name.as_str() {
+                            function_name = name;
+                        }
+                    }
+                    let mut file_name = "<unknown>";
+                    if let Some(filename) = symbol.filename() {
+                        if let Some(filename) = filename.to_str() {
+                            file_name = filename.split('/').last().unwrap_or(filename);
+                        }
+                    }
+                    let lineno = symbol.lineno().unwrap_or(0);
+                    trace.push_str(&format!("In function {} at {}:{}\n", function_name, file_name, lineno));
+                });
+                len = len - 1;
+                return len > 0;
+            });
             Some(format!(
                 "UNKNOWN_INVARIANT_VIOLATION_ERROR at {:?}",
                 std::backtrace::Backtrace::force_capture()
