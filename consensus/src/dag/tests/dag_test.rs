@@ -4,15 +4,12 @@
 use crate::dag::{
     dag_store::Dag,
     storage::DAGStorage,
-    types::{CertifiedNode, Node, NodeCertificate},
+    tests::helpers::new_certified_node,
+    types::{CertifiedNode, Node},
 };
-use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
-use aptos_types::{
-    aggregate_signature::AggregateSignature, epoch_state::EpochState,
-    validator_verifier::random_validator_verifier,
-};
+use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
 use std::{collections::HashMap, sync::Arc};
 
 pub struct MockStorage {
@@ -169,13 +166,4 @@ fn test_dag_recover_from_storage() {
 
     let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone());
     assert!(storage.certified_node_data.lock().is_empty());
-}
-
-fn new_certified_node(
-    round: Round,
-    author: Author,
-    parents: Vec<NodeCertificate>,
-) -> CertifiedNode {
-    let node = Node::new(1, round, author, 0, Payload::empty(false), parents);
-    CertifiedNode::new(node, AggregateSignature::empty())
 }

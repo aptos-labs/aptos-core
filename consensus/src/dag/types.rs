@@ -33,11 +33,7 @@ impl TDAGMessage for NodeDigestSignature {
         todo!()
     }
 }
-impl TDAGMessage for NodeCertificate {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        todo!()
-    }
-}
+
 impl TDAGMessage for CertifiedAck {
     fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         todo!()
@@ -283,6 +279,16 @@ impl Deref for CertifiedNode {
     }
 }
 
+impl TDAGMessage for CertifiedNode {
+    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        let node_digest = NodeDigest::new(self.digest());
+
+        verifier
+            .verify_multi_signatures(&node_digest, self.certificate().signatures())
+            .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct NodeDigestSignature {
     epoch: u64,
@@ -363,10 +369,16 @@ pub struct CertifiedAck {
     epoch: u64,
 }
 
+impl CertifiedAck {
+    pub fn new(epoch: u64) -> Self {
+        Self { epoch }
+    }
+}
+
 impl BroadcastStatus for CertificateAckState {
     type Ack = CertifiedAck;
     type Aggregated = ();
-    type Message = NodeCertificate;
+    type Message = CertifiedNode;
 
     fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         self.received.insert(peer);
@@ -431,7 +443,7 @@ pub struct DAGNetworkMessage {
 pub enum DAGMessage {
     NodeMsg(Node),
     NodeDigestSignatureMsg(NodeDigestSignature),
-    NodeCertificateMsg(NodeCertificate),
+    CertifiedNodeMsg(CertifiedNode),
     CertifiedAckMsg(CertifiedAck),
     FetchRequest(RemoteFetchRequest),
     FetchResponse(FetchResponse),
@@ -447,7 +459,7 @@ impl DAGMessage {
         match self {
             DAGMessage::NodeMsg(_) => "NodeMsg",
             DAGMessage::NodeDigestSignatureMsg(_) => "NodeDigestSignatureMsg",
-            DAGMessage::NodeCertificateMsg(_) => "NodeCertificateMsg",
+            DAGMessage::CertifiedNodeMsg(_) => "CertifiedNodeMsg",
             DAGMessage::CertifiedAckMsg(_) => "CertifiedAckMsg",
             DAGMessage::FetchRequest(_) => "FetchRequest",
             DAGMessage::FetchResponse(_) => "FetchResponse",
@@ -464,7 +476,7 @@ impl TConsensusMsg for DAGMessage {
         match self {
             DAGMessage::NodeMsg(node) => node.metadata.epoch,
             DAGMessage::NodeDigestSignatureMsg(signature) => signature.epoch,
-            DAGMessage::NodeCertificateMsg(certificate) => certificate.metadata.epoch,
+            DAGMessage::CertifiedNodeMsg(node) => node.metadata.epoch,
             DAGMessage::CertifiedAckMsg(ack) => ack.epoch,
             DAGMessage::FetchRequest(req) => req.target.epoch,
             DAGMessage::FetchResponse(res) => res.epoch,
