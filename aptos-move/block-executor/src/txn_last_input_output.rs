@@ -28,14 +28,18 @@ type TxnInput<K> = Vec<ReadDescriptor<K>>;
 // When a transaction is committed, the output delta writes must be populated by
 // the WriteOps corresponding to the deltas in the corresponding outputs.
 #[derive(Debug)]
-struct TxnOutput<T: TransactionOutput, E: Debug> {
+pub(crate) struct TxnOutput<T: TransactionOutput, E: Debug> {
     output_status: ExecutionStatus<T, Error<E>>,
 }
 type KeySet<T> = HashSet<<<T as TransactionOutput>::Txn as Transaction>::Key>;
 
 impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
-    fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
+    pub fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
         Self { output_status }
+    }
+
+    pub fn output_status(&self) -> &ExecutionStatus<T, Error<E>> {
+        &self.output_status
     }
 }
 
@@ -241,6 +245,10 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         } else {
             unreachable!();
         }
+    }
+
+    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<TxnOutput<T, E>>> {
+        self.outputs[txn_idx as usize].load_full()
     }
 
     // Extracts a set of paths written or updated during execution from transaction

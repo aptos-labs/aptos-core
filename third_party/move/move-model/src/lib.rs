@@ -27,12 +27,12 @@ use move_binary_format::{
 use move_compiler::{
     self,
     compiled_unit::{self, AnnotatedCompiledScript, AnnotatedCompiledUnit},
-    diagnostics::Diagnostics,
+    diagnostics::{codes::Severity, Diagnostics},
     expansion::ast::{self as E, ModuleIdent, ModuleIdent_},
     naming::ast as N,
     parser::ast::{self as P, ModuleName as ParserModuleName},
     shared::{
-        parse_named_address, unique_map::UniqueMap, Identifier as IdentifierTrait,
+        parse_named_address, unique_map::UniqueMap, CompilationEnv, Identifier as IdentifierTrait,
         NumericalAddress, PackagePaths,
     },
     typing::ast as T,
@@ -239,7 +239,17 @@ pub fn run_model_builder_with_options_and_compilation_flags<
             add_move_lang_diagnostics(&mut env, diags);
             return Ok(env);
         },
-        Ok(compiler) => compiler.into_ast(),
+        Ok(mut compiler) => {
+            // There may have been errors but nevertheless a stepped compiler is returned.
+            let compiler_env: &mut CompilationEnv = compiler.compilation_env();
+            if let Err(diags) = compiler_env.check_diags_at_or_above_severity(Severity::Warning) {
+                add_move_lang_diagnostics(&mut env, diags);
+                if env.has_errors() {
+                    return Ok(env);
+                }
+            }
+            compiler.into_ast()
+        },
     };
 
     // Extract the module/script closure
@@ -350,7 +360,12 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
     // TODO: verify that the expansion AST has modules in bottom-up dependency order, since this
     // is a requirement for the builder.
     let mut builder = ModelBuilder::new(env);
-    for (module_count, (module_id, module_def)) in program.modules.into_iter().enumerate() {
+    for (module_count, (module_id, module_def)) in program
+        .modules
+        .into_iter()
+        .sorted_by_key(|(_, def)| def.dependency_order)
+        .enumerate()
+    {
         let loc = builder.to_loc(&module_def.loc);
         let addr_bytes = builder.resolve_address(&loc, &module_id.value.address);
         let module_name = ModuleName::from_address_bytes_and_name(

@@ -25,7 +25,6 @@ use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf, str::FromStr};
 /// default configuration, and user specific settings.
 #[derive(Parser)]
 pub enum ConfigTool {
-    Init(crate::common::init::InitTool),
     GenerateShellCompletions(GenerateShellCompletions),
     SetGlobalConfig(SetGlobalConfig),
     ShowGlobalConfig(ShowGlobalConfig),
@@ -35,7 +34,6 @@ pub enum ConfigTool {
 impl ConfigTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            ConfigTool::Init(tool) => tool.execute_serialized_success().await,
             ConfigTool::GenerateShellCompletions(tool) => tool.execute_serialized_success().await,
             ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized().await,
             ConfigTool::ShowGlobalConfig(tool) => tool.execute_serialized().await,

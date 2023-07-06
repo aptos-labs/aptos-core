@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: expected `bool` but found `integer` in constant
+  ┌─ tests/checking/typing/block_single_expr_invalid.move:4:12
+  │
+4 │         ({ 0 } : bool);
+  │            ^
+
+error: expected `u64` but found `&?3` in expression
+  ┌─ tests/checking/typing/block_single_expr_invalid.move:5:12
+  │
+5 │         ({ &0 } : u64);
+  │            ^^
+
+error: expected `()` but found `&mut ?6` in expression
+  ┌─ tests/checking/typing/block_single_expr_invalid.move:6:12
+  │
+6 │         ({ &mut 0 } : ());
+  │            ^^^^^^
+
+error: expected 2 item(s), found 3
+  ┌─ tests/checking/typing/block_single_expr_invalid.move:8:12
+  │
+8 │         ({ (0, false, false) } : (u64, bool));
+  │            ^^^^^^^^^^^^^^^^^

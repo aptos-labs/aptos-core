@@ -10,14 +10,16 @@
 //! | block_hash |  QuorumCert  |
 //! ```
 
-use super::QC_CF_NAME;
 use anyhow::Result;
 use aptos_consensus_types::quorum_cert::QuorumCert;
 use aptos_crypto::HashValue;
 use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
+    ColumnFamilyName,
 };
+
+pub const QC_CF_NAME: ColumnFamilyName = "quorum_certificate";
 
 define_schema!(QCSchema, HashValue, QuorumCert, QC_CF_NAME);
 

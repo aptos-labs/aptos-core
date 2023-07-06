@@ -143,7 +143,8 @@ pub mod executor;
 pub mod proptest_types;
 mod scheduler;
 pub mod task;
-mod txn_last_input_output;
+pub mod txn_commit_hook;
+pub mod txn_last_input_output;
 #[cfg(test)]
 mod unit_tests;
 pub mod view;
