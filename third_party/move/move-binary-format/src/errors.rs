@@ -11,7 +11,7 @@ use move_core_types::{
     vm_status::{self, StatusCode, StatusType, VMStatus},
 };
 use std::fmt;
-use backtrace::trace;
+
 
 pub type VMResult<T> = ::std::result::Result<T, VMError>;
 pub type BinaryLoaderResult<T> = ::std::result::Result<T, PartialVMError>;
