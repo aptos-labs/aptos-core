@@ -12,7 +12,6 @@ use move_core_types::{
 };
 use std::fmt;
 
-
 pub type VMResult<T> = ::std::result::Result<T, VMError>;
 pub type BinaryLoaderResult<T> = ::std::result::Result<T, PartialVMError>;
 pub type PartialVMResult<T> = ::std::result::Result<T, PartialVMError>;
@@ -335,25 +334,26 @@ impl PartialVMError {
         let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
             let mut len = 5;
             let mut trace: String = "Unknown invariant violation generated:\n".to_string();
-            backtrace::trace(|f| {
-                backtrace::resolve(f.ip(), |symbol| {
-                    let mut function_name = "<unknown>";
+            backtrace::trace(|frame| {
+                backtrace::resolve_frame(frame, |symbol| {
+                    let mut function_name = backtrace::SymbolName::new("<unknown>".as_bytes());
                     if let Some(name) = symbol.name() {
-                        if let Some(name) = name.as_str() {
-                            function_name = name;
-                        }
+                        function_name = name;
                     }
                     let mut file_name = "<unknown>";
                     if let Some(filename) = symbol.filename() {
                         if let Some(filename) = filename.to_str() {
-                            file_name = filename.split('/').last().unwrap_or(filename);
+                            file_name = filename;
                         }
                     }
                     let lineno = symbol.lineno().unwrap_or(0);
-                    trace.push_str(&format!("In function {} at {}:{}\n", function_name, file_name, lineno));
+                    trace.push_str(&format!(
+                        "In function {} at {}:{}\n",
+                        function_name, file_name, lineno
+                    ));
                 });
-                len = len - 1;
-                return len > 0;
+                len -= 1;
+                len > 0
             });
             Some(trace)
         } else {
