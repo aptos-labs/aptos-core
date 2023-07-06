@@ -56,7 +56,7 @@ impl CoinInfo {
             Some(CoinResource::CoinInfoResource(inner)) => {
                 let coin_info_type = &CoinInfoType::from_move_type(
                     &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
-                    write_resource.r#type.as_ref().unwrap().address.as_str(),
+                    write_resource.type_str.as_ref(),
                     txn_version,
                 );
                 let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner

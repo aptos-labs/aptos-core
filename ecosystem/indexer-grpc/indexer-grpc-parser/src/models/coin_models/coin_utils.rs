@@ -11,6 +11,7 @@ use crate::{
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::{move_type::Content, MoveType, WriteResource};
 use bigdecimal::BigDecimal;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -159,14 +160,25 @@ pub struct CoinInfoType {
 }
 
 impl CoinInfoType {
-    pub fn from_move_type(move_type: &MoveType, address: &str, txn_version: i64) -> Self {
+    /// get creator address from move_type, and get coin type from move_type_str
+    /// Since move_type_str will contain things we don't need, e.g. 0x1::coin::CoinInfo<T>. We will use
+    /// regex to extract T.
+    pub fn from_move_type(move_type: &MoveType, move_type_str: &str, txn_version: i64) -> Self {
         if let Content::Struct(struct_tag) = move_type.content.as_ref().unwrap() {
+            let re = Regex::new(r"(<(.*)>)").unwrap();
+
+            let matched = re.captures(move_type_str).unwrap_or_else(|| {
+                error!(
+                    txn_version = txn_version,
+                    move_type_str = move_type_str,
+                    "move_type should look like 0x1::coin::CoinInfo<T>"
+                );
+                panic!();
+            });
+            let coin_type = matched.get(2).unwrap().as_str();
             Self {
-                coin_type: format!(
-                    "{}::{}::{}",
-                    struct_tag.address, struct_tag.module, struct_tag.name
-                ),
-                creator_address: standardize_address(address),
+                coin_type: coin_type.to_string(),
+                creator_address: struct_tag.address.clone(),
             }
         } else {
             error!(txn_version = txn_version, move_type = ?move_type, "Expected struct tag");
