@@ -184,15 +184,11 @@ async fn test_accountbalance(
     account: &LocalAccount,
     expected_balance: u64,
 ) -> TestResult {
-    // ask for account balance
-    let response = match client.get_account_balance(account.address()).await {
-        Ok(response) => response,
+    let expected_balance = U64(expected_balance);
+    let actual_balance = match client.get_account_balance(account.address()).await {
+        Ok(response) => response.inner().coin.value,
         Err(e) => return TestResult::Error(e.into()),
     };
-
-    // check balance
-    let expected_balance = U64(expected_balance);
-    let actual_balance = response.inner().coin.value;
 
     if expected_balance != actual_balance {
         return TestResult::Fail("wrong balance");
@@ -220,7 +216,7 @@ async fn test_cointransfer(
         Ok(txn) => txn,
         Err(e) => return TestResult::Error(e),
     };
-    let _ = match client.wait_for_transaction(&txn_hash).await {
+    let response = match client.wait_for_transaction(&txn_hash).await {
         Ok(response) => response,
         Err(e) => return TestResult::Error(e.into()),
     };
@@ -234,6 +230,25 @@ async fn test_cointransfer(
 
     if expected_receiver_balance != actual_receiver_balance {
         return TestResult::Fail("wrong balance after coin transfer");
+    }
+
+    // check account balance with a lower version number
+    let version = match response.inner().version() {
+        Some(version) => version,
+        _ => return TestResult::Error(anyhow!("transaction did not return version")),
+    };
+
+    let expected_balance_at_version = U64(starting_receiver_balance);
+    let actual_balance_at_version = match client
+        .get_account_balance_at_version(address, version - 1)
+        .await
+    {
+        Ok(response) => response.inner().coin.value,
+        Err(e) => return TestResult::Error(e.into()),
+    };
+
+    if expected_balance_at_version != actual_balance_at_version {
+        return TestResult::Fail("wrong balance at version before the coin transfer");
     }
 
     // TODO: do we want to check transaction details returned by the API?
@@ -273,7 +288,8 @@ async fn testnet_1() -> Result<()> {
         &mut giray,
         *TEST_ACCOUNT_1,
         1_000,
-    )).await;
+    ))
+    .await;
 
     Ok(())
 }
