@@ -355,10 +355,7 @@ impl PartialVMError {
                 len = len - 1;
                 return len > 0;
             });
-            Some(format!(
-                "UNKNOWN_INVARIANT_VIOLATION_ERROR at {:?}",
-                std::backtrace::Backtrace::force_capture()
-            ))
+            Some(trace)
         } else {
             None
         };
