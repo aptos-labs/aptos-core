@@ -407,11 +407,9 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
         throw new Error("Fee payer is not set.");
       }
       fee_pay = { address: this.fee_payer_address, authenticator: fee_payer };
-    } else {
-      if (fee_payer) {
+    } else if (fee_payer) {
         throw new Error("Fee payer is set.");
       }
-    }
     return new TransactionAuthenticatorMultiAgent(sender, this.secondary_signer_addresses, secondary_signers, fee_pay);
   }
 
@@ -438,7 +436,7 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
   }
 
   static load_fee_payer(deserializer: Deserializer): MultiAgentRawTransaction {
-    let ret = this.load(deserializer);
+    const ret = this.load(deserializer);
     ret.set_fee_payer_address(AccountAddress.deserialize(deserializer));
     return ret;
   }

@@ -13,7 +13,6 @@ import { MAX_U64_BIG_INT } from "../bcs/consts";
 import { AnyNumber, bcsToBytes, Bytes } from "../bcs";
 import { getPropertyValueRaw, PropertyMap } from "../utils/property_map_serde";
 import { Token, TokenData } from "../aptos_types/token_types";
-import { AccountAddress, AccountAuthenticator } from "../aptos_types";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
