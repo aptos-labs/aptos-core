@@ -53,7 +53,8 @@ impl PartitioningShard {
             frozen_sub_blocks,
             round_id,
         } = partition_msg;
-        let mut conflict_detector = CrossShardConflictDetector::new(self.shard_id, self.num_shards, round_id);
+        let mut conflict_detector =
+            CrossShardConflictDetector::new(self.shard_id, self.num_shards, round_id);
         // If transaction filtering is allowed, we need to prepare the dependency analysis and broadcast it to other shards
         // Based on the dependency analysis received from other shards, we will reject transactions that are conflicting with
         // transactions in other shards
@@ -122,7 +123,8 @@ impl PartitioningShard {
             mut frozen_sub_blocks,
             round_id,
         } = partition_msg;
-        let conflict_detector = CrossShardConflictDetector::new(self.shard_id, self.num_shards, round_id);
+        let conflict_detector =
+            CrossShardConflictDetector::new(self.shard_id, self.num_shards, round_id);
 
         // Since txn filtering is not allowed, we can create the RW set with maximum txn
         // index with the index offset passed.
@@ -159,7 +161,7 @@ impl PartitioningShard {
             .unwrap();
     }
 
-    pub fn start(&mut self) {
+    pub fn start(&self) {
         loop {
             let command = self.control_rx.recv().unwrap();
             match command {

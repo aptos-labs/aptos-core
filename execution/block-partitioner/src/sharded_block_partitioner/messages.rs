@@ -2,11 +2,10 @@
 
 use crate::sharded_block_partitioner::dependency_analysis::WriteSetWithTxnIndex;
 use aptos_types::{
-    block_executor::partitioner::{SubBlocksForShard, TxnIndex},
+    block_executor::partitioner::{RoundId, SubBlocksForShard, TxnIndex},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
 use std::sync::Arc;
-use aptos_types::block_executor::partitioner::RoundId;
 
 pub struct DiscardCrossShardDep {
     pub transactions: Vec<AnalyzedTransaction>,

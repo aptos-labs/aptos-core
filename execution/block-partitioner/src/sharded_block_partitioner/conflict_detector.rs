@@ -3,8 +3,8 @@
 use crate::sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex};
 use aptos_types::{
     block_executor::partitioner::{
-        CrossShardDependencies, ShardId, SubBlock, TransactionWithDependencies, ShardedTxnIndex,
-        TxnIndex,
+        CrossShardDependencies, RoundId, ShardId, ShardedTxnIndex, SubBlock,
+        TransactionWithDependencies, TxnIndex,
     },
     transaction::{
         analyzed_transaction::{AnalyzedTransaction, StorageLocation},
@@ -16,7 +16,6 @@ use std::{
     hash::{Hash, Hasher},
     sync::Arc,
 };
-use aptos_types::block_executor::partitioner::RoundId;
 
 pub struct CrossShardConflictDetector {
     shard_id: ShardId,

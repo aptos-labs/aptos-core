@@ -6,7 +6,7 @@ use crate::sharded_block_partitioner::cross_shard_messages::{
 };
 use aptos_types::{
     block_executor::partitioner::{
-        CrossShardDependencies, CrossShardEdges, ShardId, SubBlocksForShard, ShardedTxnIndex,
+        CrossShardDependencies, CrossShardEdges, ShardId, ShardedTxnIndex, SubBlocksForShard,
         TxnIndex,
     },
     transaction::Transaction,
@@ -175,8 +175,8 @@ mod tests {
     };
     use aptos_types::{
         block_executor::partitioner::{
-            CrossShardDependencies, CrossShardEdges, SubBlock, SubBlocksForShard,
-            TransactionWithDependencies, ShardedTxnIndex,
+            CrossShardDependencies, CrossShardEdges, ShardedTxnIndex, SubBlock, SubBlocksForShard,
+            TransactionWithDependencies,
         },
         transaction::analyzed_transaction::StorageLocation,
     };
@@ -262,8 +262,13 @@ mod tests {
         );
         sub_blocks.add_sub_block(sub_block);
 
-        let mut dependent_edge_creator =
-            DependentEdgeCreator::new(shard_id, cross_shard_client, sub_blocks, num_shards, round_id);
+        let mut dependent_edge_creator = DependentEdgeCreator::new(
+            shard_id,
+            cross_shard_client,
+            sub_blocks,
+            num_shards,
+            round_id,
+        );
 
         dependent_edge_creator.create_dependent_edges(&[], 0);
 

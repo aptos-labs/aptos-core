@@ -40,11 +40,7 @@ impl CrossShardEdges {
         Self { edges }
     }
 
-    pub fn add_edge(
-        &mut self,
-        txn_idx: ShardedTxnIndex,
-        storage_locations: Vec<StorageLocation>,
-    ) {
+    pub fn add_edge(&mut self, txn_idx: ShardedTxnIndex, storage_locations: Vec<StorageLocation>) {
         self.edges
             .entry(txn_idx)
             .or_insert_with(Vec::new)
@@ -114,10 +110,7 @@ impl CrossShardDependencies {
         self.required_edges.contains_idx(&txn_idx)
     }
 
-    pub fn get_required_edge_for(
-        &self,
-        txn_idx: ShardedTxnIndex,
-    ) -> Option<&Vec<StorageLocation>> {
+    pub fn get_required_edge_for(&self, txn_idx: ShardedTxnIndex) -> Option<&Vec<StorageLocation>> {
         self.required_edges.edges.get(&txn_idx)
     }
 

@@ -14,7 +14,7 @@ use crate::sharded_block_partitioner::{
 use aptos_logger::{error, info};
 use aptos_metrics_core::{exponential_buckets, register_histogram, Histogram};
 use aptos_types::{
-    block_executor::partitioner::{ShardId, SubBlocksForShard, TxnIndex},
+    block_executor::partitioner::{RoundId, ShardId, SubBlocksForShard, TxnIndex},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
 use itertools::Itertools;
@@ -27,7 +27,6 @@ use std::{
     },
     thread,
 };
-use aptos_types::block_executor::partitioner::RoundId;
 
 mod conflict_detector;
 mod cross_shard_messages;
@@ -396,7 +395,7 @@ fn spawn_partitioning_shard(
     thread::Builder::new()
         .name(format!("partitioning-shard-{}", shard_id))
         .spawn(move || {
-            let mut partitioning_shard =
+            let partitioning_shard =
                 PartitioningShard::new(shard_id, control_rx, result_tx, message_rxs, messages_txs);
             partitioning_shard.start();
         })
@@ -414,13 +413,12 @@ mod tests {
     };
     use aptos_crypto::hash::CryptoHash;
     use aptos_types::{
-        block_executor::partitioner::{SubBlock, ShardedTxnIndex},
+        block_executor::partitioner::{ShardedTxnIndex, SubBlock, SubBlocksForShard},
         transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
     };
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
     use std::{collections::HashMap, sync::Mutex};
-    use aptos_types::block_executor::partitioner::SubBlocksForShard;
 
     fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock<Transaction>>) {
         for sub_blocks in sub_blocks_for_shards {
