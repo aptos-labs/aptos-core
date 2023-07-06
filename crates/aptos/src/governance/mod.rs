@@ -464,7 +464,7 @@ pub struct SubmitVote {
     pub(crate) no: bool,
 
     /// Space separated list of pool addresses.
-    #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, num_args = 0.., value_parser = crate::common::types::load_account_arg)]
     pub(crate) pool_addresses: Vec<AccountAddress>,
 
     #[clap(flatten)]
@@ -727,11 +727,11 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
 #[derive(Parser)]
 pub struct CompileScriptFunction {
     /// Path to the Move script for the proposal
-    #[clap(long, group = "script", parse(from_os_str))]
+    #[clap(long, group = "script", value_parser)]
     pub script_path: Option<PathBuf>,
 
     /// Path to the Move script for the proposal
-    #[clap(long, group = "script", parse(from_os_str))]
+    #[clap(long, group = "script", value_parser)]
     pub compiled_script_path: Option<PathBuf>,
 
     #[clap(flatten)]
@@ -792,11 +792,11 @@ impl CompileScriptFunction {
 #[derive(Parser)]
 pub struct GenerateUpgradeProposal {
     /// Address of the account which the proposal addresses.
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     /// Where to store the generated proposal
-    #[clap(long, parse(from_os_str), default_value = "proposal.move")]
+    #[clap(long, value_parser, default_value = "proposal.move")]
     pub(crate) output: PathBuf,
 
     /// What artifacts to include in the package. This can be one of `none`, `sparse`, and
@@ -837,6 +837,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
         } = self;
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts.build_options(
+            move_options.dev,
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
             move_options.bytecode_version,
@@ -868,30 +869,37 @@ impl CliCommand<()> for GenerateUpgradeProposal {
 pub struct GenerateExecutionHash {
     #[clap(long)]
     pub script_path: Option<PathBuf>,
+    #[clap(long)]
+    pub framework_local_dir: Option<PathBuf>,
 }
 
 impl GenerateExecutionHash {
     pub fn generate_hash(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        let framework_local_dir = if self.framework_local_dir.is_some() {
+            self.framework_local_dir.clone()
+        } else {
+            Option::from({
+                let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                path.pop();
+                path.pop();
+                path.join("aptos-move")
+                    .join("framework")
+                    .join("aptos-framework")
+                    .canonicalize()
+                    .map_err(|err| {
+                        CliError::IO(
+                            format!("Failed to canonicalize aptos framework path: {:?}", path),
+                            err,
+                        )
+                    })?
+            })
+        };
         CompileScriptFunction {
             script_path: self.script_path.clone(),
             compiled_script_path: None,
             framework_package_args: FrameworkPackageArgs {
                 framework_git_rev: None,
-                framework_local_dir: Option::from({
-                    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-                    path.pop();
-                    path.pop();
-                    path.join("aptos-move")
-                        .join("framework")
-                        .join("aptos-framework")
-                        .canonicalize()
-                        .map_err(|err| {
-                            CliError::IO(
-                                format!("Failed to canonicalize aptos framework path: {:?}", path),
-                                err,
-                            )
-                        })?
-                }),
+                framework_local_dir,
                 skip_fetch_latest_git_deps: false,
             },
             bytecode_version: None,

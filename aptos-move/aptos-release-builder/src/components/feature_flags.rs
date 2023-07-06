@@ -40,6 +40,8 @@ pub enum FeatureFlag {
     StorageSlotMetadata,
     ChargeInvariantViolation,
     DelegationPoolPartialGovernanceVoting,
+    GasPayerEnabled,
+    AptosUniqueIdentifiers,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -160,6 +162,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DelegationPoolPartialGovernanceVoting => {
                 AptosFeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING
             },
+            FeatureFlag::GasPayerEnabled => AptosFeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::AptosUniqueIdentifiers => AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
         }
     }
 }
@@ -203,6 +207,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING => {
                 FeatureFlag::DelegationPoolPartialGovernanceVoting
             },
+            AptosFeatureFlag::GAS_PAYER_ENABLED => FeatureFlag::GasPayerEnabled,
+            AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS => FeatureFlag::AptosUniqueIdentifiers,
         }
     }
 }

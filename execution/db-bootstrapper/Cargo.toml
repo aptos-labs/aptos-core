@@ -23,4 +23,4 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
-structopt = { workspace = true }
+clap = { workspace = true }

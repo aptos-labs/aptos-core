@@ -78,7 +78,10 @@ impl DepthFormula {
         }
         for (t_i, c_i) in terms {
             let Some(mut u_form) = map.remove(t_i) else {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(format!("{t_i:?} missing mapping")))
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("{t_i:?} missing mapping")),
+                );
             };
             u_form.scale(*c_i);
             formulas.push(u_form)
@@ -268,7 +271,7 @@ impl Type {
                 _ => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message("VecMutBorrow expects a vector reference".to_string())
-                        .with_sub_status(crate::errors::EPARANOID_FAILURE),
+                        .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
                 ),
             },
             Type::Reference(inner) if !is_mut => match &**inner {
@@ -279,13 +282,13 @@ impl Type {
                 _ => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message("VecMutBorrow expects a vector reference".to_string())
-                        .with_sub_status(crate::errors::EPARANOID_FAILURE),
+                        .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
                 ),
             },
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("VecMutBorrow expects a vector reference".to_string())
-                    .with_sub_status(crate::errors::EPARANOID_FAILURE),
+                    .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
             ),
         }
     }
@@ -298,7 +301,7 @@ impl Type {
                         "Type mismatch: expected {:?}, got {:?}",
                         self, other
                     ))
-                    .with_sub_status(crate::errors::EPARANOID_FAILURE),
+                    .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
             );
         }
         Ok(())

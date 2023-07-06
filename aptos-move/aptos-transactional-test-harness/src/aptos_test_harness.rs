@@ -27,7 +27,7 @@ use aptos_types::{
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
-use clap::StructOpt;
+use clap::Parser;
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_command_line_common::{
     address::ParsedAddress, files::verify_and_create_named_address_mapping,
@@ -85,104 +85,108 @@ struct TransactionParameters {
 }
 
 /// Aptos-specific arguments for the publish command.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct AptosPublishArgs {
-    #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
+    #[clap(long = "private-key", value_parser = RawPrivateKey::parse)]
     private_key: Option<RawPrivateKey>,
 
-    #[structopt(long = "expiration")]
+    #[clap(long = "expiration")]
     expiration_time: Option<u64>,
 
-    #[structopt(long = "sequence-number")]
+    #[clap(long = "sequence-number")]
     sequence_number: Option<u64>,
 
-    #[structopt(long = "gas-price")]
+    #[clap(long = "gas-price")]
     gas_unit_price: Option<u64>,
 
-    #[structopt(long = "override-signer", parse(try_from_str = ParsedAddress::parse))]
+    #[clap(long = "override-signer", value_parser= ParsedAddress::parse)]
     override_signer: Option<ParsedAddress>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SignerAndKeyPair {
     address: ParsedAddress,
     private_key: Option<RawPrivateKey>,
 }
 
 /// Aptos-specifc arguments for the run command.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct AptosRunArgs {
-    #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
+    #[clap(long = "private-key", value_parser = RawPrivateKey::parse)]
     private_key: Option<RawPrivateKey>,
 
-    #[structopt(long = "script")]
+    #[clap(long = "script")]
     script: bool,
 
-    #[structopt(long = "expiration")]
+    #[clap(long = "expiration")]
     expiration_time: Option<u64>,
 
-    #[structopt(long = "sequence-number")]
+    #[clap(long = "sequence-number")]
     sequence_number: Option<u64>,
 
-    #[structopt(long = "gas-price")]
+    #[clap(long = "gas-price")]
     gas_unit_price: Option<u64>,
 
-    #[structopt(long = "show-events")]
+    #[clap(long = "show-events")]
     show_events: bool,
 
-    #[structopt(long = "secondary-signers", parse(try_from_str = SignerAndKeyPair::parse), multiple_values(true))]
+    #[clap(long = "secondary-signers", value_parser = SignerAndKeyPair::parse, num_args = 0..)]
     secondary_signers: Option<Vec<SignerAndKeyPair>>,
 }
 
 /// Aptos-specifc arguments for the init command.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct AptosInitArgs {
-    #[structopt(long = "private-keys", parse(try_from_str = parse_named_private_key), multiple_values(true))]
+    #[clap(long = "private-keys", value_parser = parse_named_private_key, num_args = 0..)]
     private_keys: Option<Vec<(Identifier, Ed25519PrivateKey)>>,
-    #[structopt(long = "initial-coins")]
+    #[clap(long = "initial-coins")]
     initial_coins: Option<u64>,
 }
 
 /// A raw private key -- either a literal or an unresolved name.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum RawPrivateKey {
     Named(Identifier),
     Anonymous(Ed25519PrivateKey),
 }
 
 /// Command to initiate a block metadata transaction.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct BlockCommand {
-    #[structopt(long = "proposer", parse(try_from_str = ParsedAddress::parse))]
+    #[clap(long = "proposer", value_parser = ParsedAddress::parse)]
     proposer: ParsedAddress,
 
-    #[structopt(long = "time")]
+    #[clap(long = "time")]
     time: u64,
 }
 
 /// Command to view a table item.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct ViewTableCommand {
-    #[structopt(long = "table_handle")]
+    #[clap(long = "table_handle")]
     table_handle: AccountAddress,
 
-    #[structopt(long = "key_type", parse(try_from_str = parse_type_tag))]
+    #[clap(long = "key_type", value_parser = parse_type_tag)]
     key_type: TypeTag,
 
-    #[structopt(long = "value_type", parse(try_from_str = parse_type_tag))]
+    #[clap(long = "value_type", value_parser = parse_type_tag)]
     value_type: TypeTag,
 
-    #[structopt(long = "key_value", parse(try_from_str = serde_json::from_str))]
+    #[clap(long = "key_value", value_parser = parse_value)]
     key_value: serde_json::Value,
 }
 
+fn parse_value(input: &str) -> Result<serde_json::Value, serde_json::Error> {
+    serde_json::from_str(input)
+}
+
 /// Custom commands for the transactional test flow.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 enum AptosSubCommand {
-    #[structopt(name = "block")]
+    #[clap(name = "block")]
     BlockCommand(BlockCommand),
 
-    #[structopt(name = "view_table")]
+    #[clap(name = "view_table")]
     ViewTableCommand(ViewTableCommand),
 }
 

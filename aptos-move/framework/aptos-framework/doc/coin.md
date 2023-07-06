@@ -29,6 +29,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `coin_address`](#0x1_coin_coin_address)
 -  [Function `balance`](#0x1_coin_balance)
 -  [Function `is_coin_initialized`](#0x1_coin_is_coin_initialized)
+-  [Function `is_coin_store_frozen`](#0x1_coin_is_coin_store_frozen)
 -  [Function `is_account_registered`](#0x1_coin_is_account_registered)
 -  [Function `name`](#0x1_coin_name)
 -  [Function `symbol`](#0x1_coin_symbol)
@@ -949,6 +950,37 @@ Returns <code><b>true</b></code> if the type <code>CoinType</code> is an initial
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;(): bool {
     <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;())
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_is_coin_store_frozen"></a>
+
+## Function `is_coin_store_frozen`
+
+Returns <code><b>true</b></code> is account_addr has frozen the CoinStore or if it's not registered at all
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_coin_store_frozen">is_coin_store_frozen</a>&lt;CoinType&gt;(account_addr: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_coin_store_frozen">is_coin_store_frozen</a>&lt;CoinType&gt;(account_addr: <b>address</b>): bool <b>acquires</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a> {
+    <b>if</b>(!<a href="coin.md#0x1_coin_is_account_registered">is_account_registered</a>&lt;CoinType&gt;(account_addr)) {
+      <b>return</b> <b>true</b>
+    };
+
+    <b>let</b> coin_store = <b>borrow_global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
+    coin_store.frozen
 }
 </code></pre>
 

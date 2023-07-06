@@ -36,7 +36,7 @@ static GET_TRANSACTION_ENTRY_FUNCTION: Lazy<EntryFunctionId> =
 #[derive(Debug, Parser)]
 pub struct Create {
     /// Addresses of additional owners for the new multisig, beside the transaction sender.
-    #[clap(long, multiple_values = true, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, num_args = 0.., value_parser = crate::common::types::load_account_arg)]
     pub(crate) additional_owners: Vec<AccountAddress>,
     /// The number of signatures (approvals or rejections) required to execute or remove a proposed
     /// transaction.

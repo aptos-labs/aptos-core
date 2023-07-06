@@ -328,7 +328,7 @@ impl<'a> Analyzer<'a> {
 
                     // make sure these two types unify before trying to instantiate them
                     let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
-                    if adapter.unify(Variance::Allow, false).is_none() {
+                    if adapter.unify(Variance::SpecVariance, false).is_none() {
                         continue;
                     }
 
@@ -468,7 +468,7 @@ impl<'a> Analyzer<'a> {
             for ref ty in self.env.get_node_instantiation(node_id) {
                 self.add_type_root(ty);
             }
-            if let ExpData::Call(node_id, ast::Operation::Function(mid, fid, _), _) = e {
+            if let ExpData::Call(node_id, ast::Operation::SpecFunction(mid, fid, _), _) = e {
                 let actuals = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
                 let module = self.env.get_module(*mid);
                 let spec_fun = module.get_spec_fun(*fid);

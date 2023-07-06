@@ -41,6 +41,10 @@ spec std::features {
         spec_is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
     }
 
+    spec fun spec_fee_payer_enabled(): bool {
+        spec_is_enabled(FEE_PAYER_ENABLED)
+    }
+
     spec periodical_reward_rate_decrease_enabled {
         pragma opaque;
         aborts_if [abstract] false;

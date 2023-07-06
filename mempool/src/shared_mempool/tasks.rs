@@ -545,13 +545,19 @@ pub(crate) fn process_committed_transactions(
     block_timestamp_usecs: u64,
 ) {
     let mut pool = mempool.lock();
+    let block_timestamp = Duration::from_micros(block_timestamp_usecs);
 
     for transaction in transactions {
+        pool.log_commit_transaction(
+            &transaction.sender,
+            transaction.sequence_number,
+            block_timestamp,
+        );
         pool.commit_transaction(&transaction.sender, transaction.sequence_number);
     }
 
     if block_timestamp_usecs > 0 {
-        pool.gc_by_expiration_time(Duration::from_micros(block_timestamp_usecs));
+        pool.gc_by_expiration_time(block_timestamp);
     }
 }
 

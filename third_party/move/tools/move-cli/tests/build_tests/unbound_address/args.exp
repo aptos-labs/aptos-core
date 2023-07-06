@@ -5,4 +5,4 @@ Named address 'A' in package 'A'
 To fix this, add an entry for each unresolved address to the [addresses] section of ./Move.toml: e.g.,
 [addresses]
 Std = "0x1"
-Alternatively, you can also define [dev-addresses] and call with the -d flag
+Alternatively, you can also define [dev-addresses] and call with the --dev flag

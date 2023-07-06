@@ -26,7 +26,9 @@ use crate::{
         INTRINSIC_PRAGMA, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
-    ty::{PrimitiveType, Type, TypeDisplayContext, TypeUnificationAdapter, Variance},
+    ty::{
+        PrimitiveType, ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
+    },
 };
 use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
 use codespan_reporting::{
@@ -996,7 +998,7 @@ impl GlobalEnv {
             }
             assert_eq!(key.inst.len(), memory.inst.len());
             let adapter = TypeUnificationAdapter::new_vec(&memory.inst, &key.inst, true, true);
-            let rel = adapter.unify(Variance::Allow, true);
+            let rel = adapter.unify(Variance::SpecVariance, true);
             if rel.is_some() {
                 inv_ids.extend(val.clone());
             }
@@ -2202,12 +2204,13 @@ impl<'env> ModuleEnv<'env> {
             SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
             SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
             SignatureToken::Reference(t) => Type::Reference(
-                false,
+                ReferenceKind::Immutable,
                 Box::new(self.internal_globalize_signature(module, t)),
             ),
-            SignatureToken::MutableReference(t) => {
-                Type::Reference(true, Box::new(self.internal_globalize_signature(module, t)))
-            },
+            SignatureToken::MutableReference(t) => Type::Reference(
+                ReferenceKind::Mutable,
+                Box::new(self.internal_globalize_signature(module, t)),
+            ),
             SignatureToken::TypeParameter(index) => Type::TypeParameter(*index),
             SignatureToken::Vector(bt) => {
                 Type::Vector(Box::new(self.internal_globalize_signature(module, bt)))
@@ -2866,11 +2869,8 @@ pub struct FunctionData {
     /// Whether this is a native function
     pub(crate) is_native: bool,
 
-    /// Whether this an entry function.
-    pub(crate) is_entry: bool,
-
-    /// Whether this is an inline function.
-    pub(crate) is_inline: bool,
+    /// The kind of the function.
+    pub(crate) kind: FunctionKind,
 
     /// Attributes attached to this function.
     pub(crate) attributes: Vec<Attribute>,
@@ -2899,6 +2899,14 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the called functions.
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+}
+
+/// Kind of a function,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FunctionKind {
+    Regular,
+    Inline,
+    Entry,
 }
 
 #[derive(Debug, Clone)]
@@ -3131,14 +3139,14 @@ impl<'env> FunctionEnv<'env> {
         self.data.is_native
     }
 
-    /// Return true if the function is an entry fucntion
+    /// Return true if the function is an entry function
     pub fn is_entry(&self) -> bool {
-        self.data.is_entry
+        self.data.kind == FunctionKind::Entry
     }
 
-    /// Return true if the function is an inline fucntion
+    /// Return true if the function is an inline function
     pub fn is_inline(&self) -> bool {
-        self.data.is_inline
+        self.data.kind == FunctionKind::Inline
     }
 
     /// Return the visibility string for this function. Useful for formatted printing.

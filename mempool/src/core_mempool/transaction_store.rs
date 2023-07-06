@@ -601,7 +601,7 @@ impl TransactionStore {
                             last_timeline_id[i] = timeline_id;
                         }
                         let bucket = self.timeline_index.get_bucket(txn.ranking_score);
-                        Mempool::log_txn_commit_latency(
+                        Mempool::log_txn_latency(
                             txn.insertion_info,
                             bucket,
                             BROADCAST_BATCHED_LABEL,

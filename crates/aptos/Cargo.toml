@@ -1,7 +1,7 @@
 [package]
 name = "aptos"
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-version = "2.0.1"
+version = "2.0.2"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -19,6 +19,7 @@ aptos-backup-cli = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-cached-packages = { workspace = true }
+aptos-cli-common = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db-tool = { workspace = true }
@@ -47,7 +48,7 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 chrono = { workspace = true }
-clap = { workspace = true }
+clap = { workspace = true, features = ["unstable-styles"] }
 clap_complete = { workspace = true }
 codespan-reporting = { workspace = true }
 dirs = { workspace = true }

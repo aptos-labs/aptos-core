@@ -1,6 +1,7 @@
-import { AptosClient, ApiError, Provider, OptionalTransactionArgs } from "../providers";
+import { AptosClient, Provider, OptionalTransactionArgs, ApiError } from "../providers";
 import * as Gen from "../generated/index";
 import { AptosAccount } from "../account";
+import { AccountAddress } from "../aptos_types";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 
 const ansContractsMap: Record<string, string> = {
@@ -32,6 +33,11 @@ type NameRegistryV1 = {
   registry: {
     handle: string;
   };
+};
+
+type AnsRegistry = {
+  expirationTimestampSeconds: number;
+  target: string | null;
 };
 
 export class AnsClient {
@@ -92,8 +98,10 @@ export class AnsClient {
   async getAddressByName(name: string): Promise<string | null> {
     const { domain, subdomain } = name.match(namePattern)?.groups ?? {};
     if (!domain) return null;
-    if (subdomain) return this.getAddressBySubdomainName(domain, subdomain);
-    return this.getAddressByDomainName(domain);
+    const registration = subdomain
+      ? await this.getRegistrationForSubdomainName(domain, subdomain)
+      : await this.getRegistrationForDomainName(domain);
+    return registration === null ? null : registration.target;
   }
 
   /**
@@ -115,9 +123,12 @@ export class AnsClient {
       throw new ApiError(400, `Name ${domainName} is not valid`);
     }
     // check if the name is available
-    const address = await this.getAddressByName(domainName);
-    if (address !== null) {
-      throw new ApiError(400, `Name ${domainName} is not available`);
+    const registration = await this.getRegistrationForDomainName(domainName);
+    if (registration) {
+      const now = Math.ceil(Date.now() / 1000);
+      if (now < registration.expirationTimestampSeconds) {
+        throw new ApiError(400, `Name ${domainName} is not available`);
+      }
     }
 
     const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
@@ -125,6 +136,111 @@ export class AnsClient {
       ...extraArgs,
     });
     const rawTxn = await builder.build(`${this.contractAddress}::domains::register_domain`, [], [domainName, years]);
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.provider.submitSignedBCSTransaction(bcsTxn);
+
+    return pendingTransaction.hash;
+  }
+
+  /**
+   * Mint a new Aptos Subdomain
+   *
+   * @param account AptosAccount the owner of the domain name
+   * @param subdomainName subdomain name to mint
+   * @param domainName Aptos domain name to mint under
+   * @param expirationTimestampSeconds must be set between the domains expiration and the current time
+   * @returns The hash of the pending transaction submitted to the API
+   */
+  async mintAptosSubdomain(
+    account: AptosAccount,
+    subdomainName: string,
+    domainName: string,
+    expirationTimestampSeconds?: number,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<Gen.HashValue> {
+    // check if the name is valid
+    if (domainName.match(nameComponentPattern) === null) {
+      throw new ApiError(400, `Domain name ${domainName} is not valid`);
+    }
+    // check if the name is valid
+    if (subdomainName.match(nameComponentPattern) === null) {
+      throw new ApiError(400, `Subdomain name ${subdomainName} is not valid`);
+    }
+    // check if the name is available
+    const subdomainRegistration = await this.getRegistrationForSubdomainName(domainName, subdomainName);
+    if (subdomainRegistration) {
+      const now = Math.ceil(Date.now() / 1000);
+      if (now < subdomainRegistration.expirationTimestampSeconds) {
+        throw new ApiError(400, `Name ${subdomainName}.${domainName} is not available`);
+      }
+    }
+
+    const domainRegistration = await this.getRegistrationForDomainName(domainName);
+    if (domainRegistration === null) {
+      throw new ApiError(400, `Domain name ${domainName} does not exist`);
+    }
+    const now = Math.ceil(Date.now() / 1000);
+    if (domainRegistration.expirationTimestampSeconds < now) {
+      throw new ApiError(400, `Domain name ${domainName} expired`);
+    }
+
+    const actualExpirationTimestampSeconds =
+      expirationTimestampSeconds || domainRegistration.expirationTimestampSeconds;
+    if (actualExpirationTimestampSeconds < now) {
+      throw new ApiError(400, `Expiration for ${subdomainName}.${domainName} is before now`);
+    }
+
+    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+      sender: account.address(),
+      ...extraArgs,
+    });
+    const rawTxn = await builder.build(
+      `${this.contractAddress}::domains::register_subdomain`,
+      [],
+      [subdomainName, domainName, actualExpirationTimestampSeconds],
+    );
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const pendingTransaction = await this.provider.submitSignedBCSTransaction(bcsTxn);
+
+    return pendingTransaction.hash;
+  }
+
+  /**
+   * @param account AptosAccount the owner of the domain name
+   * @param subdomainName subdomain name to mint
+   * @param domainName Aptos domain name to mint
+   * @param target the target address for the subdomain
+   * @returns The hash of the pending transaction submitted to the API
+   */
+  async setSubdomainAddress(
+    account: AptosAccount,
+    subdomainName: string,
+    domainName: string,
+    target: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<Gen.HashValue> {
+    const standardizeAddress = AccountAddress.standardizeAddress(target);
+
+    // check if the name is valid
+    if (domainName.match(nameComponentPattern) === null) {
+      throw new ApiError(400, `Name ${domainName} is not valid`);
+    }
+    // check if the name is valid
+    if (subdomainName.match(nameComponentPattern) === null) {
+      throw new ApiError(400, `Name ${subdomainName} is not valid`);
+    }
+
+    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
+      sender: account.address(),
+      ...extraArgs,
+    });
+    const rawTxn = await builder.build(
+      `${this.contractAddress}::domains::set_subdomain_address`,
+      [],
+      [subdomainName, domainName, standardizeAddress],
+    );
 
     const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
     const pendingTransaction = await this.provider.submitSignedBCSTransaction(bcsTxn);
@@ -152,15 +268,15 @@ export class AnsClient {
   }
 
   /**
-   * Returns the account address for the given domain name
+   * Returns the AnsRegistry for the given domain name
    * @param domain domain name
    * @example
    * if name is `aptos.apt`
    * domain = aptos
    *
-   * @returns account address | null
+   * @returns AnsRegistry | null
    */
-  private async getAddressByDomainName(domain: string) {
+  private async getRegistrationForDomainName(domain: string): Promise<AnsRegistry | null> {
     if (domain.match(nameComponentPattern) === null) return null;
     const ansResource: { type: Gen.MoveStructTag; data: any } = await this.provider.getAccountResource(
       this.contractAddress,
@@ -179,7 +295,10 @@ export class AnsClient {
 
     try {
       const item = await this.provider.getTableItem(handle, domainsTableItemRequest);
-      return item.target_address.vec[0];
+      return {
+        target: item.target_address.vec.length === 1 ? item.target_address.vec[0] : null,
+        expirationTimestampSeconds: item.expiration_time_sec,
+      };
     } catch (error: any) {
       // if item not found, response is 404 error - meaning item not found
       if (error.status === 404) {
@@ -190,7 +309,7 @@ export class AnsClient {
   }
 
   /**
-   * Returns the account address for the given subdomain_name
+   * Returns the AnsRegistry for the given subdomain_name
    * @param domain domain name
    * @param subdomain subdomain name
    * @example
@@ -198,9 +317,9 @@ export class AnsClient {
    * domain = aptos
    * subdomain = dev
    *
-   * @returns account address | null
+   * @returns AnsRegistry | null
    */
-  private async getAddressBySubdomainName(domain: string, subdomain: string): Promise<string | null> {
+  private async getRegistrationForSubdomainName(domain: string, subdomain: string): Promise<AnsRegistry | null> {
     if (domain.match(nameComponentPattern) === null) return null;
     if (subdomain.match(nameComponentPattern) === null) return null;
     const ansResource: { type: Gen.MoveStructTag; data: any } = await this.provider.getAccountResource(
@@ -220,7 +339,10 @@ export class AnsClient {
 
     try {
       const item = await this.provider.getTableItem(handle, domainsTableItemRequest);
-      return item.target_address.vec[0];
+      return {
+        target: item.target_address.vec.length === 1 ? item.target_address.vec[0] : null,
+        expirationTimestampSeconds: item.expiration_time_sec,
+      };
     } catch (error: any) {
       // if item not found, response is 404 error - meaning item not found
       if (error.status === 404) {
