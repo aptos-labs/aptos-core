@@ -17,7 +17,7 @@ use std::str::FromStr;
 use url::Url;
 
 // global parameters (todo: make into clap)
-static HAS_FAUCET_ACCESS: bool = false;
+static HAS_FAUCET_ACCESS: bool = true;
 
 // network urls
 static DEVNET_NODE_URL: Lazy<Url> =
@@ -66,29 +66,8 @@ static SUCCESS: &str = "success";
 enum TestResult {
     Success,
     Skip,
-    Fail(Failure),
-    Error(Error),
-}
-
-#[derive(Debug)]
-enum Failure {
-    WrongAuthKey,
-    WrongSeqNumber,
-    WrongBalance,
-    WrongBalanceAtVersion,
-    WrongBlockHeight,
-    WrongBlockHash,
-    WrongBlockTimestamp,
-    WrongFirstVersion,
-    WrongLastVersion,
-    WrongTransactions,
-}
-
-#[derive(Debug)]
-enum Error {
-    ClientResponse(RestError),
-    FaucetFund(anyhow::Error),
-    Other(anyhow::Error),
+    Fail(&'static str),
+    Error(anyhow::Error),
 }
 
 /// Calls get_account on a newly created account on devnet. Requires faucet.
@@ -105,13 +84,13 @@ async fn probe_getaccount_1() -> TestResult {
     // create and fund an account
     let giray = LocalAccount::generate(&mut rand::rngs::OsRng);
     if let Err(e) = faucet_client.fund(giray.address(), 100_000_000).await {
-        return TestResult::Error(Error::FaucetFund(e));
+        return TestResult::Error(e);
     }
 
     // ask for account data
     let response = match client.get_account(giray.address()).await {
         Ok(response) => response,
-        Err(e) => return TestResult::Error(Error::ClientResponse(e)),
+        Err(e) => return TestResult::Error(e.into()),
     };
 
     // check account data
@@ -122,10 +101,10 @@ async fn probe_getaccount_1() -> TestResult {
     let actual_account = response.inner();
 
     if !(expected_account.authentication_key == actual_account.authentication_key) {
-        return TestResult::Fail(Failure::WrongAuthKey);
+        return TestResult::Fail(FAIL_WRONG_AUTH_KEY);
     }
     if !(expected_account.sequence_number == actual_account.sequence_number) {
-        return TestResult::Fail(Failure::WrongSeqNumber);
+        return TestResult::Fail(FAIL_WRONG_SEQ_NUMBER);
     }
 
     TestResult::Success
@@ -417,30 +396,54 @@ async fn probe_getblockbyversion_1() -> Result<&'static str> {
 }
 
 /// Tests if transactions created on the spot are returned by the API.
-async fn testnet_1() -> Result<&'static str> {
+/// TODO: make this not a test but a procedure, and individual checks into tests and handle inside
+async fn testnet_1() -> TestResult {
     // create clients
     let client: Client = Client::new(TESTNET_NODE_URL.clone());
     let faucet_client = FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone());
     let coin_client = CoinClient::new(&client);
 
     // Step 1: Test new account creation
+    // TODO: refactor into own test
     let mut giray = LocalAccount::generate(&mut rand::rngs::OsRng);
-    faucet_client
-        .fund(giray.address(), 100_000_000)
-        .await
-        .context(ERROR_FAUCET_FUND)?;
+    if let Err(e) = faucet_client.fund(giray.address(), 100_000_000).await {
+        return TestResult::Error(e);
+    }
+
+    // ask for account data
+    let response = match client.get_account(giray.address()).await {
+        Ok(response) => response,
+        Err(e) => return TestResult::Error(e.into()),
+    };
+
+    // check account data
+    let expected_account = Account {
+        authentication_key: giray.authentication_key(),
+        sequence_number: giray.sequence_number(),
+    };
+    let actual_account = response.inner();
+
+    if !(expected_account.authentication_key == actual_account.authentication_key) {
+        return TestResult::Fail(FAIL_WRONG_AUTH_KEY);
+    }
+    if !(expected_account.sequence_number == actual_account.sequence_number) {
+        return TestResult::Fail(FAIL_WRONG_SEQ_NUMBER);
+    }
 
     // Step 2: Test coin transfer
-    let txn_hash = coin_client
+    let txn_hash = match coin_client
         .transfer(&mut giray, *TEST_ACCOUNT_2, 1_000, None)
         .await
-        .context(ERROR_COIN_TRANSFER)?;
-    let _ = client
-        .wait_for_transaction(&txn_hash)
-        .await
-        .context(ERROR_COIN_TRANSFER)?;
+    {
+        Ok(txn) => txn,
+        Err(e) => return TestResult::Error(e),
+    };
+    let _ = match client.wait_for_transaction(&txn_hash).await {
+        Ok(response) => response,
+        Err(e) => return TestResult::Error(e.into()),
+    };
 
-    Ok(SUCCESS)
+    TestResult::Success
 }
 
 #[tokio::main]
@@ -462,10 +465,7 @@ async fn main() -> Result<()> {
         Ok(result) => println!("{:?}", result),
         Err(e) => println!("{:?}", e),
     }
-    match testnet_1().await {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{:?}", e),
-    }
+    println!("{:?}", testnet_1().await);
 
     Ok(())
 }
