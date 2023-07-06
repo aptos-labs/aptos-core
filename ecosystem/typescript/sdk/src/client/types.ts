@@ -1,4 +1,3 @@
-import { AxiosResponse } from "axios";
 import { AnyNumber } from "../bcs";
 
 /**
@@ -41,11 +40,13 @@ export type AptosRequest = {
 /**
  * The response type returned from an API error
  */
-export interface AptosResponse<Req, Res> extends AxiosResponse<Res, ClientConfig> {
+export interface AptosResponse<Req, Res> {
   status: number;
   statusText: string;
   data: Res;
   url: string;
+  headers: any;
+  config?: any;
   request?: Req;
 }
 
