@@ -95,7 +95,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -152,7 +152,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -209,7 +209,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -267,7 +267,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -329,7 +329,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -381,7 +381,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -439,7 +439,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -495,7 +495,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -557,7 +557,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -605,7 +605,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -663,7 +663,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -714,7 +714,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -756,7 +756,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -807,7 +807,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -867,7 +867,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -915,7 +915,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -957,7 +957,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -993,7 +993,7 @@
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1058,7 +1058,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -1103,7 +1103,7 @@
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1164,7 +1164,7 @@
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -1397,7 +1397,7 @@
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -1510,7 +1510,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -1572,7 +1572,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1786,7 +1786,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1851,7 +1851,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2036,7 +2036,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2100,7 +2100,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2163,7 +2163,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2247,7 +2247,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2321,7 +2321,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2385,7 +2385,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2448,7 +2448,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2532,7 +2532,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2721,7 +2721,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2782,7 +2782,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2843,7 +2843,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2917,7 +2917,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2996,7 +2996,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
+          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])) ",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "p50",
@@ -3057,7 +3057,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.3.f250259e",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3103,6 +3103,66 @@
         { "format": "short", "logBase": 1, "show": true }
       ],
       "yaxis": { "align": false }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "This includes the API call time for submit_transaction",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 96 },
+      "id": 160,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "sum( rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m]) )/ sum (rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m])) + \nsum (rate(aptos_api_requests_sum{operation_id=~\"submit_transaction\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m])) / sum(rate(aptos_api_requests_count{operation_id=~\"submit_transaction\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Average (mean) latency",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Aptos PFN-only e2e latency, including submit API time",
+      "type": "timeseries"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -3153,7 +3213,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
+          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", submitted_by=\"client\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", submitted_by=\"client\"}[1m]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "p50",
@@ -3163,7 +3223,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
+          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", submitted_by=\"client\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", submitted_by=\"client\"}[1m]))",
           "hide": false,
           "legendFormat": "p90",
           "range": true,
@@ -3172,7 +3232,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
+          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", submitted_by=\"client\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", submitted_by=\"client\"}[1m]))",
           "hide": false,
           "legendFormat": "p99",
           "range": true,
@@ -3180,6 +3240,84 @@
         }
       ],
       "title": "Aptos PFN-only e2e latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "To be removed once mainnet has the metrics for the current dashboard.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 96 },
+      "id": 159,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "p50",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m]))",
+          "hide": false,
+          "legendFormat": "p90",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\"}[1m]))",
+          "hide": false,
+          "legendFormat": "p99",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "(deprecated) Aptos PFN-only e2e latency",
       "type": "timeseries"
     },
     {
@@ -3913,6 +4051,6 @@
   "timezone": "",
   "title": "overview",
   "uid": "overview",
-  "version": 17,
+  "version": 21,
   "weekStart": ""
 }

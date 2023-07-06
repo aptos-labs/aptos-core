@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: expected `M::S` but found `S` in name expression
+  ┌─ tests/checking/naming/generics_shadowing_invalid.move:7:10
+  │
+7 │         (s1: Self::S);
+  │          ^^
+
+error: expected `S` but found `M::S` in pack expression
+  ┌─ tests/checking/naming/generics_shadowing_invalid.move:8:20
+  │
+8 │         let s: S = S {};
+  │                    ^^^^
+
+error: invalid call of `M::bar`: expected `M::S` but found `S` for argument 1
+  ┌─ tests/checking/naming/generics_shadowing_invalid.move:9:9
+  │
+9 │         bar(s1);
+  │         ^^^^^^^
+
+error: expected `S` but found `M::S` in pack expression
+   ┌─ tests/checking/naming/generics_shadowing_invalid.move:10:9
+   │
+10 │         S {}
+   │         ^^^^

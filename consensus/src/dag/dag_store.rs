@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::types::{CertifiedNode, NodeMetadata};
+use crate::dag::types::{CertifiedNode, NodeCertificate};
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
@@ -32,7 +32,7 @@ impl Dag {
         }
     }
 
-    fn lowest_round(&self) -> Round {
+    pub(crate) fn lowest_round(&self) -> Round {
         *self
             .nodes_by_round
             .first_key_value()
@@ -40,7 +40,7 @@ impl Dag {
             .unwrap_or(&0)
     }
 
-    fn highest_round(&self) -> Round {
+    pub fn highest_round(&self) -> Round {
         *self
             .nodes_by_round
             .last_key_value()
@@ -58,7 +58,7 @@ impl Dag {
         ensure!(round >= self.lowest_round(), "round too low");
         ensure!(round <= self.highest_round() + 1, "round too high");
         for parent in node.parents() {
-            ensure!(self.exists(parent.digest()), "parent not exist");
+            ensure!(self.exists(parent.metadata().digest()), "parent not exist");
         }
         ensure!(
             self.nodes_by_digest
@@ -79,8 +79,11 @@ impl Dag {
         self.nodes_by_digest.contains_key(digest)
     }
 
-    pub fn all_exists<'a>(&self, mut digests: impl Iterator<Item = &'a HashValue>) -> bool {
-        digests.all(|digest| self.nodes_by_digest.contains_key(digest))
+    pub fn all_exists(&self, nodes: &[NodeCertificate]) -> bool {
+        nodes.iter().all(|certificate| {
+            self.nodes_by_digest
+                .contains_key(certificate.metadata().digest())
+        })
     }
 
     pub fn get_node(&self, digest: &HashValue) -> Option<Arc<CertifiedNode>> {
@@ -91,7 +94,7 @@ impl Dag {
         &self,
         round: Round,
         validator_verifier: &ValidatorVerifier,
-    ) -> Option<Vec<NodeMetadata>> {
+    ) -> Option<Vec<NodeCertificate>> {
         let all_nodes_in_round = self.nodes_by_round.get(&round)?.iter().flatten();
         if validator_verifier
             .check_voting_power(
@@ -103,11 +106,21 @@ impl Dag {
         {
             Some(
                 all_nodes_in_round
-                    .map(|node| node.metadata().clone())
+                    .map(|node| {
+                        NodeCertificate::new(
+                            node.metadata().clone(),
+                            node.certificate().signatures().clone(),
+                        )
+                    })
                     .collect(),
             )
         } else {
             None
         }
+    }
+
+    pub fn bitmask(&self) -> Vec<Vec<bool>> {
+        // TODO: extract local bitvec
+        todo!();
     }
 }

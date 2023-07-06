@@ -3,7 +3,7 @@
 
 use aptos_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    Histogram, HistogramVec, IntCounter,
+    register_int_counter_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
 };
 use once_cell::sync::Lazy;
 
@@ -13,36 +13,43 @@ impl GasType {
     pub const EXECUTION_GAS: &'static str = "execution_gas";
     pub const IO_GAS: &'static str = "io_gas";
     pub const NON_STORAGE_GAS: &'static str = "non_storage_gas";
-    pub const STORAGE_FEE: &'static str = "storage_fee";
-    pub const STORAGE_GAS: &'static str = "storage_gas";
+    pub const STORAGE_FEE: &'static str = "storage_in_octas";
+    pub const STORAGE_GAS: &'static str = "storage_in_gas";
     pub const TOTAL_GAS: &'static str = "total_gas";
+}
+
+pub struct Mode;
+
+impl Mode {
+    pub const PARALLEL: &'static str = "parallel";
+    pub const SEQUENTIAL: &'static str = "sequential";
 }
 
 /// Record the block gas during parallel execution.
 pub fn observe_parallel_execution_block_gas(cost: u64, gas_type: &'static str) {
-    PARALLEL_BLOCK_GAS
-        .with_label_values(&[gas_type])
+    BLOCK_GAS
+        .with_label_values(&[Mode::PARALLEL, gas_type])
         .observe(cost as f64);
 }
 
 /// Record the txn gas during parallel execution.
 pub fn observe_parallel_execution_txn_gas(cost: u64, gas_type: &'static str) {
-    PARALLEL_TXN_GAS
-        .with_label_values(&[gas_type])
+    TXN_GAS
+        .with_label_values(&[Mode::PARALLEL, gas_type])
         .observe(cost as f64);
 }
 
 /// Record the block gas during sequential execution.
 pub fn observe_sequential_execution_block_gas(cost: u64, gas_type: &'static str) {
-    SEQUENTIAL_BLOCK_GAS
-        .with_label_values(&[gas_type])
+    BLOCK_GAS
+        .with_label_values(&[Mode::SEQUENTIAL, gas_type])
         .observe(cost as f64);
 }
 
 /// Record the txn gas during sequential execution.
 pub fn observe_sequential_execution_txn_gas(cost: u64, gas_type: &'static str) {
-    SEQUENTIAL_TXN_GAS
-        .with_label_values(&[gas_type])
+    TXN_GAS
+        .with_label_values(&[Mode::SEQUENTIAL, gas_type])
         .observe(cost as f64);
 }
 
@@ -65,19 +72,11 @@ pub static SPECULATIVE_ABORT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 /// Count of times the BlockSTM is early halted due to exceeding the per-block gas limit.
-pub static PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_execution_par_gas_limit_count",
-        "Count of times the BlockSTM is early halted due to exceeding the per-block gas limit"
-    )
-    .unwrap()
-});
-
-/// Count of times the sequential execution is early halted due to exceeding the per-block gas limit.
-pub static SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_execution_seq_gas_limit_count",
-        "Count of times the sequential execution is early halted due to exceeding the per-block gas limit"
+pub static EXCEED_PER_BLOCK_GAS_LIMIT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_execution_gas_limit_count",
+        "Count of times the BlockSTM is early halted due to exceeding the per-block gas limit",
+        &["mode"]
     )
     .unwrap()
 });
@@ -168,55 +167,29 @@ pub static DEPENDENCY_WAIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static PARALLEL_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "aptos_execution_parallel_block_gas",
-        "Histogram for different block gas costs (execution, io, storage, storage fee, non-storage) during parallel execution",
-        &["stage"]
+        "aptos_execution_block_gas",
+        "Histogram for different block gas costs (execution, io, storage, storage fee, non-storage)",
+        &["mode", "stage"]
     )
     .unwrap()
 });
 
-pub static PARALLEL_TXN_GAS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static TXN_GAS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "aptos_execution_parallel_txn_gas",
-        "Histogram for different average txn gas costs (execution, io, storage, storage fee, non-storage) during parallel execution",
-        &["stage"]
+        "aptos_execution_txn_gas",
+        "Histogram for different average txn gas costs (execution, io, storage, storage fee, non-storage)",
+        &["mode", "stage"]
     )
     .unwrap()
 });
 
-pub static SEQUENTIAL_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static BLOCK_COMMITTED_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "aptos_execution_sequential_block_gas",
-        "Histogram for different block gas costs (execution, io, storage, storage fee, non-storage) during sequential execution",
-        &["stage"]
-    )
-    .unwrap()
-});
-
-pub static SEQUENTIAL_TXN_GAS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_execution_sequential_txn_gas",
-        "Histogram for different average txn gas costs (execution, io, storage, storage fee, non-storage) during sequential execution",
-        &["stage"]
-    )
-    .unwrap()
-});
-
-pub static PARALLEL_BLOCK_COMMITTED_TXNS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_execution_par_block_committed_txns",
-        "The per-block committed txns in parallel execution (Block STM)",
-        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
-    )
-    .unwrap()
-});
-
-pub static SEQUENTIAL_BLOCK_COMMITTED_TXNS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "aptos_execution_seq_block_committed_txns",
-        "The per-block committed txns in sequential execution",
+        "aptos_execution_block_committed_txns",
+        "The per-block committed txns (Block STM)",
+        &["mode"],
         exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()

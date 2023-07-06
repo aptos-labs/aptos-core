@@ -4,8 +4,11 @@
 
 use crate::{
     executor::BlockExecutor,
-    proptest_types::types::{DeltaDataView, ExpectedOutput, KeyType, Task, Transaction, ValueType},
+    proptest_types::types::{
+        DeltaDataView, ExpectedOutput, KeyType, Output, Task, Transaction, ValueType,
+    },
     scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
+    txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
@@ -44,8 +47,9 @@ where
         Transaction<K, V>,
         Task<K, V>,
         DeltaDataView<K, V>,
+        NoOpTransactionCommitHook<Output<K, V>, usize>,
         ExecutableTestType,
-    >::new(num_cpus::get(), executor_thread_pool, None)
+    >::new(num_cpus::get(), executor_thread_pool, None, None)
     .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);

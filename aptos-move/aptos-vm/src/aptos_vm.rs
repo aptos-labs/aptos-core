@@ -6,8 +6,8 @@ use crate::{
     adapter_common::{
         discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
     },
-    aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals, GAS_PAYER_FLAG_BIT},
-    block_executor::BlockAptosVM,
+    aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
+    block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
     data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
@@ -19,6 +19,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::{
@@ -282,7 +283,7 @@ impl AptosVM {
     ) -> (VMStatus, VMOutput) {
         let mut session = self
             .0
-            .new_session(resolver, SessionId::txn_meta(txn_data), true);
+            .new_session(resolver, SessionId::epilogue_meta(txn_data), true);
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -394,18 +395,6 @@ impl AptosVM {
         )?)
     }
 
-    fn get_senders(txn_data: &TransactionMetadata) -> Vec<AccountAddress> {
-        let mut res = vec![txn_data.sender];
-        res.extend(txn_data.secondary_signers());
-        if txn_data.sequence_number & GAS_PAYER_FLAG_BIT != 0 {
-            // In a gas payer tx, the last multi-agent signer of the secondary signers is in
-            // fact the gas payer and not to be part of the tx parameters. So we remove the last
-            // signer.
-            res.pop();
-        }
-        res
-    }
-
     fn execute_script_or_entry_function(
         &self,
         resolver: &impl MoveResolverExt,
@@ -431,13 +420,12 @@ impl AptosVM {
 
             match payload {
                 TransactionPayload::Script(script) => {
-                    let senders = Self::get_senders(txn_data);
                     let loaded_func =
                         session.load_script(script.code(), script.ty_args().to_vec())?;
                     let args =
                         verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                             &mut session,
-                            senders,
+                            txn_data.senders(),
                             convert_txn_args(script.args()),
                             &loaded_func,
                             self.0
@@ -452,11 +440,10 @@ impl AptosVM {
                     )?;
                 },
                 TransactionPayload::EntryFunction(script_fn) => {
-                    let senders = Self::get_senders(txn_data);
                     self.validate_and_execute_entry_function(
                         &mut session,
                         gas_meter,
-                        senders,
+                        txn_data.senders(),
                         script_fn,
                     )?;
                 },
@@ -510,7 +497,7 @@ impl AptosVM {
         )?;
 
         // TODO(Gas): Charge for aggregator writes
-        let session_id = SessionId::txn_meta(txn_data);
+        let session_id = SessionId::epilogue_meta(txn_data);
         RespawnedSession::spawn(&self.0, session_id, resolver, change_set)
     }
 
@@ -714,7 +701,7 @@ impl AptosVM {
         // the inner function call earlier (since it failed).
         let mut respawned_session = RespawnedSession::spawn(
             &self.0,
-            SessionId::txn_meta(txn_data),
+            SessionId::epilogue_meta(txn_data),
             resolver,
             VMChangeSet::empty(),
         )?;
@@ -1035,7 +1022,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
-        let mut session = self.0.new_session(resolver, SessionId::txn(txn), true);
+        let mut session = self.0.new_session(resolver, SessionId::prologue(txn), true);
         if let Err(err) = self.validate_signature_checked_transaction(
             &mut session,
             resolver,
@@ -1520,12 +1507,16 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
-        let ret = BlockAptosVM::execute_block(
+        let ret = BlockAptosVM::execute_block::<
+            _,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+        >(
             Arc::clone(&RAYON_EXEC_POOL),
             BlockExecutorTransactions::Unsharded(transactions),
             state_view,
             Self::get_concurrency_level(),
             maybe_block_gas_limit,
+            None,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
@@ -1590,7 +1581,9 @@ impl VMValidator for AptosVM {
         };
 
         let resolver = self.as_move_resolver(state_view);
-        let mut session = self.0.new_session(&resolver, SessionId::txn(&txn), true);
+        let mut session = self
+            .0
+            .new_session(&resolver, SessionId::prologue(&txn), true);
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,
             &resolver,

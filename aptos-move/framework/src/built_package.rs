@@ -39,6 +39,14 @@ pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 /// Represents a set of options for building artifacts from Move.
 #[derive(Debug, Clone, Parser, Serialize, Deserialize)]
 pub struct BuildOptions {
+    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
+    ///
+    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
+    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+    ///
+    /// Currently, it also additionally pulls in all test compilation artifacts
+    #[clap(long)]
+    pub dev: bool,
     #[clap(long)]
     pub with_srcs: bool,
     #[clap(long)]
@@ -67,6 +75,7 @@ pub struct BuildOptions {
 impl Default for BuildOptions {
     fn default() -> Self {
         Self {
+            dev: false,
             with_srcs: false,
             with_abis: false,
             with_source_maps: false,
@@ -92,13 +101,14 @@ pub struct BuiltPackage {
 }
 
 pub fn build_model(
+    dev_mode: bool,
     package_path: &Path,
     additional_named_addresses: BTreeMap<String, AccountAddress>,
     target_filter: Option<String>,
     bytecode_version: Option<u32>,
 ) -> anyhow::Result<GlobalEnv> {
     let build_config = BuildConfig {
-        dev_mode: false,
+        dev_mode,
         additional_named_addresses,
         architecture: None,
         generate_abis: false,
@@ -124,7 +134,7 @@ impl BuiltPackage {
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
         let bytecode_version = options.bytecode_version;
         let build_config = BuildConfig {
-            dev_mode: false,
+            dev_mode: options.dev,
             additional_named_addresses: options.named_addresses.clone(),
             architecture: None,
             generate_abis: options.with_abis,
@@ -142,6 +152,7 @@ impl BuiltPackage {
         // Build the Move model for extra processing and run extended checks as well derive
         // runtime metadata
         let model = &build_model(
+            options.dev,
             package_path.as_path(),
             options.named_addresses.clone(),
             None,
@@ -236,6 +247,17 @@ impl BuiltPackage {
     pub fn modules(&self) -> impl Iterator<Item = &CompiledModule> {
         self.package
             .root_modules()
+            .filter_map(|unit| match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module),
+                CompiledUnit::Script(_) => None,
+            })
+    }
+
+    /// Returns an iterator for all compiled proper (non-script) modules, including
+    /// modules that are dependencies of the root modules.
+    pub fn all_modules(&self) -> impl Iterator<Item = &CompiledModule> {
+        self.package
+            .all_modules()
             .filter_map(|unit| match &unit.unit {
                 CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module),
                 CompiledUnit::Script(_) => None,

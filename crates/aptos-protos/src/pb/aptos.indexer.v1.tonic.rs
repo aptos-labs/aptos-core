@@ -101,10 +101,10 @@ pub mod raw_data_client {
 pub mod raw_data_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    ///Generated trait containing gRPC methods that should be implemented for use with RawDataServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with RawDataServer.
     #[async_trait]
     pub trait RawData: Send + Sync + 'static {
-        ///Server streaming response type for the GetTransactions method.
+        /// Server streaming response type for the GetTransactions method.
         type GetTransactionsStream: futures_core::Stream<
                 Item = Result<super::TransactionsResponse, tonic::Status>,
             >

@@ -99,6 +99,7 @@ impl ReleaseTarget {
             .collect::<Vec<_>>();
         ReleaseOptions {
             build_options: BuildOptions {
+                dev: false,
                 with_srcs,
                 with_abis: true,
                 with_source_maps: false,
@@ -115,7 +116,7 @@ impl ReleaseTarget {
                     landing_page_template: Some("doc_template/overview.md".to_string()),
                     references_file: Some("doc_template/references.md".to_string()),
                 }),
-                skip_fetch_latest_git_deps: false,
+                skip_fetch_latest_git_deps: true,
                 bytecode_version: None,
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),

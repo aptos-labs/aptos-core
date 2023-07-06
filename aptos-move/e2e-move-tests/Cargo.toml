@@ -20,6 +20,7 @@ aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
+aptos-gas-profiling = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }

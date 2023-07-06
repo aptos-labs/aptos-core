@@ -250,7 +250,74 @@ async fn test_multi_agent_signed_transaction() {
         .post("/transactions", resp)
         .await;
 }
+/* works when feature is enabled
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_fee_payer_signed_transaction() {
+    let mut context = new_test_context(current_function_name!());
+    let account = context.gen_account();
+    let secondary = context.gen_account();
+    let factory = context.transaction_factory();
+    let mut root_account = context.root_account().await;
 
+    // Create secondary signer account
+    context
+        .commit_block(&[context.create_user_account_by(&mut root_account, &secondary)])
+        .await;
+
+    // Create a new account with a multi-agent signer
+    let txn = root_account.sign_fee_payer_with_transaction_builder(
+        vec![], &secondary,
+        factory.create_user_account(account.public_key()),
+    );
+
+    let body = bcs::to_bytes(&txn).unwrap();
+    let resp = context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", body)
+        .await;
+
+    let (sender, secondary_signers,fee_payer_signer) = match txn.authenticator() {
+        TransactionAuthenticator::FeePayer {
+            sender,
+            secondary_signer_addresses: _,
+            secondary_signers,
+            fee_payer_address: _,
+            fee_payer_signer
+        } => (sender, secondary_signers, fee_payer_signer),
+        _ => panic!(
+            "expecting TransactionAuthenticator::MultiAgent, but got: {:?}",
+            txn.authenticator()
+        ),
+    };
+    assert_json(
+        resp["signature"].clone(),
+        json!({
+            "type": "fee_payer_signature",
+            "sender": {
+                "type": "ed25519_signature",
+                "public_key": format!("0x{}", hex::encode(sender.public_key_bytes())),
+                "signature": format!("0x{}", hex::encode(sender.signature_bytes())),
+            },
+            "secondary_signer_addresses": [
+            ],
+            "secondary_signers": [
+            ],
+            "fee_payer_address": secondary.address().to_hex_literal(),
+            "fee_payer_signer": {
+                "type": "ed25519_signature",
+                "public_key": format!("0x{}",hex::encode(fee_payer_signer.public_key_bytes())),
+                "signature": format!("0x{}", hex::encode(fee_payer_signer.signature_bytes())),
+            },
+        }),
+    );
+
+    // ensure fee payer txns can be submitted into mempool by JSON format
+    context
+        .expect_status_code(202)
+        .post("/transactions", resp)
+        .await;
+}
+*/
 #[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_multi_ed25519_signed_transaction() {

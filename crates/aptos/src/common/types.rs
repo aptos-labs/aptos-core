@@ -952,6 +952,14 @@ impl RestOptions {
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
+    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
+    ///
+    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
+    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+    ///
+    /// Currently, it also additionally pulls in all test compilation artifacts
+    #[clap(long)]
+    pub dev: bool,
     /// Path to a move package (the folder with a Move.toml file)
     #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
@@ -984,6 +992,7 @@ pub struct MovePackageDir {
 impl MovePackageDir {
     pub fn new(package_dir: PathBuf) -> Self {
         Self {
+            dev: false,
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
@@ -1597,7 +1606,10 @@ impl TransactionOptions {
 
         // Generate the execution & IO flamegraph.
         println!();
-        match gas_log.to_flamegraph(format!("Transaction {} -- Execution & IO", hash))? {
+        match gas_log
+            .exec_io
+            .to_flamegraph(format!("Transaction {} -- Execution & IO", hash))?
+        {
             Some(graph_bytes) => {
                 create_dir!();
                 let graph_file_path = Path::join(dir, format!("{}.exec_io.svg", raw_file_name));
