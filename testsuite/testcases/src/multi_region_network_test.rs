@@ -240,7 +240,9 @@ impl Test for MultiRegionNetworkEmulationTest {
     }
 }
 
-fn create_multi_region_swarm_network_chaos(
+/// Creates a SwarmNetEm to be injected via chaos. Network emulation
+/// is added to all the given peers using the specified config.
+pub fn create_multi_region_swarm_network_chaos(
     all_peers: Vec<PeerId>,
     network_emulation_config: Option<MultiRegionNetworkEmulationConfig>,
 ) -> SwarmNetEm {
