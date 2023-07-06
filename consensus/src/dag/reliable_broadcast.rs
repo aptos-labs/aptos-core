@@ -211,7 +211,7 @@ impl RpcHandler for CertifiedNodeHandler {
         let epoch = node.metadata().epoch();
         {
             let dag_reader = self.dag.read();
-            if dag_reader.exists(&node.metadata()) {
+            if dag_reader.exists(node.metadata()) {
                 return Ok(CertifiedAck::new(node.metadata().epoch()));
             }
 
