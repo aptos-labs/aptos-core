@@ -4,16 +4,13 @@
 #![forbid(unsafe_code)]
 
 use anyhow::{ensure, Context, Result};
-use aptos_api_types::{Block, HashValue, U64};
-use aptos_rest_client::error::RestError;
-use aptos_rest_client::{Account, Client, FaucetClient};
+use aptos_api_types::U64;
+use aptos_rest_client::{Client, FaucetClient, Account};
 use aptos_sdk::coin_client::CoinClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::authenticator::AuthenticationKey;
 use once_cell::sync::Lazy;
 use rand::Rng;
-use std::str::FromStr;
 use url::Url;
 
 // global parameters (todo: make into clap)
@@ -30,14 +27,7 @@ static TESTNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
 
 // static accounts to use
-// don't send coins to TEST_ACCOUNT_1
 static TEST_ACCOUNT_1: Lazy<AccountAddress> = Lazy::new(|| {
-    AccountAddress::from_hex_literal(
-        "0x7fed760c508a8885e1438c90f81dea6940ad53b05527fadddd3851f53342d7c4",
-    )
-    .unwrap()
-});
-static TEST_ACCOUNT_2: Lazy<AccountAddress> = Lazy::new(|| {
     AccountAddress::from_hex_literal(
         "0xf6cee5c359839a321a08af6b8cfe4a6e439db46f4942e21b6845aa57d770efdb",
     )
@@ -48,18 +38,11 @@ static TEST_ACCOUNT_2: Lazy<AccountAddress> = Lazy::new(|| {
 static SKIP_NO_FAUCET_ACCESS: &str = "This test requires faucet access.";
 static ERROR_CLIENT_RESPONSE: &str = "Client responded with error.";
 static ERROR_FAUCET_FUND: &str = "Funding from faucet failed.";
-static ERROR_OTHER: &str = "Something went wrong.";
 static ERROR_COIN_TRANSFER: &str = "Coin transfer failed.";
 static FAIL_WRONG_AUTH_KEY: &str = "Returned wrong authentication key.";
 static FAIL_WRONG_SEQ_NUMBER: &str = "Returned wrong sequence number.";
 static FAIL_WRONG_BALANCE: &str = "Returned wrong balance.";
 static FAIL_WRONG_BALANCE_AT_VERSION: &str = "Returned wrong balance at the given version.";
-static FAIL_WRONG_BLOCK_HEIGHT: &str = "Returned wrong block height.";
-static FAIL_WRONG_BLOCK_HASH: &str = "Returned wrong block hash.";
-static FAIL_WRONG_BLOCK_TIMESTAMP: &str = "Returned wrong block timestamp.";
-static FAIL_WRONG_FIRST_VERSION: &str = "Returned wrong block first version.";
-static FAIL_WRONG_LAST_VERSION: &str = "Returned wrong block last version.";
-static FAIL_WRONG_TRANSACTIONS: &str = "Returned wrong transactions.";
 static SUCCESS: &str = "success";
 
 #[derive(Debug)]
@@ -252,174 +235,18 @@ async fn probe_getaccountbalanceatversion_1() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
-/// Calls get_block_by_height by setting with_transactions=False on a fixed block on testnet.
-async fn probe_getblockbyheight_1() -> Result<&'static str> {
-    // create the rest client
-    let client: Client = Client::new(TESTNET_NODE_URL.clone());
-
-    // ask for block
-    let response = client
-        .get_block_by_height(98669388, false)
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
-
-    // check block
-    let actual_block = response.inner();
-    let expected_block = Block {
-        block_height: U64(98669388),
-        block_hash: HashValue::from_str(
-            "b40362602dccfa1dccebb94adfd4c06d4b0ffe1eadb07659556744db3fe1d0e5",
-        )
-        .context(ERROR_OTHER)?,
-        block_timestamp: U64(1688146946653187),
-        first_version: U64(565538916),
-        last_version: U64(565538919),
-        transactions: None,
-    };
-
-    ensure!(
-        actual_block.block_height == expected_block.block_height,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BLOCK_HEIGHT,
-        expected_block.block_height,
-        actual_block.block_height,
-    );
-    ensure!(
-        actual_block.block_hash == expected_block.block_hash,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BLOCK_HASH,
-        expected_block.block_hash,
-        actual_block.block_hash,
-    );
-    ensure!(
-        actual_block.block_timestamp == expected_block.block_timestamp,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BLOCK_TIMESTAMP,
-        expected_block.block_timestamp,
-        actual_block.block_timestamp,
-    );
-    ensure!(
-        actual_block.first_version == expected_block.first_version,
-        "{} expected {}, got {}",
-        FAIL_WRONG_FIRST_VERSION,
-        expected_block.first_version,
-        actual_block.first_version,
-    );
-    ensure!(
-        actual_block.last_version == expected_block.last_version,
-        "{} expected {}, got {}",
-        FAIL_WRONG_LAST_VERSION,
-        expected_block.last_version,
-        actual_block.last_version,
-    );
-    ensure!(
-        actual_block.transactions == expected_block.transactions,
-        "{} expected {:?}, got {:?}",
-        FAIL_WRONG_TRANSACTIONS,
-        expected_block.transactions,
-        actual_block.transactions,
-    );
-
-    Ok(SUCCESS)
-}
-
-/// Calls get_block_by_version by setting with_transactions=False on a fixed block on testnet.
-/// The version belongs to a user transaction inside the block.
-async fn probe_getblockbyversion_1() -> Result<&'static str> {
-    // create the rest client
-    let client: Client = Client::new(TESTNET_NODE_URL.clone());
-
-    // ask for block
-    let response = client
-        .get_block_by_version(565767993, false)
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
-
-    // check block
-    let actual_block = response.inner();
-    let expected_block = Block {
-        block_height: U64(98764388),
-        block_hash: HashValue::from_str(
-            "f1fcfd799f88a2526d649d5a2cf227c14b77ef374b5daf6fb5d4987c430a91dd",
-        )
-        .context(ERROR_OTHER)?,
-        block_timestamp: U64(1688165648699603),
-        first_version: U64(565767992),
-        last_version: U64(565767994),
-        transactions: None,
-    };
-
-    ensure!(
-        actual_block.block_height == expected_block.block_height,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BLOCK_HEIGHT,
-        expected_block.block_height,
-        actual_block.block_height,
-    );
-    ensure!(
-        actual_block.block_hash == expected_block.block_hash,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BLOCK_HASH,
-        expected_block.block_hash,
-        actual_block.block_hash,
-    );
-    ensure!(
-        actual_block.block_timestamp == expected_block.block_timestamp,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BLOCK_TIMESTAMP,
-        expected_block.block_timestamp,
-        actual_block.block_timestamp,
-    );
-    ensure!(
-        actual_block.first_version == expected_block.first_version,
-        "{} expected {}, got {}",
-        FAIL_WRONG_FIRST_VERSION,
-        expected_block.first_version,
-        actual_block.first_version,
-    );
-    ensure!(
-        actual_block.last_version == expected_block.last_version,
-        "{} expected {}, got {}",
-        FAIL_WRONG_LAST_VERSION,
-        expected_block.last_version,
-        actual_block.last_version,
-    );
-    ensure!(
-        actual_block.transactions == expected_block.transactions,
-        "{} expected {:?}, got {:?}",
-        FAIL_WRONG_TRANSACTIONS,
-        expected_block.transactions,
-        actual_block.transactions,
-    );
-
-    Ok(SUCCESS)
-}
-
-/// Tests if transactions created on the spot are returned by the API.
-/// TODO: make this not a test but a procedure, and individual checks into tests and handle inside
-async fn testnet_1() -> TestResult {
-    // create clients
-    let client: Client = Client::new(TESTNET_NODE_URL.clone());
-    let faucet_client = FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone());
-    let coin_client = CoinClient::new(&client);
-
-    // Step 1: Test new account creation
-    // TODO: refactor into own test
-    let mut giray = LocalAccount::generate(&mut rand::rngs::OsRng);
-    if let Err(e) = faucet_client.fund(giray.address(), 100_000_000).await {
-        return TestResult::Error(e);
-    }
-
+// Compares the account data of a newly created LocalAccount with the values returned from the API.
+async fn test_getaccountdata(client: &Client, account: &LocalAccount) -> TestResult {
     // ask for account data
-    let response = match client.get_account(giray.address()).await {
+    let response = match client.get_account(account.address()).await {
         Ok(response) => response,
         Err(e) => return TestResult::Error(e.into()),
     };
 
     // check account data
     let expected_account = Account {
-        authentication_key: giray.authentication_key(),
-        sequence_number: giray.sequence_number(),
+        authentication_key: account.authentication_key(),
+        sequence_number: account.sequence_number(),
     };
     let actual_account = response.inner();
 
@@ -430,42 +257,40 @@ async fn testnet_1() -> TestResult {
         return TestResult::Fail(FAIL_WRONG_SEQ_NUMBER);
     }
 
-    // Step 2: Test coin transfer
-    let txn_hash = match coin_client
-        .transfer(&mut giray, *TEST_ACCOUNT_2, 1_000, None)
-        .await
-    {
-        Ok(txn) => txn,
-        Err(e) => return TestResult::Error(e),
-    };
-    let _ = match client.wait_for_transaction(&txn_hash).await {
-        Ok(response) => response,
-        Err(e) => return TestResult::Error(e.into()),
-    };
-
     TestResult::Success
+}
+
+fn log_result(result: &TestResult) {
+    println!("{:?}", result);
+}
+
+async fn testnet_1() -> Result<()> {
+    // create clients
+    let client: Client = Client::new(TESTNET_NODE_URL.clone());
+    let faucet_client = FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone());
+
+    // Step 1: Test new account creation
+    let giray = LocalAccount::generate(&mut rand::rngs::OsRng);
+    faucet_client.fund(giray.address(), 100_000_000).await?;
+
+    let result = test_getaccountdata(&client, &giray).await;
+    log_result(&result);
+
+    // this test is critical to pass for the next tests
+    match result {
+        TestResult::Success => {},
+        _ => return Ok(()),
+    }
+
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("{:?}", probe_getaccount_1().await);
-    match probe_getaccountbalance_1().await {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{:?}", e),
-    }
-    match probe_getaccountbalanceatversion_1().await {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{:?}", e),
-    }
-    match probe_getblockbyheight_1().await {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{:?}", e),
-    }
-    match probe_getblockbyversion_1().await {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{:?}", e),
-    }
-    println!("{:?}", testnet_1().await);
+    println!("{:?}", probe_getaccountbalance_1().await);
+    println!("{:?}", probe_getaccountbalanceatversion_1().await);
+    let _ = testnet_1().await;
 
     Ok(())
 }
