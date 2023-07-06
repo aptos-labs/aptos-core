@@ -13,7 +13,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - init command from config subcommand is removed. Please use init from the root command.
   - Example: `aptos config init` -> `aptos init`
 ### Fixed
-- Panic issue when running `aptos move test` is fixed
+- Panic issue when running `aptos move test` is fixed - GitHub issue #8516
 
 ## [2.0.1] - 2023/06/05
 ### Fixed
