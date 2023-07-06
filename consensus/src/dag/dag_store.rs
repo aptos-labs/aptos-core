@@ -7,6 +7,7 @@ use crate::dag::{
 };
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
+use aptos_crypto::HashValue;
 use aptos_logger::error;
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use std::{
@@ -15,14 +16,14 @@ use std::{
 };
 
 #[derive(Clone)]
-enum NodeStatus {
+pub enum NodeStatus {
     Unordered(Arc<CertifiedNode>),
     Ordered(Arc<CertifiedNode>),
     Committed(Arc<CertifiedNode>),
 }
 
 impl NodeStatus {
-    fn as_node(&self) -> &Arc<CertifiedNode> {
+    pub fn as_node(&self) -> &Arc<CertifiedNode> {
         match self {
             NodeStatus::Unordered(node)
             | NodeStatus::Ordered(node)
@@ -114,7 +115,7 @@ impl Dag {
     }
 
     pub fn exists(&self, metadata: &NodeMetadata) -> bool {
-        self.get_node_ref(metadata).is_some()
+        self.get_node_ref_by_metadata(metadata).is_some()
     }
 
     pub fn all_exists(&self, nodes: &[NodeCertificate]) -> bool {
@@ -123,15 +124,63 @@ impl Dag {
             .all(|certificate| self.exists(certificate.metadata()))
     }
 
-    fn get_node_ref(&self, metadata: &NodeMetadata) -> Option<&NodeStatus> {
-        let index = self.author_to_index.get(metadata.author())?;
-        let round_ref = self.nodes_by_round.get(&metadata.round())?;
+    fn get_node_ref_by_metadata(&self, metadata: &NodeMetadata) -> Option<&NodeStatus> {
+        self.get_node_ref(metadata.round(), metadata.author())
+    }
+
+    fn get_node_ref(&self, round: Round, author: &Author) -> Option<&NodeStatus> {
+        let index = self.author_to_index.get(author)?;
+        let round_ref = self.nodes_by_round.get(&round)?;
         round_ref[*index].as_ref()
     }
 
+    fn get_round_iter(&self, round: Round) -> Option<impl Iterator<Item = &NodeStatus>> {
+        self.nodes_by_round
+            .get(&round)
+            .map(|round_ref| round_ref.iter().flatten())
+    }
+
     pub fn get_node(&self, metadata: &NodeMetadata) -> Option<Arc<CertifiedNode>> {
-        self.get_node_ref(metadata)
+        self.get_node_ref_by_metadata(metadata)
             .map(|node_status| node_status.as_node().clone())
+    }
+
+    pub fn get_node_by_round_author(
+        &self,
+        round: Round,
+        author: &Author,
+    ) -> Option<Arc<CertifiedNode>> {
+        self.get_node_ref(round, author)
+            .map(|node_status| node_status.as_node().clone())
+    }
+
+    // TODO: I think we can cache votes in the NodeStatus::Unordered
+    pub fn check_votes_for_node(
+        &self,
+        metadata: &NodeMetadata,
+        validator_verifier: &ValidatorVerifier,
+    ) -> bool {
+        self.get_round_iter(metadata.round() + 1)
+            .and_then(|next_round_iter| {
+                let votes = next_round_iter
+                    .filter(|node_status| {
+                        node_status
+                            .as_node()
+                            .parents()
+                            .iter()
+                            .any(|cert| cert.metadata() == metadata)
+                    })
+                    .map(|node_status| node_status.as_node().author());
+                Some(validator_verifier.check_voting_power(votes).is_ok())
+            })
+            .unwrap_or(false)
+    }
+
+    pub fn reachable<'a>(
+        &'a self,
+        from: &'a Arc<CertifiedNode>,
+    ) -> impl Iterator<Item = &Arc<CertifiedNode>> {
+        ReachableIterator::new(from, self)
     }
 
     pub fn get_strong_links_for_round(
@@ -139,17 +188,15 @@ impl Dag {
         round: Round,
         validator_verifier: &ValidatorVerifier,
     ) -> Option<Vec<NodeCertificate>> {
-        let all_nodes_in_round = self.nodes_by_round.get(&round)?.iter().flatten();
         if validator_verifier
             .check_voting_power(
-                all_nodes_in_round
-                    .clone()
+                self.get_round_iter(round)?
                     .map(|node_status| node_status.as_node().metadata().author()),
             )
             .is_ok()
         {
             Some(
-                all_nodes_in_round
+                self.get_round_iter(round)?
                     .map(|node_status| node_status.as_node().certificate())
                     .collect(),
             )
@@ -161,5 +208,45 @@ impl Dag {
     pub fn bitmask(&self) -> Vec<Vec<bool>> {
         // TODO: extract local bitvec
         todo!();
+    }
+}
+
+pub struct ReachableIterator<'a> {
+    current: Vec<&'a Arc<CertifiedNode>>,
+    next: HashMap<HashValue, NodeMetadata>,
+    dag: &'a Dag,
+}
+
+impl<'a> ReachableIterator<'a> {
+    fn new(from: &'a Arc<CertifiedNode>, dag: &'a Dag) -> Self {
+        Self {
+            current: vec![from],
+            next: HashMap::new(),
+            dag,
+        }
+    }
+}
+
+impl<'a> Iterator for ReachableIterator<'a> {
+    type Item = &'a Arc<CertifiedNode>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current.is_empty() {
+            for (_, metadata) in self.next.drain() {
+                match self.dag.get_node_ref_by_metadata(&metadata) {
+                    Some(NodeStatus::Unordered(node)) => self.current.push(node),
+                    _ => (),
+                }
+            }
+        }
+        if let Some(node) = self.current.pop() {
+            for parent in node.parents() {
+                self.next
+                    .insert(*parent.metadata().digest(), parent.metadata().clone());
+            }
+            Some(node)
+        } else {
+            None
+        }
     }
 }
