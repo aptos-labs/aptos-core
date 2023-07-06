@@ -21,7 +21,7 @@ import {
   Uint16,
   Uint256,
 } from "../bcs";
-import { TransactionAuthenticator } from "./authenticator";
+import { AccountAuthenticator, TransactionAuthenticator, TransactionAuthenticatorMultiAgent } from "./authenticator";
 import { Identifier } from "./identifier";
 import { TypeTag } from "./type_tag";
 import { AccountAddress } from "./account_address";
@@ -380,12 +380,39 @@ export abstract class RawTransactionWithData {
 }
 
 export class MultiAgentRawTransaction extends RawTransactionWithData {
+  private fee_payer_address?: AccountAddress;
+
   constructor(
     public readonly raw_txn: RawTransaction,
     public readonly secondary_signer_addresses: Seq<AccountAddress>,
-    public readonly fee_payer_address?: AccountAddress,
   ) {
     super();
+  }
+
+  set_fee_payer_address(fee_payer_address: AccountAddress): void {
+    this.fee_payer_address = fee_payer_address;
+  }
+
+  get_authenticator(
+    sender: AccountAuthenticator,
+    secondary_signers: Seq<AccountAuthenticator>,
+    fee_payer?: AccountAuthenticator,
+  ): TransactionAuthenticatorMultiAgent {
+    if (secondary_signers.length !== this.secondary_signer_addresses.length) {
+      throw new Error("Number of secondary signers does not match.");
+    }
+    let fee_pay;
+    if (this.fee_payer_address) {
+      if (!fee_payer) {
+        throw new Error("Fee payer is not set.");
+      }
+      fee_pay = { address: this.fee_payer_address, authenticator: fee_payer };
+    } else {
+      if (fee_payer) {
+        throw new Error("Fee payer is set.");
+      }
+    }
+    return new TransactionAuthenticatorMultiAgent(sender, this.secondary_signer_addresses, secondary_signers, fee_pay);
   }
 
   serialize(serializer: Serializer): void {
@@ -411,11 +438,9 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
   }
 
   static load_fee_payer(deserializer: Deserializer): MultiAgentRawTransaction {
-    const rawTxn = RawTransaction.deserialize(deserializer);
-    const secondarySignerAddresses = deserializeVector(deserializer, AccountAddress);
-    const feePayerAddress = AccountAddress.deserialize(deserializer);
-
-    return new MultiAgentRawTransaction(rawTxn, secondarySignerAddresses, feePayerAddress);
+    let ret = this.load(deserializer);
+    ret.set_fee_payer_address(AccountAddress.deserialize(deserializer));
+    return ret;
   }
 }
 

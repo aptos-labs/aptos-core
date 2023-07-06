@@ -83,7 +83,7 @@ export class TransactionAuthenticatorMultiAgent extends TransactionAuthenticator
     public readonly sender: AccountAuthenticator,
     public readonly secondary_signer_addresses: Seq<AccountAddress>,
     public readonly secondary_signers: Seq<AccountAuthenticator>,
-    public readonly fee_payer: { address: AccountAddress; authenticator: AccountAuthenticator } | null = null,
+    public readonly fee_payer?: { address: AccountAddress; authenticator: AccountAuthenticator },
   ) {
     super();
   }

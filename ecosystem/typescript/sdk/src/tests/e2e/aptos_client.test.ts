@@ -532,10 +532,10 @@ test(
     expect(aliceBalance.amount).toBe("1");
 
     const getBalance = async (account: AptosAccount) => {
-        const resources = await client.getAccountResources(account.address().hex());
-        let accountResource = resources.find((r) => r.type === aptosCoin);
-        return BigInt((accountResource!.data as any).coin.value);
-    }
+      const resources = await client.getAccountResources(account.address().hex());
+      let accountResource = resources.find((r) => r.type === aptosCoin);
+      return BigInt((accountResource!.data as any).coin.value);
+    };
 
     const aliceBefore = await getBalance(alice);
     const bobBefore = await getBalance(bob);

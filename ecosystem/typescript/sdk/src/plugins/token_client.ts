@@ -319,11 +319,13 @@ export class TokenClient {
       [creator, collectionName, name, propertyVersion, amount],
     );
 
-    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(
-      rawTxn,
-      [TxnBuilderTypes.AccountAddress.fromHex(receiver.address())],
-      fee_payer ? TxnBuilderTypes.AccountAddress.fromHex(fee_payer.address()) : undefined,
-    );
+    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
+      TxnBuilderTypes.AccountAddress.fromHex(receiver.address()),
+    ]);
+
+    if (fee_payer) {
+      multiAgentTxn.set_fee_payer_address(TxnBuilderTypes.AccountAddress.fromHex(fee_payer.address()));
+    }
 
     const senderSignature = new TxnBuilderTypes.Ed25519Signature(
       sender.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
@@ -343,27 +345,22 @@ export class TokenClient {
       receiverSignature,
     );
 
-    let feePayer: { address: AccountAddress; authenticator: AccountAuthenticator } | undefined;
+    let feePayerAuthenticator: TxnBuilderTypes.AccountAuthenticator | undefined;
     if (fee_payer) {
       const feePayerSignature = new TxnBuilderTypes.Ed25519Signature(
         fee_payer.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
       );
 
-      const feePayerAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
+      feePayerAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
         new TxnBuilderTypes.Ed25519PublicKey(fee_payer.signingKey.publicKey),
         feePayerSignature,
       );
-      feePayer = {
-        address: TxnBuilderTypes.AccountAddress.fromHex(fee_payer.address()),
-        authenticator: feePayerAuthenticator,
-      };
     }
 
-    const multiAgentAuthenticator = new TxnBuilderTypes.TransactionAuthenticatorMultiAgent(
+    const multiAgentAuthenticator = multiAgentTxn.get_authenticator(
       senderAuthenticator,
-      [TxnBuilderTypes.AccountAddress.fromHex(receiver.address())], // Secondary signer addresses
-      [receiverAuthenticator], // Secondary signer authenticators
-      feePayer,
+      [receiverAuthenticator],
+      feePayerAuthenticator,
     );
 
     const bcsTxn = bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, multiAgentAuthenticator));
