@@ -40,9 +40,6 @@ static SKIP_NO_FAUCET_ACCESS: &str = "This test requires faucet access.";
 static ERROR_CLIENT_RESPONSE: &str = "Client responded with error.";
 static ERROR_FAUCET_FUND: &str = "Funding from faucet failed.";
 static ERROR_COIN_TRANSFER: &str = "Coin transfer failed.";
-static FAIL_WRONG_AUTH_KEY: &str = "Returned wrong authentication key.";
-static FAIL_WRONG_SEQ_NUMBER: &str = "Returned wrong sequence number.";
-static FAIL_WRONG_BALANCE: &str = "Returned wrong balance.";
 static FAIL_WRONG_BALANCE_AT_VERSION: &str = "Returned wrong balance at the given version.";
 static SUCCESS: &str = "success";
 
@@ -172,10 +169,10 @@ async fn test_accountdata(client: &Client, account: &LocalAccount) -> TestResult
     let actual_account = response.inner();
 
     if !(expected_account.authentication_key == actual_account.authentication_key) {
-        return TestResult::Fail(FAIL_WRONG_AUTH_KEY);
+        return TestResult::Fail("wrong authentication key");
     }
     if !(expected_account.sequence_number == actual_account.sequence_number) {
-        return TestResult::Fail(FAIL_WRONG_SEQ_NUMBER);
+        return TestResult::Fail("wrong sequence number");
     }
 
     TestResult::Success
@@ -198,9 +195,48 @@ async fn test_accountbalance(
     let actual_balance = response.inner().coin.value;
 
     if !(expected_balance == actual_balance) {
-        return TestResult::Fail(FAIL_WRONG_BALANCE);
+        return TestResult::Fail("wrong balance");
     }
 
+    TestResult::Success
+}
+
+// Tests that the coin transfer changes the balance of the sender and the receiver.
+async fn test_cointransfer(
+    client: &Client,
+    coin_client: &CoinClient<'_>,
+    account: &mut LocalAccount,
+    address: AccountAddress,
+    amount: u64,
+) -> TestResult {
+    // get starting balance
+    let starting_receiver_balance = match client.get_account_balance(address).await {
+        Ok(response) => u64::from(response.inner().coin.value),
+        Err(e) => return TestResult::Error(e.into()),
+    };
+
+    // transfer coins to static account
+    let txn_hash = match coin_client.transfer(account, address, amount, None).await {
+        Ok(txn) => txn,
+        Err(e) => return TestResult::Error(e),
+    };
+    let response = match client.wait_for_transaction(&txn_hash).await {
+        Ok(response) => response,
+        Err(e) => return TestResult::Error(e.into()),
+    };
+
+    // check receiver balance
+    let expected_receiver_balance = U64(starting_receiver_balance + amount);
+    let actual_receiver_balance = match client.get_account_balance(address).await {
+        Ok(response) => response.inner().coin.value,
+        Err(e) => return TestResult::Error(e.into()),
+    };
+
+    if !(expected_receiver_balance == actual_receiver_balance) {
+        return TestResult::Fail("wrong balance after coin transfer");
+    }
+
+    // TODO: do we want to check transaction details returned by the API?
     TestResult::Success
 }
 
@@ -208,11 +244,13 @@ async fn testnet_1() -> Result<()> {
     // create clients
     let client: Client = Client::new(TESTNET_NODE_URL.clone());
     let faucet_client = FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone());
+    let coin_client = CoinClient::new(&client);
 
-    // Step 1: Test new account creation
-    let giray = LocalAccount::generate(&mut rand::rngs::OsRng);
+    // create and fund account for tests
+    let mut giray = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(giray.address(), 100_000_000).await?;
 
+    // Step 1: Test new account creation
     // this test is critical to pass for the next tests
     let result = handle_result(test_accountdata(&client, &giray)).await;
     match result {
@@ -221,9 +259,21 @@ async fn testnet_1() -> Result<()> {
     }
 
     // Step 2: Test account balance
-    handle_result(test_accountbalance(&client, &giray, 100_000_000)).await;
+    // this test is critical to pass for the next tests
+    let result = handle_result(test_accountbalance(&client, &giray, 100_000_000)).await;
+    match result {
+        TestResult::Success => {},
+        _ => return Err(anyhow!("returning early because balance check failed")),
+    }
 
     // Step 3: Test coin transfer
+    handle_result(test_cointransfer(
+        &client,
+        &coin_client,
+        &mut giray,
+        *TEST_ACCOUNT_1,
+        1_000,
+    )).await;
 
     Ok(())
 }
