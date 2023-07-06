@@ -141,7 +141,7 @@ fn test_dag_recover_from_storage() {
     let storage = Arc::new(MockStorage::new());
     let mut dag = Dag::new(epoch_state.clone(), storage.clone());
 
-    let mut digests = vec![];
+    let mut metadatas = vec![];
 
     for round in 1..10 {
         let parents = dag
@@ -149,14 +149,14 @@ fn test_dag_recover_from_storage() {
             .unwrap_or_default();
         for signer in &signers[0..3] {
             let node = new_certified_node(round, signer.author(), parents.clone());
-            digests.push(node.digest());
+            metadatas.push(node.metadata().clone());
             assert!(dag.add_node(node).is_ok());
         }
     }
     let new_dag = Dag::new(epoch_state, storage.clone());
 
-    for digest in &digests {
-        assert!(new_dag.exists(digest));
+    for metadata in &metadatas {
+        assert!(new_dag.exists(metadata));
     }
 
     let new_epoch_state = Arc::new(EpochState {

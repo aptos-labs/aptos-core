@@ -138,7 +138,7 @@ impl NodeBroadcastHandler {
         let missing_parents: Vec<NodeCertificate> = node
             .parents()
             .iter()
-            .filter(|parent| !dag_reader.exists(parent.metadata().digest()))
+            .filter(|parent| !dag_reader.exists(parent.metadata()))
             .cloned()
             .collect();
         if !missing_parents.is_empty() {
@@ -211,8 +211,8 @@ impl RpcHandler for CertifiedNodeHandler {
         let epoch = node.metadata().epoch();
         {
             let dag_reader = self.dag.read();
-            if dag_reader.exists(&node.digest()) {
-                return Ok(CertifiedAck::new(epoch));
+            if dag_reader.exists(&node.metadata()) {
+                return Ok(CertifiedAck::new(node.metadata().epoch()));
             }
 
             if !dag_reader.all_exists(node.parents()) {
