@@ -6,6 +6,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 - Fixed serialization of arguments like `u16`, `u32` and `u256`
 
 - Support `contentType` in request so custom headers would not override required headers
+- Set `WITH_CREDENTIALS` to false on Indexer requests
 
 ## 1.13.0 (2023-07-05)
 
