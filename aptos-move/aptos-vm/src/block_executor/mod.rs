@@ -18,7 +18,7 @@ use aptos_block_executor::{
     errors::Error,
     executor::BlockExecutor,
     task::{
-        ExecutionStatus as BlockExecutorExecutionStatus, Transaction as BlockExecutorTransaction,
+        Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
     txn_commit_hook::TransactionCommitHook,
@@ -62,29 +62,12 @@ impl AptosTransactionOutput {
         }
     }
 
-    pub(crate) fn get_cloned_output(&self) -> TransactionOutput {
-        if let Some(output) = self.committed_output.get() {
-            output.clone()
-        } else {
-            self.vm_output
-                .lock()
-                .as_ref()
-                .expect("Output to be set")
-                .clone()
-                .output_with_delta_writes(vec![])
-        }
+    pub(crate) fn get_output(&self) -> &TransactionOutput {
+        self.committed_output.get().unwrap()
     }
 
     fn take_output(mut self) -> TransactionOutput {
-        match self.committed_output.take() {
-            Some(output) => output,
-            None => self
-                .vm_output
-                .lock()
-                .take()
-                .expect("Output must be set")
-                .output_with_delta_writes(vec![]),
-        }
+        self.committed_output.take().unwrap()
     }
 }
 
@@ -210,9 +193,7 @@ impl BlockAptosVM {
 
     pub fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitHook<
-            ExecutionStatus = BlockExecutorExecutionStatus<AptosTransactionOutput, Error<VMStatus>>,
-        >,
+        L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
         executor_thread_pool: Arc<ThreadPool>,
         transactions: BlockExecutorTransactions<Transaction>,
