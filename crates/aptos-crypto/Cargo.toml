@@ -55,6 +55,7 @@ byteorder = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
+rayon = { workspace = true }
 serde_json = { workspace = true }
 sha3 = { workspace = true }
 trybuild = { workspace = true }

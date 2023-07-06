@@ -46,6 +46,12 @@ macro_rules! serialize {
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("ark_bls12_381");
 
+    group.bench_function("rayon", |b| {
+        b.iter(||{
+            let _p = rayon::ThreadPoolBuilder::new().num_threads(112).build();
+        })
+    });
+
     group.bench_function("fr_add", move |b| {
         b.iter_with_setup(
             || (rand!(Fr), rand!(Fr)),

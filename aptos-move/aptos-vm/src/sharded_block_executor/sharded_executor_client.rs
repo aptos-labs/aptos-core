@@ -29,8 +29,8 @@ use std::{
 };
 
 pub struct ShardedExecutorClient {
+    num_shards: ShardId,
     shard_id: ShardId,
-    executor_thread_pool: Arc<rayon::ThreadPool>,
     message_rx: Arc<Mutex<Receiver<CrossShardMsg>>>,
     // The senders of cross-shard messages to other shards.
     message_txs: Arc<Vec<Mutex<Sender<CrossShardMsg>>>>,
@@ -38,22 +38,14 @@ pub struct ShardedExecutorClient {
 
 impl ShardedExecutorClient {
     pub fn new(
+        num_shards: ShardId,
         shard_id: ShardId,
-        num_threads: usize,
         message_txs: Vec<Sender<CrossShardMsg>>,
         message_rx: Receiver<CrossShardMsg>,
     ) -> Self {
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                // We need two extra threads for the cross-shard commit receiver and the thread
-                // that is blocked on waiting for execute block to finish.
-                .num_threads(num_threads + 2)
-                .build()
-                .unwrap(),
-        );
         Self {
+            num_shards,
             shard_id,
-            executor_thread_pool,
             message_rx: Arc::new(Mutex::new(message_rx)),
             message_txs: Arc::new(message_txs.into_iter().map(Mutex::new).collect()),
         }
@@ -63,8 +55,6 @@ impl ShardedExecutorClient {
         num_shards: usize,
         num_threads: Option<usize>,
     ) -> Vec<Self> {
-        let num_threads = num_threads
-            .unwrap_or_else(|| (num_cpus::get() as f64 / num_shards as f64).ceil() as usize);
         let mut cross_shard_msg_txs = vec![];
         let mut cross_shard_msg_rxs = vec![];
         for _ in 0..num_shards {
@@ -77,8 +67,8 @@ impl ShardedExecutorClient {
             .enumerate()
             .map(|(shard_id, rx)| {
                 Self::new(
+                    num_shards as ShardId,
                     shard_id as ShardId,
-                    num_threads,
                     cross_shard_msg_txs.clone(),
                     rx,
                 )
@@ -137,7 +127,11 @@ impl ShardedExecutorClient {
         let cross_shard_state_view =
             Arc::new(self.create_cross_shard_state_view(state_view, &sub_block));
         let cross_shard_state_view_clone1 = cross_shard_state_view.clone();
-        self.executor_thread_pool.scope(|s| {
+
+        // Ad-hoc thread pool creation is fine: benchmark shows it only takes ~1ms with 112 threads.
+        let executor_thread_pool = Arc::new(rayon::ThreadPoolBuilder::new().num_threads(concurrency_level + 2).build().unwrap());
+        let executor_thread_pool_clone = executor_thread_pool.clone();
+        executor_thread_pool.scope(|s| {
             s.spawn(move |_| {
                 if round != 0 {
                     // If this is not the first round, start the cross-shard commit receiver.
@@ -152,7 +146,7 @@ impl ShardedExecutorClient {
             s.spawn(move |_| {
                 disable_speculative_logging();
                 let ret = BlockAptosVM::execute_block(
-                    self.executor_thread_pool.clone(),
+                    executor_thread_pool_clone,
                     BlockExecutorTransactions::Unsharded(sub_block.into_txns()),
                     cross_shard_state_view.as_ref(),
                     concurrency_level,
@@ -190,11 +184,23 @@ impl BlockExecutorClient for ShardedExecutorClient {
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
+            // A hacky way to ensure last-round txns are executed in a single large BlockSTM.
+            // TODO: let the partitioner leave a flag in the special sub-block instead.
+            let modified_concurrency_level = if round == 1 {
+                if self.shard_id == self.num_shards - 1 {
+                    concurrency_level * self.num_shards
+                } else {
+                    1
+                }
+            } else {
+                concurrency_level
+            };
+
             result.push(self.execute_sub_block(
                 sub_block,
                 round,
                 state_view,
-                concurrency_level,
+                modified_concurrency_level,
                 maybe_block_gas_limit,
             )?);
         }
