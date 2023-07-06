@@ -235,6 +235,10 @@ impl Node {
         let node_digest = NodeDigest::new(self.digest());
         signer.sign(&node_digest)
     }
+
+    pub fn round(&self) -> Round {
+        self.metadata.round
+    }
 }
 
 impl TDAGMessage for Node {

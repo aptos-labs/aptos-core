@@ -3,11 +3,10 @@
 
 use crate::dag::{
     storage::DAGStorage,
-    types::{CertifiedNode, NodeCertificate},
+    types::{CertifiedNode, NodeCertificate, NodeMetadata},
 };
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
-use aptos_crypto::HashValue;
 use aptos_logger::error;
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use std::{
@@ -15,17 +14,26 @@ use std::{
     sync::Arc,
 };
 
+#[derive(Clone)]
 enum NodeStatus {
     Unordered(Arc<CertifiedNode>),
     Ordered(Arc<CertifiedNode>),
     Committed(Arc<CertifiedNode>),
 }
 
-/// Data structure that stores the DAG representation, it maintains both hash based index and
-/// round based index.
+impl NodeStatus {
+    fn as_node(&self) -> &Arc<CertifiedNode> {
+        match self {
+            NodeStatus::Unordered(node)
+            | NodeStatus::Ordered(node)
+            | NodeStatus::Committed(node) => node,
+        }
+    }
+}
+
+/// Data structure that stores the DAG representation, it maintains round based index.
 pub struct Dag {
-    nodes_by_digest: HashMap<HashValue, NodeStatus>,
-    nodes_by_round: BTreeMap<Round, Vec<Option<Arc<CertifiedNode>>>>,
+    nodes_by_round: BTreeMap<Round, Vec<Option<NodeStatus>>>,
     /// Map between peer id to vector index
     author_to_index: HashMap<Author, usize>,
     storage: Arc<dyn DAGStorage>,
@@ -38,19 +46,18 @@ impl Dag {
         let num_validators = author_to_index.len();
         let all_nodes = storage.get_certified_nodes().unwrap_or_default();
         let mut expired = vec![];
-        let mut nodes_by_digest = HashMap::new();
         let mut nodes_by_round = BTreeMap::new();
         for (digest, certified_node) in all_nodes {
             if certified_node.metadata().epoch() == epoch {
                 let arc_node = Arc::new(certified_node);
-                nodes_by_digest.insert(digest, NodeStatus::Unordered(arc_node.clone()));
                 let index = *author_to_index
                     .get(arc_node.metadata().author())
                     .expect("Author from certified node should exist");
                 let round = arc_node.metadata().round();
                 nodes_by_round
                     .entry(round)
-                    .or_insert_with(|| vec![None; num_validators])[index] = Some(arc_node);
+                    .or_insert_with(|| vec![None; num_validators])[index] =
+                    Some(NodeStatus::Unordered(arc_node));
             } else {
                 expired.push(digest);
             }
@@ -59,7 +66,6 @@ impl Dag {
             error!("Error deleting expired nodes: {:?}", e);
         }
         Self {
-            nodes_by_digest,
             nodes_by_round,
             author_to_index,
             storage,
@@ -84,49 +90,48 @@ impl Dag {
 
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let node = Arc::new(node);
+        let author = node.metadata().author();
         let index = *self
             .author_to_index
-            .get(node.metadata().author())
+            .get(author)
             .ok_or_else(|| anyhow!("unknown author"))?;
         let round = node.metadata().round();
         ensure!(round >= self.lowest_round(), "round too low");
         ensure!(round <= self.highest_round() + 1, "round too high");
         for parent in node.parents() {
-            ensure!(self.exists(parent.metadata().digest()), "parent not exist");
+            ensure!(self.exists(parent.metadata()), "parent not exist");
         }
-        self.storage.save_certified_node(&node)?;
-        ensure!(
-            self.nodes_by_digest
-                .insert(node.digest(), NodeStatus::Unordered(node.clone()))
-                .is_none(),
-            "duplicate node"
-        );
         let round_ref = self
             .nodes_by_round
             .entry(round)
             .or_insert_with(|| vec![None; self.author_to_index.len()]);
-        ensure!(round_ref[index].is_none(), "equivocate node");
-        round_ref[index] = Some(node);
+        ensure!(round_ref[index].is_none(), "duplicate node");
+
+        // mutate after all checks pass
+        self.storage.save_certified_node(&node)?;
+        round_ref[index] = Some(NodeStatus::Unordered(node.clone()));
         Ok(())
     }
 
-    pub fn exists(&self, digest: &HashValue) -> bool {
-        self.nodes_by_digest.contains_key(digest)
+    pub fn exists(&self, metadata: &NodeMetadata) -> bool {
+        self.get_node_ref(metadata).is_some()
     }
 
     pub fn all_exists(&self, nodes: &[NodeCertificate]) -> bool {
-        nodes.iter().all(|certificate| {
-            self.nodes_by_digest
-                .contains_key(certificate.metadata().digest())
-        })
+        nodes
+            .iter()
+            .all(|certificate| self.exists(certificate.metadata()))
     }
 
-    pub fn get_node(&self, digest: &HashValue) -> Option<Arc<CertifiedNode>> {
-        match self.nodes_by_digest.get(digest)? {
-            NodeStatus::Unordered(node)
-            | NodeStatus::Ordered(node)
-            | NodeStatus::Committed(node) => Some(node.clone()),
-        }
+    fn get_node_ref(&self, metadata: &NodeMetadata) -> Option<&NodeStatus> {
+        let index = self.author_to_index.get(metadata.author())?;
+        let round_ref = self.nodes_by_round.get(&metadata.round())?;
+        round_ref[*index].as_ref()
+    }
+
+    pub fn get_node(&self, metadata: &NodeMetadata) -> Option<Arc<CertifiedNode>> {
+        self.get_node_ref(metadata)
+            .map(|node_status| node_status.as_node().clone())
     }
 
     pub fn get_strong_links_for_round(
@@ -139,11 +144,15 @@ impl Dag {
             .check_voting_power(
                 all_nodes_in_round
                     .clone()
-                    .map(|node| node.metadata().author()),
+                    .map(|node_status| node_status.as_node().metadata().author()),
             )
             .is_ok()
         {
-            Some(all_nodes_in_round.map(|node| node.certificate()).collect())
+            Some(
+                all_nodes_in_round
+                    .map(|node_status| node_status.as_node().certificate())
+                    .collect(),
+            )
         } else {
             None
         }
