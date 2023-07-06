@@ -82,7 +82,8 @@ pub struct IncomingBatchRetrievalRequest {
 
 #[derive(Debug)]
 pub struct IncomingDAGRequest {
-    pub req: ConsensusMsg,
+    pub req: DAGNetworkMessage,
+    pub sender: Author,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
@@ -91,6 +92,7 @@ pub struct IncomingDAGRequest {
 pub enum IncomingRpcRequest {
     BlockRetrieval(IncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
+    DAGRequest(IncomingDAGRequest),
 }
 
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
@@ -576,6 +578,18 @@ impl NetworkTask {
                         let req_with_callback =
                             IncomingRpcRequest::BatchRetrieval(IncomingBatchRetrievalRequest {
                                 req: *request,
+                                protocol,
+                                response_sender: callback,
+                            });
+                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
+                            warn!(error = ?e, "aptos channel closed");
+                        }
+                    },
+                    ConsensusMsg::DAGMessage(request) => {
+                        let req_with_callback =
+                            IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
+                                req: request,
+                                sender: peer_id,
                                 protocol,
                                 response_sender: callback,
                             });
