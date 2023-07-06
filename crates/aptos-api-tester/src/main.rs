@@ -3,14 +3,15 @@
 
 #![forbid(unsafe_code)]
 
-use anyhow::{ensure, Context, Result};
+use std::future::Future;
+
+use anyhow::{anyhow, ensure, Context, Result};
 use aptos_api_types::U64;
-use aptos_rest_client::{Client, FaucetClient, Account};
+use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::coin_client::CoinClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
-use rand::Rng;
 use url::Url;
 
 // global parameters (todo: make into clap)
@@ -48,95 +49,8 @@ static SUCCESS: &str = "success";
 #[derive(Debug)]
 enum TestResult {
     Success,
-    Skip,
     Fail(&'static str),
     Error(anyhow::Error),
-}
-
-/// Calls get_account on a newly created account on devnet. Requires faucet.
-async fn probe_getaccount_1() -> TestResult {
-    // check faucet access
-    if !HAS_FAUCET_ACCESS {
-        return TestResult::Skip;
-    }
-
-    // create the rest client
-    let client = Client::new(DEVNET_NODE_URL.clone());
-    let faucet_client = FaucetClient::new(DEVNET_FAUCET_URL.clone(), DEVNET_NODE_URL.clone());
-
-    // create and fund an account
-    let giray = LocalAccount::generate(&mut rand::rngs::OsRng);
-    if let Err(e) = faucet_client.fund(giray.address(), 100_000_000).await {
-        return TestResult::Error(e);
-    }
-
-    // ask for account data
-    let response = match client.get_account(giray.address()).await {
-        Ok(response) => response,
-        Err(e) => return TestResult::Error(e.into()),
-    };
-
-    // check account data
-    let expected_account = Account {
-        authentication_key: giray.authentication_key(),
-        sequence_number: giray.sequence_number(),
-    };
-    let actual_account = response.inner();
-
-    if !(expected_account.authentication_key == actual_account.authentication_key) {
-        return TestResult::Fail(FAIL_WRONG_AUTH_KEY);
-    }
-    if !(expected_account.sequence_number == actual_account.sequence_number) {
-        return TestResult::Fail(FAIL_WRONG_SEQ_NUMBER);
-    }
-
-    TestResult::Success
-}
-
-/// Calls get_account_balance on a newly created account on devnet. Requires faucet.
-async fn probe_getaccountbalance_1() -> Result<&'static str> {
-    // check faucet access
-    if !HAS_FAUCET_ACCESS {
-        return Ok(SKIP_NO_FAUCET_ACCESS);
-    }
-
-    // create the rest client
-    let client = Client::new(DEVNET_NODE_URL.clone());
-    let faucet_client = FaucetClient::new(DEVNET_FAUCET_URL.clone(), DEVNET_NODE_URL.clone());
-
-    // create and fund an account
-    let giray = LocalAccount::generate(&mut rand::rngs::OsRng);
-    faucet_client
-        .fund(giray.address(), 100_000_000)
-        .await
-        .context(ERROR_FAUCET_FUND)?;
-
-    // fund the account further with some random amount
-    let random_number: u64 = rand::thread_rng().gen_range(50_000_000, 100_000_000);
-    faucet_client
-        .fund(giray.address(), random_number)
-        .await
-        .context(ERROR_FAUCET_FUND)?;
-
-    // ask for account balance
-    let response = client
-        .get_account_balance(giray.address())
-        .await
-        .context(ERROR_CLIENT_RESPONSE)?;
-
-    // check balance
-    let expected_balance = U64(100_000_000 + random_number);
-    let actual_balance = response.inner().coin.value;
-
-    ensure!(
-        expected_balance == actual_balance,
-        "{} expected {}, got {}",
-        FAIL_WRONG_BALANCE,
-        expected_balance,
-        actual_balance,
-    );
-
-    Ok(SUCCESS)
 }
 
 /// Calls get_account_balance_at_version on a newly created account on devnet. Requires faucet.
@@ -235,8 +149,15 @@ async fn probe_getaccountbalanceatversion_1() -> Result<&'static str> {
     Ok(SUCCESS)
 }
 
-// Compares the account data of a newly created LocalAccount with the values returned from the API.
-async fn test_getaccountdata(client: &Client, account: &LocalAccount) -> TestResult {
+async fn handle_result<Fut: Future<Output = TestResult>>(fut: Fut) -> TestResult {
+    let result = fut.await;
+    println!("{:?}", result);
+
+    result
+}
+
+// Tests that the account data for a newly created account is correct.
+async fn test_accountdata(client: &Client, account: &LocalAccount) -> TestResult {
     // ask for account data
     let response = match client.get_account(account.address()).await {
         Ok(response) => response,
@@ -260,8 +181,27 @@ async fn test_getaccountdata(client: &Client, account: &LocalAccount) -> TestRes
     TestResult::Success
 }
 
-fn log_result(result: &TestResult) {
-    println!("{:?}", result);
+// Tests that the balance of an account is correct.
+async fn test_accountbalance(
+    client: &Client,
+    account: &LocalAccount,
+    expected_balance: u64,
+) -> TestResult {
+    // ask for account balance
+    let response = match client.get_account_balance(account.address()).await {
+        Ok(response) => response,
+        Err(e) => return TestResult::Error(e.into()),
+    };
+
+    // check balance
+    let expected_balance = U64(expected_balance);
+    let actual_balance = response.inner().coin.value;
+
+    if !(expected_balance == actual_balance) {
+        return TestResult::Fail(FAIL_WRONG_BALANCE);
+    }
+
+    TestResult::Success
 }
 
 async fn testnet_1() -> Result<()> {
@@ -273,22 +213,23 @@ async fn testnet_1() -> Result<()> {
     let giray = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(giray.address(), 100_000_000).await?;
 
-    let result = test_getaccountdata(&client, &giray).await;
-    log_result(&result);
-
     // this test is critical to pass for the next tests
+    let result = handle_result(test_accountdata(&client, &giray)).await;
     match result {
         TestResult::Success => {},
-        _ => return Ok(()),
+        _ => return Err(anyhow!("returning early because account creation failed")),
     }
+
+    // Step 2: Test account balance
+    handle_result(test_accountbalance(&client, &giray, 100_000_000)).await;
+
+    // Step 3: Test coin transfer
 
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("{:?}", probe_getaccount_1().await);
-    println!("{:?}", probe_getaccountbalance_1().await);
     println!("{:?}", probe_getaccountbalanceatversion_1().await);
     let _ = testnet_1().await;
 
