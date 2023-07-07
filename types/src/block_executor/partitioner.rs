@@ -7,18 +7,21 @@ use std::collections::HashMap;
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
+pub type RoundId = usize;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub struct TxnIdxWithShardId {
+pub struct ShardedTxnIndex {
     pub txn_index: TxnIndex,
     pub shard_id: ShardId,
+    pub round_id: RoundId,
 }
 
-impl TxnIdxWithShardId {
-    pub fn new(txn_index: TxnIndex, shard_id: ShardId) -> Self {
+impl ShardedTxnIndex {
+    pub fn new(txn_index: TxnIndex, shard_id: ShardId, round_id: RoundId) -> Self {
         Self {
             shard_id,
             txn_index,
+            round_id,
         }
     }
 }
@@ -27,28 +30,24 @@ impl TxnIdxWithShardId {
 /// Denotes a set of cross shard edges, which contains the set (required or dependent) transaction
 /// indices and the relevant storage locations that are conflicting.
 pub struct CrossShardEdges {
-    edges: HashMap<TxnIdxWithShardId, Vec<StorageLocation>>,
+    edges: HashMap<ShardedTxnIndex, Vec<StorageLocation>>,
 }
 
 impl CrossShardEdges {
-    pub fn new(txn_idx: TxnIdxWithShardId, storage_locations: Vec<StorageLocation>) -> Self {
+    pub fn new(txn_idx: ShardedTxnIndex, storage_locations: Vec<StorageLocation>) -> Self {
         let mut edges = HashMap::new();
         edges.insert(txn_idx, storage_locations);
         Self { edges }
     }
 
-    pub fn add_edge(
-        &mut self,
-        txn_idx: TxnIdxWithShardId,
-        storage_locations: Vec<StorageLocation>,
-    ) {
+    pub fn add_edge(&mut self, txn_idx: ShardedTxnIndex, storage_locations: Vec<StorageLocation>) {
         self.edges
             .entry(txn_idx)
             .or_insert_with(Vec::new)
             .extend(storage_locations.into_iter());
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&TxnIdxWithShardId, &Vec<StorageLocation>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&ShardedTxnIndex, &Vec<StorageLocation>)> {
         self.edges.iter()
     }
 
@@ -56,7 +55,7 @@ impl CrossShardEdges {
         self.edges.len()
     }
 
-    pub fn contains_idx(&self, txn_idx: &TxnIdxWithShardId) -> bool {
+    pub fn contains_idx(&self, txn_idx: &ShardedTxnIndex) -> bool {
         self.edges.contains_key(txn_idx)
     }
 
@@ -66,8 +65,8 @@ impl CrossShardEdges {
 }
 
 impl IntoIterator for CrossShardEdges {
-    type IntoIter = std::collections::hash_map::IntoIter<TxnIdxWithShardId, Vec<StorageLocation>>;
-    type Item = (TxnIdxWithShardId, Vec<StorageLocation>);
+    type IntoIter = std::collections::hash_map::IntoIter<ShardedTxnIndex, Vec<StorageLocation>>;
+    type Item = (ShardedTxnIndex, Vec<StorageLocation>);
 
     fn into_iter(self) -> Self::IntoIter {
         self.edges.into_iter()
@@ -103,35 +102,32 @@ impl CrossShardDependencies {
 
     pub fn required_edges_iter(
         &self,
-    ) -> impl Iterator<Item = (&TxnIdxWithShardId, &Vec<StorageLocation>)> {
+    ) -> impl Iterator<Item = (&ShardedTxnIndex, &Vec<StorageLocation>)> {
         self.required_edges.iter()
     }
 
-    pub fn has_required_txn(&self, txn_idx: TxnIdxWithShardId) -> bool {
+    pub fn has_required_txn(&self, txn_idx: ShardedTxnIndex) -> bool {
         self.required_edges.contains_idx(&txn_idx)
     }
 
-    pub fn get_required_edge_for(
-        &self,
-        txn_idx: TxnIdxWithShardId,
-    ) -> Option<&Vec<StorageLocation>> {
+    pub fn get_required_edge_for(&self, txn_idx: ShardedTxnIndex) -> Option<&Vec<StorageLocation>> {
         self.required_edges.edges.get(&txn_idx)
     }
 
     pub fn get_dependent_edge_for(
         &self,
-        txn_idx: TxnIdxWithShardId,
+        txn_idx: ShardedTxnIndex,
     ) -> Option<&Vec<StorageLocation>> {
         self.dependent_edges.edges.get(&txn_idx)
     }
 
-    pub fn has_dependent_txn(&self, txn_ids: TxnIdxWithShardId) -> bool {
+    pub fn has_dependent_txn(&self, txn_ids: ShardedTxnIndex) -> bool {
         self.dependent_edges.contains_idx(&txn_ids)
     }
 
     pub fn add_required_edge(
         &mut self,
-        txn_idx: TxnIdxWithShardId,
+        txn_idx: ShardedTxnIndex,
         storage_location: StorageLocation,
     ) {
         self.required_edges
@@ -140,7 +136,7 @@ impl CrossShardDependencies {
 
     pub fn add_dependent_edge(
         &mut self,
-        txn_idx: TxnIdxWithShardId,
+        txn_idx: ShardedTxnIndex,
         storage_locations: Vec<StorageLocation>,
     ) {
         self.dependent_edges.add_edge(txn_idx, storage_locations);
@@ -225,7 +221,7 @@ impl<T: Clone> SubBlock<T> {
     pub fn add_dependent_edge(
         &mut self,
         source_index: TxnIndex,
-        txn_idx: TxnIdxWithShardId,
+        txn_idx: ShardedTxnIndex,
         storage_locations: Vec<StorageLocation>,
     ) {
         let source_txn = self
@@ -368,7 +364,7 @@ impl<T: Clone> TransactionWithDependencies<T> {
 
     pub fn add_dependent_edge(
         &mut self,
-        txn_idx: TxnIdxWithShardId,
+        txn_idx: ShardedTxnIndex,
         storage_locations: Vec<StorageLocation>,
     ) {
         self.cross_shard_dependencies
