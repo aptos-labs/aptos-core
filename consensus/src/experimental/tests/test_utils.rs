@@ -78,7 +78,6 @@ pub fn prepare_executed_blocks_with_ledger_info(
     let mut proposals: Vec<VoteProposal> = vec![p1];
 
     for i in 1..num_blocks {
-        println!("Generating {}", i);
         let parent = proposals.last().unwrap();
         let proposal =
             make_proposal_with_parent(Payload::empty(false), init_round + i, parent, None, signer);

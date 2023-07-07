@@ -33,7 +33,7 @@ use crate::{
     monitor,
     network::{
         IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingRpcRequest,
-        NetworkReceivers, NetworkSender,
+        NetworkReceivers, NetworkSender, IncomingRandDecisions,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
@@ -122,7 +122,8 @@ pub struct EpochManager {
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener,
     // channels to buffer manager
-    buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    buffer_manager_rand_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    buffer_manager_commit_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
     // channels to round manager
     round_manager_tx: Option<
@@ -138,6 +139,7 @@ pub struct EpochManager {
     batch_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
     bounded_executor: BoundedExecutor,
+    rand_decisions_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandDecisions>>,
     // recovery_mode is set to true when the recovery manager is spawned
     recovery_mode: bool,
 }
@@ -174,7 +176,8 @@ impl EpochManager {
             storage,
             safety_rules_manager,
             reconfig_events,
-            buffer_manager_msg_tx: None,
+            buffer_manager_rand_msg_tx: None,
+            buffer_manager_commit_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
             round_manager_close_tx: None,
@@ -185,6 +188,7 @@ impl EpochManager {
             quorum_store_storage,
             batch_retrieval_tx: None,
             bounded_executor,
+            rand_decisions_tx: None,
             recovery_mode: false,
         }
     }
@@ -496,13 +500,20 @@ impl EpochManager {
         let (block_tx, block_rx) = unbounded::<OrderedBlocks>();
         let (reset_tx, reset_rx) = unbounded::<ResetRequest>();
 
+        let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, VerifiedEvent>(
+            QueueStyle::FIFO,
+            self.config.channel_size,
+            Some(&counters::BUFFER_MANAGER_RAND_MSGS),
+        );
+
         let (commit_msg_tx, commit_msg_rx) = aptos_channel::new::<AccountAddress, VerifiedEvent>(
             QueueStyle::FIFO,
             100,
-            Some(&counters::BUFFER_MANAGER_MSGS),
+            Some(&counters::BUFFER_MANAGER_COMMIT_MSGS),
         );
 
-        self.buffer_manager_msg_tx = Some(commit_msg_tx);
+        self.buffer_manager_rand_msg_tx = Some(rand_msg_tx);
+        self.buffer_manager_commit_msg_tx = Some(commit_msg_tx);
         self.buffer_manager_reset_tx = Some(reset_tx.clone());
 
         let (execution_phase, signing_phase, persisting_phase, buffer_manager) =
@@ -511,6 +522,7 @@ impl EpochManager {
                 self.commit_state_computer.clone(),
                 safety_rules_container,
                 network_sender,
+                rand_msg_rx,
                 commit_msg_rx,
                 self.commit_state_computer.clone(),
                 block_rx,
@@ -540,7 +552,8 @@ impl EpochManager {
         self.round_manager_tx = None;
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
-        self.buffer_manager_msg_tx = None;
+        self.buffer_manager_rand_msg_tx = None;
+        self.buffer_manager_commit_msg_tx = None;
         if let Some(mut tx) = self.buffer_manager_reset_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
@@ -557,6 +570,7 @@ impl EpochManager {
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
         self.batch_retrieval_tx = None;
+        self.rand_decisions_tx = None;
 
         if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -868,7 +882,8 @@ impl EpochManager {
             let epoch_state = self.epoch_state.clone().unwrap();
             let quorum_store_enabled = self.quorum_store_enabled;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
-            let buffer_manager_msg_tx = self.buffer_manager_msg_tx.clone();
+            let buffer_manager_rand_msg_tx = self.buffer_manager_rand_msg_tx.clone();
+            let buffer_manager_commit_msg_tx = self.buffer_manager_commit_msg_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
@@ -887,8 +902,8 @@ impl EpochManager {
                         Ok(verified_event) => {
                             Self::forward_event(
                                 quorum_store_msg_tx,
-                                buffer_manager_msg_tx,
-                                round_manager_tx,
+                                buffer_manager_rand_msg_tx,
+                                buffer_manager_commit_msg_tx,                                round_manager_tx,
                                 peer_id,
                                 verified_event,
                             );
@@ -917,6 +932,8 @@ impl EpochManager {
             ConsensusMsg::ProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
+            | ConsensusMsg::RandShareMsg(_)
+            | ConsensusMsg::RandDecisionMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::BatchMsg(_)
@@ -1006,7 +1023,8 @@ impl EpochManager {
 
     fn forward_event(
         quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
-        buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        buffer_manager_rand_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        buffer_manager_commit_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
         round_manager_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         >,
@@ -1026,10 +1044,15 @@ impl EpochManager {
                 Self::forward_event_to(quorum_store_msg_tx, peer_id, quorum_store_event)
                     .context("quorum store sender")
             },
+            buffer_manager_event @ (VerifiedEvent::RandShareMsg(_)
+            | VerifiedEvent::RandDecisionMsg(_)) => {
+                Self::forward_event_to(buffer_manager_rand_msg_tx, peer_id, buffer_manager_event)
+                    .context("buffer manager rand message sender")
+            },
             buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
-                Self::forward_event_to(buffer_manager_msg_tx, peer_id, buffer_manager_event)
-                    .context("buffer manager sender")
+                Self::forward_event_to(buffer_manager_commit_msg_tx, peer_id, buffer_manager_event)
+                    .context("buffer manager commit message sender")
             },
             round_manager_event => Self::forward_event_to(
                 round_manager_tx,
@@ -1065,6 +1088,19 @@ impl EpochManager {
                     Err(anyhow::anyhow!("Quorum store not started"))
                 }
             },
+            IncomingRpcRequest::RandDecisions(request) => {
+                if let Some(tx) = &self.buffer_manager_rand_msg_tx {
+                    let response = ConsensusMsg::RandResponse();
+                    let bytes = request
+                        .protocol
+                        .to_bytes(&response)?;
+                    request.response_sender.send(Ok(bytes.into())).map_err(|_| anyhow::anyhow!("Failed to send randomness decision ack"))?;
+
+                    tx.push(peer_id, request.req)
+                } else {
+                    Err(anyhow::anyhow!("Buffer manager not started"))
+                }
+            }
         }
     }
 

@@ -2,10 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashMap;
+
 use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
+    common::Author, executed_block::ExecutedBlock, experimental::{commit_vote::CommitVote, rand_decision::{RandDecisions, RandDecision}, rand_share::{RandShares, RandShare}},
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -15,7 +17,9 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,
 };
-use itertools::zip_eq;
+use itertools::{zip_eq, Itertools};
+
+use super::buffer_manager::{SHARE_SIZE, DECISION_SIZE};
 
 fn generate_commit_ledger_info(
     commit_info: &BlockInfo,
@@ -48,14 +52,14 @@ fn verify_signatures(
     )
 }
 
-fn generate_executed_item_from_ordered(
+fn generate_executed_item_from_execution_ready(
     commit_info: BlockInfo,
     executed_blocks: Vec<ExecutedBlock>,
     verified_signatures: PartialSignatures,
     callback: StateComputerCommitCallBackType,
     ordered_proof: LedgerInfoWithSignatures,
 ) -> BufferItem {
-    debug!("{} advance to executed from ordered", commit_info);
+    debug!("{} advance to executed from execution ready", commit_info);
     let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
         generate_commit_ledger_info(&commit_info, &ordered_proof),
         verified_signatures,
@@ -90,6 +94,18 @@ pub struct OrderedItem {
     pub callback: StateComputerCommitCallBackType,
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
+    pub partial_rand_decision: RandDecisions, // place holder for aggregated randomness
+}
+
+pub struct ExecutionReadyItem {
+    pub unverified_signatures: PartialSignatures,
+    // This can happen in the fast forward sync path, where we can receive the commit proof
+    // from peers.
+    pub commit_proof: Option<LedgerInfoWithSignatures>,
+    pub callback: StateComputerCommitCallBackType,
+    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub ordered_proof: LedgerInfoWithSignatures,
+    pub rand_decisions: RandDecisions, // place holder for aggregated randomness
 }
 
 pub struct ExecutedItem {
@@ -115,6 +131,7 @@ pub struct AggregatedItem {
 
 pub enum BufferItem {
     Ordered(Box<OrderedItem>),
+    ExecutionReady(Box<ExecutionReadyItem>),
     Executed(Box<ExecutedItem>),
     Signed(Box<SignedItem>),
     Aggregated(Box<AggregatedItem>),
@@ -138,7 +155,22 @@ impl BufferItem {
             callback,
             ordered_blocks,
             ordered_proof,
+            partial_rand_decision: RandDecisions::new(HashValue::default(), 0, vec![]),
         }))
+    }
+
+    pub fn aggregate_rand_shares(&mut self, _rand_shares_map: HashMap<Author,RandShares>) -> anyhow::Result<()> {
+        if let Self::Ordered(ref mut _ordered_item) = self {
+            // todo: aggregate the new shares properly, update the rand decisions
+            return Ok(());
+        }
+        Err(anyhow!("Failed to aggregated randomness shares."))
+    }
+
+    pub fn update_rand_decisions(&mut self, rand_decisions: RandDecisions) {
+        if let Self::Ordered(ref mut ordered_item) = self {
+            ordered_item.partial_rand_decision = rand_decisions;
+        }
     }
 
     // pipeline functions
@@ -149,14 +181,15 @@ impl BufferItem {
         epoch_end_timestamp: Option<u64>,
     ) -> Self {
         match self {
-            Self::Ordered(ordered_item) => {
-                let OrderedItem {
+            Self::ExecutionReady(execution_ready_item) => {
+                let ExecutionReadyItem {
                     ordered_blocks,
                     commit_proof,
                     unverified_signatures,
                     callback,
                     ordered_proof,
-                } = *ordered_item;
+                    rand_decisions: _,
+                } = *execution_ready_item;
                 for (b1, b2) in zip_eq(ordered_blocks.iter(), executed_blocks.iter()) {
                     assert_eq!(b1.id(), b2.id());
                 }
@@ -173,7 +206,7 @@ impl BufferItem {
                     // we can just use that proof and proceed to aggregated
                     assert_eq!(commit_proof.commit_info().clone(), commit_info);
                     debug!(
-                        "{} advance to aggregated from ordered",
+                        "{} advance to aggregated from execution ready",
                         commit_proof.commit_info()
                     );
                     Self::Aggregated(Box::new(AggregatedItem {
@@ -196,7 +229,7 @@ impl BufferItem {
                             validator,
                         );
                         debug!(
-                            "{} advance to aggregated from ordered",
+                            "{} advance to aggregated from execution ready",
                             commit_proof.commit_info()
                         );
                         Self::Aggregated(Box::new(AggregatedItem {
@@ -205,7 +238,7 @@ impl BufferItem {
                             callback,
                         }))
                     } else {
-                        generate_executed_item_from_ordered(
+                        generate_executed_item_from_execution_ready(
                             commit_info,
                             executed_blocks,
                             verified_signatures,
@@ -311,6 +344,22 @@ impl BufferItem {
                     ..ordered
                 }))
             },
+            Self::ExecutionReady(execution_ready_item) => {
+                let ordered = *execution_ready_item;
+                assert!(ordered
+                    .ordered_proof
+                    .commit_info()
+                    .match_ordered_only(commit_proof.commit_info()));
+                // can't aggregate it without execution, only store the signatures
+                debug!(
+                    "{} received commit decision in execution ready stage",
+                    commit_proof.commit_info()
+                );
+                Self::ExecutionReady(Box::new(ExecutionReadyItem {
+                    commit_proof: Some(commit_proof),
+                    ..ordered
+                }))
+            },
             Self::Aggregated(_) => {
                 unreachable!("Found aggregated buffer item but any aggregated buffer item should get dequeued right away.");
             },
@@ -363,10 +412,49 @@ impl BufferItem {
     pub fn get_blocks(&self) -> &Vec<ExecutedBlock> {
         match self {
             Self::Ordered(ordered) => &ordered.ordered_blocks,
+            Self::ExecutionReady(execution_ready) => &execution_ready.ordered_blocks,
             Self::Executed(executed) => &executed.executed_blocks,
             Self::Signed(signed) => &signed.executed_blocks,
             Self::Aggregated(aggregated) => &aggregated.executed_blocks,
         }
+    }
+
+    pub fn get_k_leaders(&self, k: usize, validators: &ValidatorVerifier) -> Vec<Author> {
+        self.get_blocks().last().and_then(|block| block.block().author()).map(|proposer| {
+            let validators = validators.get_ordered_account_addresses();
+            let pos = validators.iter().position(|&addr| addr == proposer).unwrap();
+            validators.iter().cycle().skip(pos + 1).take(k).copied().collect_vec()
+        }).unwrap_or_default()
+    }
+
+    pub fn gen_dummy_rand_share_vec(&self, author: Author) -> Vec<Option<RandShare>> {
+        self.get_blocks()
+            .iter()
+            .map(|block| {
+                if block.block().author().is_some() {
+                    Some(RandShare::new(author, block.block_info(), vec![u8::MAX; SHARE_SIZE]))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn gen_dummy_rand_decision_vec(&self) -> Vec<Option<RandDecision>> {
+        self.get_blocks()
+            .iter()
+            .map(|block| {
+                if block.block().author().is_some() {
+                    Some(RandDecision::new(block.block_info(), vec![u8::MAX; DECISION_SIZE]))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.get_blocks().last().unwrap().epoch()
     }
 
     pub fn block_id(&self) -> HashValue {
@@ -379,6 +467,22 @@ impl BufferItem {
         let signature = vote.signature().clone();
         match self {
             Self::Ordered(ordered) => {
+                if ordered
+                    .ordered_proof
+                    .commit_info()
+                    .match_ordered_only(target_commit_info)
+                {
+                    // we optimistically assume the vote will be valid in the future.
+                    // when advancing to executed item, we will check if the sigs are valid.
+                    // each author at most stores a single sig for each item,
+                    // so an adversary will not be able to flood our memory.
+                    ordered
+                        .unverified_signatures
+                        .add_signature(author, signature);
+                    return Ok(());
+                }
+            },
+            Self::ExecutionReady(ordered) => {
                 if ordered
                     .ordered_proof
                     .commit_info()
@@ -423,6 +527,10 @@ impl BufferItem {
         matches!(self, Self::Ordered(_))
     }
 
+    pub fn is_execution_ready(&self) -> bool {
+        matches!(self, Self::ExecutionReady(_))
+    }
+
     pub fn is_executed(&self) -> bool {
         matches!(self, Self::Executed(_))
     }
@@ -454,5 +562,23 @@ impl BufferItem {
             BufferItem::Aggregated(item) => *item,
             _ => panic!("Not aggregated item"),
         }
+    }
+
+    pub fn try_advance_to_execution_ready(self) -> Self {
+        if let Self::Ordered(ordered_item) = self {
+            return Self::ExecutionReady(Box::new(ExecutionReadyItem {
+                unverified_signatures: ordered_item.unverified_signatures,
+                commit_proof: ordered_item.commit_proof,
+                callback: ordered_item.callback,
+                ordered_blocks: ordered_item.ordered_blocks,
+                ordered_proof: ordered_item.ordered_proof,
+                rand_decisions: ordered_item.partial_rand_decision,
+            }));
+        }
+        self
+    }
+
+    pub fn get_hash(&self) -> HashValue {
+        self.hash()
     }
 }

@@ -12,7 +12,7 @@ use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote, rand_share::RandShares, rand_decision::RandDecisions},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -66,6 +66,12 @@ pub enum ConsensusMsg {
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
     /// DAG protocol message
     DAGMessage(DAGNetworkMessage),
+    /// Randomness: send VRF evaluation shares for generating the distributed randomness of a given round
+    RandShareMsg(Box<RandShares>),
+    /// Randomness: send VRF evaluation results (aggregated from 2/3 shares) as the distributed randomness for a given round
+    RandDecisionMsg(Box<RandDecisions>),
+    /// Randomness: ack of receiving the randomness decision message
+    RandResponse(),
 }
 
 /// Network type for consensus
@@ -89,6 +95,9 @@ impl ConsensusMsg {
             ConsensusMsg::SignedBatchInfo(_) => "SignedBatchInfo",
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
             ConsensusMsg::DAGMessage(_) => "DAGMessage",
+            ConsensusMsg::RandShareMsg(_) => "RandShareMsg",
+            ConsensusMsg::RandDecisionMsg(_) => "RandDecisionMsg",
+            ConsensusMsg::RandResponse() => "RandResponse",
         }
     }
 }

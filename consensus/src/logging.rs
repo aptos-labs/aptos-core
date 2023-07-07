@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::common::Author;
+use aptos_crypto::HashValue;
 use aptos_logger::Schema;
 use aptos_types::block_info::Round;
 use serde::Serialize;
@@ -13,6 +14,7 @@ pub struct LogSchema {
     remote_peer: Option<Author>,
     epoch: Option<u64>,
     round: Option<Round>,
+    item_id: Option<HashValue>,
 }
 
 #[derive(Serialize)]
@@ -36,6 +38,10 @@ pub enum LogEvent {
     Timeout,
     Vote,
     VoteNIL,
+    SendRandToLeader,
+    LeaderReceiveRand,
+    LeaderBCastRand,
+    ReceiveRand,
 }
 
 impl LogSchema {
@@ -45,6 +51,7 @@ impl LogSchema {
             remote_peer: None,
             epoch: None,
             round: None,
+            item_id: None,
         }
     }
 }

@@ -22,6 +22,9 @@ impl BlockStage {
     pub const SIGNED: &'static str = "signed";
     pub const SYNCED: &'static str = "synced";
     pub const VOTED: &'static str = "voted";
+    pub const RAND_SENT: &'static str = "rand_sent";
+    pub const RAND_AGGREGATED: &'static str = "rand_aggregated";
+    pub const RAND_RECEIVED: &'static str = "rand_received";
 }
 
 /// Record the time during each stage of a block.

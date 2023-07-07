@@ -111,15 +111,44 @@ impl<T: Hashable> Buffer<T> {
         cursor.map_or(false, |key| self.map.contains_key(&key))
     }
 
-    /// find_elem returns the first item non-prior to `cursor` that compare(item) is true
+    // /// find_elem returns the first item non-prior to `cursor` that compare(item) is true
+    // /// if no such item exists, the function returns None
+    // pub fn find_elem_from<F: Fn(&T) -> bool>(&self, cursor: Cursor, compare: F) -> Cursor {
+    //     let mut current = cursor;
+    //     if !self.exist(&cursor) {
+    //         return None;
+    //     }
+    //     while current.is_some() {
+    //         if compare(self.get(&current)) {
+    //             return current;
+    //         }
+    //         current = self.get_next(&current);
+    //     }
+    //     None
+    // }
+
+    /// find_elem_from returns the first item >= `cursor` that compare(item) is true
     /// if no such item exists, the function returns None
-    pub fn find_elem_from<F: Fn(&T) -> bool>(&self, cursor: Cursor, compare: F) -> Cursor {
+    pub fn find_elem_from<F: Fn(&T) -> bool>(&self, cursor: Cursor, satisfy: F) -> Cursor {
         let mut current = cursor;
         if !self.exist(&cursor) {
             return None;
         }
         while current.is_some() {
-            if compare(self.get(&current)) {
+            if satisfy(self.get(&current)) {
+                return current;
+            }
+            current = self.get_next(&current);
+        }
+        None
+    }
+
+    /// find_elem_from_with_prefix returns the first item >= `cursor` that compare(item) is true, but no item before it has must_not evaluated to be true
+    /// if no such item exists, the function returns None
+    pub fn find_elem_from_with_prefix<F1: Fn(&T) -> bool, F2: Fn(&T) -> bool>(&self, cursor: Cursor, satisfy: F1, not_satisfy: F2) -> Cursor {
+        let mut current = cursor;
+        while current.is_some() && self.exist(&current) && !not_satisfy(self.get(&current)) {
+            if satisfy(self.get(&current)) {
                 return current;
             }
             current = self.get_next(&current);
