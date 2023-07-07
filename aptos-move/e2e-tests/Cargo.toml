@@ -22,6 +22,7 @@ aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-keygen = { workspace = true }
+aptos-memory-usage-tracker = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
