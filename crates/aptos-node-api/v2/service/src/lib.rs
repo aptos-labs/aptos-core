@@ -3,6 +3,7 @@
 
 mod config;
 mod module;
+mod resource;
 mod routes;
 mod schema;
 

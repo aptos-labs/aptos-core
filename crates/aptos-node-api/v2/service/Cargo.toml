@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-node-api-context = { workspace = true }
+aptos-vm = { workspace = true }
 async-graphql = { workspace = true }
 async-graphql-poem = { workspace = true }
 poem = { workspace = true }
