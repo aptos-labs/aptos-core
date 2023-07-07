@@ -13,5 +13,5 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-#rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
+rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 
