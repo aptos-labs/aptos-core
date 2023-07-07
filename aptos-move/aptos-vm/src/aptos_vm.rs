@@ -1833,24 +1833,17 @@ impl VMAdapter for AptosVM {
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
         let is_aggregator_error = |vm_status: &VMStatus| matches!(vm_status, VMStatus::MoveAbort(_, code) if *code == EADD_OVERFLOW || *code == ESUB_UNDERFLOW);
-        match self.execute_single_transaction(txn, &view, log_context, true) {
-            Ok((vm_status, vm_output, sender)) => match vm_output.try_materialize(view) {
-                Ok(vm_output) => {
-                    return Ok((vm_status, vm_output, sender));
-                },
-                Err(vm_status) => {
-                    if !is_aggregator_error(&vm_status) {
-                        return Err(vm_status);
-                    }
-                },
-            },
-            Err(vm_status) => {
-                if !is_aggregator_error(&vm_status) {
-                    return Err(vm_status);
-                }
-            },
+        match self
+            .execute_single_transaction(txn, &view, log_context, true)
+            .and_then(|(vm_status, vm_output, sender)| {
+                vm_output
+                    .try_materialize(view)
+                    .map(|vm_output| (vm_status, vm_output, sender))
+            }) {
+            res @ Ok(_) => res,
+            Err(e) if !is_aggregator_error(&e) => Err(e),
+            _ => self.execute_single_transaction(txn, &view, log_context, false),
         }
-        self.execute_single_transaction(txn, &view, log_context, false)
     }
 }
 
