@@ -32,11 +32,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          token: ${{ secrets.CUT_RELEASE_BRANCH_CREDENTIALS }}
+          fetch-depth: 0
       - name: Cut Release Branch
         run: |
           set -ex
 
           BRANCH_NAME="${{ inputs.BRANCH_PREFIX }}${{ inputs.NEW_VERSION }}${{ inputs.BRANCH_SUFFIX }}"
+          git branch
 
           git checkout ${{ inputs.GIT_HASH }}
           git checkout -b "$BRANCH_NAME"
