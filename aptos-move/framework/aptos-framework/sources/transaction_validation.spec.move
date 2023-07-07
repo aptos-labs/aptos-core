@@ -52,6 +52,7 @@ spec aptos_framework::transaction_validation {
         aborts_if max_transaction_fee > MAX_U64;
         aborts_if !(txn_sequence_number == global<Account>(transaction_sender).sequence_number);
         aborts_if !exists<CoinStore<AptosCoin>>(gas_payer);
+        // property 1: The sender of a transaction should have sufficient coin balance to pay the transaction fee.
         aborts_if !(global<CoinStore<AptosCoin>>(gas_payer).coin.value >= max_transaction_fee);
     }
 
@@ -108,10 +109,17 @@ spec aptos_framework::transaction_validation {
         aborts_if len(secondary_signer_public_key_hashes) != num_secondary_signers;
 
         // If any account does not exist, or public key hash does not match, abort.
+        // property 2: All secondary signer addresses are verified to be authentic through a validation process.
         aborts_if exists i in 0..num_secondary_signers:
             !account::exists_at(secondary_signer_addresses[i])
                 || secondary_signer_public_key_hashes[i] !=
                 account::get_authentication_key(secondary_signer_addresses[i]);
+
+        // By the end, all secondary signers account should exist and public key hash should match.
+        ensures forall i in 0..num_secondary_signers:
+            account::exists_at(secondary_signer_addresses[i])
+                && secondary_signer_public_key_hashes[i] ==
+                    account::get_authentication_key(secondary_signer_addresses[i]);
     }
 
     spec multi_agent_common_prologue(
@@ -258,6 +266,7 @@ spec aptos_framework::transaction_validation {
         let maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
         let apt_supply = option::spec_borrow(maybe_apt_supply);
         let apt_supply_value = optional_aggregator::optional_aggregator_value(apt_supply);
+        // property 3: After successful execution, base the transaction fee on the configuration set by the features library.
         // N.B.: Why can't `features::is_enabled`
         aborts_if if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES)) {
             !exists<CollectedFeesPerBlock>(@aptos_framework)
@@ -281,6 +290,7 @@ spec aptos_framework::transaction_validation {
         let post post_maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
         let post post_apt_supply = option::spec_borrow(post_maybe_apt_supply);
         let post post_apt_supply_value = optional_aggregator::optional_aggregator_value(post_apt_supply);
+        // property 3: After successful execution, base the transaction fee on the configuration set by the features library.
         ensures transaction_fee_amount > 0 ==>
             if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES)) {
                 post_collected_fees_value == aggr_val + transaction_fee_amount
