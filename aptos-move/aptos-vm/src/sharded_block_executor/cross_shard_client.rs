@@ -110,7 +110,7 @@ impl CrossShardCommitSender {
         txn_output: &AptosTransactionOutput,
     ) {
         let edges = self.dependent_edges.get(&txn_idx).unwrap();
-        let output = txn_output.get_output();
+        let output = txn_output.committed_output();
         let write_set = output.write_set();
 
         for (state_key, write_op) in write_set.iter() {
@@ -142,7 +142,7 @@ impl TransactionCommitHook for CrossShardCommitSender {
         }
     }
 
-    fn on_transaction_aborted(&self, _txn_idx: TxnIndex) {
+    fn on_execution_aborted(&self, _txn_idx: TxnIndex) {
         todo!("on_transaction_aborted not supported for sharded execution yet")
     }
 }

@@ -512,7 +512,7 @@ where
                     txn_commit_listener.on_transaction_committed(txn_idx, output);
                 },
                 ExecutionStatus::Abort(_) => {
-                    txn_commit_listener.on_transaction_aborted(txn_idx);
+                    txn_commit_listener.on_execution_aborted(txn_idx);
                 },
             }
         }
@@ -762,7 +762,7 @@ where
                 },
                 ExecutionStatus::Abort(err) => {
                     if let Some(commit_hook) = &self.transaction_commit_hook {
-                        commit_hook.on_transaction_aborted(idx as TxnIndex);
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
                     }
                     // Record the status indicating abort.
                     return Err(Error::UserError(err));

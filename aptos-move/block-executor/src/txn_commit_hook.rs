@@ -12,7 +12,7 @@ pub trait TransactionCommitHook: Send + Sync {
 
     fn on_transaction_committed(&self, txn_idx: TxnIndex, output: &Self::Output);
 
-    fn on_transaction_aborted(&self, txn_idx: TxnIndex);
+    fn on_execution_aborted(&self, txn_idx: TxnIndex);
 }
 
 pub struct NoOpTransactionCommitHook<T, E> {
@@ -42,7 +42,7 @@ impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitHook
         // no-op
     }
 
-    fn on_transaction_aborted(&self, _txn_idx: TxnIndex) {
+    fn on_execution_aborted(&self, _txn_idx: TxnIndex) {
         // no-op
     }
 }

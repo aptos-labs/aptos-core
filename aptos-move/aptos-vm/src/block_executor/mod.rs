@@ -62,7 +62,7 @@ impl AptosTransactionOutput {
         }
     }
 
-    pub(crate) fn get_output(&self) -> &TransactionOutput {
+    pub(crate) fn committed_output(&self) -> &TransactionOutput {
         self.committed_output.get().unwrap()
     }
 
