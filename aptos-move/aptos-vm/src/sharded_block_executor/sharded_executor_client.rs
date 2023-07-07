@@ -9,7 +9,7 @@ use crate::{
         messages::CrossShardMsg,
     },
 };
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
@@ -31,6 +31,7 @@ use std::{
 pub struct ShardedExecutorClient {
     num_shards: ShardId,
     shard_id: ShardId,
+    executor_thread_pool: Arc<rayon::ThreadPool>,
     message_rx: Arc<Mutex<Receiver<CrossShardMsg>>>,
     // The senders of cross-shard messages to other shards.
     message_txs: Arc<Vec<Mutex<Sender<CrossShardMsg>>>>,
@@ -40,12 +41,22 @@ impl ShardedExecutorClient {
     pub fn new(
         num_shards: ShardId,
         shard_id: ShardId,
+        num_threads: usize,
         message_txs: Vec<Sender<CrossShardMsg>>,
         message_rx: Receiver<CrossShardMsg>,
     ) -> Self {
+        let executor_thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                // We need two extra threads for the cross-shard commit receiver and the thread
+                // that is blocked on waiting for execute block to finish.
+                .num_threads(num_threads + 2)
+                .build()
+                .unwrap(),
+        );
         Self {
             num_shards,
             shard_id,
+            executor_thread_pool,
             message_rx: Arc::new(Mutex::new(message_rx)),
             message_txs: Arc::new(message_txs.into_iter().map(Mutex::new).collect()),
         }
@@ -55,6 +66,8 @@ impl ShardedExecutorClient {
         num_shards: usize,
         num_threads: Option<usize>,
     ) -> Vec<Self> {
+        let num_threads = num_threads
+            .unwrap_or_else(|| (num_cpus::get() as f64 / num_shards as f64).ceil() as usize);
         let mut cross_shard_msg_txs = vec![];
         let mut cross_shard_msg_rxs = vec![];
         for _ in 0..num_shards {
@@ -66,9 +79,15 @@ impl ShardedExecutorClient {
             .into_iter()
             .enumerate()
             .map(|(shard_id, rx)| {
+                let modified_num_threads = if shard_id == num_shards - 1 {
+                    num_threads * num_shards
+                } else {
+                    num_threads
+                };
                 Self::new(
                     num_shards as ShardId,
                     shard_id as ShardId,
+                    modified_num_threads,
                     cross_shard_msg_txs.clone(),
                     rx,
                 )
@@ -104,10 +123,12 @@ impl ShardedExecutorClient {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        trace!(
-            "executing sub block for shard {} and round {}",
+        info!(
+            "executing sub block for shard {} and round {} with concurrency_level={}, thread_pool_size={}",
             self.shard_id,
-            round
+            round,
+            concurrency_level,
+            self.executor_thread_pool.current_num_threads()
         );
         let cross_shard_commit_sender = CrossShardCommitSender::new(
             self.shard_id,
@@ -127,11 +148,7 @@ impl ShardedExecutorClient {
         let cross_shard_state_view =
             Arc::new(self.create_cross_shard_state_view(state_view, &sub_block));
         let cross_shard_state_view_clone1 = cross_shard_state_view.clone();
-
-        // Ad-hoc thread pool creation is fine: benchmark shows it only takes ~1ms with 112 threads.
-        let executor_thread_pool = Arc::new(rayon::ThreadPoolBuilder::new().num_threads(concurrency_level + 2).build().unwrap());
-        let executor_thread_pool_clone = executor_thread_pool.clone();
-        executor_thread_pool.scope(|s| {
+        self.executor_thread_pool.scope(|s| {
             s.spawn(move |_| {
                 if round != 0 {
                     // If this is not the first round, start the cross-shard commit receiver.
@@ -146,7 +163,7 @@ impl ShardedExecutorClient {
             s.spawn(move |_| {
                 disable_speculative_logging();
                 let ret = BlockAptosVM::execute_block(
-                    executor_thread_pool_clone,
+                    self.executor_thread_pool.clone(),
                     BlockExecutorTransactions::Unsharded(sub_block.into_txns()),
                     cross_shard_state_view.as_ref(),
                     concurrency_level,
