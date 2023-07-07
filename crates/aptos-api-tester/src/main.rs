@@ -9,6 +9,7 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::U64;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::coin_client::CoinClient;
+use aptos_sdk::token_client::TokenClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
@@ -49,7 +50,11 @@ async fn handle_result<Fut: Future<Output = TestResult>>(fut: Fut) -> TestResult
 /// Tests new account creation. Checks that:
 ///   - account data exists
 ///   - account balance reflects funded amount
-async fn test_newaccount(client: &Client, account: &LocalAccount, amount_funded: u64) -> TestResult {
+async fn test_newaccount(
+    client: &Client,
+    account: &LocalAccount,
+    amount_funded: u64,
+) -> TestResult {
     // ask for account data
     let response = match client.get_account(account.address()).await {
         Ok(response) => response,
@@ -144,11 +149,20 @@ async fn test_cointransfer(
     TestResult::Success
 }
 
+async fn test_mintnft(token_client: &TokenClient<'_>, account: &mut LocalAccount) -> TestResult {
+    let _ = token_client
+        .create_collection(account, "test", "test", "test", 1000, None)
+        .await;
+
+    TestResult::Success
+}
+
 async fn testnet_1() -> Result<()> {
     // create clients
     let client: Client = Client::new(TESTNET_NODE_URL.clone());
     let faucet_client = FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone());
     let coin_client = CoinClient::new(&client);
+    let token_client = TokenClient::new(&client);
 
     // create and fund account for tests
     let mut giray = LocalAccount::generate(&mut rand::rngs::OsRng);
@@ -171,6 +185,9 @@ async fn testnet_1() -> Result<()> {
         1_000,
     ))
     .await;
+
+    // Step 3: Test NFT minting
+    handle_result(test_mintnft(&token_client, &mut giray)).await;
 
     Ok(())
 }
