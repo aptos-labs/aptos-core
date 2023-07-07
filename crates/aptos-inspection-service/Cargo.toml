@@ -37,8 +37,8 @@ jemallocator = { version = "0.3.2", features = [
     "unprefixed_malloc_on_supported_platforms",
 ] }
 jemalloc-sys = "0.3"
-#rstack = { version = "0.3.3", features = ["dw"], default-features = false }
-#rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
+rstack = { version = "0.3.3", features = ["dw"], default-features = false }
+rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 
 [dev-dependencies]
 assert_approx_eq = { workspace = true }
