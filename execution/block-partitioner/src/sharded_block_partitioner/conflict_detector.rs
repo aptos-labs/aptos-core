@@ -60,7 +60,7 @@ impl CrossShardConflictDetector {
                 }
                 rejected_txns.push(txn);
             } else {
-                let deps = if self.round_id == 0 {
+                let cross_shard_deps = if self.round_id == 0 {
                     // 1st-round txns always have 0 cross-shard dependencies.
                     CrossShardDependencies::default()
                 } else {
@@ -70,7 +70,7 @@ impl CrossShardConflictDetector {
                         prev_rounds_rw_set_with_index.clone(),
                     )
                 };
-                accepted_txn_dependencies.push(deps);
+                accepted_txn_dependencies.push(cross_shard_deps);
                 accepted_txns.push(txn);
             }
         }
