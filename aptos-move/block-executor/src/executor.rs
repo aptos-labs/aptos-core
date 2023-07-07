@@ -86,7 +86,7 @@ where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitHook<ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>>,
+    L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
@@ -504,14 +504,17 @@ where
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
-            txn_commit_listener.on_transaction_committed(
-                txn_idx,
-                last_input_output
-                    .txn_output(txn_idx)
-                    .unwrap()
-                    .as_ref()
-                    .output_status(),
-            );
+            let txn_output = last_input_output.txn_output(txn_idx).unwrap();
+            let execution_status = txn_output.output_status();
+
+            match execution_status {
+                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                    txn_commit_listener.on_transaction_committed(txn_idx, output);
+                },
+                ExecutionStatus::Abort(_) => {
+                    txn_commit_listener.on_execution_aborted(txn_idx);
+                },
+            }
         }
     }
 
@@ -733,16 +736,6 @@ where
                 true,
             );
 
-            let res = match res {
-                ExecutionStatus::Success(output) => ExecutionStatus::Success(output),
-                ExecutionStatus::SkipRest(output) => ExecutionStatus::SkipRest(output),
-                ExecutionStatus::Abort(err) => ExecutionStatus::Abort(Error::UserError(err)),
-            };
-
-            if let Some(commit_hook) = &self.transaction_commit_hook {
-                commit_hook.on_transaction_committed(idx as TxnIndex, &res);
-            }
-
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -759,11 +752,20 @@ where
                     let fee_statement = output.fee_statement();
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
                     Self::update_sequential_txn_gas_counters(&fee_statement);
+                    // No delta writes are needed for sequential execution.
+                    output.incorporate_delta_writes(vec![]);
+                    //
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_transaction_committed(idx as TxnIndex, &output);
+                    }
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
+                    }
                     // Record the status indicating abort.
-                    return Err(err);
+                    return Err(Error::UserError(err));
                 },
             }
 

@@ -18,7 +18,7 @@ use aptos_block_executor::{
     errors::Error,
     executor::BlockExecutor,
     task::{
-        ExecutionStatus as BlockExecutorExecutionStatus, Transaction as BlockExecutorTransaction,
+        Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
     txn_commit_hook::TransactionCommitHook,
@@ -62,8 +62,8 @@ impl AptosTransactionOutput {
         }
     }
 
-    pub(crate) fn committed_output(&self) -> Option<&TransactionOutput> {
-        self.committed_output.get()
+    pub(crate) fn committed_output(&self) -> &TransactionOutput {
+        self.committed_output.get().unwrap()
     }
 
     fn take_output(mut self) -> TransactionOutput {
@@ -201,9 +201,7 @@ impl BlockAptosVM {
 
     pub fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitHook<
-            ExecutionStatus = BlockExecutorExecutionStatus<AptosTransactionOutput, Error<VMStatus>>,
-        >,
+        L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
         executor_thread_pool: Arc<ThreadPool>,
         transactions: BlockExecutorTransactions<Transaction>,
