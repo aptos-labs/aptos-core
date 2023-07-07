@@ -60,11 +60,17 @@ impl CrossShardConflictDetector {
                 }
                 rejected_txns.push(txn);
             } else {
-                accepted_txn_dependencies.push(self.get_deps_for_frozen_txn(
-                    &txn,
-                    Arc::new(vec![WriteSetWithTxnIndex::default(); self.num_shards]),
-                    prev_rounds_rw_set_with_index.clone(),
-                ));
+                let deps = if self.round_id == 0 {
+                    // 1st-round txns always have 0 cross-shard dependencies.
+                    CrossShardDependencies::default()
+                } else {
+                    self.get_deps_for_frozen_txn(
+                        &txn,
+                        Arc::new(vec![WriteSetWithTxnIndex::default(); self.num_shards]),
+                        prev_rounds_rw_set_with_index.clone(),
+                    )
+                };
+                accepted_txn_dependencies.push(deps);
                 accepted_txns.push(txn);
             }
         }
