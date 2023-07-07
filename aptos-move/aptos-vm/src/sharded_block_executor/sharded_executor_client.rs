@@ -82,7 +82,8 @@ impl ShardedExecutorClient {
             .enumerate()
             .map(|(shard_id, rx)| {
                 let modified_num_threads = if shard_id == num_shards - 1 {
-                    num_threads * num_shards
+                    // num_threads * num_shards
+                    num_threads
                 } else {
                     num_threads
                 };

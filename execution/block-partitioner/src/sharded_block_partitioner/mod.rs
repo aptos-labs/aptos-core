@@ -351,9 +351,8 @@ impl ShardedBlockPartitioner {
         }
 
         // Let the the last shard handle the leftover.
-        let last_round_txns: Vec<AnalyzedTransaction> = txns_to_partition.into_iter().flatten().collect();
-        info!("num_discarded_txns={}", last_round_txns.len());
-        txns_to_partition = vec![vec![vec![]; self.num_shards - 1], vec![last_round_txns]].concat();
+        // let last_round_txns: Vec<AnalyzedTransaction> = txns_to_partition.into_iter().flatten().collect();
+        // txns_to_partition = vec![vec![vec![]; self.num_shards - 1], vec![last_round_txns]].concat();
 
         // We just add cross shard dependencies for remaining transactions.
         let (frozen_sub_blocks, _, rejected_txns) = self.add_cross_shard_dependencies(
