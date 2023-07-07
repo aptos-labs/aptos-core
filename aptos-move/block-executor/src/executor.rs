@@ -98,7 +98,6 @@ where
         executor_thread_pool: Arc<ThreadPool>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
-        let a = num_cpus::get();
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
