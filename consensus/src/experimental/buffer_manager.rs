@@ -45,12 +45,14 @@ pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 3000;
 
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
-// number of leaders that aggregates the randomness shares
+// If the randomness shares are broadcasted to all validators, or sent through the leaders
+pub const BROADCAST_SHARES: bool = true;
+// Number of leaders that aggregates the randomness shares
 pub const NUM_LEADERS: usize = 1;
 
 // Each validator will send a randomness share of size rand_size * rand_num / 100 (assuming 100 validators and even distribution)
 pub const RAND_SIZE: usize = 96;
-pub const RAND_NUM: usize = 100;
+pub const RAND_NUM: usize = 1000;
 pub const SHARE_SIZE: usize = RAND_SIZE * RAND_NUM / 100;
 pub const DECISION_SIZE: usize = RAND_SIZE;
 
@@ -226,30 +228,37 @@ impl BufferManager {
         // Send the randomness shares through the first k proposers,
         // otherwise all blocks are Nil/genesis blocks that do not need randomness
         let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
-        let leaders = item.get_k_leaders(NUM_LEADERS, &self.verifier);
-
-        if leaders.len() == 0 {
-            self.buffer.push_back(item.try_advance_to_execution_ready());
-            return;
+        if BROADCAST_SHARES {
+            info!(
+                self.new_log(LogEvent::BCastRandToAll)
+                    .item_id(item_hash),
+                "item id {} broadcast to all, item size {}", item_hash, item.get_blocks().len()
+            );
+            self.rand_msg_tx
+                    .broadcast_rand_shares(rand_shares)
+                    .await;
         } else {
-            for leader in leaders {
-                info!(
-                    self.new_log(LogEvent::SendRandToLeader)
-                        .remote_peer(leader)
-                        .item_id(item_hash),
-                    "item id {} send to leader {}, item size {}", item_hash, leader, item.get_blocks().len()
-                );
-                for block in item.get_blocks() {
-                    observe_block(block.timestamp_usecs(), BlockStage::RAND_SENT);
+            let leaders = item.get_k_leaders(NUM_LEADERS, &self.verifier);
+            if leaders.len() == 0 {
+                self.buffer.push_back(item.try_advance_to_execution_ready());
+                return;
+            } else {
+                for leader in leaders {
+                    info!(
+                        self.new_log(LogEvent::SendRandToLeader)
+                            .remote_peer(leader)
+                            .item_id(item_hash),
+                        "item id {} send to leader {}, item size {}", item_hash, leader, item.get_blocks().len()
+                    );
+                    for block in item.get_blocks() {
+                        observe_block(block.timestamp_usecs(), BlockStage::RAND_SENT);
+                    }
+                    println!("[rand debug] share {} sent by {} to leader {}", rand_shares.item_id(), self.author, leader);
+                    self.rand_msg_tx
+                    .send_rand_shares(rand_shares.clone(), leader)
+                    .await;
                 }
-                println!("[rand debug] share {} sent by {} to leader {}", rand_shares.item_id(), self.author, leader);
-                self.rand_msg_tx
-                .send_rand_shares(rand_shares.clone(), leader)
-                .await;
             }
-            // self.rand_msg_tx
-            //     .broadcast_rand_shares(rand_shares)
-            //     .await;
         }
 
         self.buffer.push_back(item);
@@ -294,59 +303,63 @@ impl BufferManager {
                             if item.get_blocks().len() != rand_decisions.decisions().len() {
                                 println!("unequal length on generated rand {} != {}", item.get_blocks().len(), rand_decisions.decisions().len());
                             }
-                            // if we're one of the proposer for the first k proposal block,
-                            // we're responsible to broadcast the randomness decision
-                            if item.get_k_leaders(NUM_LEADERS, &self.verifier).contains(&self.author) {
-                                info!(
-                                    self.new_log(LogEvent::LeaderBCastRand).item_id(item_id),
-                                    "item id {} broadcast by {}, item size {}", item_id, self.author, item.get_blocks().len()
-                                );
-                                for block in item.get_blocks() {
-                                    observe_block(block.timestamp_usecs(), BlockStage::RAND_AGGREGATED);
+
+                            if !BROADCAST_SHARES {
+                                // if we're one of the proposer for the first k proposal block,
+                                // we're responsible to broadcast the randomness decision
+                                if item.get_k_leaders(NUM_LEADERS, &self.verifier).contains(&self.author) {
+                                    info!(
+                                        self.new_log(LogEvent::LeaderBCastRand).item_id(item_id),
+                                        "item id {} broadcast by {}, item size {}", item_id, self.author, item.get_blocks().len()
+                                    );
+                                    for block in item.get_blocks() {
+                                        observe_block(block.timestamp_usecs(), BlockStage::RAND_AGGREGATED);
+                                    }
+
+                                    // let peers = self.verifier.get_ordered_account_addresses();
+                                    // let retry_interval = Duration::from_millis(500 as u64);
+                                    // let rpc_timeout = Duration::from_millis(1000 as u64);
+                                    // let rand_msg_tx = self.rand_msg_tx.clone();
+                                    // let author = self.author;
+
+                                    // tokio::spawn(async move {
+                                    //     monitor!("batch_request", {
+                                    //         let mut interval = time::interval(retry_interval);
+                                    //         let mut futures = FuturesUnordered::new();
+                                    //         for peer in peers {
+                                    //             if peer == author {
+                                    //                 continue;
+                                    //             }
+                                    //             info!("leader send {} item to {}", item_id, peer);
+                                    //             futures.push(rand_msg_tx.rpc_send_rand_decisions(rand_decisions.clone(), peer, rpc_timeout));
+                                    //         }
+                                    //         loop {
+                                    //             tokio::select! {
+                                    //                 _ = interval.tick() => {
+                                    //                     if futures.is_empty() {
+                                    //                         // end the loop when the futures are drained
+                                    //                         break;
+                                    //                     }
+                                    //                 }
+                                    //                 Some(response) = futures.next() => {
+                                    //                     if let Err(peer) = response {
+                                    //                         info!("leader resend {} item to {}", item_id, peer);
+                                    //                         futures.push(rand_msg_tx.rpc_send_rand_decisions(rand_decisions.clone(), peer, rpc_timeout));
+                                    //                     }
+                                    //                 },
+                                    //             }
+                                    //         }
+                                    //     })
+                                    // });
+
+                                    println!("[rand debug] share {} decision broadcasted by leader {}", rand_shares.item_id(), self.author);
+
+                                    self.rand_msg_tx
+                                        .broadcast_rand_decisions(rand_decisions)
+                                        .await;
                                 }
-
-                                // let peers = self.verifier.get_ordered_account_addresses();
-                                // let retry_interval = Duration::from_millis(500 as u64);
-                                // let rpc_timeout = Duration::from_millis(1000 as u64);
-                                // let rand_msg_tx = self.rand_msg_tx.clone();
-                                // let author = self.author;
-
-                                // tokio::spawn(async move {
-                                //     monitor!("batch_request", {
-                                //         let mut interval = time::interval(retry_interval);
-                                //         let mut futures = FuturesUnordered::new();
-                                //         for peer in peers {
-                                //             if peer == author {
-                                //                 continue;
-                                //             }
-                                //             info!("leader send {} item to {}", item_id, peer);
-                                //             futures.push(rand_msg_tx.rpc_send_rand_decisions(rand_decisions.clone(), peer, rpc_timeout));
-                                //         }
-                                //         loop {
-                                //             tokio::select! {
-                                //                 _ = interval.tick() => {
-                                //                     if futures.is_empty() {
-                                //                         // end the loop when the futures are drained
-                                //                         break;
-                                //                     }
-                                //                 }
-                                //                 Some(response) = futures.next() => {
-                                //                     if let Err(peer) = response {
-                                //                         info!("leader resend {} item to {}", item_id, peer);
-                                //                         futures.push(rand_msg_tx.rpc_send_rand_decisions(rand_decisions.clone(), peer, rpc_timeout));
-                                //                     }
-                                //                 },
-                                //             }
-                                //         }
-                                //     })
-                                // });
-
-                                println!("[rand debug] share {} decision broadcasted by leader {}", rand_shares.item_id(), self.author);
-
-                                self.rand_msg_tx
-                                    .broadcast_rand_decisions(rand_decisions)
-                                    .await;
                             }
+
                             self.buffer.set(&current_cursor, item.try_advance_to_execution_ready());
                             return true;
                         }
@@ -807,7 +820,7 @@ impl BufferManager {
         while cursor.is_some() {
             let item = self.buffer.get(&cursor);
             // ordered item or NIL blocks
-            if item.is_ordered() || item.get_k_leaders(NUM_LEADERS, &self.verifier).is_empty() {
+            if item.is_ordered() || item.get_k_leaders(1, &self.verifier).is_empty() {
                 cursor = self.buffer.get_next(&cursor);
                 continue;
             }
