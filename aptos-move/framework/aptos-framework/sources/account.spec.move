@@ -20,6 +20,7 @@ spec aptos_framework::account {
         include CreateAccountAbortsIf {addr: new_address};
         aborts_if new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
         ensures signer::address_of(result) == new_address;
+        ensures exists<Account>(new_address);
     }
 
     /// Check if the bytes of the new address is 32.
@@ -27,6 +28,11 @@ spec aptos_framework::account {
     spec create_account_unchecked(new_address: address): signer {
         include CreateAccountAbortsIf {addr: new_address};
         ensures signer::address_of(result) == new_address;
+        ensures exists<Account>(new_address);
+    }
+
+    spec exists_at {
+        aborts_if false;
     }
 
     spec schema CreateAccountAbortsIf {
