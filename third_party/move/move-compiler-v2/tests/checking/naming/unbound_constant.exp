@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: unbound module
+   ┌─ tests/checking/naming/unbound_constant.move:14:17
+   │
+14 │         let y = Self::CONSTANT;
+   │                 ^^^^ Unbound module alias 'Self'
+
+error: unbound module
+   ┌─ tests/checking/naming/unbound_constant.move:15:24
+   │
+15 │         0 + CONSTANT + Self::CONSTANT;
+   │                        ^^^^ Unbound module alias 'Self'

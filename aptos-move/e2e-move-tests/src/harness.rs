@@ -10,6 +10,7 @@ use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage
 use aptos_gas::{
     AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule,
 };
+use aptos_gas_profiling::TransactionGasLog;
 use aptos_language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
@@ -238,6 +239,23 @@ impl MoveHarness {
         output.gas_used()
     }
 
+    /// Runs a transaction with the gas profiler.
+    pub fn evaluate_gas_with_profiler(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> (TransactionGasLog, u64) {
+        let txn = self.create_transaction_payload(account, payload);
+        let (output, gas_log) = self
+            .executor
+            .execute_transaction_with_gas_profiler(txn)
+            .unwrap();
+        if matches!(output.status(), TransactionStatus::Keep(_)) {
+            self.executor.apply_write_set(output.write_set());
+        }
+        (gas_log, output.gas_used())
+    }
+
     /// Creates a transaction which runs the specified entry point `fun`. Arguments need to be
     /// provided in bcs-serialized form.
     pub fn create_entry_function(
@@ -339,6 +357,22 @@ impl MoveHarness {
         let output = self.run_raw(txn);
         assert_success!(output.status().to_owned());
         output.gas_used()
+    }
+
+    pub fn evaluate_publish_gas_with_profiler(
+        &mut self,
+        account: &Account,
+        path: &Path,
+    ) -> (TransactionGasLog, u64) {
+        let txn = self.create_publish_package(account, path, None, |_| {});
+        let (output, gas_log) = self
+            .executor
+            .execute_transaction_with_gas_profiler(txn)
+            .unwrap();
+        if matches!(output.status(), TransactionStatus::Keep(_)) {
+            self.executor.apply_write_set(output.write_set());
+        }
+        (gas_log, output.gas_used())
     }
 
     /// Runs transaction which publishes the Move Package.

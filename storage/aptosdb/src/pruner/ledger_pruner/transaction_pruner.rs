@@ -10,6 +10,7 @@ use crate::{
     TransactionStore,
 };
 use anyhow::{ensure, Result};
+use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_types::transaction::{Transaction, Version};
 use std::sync::Arc;
@@ -59,6 +60,11 @@ impl TransactionPruner {
             transaction_db,
         };
 
+        info!(
+            progress = progress,
+            metadata_progress = metadata_progress,
+            "Catching up TransactionPruner."
+        );
         myself.prune(progress, metadata_progress)?;
 
         Ok(myself)

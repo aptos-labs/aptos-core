@@ -152,8 +152,7 @@ def test_move_run(run_helper: RunHelper, test_name=None):
         ],
     )
 
-    response = json.loads(response.stdout)
-    if response["Result"].get("success") != True:
+    if '"success": true' not in response.stdout:
         raise TestError("Move run did not execute successfully")
 
     # Get what modules exist on chain.
@@ -178,3 +177,26 @@ def test_move_run(run_helper: RunHelper, test_name=None):
         raise TestError(
             "Data on chain (view_hero) does not match expected data from (mint_hero)"
         )
+
+
+@test_case
+def test_move_view(run_helper: RunHelper, test_name=None):
+    account_info = run_helper.get_account_info()
+
+    # Run the view function
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "view",
+            "--function-id",
+            "0x1::account::exists_at",
+            "--args",
+            f"address:{account_info.account_address}",
+        ],
+    )
+
+    response = json.loads(response.stdout)
+    if response["Result"] == None or response["Result"][0] != True:
+        raise TestError("View function did not return correct result")

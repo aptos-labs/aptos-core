@@ -55,11 +55,7 @@ impl DagDriver {
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let mut dag_writer = self.dag.write();
         let round = node.metadata().round();
-        if dag_writer.all_exists(
-            node.parents()
-                .iter()
-                .map(|certificate| certificate.metadata().digest()),
-        ) {
+        if dag_writer.all_exists(node.parents()) {
             dag_writer.add_node(node)?;
             if self.current_round == round {
                 let maybe_strong_links = dag_writer
@@ -99,8 +95,11 @@ impl DagDriver {
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let task = self
             .reliable_broadcast
-            .broadcast(node, signature_builder)
-            .then(move |certificate| rb.broadcast(certificate, cert_ack_set));
+            .broadcast(node.clone(), signature_builder)
+            .then(move |certificate| {
+                let certified_node = CertifiedNode::new(node, certificate.signatures().to_owned());
+                rb.broadcast(certified_node, cert_ack_set)
+            });
         tokio::spawn(Abortable::new(task, abort_registration));
         if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
             prev_handle.abort();
