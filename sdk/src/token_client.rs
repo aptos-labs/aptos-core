@@ -82,6 +82,79 @@ impl<'a> TokenClient<'a> {
             .context("Failed to submit transfer transaction")?
             .into_inner())
     }
+
+    pub async fn create_token(
+        &self,
+        account: &mut LocalAccount,
+        collection_name: &str,
+        name: &str,
+        description: &str,
+        supply: u64,
+        uri: &str,
+        max_amount: u64,
+        royalty_payee_address: &AccountAddress,
+        royalty_points_denominator: u64,
+        royalty_points_numerator: u64,
+        property_keys: Box<Vec<&str>>,
+        property_values: Box<Vec<&str>>,
+        property_types: Box<Vec<&str>>,
+        options: Option<TransactionOptions>,
+    ) -> Result<PendingTransaction> {
+        let options = options.unwrap_or_default();
+
+        let chain_id = self
+            .api_client
+            .get_index()
+            .await
+            .context("Failed to get chain ID")?
+            .inner()
+            .chain_id;
+        let transaction_builder = TransactionBuilder::new(
+            TransactionPayload::EntryFunction(EntryFunction::new(
+                ModuleId::new(
+                    AccountAddress::from_hex_literal("0x3").unwrap(),
+                    Identifier::new("token").unwrap(),
+                ),
+                Identifier::new("create_token_script").unwrap(),
+                vec![],
+                vec![
+                    bcs::to_bytes(&collection_name).unwrap(),
+                    bcs::to_bytes(&name).unwrap(),
+                    bcs::to_bytes(&description).unwrap(),
+                    bcs::to_bytes(&supply).unwrap(),
+                    bcs::to_bytes(&max_amount).unwrap(),
+                    bcs::to_bytes(&uri).unwrap(),
+                    bcs::to_bytes(&royalty_payee_address).unwrap(),
+                    bcs::to_bytes(&royalty_points_denominator).unwrap(),
+                    bcs::to_bytes(&royalty_points_numerator).unwrap(),
+                    bcs::to_bytes(&vec![false, false, false, false, false]).unwrap(),
+                    bcs::to_bytes(property_keys.as_ref()).unwrap(),
+                    // TODO: this is wrong
+                    bcs::to_bytes(property_values.as_ref()).unwrap(),
+                    bcs::to_bytes(property_types.as_ref()).unwrap(),
+
+                ],
+            )),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + options.timeout_secs,
+            ChainId::new(chain_id),
+        )
+        .sender(account.address())
+        .sequence_number(account.sequence_number())
+        .max_gas_amount(options.max_gas_amount)
+        .gas_unit_price(options.gas_unit_price);
+        let signed_txn = account.sign_with_transaction_builder(transaction_builder);
+        Ok(self
+            .api_client
+            .submit(&signed_txn)
+            .await
+            .context("Failed to submit transfer transaction")?
+            .into_inner())
+    }
+
 }
 
 pub struct TransactionOptions {

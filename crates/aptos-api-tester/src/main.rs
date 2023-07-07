@@ -16,10 +16,10 @@ use once_cell::sync::Lazy;
 use url::Url;
 
 // network urls
-static DEVNET_NODE_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
-static DEVNET_FAUCET_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
+// static DEVNET_NODE_URL: Lazy<Url> =
+//     Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
+// static DEVNET_FAUCET_URL: Lazy<Url> =
+//     Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
 static TESTNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
 static TESTNET_FAUCET_URL: Lazy<Url> =
@@ -149,10 +149,60 @@ async fn test_cointransfer(
     TestResult::Success
 }
 
-async fn test_mintnft(token_client: &TokenClient<'_>, account: &mut LocalAccount) -> TestResult {
-    let _ = token_client
-        .create_collection(account, "test", "test", "test", 1000, None)
-        .await;
+async fn test_mintnft(
+    client: &Client,
+    token_client: &TokenClient<'_>,
+    account: &mut LocalAccount,
+) -> TestResult {
+    // create collection
+    let collection_name = "test collection";
+    let txn_hash = match token_client
+        .create_collection(
+            account,
+            &collection_name,
+            "collection desc",
+            "collection",
+            1000,
+            None,
+        )
+        .await
+    {
+        Ok(txn) => txn,
+        Err(e) => return TestResult::Error(e),
+    };
+    match client.wait_for_transaction(&txn_hash).await {
+        Ok(_) => {},
+        Err(e) => return TestResult::Error(e.into()),
+    }
+
+    // create token
+    let address = &account.address();
+    let txn_hash = match token_client
+        .create_token(
+            account,
+            &collection_name,
+            "test token",
+            "token desc",
+            10,
+            "token",
+            10,
+            address,
+            0,
+            0,
+            Box::new(vec![]),
+            Box::new(vec![]),
+            Box::new(vec![]),
+            None,
+        )
+        .await
+    {
+        Ok(txn) => txn,
+        Err(e) => return TestResult::Error(e),
+    };
+    match client.wait_for_transaction(&txn_hash).await {
+        Ok(_) => {},
+        Err(e) => return TestResult::Error(e.into()),
+    }
 
     TestResult::Success
 }
@@ -187,7 +237,7 @@ async fn testnet_1() -> Result<()> {
     .await;
 
     // Step 3: Test NFT minting
-    handle_result(test_mintnft(&token_client, &mut giray)).await;
+    handle_result(test_mintnft(&client, &token_client, &mut giray)).await;
 
     Ok(())
 }
