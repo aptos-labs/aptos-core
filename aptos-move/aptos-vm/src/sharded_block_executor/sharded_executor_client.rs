@@ -28,7 +28,7 @@ use std::{
     },
 };
 use once_cell::sync::Lazy;
-use aptos_metrics_core::{HistogramVec, register_histogram_vec, exponential_buckets};
+use aptos_metrics_core::{HistogramVec, register_histogram_vec, exponential_buckets, IntCounterVec, register_int_counter_vec};
 
 pub struct ShardedExecutorClient {
     num_shards: ShardId,
@@ -125,8 +125,13 @@ impl ShardedExecutorClient {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let label_shard_id = format!("{}", self.shard_id);
+        let label_round_id = format!("{}", round);
+        APTOS_SUB_BLOCK_SIZES
+            .with_label_values(&[label_shard_id.as_str(), label_round_id.as_str()])
+            .inc_by(sub_block.num_txns() as u64);
         let _timer = APTOS_SUB_BLOCK_EXECUTION_SECONDS
-            .with_label_values(&[format!("{}", self.shard_id).as_str(), format!("{}", round).as_str()])
+            .with_label_values(&[label_shard_id.as_str(), label_round_id.as_str()])
             .start_timer();
         info!(
             "executing sub block for shard {} and round {} with concurrency_level={}, thread_pool_size={}",
@@ -239,6 +244,17 @@ pub static APTOS_SUB_BLOCK_EXECUTION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| 
         "foo",
         &["shard_id", "round_id"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+        .unwrap()
+});
+
+pub static APTOS_SUB_BLOCK_SIZES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        // metric name
+        "aptos_sub_block_sizes",
+        // metric description
+        "foo",
+        &["shard_id", "round_id"],
     )
         .unwrap()
 });
