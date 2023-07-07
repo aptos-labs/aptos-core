@@ -1458,8 +1458,8 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
 fn realistic_env_max_load_test(duration: Duration) -> ForgeConfig {
     let duration_secs = duration.as_secs();
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_initial_fullnode_count(0)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
