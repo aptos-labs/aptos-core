@@ -393,6 +393,8 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
     this.fee_payer_address = fee_payer_address;
   }
 
+  // Get the authenticator for this transaction, making sure that the multi-agent authenticator matches this
+  // multi-agent transaction. Ie. the secondary signers match and the optional fee payer matches.
   get_authenticator(
     sender: AccountAuthenticator,
     secondary_signers: Seq<AccountAuthenticator>,
@@ -404,11 +406,11 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
     let fee_pay;
     if (this.fee_payer_address) {
       if (!fee_payer) {
-        throw new Error("Fee payer is not set.");
+        throw new Error("No fee payer authenticator provided to match the fee payer of the transaction.");
       }
       fee_pay = { address: this.fee_payer_address, authenticator: fee_payer };
     } else if (fee_payer) {
-        throw new Error("Fee payer is set.");
+        throw new Error("A fee payer authenticator provided while not a transaction with a fee payer.");
       }
     return new TransactionAuthenticatorMultiAgent(sender, this.secondary_signer_addresses, secondary_signers, fee_pay);
   }
