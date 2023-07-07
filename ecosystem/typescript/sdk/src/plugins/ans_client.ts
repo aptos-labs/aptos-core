@@ -1,4 +1,4 @@
-import { AptosClient, ApiError, Provider, OptionalTransactionArgs } from "../providers";
+import { AptosClient, Provider, OptionalTransactionArgs, ApiError } from "../providers";
 import * as Gen from "../generated/index";
 import { AptosAccount } from "../account";
 import { AccountAddress } from "../aptos_types";

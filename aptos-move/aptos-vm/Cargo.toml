@@ -34,6 +34,7 @@ aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
+futures = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }

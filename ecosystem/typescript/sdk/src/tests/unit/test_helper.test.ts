@@ -1,5 +1,9 @@
+import { AptosAccount } from "../../account";
+import { bcsToBytes, bcsSerializeUint64 } from "../../bcs";
+import { ClientConfig } from "../../client";
 import { FaucetClient } from "../../plugins/faucet_client";
-import { OpenAPIConfig } from "../../generated";
+import { AptosClient } from "../../providers";
+import { TxnBuilderTypes } from "../../transaction_builder";
 import { CustomEndpoints } from "../../utils/api-endpoints";
 
 export const NODE_URL = process.env.APTOS_NODE_URL!;
@@ -18,11 +22,35 @@ export const ANS_OWNER_PK = "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a1
  * pass that along in the header in the format the faucet expects.
  */
 export function getFaucetClient(): FaucetClient {
-  const config: Partial<OpenAPIConfig> = {};
+  const config: ClientConfig = {};
   if (process.env.FAUCET_AUTH_TOKEN) {
     config.HEADERS = { Authorization: `Bearer ${process.env.FAUCET_AUTH_TOKEN}` };
   }
   return new FaucetClient(NODE_URL, FAUCET_URL, config);
+}
+
+export async function getTransaction(): Promise<Uint8Array> {
+  const client = new AptosClient(NODE_URL);
+  const faucetClient = getFaucetClient();
+
+  const account1 = new AptosAccount();
+  await faucetClient.fundAccount(account1.address(), 100_000_000);
+
+  const account2 = new AptosAccount();
+
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
+      "0x1::aptos_account",
+      "transfer",
+      [],
+      [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(account2.address())), bcsSerializeUint64(717)],
+    ),
+  );
+
+  const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
+
+  const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
+  return bcsTxn;
 }
 
 test("noop", () => {

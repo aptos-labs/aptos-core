@@ -14,6 +14,7 @@ use crate::{
 };
 use anyhow::Error;
 use aptos_bitvec::BitVec;
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas::{
@@ -44,7 +45,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
-    block_executor::BlockAptosVM,
+    block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor, VMValidator,
@@ -284,12 +285,17 @@ impl FakeExecutor {
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
+        let data = self.new_account_data_at(addr);
+        data.account().clone()
+    }
+
+    pub fn new_account_data_at(&mut self, addr: AccountAddress) -> AccountData {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
         let data = AccountData::with_account(acc, 1_000_000_000_000_000, 0);
         self.add_account_data(&data);
-        data.account().clone()
+        data
     }
 
     /// Applies a [`WriteSet`] to this executor's data store.
@@ -417,11 +423,12 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block(
+        BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             BlockExecutorTransactions::Unsharded(txn_block),
             &self.data_store,
             usize::min(4, num_cpus::get()),
+            None,
             None,
         )
     }

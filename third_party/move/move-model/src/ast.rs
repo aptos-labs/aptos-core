@@ -12,7 +12,7 @@ use crate::{
         GHOST_MEMORY_PREFIX,
     },
     symbol::Symbol,
-    ty::{Type, TypeDisplayContext},
+    ty::{ReferenceKind, Type, TypeDisplayContext},
 };
 use internment::LocalIntern;
 use itertools::Itertools;
@@ -956,7 +956,9 @@ pub enum Operation {
     Exists(Option<MemoryLabel>),
 
     // Builtin functions (impl only)
-    BorrowGlobal(bool),
+    BorrowGlobal(ReferenceKind),
+    Borrow(ReferenceKind),
+    Deref,
     MoveTo,
     MoveFrom,
     Freeze,
