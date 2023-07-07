@@ -27,6 +27,7 @@ use aptos_gas::{
     StorageGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
+use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
@@ -1005,13 +1006,13 @@ impl AptosVM {
         &self,
         balance: Gas,
         log_context: &AdapterLogSchema,
-    ) -> Result<StandardGasMeter, VMStatus> {
-        Ok(StandardGasMeter::new(
+    ) -> Result<MemoryTrackedGasMeter<StandardGasMeter>, VMStatus> {
+        Ok(MemoryTrackedGasMeter::new(StandardGasMeter::new(
             self.0.get_gas_feature_version(),
             self.0.get_gas_parameters(log_context)?.clone(),
             self.0.get_storage_gas_parameters(log_context)?.clone(),
             balance,
-        ))
+        )))
     }
 
     fn execute_user_transaction_impl(
@@ -1396,12 +1397,12 @@ impl AptosVM {
     ) -> Result<Vec<Vec<u8>>> {
         let vm = AptosVM::new(state_view);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        let mut gas_meter = StandardGasMeter::new(
+        let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
             vm.0.get_gas_feature_version(),
             vm.0.get_gas_parameters(&log_context)?.clone(),
             vm.0.get_storage_gas_parameters(&log_context)?.clone(),
             gas_budget,
-        );
+        ));
         let resolver = vm.as_move_resolver(state_view);
         let mut session = vm.new_session(&resolver, SessionId::Void, true);
 
@@ -1838,12 +1839,12 @@ impl AptosSimulationVM {
             Ok(s) => s,
         };
 
-        let mut gas_meter = StandardGasMeter::new(
+        let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
             self.0 .0.get_gas_feature_version(),
             gas_params.clone(),
             storage_gas_params.clone(),
             txn_data.max_gas_amount(),
-        );
+        ));
 
         let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
