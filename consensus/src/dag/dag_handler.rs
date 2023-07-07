@@ -55,6 +55,8 @@ impl NetworkHandler {
     async fn process_rpc(&mut self, rpc_request: IncomingDAGRequest) -> anyhow::Result<()> {
         let dag_message: DAGMessage = TConsensusMsg::from_network_message(rpc_request.req)?;
 
+        // TODO: verify epoch number and author
+
         let response: anyhow::Result<DAGMessage> = match dag_message {
             DAGMessage::NodeMsg(node) => node
                 .verify(&self.epoch_state.verifier)

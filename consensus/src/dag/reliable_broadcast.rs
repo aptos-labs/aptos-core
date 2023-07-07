@@ -125,8 +125,6 @@ impl NodeBroadcastHandler {
             return Ok(());
         }
 
-        node.verify(&self.verifier)?;
-
         let prev_round = current_round - 1;
 
         let dag_reader = self.dag.read();
@@ -210,10 +208,11 @@ impl RpcHandler for CertifiedNodeHandler {
     type Response = CertifiedAck;
 
     fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+        let epoch = node.metadata().epoch();
         {
             let dag_reader = self.dag.read();
             if dag_reader.exists(&node.digest()) {
-                return Ok(CertifiedAck::new(node.metadata().epoch()));
+                return Ok(CertifiedAck::new(epoch));
             }
 
             if !dag_reader.all_exists(node.parents()) {
@@ -223,7 +222,6 @@ impl RpcHandler for CertifiedNodeHandler {
         }
 
         let mut dag_writer = self.dag.write();
-        let epoch = node.metadata().epoch();
         dag_writer.add_node(node)?;
 
         Ok(CertifiedAck::new(epoch))

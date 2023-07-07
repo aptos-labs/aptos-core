@@ -7,9 +7,7 @@ use crate::{
         messages::{CrossShardMsg, CrossShardMsg::RemoteTxnWriteMsg, RemoteTxnWrite},
     },
 };
-use aptos_block_executor::{
-    errors::Error, task::ExecutionStatus, txn_commit_hook::TransactionCommitHook,
-};
+use aptos_block_executor::txn_commit_hook::TransactionCommitHook;
 use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
@@ -19,7 +17,6 @@ use aptos_types::{
     transaction::Transaction,
     write_set::TransactionWrite,
 };
-use move_core_types::vm_status::VMStatus;
 use std::{
     collections::{HashMap, HashSet},
     sync::{
@@ -113,8 +110,8 @@ impl CrossShardCommitSender {
         txn_output: &AptosTransactionOutput,
     ) {
         let edges = self.dependent_edges.get(&txn_idx).unwrap();
-        // TODO(skedia): This doesn't work for sequantial execution - fix it.
-        let write_set = txn_output.committed_output().unwrap().write_set();
+        let output = txn_output.committed_output();
+        let write_set = output.write_set();
 
         for (state_key, write_op) in write_set.iter() {
             if let Some(dependent_shard_ids) = edges.get(state_key) {
@@ -136,26 +133,16 @@ impl CrossShardCommitSender {
 }
 
 impl TransactionCommitHook for CrossShardCommitSender {
-    type ExecutionStatus = ExecutionStatus<AptosTransactionOutput, Error<VMStatus>>;
+    type Output = AptosTransactionOutput;
 
-    fn on_transaction_committed(
-        &self,
-        txn_idx: TxnIndex,
-        execution_status: &Self::ExecutionStatus,
-    ) {
+    fn on_transaction_committed(&self, txn_idx: TxnIndex, txn_output: &Self::Output) {
         let global_txn_idx = txn_idx + self.index_offset;
         if self.dependent_edges.contains_key(&global_txn_idx) {
-            match execution_status {
-                ExecutionStatus::Success(output) => {
-                    self.send_remote_update_for_success(global_txn_idx, output);
-                },
-                ExecutionStatus::Abort(_) => {
-                    todo!("Handle abort case")
-                },
-                ExecutionStatus::SkipRest(output) => {
-                    self.send_remote_update_for_success(global_txn_idx, output);
-                },
-            }
+            self.send_remote_update_for_success(global_txn_idx, txn_output);
         }
+    }
+
+    fn on_execution_aborted(&self, _txn_idx: TxnIndex) {
+        todo!("on_transaction_aborted not supported for sharded execution yet")
     }
 }
