@@ -69,7 +69,7 @@ Install the necessary dependencies:
 
 ```bash
 curl -sSL https://install.python-poetry.org | python3
-poetry update
+poetry install
 ```
 
 Run the Python [`your-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/your-coin.py) example:

@@ -63,7 +63,7 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   Install the necessary dependencies:
   ```bash
   curl -sSL https://install.python-poetry.org | python3
-  poetry update
+  poetry install
   ```
 
   Run the Python [`simple-nft`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-nft.py) example:
