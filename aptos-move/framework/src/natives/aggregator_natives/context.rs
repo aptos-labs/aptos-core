@@ -11,8 +11,10 @@ use better_any::{Tid, TidAble};
 use move_binary_format::errors::Location;
 use std::{
     cell::RefCell,
-    collections::{btree_map, BTreeMap},
+    collections::{btree_map, BTreeMap}
 };
+
+pub type TxnIndex = u32;
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -47,6 +49,7 @@ impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
     pub fn new(
+        txn_idx: TxnIndex, 
         txn_hash: [u8; 32],
         resolver: &'a dyn AggregatorResolver,
         aggregator_enabled: bool,
@@ -54,7 +57,7 @@ impl<'a> NativeAggregatorContext<'a> {
         Self {
             txn_hash,
             resolver,
-            aggregator_data: Default::default(),
+            aggregator_data: RefCell::new(AggregatorData::new((txn_idx as u64) << 32)),
             aggregator_enabled,
         }
     }
@@ -241,7 +244,7 @@ mod test {
     #[test]
     fn test_into_change_set() {
         let resolver = get_test_resolver();
-        let context = NativeAggregatorContext::new([0; 32], &resolver, true);
+        let context = NativeAggregatorContext::new(30, [0; 32], &resolver, true);
 
         test_set_up(&context, true);
         let AggregatorChangeSet { changes } = context.into_change_set();
@@ -279,7 +282,7 @@ mod test {
     #[test]
     fn test_into_change_set_aggregator_disabled() {
         let resolver = get_test_resolver();
-        let context = NativeAggregatorContext::new([0; 32], &resolver, false);
+        let context = NativeAggregatorContext::new(30, [0; 32], &resolver, false);
 
         test_set_up(&context, false);
         let AggregatorChangeSet { changes } = context.into_change_set();

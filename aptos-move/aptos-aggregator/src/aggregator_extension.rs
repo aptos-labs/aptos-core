@@ -9,7 +9,7 @@ use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
 use move_table_extension::TableHandle;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{sync::atomic::{AtomicU64, Ordering}, collections::{BTreeMap, BTreeSet}};
 
 /// Describes the state of each aggregator instance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -292,9 +292,18 @@ pub struct AggregatorData {
     destroyed_aggregators: BTreeSet<AggregatorID>,
     // All aggregator instances that exist in the current transaction.
     aggregators: BTreeMap<AggregatorID, Aggregator>,
+    // Counter for generating identifiers for AggregatorSnapshots.
+    pub id_counter: AtomicU64
 }
 
 impl AggregatorData {
+
+    pub fn new(id_counter: u64) -> Self {
+        Self {
+            id_counter: AtomicU64::new(id_counter),
+            ..Default::default()
+        }
+    }
     /// Returns a mutable reference to an aggregator with `id` and a `limit`.
     /// If transaction that is currently executing did not initialize it, a new aggregator instance is created.
     /// The state of the new aggregator instance depends on the `aggregator_enabled` flag.
@@ -357,6 +366,11 @@ impl AggregatorData {
             // Otherwise, aggregator has been created somewhere else.
             self.destroyed_aggregators.insert(id);
         }
+    }
+
+    pub fn generate_id(&mut self) -> u64 {
+        self.id_counter.fetch_add(1, Ordering::SeqCst);
+        self.id_counter.load(Ordering::SeqCst)
     }
 
     /// Unpacks aggregator data.

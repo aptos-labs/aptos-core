@@ -110,6 +110,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
         ChainId::test().id(),
     )); // We use the testing environment chain ID here
     exts.add(NativeAggregatorContext::new(
+        0,
         [0; 32],
         &*DUMMY_RESOLVER,
         true,

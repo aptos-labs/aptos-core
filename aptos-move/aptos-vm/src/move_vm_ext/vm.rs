@@ -13,6 +13,7 @@ use aptos_framework::natives::{
     transaction_context::NativeTransactionContext,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
@@ -83,6 +84,7 @@ impl MoveVmExt {
 
     pub fn new_session<'r, S: MoveResolverExt>(
         &self,
+        txn_idx: TxnIndex,
         remote: &'r S,
         session_id: SessionId,
         aggregator_enabled: bool,
@@ -98,6 +100,7 @@ impl MoveVmExt {
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(
+            txn_idx,
             txn_hash,
             remote,
             aggregator_enabled,
@@ -126,6 +129,7 @@ impl MoveVmExt {
         self.inner.flush_loader_cache_if_invalidated();
 
         SessionExt::new(
+            txn_idx,
             self.inner.new_session_with_extensions(remote, extensions),
             remote,
             sender_opt,

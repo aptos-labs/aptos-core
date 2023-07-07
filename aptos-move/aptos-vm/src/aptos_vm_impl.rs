@@ -17,6 +17,7 @@ use aptos_gas::{
     Gas, NativeGasParameters, StorageGasParameters, StoragePricing,
 };
 use aptos_logger::{enabled, prelude::*, Level};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -600,12 +601,13 @@ impl AptosVMImpl {
 
     pub fn new_session<'r>(
         &self,
+        txn_idx: TxnIndex,
         resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
         aggregator_enabled: bool,
     ) -> SessionExt<'r, '_> {
         self.move_vm
-            .new_session(resolver, session_id, aggregator_enabled)
+            .new_session(txn_idx, resolver, session_id, aggregator_enabled)
     }
 
     pub fn load_module(

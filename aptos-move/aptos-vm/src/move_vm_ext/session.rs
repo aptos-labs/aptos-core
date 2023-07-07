@@ -16,6 +16,7 @@ use aptos_framework::natives::{
     code::{NativeCodeContext, PublishRequest},
 };
 use aptos_gas::ChangeSetConfigs;
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
@@ -103,6 +104,7 @@ impl SessionId {
 }
 
 pub struct SessionExt<'r, 'l> {
+    pub txn_idx: TxnIndex,
     inner: Session<'r, 'l>,
     remote: &'r dyn MoveResolverExt,
     new_slot_payer: Option<AccountAddress>,
@@ -111,12 +113,14 @@ pub struct SessionExt<'r, 'l> {
 
 impl<'r, 'l> SessionExt<'r, 'l> {
     pub fn new(
+        txn_idx: TxnIndex,
         inner: Session<'r, 'l>,
         remote: &'r dyn MoveResolverExt,
         new_slot_payer: Option<AccountAddress>,
         features: Arc<Features>,
     ) -> Self {
         Self {
+            txn_idx,
             inner,
             remote,
             new_slot_payer,

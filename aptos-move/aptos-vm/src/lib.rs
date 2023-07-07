@@ -124,6 +124,7 @@ mod verifier;
 
 pub use crate::aptos_vm::AptosVM;
 use crate::sharded_block_executor::ShardedBlockExecutor;
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::SubBlocksForShard,
@@ -138,6 +139,7 @@ pub trait VMValidator {
     /// Executes the prologue of the Aptos Account and verifies that the transaction is valid.
     fn validate_transaction(
         &self,
+        txn_idx: TxnIndex,
         transaction: SignedTransaction,
         state_view: &impl StateView,
     ) -> VMValidatorResult;
