@@ -6,11 +6,16 @@
 
 use crate::{
     ast::QualifiedSymbol,
-    model::{GlobalEnv, ModuleId, QualifiedInstId, StructEnv, StructId},
+    model::{GlobalEnv, Loc, ModuleId, QualifiedInstId, StructEnv, StructId},
     symbol::Symbol,
 };
+use itertools::Itertools;
 use move_binary_format::{file_format::TypeParameterIndex, normalized::Type as MType};
-use move_core_types::language_storage::{StructTag, TypeTag};
+use move_core_types::{
+    language_storage::{StructTag, TypeTag},
+    u256::U256,
+};
+use num::BigInt;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
@@ -27,7 +32,7 @@ pub enum Type {
     TypeParameter(u16),
 
     // Types only appearing in programs.
-    Reference(bool, Box<Type>),
+    Reference(ReferenceKind, Box<Type>),
 
     // Types only appearing in specifications
     Fun(Box<Type>, Box<Type>),
@@ -37,6 +42,23 @@ pub enum Type {
     // Temporary types used during type checking
     Error,
     Var(u16),
+}
+
+/// Represents a reference kind.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub enum ReferenceKind {
+    Immutable,
+    Mutable,
+}
+
+impl ReferenceKind {
+    pub fn from_is_mut(is_mut: bool) -> ReferenceKind {
+        if is_mut {
+            ReferenceKind::Mutable
+        } else {
+            ReferenceKind::Immutable
+        }
+    }
 }
 
 pub const BOOL_TYPE: Type = Type::Primitive(PrimitiveType::Bool);
@@ -63,7 +85,21 @@ pub enum PrimitiveType {
 /// A type substitution.
 #[derive(Debug, Clone)]
 pub struct Substitution {
+    /// Assignment of types to variables.
     subs: BTreeMap<u16, Type>,
+    /// Constraints on (unassigned) variables.
+    constraints: BTreeMap<u16, Vec<(Loc, Constraint)>>,
+}
+
+/// A constraint on a type variable, maintained during unification.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Constraint {
+    /// The type variable must be instantiated with one of the given primitive types. This is used
+    /// for representing integer constants, though the mechanism is valid for arbitrary primitive
+    /// types.
+    SomePrimitive(BTreeSet<PrimitiveType>),
+    /// The type variable must be instantiated with a reference of given type.
+    SomeReference(Type),
 }
 
 /// Represents an error resulting from type unification.
@@ -71,6 +107,8 @@ pub enum TypeUnificationError {
     TypeMismatch(Type, Type),
     ArityMismatch(String, usize, usize),
     CyclicSubstitution(Type, Type),
+    MutabilityMismatch(ReferenceKind, ReferenceKind),
+    ConstraintUnsatisfied(Loc, Type, Constraint),
 }
 
 impl PrimitiveType {
@@ -98,6 +136,40 @@ impl PrimitiveType {
             Signer => MType::Signer,
             Num | Range | EventStore => return None,
         })
+    }
+
+    /// Infer a type from a value. Returns the smallest type from u64 onwards which can fit the
+    /// value.
+    pub fn possible_int_types(value: BigInt) -> Vec<PrimitiveType> {
+        Self::all_int_types()
+            .into_iter()
+            .filter(|t| value <= Self::get_max_value(t).expect("type has max"))
+            .collect()
+    }
+
+    pub fn all_int_types() -> Vec<PrimitiveType> {
+        vec![
+            PrimitiveType::U8,
+            PrimitiveType::U16,
+            PrimitiveType::U32,
+            PrimitiveType::U64,
+            PrimitiveType::U128,
+            PrimitiveType::U256,
+        ]
+    }
+
+    /// Gets the maximal value allowed for a numeric type, or none if it is unbounded.
+    pub fn get_max_value(self: &PrimitiveType) -> Option<BigInt> {
+        match self {
+            PrimitiveType::U8 => Some(BigInt::from(u8::MAX)),
+            PrimitiveType::U16 => Some(BigInt::from(u16::MAX)),
+            PrimitiveType::U32 => Some(BigInt::from(u32::MAX)),
+            PrimitiveType::U64 => Some(BigInt::from(u64::MAX)),
+            PrimitiveType::U128 => Some(BigInt::from(u128::MAX)),
+            PrimitiveType::U256 => Some(BigInt::from(&U256::max_value())),
+            PrimitiveType::Num => None,
+            _ => unreachable!("no num type"),
+        }
     }
 }
 
@@ -129,17 +201,22 @@ impl Type {
 
     /// Determines whether this is a mutable reference.
     pub fn is_mutable_reference(&self) -> bool {
-        matches!(self, Type::Reference(true, _))
+        matches!(self, Type::Reference(ReferenceKind::Mutable, _))
     }
 
     /// Determines whether this is an immutable reference.
     pub fn is_immutable_reference(&self) -> bool {
-        matches!(self, Type::Reference(false, _))
+        matches!(self, Type::Reference(ReferenceKind::Immutable, _))
     }
 
     /// Determines whether this type is a struct.
     pub fn is_struct(&self) -> bool {
         matches!(self, Type::Struct(..))
+    }
+
+    /// Determines whether this is the error type.
+    pub fn is_error(&self) -> bool {
+        matches!(self, Type::Error)
     }
 
     /// Determines whether this type is a vector
@@ -153,6 +230,17 @@ impl Type {
         match self.skip_reference() {
             Type::Struct(..) => true,
             Type::Vector(ety) => ety.is_struct_or_vector_of_struct(),
+            _ => false,
+        }
+    }
+
+    /// Whether the type is allowed for a Move constant.
+    pub fn is_valid_for_constant(&self) -> bool {
+        use PrimitiveType::*;
+        use Type::*;
+        match self {
+            Primitive(p) => matches!(p, U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address),
+            Vector(ety) => ety.is_valid_for_constant(),
             _ => false,
         }
     }
@@ -346,9 +434,7 @@ impl Type {
                     self.clone()
                 }
             },
-            Type::Reference(is_mut, bt) => {
-                Type::Reference(*is_mut, Box::new(bt.replace(params, subs)))
-            },
+            Type::Reference(kind, bt) => Type::Reference(*kind, Box::new(bt.replace(params, subs))),
             Type::Struct(mid, sid, args) => Type::Struct(*mid, *sid, replace_vec(args)),
             Type::Fun(arg, result) => Type::Fun(
                 Box::new(arg.replace(params, subs)),
@@ -447,11 +533,14 @@ impl Type {
                     .expect("Invariant violation: vector type argument contains incomplete, tuple, or spec type"))
             )),
             Reference(r, t) =>
-                if r {
+            match r {
+                ReferenceKind::Mutable => {
                     Some(MType::MutableReference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
-                } else {
+                },
+                ReferenceKind::Immutable => {
                     Some(MType::Reference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
-                }
+                },
+            },
             TypeParameter(idx) => Some(MType::TypeParameter(idx)),
             Tuple(..) | Error | Fun(..) | TypeDomain(..) | ResourceDomain(..) | Var(..) =>
                 None
@@ -571,12 +660,39 @@ impl Type {
 /// A parameter for type unification that specifies the type compatibility rules to follow.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Variance {
-    /// Co-variance is allowed in all depths of the recursive type unification process
-    Allow,
-    /// Co-variance is only allowed for the outermost type unification round
-    Shallow,
-    /// Co-variance is not allowed at all
-    Disallow,
+    /// All integer types are compatible, and reference types are eliminated.
+    SpecVariance,
+    /// Same like `SpecVariance` but only for outermost types. This is useful for preventing
+    /// variance for type parameters: e.g. we want `num` and `u64` be substitutable, but
+    /// not `vector<num>` and `vector<u64>`.
+    ShallowSpecVariance,
+    /// No variance, used in the impl language fragment
+    NoVariance,
+}
+
+impl Variance {
+    /// Checks whether specification language variance rules are selected.
+    pub fn is_spec_variance(self) -> bool {
+        matches!(self, Variance::SpecVariance | Variance::ShallowSpecVariance)
+    }
+
+    /// Constructs the variance to be used for subterms of the current type.
+    pub fn sub_variance(self) -> Variance {
+        match self {
+            Variance::ShallowSpecVariance => Variance::NoVariance,
+            Variance::SpecVariance => Variance::SpecVariance,
+            Variance::NoVariance => Variance::NoVariance,
+        }
+    }
+
+    /// Makes a selected variance shallow.
+    pub fn shallow(self) -> Self {
+        match self {
+            Variance::ShallowSpecVariance => Variance::ShallowSpecVariance,
+            Variance::SpecVariance => Variance::ShallowSpecVariance,
+            Variance::NoVariance => Variance::NoVariance,
+        }
+    }
 }
 
 impl Substitution {
@@ -584,12 +700,70 @@ impl Substitution {
     pub fn new() -> Self {
         Self {
             subs: BTreeMap::new(),
+            constraints: BTreeMap::new(),
         }
     }
 
-    /// Binds the type variables.
-    pub fn bind(&mut self, var: u16, ty: Type) {
+    /// Add a constraint to the variable.
+    pub fn add_constraint(&mut self, var: u16, loc: Loc, c: Constraint) {
+        self.constraints.entry(var).or_default().push((loc, c))
+    }
+
+    /// Binds the type variable. If there are constraints associated with the
+    /// variable, those are evaluated, possibly leading into unification
+    /// errors.
+    pub fn bind(&mut self, var: u16, ty: Type) -> Result<(), TypeUnificationError> {
+        // Specialized the type before binding, to maximize groundness of type terms.
+        let ty = self.specialize(&ty);
+        if let Some(constrs) = self.constraints.remove(&var) {
+            for (loc, c) in constrs {
+                self.eval_constraint(loc, &ty, c)?
+            }
+        }
         self.subs.insert(var, ty);
+        Ok(())
+    }
+
+    /// Evaluates whether the given type satisfies the constraint, discharging the constraint.
+    /// Notice that discharging is possible since we expect the type to be fully specialized.
+    /// For variables, we just transfer the constraint. For other types, since constraints
+    /// are over shallow structure of types, they can be decided.
+    pub fn eval_constraint(
+        &mut self,
+        loc: Loc,
+        ty: &Type,
+        c: Constraint,
+    ) -> Result<(), TypeUnificationError> {
+        if matches!(ty, Type::Error) {
+            Ok(())
+        } else if let Type::Var(other_var) = ty {
+            // Transfer constraint on to other variable, which we assert to be free
+            assert!(!self.subs.contains_key(other_var));
+            self.add_constraint(*other_var, loc, c);
+            Ok(())
+        } else {
+            match &c {
+                Constraint::SomePrimitive(options) => match ty {
+                    Type::Primitive(prim) if options.contains(prim) => Ok(()),
+                    _ => Err(TypeUnificationError::ConstraintUnsatisfied(
+                        loc,
+                        ty.clone(),
+                        c,
+                    )),
+                },
+                Constraint::SomeReference(inner_type) => match ty {
+                    Type::Reference(_, target_type) => {
+                        self.unify(Variance::NoVariance, target_type, inner_type)?;
+                        Ok(())
+                    },
+                    _ => Err(TypeUnificationError::ConstraintUnsatisfied(
+                        loc,
+                        ty.clone(),
+                        c,
+                    )),
+                },
+            }
+        }
     }
 
     /// Specializes the type, substituting all variables bound in this substitution.
@@ -638,29 +812,29 @@ impl Substitution {
         t2: &Type,
     ) -> Result<Type, TypeUnificationError> {
         // Derive the variance level for recursion
-        let sub_variance = match variance {
-            Variance::Allow => Variance::Allow,
-            Variance::Shallow | Variance::Disallow => Variance::Disallow,
-        };
-        // If any of the arguments is a reference, drop it for unification, but ensure
-        // it is put back since we need to maintain this information for later phases.
-        if let Type::Reference(is_mut, bt1) = t1 {
-            // Avoid creating nested references.
-            let t2 = if let Type::Reference(_, bt2) = t2 {
-                bt2.as_ref()
-            } else {
-                t2
-            };
-            return Ok(Type::Reference(
-                *is_mut,
-                Box::new(self.unify(sub_variance, bt1.as_ref(), t2)?),
-            ));
-        }
-        if let Type::Reference(is_mut, bt2) = t2 {
-            return Ok(Type::Reference(
-                *is_mut,
-                Box::new(self.unify(sub_variance, t1, bt2.as_ref())?),
-            ));
+        let sub_variance = variance.sub_variance();
+        // If variance is for specs and any of the arguments is a reference, drop it for
+        // unification, but ensure it is put back since we need to maintain this information
+        // for later phases.
+        if variance.is_spec_variance() {
+            if let Type::Reference(kind, bt1) = t1 {
+                // Avoid creating nested references.
+                let t2 = if let Type::Reference(_, bt2) = t2 {
+                    bt2.as_ref()
+                } else {
+                    t2
+                };
+                return Ok(Type::Reference(
+                    *kind,
+                    Box::new(self.unify(sub_variance, bt1.as_ref(), t2)?),
+                ));
+            }
+            if let Type::Reference(kind, bt2) = t2 {
+                return Ok(Type::Reference(
+                    *kind,
+                    Box::new(self.unify(sub_variance, t1, bt2.as_ref())?),
+                ));
+            }
         }
 
         // Substitute or assign variables.
@@ -686,16 +860,21 @@ impl Substitution {
                     return Ok(t1.clone());
                 }
                 // All integer types are compatible if co-variance is allowed.
-                if matches!(variance, Variance::Allow | Variance::Shallow)
-                    && t1.is_number()
-                    && t2.is_number()
-                {
+                if variance.is_spec_variance() && t1.is_number() && t2.is_number() {
                     return Ok(Type::Primitive(PrimitiveType::Num));
                 }
             },
             (Type::TypeParameter(idx1), Type::TypeParameter(idx2)) => {
                 if idx1 == idx2 {
                     return Ok(t1.clone());
+                }
+            },
+            (Type::Reference(k1, ty1), Type::Reference(k2, ty2)) => {
+                let ty = self.unify(sub_variance, ty1, ty2)?;
+                if *k1 == *k2 {
+                    return Ok(Type::Reference(*k1, Box::new(ty)));
+                } else {
+                    return Err(TypeUnificationError::MutabilityMismatch(*k1, *k2));
                 }
             },
             (Type::Tuple(ts1), Type::Tuple(ts2)) => {
@@ -786,7 +965,7 @@ impl Substitution {
             }
             // Cycle check.
             if !self.occurs_check(t2, *v1) {
-                self.subs.insert(*v1, t2.clone());
+                self.bind(*v1, t2.clone())?;
                 Ok(Some(t2.clone()))
             } else {
                 Err(TypeUnificationError::CyclicSubstitution(
@@ -1033,6 +1212,39 @@ impl TypeUnificationError {
                     t2.display(display_context),
                 )
             },
+            TypeUnificationError::MutabilityMismatch(k1, k2) => {
+                let pr = |k: ReferenceKind| match k {
+                    ReferenceKind::Immutable => "&",
+                    ReferenceKind::Mutable => "&mut",
+                };
+                format!("mutability mismatch ({} != {})", pr(*k1), pr(*k2))
+            },
+            TypeUnificationError::ConstraintUnsatisfied(_, ty, constr) => match constr {
+                Constraint::SomePrimitive(options) => {
+                    let all_ints = PrimitiveType::all_int_types()
+                        .into_iter()
+                        .collect::<BTreeSet<_>>();
+                    let options_str = if options == &all_ints {
+                        "integer".to_owned()
+                    } else {
+                        options
+                            .iter()
+                            .map(|p| Type::new_prim(*p).display(display_context).to_string())
+                            .join("|")
+                    };
+                    format!(
+                        "expected `{}` but found `{}`",
+                        ty.display(display_context),
+                        options_str
+                    )
+                },
+                Constraint::SomeReference(_) => {
+                    format!(
+                        "expected `{}` to be a reference",
+                        ty.display(display_context)
+                    )
+                },
+            },
         }
     }
 }
@@ -1075,7 +1287,7 @@ impl TypeInstantiationDerivation {
                     treat_lhs_type_param_as_var_after_index,
                     treat_rhs_type_param_as_var_after_index,
                 );
-                let rel = adapter.unify(Variance::Allow, false);
+                let rel = adapter.unify(Variance::SpecVariance, false);
                 if let Some((subst_lhs, subst_rhs)) = rel {
                     let subst = if target_lhs { subst_lhs } else { subst_rhs };
                     for (param_idx, inst_ty) in subst.into_iter() {
@@ -1289,11 +1501,13 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 }
                 Ok(())
             },
-            Reference(is_mut, t) => {
+            Reference(kind, t) => {
                 f.write_str("&")?;
-                if *is_mut {
-                    f.write_str("mut ")?;
-                }
+                let modifier = match kind {
+                    ReferenceKind::Immutable => "",
+                    ReferenceKind::Mutable => "mut ",
+                };
+                f.write_str(modifier)?;
                 write!(f, "{}", t.display(self.context))
             },
             TypeParameter(idx) => {

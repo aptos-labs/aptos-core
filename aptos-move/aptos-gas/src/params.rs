@@ -20,7 +20,7 @@ macro_rules! define_gas_parameters {
         $params_name: ident,
         $prefix: literal,
         [$(
-            [$name: ident: $ty: ty, $key_bindings: tt, $initial: expr $(,)?]
+            [$name: ident: $ty: ty, $key_bindings: tt, $initial: expr $(, $tn: ident)? $(,)?]
         ),* $(,)?]
     ) => {
         #[derive(Debug, Clone)]
@@ -75,6 +75,15 @@ macro_rules! define_gas_parameters {
             }
         }
 
+        pub mod gas_params {
+            $(
+                $(
+                    /// Marker type representing the corresponding gas parameter.
+                    #[allow(non_camel_case_types)]
+                    pub enum $tn {}
+                )?
+            )*
+        }
 
         #[test]
         fn keys_should_be_unique_for_all_versions() {

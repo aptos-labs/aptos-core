@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: invalid call of `M::foo`: generic count mismatch (expected 1 but found 0)
+   ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:11:17
+   │
+11 │         let x = foo<>(0);
+   │                 ^^^^^^^^
+
+error: invalid call of `M::foo`: generic count mismatch (expected 1 but found 2)
+   ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:12:17
+   │
+12 │         let b = foo<bool, u64>(false);
+   │                 ^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: generic count mismatch (expected 1 but found 2)
+   ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:14:17
+   │
+14 │         let r = foo<&mut u64, bool>(&mut 0);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expression construct not yet implemented: Mutate(Name(Name("r"), None), Value(InferredNum(U256(1))))
+   ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:15:9
+   │
+15 │         *r = 1;
+   │         ^^^^^^

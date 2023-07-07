@@ -360,7 +360,12 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
     // TODO: verify that the expansion AST has modules in bottom-up dependency order, since this
     // is a requirement for the builder.
     let mut builder = ModelBuilder::new(env);
-    for (module_count, (module_id, module_def)) in program.modules.into_iter().enumerate() {
+    for (module_count, (module_id, module_def)) in program
+        .modules
+        .into_iter()
+        .sorted_by_key(|(_, def)| def.dependency_order)
+        .enumerate()
+    {
         let loc = builder.to_loc(&module_def.loc);
         let addr_bytes = builder.resolve_address(&loc, &module_id.value.address);
         let module_name = ModuleName::from_address_bytes_and_name(

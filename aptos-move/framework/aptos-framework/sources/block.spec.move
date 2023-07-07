@@ -5,6 +5,10 @@ spec aptos_framework::block {
         invariant [suspendable] chain_status::is_operating() ==> exists<BlockResource>(@aptos_framework);
     }
 
+    spec BlockResource {
+        invariant epoch_interval > 0;
+    }
+
     spec block_prologue {
         use aptos_framework::chain_status;
         use aptos_framework::coin::CoinInfo;
@@ -79,6 +83,7 @@ spec aptos_framework::block {
         aborts_if epoch_interval_microsecs <= 0;
         aborts_if exists<BlockResource>(addr);
         ensures exists<BlockResource>(addr);
+        ensures global<BlockResource>(addr).height == 0;
     }
 
     spec schema NewEventHandle {
