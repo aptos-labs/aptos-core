@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::vm_validator::TransactionValidation;
+use crate::vm_validator::{TransactionValidation, TxnIndex};
 use anyhow::Result;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -34,6 +34,7 @@ pub struct MockVMValidator;
 impl VMValidator for MockVMValidator {
     fn validate_transaction(
         &self,
+        _txn_idx: TxnIndex,
         _transaction: SignedTransaction,
         _state_view: &impl StateView,
     ) -> VMValidatorResult {
@@ -44,7 +45,7 @@ impl VMValidator for MockVMValidator {
 impl TransactionValidation for MockVMValidator {
     type ValidationInstance = MockVMValidator;
 
-    fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
+    fn validate_transaction(&self, _txn_idx: TxnIndex, txn: SignedTransaction) -> Result<VMValidatorResult> {
         let txn = match txn.check_signature() {
             Ok(txn) => txn,
             Err(_) => {

@@ -75,6 +75,7 @@ impl AptosDebugger {
 
         let (status, output, gas_profiler) =
             AptosVM::execute_user_transaction_with_custom_gas_meter(
+                version as u32,
                 &state_view,
                 &txn,
                 &log_context,
@@ -235,7 +236,7 @@ impl AptosDebugger {
             TimedFeatures::enable_all(),
         )
         .unwrap();
-        let mut session = move_vm.new_session(version.into(),&state_view_storage, SessionId::Void, true);
+        let mut session = move_vm.new_session(version as u32,&state_view_storage, SessionId::Void, true);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         let change_set = session
             .finish(

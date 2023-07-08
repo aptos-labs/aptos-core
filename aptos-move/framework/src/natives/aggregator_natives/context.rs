@@ -57,7 +57,7 @@ impl<'a> NativeAggregatorContext<'a> {
         Self {
             txn_hash,
             resolver,
-            aggregator_data: RefCell::new(AggregatorData::new((txn_idx as u64) << 32)),
+            aggregator_data: RefCell::new(AggregatorData::new(((txn_idx+1) as u64) << 32)),
             aggregator_enabled,
         }
     }
