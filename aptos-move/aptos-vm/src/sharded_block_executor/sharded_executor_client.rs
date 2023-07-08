@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING_ROUNDS;
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
@@ -198,6 +198,7 @@ impl BlockExecutorClient for ShardedExecutorClient {
             let _timer = SHARDED_BLOCK_EXECUTION_SECONDS
                 .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
                 .start_timer();
+            info!("executing sub block for shard {} and round {}, number of txns {}", self.shard_id, round, sub_block.transactions.len());
             result.push(self.execute_sub_block(
                 sub_block,
                 round,
