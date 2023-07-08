@@ -143,13 +143,6 @@ impl DependentEdgeCreator {
         for (source_index, dependent_edges) in dependent_edges.into_iter() {
             while source_index >= current_sub_block.end_index() {
                 current_sub_block_index += 1;
-                if current_sub_block_index >= self.froze_sub_blocks.num_sub_blocks() {
-                    println!(
-                        "current_sub_block_index: {}, frozen_sub_block len {}",
-                        current_sub_block_index,
-                        self.froze_sub_blocks.num_sub_blocks()
-                    );
-                }
                 current_sub_block = self
                     .froze_sub_blocks
                     .get_sub_block_mut(current_sub_block_index)
