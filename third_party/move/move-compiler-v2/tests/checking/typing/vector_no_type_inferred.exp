@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unable to infer type: `vector<?1>`
+  ┌─ tests/checking/typing/vector_no_type_inferred.move:4:9
+  │
+4 │         vector[];
+  │         ^^^^^^

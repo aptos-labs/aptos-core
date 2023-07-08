@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: `integer` not compatible with `&mut integer` in name expression
+  ┌─ tests/checking/typing/mutate_non_ref.move:7:10
+  │
+7 │         *u = 1;
+  │          ^
+
+error: expected `&mut M::S` but found `M::S` in name expression
+   ┌─ tests/checking/typing/mutate_non_ref.move:10:10
+   │
+10 │         *s = S { f: 0 };
+   │          ^
+
+error: expected `&mut integer` but found `u64` in field selection
+   ┌─ tests/checking/typing/mutate_non_ref.move:11:10
+   │
+11 │         *s.f = 0;
+   │          ^^^
+
+error: expected `&mut integer` but found `u64` in field selection
+   ┌─ tests/checking/typing/mutate_non_ref.move:14:10
+   │
+14 │         *s_ref.f = 0;
+   │          ^^^^^^^
+
+error: expected `&mut M::S` but found `M::S` in field selection
+   ┌─ tests/checking/typing/mutate_non_ref.move:17:10
+   │
+17 │         *x.s = S { f: 0 };
+   │          ^^^
+
+error: expected `&mut integer` but found `u64` in field selection
+   ┌─ tests/checking/typing/mutate_non_ref.move:18:10
+   │
+18 │         *x.s.f = 0;
+   │          ^^^^^
+
+error: expected `&mut M::S` but found `M::S` in field selection
+   ┌─ tests/checking/typing/mutate_non_ref.move:21:10
+   │
+21 │         *x_ref.s = S{ f: 0 };
+   │          ^^^^^^^
+
+error: expected `&mut integer` but found `u64` in field selection
+   ┌─ tests/checking/typing/mutate_non_ref.move:22:10
+   │
+22 │         *x_ref.s.f = 0;
+   │          ^^^^^^^^^

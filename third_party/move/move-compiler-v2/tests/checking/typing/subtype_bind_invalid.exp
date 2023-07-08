@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: mutability mismatch (&mut != &) in expression
+  ┌─ tests/checking/typing/subtype_bind_invalid.move:5:27
+  │
+5 │         let x: &mut u64 = &0;
+  │                           ^^
+
+error: mutability mismatch (&mut != &) in expression
+  ┌─ tests/checking/typing/subtype_bind_invalid.move:9:45
+  │
+9 │         let (x, y): (&mut u64, &mut u64) = (&0, &0);
+  │                                             ^^
+
+error: mutability mismatch (&mut != &) in expression
+  ┌─ tests/checking/typing/subtype_bind_invalid.move:9:49
+  │
+9 │         let (x, y): (&mut u64, &mut u64) = (&0, &0);
+  │                                                 ^^
+
+error: mutability mismatch (&mut != &) in expression
+   ┌─ tests/checking/typing/subtype_bind_invalid.move:10:41
+   │
+10 │         let (x, y): (&mut u64, &u64) = (&0, &0);
+   │                                         ^^
+
+error: mutability mismatch (&mut != &) in expression
+   ┌─ tests/checking/typing/subtype_bind_invalid.move:11:45
+   │
+11 │         let (x, y): (&u64, &mut u64) = (&0, &0);
+   │                                             ^^

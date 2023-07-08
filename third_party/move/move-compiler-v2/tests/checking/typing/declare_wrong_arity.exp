@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: expected `u64` but found `()` in lvalue
+  ┌─ tests/checking/typing/declare_wrong_arity.move:6:13
+  │
+6 │         let (): u64;
+  │             ^^
+
+error: expected 4 item(s), found 3
+  ┌─ tests/checking/typing/declare_wrong_arity.move:7:13
+  │
+7 │         let (x, b, R{f}): (u64, bool, R, R);
+  │             ^^^^^^^^^^^^
+
+error: expected 2 item(s), found 3
+  ┌─ tests/checking/typing/declare_wrong_arity.move:8:13
+  │
+8 │         let (x, b, R{f}): (u64, bool);
+  │             ^^^^^^^^^^^^

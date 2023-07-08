@@ -1,18 +1,18 @@
 
 Diagnostics:
-error: expected `M::R` but found `M::S` in lvalue
+error: expected `M::S` but found `M::R` in lvalue
   ┌─ tests/checking/typing/bind_wrong_type.move:6:13
   │
 6 │         let S { g } = R {f :0};
   │             ^^^^^^^
 
-error: expected `M::R` but found `M::S` in lvalue
+error: expected `M::S` but found `M::R` in lvalue
   ┌─ tests/checking/typing/bind_wrong_type.move:7:14
   │
 7 │         let (S { g }, R { f }) = (R{ f: 0 }, R{ f: 1 });
   │              ^^^^^^^
 
-error: expected `()` but found `integer` in lvalue
+error: `integer` not compatible with `()` in lvalue
    ┌─ tests/checking/typing/bind_wrong_type.move:12:13
    │
 12 │         let () = 0;
@@ -30,13 +30,13 @@ error: expected 2 item(s), found 3
 14 │         let (x, b, R{f}) = (0, false);
    │             ^^^^^^^^^^^^
 
-error: expected `()` but found `integer` in constant
+error: `integer` not compatible with `()` in constant
    ┌─ tests/checking/typing/bind_wrong_type.move:18:21
    │
 18 │         let x: () = 0;
    │                     ^
 
-error: expected `u64` but found `()` in unit expression
+error: expected `u64` but found `()` in expression
    ┌─ tests/checking/typing/bind_wrong_type.move:19:23
    │
 19 │         let (): u64 = ();

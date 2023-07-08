@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected `bool` but found `integer` in constant
+error: `integer` not compatible with `bool` in constant
   ┌─ tests/checking/typing/block_single_expr_invalid.move:4:12
   │
 4 │         ({ 0 } : bool);

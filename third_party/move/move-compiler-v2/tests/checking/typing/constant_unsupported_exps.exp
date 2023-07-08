@@ -1,0 +1,62 @@
+
+Diagnostics:
+error: no function named `f_script` found
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:21:9
+   │
+21 │         f_script();
+   │         ^^^^^^^^^^
+
+error: no function named `X::f_public` found
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:24:9
+   │
+24 │         0x42::X::f_public();
+   │         ^^^^^^^^^^^^^^^^^^^
+
+error: no function named `X::f_script` found
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:25:9
+   │
+25 │         0x42::X::f_script();
+   │         ^^^^^^^^^^^^^^^^^^^
+
+error: no function named `X::f_friend` found
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:26:9
+   │
+26 │         0x42::X::f_friend();
+   │         ^^^^^^^^^^^^^^^^^^^
+
+error: no function named `X::f_private` found
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:27:9
+   │
+27 │         0x42::X::f_private();
+   │         ^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `move_to`: expected `&signer` but found `signer` for argument 1
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:30:9
+   │
+30 │         move_to(s, R{});
+   │         ^^^^^^^^^^^^^^^
+
+error: The type argument to `exists` and `global` must be a struct type but `?25` is not
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:31:15
+   │
+31 │         R{} = move_from(@0x42);
+   │               ^^^^^^^^^^^^^^^^
+
+error: `integer` not compatible with `()` in constant
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:39:16
+   │
+39 │         return 0;
+   │                ^
+
+error: not a valid constant expression
+   ┌─ tests/checking/typing/constant_unsupported_exps.move:13:20
+   │
+13 │       const C: u64 = {
+   │ ╭────────────────────^
+14 │ │         let x = 0;
+15 │ │         let s: signer = abort 0;
+16 │ │         let b = B { f: 0 };
+   · │
+46 │ │         0
+47 │ │     };
+   │ ╰─────^

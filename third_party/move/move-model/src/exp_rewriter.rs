@@ -381,6 +381,16 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
+            Mutate(id, lhs, rhs) => {
+                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (lhs_changed, new_lhs) = self.internal_rewrite_exp(lhs);
+                let (rhs_changed, new_rhs) = self.internal_rewrite_exp(rhs);
+                if id_changed || lhs_changed || rhs_changed {
+                    Mutate(new_id, new_lhs, new_rhs).into_exp()
+                } else {
+                    exp
+                }
+            },
             // This can happen since we are calling the rewriter during type checking, and
             // we may have encountered an error which is represented as an Invalid expression.
             Invalid(id) => Invalid(*id).into_exp(),

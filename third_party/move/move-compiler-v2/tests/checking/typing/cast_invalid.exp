@@ -1,0 +1,67 @@
+
+Diagnostics:
+error: the casted value must be a number
+  ┌─ tests/checking/typing/cast_invalid.move:6:9
+  │
+6 │         (false as u8);
+  │         ^^^^^^^^^^^^^
+
+error: the casted value must be a number
+  ┌─ tests/checking/typing/cast_invalid.move:7:9
+  │
+7 │         (true as u128);
+  │         ^^^^^^^^^^^^^^
+
+error: the casted value must be a number
+  ┌─ tests/checking/typing/cast_invalid.move:9:9
+  │
+9 │         (() as u64);
+  │         ^^^^^^^^^^^
+
+error: the casted value must be a number
+   ┌─ tests/checking/typing/cast_invalid.move:10:9
+   │
+10 │         ((0, 1) as u8);
+   │         ^^^^^^^^^^^^^^
+
+error: the cast target type must be a number
+   ┌─ tests/checking/typing/cast_invalid.move:12:9
+   │
+12 │         (0 as bool);
+   │         ^^^^^^^^^^^
+
+error: the cast target type must be a number
+   ┌─ tests/checking/typing/cast_invalid.move:13:9
+   │
+13 │         (0 as address);
+   │         ^^^^^^^^^^^^^^
+
+error: the cast target type must be a number
+   ┌─ tests/checking/typing/cast_invalid.move:14:15
+   │
+14 │         R{} = (0 as R);
+   │               ^^^^^^^^
+
+error: the cast target type must be a number
+   ┌─ tests/checking/typing/cast_invalid.move:15:9
+   │
+15 │         (0 as Cup<u8>);
+   │         ^^^^^^^^^^^^^^
+
+error: the cast target type must be a number
+   ┌─ tests/checking/typing/cast_invalid.move:16:9
+   │
+16 │         (0 as ());
+   │         ^^^^^^^^^
+
+error: the cast target type must be a number
+   ┌─ tests/checking/typing/cast_invalid.move:17:9
+   │
+17 │         (0 as (u64, u8));
+   │         ^^^^^^^^^^^^^^^^
+
+error: the casted value must be a number
+   ┌─ tests/checking/typing/cast_invalid.move:19:2
+   │
+19 │     (x"1234" as u64);
+   │     ^^^^^^^^^^^^^^^^

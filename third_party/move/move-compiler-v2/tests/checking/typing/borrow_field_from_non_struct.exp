@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: type `?2` cannot be resolved as a struct
+error: type `integer` cannot be resolved as a struct
   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:6:10
   │
 6 │         &0.f;
   │          ^^^
 
-error: type `?6` cannot be resolved as a struct
+error: type `integer` cannot be resolved as a struct
   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:7:10
   │
 7 │         &0.g;

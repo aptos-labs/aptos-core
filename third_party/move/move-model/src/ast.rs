@@ -420,6 +420,8 @@ pub enum ExpData {
     LoopCont(NodeId, bool),
     /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.
     Assign(NodeId, Pattern, Exp),
+    /// Mutation of a lhs reference, as in `*lhs = rhs`.
+    Mutate(NodeId, Exp, Exp),
 }
 
 /// An internalized expression. We do use a wrapper around the underlying internement implementation
@@ -511,6 +513,7 @@ impl ExpData {
             | Loop(node_id, ..)
             | LoopCont(node_id, ..)
             | Return(node_id, ..)
+            | Mutate(node_id, ..)
             | Assign(node_id, ..) => *node_id,
         }
     }
@@ -644,6 +647,43 @@ impl ExpData {
         called
     }
 
+    pub fn has_exit(&self) -> bool {
+        // TODO: we currently cannot break out of a visitor, so we maintain a state when we
+        // are inside a loop.
+        let mut in_loop = false;
+        let mut has_exit = false;
+        let mut visitor = |post: bool, e: &ExpData| match e {
+            ExpData::Loop(_, _) => in_loop = !post,
+            ExpData::LoopCont(_, _) if !in_loop => has_exit = true,
+            _ => {},
+        };
+        self.visit_pre_post(&mut visitor);
+        has_exit
+    }
+
+    /// Returns true of the given expression is valid for a constant expression.
+    /// TODO: this mimics the current allowed expression forms the v1 compiler allows,
+    /// but is not documented as such in the book
+    pub fn is_valid_for_constant(&self) -> bool {
+        let mut valid = true;
+        let mut visitor = |e: &ExpData| match e {
+            ExpData::Value(..) | ExpData::Invalid(_) => {},
+            ExpData::Call(_, oper, args) => {
+                if !oper.is_builtin_op() || !args.iter().all(|e| e.is_valid_for_constant()) {
+                    valid = false;
+                }
+            },
+            ExpData::Sequence(_, items) => {
+                if !items.iter().all(|e| e.is_valid_for_constant()) {
+                    valid = false
+                }
+            },
+            _ => valid = false,
+        };
+        self.visit(&mut visitor);
+        valid
+    }
+
     /// Visits expression, calling visitor on each sub-expression, depth first.
     pub fn visit<F>(&self, visitor: &mut F)
     where
@@ -727,6 +767,10 @@ impl ExpData {
                 }
             },
             Assign(_, _, e) => e.visit_pre_post(visitor),
+            Mutate(_, lhs, rhs) => {
+                lhs.visit_pre_post(visitor);
+                rhs.visit_pre_post(visitor);
+            },
             // Explicitly list all enum variants
             LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
         }
@@ -963,6 +1007,7 @@ pub enum Operation {
     MoveFrom,
     Freeze,
     Abort,
+    Vector,
 
     // Builtin functions (spec only)
     Len,
@@ -1126,6 +1171,48 @@ impl Operation {
             SpecFunction(mid, fid, _) => check_pure(*mid, *fid),
             _ => true,
         }
+    }
+
+    /// Determines whether this is a builtin operator
+    pub fn is_builtin_op(&self) -> bool {
+        use Operation::*;
+        matches!(
+            self,
+            Tuple
+                | Index
+                | Slice
+                | Range
+                | Implies
+                | Iff
+                | Identical
+                | Add
+                | Sub
+                | Mul
+                | Mod
+                | Div
+                | BitOr
+                | BitAnd
+                | Xor
+                | Shl
+                | Shr
+                | And
+                | Or
+                | Eq
+                | Neq
+                | Lt
+                | Gt
+                | Le
+                | Ge
+                | Not
+                | Cast
+                | Len
+        )
+    }
+
+    /// Whether the operation alllows to take reference parameters instead of values. This applies
+    /// currently to equality which can be used on `(T, T)`, `(T, &T)`, etc.
+    pub fn allows_ref_param_for_value(&self) -> bool {
+        matches!(self, Operation::Eq | Operation::Neq)
     }
 }
 
@@ -1457,6 +1544,9 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
             Return(_, e) => write!(f, "return {}", e.display(self.env)),
             Assign(_, lhs, rhs) => {
                 write!(f, "{} = {}", self.fmt_pattern(lhs), rhs.display(self.env))
+            },
+            Mutate(_, lhs, rhs) => {
+                write!(f, "{} = {}", lhs.display(self.env), rhs.display(self.env))
             },
         }
     }

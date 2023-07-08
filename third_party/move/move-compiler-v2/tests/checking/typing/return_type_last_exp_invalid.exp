@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: expected `u64` but found `()` in expression
+  ┌─ tests/checking/typing/return_type_last_exp_invalid.move:5:9
+  │
+5 │         ()
+  │         ^^
+
+error: `integer` not compatible with `()` in constant
+  ┌─ tests/checking/typing/return_type_last_exp_invalid.move:9:9
+  │
+9 │         0
+  │         ^
+
+error: expected 2 item(s), found 3
+   ┌─ tests/checking/typing/return_type_last_exp_invalid.move:13:9
+   │
+13 │         (0, false, R{})
+   │         ^^^^^^^^^^^^^^^
+
+error: expected 4 item(s), found 3
+   ┌─ tests/checking/typing/return_type_last_exp_invalid.move:17:9
+   │
+17 │         (0, false, R{})
+   │         ^^^^^^^^^^^^^^^
+
+error: `integer` not compatible with `bool` in constant
+   ┌─ tests/checking/typing/return_type_last_exp_invalid.move:21:10
+   │
+21 │         (0, false, R{})
+   │          ^
+
+error: expected `u64` but found `bool` in expression
+   ┌─ tests/checking/typing/return_type_last_exp_invalid.move:21:13
+   │
+21 │         (0, false, R{})
+   │             ^^^^^

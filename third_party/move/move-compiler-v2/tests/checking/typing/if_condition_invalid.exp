@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: expected `bool` but found `()` in expression
+  ┌─ tests/checking/typing/if_condition_invalid.move:3:13
+  │
+3 │         if (()) () else ();
+  │             ^^
+
+error: expected `bool` but found `()` in expression
+  ┌─ tests/checking/typing/if_condition_invalid.move:4:13
+  │
+4 │         if ((())) () else ();
+  │             ^^^^
+
+error: expected `bool` but found `()` in expression
+  ┌─ tests/checking/typing/if_condition_invalid.move:5:13
+  │
+5 │         if ({}) () else ()
+  │             ^^
+
+error: expected `bool` but found `T` in name expression
+  ┌─ tests/checking/typing/if_condition_invalid.move:9:13
+  │
+9 │         if (x) () else ();
+  │             ^
+
+error: `integer` not compatible with `bool` in constant
+   ┌─ tests/checking/typing/if_condition_invalid.move:10:13
+   │
+10 │         if (0) () else ();
+   │             ^
+
+error: expected `bool` but found `address` in value
+   ┌─ tests/checking/typing/if_condition_invalid.move:11:13
+   │
+11 │         if (@0x0) () else ()
+   │             ^^^^
+
+error: expected `bool` but found `(?3, ?4)` in expression list
+   ┌─ tests/checking/typing/if_condition_invalid.move:15:13
+   │
+15 │         if ((false, true)) () else ();
+   │             ^^^^^^^^^^^^^
+
+error: expected `bool` but found `(?5, ?6)` in expression list
+   ┌─ tests/checking/typing/if_condition_invalid.move:16:13
+   │
+16 │         if ((0, false)) () else ()
+   │             ^^^^^^^^^^

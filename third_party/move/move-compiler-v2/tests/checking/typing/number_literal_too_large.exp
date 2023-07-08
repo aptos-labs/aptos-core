@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: constant does not fit into `u64`
+  ┌─ tests/checking/typing/number_literal_too_large.move:5:10
+  │
+5 │         (340282366920938463463374607431768211454: u64);
+  │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `u8`
+  ┌─ tests/checking/typing/number_literal_too_large.move:6:10
+  │
+6 │         (340282366920938463463374607431768211454: u8);
+  │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `u64`
+  ┌─ tests/checking/typing/number_literal_too_large.move:8:10
+  │
+8 │         (18446744073709551616: u64);
+  │          ^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `u8`
+  ┌─ tests/checking/typing/number_literal_too_large.move:9:10
+  │
+9 │         (18446744073709551616: u8);
+  │          ^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `u8`
+   ┌─ tests/checking/typing/number_literal_too_large.move:11:10
+   │
+11 │         (18446744073709551615: u8);
+   │          ^^^^^^^^^^^^^^^^^^^^
+
+error: constant does not fit into `u8`
+   ┌─ tests/checking/typing/number_literal_too_large.move:13:10
+   │
+13 │         (256: u8);
+   │          ^^^
+
+error: constant does not fit into `u16`
+   ┌─ tests/checking/typing/number_literal_too_large.move:19:10
+   │
+19 │         (3402534025: u16);
+   │          ^^^^^^^^^^
+
+error: constant does not fit into `u32`
+   ┌─ tests/checking/typing/number_literal_too_large.move:22:10
+   │
+22 │         (3402534025534025: u32);
+   │          ^^^^^^^^^^^^^^^^

@@ -383,7 +383,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn decl_ana(
         &mut self,
         module_def: &EA::ModuleDefinition,
-        compiled_module: &Option<BytecodeModule>,
+        _compiled_module: &Option<BytecodeModule>,
     ) {
         for (name, struct_def) in module_def.structs.key_cloned_iter() {
             self.decl_ana_struct(&name, struct_def);
@@ -392,19 +392,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.decl_ana_fun(&name, fun_def);
         }
         for (name, const_def) in module_def.constants.key_cloned_iter() {
-            self.decl_ana_const(&name, const_def, compiled_module);
+            self.decl_ana_const(&name, const_def);
         }
         for spec in &module_def.specs {
             self.decl_ana_spec_block(spec);
         }
     }
 
-    fn decl_ana_const(
-        &mut self,
-        name: &PA::ConstantName,
-        def: &EA::Constant,
-        compiled_module: &Option<BytecodeModule>,
-    ) {
+    fn decl_ana_const(&mut self, name: &PA::ConstantName, def: &EA::Constant) {
         let qsym = self.qualified_by_module_from_name(&name.0);
         if self.parent.const_table.contains_key(&qsym) {
             self.parent.env.error(
@@ -412,49 +407,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 &format!("duplicate declaration of `{}`", &name.value()),
             )
         }
-        let name = qsym.symbol;
-        let const_name = ConstantName(self.symbol_pool().string(name).to_string().into());
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun();
         let loc = et.to_loc(&def.loc);
         let ty = et.translate_type(&def.signature);
-        let value = if !ty.is_valid_for_constant() {
-            et.error(&et.to_loc(&def.signature.loc), "invalid type for constant");
-            // Use dummy value. It does not matter its not matching the type, we never
-            // continue after type checking.
-            Value::Bool(false)
-        } else if let Some(BytecodeModule {
-            compiled_module,
-            source_map,
-            ..
-        }) = compiled_module
-        {
-            // Get the already assigned constant index.
-            let const_idx = source_map
-                .constant_map
-                .get(&const_name)
-                .expect("constant not in source map");
-            let move_value = Constant::deserialize_constant(
-                &compiled_module.constant_pool()[*const_idx as usize],
-            )
-            .unwrap();
-            et.translate_from_move_value(&loc, &ty, &move_value)
-        } else {
-            // Type check the constant.
-            let exp = et.translate_exp(&def.value, &ty);
-            if let ExpData::Value(_, value) = exp {
-                value
-            } else {
-                et.error(
-                    &et.parent.parent.env.get_node_loc(exp.node_id()),
-                    "expected a constant expression",
-                );
-                Value::Bool(false)
-            }
-        };
         et.parent.parent.define_const(qsym, ConstEntry {
             loc,
             ty,
-            value,
+            value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
             visibility: EntryVisibility::SpecAndImpl,
         });
     }
@@ -761,6 +721,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.def_ana_struct(&name, def);
         }
 
+        // Analyze all constants.
+        for (name, def) in module_def.constants.key_cloned_iter() {
+            self.def_ana_constant(&name, def, compiled_module);
+        }
+
         // Analyze all functions.
         for (idx, (name, fun_def)) in module_def.functions.key_cloned_iter().enumerate() {
             self.def_ana_fun(&name, &fun_def.body, idx);
@@ -1012,6 +977,71 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     }
 }
 
+/// ## Constant Definition Analysis
+
+impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+    fn def_ana_constant(
+        &mut self,
+        name: &PA::ConstantName,
+        def: &EA::Constant,
+        compiled_module: &Option<BytecodeModule>,
+    ) {
+        let qsym = self.qualified_by_module_from_name(&name.0);
+        let (loc, ty) = {
+            let entry = self
+                .parent
+                .const_table
+                .get(&qsym)
+                .expect("constant declared");
+            (entry.loc.clone(), entry.ty.clone())
+        };
+        let name = qsym.symbol;
+        let const_name = ConstantName(self.symbol_pool().string(name).to_string().into());
+        let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun();
+        let value = if let Some(BytecodeModule {
+            compiled_module,
+            source_map,
+            ..
+        }) = compiled_module
+        {
+            // Get the already assigned constant index.
+            let const_idx = source_map
+                .constant_map
+                .get(&const_name)
+                .expect("constant not in source map");
+            let move_value = Constant::deserialize_constant(
+                &compiled_module.constant_pool()[*const_idx as usize],
+            )
+            .unwrap();
+            et.translate_from_move_value(&loc, &ty, &move_value)
+        } else {
+            // Type check the constant.
+            let exp = et.translate_exp(&def.value, &ty);
+            if !exp.is_valid_for_constant() {
+                et.error(
+                    &et.get_node_loc(exp.node_id()),
+                    "not a valid constant expression",
+                );
+                Value::Bool(false)
+            } else if let ExpData::Value(_, value) = exp {
+                value
+            } else {
+                et.error(
+                    &et.get_node_loc(exp.node_id()),
+                    "current restriction: constant expression must be a value",
+                );
+                Value::Bool(false)
+            }
+        };
+        self.parent
+            .const_table
+            .get_mut(&qsym)
+            .expect("constant declared")
+            .value = value;
+    }
+}
+
 /// ## Struct Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
@@ -1080,9 +1110,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
             let body_translator = |et: &mut ExpTranslator, as_spec_fun: bool| {
                 if as_spec_fun {
-                    et.translate_fun_as_spec_fun()
+                    et.set_translate_fun_as_spec_fun()
                 } else {
-                    et.translate_move_fun()
+                    et.set_translate_move_fun()
                 }
                 let loc = et.to_loc(&body.loc);
                 for (pos, TypeParameter(name, _)) in type_params.iter().enumerate() {
@@ -1118,6 +1148,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             if self.compile_move {
                 // Also translate as regular Move function
                 let mut et = ExpTranslator::new(self);
+                et.set_result_type(result_type.clone());
                 let translated = body_translator(&mut et, false);
                 assert!(self
                     .fun_defs

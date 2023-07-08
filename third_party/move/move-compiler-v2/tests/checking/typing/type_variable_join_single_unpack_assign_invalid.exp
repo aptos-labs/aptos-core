@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: expected `bool` but found `u64` in name expression
+   ┌─ tests/checking/typing/type_variable_join_single_unpack_assign_invalid.move:13:10
+   │
+13 │         (f2: bool);
+   │          ^^
+
+error: expected `bool` but found `u64` in name expression
+   ┌─ tests/checking/typing/type_variable_join_single_unpack_assign_invalid.move:18:10
+   │
+18 │         (f2: Box<bool>);
+   │          ^^

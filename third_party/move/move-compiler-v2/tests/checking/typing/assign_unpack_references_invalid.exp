@@ -1,24 +1,24 @@
 
 Diagnostics:
-error: expected `&u64` but found `integer` in lvalue
+error: `integer` not compatible with `&u64` in lvalue
   ┌─ tests/checking/typing/assign_unpack_references_invalid.move:9:9
   │
 9 │         f = 0;
   │         ^
 
-error: expected `M::S` but found `&M::S` in lvalue
+error: expected `&M::S` but found `M::S` in lvalue
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:10:9
    │
 10 │         s2 = S { f: 0 }
    │         ^^
 
-error: expected `&mut u64` but found `integer` in lvalue
+error: `integer` not compatible with `&mut u64` in lvalue
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:17:9
    │
 17 │         f = 0;
    │         ^
 
-error: expected `M::S` but found `&mut M::S` in lvalue
+error: expected `&mut M::S` but found `M::S` in lvalue
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:18:9
    │
 18 │         s2 = S { f: 0 }

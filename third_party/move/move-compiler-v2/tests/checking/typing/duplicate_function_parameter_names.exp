@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: duplicate declaration of `x`
+  ┌─ tests/checking/typing/duplicate_function_parameter_names.move:2:21
+  │
+2 │     fun foo(x: u64, x: u64) {}
+  │                     ^
+
+error: previous declaration of `x`
+  ┌─ tests/checking/typing/duplicate_function_parameter_names.move:2:13
+  │
+2 │     fun foo(x: u64, x: u64) {}
+  │             ^
+
+error: duplicate declaration of `x`
+  ┌─ tests/checking/typing/duplicate_function_parameter_names.move:2:29
+  │
+2 │     fun foo(x: u64, x: u64) {}
+  │                             ^^
+
+error: previous declaration of `x`
+  ┌─ tests/checking/typing/duplicate_function_parameter_names.move:2:29
+  │
+2 │     fun foo(x: u64, x: u64) {}
+  │                             ^^

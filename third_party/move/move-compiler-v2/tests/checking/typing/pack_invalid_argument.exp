@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: expected `u64` but found `bool` in expression
+  ┌─ tests/checking/typing/pack_invalid_argument.move:7:17
+  │
+7 │         (S { f: false } : S);
+  │                 ^^^^^
+
+error: expected `u64` but found `bool` in expression
+   ┌─ tests/checking/typing/pack_invalid_argument.move:18:16
+   │
+18 │             f: false,
+   │                ^^^^^
+
+error: expected `u64` but found `bool` in pack expression
+   ┌─ tests/checking/typing/pack_invalid_argument.move:19:17
+   │
+19 │             n1: Nat { f: false },
+   │                 ^^^^^^^^^^^^^^^^
+
+error: expected `M::S` but found `M::R` in pack expression
+   ┌─ tests/checking/typing/pack_invalid_argument.move:20:17
+   │
+20 │             n2: Nat{ f: r }
+   │                 ^^^^^^^^^^^
+
+error: expected `M::S` but found `M::R` in name expression
+   ┌─ tests/checking/typing/pack_invalid_argument.move:17:16
+   │
+17 │             s: r,
+   │                ^

@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: invalid call of `M::foo`: `integer` not compatible with `M::S` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_single_argument.move:24:9
+   │
+24 │         foo(0);
+   │         ^^^^^^
+
+error: invalid call of `M::bar`: expected `u64` but found `M::S` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_single_argument.move:25:9
+   │
+25 │         bar(S{});
+   │         ^^^^^^^^
+
+error: invalid call of `M::bar`: expected `u64` but found `address` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_single_argument.move:26:9
+   │
+26 │         bar(@0x0);
+   │         ^^^^^^^^^
+
+error: invalid call of `X::foo`: expected `X::S` but found `M::S` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_single_argument.move:30:9
+   │
+30 │         X::foo(S{});
+   │         ^^^^^^^^^^^
+
+error: invalid call of `X::foo`: `integer` not compatible with `X::S` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_single_argument.move:31:9
+   │
+31 │         X::foo(0);
+   │         ^^^^^^^^^
+
+error: invalid call of `X::bar`: expected `u64` but found `M::S` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_single_argument.move:32:9
+   │
+32 │         X::bar(S{});
+   │         ^^^^^^^^^^^
+
+error: invalid call of `X::bar`: expected `u64` but found `bool` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_single_argument.move:33:9
+   │
+33 │         X::bar(false);
+   │         ^^^^^^^^^^^^^

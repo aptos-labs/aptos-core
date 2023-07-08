@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: type unification cycle check failed (`?3 =?= (?3, integer)`, try to annotate type) in lvalue
+  ┌─ tests/checking/typing/recursive_local.move:5:9
+  │
+5 │         x = (x, 0);
+  │         ^

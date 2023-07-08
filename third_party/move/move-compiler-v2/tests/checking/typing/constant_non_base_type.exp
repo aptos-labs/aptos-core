@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: not a valid constant expression
+  ┌─ tests/checking/typing/constant_non_base_type.move:3:22
+  │
+3 │     const C1: &u64 = &0;
+  │                      ^^
+
+error: mutability mismatch (&mut != &) in expression
+  ┌─ tests/checking/typing/constant_non_base_type.move:4:26
+  │
+4 │     const C2: &mut u64 = &0;
+  │                          ^^
+
+error: not a valid constant expression
+  ┌─ tests/checking/typing/constant_non_base_type.move:4:26
+  │
+4 │     const C2: &mut u64 = &0;
+  │                          ^^
+
+error: current restriction: constant expression must be a value
+  ┌─ tests/checking/typing/constant_non_base_type.move:5:20
+  │
+5 │     const C3: () = ();
+  │                    ^^
+
+error: current restriction: constant expression must be a value
+  ┌─ tests/checking/typing/constant_non_base_type.move:6:33
+  │
+6 │     const C4: (address, bool) = (@0x0, false);
+  │                                 ^^^^^^^^^^^^^

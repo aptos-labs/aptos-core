@@ -163,6 +163,7 @@ impl<'env> Generator<'env> {
             | ExpData::Sequence(id, _)
             | ExpData::Loop(id, _)
             | ExpData::LoopCont(id, _)
+            | ExpData::Mutate(id, _, _)
             | ExpData::Assign(id, _, _) => self.internal_error(*id, "not yet implemented"),
             ExpData::Quant(id, _, _, _, _, _) => {
                 self.internal_error(*id, "unsupported specification construct")
@@ -266,6 +267,7 @@ impl<'env> Generator<'env> {
             | Operation::MoveFrom
             | Operation::MoveTo
             | Operation::Abort
+            | Operation::Vector
             | Operation::Freeze => self.internal_error(id, "not yet implemented"),
             Operation::MoveFunction(m, f) => {
                 self.gen_function_call(targets, id, m.qualified(*f), args)

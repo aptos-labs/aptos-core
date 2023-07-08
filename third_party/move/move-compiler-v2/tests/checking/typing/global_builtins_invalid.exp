@@ -1,0 +1,103 @@
+
+Diagnostics:
+error: invalid call of `exists`: argument count mismatch (expected 1 but found 0)
+  ┌─ tests/checking/typing/global_builtins_invalid.move:5:24
+  │
+5 │         let _ : bool = exists<R>();
+  │                        ^^^^^^^^^^^
+
+error: invalid call of `move_to`: argument count mismatch (expected 2 but found 0)
+  ┌─ tests/checking/typing/global_builtins_invalid.move:6:18
+  │
+6 │         let () = move_to<R>();
+  │                  ^^^^^^^^^^^^
+
+error: invalid call of `borrow_global`: argument count mismatch (expected 1 but found 0)
+  ┌─ tests/checking/typing/global_builtins_invalid.move:7:22
+  │
+7 │         let _ : &R = borrow_global<R>();
+  │                      ^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `borrow_global_mut`: argument count mismatch (expected 1 but found 0)
+  ┌─ tests/checking/typing/global_builtins_invalid.move:8:26
+  │
+8 │         let _ : &mut R = borrow_global_mut<R>();
+  │                          ^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `move_from`: argument count mismatch (expected 1 but found 0)
+  ┌─ tests/checking/typing/global_builtins_invalid.move:9:20
+  │
+9 │         let R {} = move_from<R>();
+  │                    ^^^^^^^^^^^^^^
+
+error: invalid call of `exists`: `integer` not compatible with `address` for argument 1
+   ┌─ tests/checking/typing/global_builtins_invalid.move:13:24
+   │
+13 │         let _ : bool = exists<R>(0);
+   │                        ^^^^^^^^^^^^
+
+error: invalid call of `move_to`: `integer` not compatible with `M::R` for argument 2
+   ┌─ tests/checking/typing/global_builtins_invalid.move:14:18
+   │
+14 │         let () = move_to<R>(a, 0);
+   │                  ^^^^^^^^^^^^^^^^
+
+error: The type argument to `exists` and `global` must be a struct type but `integer` is not
+   ┌─ tests/checking/typing/global_builtins_invalid.move:15:18
+   │
+15 │         let () = move_to(a, 0);
+   │                  ^^^^^^^^^^^^^
+
+error: invalid call of `borrow_global`: `integer` not compatible with `address` for argument 1
+   ┌─ tests/checking/typing/global_builtins_invalid.move:16:22
+   │
+16 │         let _ : &R = borrow_global<R>(0);
+   │                      ^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `borrow_global_mut`: `integer` not compatible with `address` for argument 1
+   ┌─ tests/checking/typing/global_builtins_invalid.move:17:26
+   │
+17 │         let _ : &mut R = borrow_global_mut<R>(0);
+   │                          ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `move_from`: `integer` not compatible with `address` for argument 1
+   ┌─ tests/checking/typing/global_builtins_invalid.move:18:20
+   │
+18 │         let R {} = move_from<R>(0);
+   │                    ^^^^^^^^^^^^^^^
+
+error: invalid call of `exists`: argument count mismatch (expected 1 but found 2)
+   ┌─ tests/checking/typing/global_builtins_invalid.move:22:24
+   │
+22 │         let _ : bool = exists<R>(@0x0, 0);
+   │                        ^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `move_to`: argument count mismatch (expected 2 but found 3)
+   ┌─ tests/checking/typing/global_builtins_invalid.move:23:18
+   │
+23 │         let () = move_to<R>(a, R{}, 0);
+   │                  ^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `move_to`: argument count mismatch (expected 2 but found 3)
+   ┌─ tests/checking/typing/global_builtins_invalid.move:24:18
+   │
+24 │         let () = move_to(a, R{}, 0);
+   │                  ^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `borrow_global`: argument count mismatch (expected 1 but found 2)
+   ┌─ tests/checking/typing/global_builtins_invalid.move:25:22
+   │
+25 │         let _ : &R = borrow_global<R>(@0x0, false);
+   │                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `borrow_global_mut`: argument count mismatch (expected 1 but found 2)
+   ┌─ tests/checking/typing/global_builtins_invalid.move:26:26
+   │
+26 │         let _ : &mut R = borrow_global_mut<R>(@0x0, true);
+   │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `move_from`: argument count mismatch (expected 1 but found 2)
+   ┌─ tests/checking/typing/global_builtins_invalid.move:27:20
+   │
+27 │         let R {} = move_from<R>(@0x0, 0);
+   │                    ^^^^^^^^^^^^^^^^^^^^^

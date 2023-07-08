@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: current restriction: constant expression must be a value
+   ┌─ tests/checking/typing/constant_allowed_but_not_supported.move:6:20
+   │
+ 6 │       const C: u64 = {
+   │ ╭────────────────────^
+ 7 │ │         move X;
+ 8 │ │         copy Y;
+ 9 │ │         Z;
+10 │ │         0
+11 │ │     };
+   │ ╰─────^
