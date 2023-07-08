@@ -4,6 +4,7 @@ use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
         block_executor_client::BlockExecutorClient,
+        counters::SHARDED_BLOCK_EXECUTION_SECONDS,
         cross_shard_client::{CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
         messages::CrossShardMsg,
@@ -194,6 +195,9 @@ impl BlockExecutorClient for ShardedExecutorClient {
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
+            let _timer = SHARDED_BLOCK_EXECUTION_SECONDS
+                .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
+                .start_timer();
             result.push(self.execute_sub_block(
                 sub_block,
                 round,
