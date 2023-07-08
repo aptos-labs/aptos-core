@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: invalid call of `==`: expected `u8` but found `u128` for argument 2
+   ┌─ tests/checking/typing/eq_invalid.move:13:9
+   │
+13 │         (0: u8) == (1: u128);
+   │         ^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `==`: `integer` not compatible with `bool` for argument 2
+   ┌─ tests/checking/typing/eq_invalid.move:14:9
+   │
+14 │         0 == false;
+   │         ^^^^^^^^^^
+
+error: unable to infer type: `M::G2<?8>`
+   ┌─ tests/checking/typing/eq_invalid.move:28:9
+   │
+28 │         G2{} == G2{};
+   │         ^^^^
+
+error: invalid call of `==`: tuples have different arity (3 != 2) for argument 2
+   ┌─ tests/checking/typing/eq_invalid.move:35:9
+   │
+35 │         (1, 2, 3) == (0, 1);
+   │         ^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `==`: tuples have different arity (2 != 3) for argument 2
+   ┌─ tests/checking/typing/eq_invalid.move:36:9
+   │
+36 │         (0, 1) == (1, 2, 3);
+   │         ^^^^^^^^^^^^^^^^^^^

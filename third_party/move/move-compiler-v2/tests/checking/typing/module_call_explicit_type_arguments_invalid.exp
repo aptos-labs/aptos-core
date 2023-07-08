@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: invalid call of `M::foo`: expected `u64` but found `bool` for argument 1
+  ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:6:9
+  │
+6 │         foo<u64, u64>(false, false);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: `integer` not compatible with `bool` for argument 1
+  ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:7:9
+  │
+7 │         foo<bool, bool>(0, false);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: `integer` not compatible with `bool` for argument 2
+  ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:8:9
+  │
+8 │         foo<bool, bool>(false, 0);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: `integer` not compatible with `bool` for argument 1
+  ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:9:9
+  │
+9 │         foo<bool, bool>(0, 0);
+  │         ^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: expected `U` but found `T` for argument 1
+   ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:13:9
+   │
+13 │         foo<U, u64>(t, 0);
+   │         ^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: expected `V` but found `U` for argument 1
+   ┌─ tests/checking/typing/module_call_explicit_type_arguments_invalid.move:14:9
+   │
+14 │         foo<V, T>(u, v);
+   │         ^^^^^^^^^^^^^^^

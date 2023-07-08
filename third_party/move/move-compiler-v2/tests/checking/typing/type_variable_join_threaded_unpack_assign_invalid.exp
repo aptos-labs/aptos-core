@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: `integer` not compatible with `bool` in name expression
+   ┌─ tests/checking/typing/type_variable_join_threaded_unpack_assign_invalid.move:36:9
+   │
+36 │         f1
+   │         ^^

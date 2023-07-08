@@ -1,18 +1,18 @@
 
 Diagnostics:
-error: expected `u64` but found `()` in unit expression
+error: expected `u64` but found `()` in expression
   ┌─ tests/checking/typing/block_empty_invalid.move:3:10
   │
 3 │         ({}: u64);
   │          ^^
 
-error: expected `&u64` but found `()` in unit expression
+error: expected `&u64` but found `()` in expression
   ┌─ tests/checking/typing/block_empty_invalid.move:4:10
   │
 4 │         ({}: &u64);
   │          ^^
 
-error: tuples have different arity (0 != 2) in unit expression
+error: tuples have different arity (0 != 2) in expression
   ┌─ tests/checking/typing/block_empty_invalid.move:5:10
   │
 5 │         ({}: (u64, bool));

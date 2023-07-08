@@ -1,0 +1,73 @@
+
+Diagnostics:
+error: `integer` not compatible with `bool` in constant
+  ┌─ tests/checking/typing/mutate_invalid.move:6:15
+  │
+6 │         *&mut 0 = false;
+  │               ^
+
+error: expected `&integer` but found `u64` in field selection
+  ┌─ tests/checking/typing/mutate_invalid.move:7:15
+  │
+7 │         *&mut S{f:0}.f = &1;
+  │               ^^^^^^^^
+
+error: cannot borrow from a reference
+  ┌─ tests/checking/typing/mutate_invalid.move:7:10
+  │
+7 │         *&mut S{f:0}.f = &1;
+  │          ^^^^^^^^^^^^^
+
+error: expected `(integer, integer)` but found `u64` in expression
+  ┌─ tests/checking/typing/mutate_invalid.move:8:10
+  │
+8 │         *foo(&mut 0) = (1, 0);
+  │          ^^^^^^^^^^^
+
+error: expected `()` but found `u64` in field selection
+  ┌─ tests/checking/typing/mutate_invalid.move:9:9
+  │
+9 │         bar(&mut S{f:0}).f = ();
+  │         ^^^^^^^^^^^^^^^^^^
+
+error: expected `&integer` but found `u64` in field selection
+   ┌─ tests/checking/typing/mutate_invalid.move:10:15
+   │
+10 │         *&mut bar(&mut S{f:0}).f = &0;
+   │               ^^^^^^^^^^^^^^^^^^
+
+error: cannot borrow from a reference
+   ┌─ tests/checking/typing/mutate_invalid.move:10:10
+   │
+10 │         *&mut bar(&mut S{f:0}).f = &0;
+   │          ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `bool` but found `u64` in field selection
+   ┌─ tests/checking/typing/mutate_invalid.move:11:9
+   │
+11 │         baz().f = false;
+   │         ^^^^^^^
+
+error: expected `bool` but found `u64` in field selection
+   ┌─ tests/checking/typing/mutate_invalid.move:12:15
+   │
+12 │         *&mut baz().f = false;
+   │               ^^^^^^^
+
+error: expected `M::X` but found `M::S` in name expression
+   ┌─ tests/checking/typing/mutate_invalid.move:17:10
+   │
+17 │         *r = X { f: 1 };
+   │          ^
+
+error: expected `&integer` but found `u64` in field selection
+   ┌─ tests/checking/typing/mutate_invalid.move:19:9
+   │
+19 │         r.f = &0;
+   │         ^^^
+
+error: expected `()` but found `u64` in field selection
+   ┌─ tests/checking/typing/mutate_invalid.move:20:15
+   │
+20 │         *&mut r.f = ();
+   │               ^^^

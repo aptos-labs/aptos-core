@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: expected `X::R` but found `()` in expression
+   ┌─ tests/checking/typing/loop_result_type_invalid.move:11:9
+   │
+11 │         loop { if (false) break }
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `u64` but found `()` in expression
+   ┌─ tests/checking/typing/loop_result_type_invalid.move:15:9
+   │
+15 │         loop { let x = 0; break }
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: expected `u64` but found `()` for argument 1
+   ┌─ tests/checking/typing/loop_result_type_invalid.move:19:9
+   │
+19 │         foo(loop { break })
+   │         ^^^^^^^^^^^^^^^^^^^
+
+error: expected 0 item(s), found 2
+   ┌─ tests/checking/typing/loop_result_type_invalid.move:26:13
+   │
+26 │         let (x, y) = loop { if (false) break };
+   │             ^^^^^^

@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: mutability mismatch (&mut != &) in annotate expression
+  ┌─ tests/checking/typing/mutate_immutable.move:5:10
+  │
+5 │         *(s: &S) = S { f: 0 };
+  │          ^^^^^^^
+
+error: mutability mismatch (&mut != &) in expression
+  ┌─ tests/checking/typing/mutate_immutable.move:6:10
+  │
+6 │         *&0 = 1;
+  │          ^^
+
+error: mutability mismatch (&mut != &) in name expression
+   ┌─ tests/checking/typing/mutate_immutable.move:10:10
+   │
+10 │         *x_ref = 0;
+   │          ^^^^^

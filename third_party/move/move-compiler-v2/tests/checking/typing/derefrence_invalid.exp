@@ -1,0 +1,79 @@
+
+Diagnostics:
+error: expected `bool` but found `u64` in name expression
+  ┌─ tests/checking/typing/derefrence_invalid.move:6:11
+  │
+6 │         (*x : bool);
+  │           ^
+
+error: expected `&u64` but found `u64` in name expression
+  ┌─ tests/checking/typing/derefrence_invalid.move:7:11
+  │
+7 │         (*x_mut: &u64);
+  │           ^^^^^
+
+error: expected `M::X` but found `M::S` in name expression
+  ┌─ tests/checking/typing/derefrence_invalid.move:9:11
+  │
+9 │         (*s: X);
+  │           ^
+
+error: expected `bool` but found `u64` in field selection
+   ┌─ tests/checking/typing/derefrence_invalid.move:10:12
+   │
+10 │         (*&s.f: bool);
+   │            ^^^
+
+error: expected `&u64` but found `u64` in field selection
+   ┌─ tests/checking/typing/derefrence_invalid.move:11:10
+   │
+11 │         (s.f: &u64);
+   │          ^^^
+
+error: expected `&M::X` but found `M::X` in field selection
+   ┌─ tests/checking/typing/derefrence_invalid.move:12:12
+   │
+12 │         (*&s.x: &X);
+   │            ^^^
+
+error: cannot borrow from a reference
+   ┌─ tests/checking/typing/derefrence_invalid.move:12:11
+   │
+12 │         (*&s.x: &X);
+   │           ^^^^
+
+error: expected `M::X` but found `M::S` in name expression
+   ┌─ tests/checking/typing/derefrence_invalid.move:14:11
+   │
+14 │         (*s_mut: X);
+   │           ^^^^^
+
+error: expected `bool` but found `u64` in field selection
+   ┌─ tests/checking/typing/derefrence_invalid.move:15:12
+   │
+15 │         (*&s_mut.f: bool);
+   │            ^^^^^^^
+
+error: expected `(bool, u64)` but found `u64` in field selection
+   ┌─ tests/checking/typing/derefrence_invalid.move:16:16
+   │
+16 │         (*&mut s_mut.f: (bool, u64));
+   │                ^^^^^^^
+
+error: expected `&u64` but found `u64` in field selection
+   ┌─ tests/checking/typing/derefrence_invalid.move:17:10
+   │
+17 │         (s_mut.f: &u64);
+   │          ^^^^^^^
+
+error: expected `(M::X, M::S)` but found `M::X` in field selection
+   ┌─ tests/checking/typing/derefrence_invalid.move:18:12
+   │
+18 │         (*&s_mut.x: (X, S));
+   │            ^^^^^^^
+
+error: expected `()` but found `M::X` in field selection
+   ┌─ tests/checking/typing/derefrence_invalid.move:19:16
+   │
+19 │         (*&mut s_mut.x: ());
+   │                ^^^^^^^
