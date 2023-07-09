@@ -541,10 +541,12 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig>
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
-        "pfn_const_tps" => pfn_const_tps(duration, false),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, true),
-        "pfn_performance" => pfn_performance(duration, false),
-        "pfn_performance_with_network_chaos" => pfn_performance(duration, true),
+        "pfn_const_tps" => pfn_const_tps(duration, false, false),
+        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true),
+        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true),
+        "pfn_performance" => pfn_performance(duration, false, false),
+        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
+        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -553,9 +555,7 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig>
 fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetworkTest {
     CompositeNetworkTest::new_with_two_wrappers(
         MultiRegionNetworkEmulationTest::default(),
-        CpuChaosTest {
-            override_config: None,
-        },
+        CpuChaosTest::default(),
         test,
     )
 }
@@ -1786,9 +1786,7 @@ fn mainnet_like_simulation_test() -> ForgeConfig {
         )
         .add_network_test(CompositeNetworkTest::new(
             MultiRegionNetworkEmulationTest::default(),
-            CpuChaosTest {
-                override_config: None,
-            },
+            CpuChaosTest::default(),
         ))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -1850,20 +1848,26 @@ fn multiregion_benchmark_test() -> ForgeConfig {
 
 /// This test runs a constant-TPS benchmark where the network includes
 /// PFNs, and the transactions are submitted to the PFNs. This is useful
-/// for measuring latencies when the system is not saturated. If
-/// `add_network_emulation` is true, network chaos is enabled on the entire swarm.
-fn pfn_const_tps(duration: Duration, add_network_emulation: bool) -> ForgeConfig {
+/// for measuring latencies when the system is not saturated.
+///
+/// Note: If `add_cpu_chaos` is true, CPU chaos is enabled on the entire swarm.
+/// Likewise, if `add_network_emulation` is true, network chaos is enabled.
+fn pfn_const_tps(
+    duration: Duration,
+    add_cpu_chaos: bool,
+    add_network_emulation: bool,
+) -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-        .add_network_test(PFNPerformance::new(add_network_emulation))
+        .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(0)
+            SuccessCriteria::new(50)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
@@ -1878,19 +1882,35 @@ fn pfn_const_tps(duration: Duration, add_network_emulation: bool) -> ForgeConfig
 
 /// This test runs a performance benchmark where the network includes
 /// PFNs, and the transactions are submitted to the PFNs. This is useful
-/// for measuring maximum throughput and latencies. If `add_network_emulation`
-/// is true, network chaos is enabled on the entire swarm.
-fn pfn_performance(duration: Duration, add_network_emulation: bool) -> ForgeConfig {
+/// for measuring maximum throughput and latencies.
+///
+/// Note: If `add_cpu_chaos` is true, CPU chaos is enabled on the entire swarm.
+/// Likewise, if `add_network_emulation` is true, network chaos is enabled.
+fn pfn_performance(
+    duration: Duration,
+    add_cpu_chaos: bool,
+    add_network_emulation: bool,
+) -> ForgeConfig {
+    // Determine the minimum expected TPS
+    let min_expected_tps = if add_cpu_chaos {
+        3000
+    } else if add_network_emulation {
+        4000
+    } else {
+        4500
+    };
+
+    // Create the forge config
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
-        .add_network_test(PFNPerformance::new(add_network_emulation))
+        .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(4500)
+            SuccessCriteria::new(min_expected_tps)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
