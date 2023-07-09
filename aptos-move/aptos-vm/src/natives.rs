@@ -4,7 +4,8 @@
 
 #[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
 use aptos_types::{

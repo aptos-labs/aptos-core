@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::{
-    AbstractValueSize, AptosGasMeter, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes,
-};
+use aptos_gas::AptosGasMeter;
+use aptos_gas_algebra::{AbstractValueSize, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
     state_store::state_key::StateKey, write_set::WriteOp,
@@ -231,7 +230,7 @@ where
         addr: move_core_types::account_address::AccountAddress,
         ty: impl TypeView,
         val: Option<impl ValueView>,
-        bytes_loaded: aptos_gas::NumBytes,
+        bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         if self.feature_version() != 0 {
             // TODO(Gas): Rewrite this in a better way.
@@ -404,7 +403,7 @@ where
     fn charge_vec_unpack(
         &mut self,
         ty: impl TypeView,
-        expect_num_elements: aptos_gas::NumArgs,
+        expect_num_elements: NumArgs,
         elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
         self.release_heap_memory(elems.clone().fold(AbstractValueSize::zero(), |acc, val| {

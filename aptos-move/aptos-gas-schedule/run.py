@@ -1,18 +1,6 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+import re
 
-//! This module defines all the gas parameters and formulae for instructions, along with their
-//! initial values in the genesis and a mapping between the Rust representation and the on-chain
-//! gas schedule.
-
-use crate::{algebra::InternalGasPerAbstractValueUnit, gas_meter::EXECUTION_GAS_MULTIPLIER as MUL};
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte};
-
-crate::params::define_gas_parameters!(
-    InstructionGasParameters,
-    "instr",
-    .instr,
-    [
+text = """
         // nop
         [nop: InternalGas, "nop", 10 * MUL],
         // control flow
@@ -202,5 +190,13 @@ crate::params::define_gas_parameters!(
             "vec_unpack.per_expected_elem",
             40 * MUL
         ],
-    ]
-);
+"""
+
+
+def replace(match):
+    return str(int(match.group(1)) * 20)
+
+
+res = re.sub("([0-9]+) *\* *MUL", replace, text)
+
+print(res)

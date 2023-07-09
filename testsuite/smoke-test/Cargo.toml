@@ -25,6 +25,7 @@ aptos-faucet-core = { workspace = true }
 aptos-forge = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
+aptos-gas-algebra = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-indexer = { workspace = true }
 aptos-keygen = { workspace = true }

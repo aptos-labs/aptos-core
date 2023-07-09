@@ -19,9 +19,10 @@ use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas::{
     AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasAlgebra,
-    StandardGasMeter, LATEST_GAS_FEATURE_VERSION,
+    StandardGasMeter,
 };
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
