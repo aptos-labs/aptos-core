@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: current restriction: constant expression must be a value
+error: constant expression must be a literal
    ┌─ tests/checking/typing/constant_supported_exps.move:3:20
    │
  3 │       const C: u64 = {

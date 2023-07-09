@@ -6,11 +6,11 @@ error: invalid call of `!=`: expected `u8` but found `u128` for argument 2
 13 │         (0: u8) != (1: u128);
    │         ^^^^^^^^^^^^^^^^^^^^
 
-error: invalid call of `!=`: `integer` not compatible with `bool` for argument 2
+error: invalid call of `!=`: expected `bool` but found `integer` for argument 2
    ┌─ tests/checking/typing/neq_invalid.move:14:9
    │
 14 │         0 != false;
-   │         ^^^^^^^^^^
+   │         ^
 
 error: unable to infer type: `M::G0<?4>`
    ┌─ tests/checking/typing/neq_invalid.move:26:9

@@ -1,18 +1,18 @@
 
 Diagnostics:
-error: expected `u64` but found `()` in expression
+error: expected `u64` but found `()`
   ┌─ tests/checking/typing/return_type_explicit_exp_invalid.move:5:16
   │
 5 │         return ()
   │                ^^
 
-error: `integer` not compatible with `()` in constant
+error: expected `()` but found `integer`
   ┌─ tests/checking/typing/return_type_explicit_exp_invalid.move:9:26
   │
 9 │         if (true) return 1 else return 0
   │                          ^
 
-error: `integer` not compatible with `()` in constant
+error: expected `()` but found `integer`
   ┌─ tests/checking/typing/return_type_explicit_exp_invalid.move:9:40
   │
 9 │         if (true) return 1 else return 0
@@ -30,13 +30,13 @@ error: expected 4 item(s), found 3
 18 │         while (true) return (0, false, R{});
    │                             ^^^^^^^^^^^^^^^
 
-error: `integer` not compatible with `bool` in constant
+error: expected `bool` but found `integer`
    ┌─ tests/checking/typing/return_type_explicit_exp_invalid.move:23:31
    │
 23 │         while (false) return (0, false, R{});
    │                               ^
 
-error: expected `u64` but found `bool` in expression
+error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/return_type_explicit_exp_invalid.move:23:34
    │
 23 │         while (false) return (0, false, R{});

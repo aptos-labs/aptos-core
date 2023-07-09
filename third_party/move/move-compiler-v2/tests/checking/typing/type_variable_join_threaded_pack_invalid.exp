@@ -1,7 +1,7 @@
 
 Diagnostics:
-error: `integer` not compatible with `bool` in name expression
-   ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:42:9
+error: expected `bool` but found `integer`
+   ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:39:32
    │
-42 │         b
-   │         ^
+39 │         Container::put(&mut v, 0);
+   │                                ^

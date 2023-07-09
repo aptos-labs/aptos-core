@@ -1,16 +1,16 @@
 
 Diagnostics:
-error: tuples have different arity (0 != 3) in lvalue
+error: tuples have different arity (0 != 3)
   ┌─ tests/checking/typing/assign_wrong_arity.move:7:9
   │
 7 │         x = (0, 1, 2);
   │         ^
 
-error: `integer` not compatible with `()` in lvalue
-  ┌─ tests/checking/typing/assign_wrong_arity.move:8:9
+error: expected `()` but found `integer`
+  ┌─ tests/checking/typing/assign_wrong_arity.move:8:14
   │
 8 │         () = 0;
-  │         ^^
+  │              ^
 
 error: expected 4 item(s), found 3
    ┌─ tests/checking/typing/assign_wrong_arity.move:11:9

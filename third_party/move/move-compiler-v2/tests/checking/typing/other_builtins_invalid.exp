@@ -12,25 +12,25 @@ error: invalid call of `freeze`: mutability mismatch (&mut != &) for argument 1
 5 │         (freeze<vector<bool>>(&any()): &mut vector<bool>);
   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `u64` but found `bool` in expression
+error: expected `u64` but found `bool`
   ┌─ tests/checking/typing/other_builtins_invalid.move:7:22
   │
 7 │         (assert!(42, true): ());
   │                      ^^^^
 
-error: `integer` not compatible with `bool` in constant
+error: expected `bool` but found `integer`
   ┌─ tests/checking/typing/other_builtins_invalid.move:7:18
   │
 7 │         (assert!(42, true): ());
   │                  ^^
 
-error: expected `bool` but found `()` in expression
+error: expected `bool` but found `()`
   ┌─ tests/checking/typing/other_builtins_invalid.move:8:10
   │
 8 │         (assert!(true && false, *x): bool);
   │          ^^^^^^
 
-error: expected `u64` but found `u8` in constant
+error: expected `u64` but found `u8`
   ┌─ tests/checking/typing/other_builtins_invalid.move:9:32
   │
 9 │         assert!(true || false, 0u8);

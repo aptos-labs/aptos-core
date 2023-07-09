@@ -1,36 +1,36 @@
 
 Diagnostics:
-error: `integer` not compatible with `()` in constant
+error: expected `()` but found `integer`
   ┌─ tests/checking/typing/loop_body_invalid.move:3:14
   │
 3 │         loop 0
   │              ^
 
-error: expected `()` but found `bool` in expression
+error: expected `()` but found `bool`
   ┌─ tests/checking/typing/loop_body_invalid.move:7:14
   │
 7 │         loop false
   │              ^^^^^
 
-error: expected `()` but found `address` in value
+error: expected `()` but found `address`
    ┌─ tests/checking/typing/loop_body_invalid.move:11:16
    │
 11 │         loop { @0x0 }
    │                ^^^^
 
-error: `integer` not compatible with `()` in name expression
-   ┌─ tests/checking/typing/loop_body_invalid.move:15:27
+error: expected `()` but found `integer`
+   ┌─ tests/checking/typing/loop_body_invalid.move:15:24
    │
 15 │         loop { let x = 0; x }
-   │                           ^
+   │                        ^
 
-error: `integer` not compatible with `()` in constant
+error: expected `()` but found `integer`
    ┌─ tests/checking/typing/loop_body_invalid.move:19:26
    │
 19 │         loop { if (true) 1 else 0 }
    │                          ^
 
-error: `integer` not compatible with `()` in constant
+error: expected `()` but found `integer`
    ┌─ tests/checking/typing/loop_body_invalid.move:19:33
    │
 19 │         loop { if (true) 1 else 0 }

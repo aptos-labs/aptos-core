@@ -1,42 +1,42 @@
 
 Diagnostics:
-error: expected `u8` but found `vector<u8>` in const expression
+error: expected `u8` but found `vector<u8>`
    ┌─ tests/checking/typing/constant_invalid_usage.move:11:20
    │
 11 │     fun t1(): u8 { C6 }
    │                    ^^
 
-error: expected `u64` but found `vector<u8>` in const expression
+error: expected `u64` but found `vector<u8>`
    ┌─ tests/checking/typing/constant_invalid_usage.move:12:21
    │
 12 │     fun t2(): u64 { C7 }
    │                     ^^
 
-error: expected `u128` but found `u8` in const expression
+error: expected `u128` but found `u8`
    ┌─ tests/checking/typing/constant_invalid_usage.move:13:22
    │
 13 │     fun t3(): u128 { C1 }
    │                      ^^
 
-error: expected `bool` but found `u64` in const expression
+error: expected `bool` but found `u64`
    ┌─ tests/checking/typing/constant_invalid_usage.move:14:22
    │
 14 │     fun t4(): bool { C2 }
    │                      ^^
 
-error: expected `address` but found `u128` in const expression
+error: expected `address` but found `u128`
    ┌─ tests/checking/typing/constant_invalid_usage.move:15:25
    │
 15 │     fun t5(): address { C3 }
    │                         ^^
 
-error: expected `vector<u8>` but found `bool` in const expression
+error: expected `vector<u8>` but found `bool`
    ┌─ tests/checking/typing/constant_invalid_usage.move:16:28
    │
 16 │     fun t6(): vector<u8> { C4 }
    │                            ^^
 
-error: expected `vector<u8>` but found `address` in const expression
+error: expected `vector<u8>` but found `address`
    ┌─ tests/checking/typing/constant_invalid_usage.move:17:28
    │
 17 │     fun t7(): vector<u8> { C5 }

@@ -1,18 +1,18 @@
 
 Diagnostics:
-error: expected `u64` but found `()` in expression
+error: expected `u64` but found `()`
   ┌─ tests/checking/typing/spec_block_fail.move:3:10
   │
 3 │         (spec {}: u64);
   │          ^^^^^^^
 
-error: expected `&u64` but found `()` in expression
+error: expected `&u64` but found `()`
   ┌─ tests/checking/typing/spec_block_fail.move:4:10
   │
 4 │         (spec {}: &u64);
   │          ^^^^^^^
 
-error: tuples have different arity (0 != 2) in expression
+error: tuples have different arity (0 != 2)
   ┌─ tests/checking/typing/spec_block_fail.move:5:10
   │
 5 │         (spec {}: (u64, u64));

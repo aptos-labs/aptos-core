@@ -1,22 +1,22 @@
 
 Diagnostics:
-error: invalid call of `&&`: `integer` not compatible with `bool` for argument 1
+error: invalid call of `&&`: expected `bool` but found `integer` for argument 1
   ┌─ tests/checking/typing/binary_and_invalid.move:8:9
   │
 8 │         0 && 1;
-  │         ^^^^^^
+  │         ^
 
-error: invalid call of `&&`: `integer` not compatible with `bool` for argument 1
+error: invalid call of `&&`: expected `bool` but found `integer` for argument 1
   ┌─ tests/checking/typing/binary_and_invalid.move:9:9
   │
 9 │         1 && false;
-  │         ^^^^^^^^^^
+  │         ^
 
-error: invalid call of `&&`: `integer` not compatible with `bool` for argument 2
-   ┌─ tests/checking/typing/binary_and_invalid.move:10:9
+error: invalid call of `&&`: expected `bool` but found `integer` for argument 2
+   ┌─ tests/checking/typing/binary_and_invalid.move:10:18
    │
 10 │         false && 1;
-   │         ^^^^^^^^^^
+   │                  ^
 
 error: invalid call of `&&`: expected `bool` but found `address` for argument 1
    ┌─ tests/checking/typing/binary_and_invalid.move:11:9
