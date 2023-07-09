@@ -79,7 +79,7 @@ pub struct StorageServiceServer<T> {
     storage_service_listener: Option<StorageServiceNotificationListener>,
 }
 
-impl<T: StorageReaderInterface> StorageServiceServer<T> {
+impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     pub fn new(
         config: StorageServiceConfig,
         executor: Handle,
@@ -208,6 +208,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         >,
     ) {
         // Clone all required components for the task
+        let bounded_executor = self.bounded_executor.clone();
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
         let config = self.config;
         let optimistic_fetches = self.optimistic_fetches.clone();
@@ -232,6 +233,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                         _ = ticker.select_next_some() => {
                             // Handle the optimistic fetches periodically
                             handle_active_optimistic_fetches(
+                                bounded_executor.clone(),
                                 cached_storage_server_summary.clone(),
                                 config,
                                 optimistic_fetches.clone(),
@@ -239,7 +241,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                                 request_moderator.clone(),
                                 storage.clone(),
                                 time_service.clone(),
-                            )
+                            ).await;
                         },
                         notification = cached_summary_update_listener.select_next_some() => {
                             trace!(LogSchema::new(LogEntry::ReceivedCacheUpdateNotification)
@@ -248,6 +250,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
                             // Handle the optimistic fetches because of a cache update
                             handle_active_optimistic_fetches(
+                                bounded_executor.clone(),
                                 cached_storage_server_summary.clone(),
                                 config,
                                 optimistic_fetches.clone(),
@@ -255,7 +258,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                                 request_moderator.clone(),
                                 storage.clone(),
                                 time_service.clone(),
-                            )
+                            ).await;
                         },
                     }
                 }
@@ -358,7 +361,8 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
 /// Handles the active optimistic fetches and logs any
 /// errors that were encountered.
-fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
+async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
+    bounded_exector: BoundedExecutor,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -368,6 +372,7 @@ fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     time_service: TimeService,
 ) {
     if let Err(error) = optimistic_fetch::handle_active_optimistic_fetches(
+        bounded_exector,
         cached_storage_server_summary,
         config,
         optimistic_fetches,
@@ -375,7 +380,9 @@ fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
         request_moderator,
         storage,
         time_service,
-    ) {
+    )
+    .await
+    {
         error!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
             .error(&error)
             .message("Failed to handle active optimistic fetches!"));
