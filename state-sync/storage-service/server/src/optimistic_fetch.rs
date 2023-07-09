@@ -11,6 +11,7 @@ use crate::{
     storage::StorageReaderInterface,
     LogEntry, LogSchema,
 };
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::Mutex;
 use aptos_logger::warn;
@@ -164,8 +165,9 @@ impl OptimisticFetchRequest {
     }
 }
 
-/// Handles ready (and expired) optimistic fetches
-pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
+/// Handles ready optimistic fetches
+pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
+    bounded_executor: BoundedExecutor,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -186,42 +188,87 @@ pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     )?;
 
     // Remove and handle the ready optimistic fetches
-    for (peer, target_ledger_info) in peers_with_ready_optimistic_fetches {
-        if let Some((_, optimistic_fetch)) = optimistic_fetches.clone().remove(&peer) {
-            let optimistic_fetch_start_time = optimistic_fetch.fetch_start_time;
-            let optimistic_fetch_request = optimistic_fetch.request.clone();
-
-            // Notify the peer of the new data
-            if let Err(error) = notify_peer_of_new_data(
-                cached_storage_server_summary.clone(),
-                config,
-                optimistic_fetches.clone(),
-                lru_response_cache.clone(),
-                request_moderator.clone(),
-                storage.clone(),
-                time_service.clone(),
-                &peer,
-                optimistic_fetch,
-                target_ledger_info,
-            ) {
-                warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
-                    .error(&Error::UnexpectedErrorEncountered(error.to_string())));
-            }
-
-            // Update the optimistic fetch latency metric
-            let optimistic_fetch_duration = time_service
-                .now()
-                .duration_since(optimistic_fetch_start_time);
-            metrics::observe_value_with_label(
-                &metrics::OPTIMISTIC_FETCH_LATENCIES,
-                peer.network_id(),
-                &optimistic_fetch_request.get_label(),
-                optimistic_fetch_duration.as_secs_f64(),
-            );
-        }
-    }
+    handle_ready_optimistic_fetches(
+        bounded_executor,
+        cached_storage_server_summary,
+        config,
+        optimistic_fetches,
+        lru_response_cache,
+        request_moderator,
+        storage,
+        time_service,
+        peers_with_ready_optimistic_fetches,
+    )
+    .await;
 
     Ok(())
+}
+
+/// Handles the ready optimistic fetches by removing them from the
+/// active map and notifying the peer of the new data.
+async fn handle_ready_optimistic_fetches<T: StorageReaderInterface>(
+    bounded_executor: BoundedExecutor,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
+    config: StorageServiceConfig,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    request_moderator: Arc<RequestModerator>,
+    storage: T,
+    time_service: TimeService,
+    peers_with_ready_optimistic_fetches: Vec<(PeerNetworkId, LedgerInfoWithSignatures)>,
+) {
+    for (peer_network_id, target_ledger_info) in peers_with_ready_optimistic_fetches {
+        // Remove the optimistic fetch from the active map
+        let ready_optimistic_fetch = optimistic_fetches.clone().remove(&peer_network_id);
+
+        // Handle the optimistic fetch request
+        if let Some((_, optimistic_fetch)) = ready_optimistic_fetch {
+            // Clone all required components for the task
+            let cached_storage_server_summary = cached_storage_server_summary.clone();
+            let optimistic_fetches = optimistic_fetches.clone();
+            let lru_response_cache = lru_response_cache.clone();
+            let request_moderator = request_moderator.clone();
+            let storage = storage.clone();
+            let time_service = time_service.clone();
+
+            // Spawn a blocking task to handle the optimistic fetch
+            bounded_executor
+                .spawn_blocking(move || {
+                    // Get the fetch start time and request
+                    let optimistic_fetch_start_time = optimistic_fetch.fetch_start_time;
+                    let optimistic_fetch_request = optimistic_fetch.request.clone();
+
+                    // Notify the peer of the new data
+                    if let Err(error) = notify_peer_of_new_data(
+                        cached_storage_server_summary.clone(),
+                        config,
+                        optimistic_fetches.clone(),
+                        lru_response_cache.clone(),
+                        request_moderator.clone(),
+                        storage.clone(),
+                        time_service.clone(),
+                        &peer_network_id,
+                        optimistic_fetch,
+                        target_ledger_info,
+                    ) {
+                        warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
+                            .error(&Error::UnexpectedErrorEncountered(error.to_string())));
+                    }
+
+                    // Update the optimistic fetch latency metric
+                    let optimistic_fetch_duration = time_service
+                        .now()
+                        .duration_since(optimistic_fetch_start_time);
+                    metrics::observe_value_with_label(
+                        &metrics::OPTIMISTIC_FETCH_LATENCIES,
+                        peer_network_id.network_id(),
+                        &optimistic_fetch_request.get_label(),
+                        optimistic_fetch_duration.as_secs_f64(),
+                    );
+                })
+                .await;
+        }
+    }
 }
 
 /// Identifies the optimistic fetches that can be handled now.
@@ -292,27 +339,13 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
     }
 
     // Remove the expired optimistic fetches
-    for peer_network_id in peers_with_expired_optimistic_fetches {
-        if optimistic_fetches.remove(&peer_network_id).is_some() {
-            increment_counter(
-                &metrics::OPTIMISTIC_FETCH_EVENTS,
-                peer_network_id.network_id(),
-                OPTIMISTIC_FETCH_EXPIRE.into(),
-            );
-        }
-    }
+    removed_expired_optimistic_fetches(
+        optimistic_fetches.clone(),
+        peers_with_expired_optimistic_fetches,
+    );
 
     // Remove the invalid optimistic fetches
-    for peer_network_id in peers_with_invalid_optimistic_fetches {
-        if let Some((_, optimistic_fetch)) = optimistic_fetches.remove(&peer_network_id) {
-            warn!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
-                .error(&Error::InvalidRequest(
-                    "Mismatch between known version and epoch!".into()
-                ))
-                .request(&optimistic_fetch.request)
-                .message("Dropping invalid optimistic fetch request!"));
-        }
-    }
+    remove_invalid_optimistic_fetches(optimistic_fetches, peers_with_invalid_optimistic_fetches);
 
     // Return the ready optimistic fetches
     Ok(peers_with_ready_optimistic_fetches)
@@ -475,5 +508,38 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
             Ok(())
         },
         Err(error) => Err(error),
+    }
+}
+
+/// Removes the expired optimistic fetches from the active map
+fn removed_expired_optimistic_fetches(
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+    peers_with_expired_optimistic_fetches: Vec<PeerNetworkId>,
+) {
+    for peer_network_id in peers_with_expired_optimistic_fetches {
+        if optimistic_fetches.remove(&peer_network_id).is_some() {
+            increment_counter(
+                &metrics::OPTIMISTIC_FETCH_EVENTS,
+                peer_network_id.network_id(),
+                OPTIMISTIC_FETCH_EXPIRE.into(),
+            );
+        }
+    }
+}
+
+/// Removes the invalid optimistic fetches from the active map
+fn remove_invalid_optimistic_fetches(
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+    peers_with_invalid_optimistic_fetches: Vec<PeerNetworkId>,
+) {
+    for peer_network_id in peers_with_invalid_optimistic_fetches {
+        if let Some((_, optimistic_fetch)) = optimistic_fetches.remove(&peer_network_id) {
+            warn!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
+                .error(&Error::InvalidRequest(
+                    "Mismatch between known version and epoch!".into()
+                ))
+                .request(&optimistic_fetch.request)
+                .message("Dropping invalid optimistic fetch request!"));
+        }
     }
 }
