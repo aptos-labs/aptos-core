@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    abstract_algebra::GasExpression, transaction::gas_params::*, AptosGasParameters,
-    LATEST_GAS_FEATURE_VERSION,
+    gas_params::{transaction::gas_params::*, AptosGasParameters},
+    ver::LATEST_GAS_FEATURE_VERSION,
 };
+use aptos_gas_algebra::GasExpression;
 use aptos_types::{
     on_chain_config::{ConfigStorage, OnChainConfig, StorageGasSchedule},
     state_store::state_key::StateKey,
@@ -192,7 +193,10 @@ pub struct StoragePricingV3 {
 }
 
 impl StoragePricingV3 {
-    fn calculate_read_gas(&self, loaded: NumBytes) -> impl GasExpression<Unit = InternalGasUnit> {
+    fn calculate_read_gas(
+        &self,
+        loaded: NumBytes,
+    ) -> impl GasExpression<AptosGasParameters, Unit = InternalGasUnit> {
         STORAGE_IO_PER_STATE_SLOT_READ * NumArgs::from(1) + STORAGE_IO_PER_STATE_BYTE_READ * loaded
     }
 
@@ -209,7 +213,7 @@ impl StoragePricingV3 {
         &self,
         key: &StateKey,
         op: &WriteOp,
-    ) -> impl GasExpression<Unit = InternalGasUnit> {
+    ) -> impl GasExpression<AptosGasParameters, Unit = InternalGasUnit> {
         use WriteOp::*;
 
         match op {
@@ -261,7 +265,7 @@ impl StoragePricing {
         &self,
         resource_exists: bool,
         bytes_loaded: NumBytes,
-    ) -> impl GasExpression<Unit = InternalGasUnit> {
+    ) -> impl GasExpression<AptosGasParameters, Unit = InternalGasUnit> {
         use StoragePricing::*;
 
         match self {
@@ -281,7 +285,7 @@ impl StoragePricing {
         &self,
         key: &StateKey,
         op: &WriteOp,
-    ) -> impl GasExpression<Unit = InternalGasUnit> {
+    ) -> impl GasExpression<AptosGasParameters, Unit = InternalGasUnit> {
         use StoragePricing::*;
 
         match self {

@@ -13,6 +13,7 @@ default-run = "aptos-debugger"
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-logger = { workspace = true }

@@ -21,7 +21,7 @@ pub mod util;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory};
-use aptos_gas_algebra_ext::AbstractValueSize;
+use aptos_gas_algebra::AbstractValueSize;
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use cryptography::ed25519;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};

@@ -4,13 +4,11 @@
 //! This module contains the official gas meter implementation, along with some top-level gas
 //! parameters and traits to help manipulate them.
 
-use crate::{
-    abstract_algebra::{GasAlgebra, GasExpression},
-    algebra::{Fee, Gas},
-    instr::{gas_params::*, InstructionGasParameters},
-    misc::MiscGasParameters,
-    transaction::{gas_params::*, TransactionGasParameters},
-    FeePerGasUnit, GasScalingFactor, StorageGasParameters,
+use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa};
+use aptos_gas_schedule::{
+    instr_gas_params::*, txn_gas_params::*, FromOnChainGasSchedule, InitialGasSchedule,
+    InstructionGasParameters, MiscGasParameters, StorageGasParameters, ToOnChainGasSchedule,
+    TransactionGasParameters,
 };
 use aptos_logger::error;
 use aptos_types::{
@@ -31,74 +29,6 @@ use move_vm_types::{
     views::{TypeView, ValueView},
 };
 use std::collections::BTreeMap;
-// This gas feature version must be bumped up when one of the following conditions arises
-//  - A new gas parameter is added, removed or renamed in `aptos_framework.rs` or `move_stdlib.rs`
-//  - Changing how gas is calculated in any way (needs to be gated by a new feature version in the
-//    first place)
-//  - << What else? >>
-//
-// Change log:
-// - V11
-//   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
-// - V10
-//   - Added generate_unique_address and get_txn_hash native functions
-//   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
-// - V9
-//   - Accurate tracking of the cost of loading resource groups
-// - V8
-//   - Added BLS12-381 operations.
-// - V7
-//   - Native support for exists<T>
-//   - New formulae for storage fees based on fixed APT costs
-//   - Lower gas price (other than the newly introduced storage fees) by upping the scaling factor
-// - V6
-//   - Added a new native function - blake2b_256.
-// - V5
-//   - u16, u32, u256
-//   - free_write_bytes_quota
-//   - configurable ChangeSetConfigs
-// - V4
-//   - Consider memory leaked for event natives
-// - V3
-//   - Add memory quota
-//   - Storage charges:
-//     - Distinguish between new and existing resources
-//     - One item write comes with 1K free bytes
-//     - abort with STORAGE_WRITE_LIMIT_REACHED if WriteOps or Events are too large
-// - V2
-//   - Table
-//     - Fix the gas formula for loading resources so that they are consistent with other
-//       global operations.
-// - V1
-//   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 11;
-
-pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
-
-/// A trait for converting from a map representation of the on-chain gas schedule.
-pub trait FromOnChainGasSchedule: Sized {
-    /// Constructs a value of this type from a map representation of the on-chain gas schedule.
-    /// `None` should be returned when the gas schedule is missing some required entries.
-    /// Unused entries should be safely ignored.
-    fn from_on_chain_gas_schedule(
-        gas_schedule: &BTreeMap<String, u64>,
-        feature_version: u64,
-    ) -> Result<Self, String>;
-}
-
-/// A trait for converting to a list of entries of the on-chain gas schedule.
-pub trait ToOnChainGasSchedule {
-    /// Converts `self` into a list of entries of the on-chain gas schedule.
-    /// Each entry is a key-value pair where the key is a string representing the name of the
-    /// parameter, where the value is the gas parameter itself.
-    fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)>;
-}
-
-/// A trait for defining an initial value to be used in the genesis.
-pub trait InitialGasSchedule: Sized {
-    /// Returns the initial value of this type, which is used in the genesis.
-    fn initial() -> Self;
-}
 
 /// Gas parameters for all native functions.
 #[derive(Debug, Clone)]
@@ -379,6 +309,40 @@ pub trait AptosGasMeter: MoveGasMeter {
     }
 }
 
+pub trait GasAlgebra {
+    fn feature_version(&self) -> u64;
+
+    fn gas_params(&self) -> &AptosGasParameters;
+
+    fn storage_gas_params(&self) -> &StorageGasParameters;
+
+    fn balance_internal(&self) -> InternalGas;
+
+    fn charge_execution(
+        &mut self,
+        abstract_amount: impl GasExpression<AptosGasParameters, Unit = InternalGasUnit>,
+    ) -> PartialVMResult<()>;
+
+    fn charge_io(
+        &mut self,
+        abstract_amount: impl GasExpression<AptosGasParameters, Unit = InternalGasUnit>,
+    ) -> PartialVMResult<()>;
+
+    fn charge_storage_fee(
+        &mut self,
+        abstract_amount: impl GasExpression<AptosGasParameters, Unit = Octa>,
+        gas_unit_price: FeePerGasUnit,
+    ) -> PartialVMResult<()>;
+
+    fn execution_gas_used(&self) -> InternalGas;
+
+    fn io_gas_used(&self) -> InternalGas;
+
+    fn storage_fee_used_in_gas_units(&self) -> InternalGas;
+
+    fn storage_fee_used(&self) -> Fee;
+}
+
 pub struct StandardGasAlgebra {
     feature_version: u64,
     gas_params: AptosGasParameters,
@@ -450,7 +414,7 @@ impl GasAlgebra for StandardGasAlgebra {
 
     fn charge_execution(
         &mut self,
-        abstract_amount: impl GasExpression<Unit = InternalGasUnit>,
+        abstract_amount: impl GasExpression<AptosGasParameters, Unit = InternalGasUnit>,
     ) -> PartialVMResult<()> {
         let amount = abstract_amount.materialize(self.feature_version, &self.gas_params);
 
@@ -468,7 +432,7 @@ impl GasAlgebra for StandardGasAlgebra {
 
     fn charge_io(
         &mut self,
-        abstract_amount: impl GasExpression<Unit = InternalGasUnit>,
+        abstract_amount: impl GasExpression<AptosGasParameters, Unit = InternalGasUnit>,
     ) -> PartialVMResult<()> {
         let amount = abstract_amount.materialize(self.feature_version, &self.gas_params);
 
@@ -484,7 +448,7 @@ impl GasAlgebra for StandardGasAlgebra {
 
     fn charge_storage_fee(
         &mut self,
-        abstract_amount: impl GasExpression<Unit = crate::Octa>,
+        abstract_amount: impl GasExpression<AptosGasParameters, Unit = Octa>,
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()> {
         let amount = abstract_amount.materialize(self.feature_version, &self.gas_params);
@@ -507,17 +471,15 @@ impl GasAlgebra for StandardGasAlgebra {
             (u64::from(amount) as u128) * (u64::from(txn_params.gas_unit_scaling_factor) as u128),
             u64::from(gas_unit_price) as u128,
         );
-        let gas_consumed_internal = InternalGas::new(
-            if gas_consumed_internal > u64::MAX as u128 {
-                error!(
-                    "Something's wrong in the gas schedule: gas_consumed_internal ({}) > u64::MAX",
-                    gas_consumed_internal
-                );
-                u64::MAX
-            } else {
-                gas_consumed_internal as u64
-            },
-        );
+        let gas_consumed_internal = InternalGas::new(if gas_consumed_internal > u64::MAX as u128 {
+            error!(
+                "Something's wrong in the gas schedule: gas_consumed_internal ({}) > u64::MAX",
+                gas_consumed_internal
+            );
+            u64::MAX
+        } else {
+            gas_consumed_internal as u64
+        });
 
         self.charge(gas_consumed_internal)?;
 

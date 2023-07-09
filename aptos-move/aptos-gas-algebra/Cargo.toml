@@ -1,6 +1,7 @@
 [package]
-name = "aptos-memory-usage-tracker"
-version = "0.1.0"
+name = "aptos-gas-algebra"
+description = "Aptos Gas Algebra"
+version = "0.0.1"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -12,9 +13,5 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-gas = { workspace = true }
-aptos-gas-algebra = { workspace = true }
-aptos-types = { workspace = true }
-move-binary-format = { workspace = true }
+either = { workspace = true }
 move-core-types = { workspace = true }
-move-vm-types = { workspace = true }

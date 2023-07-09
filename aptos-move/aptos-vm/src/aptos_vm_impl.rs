@@ -14,8 +14,9 @@ use crate::{
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
-    Gas, GasExpression, NativeGasParameters, StorageGasParameters, StoragePricing,
+    NativeGasParameters, StorageGasParameters, StoragePricing,
 };
+use aptos_gas_algebra::{Gas, GasExpression};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_state_view::StateView;
 use aptos_types::{

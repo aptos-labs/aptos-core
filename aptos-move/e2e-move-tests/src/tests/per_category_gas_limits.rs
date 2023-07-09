@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
-use aptos_gas::{Fee, Gas};
+use aptos_gas_algebra::{Fee, Gas};
 use aptos_types::{account_address::AccountAddress, vm_status::StatusCode};
 use move_core_types::gas_algebra::InternalGas;
 use serde::{Deserialize, Serialize};

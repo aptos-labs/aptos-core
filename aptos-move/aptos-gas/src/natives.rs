@@ -69,7 +69,7 @@ macro_rules! define_gas_parameters_for_natives {
 
         #[test]
         fn keys_should_be_unique_for_all_versions() {
-            for ver in 0..=$crate::gas_meter::LATEST_GAS_FEATURE_VERSION {
+            for ver in 0..=aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION {
                 let mut map = std::collections::BTreeMap::<&str, ()>::new();
 
                 $(

@@ -19,7 +19,9 @@ aptos-block-executor = { workspace = true }
 aptos-cached-packages ={ workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-framework = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-gas = { workspace = true }
+aptos-gas-algebra = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-memory-usage-tracker = { workspace = true }

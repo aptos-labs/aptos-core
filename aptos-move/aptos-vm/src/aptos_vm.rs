@@ -23,9 +23,10 @@ use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::{
-    AptosGasMeter, AptosGasParameters, ChangeSetConfigs, Gas, StandardGasAlgebra, StandardGasMeter,
+    AptosGasMeter, AptosGasParameters, ChangeSetConfigs, StandardGasAlgebra, StandardGasMeter,
     StorageGasParameters,
 };
+use aptos_gas_algebra::Gas;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::StateView;

@@ -162,7 +162,7 @@ macro_rules! safely_pop_type_arg {
 #[allow(unused)]
 pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
     timed_features: &'c TimedFeatures,
-    features: Arc<Features>,
+    features: &'c Features,
     inner: &'c mut NativeContext<'a, 'b, 'd>,
 
     gas_budget: InternalGas,
@@ -198,6 +198,13 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
             Ok(())
         }
     }
+
+    //pub fn charge_abstract(
+    //    &mut self,
+    //    abstract_amount: impl GasExpression<Unit = InternalGasUnit>,
+    //) -> SafeNativeResult<()> {
+    //    unimplemented!()
+    //}
 
     pub fn get_feature_flags(&self) -> &Features {
         self.features.deref()
@@ -248,7 +255,7 @@ where
 
         let mut context = SafeNativeContext {
             timed_features: &timed_features,
-            features: features.clone(),
+            features: &features,
             inner: context,
 
             gas_budget,

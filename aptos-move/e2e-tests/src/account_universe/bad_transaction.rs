@@ -11,10 +11,9 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
 };
-use aptos_gas::{
-    AptosGasParameters, FeePerGasUnit, Gas, GasExpression, InitialGasSchedule,
-    LATEST_GAS_FEATURE_VERSION,
-};
+use aptos_gas::{AptosGasParameters, InitialGasSchedule};
+use aptos_gas_algebra::{FeePerGasUnit, Gas, GasExpression};
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_proptest_helpers::Index;
 use aptos_types::{
     transaction::{Script, SignedTransaction, TransactionStatus},

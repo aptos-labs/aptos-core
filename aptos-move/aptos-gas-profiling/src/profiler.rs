@@ -5,7 +5,8 @@ use crate::log::{
     CallFrame, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, FrameName, StorageFees,
     TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
-use aptos_gas::{AptosGasMeter, Fee};
+use aptos_gas::AptosGasMeter;
+use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
@@ -16,7 +17,6 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{InternalGas, NumArgs, NumBytes},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
@@ -493,8 +493,8 @@ where
 
         fn charge_storage_fee(
             &mut self,
-            amount: aptos_gas::Fee,
-            gas_unit_price: aptos_gas::FeePerGasUnit,
+            amount: Fee,
+            gas_unit_price: FeePerGasUnit,
         ) -> PartialVMResult<()>;
     }
 
@@ -516,7 +516,7 @@ where
         write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
         events: impl IntoIterator<Item = &'a ContractEvent>,
         txn_size: NumBytes,
-        gas_unit_price: aptos_gas::FeePerGasUnit,
+        gas_unit_price: FeePerGasUnit,
     ) -> VMResult<()> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {
