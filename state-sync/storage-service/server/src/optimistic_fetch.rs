@@ -14,7 +14,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::Mutex;
-use aptos_logger::warn;
+use aptos_logger::{error, warn};
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, StorageServiceRequest,
@@ -24,11 +24,12 @@ use aptos_storage_service_types::{
     responses::{DataResponse, StorageServerSummary, StorageServiceResponse},
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
+use futures::future::join_all;
 use lru::LruCache;
-use std::{cmp::min, sync::Arc, time::Instant};
+use std::{cmp::min, collections::HashMap, ops::Deref, sync::Arc, time::Instant};
 
 /// An optimistic fetch request from a peer
 pub struct OptimisticFetchRequest {
@@ -178,6 +179,7 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 ) -> Result<(), Error> {
     // Identify the peers with ready optimistic fetches
     let peers_with_ready_optimistic_fetches = get_peers_with_ready_optimistic_fetches(
+        bounded_executor.clone(),
         config,
         cached_storage_server_summary.clone(),
         optimistic_fetches.clone(),
@@ -185,7 +187,8 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
         request_moderator.clone(),
         storage.clone(),
         time_service.clone(),
-    )?;
+    )
+    .await?;
 
     // Remove and handle the ready optimistic fetches
     handle_ready_optimistic_fetches(
@@ -274,7 +277,8 @@ async fn handle_ready_optimistic_fetches<T: StorageReaderInterface>(
 /// Identifies the optimistic fetches that can be handled now.
 /// Returns the list of peers that made those optimistic fetches
 /// alongside the ledger info at the target version for the peer.
-pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>(
+pub(crate) async fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>(
+    bounded_executor: BoundedExecutor,
     config: StorageServiceConfig,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
@@ -293,50 +297,24 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
     let highest_synced_epoch = highest_synced_ledger_info.ledger_info().epoch();
 
     // Identify the peers with expired, invalid and ready optimistic fetches
-    let mut peers_with_expired_optimistic_fetches = vec![];
-    let mut peers_with_invalid_optimistic_fetches = vec![];
-    let mut peers_with_ready_optimistic_fetches = vec![];
-    for optimistic_fetch in optimistic_fetches.iter() {
-        // Get the peer and the optimistic fetch request
-        let peer = optimistic_fetch.key();
-        let optimistic_fetch = optimistic_fetch.value();
-
-        // Ensure the optimistic fetch hasn't expired
-        if optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
-            peers_with_expired_optimistic_fetches.push(*peer);
-            continue;
-        }
-
-        // Check if we have synced beyond the highest known version
-        let highest_known_version = optimistic_fetch.highest_known_version();
-        if highest_known_version < highest_synced_version {
-            let highest_known_epoch = optimistic_fetch.highest_known_epoch();
-            if highest_known_epoch < highest_synced_epoch {
-                // The peer needs to sync to their epoch ending ledger info
-                let epoch_ending_ledger_info = get_epoch_ending_ledger_info(
-                    cached_storage_server_summary.clone(),
-                    optimistic_fetches.clone(),
-                    highest_known_epoch,
-                    lru_response_cache.clone(),
-                    request_moderator.clone(),
-                    peer,
-                    storage.clone(),
-                    time_service.clone(),
-                )?;
-
-                // Check that we haven't been sent an invalid optimistic fetch request
-                // (i.e., a request that does not respect an epoch boundary).
-                if epoch_ending_ledger_info.ledger_info().version() <= highest_known_version {
-                    peers_with_invalid_optimistic_fetches.push(*peer);
-                } else {
-                    peers_with_ready_optimistic_fetches.push((*peer, epoch_ending_ledger_info));
-                }
-            } else {
-                peers_with_ready_optimistic_fetches
-                    .push((*peer, highest_synced_ledger_info.clone()));
-            };
-        }
-    }
+    let (
+        peers_with_expired_optimistic_fetches,
+        peers_with_invalid_optimistic_fetches,
+        peers_with_ready_optimistic_fetches,
+    ) = identify_expired_invalid_and_ready_fetches(
+        bounded_executor,
+        config,
+        cached_storage_server_summary,
+        optimistic_fetches.clone(),
+        lru_response_cache,
+        request_moderator,
+        storage,
+        time_service,
+        highest_synced_ledger_info,
+        highest_synced_version,
+        highest_synced_epoch,
+    )
+    .await;
 
     // Remove the expired optimistic fetches
     removed_expired_optimistic_fetches(
@@ -349,6 +327,182 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
 
     // Return the ready optimistic fetches
     Ok(peers_with_ready_optimistic_fetches)
+}
+
+/// Identifies the expired, invalid and ready optimistic fetches
+/// from the active map. Returns each peer list separately.
+async fn identify_expired_invalid_and_ready_fetches<T: StorageReaderInterface>(
+    bounded_executor: BoundedExecutor,
+    config: StorageServiceConfig,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    request_moderator: Arc<RequestModerator>,
+    storage: T,
+    time_service: TimeService,
+    highest_synced_ledger_info: LedgerInfoWithSignatures,
+    highest_synced_version: Version,
+    highest_synced_epoch: u64,
+) -> (
+    Vec<PeerNetworkId>,
+    Vec<PeerNetworkId>,
+    Vec<(PeerNetworkId, LedgerInfoWithSignatures)>,
+) {
+    // Gather the highest synced version and epoch for each peer
+    let mut peers_and_highest_synced_data = HashMap::new();
+    let mut peers_with_expired_optimistic_fetches = vec![];
+    for optimistic_fetch in optimistic_fetches.iter() {
+        // Get the peer and the optimistic fetch request
+        let peer_network_id = *optimistic_fetch.key();
+        let optimistic_fetch = optimistic_fetch.value();
+
+        // Gather the peer's highest synced version and epoch
+        if !optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
+            let highest_known_version = optimistic_fetch.highest_known_version();
+            let highest_known_epoch = optimistic_fetch.highest_known_epoch();
+
+            // Save the peer's version and epoch
+            peers_and_highest_synced_data.insert(
+                peer_network_id,
+                (highest_known_version, highest_known_epoch),
+            );
+        } else {
+            peers_with_expired_optimistic_fetches.push(peer_network_id); // The request has expired
+        }
+    }
+
+    // Identify the peers with ready and invalid optimistic fetches
+    let (peers_with_ready_optimistic_fetches, peers_with_invalid_optimistic_fetches) =
+        identify_ready_and_invalid_optimistic_fetches(
+            bounded_executor,
+            cached_storage_server_summary,
+            optimistic_fetches,
+            lru_response_cache,
+            request_moderator,
+            storage,
+            time_service,
+            highest_synced_ledger_info,
+            highest_synced_version,
+            highest_synced_epoch,
+            peers_and_highest_synced_data,
+        )
+        .await;
+
+    // Return all peer lists
+    (
+        peers_with_expired_optimistic_fetches,
+        peers_with_invalid_optimistic_fetches,
+        peers_with_ready_optimistic_fetches,
+    )
+}
+
+/// Identifies the ready and invalid optimistic fetches from the given
+/// map of peers and their highest synced versions and epochs.
+async fn identify_ready_and_invalid_optimistic_fetches<T: StorageReaderInterface>(
+    bounded_executor: BoundedExecutor,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    request_moderator: Arc<RequestModerator>,
+    storage: T,
+    time_service: TimeService,
+    highest_synced_ledger_info: LedgerInfoWithSignatures,
+    highest_synced_version: Version,
+    highest_synced_epoch: u64,
+    peers_and_highest_synced_data: HashMap<PeerNetworkId, (u64, u64)>,
+) -> (
+    Vec<(PeerNetworkId, LedgerInfoWithSignatures)>,
+    Vec<PeerNetworkId>,
+) {
+    // Create the peer lists for ready and invalid optimistic fetches
+    let peers_with_ready_optimistic_fetches = Arc::new(Mutex::new(vec![]));
+    let peers_with_invalid_optimistic_fetches = Arc::new(Mutex::new(vec![]));
+
+    // Go through all peers and highest synced data and identify the relevant entries
+    let mut active_tasks = vec![];
+    for (peer_network_id, (highest_known_version, highest_known_epoch)) in
+        peers_and_highest_synced_data.into_iter()
+    {
+        // Clone all required components for the task
+        let cached_storage_server_summary = cached_storage_server_summary.clone();
+        let highest_synced_ledger_info = highest_synced_ledger_info.clone();
+        let optimistic_fetches = optimistic_fetches.clone();
+        let lru_response_cache = lru_response_cache.clone();
+        let request_moderator = request_moderator.clone();
+        let storage = storage.clone();
+        let time_service = time_service.clone();
+        let peers_with_invalid_optimistic_fetches = peers_with_invalid_optimistic_fetches.clone();
+        let peers_with_ready_optimistic_fetches = peers_with_ready_optimistic_fetches.clone();
+
+        // Spawn a blocking task to determine if the optimistic fetch is ready or
+        // invalid. We do this because each entry requires reading from storage.
+        let active_task = bounded_executor
+            .spawn_blocking(move || {
+                // Check if we have synced beyond the highest known version
+                if highest_known_version < highest_synced_version {
+                    if highest_known_epoch < highest_synced_epoch {
+                        // Fetch the epoch ending ledger info from storage (the
+                        // peer needs to sync to their epoch ending ledger info).
+                        let epoch_ending_ledger_info = match get_epoch_ending_ledger_info(
+                            cached_storage_server_summary.clone(),
+                            optimistic_fetches.clone(),
+                            highest_known_epoch,
+                            lru_response_cache.clone(),
+                            request_moderator.clone(),
+                            &peer_network_id,
+                            storage.clone(),
+                            time_service.clone(),
+                        ) {
+                            Ok(epoch_ending_ledger_info) => epoch_ending_ledger_info,
+                            Err(error) => {
+                                // Log the failure to fetch the epoch ending ledger info
+                                error!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
+                                    .error(&error)
+                                    .message(&format!(
+                                    "Failed to get the epoch ending ledger info for epoch: {:?} !",
+                                    highest_known_epoch
+                                )));
+
+                                return;
+                            },
+                        };
+
+                        // Check that we haven't been sent an invalid optimistic fetch request
+                        // (i.e., a request that does not respect an epoch boundary).
+                        if epoch_ending_ledger_info.ledger_info().version() <= highest_known_version
+                        {
+                            peers_with_invalid_optimistic_fetches
+                                .lock()
+                                .push(peer_network_id);
+                        } else {
+                            peers_with_ready_optimistic_fetches
+                                .lock()
+                                .push((peer_network_id, epoch_ending_ledger_info));
+                        }
+                    } else {
+                        peers_with_ready_optimistic_fetches
+                            .lock()
+                            .push((peer_network_id, highest_synced_ledger_info.clone()));
+                    };
+                }
+            })
+            .await;
+        active_tasks.push(active_task);
+    }
+
+    // Wait for all the active tasks to complete
+    join_all(active_tasks).await;
+
+    // Gather the invalid and ready optimistic fetches
+    let peers_with_invalid_optimistic_fetches =
+        peers_with_invalid_optimistic_fetches.lock().deref().clone();
+    let peers_with_ready_optimistic_fetches =
+        peers_with_ready_optimistic_fetches.lock().deref().clone();
+
+    (
+        peers_with_ready_optimistic_fetches,
+        peers_with_invalid_optimistic_fetches,
+    )
 }
 
 /// Gets the epoch ending ledger info at the given epoch
