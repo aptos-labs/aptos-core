@@ -235,7 +235,6 @@ impl BlockExecutorClient for ShardedExecutorClient {
             let _timer = SHARDED_BLOCK_EXECUTION_SECONDS
                 .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
                 .start_timer();
-            info!("executing sub block for shard {} and round {}, number of txns {}", self.shard_id, round, sub_block.transactions.len());
             // A hacky way to ensure last-round txns are executed in a single large BlockSTM.
             // TODO: let the partitioner leave a flag in the special sub-block instead.
             let modified_concurrency_level = match std::env::var("SHARDED_PARTITIONER__MERGE_LAST_ROUND") {
@@ -252,6 +251,7 @@ impl BlockExecutorClient for ShardedExecutorClient {
                 },
                 _ => concurrency_level
             };
+            info!("executing sub block for shard {} and round {}, number of txns {} with concurrency level {}.", self.shard_id, round, sub_block.transactions.len(), modified_concurrency_level);
 
             result.push(self.execute_sub_block(
                 sub_block,
