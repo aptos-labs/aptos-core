@@ -21,13 +21,14 @@ use aptos_storage_service_types::{
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use error::Error;
 use futures::stream::StreamExt;
 use handler::Handler;
 use lru::LruCache;
 use moderator::RequestModerator;
 use optimistic_fetch::OptimisticFetchRequest;
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
+use std::{ops::Deref, sync::Arc, time::Duration};
 use storage::StorageReaderInterface;
 use thiserror::Error;
 use tokio::runtime::Handle;
@@ -69,7 +70,7 @@ pub struct StorageServiceServer<T> {
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
 
     // A set of active optimistic fetches for peers waiting for new data
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
 
     // A moderator for incoming peer requests
     request_moderator: Arc<RequestModerator>,
@@ -92,7 +93,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
         let cached_storage_server_summary =
             Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
-        let optimistic_fetches = Arc::new(Mutex::new(HashMap::new()));
+        let optimistic_fetches = Arc::new(DashMap::new());
         let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
             config.max_lru_cache_size as usize,
         )));
@@ -350,7 +351,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     /// Returns a copy of the active optimistic fetches for test purposes
     pub(crate) fn get_optimistic_fetches(
         &self,
-    ) -> Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>> {
+    ) -> Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>> {
         self.optimistic_fetches.clone()
     }
 }
@@ -360,7 +361,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,

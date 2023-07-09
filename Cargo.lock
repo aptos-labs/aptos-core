@@ -3207,6 +3207,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "claims",
+ "dashmap",
  "futures",
  "lru 0.7.8",
  "maplit",
