@@ -10,7 +10,7 @@ use crate::{
     tests::{mock, utils},
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, NewTransactionOutputsWithProofRequest,
@@ -21,6 +21,7 @@ use aptos_storage_service_types::{
 };
 use aptos_time_service::TimeService;
 use aptos_types::epoch_change::EpochChangeProof;
+use arc_swap::ArcSwap;
 use futures::channel::oneshot;
 use lru::LruCache;
 use rand::{rngs::OsRng, Rng};
@@ -63,7 +64,8 @@ async fn test_peers_with_ready_optimistic_fetches() {
     let storage_reader = StorageReader::new(StorageServiceConfig::default(), Arc::new(db_reader));
 
     // Create test data with an empty storage server summary
-    let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
+    let cached_storage_server_summary =
+        Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let lru_response_cache = Arc::new(Mutex::new(LruCache::new(0)));
     let request_moderator = Arc::new(RequestModerator::new(
         cached_storage_server_summary.clone(),
@@ -92,7 +94,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
         .epoch_ending_ledger_infos = Some(CompleteDataRange::new(0, 1).unwrap());
     let synced_ledger_info = utils::create_test_ledger_info_with_sigs(1, 2);
     storage_server_summary.data_summary.synced_ledger_info = Some(synced_ledger_info.clone());
-    *cached_storage_server_summary.write() = storage_server_summary;
+    cached_storage_server_summary.store(Arc::new(storage_server_summary));
 
     // Verify that optimistic fetch 1 is ready
     let peers_with_ready_optimistic_fetches =
@@ -121,7 +123,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
         .epoch_ending_ledger_infos = Some(CompleteDataRange::new(0, 2).unwrap());
     let synced_ledger_info = utils::create_test_ledger_info_with_sigs(2, 100);
     storage_server_summary.data_summary.synced_ledger_info = Some(synced_ledger_info);
-    *cached_storage_server_summary.write() = storage_server_summary;
+    cached_storage_server_summary.store(Arc::new(storage_server_summary));
 
     // Verify that optimistic fetch 2 is not returned because it was invalid
     let peers_with_ready_optimistic_fetches =

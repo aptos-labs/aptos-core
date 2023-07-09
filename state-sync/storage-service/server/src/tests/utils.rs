@@ -401,7 +401,9 @@ pub fn update_storage_server_summary(
     data_summary.transaction_outputs = Some(data_range);
 
     // Update the storage server summary
-    *storage_server.cached_storage_server_summary.write() = storage_server_summary;
+    storage_server
+        .cached_storage_server_summary
+        .store(Arc::new(storage_server_summary));
 }
 
 /// Advances the storage refresh time and

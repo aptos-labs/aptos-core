@@ -11,7 +11,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_notifications::StorageServiceNotificationListener;
@@ -20,13 +20,14 @@ use aptos_storage_service_types::{
     responses::{ProtocolMetadata, StorageServerSummary, StorageServiceResponse},
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use arc_swap::ArcSwap;
 use error::Error;
 use futures::stream::StreamExt;
 use handler::Handler;
 use lru::LruCache;
 use moderator::RequestModerator;
 use optimistic_fetch::OptimisticFetchRequest;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use storage::StorageReaderInterface;
 use thiserror::Error;
 use tokio::runtime::Handle;
@@ -60,7 +61,7 @@ pub struct StorageServiceServer<T> {
 
     // A cached storage server summary to avoid hitting the DB for every
     // request. This is refreshed periodically.
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
 
     // An LRU cache for commonly requested data items.
     // Note: This is not just a database cache because it contains
@@ -89,7 +90,8 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     ) -> Self {
         let bounded_executor =
             BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
-        let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
+        let cached_storage_server_summary =
+            Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
         let optimistic_fetches = Arc::new(Mutex::new(HashMap::new()));
         let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
             config.max_lru_cache_size as usize,
@@ -356,7 +358,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 /// Handles the active optimistic fetches and logs any
 /// errors that were encountered.
 fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
@@ -383,14 +385,11 @@ fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 /// a notification via the given channel. If an error
 /// occurs, it is logged.
 pub(crate) fn refresh_cached_storage_summary<T: StorageReaderInterface>(
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     storage: T,
     storage_config: StorageServiceConfig,
     cached_summary_update_notifier: aptos_channel::Sender<(), CachedSummaryUpdateNotification>,
 ) {
-    // Read the currently cached storage server summary
-    let existing_storage_server_summary = cached_storage_server_summary.read().clone();
-
     // Fetch the new data summary from storage
     let new_data_summary = match storage.get_data_summary() {
         Ok(data_summary) => data_summary,
@@ -418,9 +417,10 @@ pub(crate) fn refresh_cached_storage_summary<T: StorageReaderInterface>(
 
     // If the new storage server summary is different to the existing one,
     // update the cache and send a notification via the notifier channel.
-    if existing_storage_server_summary != new_storage_server_summary {
+    let existing_storage_server_summary = cached_storage_server_summary.load().clone();
+    if existing_storage_server_summary.deref().clone() != new_storage_server_summary {
         // Update the storage server summary cache
-        *cached_storage_server_summary.write() = new_storage_server_summary.clone();
+        cached_storage_server_summary.store(Arc::new(new_storage_server_summary.clone()));
 
         // Create an update notification
         let highest_synced_version = new_storage_server_summary
