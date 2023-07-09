@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::block_executor::{AptosTransactionOutput, BlockAptosVM};
-use aptos_block_executor::txn_commit_listener::NoOpTransactionCommitListener;
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{BlockExecutorTransactions, SubBlocksForShard},
@@ -30,7 +30,7 @@ impl BlockExecutorClient for VMExecutorClient {
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         Ok(vec![BlockAptosVM::execute_block::<
             _,
-            NoOpTransactionCommitListener<AptosTransactionOutput, VMStatus>,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             self.executor_thread_pool.clone(),
             BlockExecutorTransactions::Sharded(sub_blocks),

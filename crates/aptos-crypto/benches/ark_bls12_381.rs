@@ -47,7 +47,7 @@ fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("ark_bls12_381");
 
     group.bench_function("rayon", |b| {
-        b.iter(||{
+        b.iter(|| {
             let _p = rayon::ThreadPoolBuilder::new().num_threads(112).build();
         })
     });

@@ -570,6 +570,14 @@ module aptos_framework::delegation_pool {
         )
     }
 
+    #[view]
+    /// Return the address of the stake pool to be created with the provided owner, and seed.
+    public fun get_expected_stake_pool_address(owner: address, delegation_pool_creation_seed: vector<u8>
+    ): address {
+        let seed = create_resource_account_seed(delegation_pool_creation_seed);
+        account::create_resource_address(&owner, seed)
+    }
+
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
     /// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
     /// to host the delegation pool resource and own the underlying stake pool.
@@ -585,11 +593,7 @@ module aptos_framework::delegation_pool {
         assert!(operator_commission_percentage <= MAX_FEE, error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE));
 
         // generate a seed to be used to create the resource account hosting the delegation pool
-        let seed = vector::empty<u8>();
-        // include module salt (before any subseeds) to avoid conflicts with other modules creating resource accounts
-        vector::append(&mut seed, MODULE_SALT);
-        // include an additional salt in case the same resource account has already been created
-        vector::append(&mut seed, delegation_pool_creation_seed);
+        let seed = create_resource_account_seed(delegation_pool_creation_seed);
 
         let (stake_pool_signer, stake_pool_signer_cap) = account::create_resource_account(owner, seed);
         coin::register<AptosCoin>(&stake_pool_signer);
@@ -833,6 +837,18 @@ module aptos_framework::delegation_pool {
             proposal_id,
         };
         *smart_table::borrow_with_default(votes, key, &0)
+    }
+
+    /// Create the seed to derive the resource account address.
+    fun create_resource_account_seed(
+        delegation_pool_creation_seed: vector<u8>,
+    ): vector<u8> {
+        let seed = vector::empty<u8>();
+        // include module salt (before any subseeds) to avoid conflicts with other modules creating resource accounts
+        vector::append(&mut seed, MODULE_SALT);
+        // include an additional salt in case the same resource account has already been created
+        vector::append(&mut seed, delegation_pool_creation_seed);
+        seed
     }
 
     /// Borrow the mutable used voting power of a voter on a proposal.
@@ -3889,6 +3905,12 @@ module aptos_framework::delegation_pool {
 
         // Delegator1 has no stake. Abort.
         delegate_voting_power(delegator1, pool_address, signer::address_of(voter1));
+    }
+
+    #[test(staker = @0xe256f4f4e2986cada739e339895cf5585082ff247464cab8ec56eea726bd2263)]
+    public entry fun test_get_expected_stake_pool_address(staker: address) {
+        let pool_address = get_expected_stake_pool_address(staker, vector[0x42, 0x42]);
+        assert!(pool_address == @0xe9fc2fbb82b7e1cb7af3daef8c7a24e66780f9122d15e4f1d486ee7c7c36c48d, 0);
     }
 
     #[test_only]

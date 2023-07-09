@@ -83,6 +83,7 @@ spec aptos_framework::staking_config {
     }
 
     spec calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {
+        pragma verify_duration_estimate = 120;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
         aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;

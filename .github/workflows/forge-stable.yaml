@@ -210,7 +210,7 @@ jobs:
       FORGE_NAMESPACE: forge-haproxy-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 600
       FORGE_ENABLE_HAPROXY: true
-      FORGE_TEST_SUITE: land_blocking
+      FORGE_TEST_SUITE: realistic_env_max_load
       POST_TO_SLACK: true
 
   run-forge-fullnode-reboot-stress-test:

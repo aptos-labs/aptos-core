@@ -73,6 +73,12 @@ impl SMRNode {
         storage: Arc<MockStorage>,
         twin_id: TwinId,
     ) -> Self {
+        // Create a runtime for the twin
+        let thread_name = format!("twin-{}", twin_id.id);
+        let runtime = aptos_runtimes::spawn_named_runtime(thread_name, None);
+        let _entered_runtime = runtime.enter();
+
+        // Setup the network and SMR node
         let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -89,7 +95,7 @@ impl SMRNode {
             playground.peer_protocols(),
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
-        let network_events = NetworkEvents::new(consensus_rx, conn_notifs_channel);
+        let network_events = NetworkEvents::new(consensus_rx, conn_notifs_channel, None);
         let network_service_events =
             NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
 
@@ -127,9 +133,6 @@ impl SMRNode {
                 on_chain_configs: payload,
             })
             .unwrap();
-
-        let thread_name = format!("twin-{}", twin_id.id,);
-        let runtime = aptos_runtimes::spawn_named_runtime(thread_name, None);
 
         let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 

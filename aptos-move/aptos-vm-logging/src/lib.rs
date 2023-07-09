@@ -81,10 +81,9 @@ pub fn speculation_disabled() -> bool {
 
 /// Initializes the storage of speculative logs for num_txns many transactions.
 pub fn init_speculative_logs(num_txns: usize) {
-    if speculation_disabled() {
-        return;
+    if !speculation_disabled() {
+        BUFFERED_LOG_EVENTS.swap(Some(Arc::new(SpeculativeEvents::new(num_txns))));
     }
-    BUFFERED_LOG_EVENTS.swap(Some(Arc::new(SpeculativeEvents::new(num_txns))));
 }
 
 /// Adds a message at a specified logging level and given context (that includes txn index)

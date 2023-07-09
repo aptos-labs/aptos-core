@@ -60,6 +60,7 @@ impl CliCommand<Vec<EntryABI>> for ShowAbi {
                 .included_artifacts_args
                 .included_artifacts
                 .build_options(
+                    self.move_options.dev,
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
                     self.move_options.bytecode_version,

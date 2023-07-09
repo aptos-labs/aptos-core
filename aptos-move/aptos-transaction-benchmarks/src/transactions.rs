@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_listener::NoOpTransactionCommitListener;
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
 use aptos_executor_service::remote_executor_client::RemoteExecutorClient;
@@ -346,7 +346,7 @@ where
         let timer = Instant::now();
         BlockAptosVM::execute_block::<
             _,
-            NoOpTransactionCommitListener<AptosTransactionOutput, VMStatus>,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
             BlockExecutorTransactions::Unsharded(transactions),
@@ -390,7 +390,7 @@ where
         } else {
             BlockAptosVM::execute_block::<
                 _,
-                NoOpTransactionCommitListener<AptosTransactionOutput, VMStatus>,
+                NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
             >(
                 Arc::clone(&RAYON_EXEC_POOL),
                 BlockExecutorTransactions::Unsharded(transactions),

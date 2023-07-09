@@ -128,7 +128,6 @@ spec aptos_framework::aptos_governance {
     ) {
         use aptos_framework::chain_status;
         pragma verify_duration_estimate = 120;
-
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
     }
@@ -143,7 +142,6 @@ spec aptos_framework::aptos_governance {
     ) {
         use aptos_framework::chain_status;
         pragma verify_duration_estimate = 120;
-
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
     }
@@ -158,7 +156,6 @@ spec aptos_framework::aptos_governance {
     ): u64 {
         use aptos_framework::chain_status;
         pragma verify_duration_estimate = 120;
-
         requires chain_status::is_operating();
         include CreateProposalAbortsIf;
     }

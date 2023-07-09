@@ -10,6 +10,10 @@ use crate::{
     },
 };
 use aptos_logger::{info, trace};
+use aptos_metrics_core::{
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
+    IntCounterVec,
+};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
@@ -20,6 +24,7 @@ use aptos_types::{
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
+use once_cell::sync::Lazy;
 use std::{
     collections::HashSet,
     sync::{
@@ -27,8 +32,6 @@ use std::{
         Arc, Mutex,
     },
 };
-use once_cell::sync::Lazy;
-use aptos_metrics_core::{HistogramVec, register_histogram_vec, exponential_buckets, IntCounterVec, register_int_counter_vec};
 
 pub struct ShardedExecutorClient {
     num_shards: ShardId,
@@ -82,8 +85,7 @@ impl ShardedExecutorClient {
             .enumerate()
             .map(|(shard_id, rx)| {
                 let modified_num_threads = if shard_id == num_shards - 1 {
-                    // num_threads * num_shards
-                    num_threads
+                    num_threads * num_shards
                 } else {
                     num_threads
                 };
@@ -246,7 +248,7 @@ pub static APTOS_SUB_BLOCK_EXECUTION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| 
         &["shard_id", "round_id"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub static APTOS_SUB_BLOCK_SIZES: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -257,5 +259,5 @@ pub static APTOS_SUB_BLOCK_SIZES: Lazy<IntCounterVec> = Lazy::new(|| {
         "foo",
         &["shard_id", "round_id"],
     )
-        .unwrap()
+    .unwrap()
 });

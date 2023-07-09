@@ -21,6 +21,7 @@ shares left.
 
 -  [Struct `Pool`](#0x1_pool_u64_Pool)
 -  [Constants](#@Constants_0)
+-  [Function `new`](#0x1_pool_u64_new)
 -  [Function `create`](#0x1_pool_u64_create)
 -  [Function `create_with_scaling_factor`](#0x1_pool_u64_create_with_scaling_factor)
 -  [Function `destroy_empty`](#0x1_pool_u64_destroy_empty)
@@ -206,14 +207,42 @@ There are too many shareholders in the pool.
 
 
 
-<a name="0x1_pool_u64_create"></a>
+<a name="0x1_pool_u64_new"></a>
 
-## Function `create`
+## Function `new`
 
 Create a new pool.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_create">create</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_new">new</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_new">new</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a> {
+    // Default <b>to</b> a scaling factor of 1 (effectively no scaling).
+    <a href="pool_u64.md#0x1_pool_u64_create_with_scaling_factor">create_with_scaling_factor</a>(shareholders_limit, 1)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_pool_u64_create"></a>
+
+## Function `create`
+
+Deprecated. Use <code>new</code> instead.
+Create a new pool.
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_create">create</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">pool_u64::Pool</a>
 </code></pre>
 
 
@@ -223,8 +252,7 @@ Create a new pool.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pool_u64.md#0x1_pool_u64_create">create</a>(shareholders_limit: u64): <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a> {
-    // Default <b>to</b> a scaling factor of 1 (effectively no scaling).
-    <a href="pool_u64.md#0x1_pool_u64_create_with_scaling_factor">create_with_scaling_factor</a>(shareholders_limit, 1)
+    <a href="pool_u64.md#0x1_pool_u64_new">new</a>(shareholders_limit)
 }
 </code></pre>
 

@@ -11,7 +11,7 @@ use crate::{
     errors::*,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
-    txn_commit_listener::TransactionCommitListener,
+    txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
@@ -77,6 +77,7 @@ pub struct BlockExecutor<T, E, S, L, X> {
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
     maybe_block_gas_limit: Option<u64>,
+    transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
 }
 
@@ -85,10 +86,7 @@ where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitListener<
-        E::Output,
-        ExecutionStatus = ExecutionStatus<E::Output, Error<E::Error>>,
-    >,
+    L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
@@ -97,6 +95,7 @@ where
         concurrency_level: usize,
         executor_thread_pool: Arc<ThreadPool>,
         maybe_block_gas_limit: Option<u64>,
+        transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
@@ -107,12 +106,12 @@ where
             concurrency_level,
             executor_thread_pool,
             maybe_block_gas_limit,
+            transaction_commit_hook,
             phantom: PhantomData,
         }
     }
 
     fn update_parallel_block_gas_counters(
-        &self,
         accumulated_fee_statement: &FeeStatement,
         num_committed: usize,
     ) {
@@ -141,32 +140,41 @@ where
             accumulated_fee_statement.storage_fee_used(),
             GasType::STORAGE_FEE,
         );
-        counters::PARALLEL_BLOCK_COMMITTED_TXNS.observe(num_committed as f64);
+        counters::BLOCK_COMMITTED_TXNS
+            .with_label_values(&[counters::Mode::PARALLEL])
+            .observe(num_committed as f64);
     }
 
-    fn update_parallel_txn_gas_counters(&self, fee_statement: &FeeStatement) {
-        counters::observe_parallel_execution_txn_gas(fee_statement.gas_used(), GasType::TOTAL_GAS);
-        counters::observe_parallel_execution_txn_gas(
-            fee_statement.execution_gas_used(),
-            GasType::EXECUTION_GAS,
-        );
-        counters::observe_parallel_execution_txn_gas(fee_statement.io_gas_used(), GasType::IO_GAS);
-        counters::observe_parallel_execution_txn_gas(
-            fee_statement.storage_gas_used(),
-            GasType::STORAGE_GAS,
-        );
-        counters::observe_parallel_execution_txn_gas(
-            fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
-            GasType::NON_STORAGE_GAS,
-        );
-        counters::observe_parallel_execution_txn_gas(
-            fee_statement.storage_fee_used(),
-            GasType::STORAGE_FEE,
-        );
+    fn update_parallel_txn_gas_counters(txn_fee_statements: &Vec<FeeStatement>) {
+        for fee_statement in txn_fee_statements {
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.gas_used(),
+                GasType::TOTAL_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.execution_gas_used(),
+                GasType::EXECUTION_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.io_gas_used(),
+                GasType::IO_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.storage_gas_used(),
+                GasType::STORAGE_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
+                GasType::NON_STORAGE_GAS,
+            );
+            counters::observe_parallel_execution_txn_gas(
+                fee_statement.storage_fee_used(),
+                GasType::STORAGE_FEE,
+            );
+        }
     }
 
     fn update_sequential_block_gas_counters(
-        &self,
         accumulated_fee_statement: &FeeStatement,
         num_committed: usize,
     ) {
@@ -195,10 +203,12 @@ where
             accumulated_fee_statement.storage_fee_used(),
             GasType::STORAGE_FEE,
         );
-        counters::PARALLEL_BLOCK_COMMITTED_TXNS.observe(num_committed as f64);
+        counters::BLOCK_COMMITTED_TXNS
+            .with_label_values(&[counters::Mode::PARALLEL])
+            .observe(num_committed as f64);
     }
 
-    fn update_sequential_txn_gas_counters(&self, fee_statement: &FeeStatement) {
+    fn update_sequential_txn_gas_counters(fee_statement: &FeeStatement) {
         counters::observe_sequential_execution_txn_gas(
             fee_statement.gas_used(),
             GasType::TOTAL_GAS,
@@ -374,6 +384,7 @@ where
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         accumulated_fee_statement: &mut FeeStatement,
+        txn_fee_statements: &mut Vec<FeeStatement>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
@@ -386,10 +397,11 @@ where
             if txn_idx as usize + 1 == scheduler.num_txns() as usize {
                 *scheduler_task = SchedulerTask::Done;
 
-                self.update_parallel_block_gas_counters(
+                Self::update_parallel_block_gas_counters(
                     accumulated_fee_statement,
                     (txn_idx + 1) as usize,
                 );
+                Self::update_parallel_txn_gas_counters(txn_fee_statements);
                 info!(
                     "[BlockSTM]: Parallel execution completed, all {} txns committed.",
                     txn_idx + 1
@@ -402,15 +414,16 @@ where
             match last_input_output.fee_statement(txn_idx) {
                 Some(fee_statement) => {
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
-                    self.update_parallel_txn_gas_counters(&fee_statement);
+                    txn_fee_statements.push(fee_statement);
                 },
                 None => {
                     scheduler.halt();
 
-                    self.update_parallel_block_gas_counters(
+                    Self::update_parallel_block_gas_counters(
                         accumulated_fee_statement,
                         (txn_idx + 1) as usize,
                     );
+                    Self::update_parallel_txn_gas_counters(txn_fee_statements);
                     info!("[BlockSTM]: Parallel execution early halted due to Abort or SkipRest txn, {} txns committed.", txn_idx + 1);
                     break;
                 },
@@ -426,11 +439,14 @@ where
                     last_input_output.update_to_skip_rest(txn_idx);
                     scheduler.halt();
 
-                    self.update_parallel_block_gas_counters(
+                    Self::update_parallel_block_gas_counters(
                         accumulated_fee_statement,
                         (txn_idx + 1) as usize,
                     );
-                    counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                    Self::update_parallel_txn_gas_counters(txn_fee_statements);
+                    counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
+                        .with_label_values(&[counters::Mode::PARALLEL])
+                        .inc();
                     info!("[BlockSTM]: Parallel execution early halted due to accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", accumulated_non_storage_gas, per_block_gas_limit, txn_idx);
                     break;
                 }
@@ -452,7 +468,6 @@ where
         versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
-        txn_commit_listener: &Option<L>,
     ) {
         let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
         let mut delta_writes = Vec::with_capacity(num_deltas);
@@ -488,15 +503,18 @@ where
             ));
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
-        if let Some(txn_commit_listener) = txn_commit_listener {
-            txn_commit_listener.on_transaction_committed(
-                txn_idx,
-                last_input_output
-                    .txn_output(txn_idx)
-                    .unwrap()
-                    .as_ref()
-                    .output_status(),
-            );
+        if let Some(txn_commit_listener) = &self.transaction_commit_hook {
+            let txn_output = last_input_output.txn_output(txn_idx).unwrap();
+            let execution_status = txn_output.output_status();
+
+            match execution_status {
+                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                    txn_commit_listener.on_transaction_committed(txn_idx, output);
+                },
+                ExecutionStatus::Abort(_) => {
+                    txn_commit_listener.on_execution_aborted(txn_idx);
+                },
+            }
         }
     }
 
@@ -509,7 +527,6 @@ where
         scheduler: &Scheduler,
         base_view: &S,
         role: CommitRole,
-        transaction_commit_listener: &Option<L>,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -523,6 +540,7 @@ where
         let mut worker_idx = 0;
 
         let mut accumulated_fee_statement = FeeStatement::zero();
+        let mut txn_fee_statements = Vec::with_capacity(block.len());
         loop {
             // Only one thread does try_commit to avoid contention.
             match &role {
@@ -535,6 +553,7 @@ where
                         &mut scheduler_task,
                         last_input_output,
                         &mut accumulated_fee_statement,
+                        &mut txn_fee_statements,
                     );
                 },
                 CommitRole::Worker(rx) => {
@@ -544,7 +563,6 @@ where
                             versioned_cache,
                             last_input_output,
                             base_view,
-                            transaction_commit_listener,
                         );
                     }
                 },
@@ -589,7 +607,6 @@ where
                                 versioned_cache,
                                 last_input_output,
                                 base_view,
-                                transaction_commit_listener,
                             );
                         }
                     }
@@ -604,7 +621,6 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-        transaction_commit_listener: &Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -650,7 +666,6 @@ where
                         &scheduler,
                         base_view,
                         role,
-                        transaction_commit_listener,
                     );
                 });
             }
@@ -704,7 +719,6 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-        transaction_commit_listener: &Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
@@ -722,21 +736,6 @@ where
                 true,
             );
 
-            let res = match res {
-                ExecutionStatus::Success(output) => {
-                    // Apply the writes/deltas to the versioned_data_cache.
-                    ExecutionStatus::Success(output)
-                },
-                ExecutionStatus::SkipRest(output) => {
-                    // Apply the writes/deltas and record status indicating skip.
-                    ExecutionStatus::SkipRest(output)
-                },
-                ExecutionStatus::Abort(err) => {
-                    // Record the status indicating abort.
-                    ExecutionStatus::Abort(Error::UserError(err))
-                },
-            };
-
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -752,16 +751,21 @@ where
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
-                    self.update_sequential_txn_gas_counters(&accumulated_fee_statement);
-                    if let Some(listener) = transaction_commit_listener {
-                        output.incorporate_delta_writes(vec![]);
-                        listener.send_remote_update_for_success(idx as TxnIndex, &output);
+                    Self::update_sequential_txn_gas_counters(&fee_statement);
+                    // No delta writes are needed for sequential execution.
+                    output.incorporate_delta_writes(vec![]);
+                    //
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_transaction_committed(idx as TxnIndex, &output);
                     }
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
+                    }
                     // Record the status indicating abort.
-                    return Err(err);
+                    return Err(Error::UserError(err));
                 },
             }
 
@@ -777,7 +781,9 @@ where
                 let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
                     + accumulated_fee_statement.io_gas_used();
                 if accumulated_non_storage_gas >= per_block_gas_limit {
-                    counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                    counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
+                        .with_label_values(&[counters::Mode::SEQUENTIAL])
+                        .inc();
                     info!("[Execution]: Sequential execution early halted due to accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", accumulated_non_storage_gas, per_block_gas_limit, ret.len());
                     break;
                 }
@@ -791,7 +797,7 @@ where
             );
         }
 
-        self.update_sequential_block_gas_counters(&accumulated_fee_statement, ret.len());
+        Self::update_sequential_block_gas_counters(&accumulated_fee_statement, ret.len());
         ret.resize_with(num_txns, E::Output::skip_output);
         Ok(ret)
     }
@@ -801,7 +807,6 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: BlockExecutorTransactions<T>,
         base_view: &S,
-        transaction_commit_listener: Option<L>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let signature_verified_txns = signature_verified_block.into_txns();
         let mut ret = if self.concurrency_level > 1 {
@@ -809,14 +814,12 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
-                &transaction_commit_listener,
             )
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
-                &transaction_commit_listener,
             )
         };
 
@@ -831,7 +834,6 @@ where
                 executor_arguments,
                 &signature_verified_txns,
                 base_view,
-                &transaction_commit_listener,
             )
         }
         self.executor_thread_pool.spawn(move || {
