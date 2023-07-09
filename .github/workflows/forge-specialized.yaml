@@ -134,7 +134,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-const-tps-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-pfn-const-tps-with-network-chaos-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
       FORGE_TEST_SUITE: pfn_const_tps_with_network_chaos
       POST_TO_SLACK: true
@@ -160,7 +160,7 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-performance-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-pfn-performance-with-network-chaos-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
       FORGE_TEST_SUITE: pfn_performance_with_network_chaos
       POST_TO_SLACK: true
