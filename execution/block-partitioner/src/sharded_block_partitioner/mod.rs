@@ -19,6 +19,7 @@ use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId, SubBlocksForShard, TxnIndex},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
+use counters::BLOCK_PARTITIONING_SECONDS;
 use itertools::Itertools;
 use std::{
     collections::HashMap,
@@ -30,6 +31,7 @@ use std::{
 };
 
 mod conflict_detector;
+mod counters;
 mod cross_shard_messages;
 mod dependency_analysis;
 mod dependent_edges;
@@ -106,6 +108,8 @@ mod partitioning_shard;
 ///       look up the read-write set index mapping received from other shards in previous iteration(s) in descending order of shard id.
 /// ```
 ///
+///
+pub static MAX_ALLOWED_PARTITIONING_ROUNDS: usize = 8;
 pub struct ShardedBlockPartitioner {
     num_shards: usize,
     control_txs: Vec<Sender<ControlMsg>>,
@@ -298,12 +302,26 @@ impl ShardedBlockPartitioner {
     /// We repeatedly partition chunks, discarding a bunch of transactions with cross-shard dependencies. The set of discarded
     /// transactions are used as candidate chunks in the next round. This process is repeated until num_partitioning_rounds.
     /// The remaining transactions are then added to the chunks with cross-shard dependencies.
+    /// `max_partitioning_rounds` is the maximum number of partitioning rounds we allow.
+    /// `cross_shard_dep_avoid_threshold` is the maximum fraction of transactions we try to avoid cross shard dependencies. Once we reach
+    /// this fraction, we terminate early and add cross-shard dependencies to the remaining transactions.
     pub fn partition(
         &self,
         transactions: Vec<AnalyzedTransaction>,
-        num_partitioning_round: RoundId,
+        max_partitioning_rounds: RoundId,
+        cross_shard_dep_avoid_threshold: f32,
     ) -> Vec<SubBlocksForShard<Transaction>> {
+        let _timer = BLOCK_PARTITIONING_SECONDS.start_timer();
         let total_txns = transactions.len();
+        assert!(
+            max_partitioning_rounds >= 1,
+            "max_partitioning_rounds must be > 0"
+        );
+        assert!(
+            max_partitioning_rounds <= MAX_ALLOWED_PARTITIONING_ROUNDS,
+            "max_partitioning_rounds must be <= {}",
+            MAX_ALLOWED_PARTITIONING_ROUNDS
+        );
         if total_txns == 0 {
             return vec![];
         }
@@ -316,8 +334,8 @@ impl ShardedBlockPartitioner {
         for shard_id in 0..self.num_shards {
             frozen_sub_blocks.push(SubBlocksForShard::empty(shard_id))
         }
-
-        for round_id in 0..num_partitioning_round {
+        let mut current_round = 0;
+        for _ in 0..max_partitioning_rounds - 1 {
             let (
                 updated_frozen_sub_blocks,
                 current_frozen_rw_set_with_index_vec,
@@ -327,7 +345,7 @@ impl ShardedBlockPartitioner {
                 current_round_start_index,
                 frozen_sub_blocks,
                 frozen_write_set_with_index.clone(),
-                round_id,
+                current_round,
             );
             // Current round start index is the sum of the number of transactions in the frozen sub-blocks
             current_round_start_index = updated_frozen_sub_blocks
@@ -340,19 +358,29 @@ impl ShardedBlockPartitioner {
             prev_frozen_write_set_with_index.extend(current_frozen_rw_set_with_index_vec);
             frozen_write_set_with_index = Arc::new(prev_frozen_write_set_with_index);
             txns_to_partition = discarded_txns_to_partition;
-            if txns_to_partition
+            current_round += 1;
+            let num_remaining_txns = txns_to_partition
                 .iter()
                 .map(|txns| txns.len())
-                .sum::<usize>()
-                == 0
-            {
+                .sum::<usize>();
+            // If there are no remaining transactions, we can stop partitioning
+            if num_remaining_txns == 0 {
                 return frozen_sub_blocks;
+            }
+
+            if num_remaining_txns as f32 / total_txns as f32 <= 1 as f32 - cross_shard_dep_avoid_threshold {
+                break;
             }
         }
 
-        // Let the the last shard handle the leftover.
-        // let last_round_txns: Vec<AnalyzedTransaction> = txns_to_partition.into_iter().flatten().collect();
-        // txns_to_partition = vec![vec![vec![]; self.num_shards - 1], vec![last_round_txns]].concat();
+        match std::env::var("SHARDED_PARTITIONER__MERGE_LAST_ROUND") {
+            Ok(v) if v.as_str() == "1" => {
+                info!("Let the the last shard handle the leftover.");
+                let last_round_txns: Vec<AnalyzedTransaction> = txns_to_partition.into_iter().flatten().collect();
+                txns_to_partition = vec![vec![vec![]; self.num_shards - 1], vec![last_round_txns]].concat();
+            }
+            _ => {}
+        }
 
         // We just add cross shard dependencies for remaining transactions.
         let (frozen_sub_blocks, _, rejected_txns) = self.add_cross_shard_dependencies(
@@ -360,7 +388,7 @@ impl ShardedBlockPartitioner {
             txns_to_partition,
             frozen_sub_blocks,
             frozen_write_set_with_index,
-            num_partitioning_round,
+            current_round,
         );
 
         // for (shard_id, sub_block_list) in frozen_sub_blocks.iter().enumerate() {
@@ -396,7 +424,7 @@ impl BlockPartitioner for ShardedBlockPartitioner {
     ) -> Vec<SubBlocksForShard<Transaction>> {
         assert_eq!(self.num_shards, num_executor_shards);
         let analyzed_transactions = transactions.into_iter().map(|t| t.into()).collect();
-        self.partition(analyzed_transactions, 1)
+        self.partition(analyzed_transactions, 4, 0.95)
     }
 }
 impl Drop for ShardedBlockPartitioner {
@@ -447,7 +475,7 @@ mod tests {
     };
     use aptos_crypto::hash::CryptoHash;
     use aptos_types::{
-        block_executor::partitioner::{ShardedTxnIdx, SubBlock, SubBlocksForShard},
+        block_executor::partitioner::{ShardedTxnIndex, SubBlock, SubBlocksForShard},
         transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
     };
     use move_core_types::account_address::AccountAddress;
@@ -478,7 +506,7 @@ mod tests {
             receivers.iter().collect::<Vec<&TestAccount>>(),
         );
         let partitioner = ShardedBlockPartitioner::new(4);
-        let sub_blocks = partitioner.partition(transactions.clone(), 1);
+        let sub_blocks = partitioner.partition(transactions.clone(), 2, 0.9);
         assert_eq!(sub_blocks.len(), 4);
         // The first shard should contain all the transactions
         assert_eq!(sub_blocks[0].num_txns(), num_txns);
@@ -505,7 +533,7 @@ mod tests {
             transactions.push(create_non_conflicting_p2p_transaction())
         }
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+        let partitioned_txns = partitioner.partition(transactions.clone(), 2, 0.9);
         assert_eq!(partitioned_txns.len(), num_shards);
         // Verify that the transactions are in the same order as the original transactions and cross shard
         // dependencies are empty.
@@ -555,7 +583,7 @@ mod tests {
         transactions.push(txns_from_sender[txn_from_sender_index].clone());
 
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let sub_blocks = partitioner.partition(transactions.clone(), 1);
+        let sub_blocks = partitioner.partition(transactions.clone(), 2, 0.9);
         assert_eq!(sub_blocks.len(), num_shards);
         assert_eq!(sub_blocks[0].num_sub_blocks(), 1);
         assert_eq!(sub_blocks[1].num_sub_blocks(), 1);
@@ -607,7 +635,7 @@ mod tests {
         }
 
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let sub_blocks = partitioner.partition(transactions.clone(), 1);
+        let sub_blocks = partitioner.partition(transactions.clone(), 2, 0.9);
 
         let mut account_to_expected_seq_number: HashMap<AccountAddress, u64> = HashMap::new();
         SubBlocksForShard::flatten(sub_blocks)
@@ -662,7 +690,7 @@ mod tests {
         ];
 
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let partitioned_sub_blocks = partitioner.partition(transactions, 1);
+        let partitioned_sub_blocks = partitioner.partition(transactions, 2, 0.9);
         assert_eq!(partitioned_sub_blocks.len(), num_shards);
 
         // In first round of the partitioning, we should have txn0, txn1 and txn2 in shard 0 and
@@ -763,7 +791,7 @@ mod tests {
             .for_each(|txn| {
                 let required_deps = txn
                     .cross_shard_dependencies
-                    .get_required_edge_for(ShardedTxnIdx::new(6, 1, 0))
+                    .get_required_edge_for(ShardedTxnIndex::new(6, 1, 0))
                     .unwrap();
                 // txn (6, 7) and 8 has conflict only on the coin store of account 7 as txn (6,7) are sending
                 // from account 7 and txn 8 is receiving in account 7
@@ -780,7 +808,7 @@ mod tests {
             .unwrap()
             .transactions[3]
             .cross_shard_dependencies
-            .get_dependent_edge_for(ShardedTxnIdx::new(7, 2, 1))
+            .get_dependent_edge_for(ShardedTxnIndex::new(7, 2, 1))
             .unwrap();
         assert_eq!(required_deps.len(), 1);
         assert_eq!(
@@ -793,7 +821,7 @@ mod tests {
             .unwrap()
             .transactions[3]
             .cross_shard_dependencies
-            .get_dependent_edge_for(ShardedTxnIdx::new(8, 2, 1))
+            .get_dependent_edge_for(ShardedTxnIndex::new(8, 2, 1))
             .unwrap();
         assert_eq!(required_deps.len(), 1);
         assert_eq!(
@@ -805,10 +833,11 @@ mod tests {
     #[test]
     // Generates a bunch of random transactions and ensures that after the partitioning, there is
     // no conflict across shards.
-    fn test_no_conflict_across_shards_in_first_round() {
+    fn test_no_conflict_across_shards_in_non_last_rounds() {
         let mut rng = OsRng;
         let max_accounts = 500;
-        let max_txns = 2000;
+        let max_txns = 5000;
+        let max_partitioning_rounds = 8;
         let max_num_shards = 64;
         let num_accounts = rng.gen_range(1, max_accounts);
         let mut accounts = Vec::new();
@@ -832,26 +861,29 @@ mod tests {
             accounts.push(sender)
         }
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let partitioned_txns = partitioner.partition(transactions, 1);
+        let partitioned_txns = partitioner.partition(transactions, max_partitioning_rounds, 0.9);
         // Build a map of storage location to corresponding shards in first round
         // and ensure that no storage location is present in more than one shard.
-        let mut storage_location_to_shard_map = HashMap::new();
-        for (shard_id, txns) in partitioned_txns.iter().enumerate() {
-            let first_round_sub_block = txns.get_sub_block(0).unwrap();
-            for txn in first_round_sub_block.iter() {
-                let analyzed_txn = txns_by_hash.get(&txn.txn.hash()).unwrap();
-                let storage_locations = analyzed_txn
-                    .read_hints()
-                    .iter()
-                    .chain(analyzed_txn.write_hints().iter());
-                for storage_location in storage_locations {
-                    if storage_location_to_shard_map.contains_key(storage_location) {
-                        assert_eq!(
-                            storage_location_to_shard_map.get(storage_location).unwrap(),
-                            &shard_id
-                        );
-                    } else {
-                        storage_location_to_shard_map.insert(storage_location, shard_id);
+        let num_partitioning_rounds = partitioned_txns[0].num_sub_blocks() - 1;
+        for round in 0..num_partitioning_rounds {
+            let mut storage_location_to_shard_map = HashMap::new();
+            for (shard_id, sub_blocks_for_shard) in partitioned_txns.iter().enumerate() {
+                let sub_block_for_round = sub_blocks_for_shard.get_sub_block(round).unwrap();
+                for txn in sub_block_for_round.iter() {
+                    let analyzed_txn = txns_by_hash.get(&txn.txn.hash()).unwrap();
+                    let storage_locations = analyzed_txn
+                        .read_hints()
+                        .iter()
+                        .chain(analyzed_txn.write_hints().iter());
+                    for storage_location in storage_locations {
+                        if storage_location_to_shard_map.contains_key(storage_location) {
+                            assert_eq!(
+                                storage_location_to_shard_map.get(storage_location).unwrap(),
+                                &shard_id
+                            );
+                        } else {
+                            storage_location_to_shard_map.insert(storage_location, shard_id);
+                        }
                     }
                 }
             }

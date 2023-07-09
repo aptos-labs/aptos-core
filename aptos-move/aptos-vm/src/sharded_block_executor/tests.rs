@@ -111,7 +111,7 @@ fn test_sharded_block_executor_no_conflict() {
         transactions.push(generate_non_conflicting_p2p(&mut executor).0)
     }
     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+    let partitioned_txns = partitioner.partition(transactions.clone(), 2, 0.9);
     let executor_clients =
         ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(2));
     let sharded_block_executor = ShardedBlockExecutor::new(executor_clients);
@@ -135,7 +135,16 @@ fn test_sharded_block_executor_no_conflict() {
 #[test]
 // Sharded execution with cross shard conflict doesn't work for now because we don't have
 // cross round dependency tracking yet.
-fn test_sharded_block_executor_with_conflict() {
+fn test_sharded_block_executor_with_conflict_parallel() {
+    sharded_block_executor_with_conflict(4)
+}
+
+#[test]
+fn test_sharded_block_executor_with_conflict_sequential() {
+    sharded_block_executor_with_conflict(1)
+}
+
+fn sharded_block_executor_with_conflict(concurrency: usize) {
     let num_txns = 800;
     let num_shards = 7;
     let num_accounts = 80;
@@ -160,18 +169,18 @@ fn test_sharded_block_executor_with_conflict() {
     }
 
     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
 
     let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
 
     let executor_clients =
-        ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(2));
+        ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(concurrency));
     let sharded_block_executor = ShardedBlockExecutor::new(executor_clients);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
             partitioned_txns,
-            2,
+            concurrency,
             None,
         )
         .unwrap();
@@ -182,7 +191,16 @@ fn test_sharded_block_executor_with_conflict() {
 }
 
 #[test]
-fn test_sharded_block_executor_with_random_transfers() {
+fn test_sharded_block_executor_with_random_transfers_parallel() {
+    sharded_block_executor_with_random_transfers(4)
+}
+
+#[test]
+fn test_sharded_block_executor_with_random_transfers_sequential() {
+    sharded_block_executor_with_random_transfers(1)
+}
+
+fn sharded_block_executor_with_random_transfers(concurrency: usize) {
     let mut rng = OsRng;
     let max_accounts = 200;
     let max_txns = 1000;
@@ -211,18 +229,18 @@ fn test_sharded_block_executor_with_random_transfers() {
     }
 
     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
 
     let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
 
     let executor_clients =
-        ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(2));
+        ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(concurrency));
     let sharded_block_executor = ShardedBlockExecutor::new(executor_clients);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
             partitioned_txns,
-            2,
+            concurrency,
             None,
         )
         .unwrap();

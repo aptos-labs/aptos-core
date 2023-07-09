@@ -23,6 +23,7 @@ use aptos_gas::{
 };
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_keygen::KeyGen;
+use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -511,12 +512,12 @@ impl FakeExecutor {
                 &txn,
                 &log_context,
                 |gas_feature_version, gas_params, storage_gas_params, balance| {
-                    let gas_meter = StandardGasMeter::new(
+                    let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
                         gas_feature_version,
                         gas_params,
                         storage_gas_params,
                         balance,
-                    );
+                    ));
                     let gas_profiler = match txn.payload() {
                         TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
                         TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(

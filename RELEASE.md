@@ -20,7 +20,7 @@
 All current development occurs on the `main` branch. All new feature developments have a feature flag to gate it off during development. Feature flags are turned on *after* the development is complete and passes Governance.
 
 ### devnet branch
-The `devnet` branch is created on the `main` branch every week. It is used to deploy devnet and allows the Aptos Community to explore the most recent changes to the Aptos node binary and Aptos framework. Follow along in our [#devnet-release](https://discord.com/channels/945856774056083548/956692649430093904) channel on [Discord](https://discord.gg/aptoslabs).
+The `devnet` branch is created on the `main` branch every week. It is used to deploy devnet and allows the Aptos Community to explore the most recent changes to the Aptos node binary and Aptos framework. Follow along in our [#devnet-release](https://discord.com/channels/945856774056083548/956692649430093904) channel on [Discord](https://discord.gg/aptosnetwork).
 
 ### aptos-release-v*X.Y* release branches
 These are release branches based on Aptos release planning timeline. They are created off
@@ -34,6 +34,22 @@ The aptos framework release tags are created to facilitate the on-chain framewor
 
 ### aptos-cli-v*X.Y.Z* release tag
 The aptos cli release tags are created to track the CLI versions for community to use when developing on the Aptos network. It's always recommended to upgrade your CLI when a new version is released, for the best user experience. Learn how to update to the [latest CLI version](https://aptos.dev/tools/install-cli/install-from-brew/#upgrading-the-cli).
+
+## Aptos Release Lifecycle
+(The time length here is a rough estimate, it varies depends on each release.)
+* [day 0] A release branch `aptos-release-vx.y` will be created, with a commit hash `abcde`. The full test suite will be triggered for the commit hash for validation.
+* [day 1] The release will be deployed to **devnet**.
+* [day 7] Once the release passed devnet test, a release tag `aptos-node-vx.y.z` will be created, and get deployed to **testnet**.
+* [day 14] After the binary release stablized on testnet, testnet framework will be upgraded.
+* Hot-fixes release will be created as needed when a release version is soaking in testnet, and we will only promote a release from testnet to Mainnet after confirming a release version is stable.
+* [day 24] Once confirmed that both binary upgrade and framework upgrade stablized on testnet, the release version will be deployed to 1% of the stake on **Mainnet**.
+* [day 25] Wider announcement will be made for the community to upgrade the binary, `aptos-node-vx.y.z` will be updated with "[Mainnet]" in the release page, Mainnet validators will be slowly upgrading.
+* [day 30] A list of framework upgrade proposals will be submitted to Mainnet for voting.
+* [day 37] Proposals executed on-chain if passed voting.
+
+## Release Announcement
+* Each of the network release will be announced on Aptos Network [Discord](https://discord.gg/aptosnetwork). Follow mainnet-release, testnet-release, devnet-release channel to get updates.
+* When a release is ready to deploy, a [Github release page](https://github.com/aptos-labs/aptos-core/releases) will be created in this repo as well. You can search for the most recent release version titled with "[Mainnet]" for production usage.
 
 ## How we test each release at Aptos
 ### Blockchain

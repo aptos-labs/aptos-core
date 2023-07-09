@@ -790,13 +790,6 @@ where
             }
         }
 
-        if ret.len() == num_txns {
-            info!(
-                "[Execution]: Sequential execution completed, all {} txns committed.",
-                ret.len()
-            );
-        }
-
         Self::update_sequential_block_gas_counters(&accumulated_fee_statement, ret.len());
         ret.resize_with(num_txns, E::Output::skip_output);
         Ok(ret)

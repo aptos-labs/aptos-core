@@ -3,7 +3,7 @@
 use crate::sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex};
 use aptos_types::{
     block_executor::partitioner::{
-        CrossShardDependencies, RoundId, ShardId, ShardedTxnIdx, SubBlock,
+        CrossShardDependencies, RoundId, ShardId, ShardedTxnIndex, SubBlock,
         TransactionWithDependencies, TxnIndex,
     },
     transaction::{
@@ -60,11 +60,17 @@ impl CrossShardConflictDetector {
                 }
                 rejected_txns.push(txn);
             } else {
-                accepted_txn_dependencies.push(self.get_deps_for_frozen_txn(
-                    &txn,
-                    Arc::new(vec![WriteSetWithTxnIndex::default(); self.num_shards]),
-                    prev_rounds_rw_set_with_index.clone(),
-                ));
+                let cross_shard_deps = if self.round_id == 0 {
+                    // 1st-round txns always have 0 cross-shard dependencies.
+                    CrossShardDependencies::default()
+                } else {
+                    self.get_deps_for_frozen_txn(
+                        &txn,
+                        Arc::new(vec![WriteSetWithTxnIndex::default(); self.num_shards]),
+                        prev_rounds_rw_set_with_index.clone(),
+                    )
+                };
+                accepted_txn_dependencies.push(cross_shard_deps);
                 accepted_txns.push(txn);
             }
         }
@@ -115,7 +121,7 @@ impl CrossShardConflictDetector {
 
                 if rw_set_with_index.has_write_lock(storage_location) {
                     cross_shard_dependencies.add_required_edge(
-                        ShardedTxnIdx::new(
+                        ShardedTxnIndex::new(
                             rw_set_with_index.get_write_lock_txn_index(storage_location),
                             current_shard_id,
                             current_round,
