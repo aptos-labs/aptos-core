@@ -12,7 +12,6 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
-use aptos_infallible::Mutex;
 use aptos_storage_service_notifications::{
     StorageServiceNotificationSender, StorageServiceNotifier,
 };
@@ -42,9 +41,10 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
     write_set::WriteSet,
 };
+use dashmap::DashMap;
 use mockall::predicate::eq;
 use rand::{rngs::OsRng, Rng};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 /// Advances the given timer by the amount of time it takes to refresh storage
 pub async fn advance_storage_refresh_time(mock_time: &MockTimeService) {
@@ -501,11 +501,11 @@ pub async fn force_optimistic_fetch_handler_to_run(
 
 /// Waits for the specified number of optimistic fetches to be active
 pub async fn wait_for_active_optimistic_fetches(
-    active_optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    active_optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     expected_num_active_fetches: usize,
 ) {
     loop {
-        let num_active_fetches = active_optimistic_fetches.lock().len();
+        let num_active_fetches = active_optimistic_fetches.len();
         if num_active_fetches == expected_num_active_fetches {
             return; // We found the expected number of active fetches
         }
