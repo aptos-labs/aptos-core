@@ -1,31 +1,31 @@
 
 Diagnostics:
-error: `integer` not compatible with `bool` in vector expression
-  ┌─ tests/checking/typing/vector_mismatched_args.move:7:19
+error: expected `bool` but found `integer`
+  ┌─ tests/checking/typing/vector_mismatched_args.move:7:16
   │
 7 │         vector[0, false];
-  │                   ^^^^^
+  │                ^
 
-error: expected `u64` but found `u8` in vector expression
+error: expected `u8` but found `u64`
   ┌─ tests/checking/typing/vector_mismatched_args.move:8:21
   │
 8 │         vector[0u8, 0u64, 0u128];
   │                     ^^^^
 
-error: `integer` not compatible with `address` in vector expression
-  ┌─ tests/checking/typing/vector_mismatched_args.move:9:19
+error: expected `address` but found `integer`
+  ┌─ tests/checking/typing/vector_mismatched_args.move:9:16
   │
 9 │         vector[0, @0];
-  │                   ^^
+  │                ^
 
-error: expected `Test::Y` but found `Test::X` in vector expression
+error: expected `Test::X` but found `Test::Y`
    ┌─ tests/checking/typing/vector_mismatched_args.move:10:21
    │
 10 │         vector[X{}, Y{}];
    │                     ^^^
 
-error: `integer` not compatible with `bool` in vector expression
-   ┌─ tests/checking/typing/vector_mismatched_args.move:11:20
+error: expected `bool` but found `integer`
+   ┌─ tests/checking/typing/vector_mismatched_args.move:11:17
    │
 11 │         vector[&0, &false];
-   │                    ^^^^^^
+   │                 ^

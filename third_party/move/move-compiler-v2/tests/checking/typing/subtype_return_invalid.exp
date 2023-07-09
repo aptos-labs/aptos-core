@@ -1,36 +1,36 @@
 
 Diagnostics:
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/subtype_return_invalid.move:5:9
   │
 5 │         u
   │         ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/subtype_return_invalid.move:9:9
   │
 9 │         s
   │         ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/subtype_return_invalid.move:13:14
    │
 13 │         (u1, u2)
    │              ^^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/subtype_return_invalid.move:17:10
    │
 17 │         (u1, u2)
    │          ^^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/subtype_return_invalid.move:21:10
    │
 21 │         (u1, u2)
    │          ^^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/subtype_return_invalid.move:21:14
    │
 21 │         (u1, u2)

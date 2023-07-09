@@ -42,7 +42,7 @@ error: The type argument to `exists` and `global` must be a struct type but `?25
 31 │         R{} = move_from(@0x42);
    │               ^^^^^^^^^^^^^^^^
 
-error: `integer` not compatible with `()` in constant
+error: expected `()` but found `integer`
    ┌─ tests/checking/typing/constant_unsupported_exps.move:39:16
    │
 39 │         return 0;

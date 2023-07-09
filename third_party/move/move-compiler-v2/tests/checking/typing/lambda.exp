@@ -19,25 +19,25 @@ error: no matching declaration of `+`
    = outruled candidate `+(u128, u128): u128` (expected `u128` but found `&integer` for argument 2)
    = outruled candidate `+(u256, u256): u256` (expected `u256` but found `&integer` for argument 2)
 
-error: expected `()` but found `u64` in name expression
-   ┌─ tests/checking/typing/lambda.move:73:44
+error: expected `()` but found `u64`
+   ┌─ tests/checking/typing/lambda.move:73:43
    │
 73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
-   │                                            ^
+   │                                           ^^
 
-error: expected `(&T, u64)` but found `&T` in expression
+error: expected `(&T, u64)` but found `&T`
    ┌─ tests/checking/typing/lambda.move:40:13
    │
 40 │             action(XVector::borrow(v, i), i); // expected to have wrong argument count
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `u64` but found `&T` in expression
+error: expected `u64` but found `&T`
    ┌─ tests/checking/typing/lambda.move:48:13
    │
 48 │             action(i); // expected to have wrong argument type
    │             ^^^^^^^^^
 
-error: expected `|integer|()` but found `u64` in expression
+error: expected `|integer|()` but found `u64`
    ┌─ tests/checking/typing/lambda.move:61:9
    │
 61 │         x(1) // expected to be not a function

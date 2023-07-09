@@ -1029,7 +1029,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             } else {
                 et.error(
                     &et.get_node_loc(exp.node_id()),
-                    "current restriction: constant expression must be a value",
+                    "constant expression must be a literal",
                 );
                 Value::Bool(false)
             }

@@ -1,54 +1,54 @@
 
 Diagnostics:
-error: `integer` not compatible with `()` in if-else
-  ┌─ tests/checking/typing/if_mismatched_branches.move:3:9
+error: expected `()` but found `integer` (in if-else)
+  ┌─ tests/checking/typing/if_mismatched_branches.move:3:27
   │
 3 │         if (cond) () else 0;
-  │         ^^^^^^^^^^^^^^^^^^^
+  │                           ^
 
-error: `integer` not compatible with `()` in if-else
-  ┌─ tests/checking/typing/if_mismatched_branches.move:4:9
+error: expected `()` but found `integer` (in if-else)
+  ┌─ tests/checking/typing/if_mismatched_branches.move:4:19
   │
 4 │         if (cond) 0 else ();
-  │         ^^^^^^^^^^^^^^^^^^^
+  │                   ^
 
-error: `integer` not compatible with `address` in if-else
-  ┌─ tests/checking/typing/if_mismatched_branches.move:8:9
+error: expected `address` but found `integer` (in if-else)
+  ┌─ tests/checking/typing/if_mismatched_branches.move:8:29
   │
 8 │         if (cond) @0x0 else 0;
-  │         ^^^^^^^^^^^^^^^^^^^^^
+  │                             ^
 
-error: `integer` not compatible with `bool` in if-else
-  ┌─ tests/checking/typing/if_mismatched_branches.move:9:9
+error: expected `bool` but found `integer` (in if-else)
+  ┌─ tests/checking/typing/if_mismatched_branches.move:9:19
   │
 9 │         if (cond) 0 else false;
-  │         ^^^^^^^^^^^^^^^^^^^^^^
+  │                   ^
 
-error: `integer` not compatible with `bool` in if-else
-   ┌─ tests/checking/typing/if_mismatched_branches.move:13:9
+error: expected `bool` but found `integer` (in if-else)
+   ┌─ tests/checking/typing/if_mismatched_branches.move:13:39
    │
 13 │         if (cond) (0, false) else (1, 1);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                                       ^
 
-error: `integer` not compatible with `bool` in if-else
-   ┌─ tests/checking/typing/if_mismatched_branches.move:14:9
+error: expected `bool` but found `integer` (in if-else)
+   ┌─ tests/checking/typing/if_mismatched_branches.move:14:20
    │
 14 │         if (cond) (0, false) else (false, false);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                    ^
 
-error: `integer` not compatible with `bool` in if-else
-   ┌─ tests/checking/typing/if_mismatched_branches.move:15:9
+error: expected `bool` but found `integer` (in if-else)
+   ┌─ tests/checking/typing/if_mismatched_branches.move:15:20
    │
 15 │         if (cond) (0, false) else (true, @0x0);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                    ^
 
-error: tuples have different arity (3 != 2) in if-else
+error: tuples have different arity (3 != 2) (in if-else)
    ┌─ tests/checking/typing/if_mismatched_branches.move:19:9
    │
 19 │         if (cond) (0, false, 0) else (0, false);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: tuples have different arity (2 != 3) in if-else
+error: tuples have different arity (2 != 3) (in if-else)
    ┌─ tests/checking/typing/if_mismatched_branches.move:20:9
    │
 20 │         if (cond) (0, false) else (0, false, 0);

@@ -1,4 +1,4 @@
-error: expected `bool` but found `num` in expression
+error: expected `bool` but found `num`
   ┌─ tests/sources/invariants_err.move:9:15
   │
 9 │     invariant x + 1;

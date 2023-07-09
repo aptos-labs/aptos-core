@@ -1,108 +1,108 @@
 
 Diagnostics:
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/if_branches_subtype_invalid.move:3:37
   │
 3 │         let _: &mut u64 = if (cond) u else u_mut;
   │                                     ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/if_branches_subtype_invalid.move:4:48
   │
 4 │         let _: &mut u64 = if (cond) u_mut else u;
   │                                                ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/if_branches_subtype_invalid.move:5:37
   │
 5 │         let _: &mut u64 = if (cond) u else u;
   │                                     ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/if_branches_subtype_invalid.move:5:44
   │
 5 │         let _: &mut u64 = if (cond) u else u;
   │                                            ^
 
-error: expected `u64` but found `bool` in name expression
+error: expected `u64` but found `bool`
   ┌─ tests/checking/typing/if_branches_subtype_invalid.move:9:40
   │
 9 │         let _: &u64 = if (cond) u else b;
   │                                        ^
 
-error: expected `u64` but found `bool` in name expression
+error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:10:33
    │
 10 │         let _: &u64 = if (cond) b else u;
    │                                 ^
 
-error: expected `u64` but found `bool` in name expression
+error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:12:44
    │
 12 │         let _: &u64 = if (cond) u_mut else b;
    │                                            ^
 
-error: expected `u64` but found `bool` in name expression
+error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:13:33
    │
 13 │         let _: &u64 = if (cond) b else u_mut;
    │                                 ^
 
-error: expected `u64` but found `bool` in name expression
+error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:15:40
    │
 15 │         let _: &u64 = if (cond) u else b_mut;
    │                                        ^^^^^
 
-error: expected `u64` but found `bool` in name expression
+error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:16:33
    │
 16 │         let _: &u64 = if (cond) b_mut else u;
    │                                 ^^^^^
 
-error: expected `u64` but found `bool` in name expression
+error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:19:48
    │
 19 │         let _: &mut u64 = if (cond) u_mut else b_mut;
    │                                                ^^^^^
 
-error: expected `u64` but found `bool` in name expression
+error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:20:37
    │
 20 │         let _: &mut u64 = if (cond) b_mut else u_mut;
    │                                     ^^^^^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:25:55
    │
 25 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u, u) else (u_mut, u_mut);
    │                                                       ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:25:58
    │
 25 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u, u) else (u_mut, u_mut);
    │                                                          ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:26:62
    │
 26 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u_mut, u) else (u, u_mut);
    │                                                              ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:26:71
    │
 26 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u_mut, u) else (u, u_mut);
    │                                                                       ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:27:55
    │
 27 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u, u_mut) else (u_mut, u);
    │                                                       ^
 
-error: mutability mismatch (&mut != &) in name expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/if_branches_subtype_invalid.move:27:78
    │
 27 │         let (_, _): (&mut u64, &mut u64) = if (cond) (u, u_mut) else (u_mut, u);

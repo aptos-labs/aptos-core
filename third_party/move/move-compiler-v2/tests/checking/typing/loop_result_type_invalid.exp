@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: expected `X::R` but found `()` in expression
+error: expected `X::R` but found `()`
    ┌─ tests/checking/typing/loop_result_type_invalid.move:11:9
    │
 11 │         loop { if (false) break }
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `u64` but found `()` in expression
+error: expected `u64` but found `()`
    ┌─ tests/checking/typing/loop_result_type_invalid.move:15:9
    │
 15 │         loop { let x = 0; break }

@@ -1,48 +1,48 @@
 
 Diagnostics:
-error: expected `bool` but found `()` in expression
+error: expected `bool` but found `()`
   ┌─ tests/checking/typing/while_condition_invalid.move:3:16
   │
 3 │         while (()) ();
   │                ^^
 
-error: expected `bool` but found `()` in expression
+error: expected `bool` but found `()`
   ┌─ tests/checking/typing/while_condition_invalid.move:4:16
   │
 4 │         while ((())) ();
   │                ^^^^
 
-error: expected `bool` but found `()` in expression
+error: expected `bool` but found `()`
   ┌─ tests/checking/typing/while_condition_invalid.move:5:16
   │
 5 │         while ({}) ()
   │                ^^
 
-error: expected `bool` but found `T` in name expression
+error: expected `bool` but found `T`
   ┌─ tests/checking/typing/while_condition_invalid.move:9:16
   │
 9 │         while (x) ();
   │                ^
 
-error: `integer` not compatible with `bool` in constant
+error: expected `bool` but found `integer`
    ┌─ tests/checking/typing/while_condition_invalid.move:10:16
    │
 10 │         while (0) ();
    │                ^
 
-error: expected `bool` but found `address` in value
+error: expected `bool` but found `address`
    ┌─ tests/checking/typing/while_condition_invalid.move:11:16
    │
 11 │         while (@0x0) ()
    │                ^^^^
 
-error: expected `bool` but found `(?1, ?2)` in expression list
+error: expected `bool` but found `(?1, ?2)`
    ┌─ tests/checking/typing/while_condition_invalid.move:15:16
    │
 15 │         while ((false, true)) ();
    │                ^^^^^^^^^^^^^
 
-error: expected `bool` but found `(?3, ?4)` in expression list
+error: expected `bool` but found `(?3, ?4)`
    ┌─ tests/checking/typing/while_condition_invalid.move:16:16
    │
 16 │         while ((0, false)) ()

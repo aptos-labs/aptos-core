@@ -1,36 +1,36 @@
 
 Diagnostics:
-error: `integer` not compatible with `&u64` in lvalue
-  ┌─ tests/checking/typing/bind_unpack_references_invalid.move:7:9
+error: expected `&u64` but found `integer`
+  ┌─ tests/checking/typing/bind_unpack_references_invalid.move:7:13
   │
 7 │         f = 0;
-  │         ^
+  │             ^
 
-error: expected `&M::S` but found `M::S` in lvalue
+error: expected `&M::S` but found `M::S`
   ┌─ tests/checking/typing/bind_unpack_references_invalid.move:8:9
   │
 8 │         s2 = S { f: 0 }
   │         ^^
 
-error: `integer` not compatible with `&mut u64` in lvalue
-   ┌─ tests/checking/typing/bind_unpack_references_invalid.move:13:9
+error: expected `&mut u64` but found `integer`
+   ┌─ tests/checking/typing/bind_unpack_references_invalid.move:13:13
    │
 13 │         f = 0;
-   │         ^
+   │             ^
 
-error: expected `&mut M::S` but found `M::S` in lvalue
+error: expected `&mut M::S` but found `M::S`
    ┌─ tests/checking/typing/bind_unpack_references_invalid.move:14:9
    │
 14 │         s2 = S { f: 0 }
    │         ^^
 
-error: mutability mismatch (&mut != &) in lvalue
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/bind_unpack_references_invalid.move:20:9
    │
 20 │         f = &0;
    │         ^
 
-error: mutability mismatch (&mut != &) in lvalue
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/bind_unpack_references_invalid.move:21:9
    │
 21 │         s2 = &S { f: 0 }

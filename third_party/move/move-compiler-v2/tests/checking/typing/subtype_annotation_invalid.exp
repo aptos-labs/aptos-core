@@ -1,30 +1,30 @@
 
 Diagnostics:
-error: mutability mismatch (&mut != &) in expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/subtype_annotation_invalid.move:5:10
   │
 5 │         (&0: &mut u64);
   │          ^^
 
-error: mutability mismatch (&mut != &) in expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/subtype_annotation_invalid.move:9:11
   │
 9 │         ((&0, &0): (&mut u64, &mut u64));
   │           ^^
 
-error: mutability mismatch (&mut != &) in expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/subtype_annotation_invalid.move:9:15
   │
 9 │         ((&0, &0): (&mut u64, &mut u64));
   │               ^^
 
-error: mutability mismatch (&mut != &) in expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/subtype_annotation_invalid.move:10:11
    │
 10 │         ((&0, &0): (&mut u64, &u64));
    │           ^^
 
-error: mutability mismatch (&mut != &) in expression
+error: mutability mismatch (&mut != &)
    ┌─ tests/checking/typing/subtype_annotation_invalid.move:11:15
    │
 11 │         ((&0, &0): (&u64, &mut u64));

@@ -1,18 +1,18 @@
 
 Diagnostics:
-error: `integer` not compatible with `bool` in name expression
-  ┌─ tests/checking/typing/block_with_statements_invalid.move:4:23
+error: expected `bool` but found `integer`
+  ┌─ tests/checking/typing/block_with_statements_invalid.move:4:20
   │
 4 │         ({ let x = 0; x } : bool);
-  │                       ^
+  │                    ^
 
-error: expected `u64` but found `&?6` in expression
+error: expected `u64` but found `&?6`
   ┌─ tests/checking/typing/block_with_statements_invalid.move:5:23
   │
 5 │         ({ let x = 0; &x } : u64);
   │                       ^^
 
-error: expected `()` but found `&mut ?10` in expression
+error: expected `()` but found `&mut ?10`
   ┌─ tests/checking/typing/block_with_statements_invalid.move:6:23
   │
 6 │         ({ let y = 0; &mut (y + 1) } : ());

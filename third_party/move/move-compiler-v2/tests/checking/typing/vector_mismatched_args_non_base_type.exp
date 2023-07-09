@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: mutability mismatch (&mut != &) in expression
+error: mutability mismatch (&mut != &)
   ┌─ tests/checking/typing/vector_mismatched_args_non_base_type.move:7:26
   │
 7 │         vector<&mut u64>[&0];
   │                          ^^
 
-error: tuples have different arity (0 != 2) in vector expression
+error: tuples have different arity (2 != 0)
   ┌─ tests/checking/typing/vector_mismatched_args_non_base_type.move:8:20
   │
 8 │         vector[(), (0, 1)];
