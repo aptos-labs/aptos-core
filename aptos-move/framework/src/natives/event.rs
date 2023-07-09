@@ -7,7 +7,7 @@ use crate::{
     },
     safely_pop_arg,
 };
-use aptos_gas_algebra_ext::{AbstractValueSize, InternalGasPerAbstractValueUnit};
+use aptos_gas_algebra::{AbstractValueSize, InternalGasPerAbstractValueUnit};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeFunction;

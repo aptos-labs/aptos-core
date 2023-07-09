@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use aptos_vm::natives;
 use move_vm_runtime::native_functions::NativeFunctionTable;
