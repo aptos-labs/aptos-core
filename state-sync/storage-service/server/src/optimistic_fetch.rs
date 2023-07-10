@@ -12,7 +12,10 @@ use crate::{
     LogEntry, LogSchema,
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
+use aptos_config::{
+    config::StorageServiceConfig,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_storage_service_types::{
@@ -177,6 +180,9 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     storage: T,
     time_service: TimeService,
 ) -> Result<(), Error> {
+    // Update the number of active optimistic fetches
+    update_optimistic_fetch_metrics(optimistic_fetches.clone());
+
     // Identify the peers with ready optimistic fetches
     let peers_with_ready_optimistic_fetches = get_peers_with_ready_optimistic_fetches(
         bounded_executor.clone(),
@@ -367,7 +373,8 @@ async fn identify_expired_invalid_and_ready_fetches<T: StorageReaderInterface>(
                 (highest_known_version, highest_known_epoch),
             );
         } else {
-            peers_with_expired_optimistic_fetches.push(peer_network_id); // The request has expired
+            // The request has expired -- there's nothing to do
+            peers_with_expired_optimistic_fetches.push(peer_network_id);
         }
     }
 
@@ -696,4 +703,42 @@ fn remove_invalid_optimistic_fetches(
                 .message("Dropping invalid optimistic fetch request!"));
         }
     }
+}
+
+/// Updates the active optimistic fetch metrics for each network
+fn update_optimistic_fetch_metrics(
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+) {
+    // Calculate the total number of optimistic fetches for each network
+    let mut num_validator_optimistic_fetches = 0;
+    let mut num_vfn_optimistic_fetches = 0;
+    let mut num_public_optimistic_fetches = 0;
+    for optimistic_fetch in optimistic_fetches.iter() {
+        // Get the peer network ID
+        let peer_network_id = optimistic_fetch.key();
+
+        // Increment the number of optimistic fetches for the peer's network
+        match peer_network_id.network_id() {
+            NetworkId::Validator => num_validator_optimistic_fetches += 1,
+            NetworkId::Vfn => num_vfn_optimistic_fetches += 1,
+            NetworkId::Public => num_public_optimistic_fetches += 1,
+        }
+    }
+
+    // Update the number of active optimistic fetches for each network
+    metrics::set_gauge(
+        &metrics::OPTIMISTIC_FETCH_COUNT,
+        NetworkId::Validator.as_str(),
+        num_validator_optimistic_fetches as u64,
+    );
+    metrics::set_gauge(
+        &metrics::OPTIMISTIC_FETCH_COUNT,
+        NetworkId::Vfn.as_str(),
+        num_vfn_optimistic_fetches as u64,
+    );
+    metrics::set_gauge(
+        &metrics::OPTIMISTIC_FETCH_COUNT,
+        NetworkId::Public.as_str(),
+        num_public_optimistic_fetches as u64,
+    );
 }
