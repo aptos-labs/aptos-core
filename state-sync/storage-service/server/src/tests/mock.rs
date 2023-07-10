@@ -37,8 +37,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionWithProof, Version,
+        AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
+        TransactionWithProof, Version,
     },
     PeerId,
 };
@@ -92,6 +92,7 @@ impl MockClient {
             let network_events = NetworkEvents::new(
                 peer_manager_notification_receiver,
                 connection_notification_receiver,
+                None,
             );
             network_and_events.insert(network_id, network_events);
             peer_manager_notifiers.insert(network_id, peer_manager_notifier);
@@ -316,8 +317,6 @@ mock! {
         fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
 
         fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
-
-        fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>>;
 
         fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue>;
 

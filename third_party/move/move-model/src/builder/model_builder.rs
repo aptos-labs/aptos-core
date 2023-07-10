@@ -9,11 +9,11 @@
 
 use crate::{
     ast::{Address, Attribute, ModuleName, Operation, QualifiedSymbol, Spec, Value},
-    builder::spec_builtins,
+    builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FunId, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, SpecFunId, SpecVarId, StructId,
-        TypeParameter,
+        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, SpecFunId,
+        SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
     ty::Type,
@@ -36,7 +36,7 @@ pub(crate) struct ModelBuilder<'env> {
     pub env: &'env mut GlobalEnv,
     /// A symbol table for specification functions. Because of overloading, and entry can
     /// contain multiple functions.
-    pub spec_fun_table: BTreeMap<QualifiedSymbol, Vec<SpecFunEntry>>,
+    pub spec_fun_table: BTreeMap<QualifiedSymbol, Vec<SpecOrBuiltinFunEntry>>,
     /// A symbol table for specification variables.
     pub spec_var_table: BTreeMap<QualifiedSymbol, SpecVarEntry>,
     /// A symbol table for specification schemas.
@@ -60,14 +60,23 @@ pub(crate) struct ModelBuilder<'env> {
 }
 
 /// A declaration of a specification function or operator in the builders state.
+/// TODO(wrwg): we should unify this type with `FunEntry` using a new `FunctionKind::Spec` kind.
 #[derive(Debug, Clone)]
-pub(crate) struct SpecFunEntry {
+pub(crate) struct SpecOrBuiltinFunEntry {
     #[allow(dead_code)]
     pub loc: Loc,
     pub oper: Operation,
     pub type_params: Vec<TypeParameter>,
     pub params: Vec<Parameter>,
     pub result_type: Type,
+    pub visibility: EntryVisibility,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum EntryVisibility {
+    Spec,
+    Impl,
+    SpecAndImpl,
 }
 
 /// A declaration of a specification variable in the builders state.
@@ -119,8 +128,7 @@ pub(crate) struct FunEntry {
     pub fun_id: FunId,
     pub visibility: Visibility,
     pub is_native: bool,
-    pub is_entry: bool,
-    pub is_inline: bool,
+    pub kind: FunctionKind,
     pub type_params: Vec<TypeParameter>,
     pub params: Vec<Parameter>,
     pub result_type: Type,
@@ -130,10 +138,45 @@ pub(crate) struct FunEntry {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) enum AnyFunEntry {
+    SpecOrBuiltin(SpecOrBuiltinFunEntry),
+    UserFun(FunEntry),
+}
+
+impl AnyFunEntry {
+    pub fn get_signature(&self) -> (&[TypeParameter], &[Parameter], &Type) {
+        match self {
+            AnyFunEntry::SpecOrBuiltin(e) => (&e.type_params, &e.params, &e.result_type),
+            AnyFunEntry::UserFun(e) => (&e.type_params, &e.params, &e.result_type),
+        }
+    }
+
+    pub fn get_operation(&self) -> Operation {
+        match self {
+            AnyFunEntry::SpecOrBuiltin(e) => e.oper.clone(),
+            AnyFunEntry::UserFun(e) => Operation::MoveFunction(e.module_id, e.fun_id),
+        }
+    }
+}
+
+impl From<SpecOrBuiltinFunEntry> for AnyFunEntry {
+    fn from(value: SpecOrBuiltinFunEntry) -> Self {
+        Self::SpecOrBuiltin(value)
+    }
+}
+
+impl From<FunEntry> for AnyFunEntry {
+    fn from(value: FunEntry) -> Self {
+        Self::UserFun(value)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct ConstEntry {
     pub loc: Loc,
     pub ty: Type,
     pub value: Value,
+    pub visibility: EntryVisibility,
 }
 
 impl<'env> ModelBuilder<'env> {
@@ -152,7 +195,7 @@ impl<'env> ModelBuilder<'env> {
             move_fun_call_graph: BTreeMap::new(),
             intrinsics: Default::default(),
         };
-        spec_builtins::declare_spec_builtins(&mut translator);
+        builtins::declare_builtins(&mut translator);
         translator
     }
 
@@ -172,7 +215,11 @@ impl<'env> ModelBuilder<'env> {
     }
 
     /// Defines a spec function, adding it to the spec fun table.
-    pub fn define_spec_fun(&mut self, name: QualifiedSymbol, entry: SpecFunEntry) {
+    pub fn define_spec_or_builtin_fun(
+        &mut self,
+        name: QualifiedSymbol,
+        entry: SpecOrBuiltinFunEntry,
+    ) {
         // TODO: check whether overloads are distinguishable
         self.spec_fun_table
             .entry(name)
@@ -264,38 +311,7 @@ impl<'env> ModelBuilder<'env> {
     }
 
     /// Defines a function.
-    #[allow(clippy::too_many_arguments)]
-    pub fn define_fun(
-        &mut self,
-        loc: Loc,
-        attributes: Vec<Attribute>,
-        name: QualifiedSymbol,
-        module_id: ModuleId,
-        fun_id: FunId,
-        visibility: Visibility,
-        is_native: bool,
-        is_entry: bool,
-        is_inline: bool,
-        type_params: Vec<TypeParameter>,
-        params: Vec<Parameter>,
-        result_type: Type,
-        inline_specs: BTreeMap<EA::SpecId, EA::SpecBlock>,
-    ) {
-        let entry = FunEntry {
-            loc,
-            attributes,
-            module_id,
-            fun_id,
-            visibility,
-            is_entry,
-            is_inline,
-            is_native,
-            type_params,
-            params,
-            result_type,
-            is_pure: false,
-            inline_specs,
-        };
+    pub fn define_fun(&mut self, name: QualifiedSymbol, entry: FunEntry) {
         self.fun_table.insert(name, entry);
     }
 

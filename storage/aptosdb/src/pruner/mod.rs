@@ -2,19 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub(crate) mod db_pruner;
-pub(crate) mod db_sub_pruner;
-pub(crate) mod event_store;
-pub(crate) mod ledger_store;
-pub(crate) mod pruner_manager;
-pub mod pruner_utils;
-pub(crate) mod pruner_worker;
-pub(crate) mod state_kv_pruner;
-pub(crate) mod state_store;
-pub(crate) mod transaction_store;
+mod db_pruner;
+mod db_sub_pruner;
+mod ledger_pruner;
+mod pruner_manager;
+mod pruner_utils;
+mod pruner_worker;
+mod state_kv_pruner;
+mod state_merkle_pruner;
 
-// This module provides `Pruner` which manages a thread pruning old data in the background and is
-// meant to be triggered by other threads as they commit new data to the DB.
-pub(crate) mod ledger_pruner_manager;
-pub(crate) mod state_kv_pruner_manager;
-pub(crate) mod state_merkle_pruner_manager;
+pub(crate) use ledger_pruner::ledger_pruner_manager::LedgerPrunerManager;
+pub(crate) use pruner_manager::PrunerManager;
+pub(crate) use state_kv_pruner::state_kv_pruner_manager::StateKvPrunerManager;
+pub(crate) use state_merkle_pruner::state_merkle_pruner_manager::StateMerklePrunerManager;

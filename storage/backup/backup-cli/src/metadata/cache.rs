@@ -38,7 +38,7 @@ static TEMP_METADATA_CACHE_DIR: Lazy<TempPath> = Lazy::new(|| {
 pub struct MetadataCacheOpt {
     #[clap(
         long = "metadata-cache-dir",
-        parse(from_os_str),
+        value_parser,
         help = "Metadata cache dir. If specified and shared across runs, \
         metadata files in cache won't be downloaded again from backup source, speeding up tool \
         boot up significantly. Cache content can be messed up if used across the devnet, \

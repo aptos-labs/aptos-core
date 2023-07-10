@@ -19,12 +19,14 @@ aptos-cached-packages ={ workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }
+aptos-gas-profiling = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
+aptos-vm-logging = { workspace = true }
 bcs = { workspace = true }
 goldenfile = { workspace = true }
 hex = { workspace = true }

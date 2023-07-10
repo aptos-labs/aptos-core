@@ -5,9 +5,7 @@ use crate::{
     error::Error,
     metadata_storage::MetadataStorageInterface,
     storage_synchronizer::StorageSynchronizerInterface,
-    tests::utils::{
-        create_empty_epoch_state, create_epoch_ending_ledger_info, create_transaction_info,
-    },
+    tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info},
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
@@ -38,8 +36,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
+        TransactionToCommit, TransactionWithProof, Version,
     },
 };
 use async_trait::async_trait;
@@ -71,9 +69,7 @@ pub fn create_mock_reader_writer(
     writer: Option<MockDatabaseWriter>,
 ) -> DbReaderWriter {
     let mut reader = reader.unwrap_or_else(create_mock_db_reader);
-    reader
-        .expect_get_latest_transaction_info_option()
-        .returning(|| Ok(Some((0, create_transaction_info()))));
+    reader.expect_get_latest_version().returning(|| Ok(0));
     reader
         .expect_get_latest_epoch_state()
         .returning(|| Ok(create_empty_epoch_state()));
@@ -248,8 +244,6 @@ mock! {
         fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
 
         fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
-
-        fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>>;
 
         fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue>;
 

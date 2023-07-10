@@ -12,7 +12,7 @@ use aptos_types::{
     },
 };
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{hash_map::DefaultHasher, HashSet},
     hash::{Hash, Hasher},
     sync::Arc,
 };
@@ -45,8 +45,17 @@ impl CrossShardConflictDetector {
         let mut accepted_txns = Vec::new();
         let mut accepted_txn_dependencies = Vec::new();
         let mut rejected_txns = Vec::new();
+        let mut discarded_senders = HashSet::new();
         for (_, txn) in txns.into_iter().enumerate() {
-            if self.check_for_cross_shard_conflict(self.shard_id, &txn, cross_shard_rw_set) {
+            let sender_was_discarded = txn
+                .sender()
+                .map_or(false, |sender| discarded_senders.contains(&sender));
+            if sender_was_discarded
+                || self.check_for_cross_shard_conflict(self.shard_id, &txn, cross_shard_rw_set)
+            {
+                if let Some(sender) = txn.sender() {
+                    discarded_senders.insert(sender);
+                }
                 rejected_txns.push(txn);
             } else {
                 accepted_txn_dependencies.push(self.get_deps_for_frozen_txn(

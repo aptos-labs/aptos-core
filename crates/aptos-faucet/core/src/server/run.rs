@@ -69,7 +69,7 @@ pub struct RunConfig {
 impl RunConfig {
     pub async fn run(self) -> Result<()> {
         info!("Running with config: {:#?}", self);
-        info!("Starting server...");
+        println!("Faucet is starting, please wait...");
 
         // Set whether we should use useful errors.
         // If it's already set, then we'll carry on
@@ -294,7 +294,7 @@ pub enum FunderKeyEnum {
 
 #[derive(Clone, Debug, Parser)]
 pub struct Run {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long, value_parser)]
     config_path: PathBuf,
 }
 

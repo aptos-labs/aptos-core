@@ -83,7 +83,11 @@ impl VMError {
                     "Expected a code and module/script location with ABORTED, but got {:?} and {}",
                     sub_status, location
                 );
-                VMStatus::Error(StatusCode::ABORTED, message)
+                VMStatus::Error {
+                    status_code: StatusCode::ABORTED,
+                    sub_status,
+                    message,
+                }
             },
 
             (major_status, sub_status, location)
@@ -93,7 +97,11 @@ impl VMError {
                     Location::Script => vm_status::AbortLocation::Script,
                     Location::Module(id) => vm_status::AbortLocation::Module(id.clone()),
                     Location::Undefined => {
-                        return VMStatus::Error(major_status, message);
+                        return VMStatus::Error {
+                            status_code: major_status,
+                            sub_status,
+                            message,
+                        };
                     },
                 };
                 // Errors for OUT_OF_GAS do not always have index set: if it does not, it should already return above.
@@ -110,7 +118,11 @@ impl VMError {
                 );
                 let (function, code_offset) = match offsets.pop() {
                     None => {
-                        return VMStatus::Error(major_status, message);
+                        return VMStatus::Error {
+                            status_code: major_status,
+                            sub_status,
+                            message,
+                        };
                     },
                     Some((fdef_idx, code_offset)) => (fdef_idx.0, code_offset),
                 };
@@ -119,11 +131,16 @@ impl VMError {
                     location: abort_location,
                     function,
                     code_offset,
+                    sub_status,
                     message,
                 }
             },
 
-            (major_status, _, _) => VMStatus::Error(major_status, message),
+            (major_status, sub_status, _) => VMStatus::Error {
+                status_code: major_status,
+                sub_status,
+                message,
+            },
         }
     }
 
@@ -133,6 +150,10 @@ impl VMError {
 
     pub fn sub_status(&self) -> Option<u64> {
         self.0.sub_status
+    }
+
+    pub fn set_sub_status(&mut self, status: u64) {
+        self.0.sub_status = Some(status);
     }
 
     pub fn message(&self) -> Option<&String> {

@@ -21,7 +21,7 @@ pub struct ReleaseOptions {
     #[clap(flatten)]
     pub build_options: BuildOptions,
     /// The path to the Move packages for which to create a release.
-    #[clap(long, parse(from_os_str), multiple_values = true)]
+    #[clap(long, value_parser, num_args(1..))]
     pub packages: Vec<PathBuf>,
     /// The path where to place generated Rust bindings for this module, in order for
     /// each package. If the value is empty (`""`) for a particular package, no bindings are
@@ -29,7 +29,7 @@ pub struct ReleaseOptions {
     #[clap(long)]
     pub rust_bindings: Vec<String>,
     /// The path to the file where to place the release bundle.
-    #[clap(long, default_value = "head.mrb", parse(from_os_str))]
+    #[clap(long, default_value = "head.mrb", value_parser)]
     pub output: PathBuf,
 }
 

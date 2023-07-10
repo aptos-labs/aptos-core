@@ -69,6 +69,8 @@ pub struct RocksdbConfigs {
     // Note: Not ready for production use yet.
     // TODO(grao): Add RocksdbConfig for individual DBs when necessary.
     pub split_ledger_db: bool,
+    // Note: Not ready for production use yet.
+    pub skip_index_and_usage: bool,
     pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
 }
@@ -80,6 +82,7 @@ impl Default for RocksdbConfigs {
             state_merkle_db_config: RocksdbConfig::default(),
             use_sharded_state_merkle_db: false,
             split_ledger_db: false,
+            skip_index_and_usage: false,
             state_kv_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,

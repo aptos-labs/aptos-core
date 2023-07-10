@@ -2866,11 +2866,8 @@ pub struct FunctionData {
     /// Whether this is a native function
     pub(crate) is_native: bool,
 
-    /// Whether this an entry function.
-    pub(crate) is_entry: bool,
-
-    /// Whether this is an inline function.
-    pub(crate) is_inline: bool,
+    /// The kind of the function.
+    pub(crate) kind: FunctionKind,
 
     /// Attributes attached to this function.
     pub(crate) attributes: Vec<Attribute>,
@@ -2899,6 +2896,15 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the called functions.
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+}
+
+/// Kind of a function,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FunctionKind {
+    Regular,
+    Inline,
+    Macro,
+    Entry,
 }
 
 #[derive(Debug, Clone)]
@@ -3131,14 +3137,14 @@ impl<'env> FunctionEnv<'env> {
         self.data.is_native
     }
 
-    /// Return true if the function is an entry fucntion
+    /// Return true if the function is an entry function
     pub fn is_entry(&self) -> bool {
-        self.data.is_entry
+        self.data.kind == FunctionKind::Entry
     }
 
-    /// Return true if the function is an inline fucntion
+    /// Return true if the function is an inline function
     pub fn is_inline(&self) -> bool {
-        self.data.is_inline
+        self.data.kind == FunctionKind::Inline
     }
 
     /// Return the visibility string for this function. Useful for formatted printing.

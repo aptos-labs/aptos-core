@@ -17,9 +17,10 @@ use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas::{
-    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
+    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasMeter,
     LATEST_GAS_FEATURE_VERSION,
 };
+use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_keygen::KeyGen;
 use aptos_state_view::TStateView;
 use aptos_types::{
@@ -36,8 +37,8 @@ use aptos_types::{
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
-        VMValidatorResult,
+        ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionPayload,
+        TransactionStatus, VMValidatorResult,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -49,6 +50,7 @@ use aptos_vm::{
     AptosVM, VMExecutor, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
+use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -428,7 +430,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let mut trace_map = TraceSeqMapping::default();
+        let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
 
         // dump serialized transaction details before execution, if tracing
         if let Some(trace_dir) = &self.trace_dir {
@@ -484,6 +486,49 @@ impl FakeExecutor {
         outputs
             .pop()
             .expect("A block with one transaction should have one output")
+    }
+
+    pub fn execute_transaction_with_gas_profiler(
+        &self,
+        txn: SignedTransaction,
+    ) -> anyhow::Result<(TransactionOutput, TransactionGasLog)> {
+        let txn = txn
+            .check_signature()
+            .expect("invalid signature for transaction");
+
+        let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
+
+        let (_status, output, gas_profiler) =
+            AptosVM::execute_user_transaction_with_custom_gas_meter(
+                &self.data_store,
+                &txn,
+                &log_context,
+                |gas_feature_version, gas_params, storage_gas_params, balance| {
+                    let gas_meter = StandardGasMeter::new(
+                        gas_feature_version,
+                        gas_params,
+                        storage_gas_params,
+                        balance,
+                    );
+                    let gas_profiler = match txn.payload() {
+                        TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
+                        TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        ),
+                        TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
+                        TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+                    };
+                    Ok(gas_profiler)
+                },
+            )?;
+
+        Ok((
+            output.into_transaction_output(self.get_state_view())?,
+            gas_profiler.finish(),
+        ))
     }
 
     fn trace<P: AsRef<Path>, T: Serialize>(dir: P, item: &T) -> usize {

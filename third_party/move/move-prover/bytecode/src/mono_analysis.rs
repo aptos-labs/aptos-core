@@ -468,7 +468,7 @@ impl<'a> Analyzer<'a> {
             for ref ty in self.env.get_node_instantiation(node_id) {
                 self.add_type_root(ty);
             }
-            if let ExpData::Call(node_id, ast::Operation::Function(mid, fid, _), _) = e {
+            if let ExpData::Call(node_id, ast::Operation::SpecFunction(mid, fid, _), _) = e {
                 let actuals = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
                 let module = self.env.get_module(*mid);
                 let spec_fun = module.get_spec_fun(*fid);

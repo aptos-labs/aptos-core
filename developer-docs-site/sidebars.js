@@ -69,7 +69,18 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       link: { type: "doc", id: "releases/index" },
-      items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
+      items: [
+        {
+          type: "category",
+          label: "Node and Framework Release",
+          collapsible: true,
+          collapsed: true,
+          link: { type: "doc", id: "releases/mainnet-release" },
+          items: ["releases/mainnet-release", "releases/testnet-release", "releases/devnet-release"],
+        },
+        "releases/cli-release",
+        "releases/sdk-release",
+      ],
     },
     "nodes/deployments",
     "guides/system-integrators-guide",
@@ -203,6 +214,7 @@ const sidebars = {
       items: [
         "standards/aptos-object",
         "standards/aptos-coin",
+        "standards/fungible-asset",
         "standards/aptos-token-v2",
         "standards/aptos-token",
         "standards/wallets",

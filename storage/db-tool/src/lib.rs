@@ -16,7 +16,7 @@ use anyhow::Result;
 use clap::Parser;
 
 #[derive(Parser)]
-#[clap(name = "Aptos db tool", author, version, propagate_version = true)]
+#[clap(name = "Aptos db tool", author, disable_version_flag = true)]
 pub enum DBTool {
     #[clap(subcommand)]
     Backup(backup::Command),
@@ -39,4 +39,10 @@ impl DBTool {
             DBTool::Debug(cmd) => cmd.run(),
         }
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    DBTool::command().debug_assert()
 }

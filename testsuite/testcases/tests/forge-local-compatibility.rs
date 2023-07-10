@@ -14,7 +14,7 @@ fn main() -> Result<()> {
         .with_initial_version(InitialVersion::Oldest)
         .add_network_test(SimpleValidatorUpgrade);
 
-    let options = Options::from_args();
+    let options = Options::parse();
     forge_main(
         tests,
         LocalFactory::with_upstream_merge_base_and_workspace()?,

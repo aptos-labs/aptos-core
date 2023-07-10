@@ -130,12 +130,26 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             fallthrough_labels: _,
         } = self;
 
+        let name_to_index = (0..func_env
+            .get_local_count()
+            .expect("compiled module available"))
+            .map(|idx| {
+                (
+                    func_env
+                        .get_local_name(idx)
+                        .expect("compiled module available"),
+                    idx,
+                )
+            })
+            .collect();
+
         FunctionData::new(
             func_env,
             code,
             local_types,
             func_env.get_result_type(),
             location_table,
+            name_to_index,
             func_env
                 .get_acquires_global_resources()
                 .expect(COMPILED_MODULE_AVAILABLE),

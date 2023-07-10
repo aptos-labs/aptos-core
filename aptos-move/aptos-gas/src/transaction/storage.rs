@@ -234,7 +234,7 @@ impl StoragePricing {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ChangeSetConfigs {
     gas_feature_version: u64,
     max_bytes_per_write_op: u64,
@@ -312,12 +312,12 @@ impl CheckChangeSet for ChangeSetConfigs {
             if let Some(bytes) = op.bytes() {
                 let write_op_size = (bytes.len() + key.size()) as u64;
                 if write_op_size > self.max_bytes_per_write_op {
-                    return Err(VMStatus::Error(ERR, None));
+                    return Err(VMStatus::error(ERR, None));
                 }
                 write_set_size += write_op_size;
             }
             if write_set_size > self.max_bytes_all_write_ops_per_transaction {
-                return Err(VMStatus::Error(ERR, None));
+                return Err(VMStatus::error(ERR, None));
             }
         }
 
@@ -325,11 +325,11 @@ impl CheckChangeSet for ChangeSetConfigs {
         for event in change_set.events() {
             let size = event.event_data().len() as u64;
             if size > self.max_bytes_per_event {
-                return Err(VMStatus::Error(ERR, None));
+                return Err(VMStatus::error(ERR, None));
             }
             total_event_size += size;
             if total_event_size > self.max_bytes_all_events_per_transaction {
-                return Err(VMStatus::Error(ERR, None));
+                return Err(VMStatus::error(ERR, None));
             }
         }
 
@@ -337,7 +337,7 @@ impl CheckChangeSet for ChangeSetConfigs {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StorageGasParameters {
     pub pricing: StoragePricing,
     pub change_set_configs: ChangeSetConfigs,

@@ -27,6 +27,7 @@ use aptos_testcases::{
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
     performance_test::PerformanceBenchmark,
+    public_fullnode_performance::PFNPerformance,
     quorum_store_onchain_enable_test::QuorumStoreOnChainEnableTest,
     reconfiguration_test::ReconfigurationTest,
     state_sync_performance::{
@@ -40,6 +41,7 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
+use clap::{Parser, Subcommand};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
@@ -52,7 +54,6 @@ use std::{
     thread,
     time::Duration,
 };
-use structopt::StructOpt;
 use tokio::runtime::Runtime;
 use url::Url;
 
@@ -60,39 +61,41 @@ use url::Url;
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct Args {
-    #[structopt(long, default_value = "300")]
+    #[clap(long, default_value_t = 300)]
     duration_secs: usize,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     options: Options,
-    #[structopt(long)]
+    #[clap(long)]
     num_validators: Option<usize>,
-    #[structopt(long)]
+    #[clap(long)]
     num_validator_fullnodes: Option<usize>,
-    #[structopt(
+    #[clap(
         long,
         help = "Specify a test suite to run",
         default_value = "land_blocking"
     )]
     suite: String,
-    #[structopt(long, multiple = true)]
+    #[clap(long, num_args = 0..)]
     changelog: Option<Vec<String>>,
 
     // subcommand groups
-    #[structopt(flatten)]
+    #[clap(subcommand)]
     cli_cmd: CliCommand,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 enum CliCommand {
     /// Subcommands to run forge tests
+    #[clap(subcommand)]
     Test(TestCommand),
     /// Subcommands to set up or manage running forge networks
+    #[clap(subcommand)]
     Operator(OperatorCommand),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 enum TestCommand {
     /// Run tests using the local swarm backend
     LocalSwarm(LocalSwarm),
@@ -100,7 +103,7 @@ enum TestCommand {
     K8sSwarm(K8sSwarm),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 enum OperatorCommand {
     /// Set the image tag for a node in the cluster
     SetNodeImageTag(SetNodeImageTag),
@@ -110,104 +113,104 @@ enum OperatorCommand {
     Resize(Resize),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct LocalSwarm {
-    #[structopt(long, help = "directory to build local swarm under")]
+    #[clap(long, help = "directory to build local swarm under")]
     swarmdir: Option<String>,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct K8sSwarm {
-    #[structopt(long, help = "The kubernetes namespace to use for test")]
+    #[clap(long, help = "The kubernetes namespace to use for test")]
     namespace: Option<String>,
-    #[structopt(
+    #[clap(
         long,
         help = "The image tag currently is used for validators",
         default_value = "devnet"
     )]
     image_tag: String,
-    #[structopt(
+    #[clap(
         long,
         help = "For supported tests, the image tag for validators to upgrade to",
         default_value = "devnet"
     )]
     upgrade_image_tag: String,
-    #[structopt(
+    #[clap(
         long,
         help = "Path to flattened directory containing compiled Move modules"
     )]
     move_modules_dir: Option<String>,
-    #[structopt(
+    #[clap(
         long,
         help = "If set, uses kubectl port-forward instead of assuming k8s DNS access"
     )]
     port_forward: bool,
-    #[structopt(
+    #[clap(
         long,
         help = "If set, reuse the forge testnet active in the specified namespace"
     )]
     reuse: bool,
-    #[structopt(
+    #[clap(
         long,
         help = "If set, keeps the forge testnet active in the specified namespace"
     )]
     keep: bool,
-    #[structopt(long, help = "If set, enables HAProxy for each of the validators")]
+    #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct SetNodeImageTag {
-    #[structopt(long, help = "The name of the node StatefulSet to update")]
+    #[clap(long, help = "The name of the node StatefulSet to update")]
     stateful_set_name: String,
-    #[structopt(long, help = "The name of the container to update")]
+    #[clap(long, help = "The name of the container to update")]
     container_name: String,
-    #[structopt(long, help = "The docker image tag to use for the node")]
+    #[clap(long, help = "The docker image tag to use for the node")]
     image_tag: String,
-    #[structopt(long, help = "The kubernetes namespace to clean up")]
+    #[clap(long, help = "The kubernetes namespace to clean up")]
     namespace: String,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct CleanUp {
-    #[structopt(
+    #[clap(
         long,
         help = "The kubernetes namespace to clean up. If unset, attemps to cleanup all by using forge-management configmaps"
     )]
     namespace: Option<String>,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct Resize {
-    #[structopt(long, help = "The kubernetes namespace to resize")]
+    #[clap(long, help = "The kubernetes namespace to resize")]
     namespace: String,
-    #[structopt(long, default_value = "30")]
+    #[clap(long, default_value_t = 30)]
     num_validators: usize,
-    #[structopt(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     num_fullnodes: usize,
-    #[structopt(
+    #[clap(
         long,
         help = "Override the image tag used for validators",
         default_value = "devnet"
     )]
     validator_image_tag: String,
-    #[structopt(
+    #[clap(
         long,
         help = "Override the image tag used for testnet-specific components",
         default_value = "devnet"
     )]
     testnet_image_tag: String,
-    #[structopt(
+    #[clap(
         long,
         help = "Path to flattened directory containing compiled Move modules"
     )]
     move_modules_dir: Option<String>,
-    #[structopt(
+    #[clap(
         long,
         help = "If set, dont use kubectl port forward to access the cluster"
     )]
     connect_directly: bool,
-    #[structopt(long, help = "If set, enables HAProxy for each of the validators")]
+    #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
 }
 
@@ -226,7 +229,7 @@ fn main() -> Result<()> {
     logger.channel_size(1000).is_async(false).level(Level::Info);
     logger.build();
 
-    let args = Args::from_args();
+    let args = Args::parse();
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
@@ -538,6 +541,8 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig>
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
+        "pfn_const_tps" => pfn_const_tps(duration),
+        "pfn_performance" => pfn_performance(duration),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -780,18 +785,19 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
             test: Box::new(PerformanceBenchmark),
             workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
             criteria: [
-                (9, 1.5, 3.),
-                (95, 1.5, 3.),
-                (950, 2., 3.),
-                (2750, 2.5, 4.),
-                (4600, 3., 5.),
+                (9, 1.5, 3., 4.),
+                (95, 1.5, 3., 4.),
+                (950, 2., 3., 4.),
+                (2750, 2.5, 3.5, 4.5),
+                (4600, 3., 4., 5.),
             ]
             .into_iter()
-            .map(|(min_tps, max_lat_p50, max_lat_p99)| {
+            .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
                 SuccessCriteria::new(min_tps)
                     .add_max_expired_tps(0)
                     .add_max_failed_submission_tps(0)
                     .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
                     .add_latency_threshold(max_lat_p99, LatencyType::P99)
             })
             .collect(),
@@ -997,8 +1003,9 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(120)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 40),
+                    // overload test uses more CPUs than others, so increase the limit
+                    // Check that we don't use more than 18 CPU cores for 30% of the time.
+                    MetricsThreshold::new(18, 40),
                     // Check that we don't use more than 5 GB of memory for 30% of the time.
                     MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
                 ))
@@ -1542,8 +1549,10 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
+                    // Tuned for throughput uses more cores than regular tests,
+                    // as it achieves higher throughput.
+                    // Check that we don't use more than 14 CPU cores for 30% of the time.
+                    MetricsThreshold::new(14, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
                 ))
@@ -1843,6 +1852,59 @@ fn multiregion_benchmark_test() -> ForgeConfig {
         )
 }
 
+/// This test runs a constant-TPS benchmark where the network includes
+/// PFNs, and the transactions are submitted to the PFNs. This is useful
+/// for measuring latencies when the system is not saturated.
+fn pfn_const_tps(duration: Duration) -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(10)
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 500 }))
+        .add_network_test(PFNPerformance)
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Require frequent epoch changes
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(0)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(
+                    // Give at least 60s for catchup and at most 10% of the run
+                    (duration.as_secs() / 10).max(60),
+                )
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
+}
+
+/// This test runs a performance benchmark where the network includes
+/// PFNs, and the transactions are submitted to the PFNs. This is useful
+/// for measuring maximum throughput and latencies.
+fn pfn_performance(duration: Duration) -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(10)
+        .add_network_test(PFNPerformance)
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Require frequent epoch changes
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(4500)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(
+                    // Give at least 60s for catchup and at most 10% of the run
+                    (duration.as_secs() / 10).max(60),
+                )
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
+}
+
 /// A simple test that runs the swarm forever. This is useful for
 /// local testing (e.g., deploying a local swarm and interacting
 /// with it).
@@ -2020,5 +2082,11 @@ mod test {
             .collect::<Vec<String>>();
         let namespace = random_namespace(words, &mut rng).unwrap();
         assert_eq!(namespace, "forge-durian-eggplant-fig-apple");
+    }
+
+    #[test]
+    fn verify_tool() {
+        use clap::CommandFactory;
+        Args::command().debug_assert()
     }
 }

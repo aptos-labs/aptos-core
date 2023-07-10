@@ -34,6 +34,7 @@ use std::collections::BTreeMap;
 
 // Change log:
 // - V10
+//   - Added generate_unique_address and get_txn_hash native functions
 //   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
 // - V9
 //   - Accurate tracking of the cost of loading resource groups
@@ -75,7 +76,7 @@ pub trait FromOnChainGasSchedule: Sized {
     fn from_on_chain_gas_schedule(
         gas_schedule: &BTreeMap<String, u64>,
         feature_version: u64,
-    ) -> Option<Self>;
+    ) -> Result<Self, String>;
 }
 
 /// A trait for converting to a list of entries of the on-chain gas schedule.
@@ -104,8 +105,8 @@ impl FromOnChainGasSchedule for NativeGasParameters {
     fn from_on_chain_gas_schedule(
         gas_schedule: &BTreeMap<String, u64>,
         feature_version: u64,
-    ) -> Option<Self> {
-        Some(Self {
+    ) -> Result<Self, String> {
+        Ok(Self {
             move_stdlib: FromOnChainGasSchedule::from_on_chain_gas_schedule(
                 gas_schedule,
                 feature_version,
@@ -168,8 +169,8 @@ impl FromOnChainGasSchedule for AptosGasParameters {
     fn from_on_chain_gas_schedule(
         gas_schedule: &BTreeMap<String, u64>,
         feature_version: u64,
-    ) -> Option<Self> {
-        Some(Self {
+    ) -> Result<Self, String> {
+        Ok(Self {
             misc: FromOnChainGasSchedule::from_on_chain_gas_schedule(
                 gas_schedule,
                 feature_version,
