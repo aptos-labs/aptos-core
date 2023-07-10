@@ -7,10 +7,8 @@ use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::TransactionPayload;
 use move_binary_format::CompiledModule;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::language_storage::ModuleId;
-use std::string::String;
-use std::{fs::ReadDir, path::PathBuf, time::Instant};
+use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
+use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
 
 //// CONSTANTS
 const PREFIX: &str = "benchmark";
@@ -65,7 +63,7 @@ pub fn sign_module_txn(
 //// sign user transaction and only records the body of the transaction
 pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
     let start = Instant::now();
-    executor.exec_module(module_name, &function_name, vec![], vec![]);
+    executor.exec_module(module_name, function_name, vec![], vec![]);
     let elapsed = start.elapsed();
     println!("running time (microseconds): {}", elapsed.as_micros());
 }
@@ -82,8 +80,7 @@ pub fn publish(
     let creator = executor.new_account_at(address);
 
     //// iterate over all the functions that satisfied the requirements above
-    let mut sequence_num_counter = 0;
-    for func_identifier in func_identifiers {
+    for (sequence_num_counter, func_identifier) in func_identifiers.into_iter().enumerate() {
         println!(
             "Executing {}::{}::{}",
             address,
@@ -94,8 +91,8 @@ pub fn publish(
         // publish package similar to create_publish_package in harness.rs
         print!("Signing txn for module... ");
         let module_payload = generate_module_payload(package);
-        sign_module_txn(executor, &creator, module_payload, sequence_num_counter);
-        sequence_num_counter += 1;
+        let counter = sequence_num_counter.try_into().unwrap();
+        sign_module_txn(executor, &creator, module_payload, counter);
 
         //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
         print!("Signing user txn... ");

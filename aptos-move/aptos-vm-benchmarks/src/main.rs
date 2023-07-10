@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod helper;
-use aptos_framework::BuildOptions;
-use aptos_framework::BuiltPackage;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use clap::Parser;
 use move_binary_format::CompiledModule;
-use std::fs::read_dir;
-use std::path::PathBuf;
+use std::{fs::read_dir, path::PathBuf};
 
 //// CLI options
 #[derive(Parser, Debug)]
