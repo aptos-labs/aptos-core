@@ -147,4 +147,11 @@ impl RandShares {
     pub fn shares(&self) -> &Vec<Option<RandShare>> {
         &self.shares
     }
+
+    pub fn rounds(&self) -> Vec<Round> {
+        self.shares
+            .iter()
+            .map(|s| s.as_ref().unwrap().round())
+            .collect()
+    }
 }

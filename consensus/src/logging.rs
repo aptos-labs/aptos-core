@@ -15,6 +15,8 @@ pub struct LogSchema {
     epoch: Option<u64>,
     round: Option<Round>,
     item_id: Option<HashValue>,
+    rounds: Option<Vec<Round>>,
+    first_round: Option<Round>,
 }
 
 #[derive(Serialize)]
@@ -53,6 +55,8 @@ impl LogSchema {
             epoch: None,
             round: None,
             item_id: None,
+            rounds: None,
+            first_round: None,
         }
     }
 }

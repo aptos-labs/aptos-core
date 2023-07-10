@@ -229,11 +229,17 @@ impl BufferManager {
         // otherwise all blocks are Nil/genesis blocks that do not need randomness
         let rand_shares = RandShares::new(item_hash, self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
         if BROADCAST_SHARES {
-            info!(
-                self.new_log(LogEvent::BCastRandToAll)
-                    .item_id(item_hash),
-                "item id {} broadcast to all, item size {}", item_hash, item.get_blocks().len()
-            );
+            let rounds = rand_shares.rounds();
+            let log_event = self
+                .new_log(LogEvent::BCastRandToAll)
+                .item_id(item_hash)
+                .rounds(rounds.clone());
+
+            if rounds.is_empty() {
+                info!(log_event, "item id {} rounds {:?} broadcast to all, item size {}", item_hash, rounds, item.get_blocks().len());
+            } else {
+                info!(log_event.first_round(rounds[0]), "item id {} rounds {:?} broadcast to all, item size {}", item_hash, rounds, item.get_blocks().len());
+            }
             self.rand_msg_tx
                     .broadcast_rand_shares(rand_shares)
                     .await;
@@ -244,12 +250,19 @@ impl BufferManager {
                 return;
             } else {
                 for leader in leaders {
-                    info!(
-                        self.new_log(LogEvent::SendRandToLeader)
-                            .remote_peer(leader)
-                            .item_id(item_hash),
-                        "item id {} send to leader {}, item size {}", item_hash, leader, item.get_blocks().len()
-                    );
+                    let rounds = rand_shares.rounds();
+                    let log_event = self
+                        .new_log(LogEvent::SendRandToLeader)
+                        .remote_peer(leader)
+                        .item_id(item_hash)
+                        .rounds(rounds.clone());
+
+                    if rounds.is_empty() {
+                        info!(log_event, "item id {} rounds {:?} send to leader {}, item size {}", item_hash, rounds, leader, item.get_blocks().len());
+                    } else {
+                        info!(log_event.first_round(rounds[0]), "item id {} rounds {:?} send to leader {}, item size {}", item_hash, rounds, leader, item.get_blocks().len());
+                    }
+
                     for block in item.get_blocks() {
                         observe_block(block.timestamp_usecs(), BlockStage::RAND_SENT);
                     }
@@ -275,12 +288,19 @@ impl BufferManager {
                 let item_id = rand_shares.item_id();
                 info!("Receive random shares for item {:?}", item_id);
 
-                info!(
-                    self.new_log(LogEvent::LeaderReceiveRand)
-                        .remote_peer(rand_shares.author())
-                        .item_id(item_id),
-                    "item id {} from node {}, rand size {}", item_id, rand_shares.author(), rand_shares.shares().len()
-                );
+                let rounds = rand_shares.rounds();
+                let log_event = self
+                    .new_log(LogEvent::LeaderReceiveRand)
+                    .remote_peer(rand_shares.author())
+                    .item_id(item_id)
+                    .rounds(rounds.clone());
+
+                if rounds.is_empty() {
+                    info!(log_event, "item id {} from node {} rounds {:?}, rand size {}", item_id, rand_shares.author(), rounds, rand_shares.shares().len());
+                } else {
+                    info!(log_event.first_round(rounds[0]), "item id {} from node {} rounds {:?}, rand size {}", item_id, rand_shares.author(), rounds, rand_shares.shares().len());
+                }
+
                 println!("[rand debug] share {} from {} by leader {}", rand_shares.item_id(), rand_shares.author(), self.author);
 
                 // todo: verify rand message, ignore invalid ones
@@ -308,10 +328,18 @@ impl BufferManager {
                                 // if we're one of the proposer for the first k proposal block,
                                 // we're responsible to broadcast the randomness decision
                                 if item.get_k_leaders(NUM_LEADERS, &self.verifier).contains(&self.author) {
-                                    info!(
-                                        self.new_log(LogEvent::LeaderBCastRand).item_id(item_id),
-                                        "item id {} broadcast by {}, item size {}", item_id, self.author, item.get_blocks().len()
-                                    );
+                                    let rounds = rand_shares.rounds();
+                                    let log_event = self
+                                        .new_log(LogEvent::LeaderBCastRand)
+                                        .item_id(item_id)
+                                        .rounds(rounds.clone());
+
+                                    if rounds.is_empty() {
+                                        info!(log_event, "item id {} rounds {:?} broadcast by {}, item size {}", item_id, rounds, self.author, item.get_blocks().len());
+                                    } else {
+                                        info!(log_event.first_round(rounds[0]), "item id {} rounds {:?} broadcast by {}, item size {}", item_id, rounds, self.author, item.get_blocks().len());
+                                    }
+
                                     for block in item.get_blocks() {
                                         observe_block(block.timestamp_usecs(), BlockStage::RAND_AGGREGATED);
                                     }
@@ -372,10 +400,17 @@ impl BufferManager {
                 // info!("Receive random decision for item {:?}", item_id);
                 println!("[rand debug] share {} decision received at node {}", rand_decisions.item_id(), self.author);
 
-                info!(
-                    self.new_log(LogEvent::ReceiveRand).item_id(item_id),
-                    "item id {}, item size {}", item_id, rand_decisions.decisions().len()
-                );
+                let rounds = rand_decisions.rounds();
+                let log_event = self
+                    .new_log(LogEvent::ReceiveRand)
+                    .item_id(item_id)
+                    .rounds(rounds.clone());
+
+                if rounds.is_empty() {
+                    info!(log_event, "item id {} rounds {:?} receive by {}, item size {}", item_id, rounds, self.author, rand_decisions.decisions().len());
+                } else {
+                    info!(log_event.first_round(rounds[0]), "item id {} rounds {:?} receive by {}, item size {}", item_id, rounds, self.author, rand_decisions.decisions().len());
+                }
 
                 // todo: verify rand message, ignore invalid ones
 

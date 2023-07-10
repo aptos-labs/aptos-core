@@ -117,4 +117,11 @@ impl RandDecisions {
     pub fn decisions(&self) -> &Vec<Option<RandDecision>> {
         &self.decisions
     }
+
+    pub fn rounds(&self) -> Vec<Round> {
+        self.decisions
+            .iter()
+            .map(|s| s.as_ref().unwrap().round())
+            .collect()
+    }
 }
