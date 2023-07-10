@@ -14,11 +14,25 @@ export type ClientConfig = {
   WITH_CREDENTIALS?: boolean;
 };
 
+/**
+ * The API request type
+ *
+ * @param url - the url to make the request to, i.e https://fullnode.aptoslabs.devnet.com/v1
+ * @param method - the request method "GET" | "POST"
+ * @param endpoint (optional) - the endpoint to make the request to, i.e transactions
+ * @param body (optional) - the body of the request
+ * @param contentType (optional) - the content type to set the `content-type` header to,
+ * by default is set to `application/json`
+ * @param params (optional) - query params to add to the request
+ * @param originMethod (optional) - the local method the request came from
+ * @param overrides (optional) - a `ClientConfig` object type to override request data
+ */
 export type AptosRequest = {
   url: string;
   method: "GET" | "POST";
   endpoint?: string;
   body?: any;
+  contentType?: string;
   params?: Record<string, string | AnyNumber | boolean | undefined>;
   originMethod?: string;
   overrides?: ClientConfig;

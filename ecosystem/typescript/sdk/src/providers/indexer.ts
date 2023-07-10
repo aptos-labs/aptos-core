@@ -102,7 +102,7 @@ export class IndexerClient {
     const response = await post<GraphqlQuery, any>({
       url: this.endpoint,
       body: graphqlQuery,
-      overrides: { ...this.config },
+      overrides: { WITH_CREDENTIALS: false, ...this.config },
     });
     if (response.data.errors) {
       throw new ApiError(

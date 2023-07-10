@@ -26,12 +26,14 @@ async function axiosRequest<Request, Response>(
   url: string,
   method: "GET" | "POST",
   body?: Request,
+  contentType?: string,
   params?: Record<string, string | AnyNumber | boolean | undefined>,
   overrides?: ClientConfig,
 ): Promise<AxiosResponse<Response>> {
   const headers: Record<string, string | number | boolean> = {
     ...overrides?.HEADERS,
     "x-aptos-client": `aptos-ts-sdk/${VERSION}`,
+    "content-type": contentType ?? "application/json",
   };
 
   if (overrides?.TOKEN) {
@@ -66,9 +68,9 @@ async function axiosRequest<Request, Response>(
  * @returns the response or AptosApiError
  */
 export async function aptosRequest<Req, Res>(options: AptosRequest): Promise<AptosResponse<Req, Res>> {
-  const { url, endpoint, method, body, params, overrides } = options;
+  const { url, endpoint, method, body, contentType, params, overrides } = options;
   const fullEndpoint = `${url}/${endpoint ?? ""}`;
-  const response = await axiosRequest<Req, Res>(fullEndpoint, method, body, params, overrides);
+  const response = await axiosRequest<Req, Res>(fullEndpoint, method, body, contentType, params, overrides);
 
   const result: AptosResponse<Req, Res> = {
     status: response.status,

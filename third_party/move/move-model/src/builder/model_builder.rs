@@ -72,7 +72,7 @@ pub(crate) struct SpecOrBuiltinFunEntry {
     pub visibility: EntryVisibility,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum EntryVisibility {
     Spec,
     Impl,

@@ -5,7 +5,7 @@ use crate::{
     dag::reliable_broadcast::BroadcastStatus, network::TConsensusMsg,
     network_interface::ConsensusMsg,
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
     bls12381,
@@ -33,11 +33,7 @@ impl TDAGMessage for NodeDigestSignature {
         todo!()
     }
 }
-impl TDAGMessage for NodeCertificate {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        todo!()
-    }
-}
+
 impl TDAGMessage for CertifiedAck {
     fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         todo!()
@@ -79,7 +75,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
 }
 
 /// Represents the metadata about the node, without payload and parents from Node
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct NodeMetadata {
     epoch: u64,
     round: Round,
@@ -89,6 +85,23 @@ pub struct NodeMetadata {
 }
 
 impl NodeMetadata {
+    #[cfg(test)]
+    pub fn new_for_test(
+        epoch: u64,
+        round: Round,
+        author: Author,
+        timestamp: u64,
+        digest: HashValue,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            author,
+            timestamp,
+            digest,
+        }
+    }
+
     pub fn digest(&self) -> &HashValue {
         &self.digest
     }
@@ -126,7 +139,7 @@ impl CryptoHash for NodeDigest {
 }
 
 /// Node representation in the DAG, parents contain 2f+1 strong links (links to previous round)
-#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug)]
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct Node {
     metadata: NodeMetadata,
     payload: Payload,
@@ -142,7 +155,8 @@ impl Node {
         payload: Payload,
         parents: Vec<NodeCertificate>,
     ) -> Self {
-        let digest = Self::calculate_digest(epoch, round, author, timestamp, &payload, &parents);
+        let digest =
+            Self::calculate_digest_internal(epoch, round, author, timestamp, &payload, &parents);
 
         Self {
             metadata: NodeMetadata {
@@ -157,8 +171,21 @@ impl Node {
         }
     }
 
+    #[cfg(test)]
+    pub fn new_for_test(
+        metadata: NodeMetadata,
+        payload: Payload,
+        parents: Vec<NodeCertificate>,
+    ) -> Self {
+        Self {
+            metadata,
+            payload,
+            parents,
+        }
+    }
+
     /// Calculate the node digest based on all fields in the node
-    fn calculate_digest(
+    fn calculate_digest_internal(
         epoch: u64,
         round: Round,
         author: Author,
@@ -175,6 +202,17 @@ impl Node {
             parents,
         };
         node_with_out_digest.hash()
+    }
+
+    fn calculate_digest(&self) -> HashValue {
+        Self::calculate_digest_internal(
+            self.metadata.epoch,
+            self.metadata.round,
+            self.metadata.author,
+            self.metadata.timestamp,
+            &self.payload,
+            &self.parents,
+        )
     }
 
     pub fn digest(&self) -> HashValue {
@@ -201,7 +239,15 @@ impl Node {
 
 impl TDAGMessage for Node {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        // TODO: move this check to rpc process logic to delay it as much as possible for performance
+        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
+
         let current_round = self.metadata().round();
+
+        if current_round == 0 {
+            ensure!(self.parents().is_empty(), "invalid parents for round 0");
+            return Ok(());
+        }
 
         let prev_round = current_round - 1;
         // check if the parents' round is the node's round - 1
@@ -220,15 +266,17 @@ impl TDAGMessage for Node {
                         .map(|parent| parent.metadata().author())
                 )
                 .is_ok(),
-            "not enough voting power"
+            "not enough parents to satisfy voting power"
         );
+
+        // TODO: validate timestamp
 
         Ok(())
     }
 }
 
 /// Quorum signatures over the node digest
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct NodeCertificate {
     metadata: NodeMetadata,
     signatures: AggregateSignature,
@@ -255,28 +303,23 @@ impl NodeCertificate {
     }
 }
 
-impl From<CertifiedNode> for NodeCertificate {
-    fn from(node: CertifiedNode) -> Self {
-        Self {
-            metadata: node.metadata.clone(),
-            signatures: node.certificate.signatures.clone(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct CertifiedNode {
     node: Node,
-    certificate: NodeCertificate,
+    signatures: AggregateSignature,
 }
 
 impl CertifiedNode {
-    pub fn new(node: Node, certificate: NodeCertificate) -> Self {
-        Self { node, certificate }
+    pub fn new(node: Node, signatures: AggregateSignature) -> Self {
+        Self { node, signatures }
     }
 
-    pub fn certificate(&self) -> &NodeCertificate {
-        &self.certificate
+    pub fn signatures(&self) -> &AggregateSignature {
+        &self.signatures
+    }
+
+    pub fn certificate(&self) -> NodeCertificate {
+        NodeCertificate::new(self.node.metadata.clone(), self.signatures.clone())
     }
 }
 
@@ -285,6 +328,18 @@ impl Deref for CertifiedNode {
 
     fn deref(&self) -> &Self::Target {
         &self.node
+    }
+}
+
+impl TDAGMessage for CertifiedNode {
+    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
+
+        let node_digest = NodeDigest::new(self.digest());
+
+        verifier
+            .verify_multi_signatures(&node_digest, self.certificate().signatures())
+            .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
     }
 }
 
@@ -363,15 +418,21 @@ impl CertificateAckState {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CertifiedAck {
     epoch: u64,
+}
+
+impl CertifiedAck {
+    pub fn new(epoch: u64) -> Self {
+        Self { epoch }
+    }
 }
 
 impl BroadcastStatus for CertificateAckState {
     type Ack = CertifiedAck;
     type Aggregated = ();
-    type Message = NodeCertificate;
+    type Message = CertifiedNode;
 
     fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         self.received.insert(peer);
@@ -436,7 +497,7 @@ pub struct DAGNetworkMessage {
 pub enum DAGMessage {
     NodeMsg(Node),
     NodeDigestSignatureMsg(NodeDigestSignature),
-    NodeCertificateMsg(NodeCertificate),
+    CertifiedNodeMsg(CertifiedNode),
     CertifiedAckMsg(CertifiedAck),
     FetchRequest(RemoteFetchRequest),
     FetchResponse(FetchResponse),
@@ -452,7 +513,7 @@ impl DAGMessage {
         match self {
             DAGMessage::NodeMsg(_) => "NodeMsg",
             DAGMessage::NodeDigestSignatureMsg(_) => "NodeDigestSignatureMsg",
-            DAGMessage::NodeCertificateMsg(_) => "NodeCertificateMsg",
+            DAGMessage::CertifiedNodeMsg(_) => "CertifiedNodeMsg",
             DAGMessage::CertifiedAckMsg(_) => "CertifiedAckMsg",
             DAGMessage::FetchRequest(_) => "FetchRequest",
             DAGMessage::FetchResponse(_) => "FetchResponse",
@@ -462,6 +523,14 @@ impl DAGMessage {
             DAGMessage::TestAck(_) => "TestAck",
         }
     }
+
+    pub fn author(&self) -> anyhow::Result<Author> {
+        match self {
+            DAGMessage::NodeMsg(node) => Ok(node.metadata.author),
+            DAGMessage::CertifiedNodeMsg(node) => Ok(node.metadata.author),
+            _ => bail!("message does not support author field"),
+        }
+    }
 }
 
 impl TConsensusMsg for DAGMessage {
@@ -469,7 +538,7 @@ impl TConsensusMsg for DAGMessage {
         match self {
             DAGMessage::NodeMsg(node) => node.metadata.epoch,
             DAGMessage::NodeDigestSignatureMsg(signature) => signature.epoch,
-            DAGMessage::NodeCertificateMsg(certificate) => certificate.metadata.epoch,
+            DAGMessage::CertifiedNodeMsg(node) => node.metadata.epoch,
             DAGMessage::CertifiedAckMsg(ack) => ack.epoch,
             DAGMessage::FetchRequest(req) => req.target.epoch,
             DAGMessage::FetchResponse(res) => res.epoch,
@@ -478,6 +547,14 @@ impl TConsensusMsg for DAGMessage {
             #[cfg(test)]
             DAGMessage::TestAck(_) => 1,
         }
+    }
+}
+
+impl TryFrom<DAGNetworkMessage> for DAGMessage {
+    type Error = anyhow::Error;
+
+    fn try_from(msg: DAGNetworkMessage) -> Result<Self, Self::Error> {
+        Ok(bcs::from_bytes(&msg.data)?)
     }
 }
 
@@ -501,7 +578,7 @@ impl TDAGMessage for TestMessage {
 }
 
 #[cfg(test)]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TestAck(pub Vec<u8>);
 
 #[cfg(test)]

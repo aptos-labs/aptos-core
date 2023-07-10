@@ -1008,6 +1008,7 @@ dependencies = [
  "aptos-gas",
  "aptos-gas-profiling",
  "aptos-logger",
+ "aptos-memory-usage-tracker",
  "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-state-view",
@@ -2017,12 +2018,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
  "aptos-gas-profiling",
  "aptos-keygen",
+ "aptos-memory-usage-tracker",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-types",
@@ -2091,6 +2094,17 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "aptos-memory-usage-tracker"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas",
+ "aptos-types",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-types",
 ]
 
 [[package]]
@@ -3266,6 +3280,7 @@ name = "aptos-transaction-benchmarks"
 version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
+ "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-executor-service",
@@ -3483,6 +3498,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-memory-usage-tracker",
  "aptos-metrics-core",
  "aptos-move-stdlib",
  "aptos-mvhashmap",
@@ -3494,6 +3510,7 @@ dependencies = [
  "bcs 0.1.4",
  "dashmap",
  "fail 0.5.0",
+ "futures",
  "move-binary-format",
  "move-bytecode-utils",
  "move-bytecode-verifier",
@@ -7502,6 +7519,7 @@ dependencies = [
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-memory-usage-tracker",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
@@ -8152,6 +8170,7 @@ version = "0.0.3"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "backtrace",
  "indexmap",
  "move-core-types",
  "once_cell",
