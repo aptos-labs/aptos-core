@@ -106,11 +106,11 @@ async fn test_cointransfer(
     };
 
     // transfer coins to static account
-    let txn_hash = match coin_client.transfer(account, address, amount, None).await {
+    let pending_txn = match coin_client.transfer(account, address, amount, None).await {
         Ok(txn) => txn,
         Err(e) => return TestResult::Error(e),
     };
-    let response = match client.wait_for_transaction(&txn_hash).await {
+    let response = match client.wait_for_transaction(&pending_txn).await {
         Ok(response) => response,
         Err(e) => return TestResult::Error(e.into()),
     };
@@ -156,7 +156,7 @@ async fn test_mintnft(
 ) -> TestResult {
     // create collection
     let collection_name = "test collection";
-    let txn_hash = match token_client
+    let pending_txn = match token_client
         .create_collection(
             account,
             &collection_name,
@@ -170,14 +170,13 @@ async fn test_mintnft(
         Ok(txn) => txn,
         Err(e) => return TestResult::Error(e),
     };
-    match client.wait_for_transaction(&txn_hash).await {
+    match client.wait_for_transaction(&pending_txn).await {
         Ok(_) => {},
         Err(e) => return TestResult::Error(e.into()),
     }
 
     // create token
-    let address = &account.address();
-    let txn_hash = match token_client
+    let pending_txn = match token_client
         .create_token(
             account,
             &collection_name,
@@ -186,12 +185,7 @@ async fn test_mintnft(
             10,
             "token",
             10,
-            address,
-            0,
-            0,
-            Box::new(vec![]),
-            Box::new(vec![]),
-            Box::new(vec![]),
+            None,
             None,
         )
         .await
@@ -199,7 +193,7 @@ async fn test_mintnft(
         Ok(txn) => txn,
         Err(e) => return TestResult::Error(e),
     };
-    match client.wait_for_transaction(&txn_hash).await {
+    match client.wait_for_transaction(&pending_txn).await {
         Ok(_) => {},
         Err(e) => return TestResult::Error(e.into()),
     }
