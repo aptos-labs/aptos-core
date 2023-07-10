@@ -9,10 +9,7 @@ use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
 use move_table_extension::TableHandle;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Describes the state of each aggregator instance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -296,13 +293,13 @@ pub struct AggregatorData {
     // All aggregator instances that exist in the current transaction.
     aggregators: BTreeMap<AggregatorID, Aggregator>,
     // Counter for generating identifiers for AggregatorSnapshots.
-    pub id_counter: AtomicU64,
+    pub id_counter: u64,
 }
 
 impl AggregatorData {
     pub fn new(id_counter: u64) -> Self {
         Self {
-            id_counter: AtomicU64::new(id_counter),
+            id_counter,
             ..Default::default()
         }
     }
@@ -372,8 +369,8 @@ impl AggregatorData {
     }
 
     pub fn generate_id(&mut self) -> u64 {
-        self.id_counter.fetch_add(1, Ordering::SeqCst);
-        self.id_counter.load(Ordering::SeqCst)
+        self.id_counter += 1;
+        self.id_counter
     }
 
     /// Unpacks aggregator data.
