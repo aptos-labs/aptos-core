@@ -179,11 +179,11 @@ jobs:
 
   # Measures max PFN throughput and latencies under load (with a realistic environment)
   run-forge-pfn-performance-realistic-env:
-      if: ${{ github.event_name != 'pull_request' }}
-      needs: determine-test-metadata
-      uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-      secrets: inherit
-      with:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-pfn-performance-with-realistic-env-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
@@ -203,7 +203,7 @@ jobs:
       FORGE_NAMESPACE: forge-state-sync-perf-validator-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
       FORGE_TEST_SUITE: state_sync_perf_validators
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
+      POST_TO_SLACK: true
 
   # Measures state sync performance for validator fullnodes (execution syncing)
   run-forge-state-sync-perf-fullnode-execute-test:
