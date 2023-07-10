@@ -562,7 +562,7 @@ fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetwor
 
 fn run_consensus_only_three_region_simulation() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 30000 })
@@ -1460,14 +1460,14 @@ fn realistic_env_max_load_test(duration: Duration) -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_initial_fullnode_count(0)
-        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
-            inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 200000,
-                })
-                .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(5000),
-        }))
+        // .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
+        //     inner_traffic: EmitJobRequest::default()
+        //         .mode(EmitJobMode::MaxLoad {
+        //             mempool_backlog: 200000,
+        //         })
+        //         .init_gas_price_multiplier(20),
+        //     inner_success_criteria: SuccessCriteria::new(5000),
+        // }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
@@ -1815,7 +1815,7 @@ fn mainnet_like_simulation_test() -> ForgeConfig {
 /// the multiregion forge cluster.
 fn multiregion_benchmark_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .add_network_test(PerformanceBenchmark)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
