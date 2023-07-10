@@ -1,0 +1,18 @@
+// ---- Model Dump
+module 0x42::M {
+    struct Box {
+        f1: #0,
+        f2: #0,
+    }
+    private fun t0() {
+        {
+          let b: M::Box<u64> = pack M::Box<u64>(0, 1);
+          Deref(Borrow(Immutable)(b));
+          {
+            let b2: M::Box<M::Box<u64>> = pack M::Box<M::Box<u64>>(Deref(Borrow(Immutable)(b)), b);
+            b2;
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::M

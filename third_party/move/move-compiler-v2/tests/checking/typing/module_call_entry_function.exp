@@ -1,0 +1,49 @@
+// ---- Model Dump
+module 0x2::Y {
+    friend fun f_friend() {
+        Tuple()
+    }
+} // end 0x2::Y
+module 0x2::X {
+    public fun f_public() {
+        Tuple()
+    }
+    public entry fun f_script() {
+        Tuple()
+    }
+} // end 0x2::X
+module 0x2::M {
+    friend fun f_friend() {
+        Tuple()
+    }
+    public fun f_public() {
+        Tuple()
+    }
+    public entry fun f_script() {
+        Tuple()
+    }
+    private fun f_private() {
+        Tuple()
+    }
+    public entry fun f_script_call_friend() {
+        Y::f_friend()
+    }
+    public entry fun f_script_call_public() {
+        X::f_public()
+    }
+    public entry fun f_script_call_script() {
+        X::f_script()
+    }
+    public entry fun f_script_call_self_friend() {
+        M::f_friend()
+    }
+    public entry fun f_script_call_self_private() {
+        M::f_private()
+    }
+    public entry fun f_script_call_self_public() {
+        M::f_public()
+    }
+    public entry fun f_script_call_self_script() {
+        M::f_script()
+    }
+} // end 0x2::M
