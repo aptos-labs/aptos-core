@@ -43,6 +43,7 @@ impl DagDriver {
         time_service: Arc<dyn TimeService>,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
+        // TODO: rebroadcast nodes after recovery
         Self {
             author,
             epoch_state,

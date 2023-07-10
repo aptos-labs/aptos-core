@@ -17,7 +17,8 @@ use crate::{
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
-use aptos_types::{validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier};
+use aptos_logger::error;
+use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
 use futures::{stream::FuturesUnordered, StreamExt};
 use std::{collections::BTreeMap, future::Future, mem, sync::Arc, time::Duration};
 use thiserror::Error as ThisError;
@@ -100,7 +101,7 @@ pub struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
     signatures_by_round_peer: BTreeMap<Round, BTreeMap<Author, NodeDigestSignature>>,
     signer: ValidatorSigner,
-    verifier: ValidatorVerifier,
+    epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
 }
 
@@ -108,26 +109,17 @@ impl NodeBroadcastHandler {
     pub fn new(
         dag: Arc<RwLock<Dag>>,
         signer: ValidatorSigner,
-        verifier: ValidatorVerifier,
+        epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
-        let mut signatures_by_round_peer = BTreeMap::new();
-        storage
-            .get_node_signatures()
-            .unwrap_or_default()
-            .into_iter()
-            .for_each(|(node_id, digest_sig)| {
-                signatures_by_round_peer
-                    .entry(node_id.round())
-                    .or_insert_with(BTreeMap::new)
-                    .insert(node_id.author(), digest_sig);
-            });
+        let epoch = epoch_state.epoch;
+        let signatures_by_round_peer = read_signatures_from_storage(&storage, epoch);
 
         Self {
             dag,
             signatures_by_round_peer,
             signer,
-            verifier,
+            epoch_state,
             storage,
         }
     }
@@ -141,7 +133,7 @@ impl NodeBroadcastHandler {
             .flat_map(|(r, peer_and_digest)| {
                 peer_and_digest
                     .iter()
-                    .map(|(author, _)| NodeId::new(*r, *author))
+                    .map(|(author, _)| NodeId::new(self.epoch_state.epoch, *r, *author))
             })
             .collect();
         self.storage.delete_node_signatures(to_delete)
@@ -176,7 +168,8 @@ impl NodeBroadcastHandler {
             ensure!(
                 missing_parents.iter().all(|parent| {
                     let node_digest = NodeDigest::new(*parent.metadata().digest());
-                    self.verifier
+                    self.epoch_state
+                        .verifier
                         .verify_multi_signatures(&node_digest, parent.signatures())
                         .is_ok()
                 }),
@@ -188,6 +181,31 @@ impl NodeBroadcastHandler {
 
         Ok(())
     }
+}
+
+fn read_signatures_from_storage(
+    storage: &Arc<dyn DAGStorage>,
+    epoch: u64,
+) -> BTreeMap<u64, BTreeMap<Author, NodeDigestSignature>> {
+    let mut signatures_by_round_peer = BTreeMap::new();
+
+    let all_node_signatures = storage.get_node_signatures().unwrap_or_default();
+    let mut to_delete = vec![];
+    for (node_id, node_sig) in all_node_signatures {
+        if node_id.epoch() == epoch {
+            signatures_by_round_peer
+                .entry(node_id.round())
+                .or_insert_with(BTreeMap::new)
+                .insert(node_id.author(), node_sig);
+        } else {
+            to_delete.push(node_id);
+        }
+    }
+    if let Err(err) = storage.delete_node_signatures(to_delete) {
+        error!("unable to clear old signatures: {}", err);
+    }
+
+    signatures_by_round_peer
 }
 
 impl RpcHandler for NodeBroadcastHandler {
@@ -208,7 +226,7 @@ impl RpcHandler for NodeBroadcastHandler {
                     NodeDigestSignature::new(node.metadata().epoch(), node.digest(), signature);
 
                 self.storage
-                    .save_node_signature(&(&node).into(), &digest_signature)?;
+                    .save_node_signature(&NodeId::from(&node), &digest_signature)?;
                 signatures_by_peer.insert(*node.metadata().author(), digest_signature.clone());
 
                 Ok(digest_signature)

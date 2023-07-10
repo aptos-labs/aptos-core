@@ -39,7 +39,7 @@ impl NetworkHandler {
             node_receiver: NodeBroadcastHandler::new(
                 dag.clone(),
                 signer,
-                epoch_state.verifier.clone(),
+                epoch_state.clone(),
                 storage,
             ),
             certified_node_receiver: CertifiedNodeHandler::new(dag),
