@@ -63,9 +63,9 @@ pub fn sign_module_txn(
 }
 
 //// sign user transaction and only records the body of the transaction
-pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &String) {
+pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
     let start = Instant::now();
-    executor.exec_module(module_name, &function_name.as_str(), vec![], vec![]);
+    executor.exec_module(module_name, &function_name, vec![], vec![]);
     let elapsed = start.elapsed();
     println!("running time (microseconds): {}", elapsed.as_micros());
 }
@@ -86,7 +86,7 @@ pub fn publish(
     for func_identifier in func_identifiers {
         println!(
             "Executing {}::{}::{}",
-            address.to_string(),
+            address,
             identifier,
             func_identifier.clone(),
         );
@@ -95,7 +95,7 @@ pub fn publish(
         print!("Signing txn for module... ");
         let module_payload = generate_module_payload(package);
         sign_module_txn(executor, &creator, module_payload, sequence_num_counter);
-        sequence_num_counter = sequence_num_counter + 1;
+        sequence_num_counter += 1;
 
         //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
         print!("Signing user txn... ");
@@ -120,9 +120,7 @@ pub fn get_module_name(
         member_id: _function_id,
     } = str::parse(&format!(
         "0x{}::{}::{}",
-        address.to_string(),
-        identifier,
-        func_identifier,
+        address, identifier, func_identifier,
     ))
     .unwrap();
 
@@ -188,7 +186,7 @@ pub fn get_functional_identifiers(
         // if it does, ensure no params in benchmark function
         let signature_idx: usize = handle.parameters.0.into();
         let func_params = &signature_pool[signature_idx];
-        if func_params.len() != 0 {
+        if !func_params.is_empty() {
             eprintln!(
                 "\n[WARNING] benchmark function should not have parameters: {}\n",
                 func_name,
