@@ -46,7 +46,7 @@ pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 3000;
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
 // If the randomness shares are broadcasted to all validators, or sent through the leaders
-pub const BROADCAST_SHARES: bool = true;
+pub const BROADCAST_SHARES: bool = false;
 // Number of leaders that aggregates the randomness shares
 pub const NUM_LEADERS: usize = 1;
 
