@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 // @generated
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetTransactionsRequest {
     /// Required; start version of current stream.
@@ -16,6 +17,7 @@ pub struct GetTransactionsRequest {
     pub batch_size: ::core::option::Option<u64>,
 }
 /// TransactionsResponse is a batch of transactions.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionsResponse {
     /// Required; transactions data.

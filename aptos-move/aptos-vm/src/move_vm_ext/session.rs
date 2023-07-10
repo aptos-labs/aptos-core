@@ -59,6 +59,16 @@ pub enum SessionId {
         // id to identify this specific genesis build
         id: HashValue,
     },
+    Prologue {
+        sender: AccountAddress,
+        sequence_number: u64,
+        script_hash: Vec<u8>,
+    },
+    Epilogue {
+        sender: AccountAddress,
+        sequence_number: u64,
+        script_hash: Vec<u8>,
+    },
     // For those runs that are not a transaction and the output of which won't be committed.
     Void,
 }
@@ -86,6 +96,30 @@ impl SessionId {
         }
     }
 
+    pub fn prologue(txn: &SignatureCheckedTransaction) -> Self {
+        Self::prologue_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
+    }
+
+    pub fn prologue_meta(txn_data: &TransactionMetadata) -> Self {
+        Self::Prologue {
+            sender: txn_data.sender,
+            sequence_number: txn_data.sequence_number,
+            script_hash: txn_data.script_hash.clone(),
+        }
+    }
+
+    pub fn epilogue(txn: &SignatureCheckedTransaction) -> Self {
+        Self::epilogue_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
+    }
+
+    pub fn epilogue_meta(txn_data: &TransactionMetadata) -> Self {
+        Self::Epilogue {
+            sender: txn_data.sender,
+            sequence_number: txn_data.sequence_number,
+            script_hash: txn_data.script_hash.clone(),
+        }
+    }
+
     pub fn void() -> Self {
         Self::Void
     }
@@ -96,7 +130,9 @@ impl SessionId {
 
     pub fn sender(&self) -> Option<AccountAddress> {
         match self {
-            SessionId::Txn { sender, .. } => Some(*sender),
+            SessionId::Txn { sender, .. }
+            | SessionId::Prologue { sender, .. }
+            | SessionId::Epilogue { sender, .. } => Some(*sender),
             SessionId::BlockMeta { .. } | SessionId::Genesis { .. } | SessionId::Void => None,
         }
     }

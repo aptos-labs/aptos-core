@@ -17,7 +17,7 @@ mod thread_executor_service;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BlockExecutionResult {
-    pub inner: Result<Vec<TransactionOutput>, VMStatus>,
+    pub inner: Result<Vec<Vec<TransactionOutput>>, VMStatus>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

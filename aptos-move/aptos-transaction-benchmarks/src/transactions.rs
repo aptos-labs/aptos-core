@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_bitvec::BitVec;
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
 use aptos_executor_service::remote_executor_client::RemoteExecutorClient;
@@ -17,11 +18,12 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
+    vm_status::VMStatus,
 };
 use aptos_vm::{
-    block_executor::BlockAptosVM,
+    block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
-    sharded_block_executor::{block_executor_client::LocalExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{block_executor_client::VMExecutorClient, ShardedBlockExecutor},
 };
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use once_cell::sync::Lazy;
@@ -254,7 +256,7 @@ where
                     Arc::new(ShardedBlockExecutor::new(remote_executor_clients))
                 } else {
                     let local_executor_client =
-                        LocalExecutorClient::create_local_clients(num_executor_shards, None);
+                        VMExecutorClient::create_vm_clients(num_executor_shards, None);
                     Arc::new(ShardedBlockExecutor::new(local_executor_client))
                 };
             (
@@ -342,12 +344,16 @@ where
     ) -> usize {
         let block_size = transactions.len();
         let timer = Instant::now();
-        BlockAptosVM::execute_block(
+        BlockAptosVM::execute_block::<
+            _,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+        >(
             Arc::clone(&RAYON_EXEC_POOL),
             BlockExecutorTransactions::Unsharded(transactions),
             self.state_view.as_ref(),
             1,
             maybe_block_gas_limit,
+            None,
         )
         .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
@@ -382,12 +388,16 @@ where
                 )
                 .expect("VM should not fail to start");
         } else {
-            BlockAptosVM::execute_block(
+            BlockAptosVM::execute_block::<
+                _,
+                NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            >(
                 Arc::clone(&RAYON_EXEC_POOL),
                 BlockExecutorTransactions::Unsharded(transactions),
                 self.state_view.as_ref(),
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
+                None,
             )
             .expect("VM should not fail to start");
         }

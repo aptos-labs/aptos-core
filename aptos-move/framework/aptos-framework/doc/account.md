@@ -55,6 +55,7 @@
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `create_account`](#@Specification_1_create_account)
     -  [Function `create_account_unchecked`](#@Specification_1_create_account_unchecked)
+    -  [Function `exists_at`](#@Specification_1_exists_at)
     -  [Function `get_guid_next_creation_num`](#@Specification_1_get_guid_next_creation_num)
     -  [Function `get_sequence_number`](#@Specification_1_get_sequence_number)
     -  [Function `increment_sequence_number`](#@Specification_1_increment_sequence_number)
@@ -2105,6 +2106,7 @@ Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_to
 <pre><code><b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: new_address};
 <b>aborts_if</b> new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == new_address;
+<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address);
 </code></pre>
 
 
@@ -2124,6 +2126,24 @@ The Account does not exist under the new address before creating the account.
 
 <pre><code><b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: new_address};
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == new_address;
+<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_exists_at"></a>
+
+### Function `exists_at`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(addr: <b>address</b>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

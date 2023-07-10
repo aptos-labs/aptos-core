@@ -61,7 +61,7 @@ return true.
 -  [Function `partial_governance_voting_enabled`](#0x1_features_partial_governance_voting_enabled)
 -  [Function `get_delegation_pool_partial_governance_voting`](#0x1_features_get_delegation_pool_partial_governance_voting)
 -  [Function `delegation_pool_partial_governance_voting_enabled`](#0x1_features_delegation_pool_partial_governance_voting_enabled)
--  [Function `gas_payer_enabled`](#0x1_features_gas_payer_enabled)
+-  [Function `fee_payer_enabled`](#0x1_features_fee_payer_enabled)
 -  [Function `get_auids`](#0x1_features_get_auids)
 -  [Function `auids_enabled`](#0x1_features_auids_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -253,13 +253,13 @@ The provided signer has not a framework address.
 
 
 
-<a name="0x1_features_GAS_PAYER_ENABLED"></a>
+<a name="0x1_features_FEE_PAYER_ENABLED"></a>
 
 Whether alternate gas payer is supported
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>: u64 = 22;
+<pre><code><b>const</b> <a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>: u64 = 22;
 </code></pre>
 
 
@@ -1058,13 +1058,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_gas_payer_enabled"></a>
+<a name="0x1_features_fee_payer_enabled"></a>
 
-## Function `gas_payer_enabled`
+## Function `fee_payer_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_gas_payer_enabled">gas_payer_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_fee_payer_enabled">fee_payer_enabled</a>(): bool
 </code></pre>
 
 
@@ -1073,8 +1073,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_gas_payer_enabled">gas_payer_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_fee_payer_enabled">fee_payer_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>)
 }
 </code></pre>
 
@@ -1386,11 +1386,11 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<a name="0x1_features_spec_gas_payer_enabled"></a>
+<a name="0x1_features_spec_fee_payer_enabled"></a>
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_gas_payer_enabled">spec_gas_payer_enabled</a>(): bool {
-   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_GAS_PAYER_ENABLED">GAS_PAYER_ENABLED</a>)
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_fee_payer_enabled">spec_fee_payer_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>)
 }
 </code></pre>
 

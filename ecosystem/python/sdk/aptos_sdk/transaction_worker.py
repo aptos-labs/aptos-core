@@ -49,6 +49,9 @@ class TransactionWorker:
         self._account_sequence_number = AccountSequenceNumber(
             rest_client, account.address()
         )
+        self._account_sequence_number.maximum_wait_time = (
+            rest_client.client_config.transaction_wait_in_seconds
+        )
         self._rest_client = rest_client
         self._transaction_generator = transaction_generator
 
