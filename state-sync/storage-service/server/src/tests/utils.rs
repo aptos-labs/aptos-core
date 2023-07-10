@@ -55,6 +55,20 @@ pub async fn advance_storage_refresh_time(mock_time: &MockTimeService) {
     mock_time.advance_ms_async(cache_update_freq_ms).await;
 }
 
+/// Advances the storage refresh time and
+/// waits for the storage summary to refresh.
+pub async fn advance_time_and_wait_for_refresh(
+    mock_client: &mut MockClient,
+    mock_time: &MockTimeService,
+    old_storage_server_summary: StorageServerSummary,
+) {
+    // Advance the storage refresh time
+    advance_storage_refresh_time(mock_time).await;
+
+    // Wait for the storage server to refresh the cached summary
+    wait_for_cached_summary_update(mock_client, mock_time, old_storage_server_summary, true).await;
+}
+
 /// Creates a test epoch ending ledger info
 pub fn create_epoch_ending_ledger_info(epoch: u64, version: u64) -> LedgerInfoWithSignatures {
     // Create a new epoch state
@@ -168,16 +182,6 @@ fn create_test_transaction(sequence_number: u64, code_bytes: Vec<u8>) -> Transac
     Transaction::UserTransaction(signed_transaction)
 }
 
-/// Creates a test transaction output
-fn create_test_transaction_output() -> TransactionOutput {
-    TransactionOutput::new(
-        WriteSet::default(),
-        vec![],
-        0,
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
-    )
-}
-
 /// Creates a test transaction list with proof with the given sizes
 pub fn create_transaction_list_using_sizes(
     start_version: u64,
@@ -237,6 +241,16 @@ pub fn create_transaction_list_with_proof(
     transaction_list_with_proof
 }
 
+/// Creates a test transaction output
+fn create_test_transaction_output() -> TransactionOutput {
+    TransactionOutput::new(
+        WriteSet::default(),
+        vec![],
+        0,
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+    )
+}
+
 /// Creates a new storage service config with the limit
 /// configured to be the size of an output list or transaction
 /// list (depending on if `fallback_to_transactions` is set).
@@ -281,6 +295,21 @@ pub fn expect_get_epoch_ending_ledger_infos(
         .returning(move |_, _| Ok(epoch_change_proof.clone()));
 }
 
+/// Sets an expectation on the given mock db for a call to fetch transaction outputs
+pub fn expect_get_transaction_outputs(
+    mock_db: &mut MockDatabaseReader,
+    start_version: u64,
+    num_items: u64,
+    proof_version: u64,
+    output_list: TransactionOutputListWithProof,
+) {
+    mock_db
+        .expect_get_transaction_outputs()
+        .times(1)
+        .with(eq(start_version), eq(num_items), eq(proof_version))
+        .returning(move |_, _, _| Ok(output_list.clone()));
+}
+
 /// Sets an expectation on the given mock db for a call to fetch transactions
 pub fn expect_get_transactions(
     mock_db: &mut MockDatabaseReader,
@@ -302,21 +331,6 @@ pub fn expect_get_transactions(
         .returning(move |_, _, _, _| Ok(transaction_list.clone()));
 }
 
-/// Sets an expectation on the given mock db for a call to fetch transaction outputs
-pub fn expect_get_transaction_outputs(
-    mock_db: &mut MockDatabaseReader,
-    start_version: u64,
-    num_items: u64,
-    proof_version: u64,
-    output_list: TransactionOutputListWithProof,
-) {
-    mock_db
-        .expect_get_transaction_outputs()
-        .times(1)
-        .with(eq(start_version), eq(num_items), eq(proof_version))
-        .returning(move |_, _, _| Ok(output_list.clone()));
-}
-
 /// Extracts the peer and network ids from an optional peer network id
 pub fn extract_peer_and_network_id(
     peer_network_id: Option<PeerNetworkId>,
@@ -328,6 +342,36 @@ pub fn extract_peer_and_network_id(
         )
     } else {
         (None, None)
+    }
+}
+
+/// This function forces the optimistic fetch handler to work.
+/// This can be done in two ways: (i) a state sync notification
+/// is sent to the storage service, invoking the handler; or (ii)
+/// enough time elapses that the handler runs manually.
+pub async fn force_optimistic_fetch_handler_to_run(
+    mock_client: &mut MockClient,
+    mock_time: &MockTimeService,
+    storage_service_notifier: &StorageServiceNotifier,
+) {
+    // Generate a random number and if the number is even, send
+    // a state sync notification. Otherwise, wait for the storage
+    // summary to refresh manually (by advancing time).
+    let random_number: u8 = OsRng.gen();
+    if random_number % 2 == 0 {
+        // Send a state sync notification and wait for storage to update
+        send_notification_and_wait_for_refresh(
+            mock_client,
+            mock_time,
+            storage_service_notifier,
+            random_number as u64,
+            StorageServerSummary::default(),
+        )
+        .await;
+    } else {
+        // Advance the time manually and wait for storage to update
+        advance_time_and_wait_for_refresh(mock_client, mock_time, StorageServerSummary::default())
+            .await;
     }
 }
 
@@ -383,6 +427,25 @@ pub fn initialize_logger() {
         .build();
 }
 
+/// Sends a state sync notification to the storage server
+/// and waits for the storage summary to refresh.
+pub async fn send_notification_and_wait_for_refresh(
+    mock_client: &mut MockClient,
+    mock_time: &MockTimeService,
+    storage_service_notifier: &StorageServiceNotifier,
+    highest_synced_version: u64,
+    old_storage_server_summary: StorageServerSummary,
+) {
+    // Send a state sync notification with the highest synced version
+    storage_service_notifier
+        .notify_new_commit(highest_synced_version)
+        .await
+        .unwrap();
+
+    // Wait for the storage server to refresh the cached summary
+    wait_for_cached_summary_update(mock_client, mock_time, old_storage_server_summary, false).await;
+}
+
 /// Sends the given storage request to the given client
 pub async fn send_storage_request(
     mock_client: &mut MockClient,
@@ -423,115 +486,6 @@ pub fn update_storage_server_summary(
     storage_server
         .cached_storage_server_summary
         .store(Arc::new(storage_server_summary));
-}
-
-/// Advances the storage refresh time and
-/// waits for the storage summary to refresh.
-pub async fn advance_time_and_wait_for_refresh(
-    mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
-    old_storage_server_summary: StorageServerSummary,
-) {
-    // Advance the storage refresh time
-    advance_storage_refresh_time(mock_time).await;
-
-    // Wait for the storage server to refresh the cached summary
-    wait_for_cached_summary_update(mock_client, mock_time, old_storage_server_summary, true).await;
-}
-
-/// Sends a state sync notification to the storage server
-/// and waits for the storage summary to refresh.
-pub async fn send_notification_and_wait_for_refresh(
-    mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
-    storage_service_notifier: &StorageServiceNotifier,
-    highest_synced_version: u64,
-    old_storage_server_summary: StorageServerSummary,
-) {
-    // Send a state sync notification with the highest synced version
-    storage_service_notifier
-        .notify_new_commit(highest_synced_version)
-        .await
-        .unwrap();
-
-    // Wait for the storage server to refresh the cached summary
-    wait_for_cached_summary_update(mock_client, mock_time, old_storage_server_summary, false).await;
-}
-
-/// Waits for the cached storage summary to update
-async fn wait_for_cached_summary_update(
-    mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
-    old_storage_server_summary: StorageServerSummary,
-    continue_advancing_time: bool,
-) {
-    let storage_request = StorageServiceRequest::new(DataRequest::GetStorageServerSummary, true);
-
-    // Loop until the storage summary has updated
-    while mock_client
-        .process_request(storage_request.clone())
-        .await
-        .unwrap()
-        == StorageServiceResponse::new(
-            DataResponse::StorageServerSummary(old_storage_server_summary.clone()),
-            true,
-        )
-        .unwrap()
-    {
-        // Advance the storage refresh time
-        if continue_advancing_time {
-            advance_storage_refresh_time(mock_time).await;
-        }
-
-        // Sleep for a while
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-}
-
-/// This function forces the optimistic fetch handler to work.
-/// This can be done in two ways: (i) a state sync notification
-/// is sent to the storage service, invoking the handler; or (ii)
-/// enough time elapses that the handler runs manually.
-pub async fn force_optimistic_fetch_handler_to_run(
-    mock_client: &mut MockClient,
-    mock_time: &MockTimeService,
-    storage_service_notifier: &StorageServiceNotifier,
-) {
-    // Generate a random number and if the number is even, send
-    // a state sync notification. Otherwise, wait for the storage
-    // summary to refresh manually (by advancing time).
-    let random_number: u8 = OsRng.gen();
-    if random_number % 2 == 0 {
-        // Send a state sync notification and wait for storage to update
-        send_notification_and_wait_for_refresh(
-            mock_client,
-            mock_time,
-            storage_service_notifier,
-            random_number as u64,
-            StorageServerSummary::default(),
-        )
-        .await;
-    } else {
-        // Advance the time manually and wait for storage to update
-        advance_time_and_wait_for_refresh(mock_client, mock_time, StorageServerSummary::default())
-            .await;
-    }
-}
-
-/// Waits for the specified number of optimistic fetches to be active
-pub async fn wait_for_active_optimistic_fetches(
-    active_optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-    expected_num_active_fetches: usize,
-) {
-    loop {
-        let num_active_fetches = active_optimistic_fetches.len();
-        if num_active_fetches == expected_num_active_fetches {
-            return; // We found the expected number of active fetches
-        }
-
-        // Sleep for a while
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
 }
 
 /// Verifies that a new transaction outputs with proof response is received
@@ -615,4 +569,50 @@ pub async fn verify_new_transactions_with_proof(
             response
         ),
     };
+}
+
+/// Waits for the specified number of optimistic fetches to be active
+pub async fn wait_for_active_optimistic_fetches(
+    active_optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
+    expected_num_active_fetches: usize,
+) {
+    loop {
+        let num_active_fetches = active_optimistic_fetches.len();
+        if num_active_fetches == expected_num_active_fetches {
+            return; // We found the expected number of active fetches
+        }
+
+        // Sleep for a while
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+/// Waits for the cached storage summary to update
+async fn wait_for_cached_summary_update(
+    mock_client: &mut MockClient,
+    mock_time: &MockTimeService,
+    old_storage_server_summary: StorageServerSummary,
+    continue_advancing_time: bool,
+) {
+    let storage_request = StorageServiceRequest::new(DataRequest::GetStorageServerSummary, true);
+
+    // Loop until the storage summary has updated
+    while mock_client
+        .process_request(storage_request.clone())
+        .await
+        .unwrap()
+        == StorageServiceResponse::new(
+            DataResponse::StorageServerSummary(old_storage_server_summary.clone()),
+            true,
+        )
+        .unwrap()
+    {
+        // Advance the storage refresh time
+        if continue_advancing_time {
+            advance_storage_refresh_time(mock_time).await;
+        }
+
+        // Sleep for a while
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }
