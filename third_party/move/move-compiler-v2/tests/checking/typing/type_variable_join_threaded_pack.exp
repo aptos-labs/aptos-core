@@ -1,0 +1,34 @@
+// ---- Model Dump
+module 0x2::Container {
+    struct T {
+        f: #0,
+    }
+    public fun get<V>(_self: &Container::T<V>) {
+        Abort(0)
+    }
+    public fun new<V>() {
+        Abort(0)
+    }
+    public fun put<V>(_self: &mut Container::T<V>,_item: V) {
+        Abort(0)
+    }
+} // end 0x2::Container
+module 0x2::M {
+    struct Box {
+        f1: #0,
+        f2: #0,
+    }
+    private fun t0() {
+        {
+          let v: Container::T<u64> = Container::new<u64>();
+          {
+            let x: u64 = Container::get<u64>(Borrow(Immutable)(v));
+            {
+              let b: M::Box<u64> = pack M::Box<u64>(x, x);
+              Container::put<u64>(Borrow(Mutable)(v), 0);
+              b
+            }
+          }
+        }
+    }
+} // end 0x2::M

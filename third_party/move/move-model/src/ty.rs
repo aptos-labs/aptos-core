@@ -41,7 +41,7 @@ pub enum Type {
 
     // Temporary types used during type checking
     Error,
-    Var(u16),
+    Var(u32),
 }
 
 /// Represents a reference kind.
@@ -86,9 +86,9 @@ pub enum PrimitiveType {
 #[derive(Debug, Clone)]
 pub struct Substitution {
     /// Assignment of types to variables.
-    subs: BTreeMap<u16, Type>,
+    subs: BTreeMap<u32, Type>,
     /// Constraints on (unassigned) variables.
-    constraints: BTreeMap<u16, Vec<(Loc, WideningOrder, Constraint)>>,
+    constraints: BTreeMap<u32, Vec<(Loc, WideningOrder, Constraint)>>,
 }
 
 /// A constraint on a type variable, maintained during unification.
@@ -634,13 +634,13 @@ impl Type {
     }
 
     /// Get the unbound type variables in the type.
-    pub fn get_vars(&self) -> BTreeSet<u16> {
+    pub fn get_vars(&self) -> BTreeSet<u32> {
         let mut vars = BTreeSet::new();
         self.internal_get_vars(&mut vars);
         vars
     }
 
-    fn internal_get_vars(&self, vars: &mut BTreeSet<u16>) {
+    fn internal_get_vars(&self, vars: &mut BTreeSet<u32>) {
         use Type::*;
         match self {
             Var(id) => {
@@ -785,7 +785,7 @@ impl Substitution {
     }
 
     /// Add a constraint to the variable.
-    pub fn add_constraint(&mut self, var: u16, loc: Loc, order: WideningOrder, c: Constraint) {
+    pub fn add_constraint(&mut self, var: u32, loc: Loc, order: WideningOrder, c: Constraint) {
         self.constraints
             .entry(var)
             .or_default()
@@ -804,7 +804,7 @@ impl Substitution {
     /// Binds the type variable. If there are constraints associated with the
     /// variable, those are evaluated, possibly leading into unification
     /// errors.
-    pub fn bind(&mut self, var: u16, ty: Type) -> Result<(), TypeUnificationError> {
+    pub fn bind(&mut self, var: u32, ty: Type) -> Result<(), TypeUnificationError> {
         // Specialize the type before binding, to maximize groundness of type terms.
         let ty = self.specialize(&ty);
         if let Some(constrs) = self.constraints.remove(&var) {
@@ -899,7 +899,7 @@ impl Substitution {
     /// If deep substitution is requested, follow down the substitution chain until either
     /// - `Some(ty)` when the final type is not a type variable or
     /// - `None` when the final type variable does not have a substitution
-    pub fn get_substitution(&self, var: u16, shallow: bool) -> Option<Type> {
+    pub fn get_substitution(&self, var: u32, shallow: bool) -> Option<Type> {
         match self.subs.get(&var) {
             None => None,
             Some(Type::Var(next_var)) => {
@@ -1138,7 +1138,7 @@ impl Substitution {
 
     /// Check whether the variables occurs in the type, or in any assignment to variables in the
     /// type.
-    fn occurs_check(&self, ty: &Type, var: u16) -> bool {
+    fn occurs_check(&self, ty: &Type, var: u32) -> bool {
         ty.get_vars().iter().any(|v| {
             if v == &var {
                 return true;
@@ -1170,7 +1170,7 @@ impl Default for Substitution {
 /// memories will result in instantiations which when applied create `f<bool>`
 /// and `invariant<u64>` respectively.
 pub struct TypeUnificationAdapter {
-    type_vars_map: BTreeMap<u16, (bool, TypeParameterIndex)>,
+    type_vars_map: BTreeMap<u32, (bool, TypeParameterIndex)>,
     types_adapted_lhs: Vec<Type>,
     types_adapted_rhs: Vec<Type>,
 }
@@ -1581,6 +1581,7 @@ impl TypeInstantiationDerivation {
 }
 
 /// Data providing context for displaying types.
+#[derive(Clone)]
 pub struct TypeDisplayContext<'a> {
     pub env: &'a GlobalEnv,
     pub type_param_names: Option<Vec<Symbol>>,

@@ -1,0 +1,32 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        dummy_field: bool,
+    }
+    private fun t0() {
+        {
+          let x: u64 = 0;
+          x
+        };
+        {
+          let x: u64 = 0;
+          Borrow(Immutable)(x)
+        };
+        {
+          let y: u64 = 0;
+          Borrow(Mutable)(Add(y, 1))
+        };
+        M::R{ dummy_field: _ } = {
+          let r: M::R = {
+            let r: M::R = pack M::R(false);
+            r
+          };
+          r
+        };
+        {
+          let x: u64 = 0;
+          Tuple(x, false)
+        };
+        Tuple()
+    }
+} // end 0x8675309::M

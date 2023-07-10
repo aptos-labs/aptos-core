@@ -55,7 +55,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// The currently build type substitution.
     pub subs: Substitution,
     /// A counter for generating type variables.
-    pub type_var_counter: u16,
+    pub type_var_counter: u32,
     /// A marker to indicate the node_counter start state.
     pub node_counter_start: usize,
     /// The locals which have been accessed with this translator. The boolean indicates whether
@@ -147,7 +147,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     pub fn type_variance(&self) -> Variance {
         if self.mode == ExpTranslationMode::Impl {
-            // When translating Move implementation code, no variance is allowed
+            // When translating Move implementation code, use impl variance.
             Variance::ShallowImplVariance
         } else {
             // In specification mode all integers are automatically extended to `num`, and
@@ -227,7 +227,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Creates a fresh type variable.
-    fn fresh_type_var_idx(&mut self) -> u16 {
+    fn fresh_type_var_idx(&mut self) -> u32 {
         let idx = self.type_var_counter;
         self.type_var_counter += 1;
         idx

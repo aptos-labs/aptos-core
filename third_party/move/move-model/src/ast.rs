@@ -7,8 +7,8 @@
 use crate::{
     exp_rewriter::ExpRewriterFunctions,
     model::{
-        EnvDisplay, FieldId, FunId, GlobalEnv, GlobalId, Loc, ModuleId, NodeId, Parameter,
-        QualifiedId, QualifiedInstId, SchemaId, SpecFunId, StructId, TypeParameter,
+        EnvDisplay, FieldId, FunId, FunctionEnv, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
+        Parameter, QualifiedId, QualifiedInstId, SchemaId, SpecFunId, StructId, TypeParameter,
         GHOST_MEMORY_PREFIX,
     },
     symbol::Symbol,
@@ -1452,7 +1452,29 @@ impl<'a> fmt::Display for QualifiedSymbolDisplay<'a> {
 impl ExpData {
     /// Creates a display of an expression which can be used in formatting.
     pub fn display<'a>(&'a self, env: &'a GlobalEnv) -> ExpDisplay<'a> {
-        ExpDisplay { env, exp: self }
+        ExpDisplay {
+            env,
+            exp: self,
+            fun_env: None,
+        }
+    }
+
+    /// Creates a display of an expression which can be used in formatting, based
+    /// on a function env for getting names of locals and type parameters.
+    pub fn display_for_fun<'a>(&'a self, fun_env: FunctionEnv<'a>) -> ExpDisplay<'a> {
+        ExpDisplay {
+            env: fun_env.module_env.env,
+            exp: self,
+            fun_env: Some(fun_env),
+        }
+    }
+
+    fn display_cont<'a>(&'a self, other: &ExpDisplay<'a>) -> ExpDisplay<'a> {
+        ExpDisplay {
+            env: other.env,
+            exp: self,
+            fun_env: other.fun_env.clone(),
+        }
     }
 }
 
@@ -1460,6 +1482,7 @@ impl ExpData {
 pub struct ExpDisplay<'a> {
     env: &'a GlobalEnv,
     exp: &'a ExpData,
+    fun_env: Option<FunctionEnv<'a>>,
 }
 
 impl<'a> fmt::Display for ExpDisplay<'a> {
@@ -1468,30 +1491,42 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
         match self.exp {
             Invalid(_) => write!(f, "*invalid*"),
             Value(_, v) => write!(f, "{}", self.env.display(v)),
-            LocalVar(_, name) => write!(f, "{}", name.display(self.env.symbol_pool())),
-            Temporary(_, idx) => write!(f, "$t{}", idx),
+            LocalVar(_, name) => {
+                write!(f, "{}", name.display(self.env.symbol_pool()))
+            },
+            Temporary(_, idx) => {
+                if let Some(name) = self
+                    .fun_env
+                    .as_ref()
+                    .and_then(|fe| fe.get_parameters().get(*idx).map(|p| p.0))
+                {
+                    write!(f, "{}", name.display(self.env.symbol_pool()))
+                } else {
+                    write!(f, "$t{}", idx)
+                }
+            },
             Call(node_id, oper, args) => {
                 write!(
                     f,
                     "{}({})",
-                    oper.display(self.env, *node_id),
+                    oper.display_for_exp(self, *node_id),
                     self.fmt_exps(args)
                 )
             },
             Lambda(_, pat, body) => {
-                write!(f, "|{}| {}", self.fmt_pattern(pat), body.display(self.env))
+                write!(f, "|{}| {}", self.fmt_pattern(pat), body.display_cont(self))
             },
             Block(_, pat, binding, body) => {
                 write!(
                     f,
-                    "{{let {}{}; {}}}",
-                    self.fmt_pattern(pat),
+                    "{{\n  let {}{};\n  {}\n}}",
+                    indent(self.fmt_pattern(pat)),
                     if let Some(exp) = binding {
-                        format!(" = {}", exp.display(self.env))
+                        indent(format!(" = {}", exp.display_cont(self)))
                     } else {
                         "".to_string()
                     },
-                    body.display(self.env)
+                    indent(body.display_cont(self))
                 )
             },
             Quant(_, kind, ranges, triggers, opt_where, body) => {
@@ -1501,7 +1536,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     .collect_vec()
                     .join("");
                 let where_str = if let Some(exp) = opt_where {
-                    format!(" where {}", exp.display(self.env))
+                    format!(" where {}", exp.display_cont(self))
                 } else {
                     "".to_string()
                 };
@@ -1512,19 +1547,19 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_quant_ranges(ranges),
                     triggers_str,
                     where_str,
-                    body.display(self.env)
+                    body.display_cont(self)
                 )
             },
             Invoke(_, fun, args) => {
-                write!(f, "({})({})", fun.display(self.env), self.fmt_exps(args))
+                write!(f, "({})({})", fun.display_cont(self), self.fmt_exps(args))
             },
             IfElse(_, cond, if_exp, else_exp) => {
                 write!(
                     f,
-                    "(if {} {{{}}} else {{{}}})",
-                    cond.display(self.env),
-                    if_exp.display(self.env),
-                    else_exp.display(self.env)
+                    "if {} {{\n  {}\n}} else {{\n  {}\n}}",
+                    cond.display_cont(self),
+                    indent(if_exp.display_cont(self)),
+                    indent(else_exp.display_cont(self))
                 )
             },
             Sequence(_, es) => {
@@ -1532,39 +1567,58 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     if i > 0 {
                         writeln!(f, ";")?
                     }
-                    write!(f, "{}", e.display(self.env))?
+                    write!(f, "{}", e.display_cont(self))?
                 }
                 Ok(())
             },
             Loop(_, e) => {
-                write!(f, "loop {{\n{}\n}}", e.display(self.env))
+                write!(f, "loop {{\n  {}\n}}", indent(e.display_cont(self)))
             },
             LoopCont(_, true) => write!(f, "continue"),
             LoopCont(_, false) => write!(f, "break"),
-            Return(_, e) => write!(f, "return {}", e.display(self.env)),
+            Return(_, e) => write!(f, "return {}", e.display_cont(self)),
             Assign(_, lhs, rhs) => {
-                write!(f, "{} = {}", self.fmt_pattern(lhs), rhs.display(self.env))
+                write!(f, "{} = {}", self.fmt_pattern(lhs), rhs.display_cont(self))
             },
             Mutate(_, lhs, rhs) => {
-                write!(f, "{} = {}", lhs.display(self.env), rhs.display(self.env))
+                write!(f, "{} = {}", lhs.display_cont(self), rhs.display_cont(self))
             },
         }
     }
 }
 
+fn indent(fmt: impl fmt::Display) -> String {
+    let s = fmt.to_string();
+    s.replace('\n', "\n  ")
+}
+
 impl<'a> ExpDisplay<'a> {
+    fn type_ctx(&self) -> TypeDisplayContext<'a> {
+        if let Some(fe) = &self.fun_env {
+            fe.get_type_display_ctx()
+        } else {
+            TypeDisplayContext::new(self.env)
+        }
+    }
+
     fn fmt_patterns(&self, patterns: &[Pattern]) -> String {
         patterns.iter().map(|pat| self.fmt_pattern(pat)).join(", ")
     }
 
     pub fn fmt_pattern(&self, pat: &Pattern) -> String {
         match pat {
-            Pattern::Var(_, name) => {
-                format!("{}", name.display(self.env.symbol_pool()))
+            Pattern::Var(id, name) => {
+                let tctx = self.type_ctx();
+                let ty = self.env.get_node_type(*id);
+                format!(
+                    "{}: {}",
+                    name.display(self.env.symbol_pool()),
+                    ty.display(&tctx)
+                )
             },
             Pattern::Tuple(_, args) => format!("({})", self.fmt_patterns(args)),
             Pattern::Struct(_, struct_id, args) => {
-                let tctx = self.env.get_type_display_ctx();
+                let tctx = self.type_ctx();
                 let inst_str = if !struct_id.inst.is_empty() {
                     format!(
                         "<{}>",
@@ -1603,13 +1657,15 @@ impl<'a> ExpDisplay<'a> {
     fn fmt_quant_ranges(&self, ranges: &[(Pattern, Exp)]) -> String {
         ranges
             .iter()
-            .map(|(pat, domain)| format!("{}: {}", self.fmt_pattern(pat), domain.display(self.env)))
+            .map(|(pat, domain)| {
+                format!("{}: {}", self.fmt_pattern(pat), domain.display_cont(self))
+            })
             .join(", ")
     }
 
     fn fmt_exps(&self, exps: &[Exp]) -> String {
         exps.iter()
-            .map(|e| e.display(self.env).to_string())
+            .map(|e| e.display_cont(self).to_string())
             .join(", ")
     }
 }
@@ -1621,6 +1677,25 @@ impl Operation {
             env,
             oper: self,
             node_id,
+            tctx: TypeDisplayContext::new(env),
+        }
+    }
+
+    fn display_for_exp<'a>(
+        &'a self,
+        exp_display: &'a ExpDisplay,
+        node_id: NodeId,
+    ) -> OperationDisplay<'a> {
+        let tctx = if let Some(fe) = &exp_display.fun_env {
+            fe.get_type_display_ctx()
+        } else {
+            TypeDisplayContext::new(exp_display.env)
+        };
+        OperationDisplay {
+            env: exp_display.env,
+            oper: self,
+            node_id,
+            tctx,
         }
     }
 }
@@ -1630,6 +1705,7 @@ pub struct OperationDisplay<'a> {
     env: &'a GlobalEnv,
     node_id: NodeId,
     oper: &'a Operation,
+    tctx: TypeDisplayContext<'a>,
 }
 
 impl<'a> fmt::Display for OperationDisplay<'a> {
@@ -1646,6 +1722,15 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                     )?;
                 }
                 Ok(())
+            },
+            MoveFunction(mid, fid) => {
+                write!(
+                    f,
+                    "{}",
+                    self.env
+                        .get_function(mid.qualified(*fid))
+                        .get_full_name_str()
+                )
             },
             Global(label_opt) => {
                 write!(f, "global")?;
@@ -1675,11 +1760,10 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
         // If operation has a type instantiation, add it.
         let type_inst = self.env.get_node_instantiation(self.node_id);
         if !type_inst.is_empty() {
-            let tctx = TypeDisplayContext::new(self.env);
             write!(
                 f,
                 "<{}>",
-                type_inst.iter().map(|ty| ty.display(&tctx)).join(", ")
+                type_inst.iter().map(|ty| ty.display(&self.tctx)).join(", ")
             )?;
         }
         Ok(())
