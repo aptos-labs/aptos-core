@@ -1,17 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    gas_params::{transaction::gas_params::*, AptosGasParameters},
-    ver::LATEST_GAS_FEATURE_VERSION,
-};
+use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
 use aptos_gas_algebra::GasExpression;
+use aptos_gas_schedule::{
+    gas_params::txn::*, AptosGasParameters, VMGasParameters, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_types::{
     on_chain_config::{ConfigStorage, OnChainConfig, StorageGasSchedule},
     state_store::state_key::StateKey,
     write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
 use either::Either;
 use move_core_types::{
     gas_algebra::{
@@ -35,13 +34,13 @@ pub struct StoragePricingV1 {
 impl StoragePricingV1 {
     fn new(gas_params: &AptosGasParameters) -> Self {
         Self {
-            write_data_per_op: gas_params.txn.storage_io_per_state_slot_write,
-            write_data_per_new_item: gas_params.txn.write_data_per_new_item,
-            write_data_per_byte_in_key: gas_params.txn.storage_io_per_state_byte_write,
-            write_data_per_byte_in_val: gas_params.txn.write_data_per_byte_in_val,
-            load_data_base: gas_params.txn.storage_io_per_state_slot_read * NumArgs::new(1),
-            load_data_per_byte: gas_params.txn.storage_io_per_state_byte_read,
-            load_data_failure: gas_params.txn.load_data_failure,
+            write_data_per_op: gas_params.vm.txn.storage_io_per_state_slot_write,
+            write_data_per_new_item: gas_params.vm.txn.write_data_per_new_item,
+            write_data_per_byte_in_key: gas_params.vm.txn.storage_io_per_state_byte_write,
+            write_data_per_byte_in_val: gas_params.vm.txn.write_data_per_byte_in_val,
+            load_data_base: gas_params.vm.txn.storage_io_per_state_slot_read * NumArgs::new(1),
+            load_data_per_byte: gas_params.vm.txn.storage_io_per_state_byte_read,
+            load_data_failure: gas_params.vm.txn.load_data_failure,
         }
     }
 }
@@ -125,12 +124,12 @@ impl StoragePricingV2 {
         Self {
             feature_version,
             free_write_bytes_quota: Self::get_free_write_bytes_quota(feature_version, gas_params),
-            per_item_read: gas_params.txn.storage_io_per_state_slot_read,
-            per_item_create: gas_params.txn.storage_io_per_state_slot_write,
-            per_item_write: gas_params.txn.storage_io_per_state_slot_write,
-            per_byte_read: gas_params.txn.storage_io_per_state_byte_read,
-            per_byte_create: gas_params.txn.storage_io_per_state_byte_write,
-            per_byte_write: gas_params.txn.storage_io_per_state_byte_write,
+            per_item_read: gas_params.vm.txn.storage_io_per_state_slot_read,
+            per_item_create: gas_params.vm.txn.storage_io_per_state_slot_write,
+            per_item_write: gas_params.vm.txn.storage_io_per_state_slot_write,
+            per_byte_read: gas_params.vm.txn.storage_io_per_state_byte_read,
+            per_byte_create: gas_params.vm.txn.storage_io_per_state_byte_write,
+            per_byte_write: gas_params.vm.txn.storage_io_per_state_byte_write,
         }
     }
 
@@ -142,7 +141,7 @@ impl StoragePricingV2 {
             0 => unreachable!("PricingV2 not applicable for feature version 0"),
             1..=2 => 0.into(),
             3..=4 => 1024.into(),
-            5.. => gas_params.txn.free_write_bytes_quota,
+            5.. => gas_params.vm.txn.free_write_bytes_quota,
         }
     }
 
@@ -196,7 +195,7 @@ impl StoragePricingV3 {
     fn calculate_read_gas(
         &self,
         loaded: NumBytes,
-    ) -> impl GasExpression<AptosGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         STORAGE_IO_PER_STATE_SLOT_READ * NumArgs::from(1) + STORAGE_IO_PER_STATE_BYTE_READ * loaded
     }
 
@@ -213,7 +212,7 @@ impl StoragePricingV3 {
         &self,
         key: &StateKey,
         op: &WriteOp,
-    ) -> impl GasExpression<AptosGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         use WriteOp::*;
 
         match op {
@@ -265,7 +264,7 @@ impl StoragePricing {
         &self,
         resource_exists: bool,
         bytes_loaded: NumBytes,
-    ) -> impl GasExpression<AptosGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         use StoragePricing::*;
 
         match self {
@@ -285,7 +284,7 @@ impl StoragePricing {
         &self,
         key: &StateKey,
         op: &WriteOp,
-    ) -> impl GasExpression<AptosGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         use StoragePricing::*;
 
         match self {
@@ -354,13 +353,18 @@ impl ChangeSetConfigs {
     fn from_gas_params(gas_feature_version: u64, gas_params: &AptosGasParameters) -> Self {
         Self::new_impl(
             gas_feature_version,
-            gas_params.txn.max_bytes_per_write_op.into(),
+            gas_params.vm.txn.max_bytes_per_write_op.into(),
             gas_params
+                .vm
                 .txn
                 .max_bytes_all_write_ops_per_transaction
                 .into(),
-            gas_params.txn.max_bytes_per_event.into(),
-            gas_params.txn.max_bytes_all_events_per_transaction.into(),
+            gas_params.vm.txn.max_bytes_per_event.into(),
+            gas_params
+                .vm
+                .txn
+                .max_bytes_all_events_per_transaction
+                .into(),
         )
     }
 }

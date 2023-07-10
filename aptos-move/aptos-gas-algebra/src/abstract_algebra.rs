@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use either::Either;
-use move_core_types::gas_algebra::GasQuantity;
-use std::ops::{Add, Mul};
+use move_core_types::gas_algebra::{GasQuantity, UnitDiv};
+use std::{
+    marker::PhantomData,
+    ops::{Add, Mul},
+};
 
 /***************************************************************************************************
  * Gas Expression & Visitor
@@ -17,9 +20,19 @@ use std::ops::{Add, Mul};
 pub trait GasExpression<E> {
     type Unit;
 
-    fn materialize(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit>;
+    fn evaluate(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit>;
 
     fn visit(&self, visitor: &mut impl GasExpressionVisitor);
+
+    fn per<U>(self) -> GasPerUnit<Self, U>
+    where
+        Self: Sized,
+    {
+        GasPerUnit {
+            inner: self,
+            phantom: PhantomData,
+        }
+    }
 }
 
 /// An interface for performing post-order traversal of the tree structure of a gas expression.
@@ -46,6 +59,8 @@ pub trait GasExpressionVisitor {
     fn gas_param<P>(&mut self);
 
     fn quantity<U>(&mut self, quantity: GasQuantity<U>);
+
+    fn per<U>(&mut self);
 }
 
 /***************************************************************************************************
@@ -64,6 +79,12 @@ pub struct GasMul<L, R> {
     pub right: R,
 }
 
+#[derive(Debug, Clone)]
+pub struct GasPerUnit<T, U> {
+    pub inner: T,
+    phantom: PhantomData<U>,
+}
+
 /***************************************************************************************************
  * Gas Expression Impl
  *
@@ -74,8 +95,8 @@ where
 {
     type Unit = T::Unit;
 
-    fn materialize(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit> {
-        (*self).materialize(feature_version, env)
+    fn evaluate(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit> {
+        (*self).evaluate(feature_version, env)
     }
 
     fn visit(&self, visitor: &mut impl GasExpressionVisitor) {
@@ -86,7 +107,7 @@ where
 impl<E, U> GasExpression<E> for GasQuantity<U> {
     type Unit = U;
 
-    fn materialize(&self, _feature_version: u64, _env: &E) -> GasQuantity<Self::Unit> {
+    fn evaluate(&self, _feature_version: u64, _env: &E) -> GasQuantity<Self::Unit> {
         *self
     }
 
@@ -103,8 +124,8 @@ where
     type Unit = U;
 
     #[inline]
-    fn materialize(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit> {
-        self.left.materialize(feature_version, env) + self.right.materialize(feature_version, env)
+    fn evaluate(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit> {
+        self.left.evaluate(feature_version, env) + self.right.evaluate(feature_version, env)
     }
 
     #[inline]
@@ -124,8 +145,8 @@ where
     type Unit = O;
 
     #[inline]
-    fn materialize(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit> {
-        self.left.materialize(feature_version, env) * self.right.materialize(feature_version, env)
+    fn evaluate(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit> {
+        self.left.evaluate(feature_version, env) * self.right.evaluate(feature_version, env)
     }
 
     #[inline]
@@ -144,10 +165,10 @@ where
     type Unit = U;
 
     #[inline]
-    fn materialize(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit> {
+    fn evaluate(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit> {
         match self {
-            Either::Left(left) => left.materialize(feature_version, env),
-            Either::Right(right) => right.materialize(feature_version, env),
+            Either::Left(left) => left.evaluate(feature_version, env),
+            Either::Right(right) => right.evaluate(feature_version, env),
         }
     }
 
@@ -157,6 +178,24 @@ where
             Either::Left(left) => left.visit(visitor),
             Either::Right(right) => right.visit(visitor),
         }
+    }
+}
+
+impl<E, T, U1, U2> GasExpression<E> for GasPerUnit<T, U2>
+where
+    T: GasExpression<E, Unit = U1>,
+{
+    type Unit = UnitDiv<U1, U2>;
+
+    #[inline]
+    fn evaluate(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit> {
+        self.inner.evaluate(feature_version, env).per()
+    }
+
+    #[inline]
+    fn visit(&self, visitor: &mut impl GasExpressionVisitor) {
+        self.inner.visit(visitor);
+        visitor.per::<U2>();
     }
 }
 
@@ -201,6 +240,28 @@ impl<L, R, T> Mul<T> for GasMul<L, R> {
     type Output = GasMul<Self, T>;
 
     fn mul(self, rhs: T) -> Self::Output {
+        GasMul {
+            left: self,
+            right: rhs,
+        }
+    }
+}
+
+impl<T, U, R> Add<R> for GasPerUnit<T, U> {
+    type Output = GasAdd<Self, R>;
+
+    fn add(self, rhs: R) -> Self::Output {
+        GasAdd {
+            left: self,
+            right: rhs,
+        }
+    }
+}
+
+impl<T, U, R> Mul<R> for GasPerUnit<T, U> {
+    type Output = GasMul<Self, R>;
+
+    fn mul(self, rhs: R) -> Self::Output {
         GasMul {
             left: self,
             right: rhs,

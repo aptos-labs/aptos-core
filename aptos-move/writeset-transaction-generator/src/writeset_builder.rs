@@ -4,10 +4,7 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
-use aptos_gas::{
-    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
-    LATEST_GAS_FEATURE_VERSION,
-};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
@@ -19,6 +16,7 @@ use aptos_vm::{
     data_cache::StorageAdapter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
+use aptos_vm_types::storage::ChangeSetConfigs;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -113,7 +111,7 @@ where
 {
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
-        AbstractValueSizeGasParameters::zeros(),
+        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         chain_id,
         Features::default(),

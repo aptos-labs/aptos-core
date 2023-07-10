@@ -4,7 +4,7 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
+use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
     compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,

@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::gas_schedule::VMGasParameters;
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
 };
 
-crate::gas_params::macros::define_gas_parameters!(
+crate::gas_schedule::macros::define_gas_parameters!(
     InstructionGasParameters,
     "instr",
-    .instr,
+    VMGasParameters => .instr,
     [
         // nop
         [nop: InternalGas, "nop", 200],

@@ -6,7 +6,7 @@ use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VM
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_db::AptosDB;
-use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
+use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_types::{
     account_address, account_config,

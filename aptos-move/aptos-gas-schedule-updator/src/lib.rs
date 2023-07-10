@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::gas_meter::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
 use anyhow::Result;
-use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
+use aptos_gas_schedule::{
+    AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::on_chain_config::GasScheduleV2;
 use clap::Parser;

@@ -18,16 +18,10 @@
 //!   - The on-chain gas schedule needs to be extensible and unordered so we can upgrade it easily
 //!     in the future.
 
-#[macro_use]
-mod natives;
+mod algebra;
+mod meter;
+mod traits;
 
-mod aptos_framework;
-mod gas_meter;
-pub mod gen;
-mod move_stdlib;
-mod table;
-
-pub use gas_meter::{
-    AptosGasMeter, AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule,
-    NativeGasParameters, StandardGasAlgebra, StandardGasMeter, ToOnChainGasSchedule,
-};
+pub use algebra::StandardGasAlgebra;
+pub use meter::StandardGasMeter;
+pub use traits::{AptosGasMeter, GasAlgebra};

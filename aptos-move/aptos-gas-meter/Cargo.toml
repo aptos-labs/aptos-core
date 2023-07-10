@@ -1,6 +1,6 @@
 [package]
-name = "aptos-gas"
-description = "Gas metering for the Aptos blockchain"
+name = "aptos-gas-meter"
+description = "Gas meter implementation for the Aptos blockchain"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -29,7 +29,6 @@ either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
-move-table-extension = { workspace = true }
 move-vm-types = { workspace = true }
 paste = { workspace = true }
 
@@ -38,7 +37,3 @@ tempfile = { workspace = true }
 
 [features]
 testing = ["aptos-move-stdlib/testing", "aptos-global-constants/testing"]
-
-[[bin]]
-name = "aptos-gas-gen-update-proposal"
-path = "src/bin/gen_proposal.rs"

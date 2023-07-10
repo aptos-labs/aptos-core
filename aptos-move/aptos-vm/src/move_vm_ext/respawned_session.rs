@@ -7,7 +7,6 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
-use aptos_gas::ChangeSetConfigs;
 use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_types::{
     state_store::{
@@ -15,7 +14,7 @@ use aptos_types::{
     },
     write_set::TransactionWrite,
 };
-use aptos_vm_types::change_set::VMChangeSet;
+use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
 /// We finish the session after the user transaction is done running to get the change set and

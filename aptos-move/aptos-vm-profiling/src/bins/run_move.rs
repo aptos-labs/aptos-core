@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
-use aptos_move_stdlib::natives::{all_natives, GasParameters};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_move_stdlib::natives::all_natives;
+use aptos_native_interface::SafeNativeBuilder;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::Identifier};
 use move_ir_compiler::Compiler;
-use move_table_extension::{self, NativeTableContext};
 use move_vm_runtime::{
     move_vm::MoveVM, native_extensions::NativeContextExtensions, native_functions::NativeFunction,
 };
@@ -125,18 +127,27 @@ fn main() -> Result<()> {
         bail!("Wrong number of arguments.")
     }
 
+    let mut builder = SafeNativeBuilder::new(
+        LATEST_GAS_FEATURE_VERSION,
+        NativeGasParameters::zeros(),
+        MiscGasParameters::zeros(),
+        TimedFeatures::enable_all(),
+        Features::default(),
+    );
+
     let stdlib_addr = AccountAddress::from_hex_literal("0x1").unwrap();
-    let mut natives = all_natives(stdlib_addr, GasParameters::zeros());
+    let mut natives = all_natives(stdlib_addr, &mut builder);
     natives.push((
         stdlib_addr,
         Identifier::new("Test").unwrap(),
         Identifier::new("create_signer").unwrap(),
         make_native_create_signer(),
     ));
-    natives.extend(move_table_extension::table_natives(
-        stdlib_addr,
-        move_table_extension::GasParameters::zeros(),
-    ));
+    // FIXME: Find a way to re-enalbe this.
+    //natives.extend(aptos_table_natives::table_natives(
+    //    stdlib_addr,
+    //    &mut builder,
+    //));
 
     let vm = MoveVM::new(natives).unwrap();
     let mut storage = InMemoryStorage::new();
@@ -148,8 +159,8 @@ fn main() -> Result<()> {
         storage.publish_or_overwrite_module(module.self_id(), blob);
     }
 
-    let mut extensions = NativeContextExtensions::default();
-    extensions.add(NativeTableContext::new([0; 32], &storage));
+    let extensions = NativeContextExtensions::default();
+    //extensions.add(NativeTableContext::new([0; 32], &storage));
 
     let mut sess = vm.new_session_with_extensions(&storage, extensions);
 

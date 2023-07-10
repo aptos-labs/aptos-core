@@ -1,16 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
+use crate::{
+    gas_schedule::VMGasParameters,
+    traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule},
+};
 use aptos_gas_algebra::{AbstractValueSize, AbstractValueSizePerArg};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs, u256::U256};
 use move_vm_types::views::{ValueView, ValueVisitor};
 use std::collections::BTreeMap;
 
-crate::gas_params::macros::define_gas_parameters!(
+crate::gas_schedule::macros::define_gas_parameters!(
     AbstractValueSizeGasParameters,
     "misc.abs_val",
-    .misc.abs_val,
+    VMGasParameters => .misc.abs_val,
     [
         // abstract value size
         [u8: AbstractValueSize, "u8", 40],

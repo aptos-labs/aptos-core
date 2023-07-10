@@ -14,7 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-gas-schedule = { workspace = true }
-aptos-gas = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm ={ workspace = true, features = ["testing"] }
 clap = { workspace = true }

@@ -1,23 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::{
-        cryptography::{ristretto255_point, ristretto255_scalar},
-        helpers::{make_safe_native, SafeNativeError, SafeNativeResult},
-    },
-    safely_assert_eq, safely_pop_arg,
+use crate::natives::cryptography::{ristretto255_point, ristretto255_scalar};
+use aptos_native_interface::{
+    safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeError,
+    SafeNativeResult,
 };
-use aptos_types::{
-    on_chain_config::{Features, TimedFeatures},
-    vm_status::StatusCode,
-};
+use aptos_types::vm_status::StatusCode;
 use curve25519_dalek::scalar::Scalar;
 use move_binary_format::errors::PartialVMError;
-use move_core_types::gas_algebra::{InternalGasPerArg, InternalGasPerByte};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::values::{Reference, StructRef, Value};
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
 
 /// The size of a serialized scalar, in bytes.
 pub(crate) const SCALAR_NUM_BYTES: usize = 32;
@@ -25,272 +19,98 @@ pub(crate) const SCALAR_NUM_BYTES: usize = 32;
 /// The size of a serialized compressed Ristretto point, in bytes.
 pub(crate) const COMPRESSED_POINT_NUM_BYTES: usize = 32;
 
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub basepoint_mul: InternalGasPerArg,
-    pub basepoint_double_mul: InternalGasPerArg,
-
-    pub point_add: InternalGasPerArg,
-    pub point_compress: InternalGasPerArg,
-    pub point_decompress: InternalGasPerArg,
-    pub point_equals: InternalGasPerArg,
-    pub point_from_64_uniform_bytes: InternalGasPerArg,
-    pub point_identity: InternalGasPerArg,
-    pub point_mul: InternalGasPerArg,
-    pub point_neg: InternalGasPerArg,
-    pub point_sub: InternalGasPerArg,
-    pub point_parse_arg: InternalGasPerArg,
-
-    pub sha512_per_byte: InternalGasPerByte,
-    pub sha512_per_hash: InternalGasPerArg,
-
-    pub scalar_add: InternalGasPerArg,
-    pub scalar_reduced_from_32_bytes: InternalGasPerArg,
-    pub scalar_uniform_from_64_bytes: InternalGasPerArg,
-    pub scalar_from_u128: InternalGasPerArg,
-    pub scalar_from_u64: InternalGasPerArg,
-    pub scalar_invert: InternalGasPerArg,
-    pub scalar_is_canonical: InternalGasPerArg,
-    pub scalar_mul: InternalGasPerArg,
-    pub scalar_neg: InternalGasPerArg,
-    pub scalar_sub: InternalGasPerArg,
-    pub scalar_parse_arg: InternalGasPerArg,
-}
-
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
         (
             "point_is_canonical_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_point_is_canonical,
-            ),
+            ristretto255_point::native_point_is_canonical as RawSafeNative,
         ),
         (
             "point_identity_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_point_identity,
-            ),
+            ristretto255_point::native_point_identity,
         ),
         (
             "point_decompress_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_point_decompress,
-            ),
+            ristretto255_point::native_point_decompress,
         ),
         (
             "point_compress_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_point_compress,
-            ),
+            ristretto255_point::native_point_compress,
         ),
-        (
-            "point_mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_point_mul,
-            ),
-        ),
-        (
-            "point_equals",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_point_equals,
-            ),
-        ),
-        (
-            "point_neg_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_point_neg,
-            ),
-        ),
-        (
-            "point_add_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_point_add,
-            ),
-        ),
-        (
-            "point_sub_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_point_sub,
-            ),
-        ),
+        ("point_mul_internal", ristretto255_point::native_point_mul),
+        ("point_equals", ristretto255_point::native_point_equals),
+        ("point_neg_internal", ristretto255_point::native_point_neg),
+        ("point_add_internal", ristretto255_point::native_point_add),
+        ("point_sub_internal", ristretto255_point::native_point_sub),
         (
             "basepoint_mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_basepoint_mul,
-            ),
+            ristretto255_point::native_basepoint_mul,
         ),
         (
             "basepoint_double_mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_basepoint_double_mul,
-            ),
+            ristretto255_point::native_basepoint_double_mul,
         ),
         (
             "new_point_from_sha512_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_new_point_from_sha512,
-            ),
+            ristretto255_point::native_new_point_from_sha512,
         ),
         (
             "new_point_from_64_uniform_bytes_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::native_new_point_from_64_uniform_bytes,
-            ),
+            ristretto255_point::native_new_point_from_64_uniform_bytes,
         ),
         (
             "multi_scalar_mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_point::safe_native_multi_scalar_mul_no_floating_point,
-            ),
+            ristretto255_point::safe_native_multi_scalar_mul_no_floating_point,
         ),
         (
             "scalar_is_canonical_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_is_canonical,
-            ),
+            ristretto255_scalar::native_scalar_is_canonical,
         ),
         (
             "scalar_invert_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_invert,
-            ),
+            ristretto255_scalar::native_scalar_invert,
         ),
         (
             "scalar_from_sha512_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_from_sha512,
-            ),
+            ristretto255_scalar::native_scalar_from_sha512,
         ),
         (
             "scalar_mul_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_mul,
-            ),
+            ristretto255_scalar::native_scalar_mul,
         ),
         (
             "scalar_add_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_add,
-            ),
+            ristretto255_scalar::native_scalar_add,
         ),
         (
             "scalar_sub_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_sub,
-            ),
+            ristretto255_scalar::native_scalar_sub,
         ),
         (
             "scalar_neg_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_neg,
-            ),
+            ristretto255_scalar::native_scalar_neg,
         ),
         (
             "scalar_from_u64_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_from_u64,
-            ),
+            ristretto255_scalar::native_scalar_from_u64,
         ),
         (
             "scalar_from_u128_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_from_u128,
-            ),
+            ristretto255_scalar::native_scalar_from_u128,
         ),
         (
             "scalar_reduced_from_32_bytes_internal",
-            make_safe_native(
-                gas_params.clone(),
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_reduced_from_32_bytes,
-            ),
+            ristretto255_scalar::native_scalar_reduced_from_32_bytes,
         ),
         (
             "scalar_uniform_from_64_bytes_internal",
-            make_safe_native(
-                gas_params,
-                timed_features,
-                features,
-                ristretto255_scalar::native_scalar_uniform_from_64_bytes,
-            ),
+            ristretto255_scalar::native_scalar_uniform_from_64_bytes,
         ),
     ];
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }
 
 /// Pops a 32 byte slice off the argument stack.
