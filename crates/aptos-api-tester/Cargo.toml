@@ -22,6 +22,4 @@ url = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 anyhow = { workspace = true }
-
-
-
+aptos-cached-packages = { workspace = true }

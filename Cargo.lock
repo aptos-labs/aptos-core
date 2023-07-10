@@ -399,6 +399,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
+ "aptos-cached-packages",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-types",
