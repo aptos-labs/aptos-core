@@ -424,7 +424,7 @@ impl BlockPartitioner for ShardedBlockPartitioner {
     ) -> Vec<SubBlocksForShard<Transaction>> {
         assert_eq!(self.num_shards, num_executor_shards);
         let analyzed_transactions = transactions.into_iter().map(|t| t.into()).collect();
-        self.partition(analyzed_transactions, 4, 0.95)
+        self.partition(analyzed_transactions, 2, 0.95)
     }
 }
 impl Drop for ShardedBlockPartitioner {
