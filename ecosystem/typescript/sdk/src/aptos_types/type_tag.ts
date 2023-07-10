@@ -395,7 +395,13 @@ export class TypeTagParser {
       return new TypeTagVector(res);
     }
     if (tokenVal === "string") {
-      return new StructTag(AccountAddress.fromHex("0x1"), new Identifier("string"), new Identifier("String"), []);
+      const structTag = new StructTag(
+        AccountAddress.fromHex("0x1"),
+        new Identifier("string"),
+        new Identifier("String"),
+        []
+      );
+      return new TypeTagStruct(structTag);
     }
     if (tokenTy === "IDENT" && (tokenVal.startsWith("0x") || tokenVal.startsWith("0X"))) {
       const address = tokenVal;
