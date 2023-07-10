@@ -543,14 +543,12 @@ module veiled_coin::veiled_coin {
         // Create a (not-yet-secure) encryption of `amount`, since `amount` is a public argument here.
         let veiled_amount = helpers::public_amount_to_veiled_balance(amount);
 
-        // Withdraw `amount` from the veiled balance (leverages the homomorphism of the encryption scheme.)
-        elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_amount);
-
         // Verify that `comm_new_balance` is a commitment to the remaing balance after withdrawing `amount`.
         sigma_protos::verify_withdrawal_subproof(
             &sender_pk,
             &veiled_balance,
             &comm_new_balance,
+            &veiled_amount,
             &withdrawal_proof.sigma_proof);
 
         // Verify a ZK range proof on `comm_new_balance` (and thus on the remaining `veiled_balance`)
@@ -559,6 +557,9 @@ module veiled_coin::veiled_coin {
             &withdrawal_proof.zkrp_new_balance,
             &std::option::none(),
             &std::option::none());
+
+        // Withdraw `amount` from the veiled balance (leverages the homomorphism of the encryption scheme.)
+        elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_amount);
 
         // Update the veiled balance to reflect the veiled withdrawal
         veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);

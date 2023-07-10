@@ -128,13 +128,9 @@ module veiled_coin::sigma_protos {
     struct WithdrawalSubproof has drop {
         x1: RistrettoPoint,
         x2: RistrettoPoint,
-        x3: RistrettoPoint,
-        x4: RistrettoPoint,
         alpha1: Scalar,
         alpha2: Scalar,
         alpha3: Scalar,
-        alpha4: Scalar,
-        alpha5: Scalar,
     }
 
     /// A $\Sigma$-protocol proof used during a veiled transfer. This proof encompasses the $\Sigma$-protocol from
@@ -171,7 +167,6 @@ module veiled_coin::sigma_protos {
         withdraw_ct: &elgamal::Ciphertext,
         deposit_ct: &elgamal::Ciphertext,
         comm_amount: &pedersen::Commitment,
-        sender_new_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
         sender_curr_balance_ct: &elgamal::Ciphertext,
         proof: &TransferSubproof)
@@ -182,7 +177,7 @@ module veiled_coin::sigma_protos {
         let (big_c, big_d) = elgamal::ciphertext_as_points(withdraw_ct);
         let (bar_big_c, _) = elgamal::ciphertext_as_points(deposit_ct);
         let c = pedersen::commitment_as_point(comm_amount);
-        let (c1, c2) = elgamal::ciphertext_as_points(sender_new_balance_ct);
+        let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c_prime = pedersen::commitment_as_point(sender_new_balance_comm);
 
         // TODO: Can be optimized so we don't re-serialize the proof for Fiat-Shamir
@@ -251,57 +246,39 @@ module veiled_coin::sigma_protos {
         sender_pk: &elgamal::CompressedPubkey,
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
-        sender_amount_ct: &elgamal::Ciphertext,
+        amount: &Scalar,
         proof: &WithdrawalSubproof)
     {
         let h = pedersen::randomness_base_for_bulletproof();
         let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
         let (big_c1, big_c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
-        let (big_c, d) = elgamal::ciphertext_as_points(sender_amount_ct);
 
         let rho = fiat_shamir_withdrawal_subproof_challenge(
             sender_pk,
-            sender_amount_ct,
             sender_curr_balance_ct,
             sender_new_balance_comm,
             &proof.x1,
-            &proof.x2,
-            &proof.x3,
-            &proof.x4);
+            &proof.x2);
 
-        // \rho * C + X_1 =? \alpha_3 * g + \alpha_1 * y
-        let big_c_acc = ristretto255::point_mul(C, &rho);
-        ristretto255::point_add_assign(&mut big_c_acc, &proof.x1);
-        let y_alpha1_acc = ristretto255::point_mul(&sender_pk_point, &proof.alpha1);
-        let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3);
-        ristretto255::point_add_assign(&mut y_alpha1_acc, &g_alpha3);
-        assert!(ristretto255::point_equals(&big_c_acc, &y_alpha1_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
-       
-        // \rho * D + X_2 =? \alpha_1 * g
-        let d_acc = ristretto255::point_mul(d, &rho);
-        ristretto255::point_add_assign(&mut d_acc, &proof.x2);
         let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
-        assert!(ristretto255::point_equals(&d_acc, &g_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
-
-        let g_alpha2 = ristretto255::basepoint_mul(&proof.alpha2);
-        // \rho * (C_1-C) + X_3 =? \alpha_2 * g + \alpha_5 * (C_2 - D)
-        let big_c1_acc = ristretto255::point_sub(big_c1, &big_c);
+        // \rho * (C_1 - v * g) + X_1 =? \alpha_1 * g + \alpha_3 * C_2
+        let gv = ristretto255::basepoint_mul(&amount);
+        let big_c1_acc = ristretto255::point_sub(big_c1, &gv);
         ristretto255::point_mul_assign(&mut big_c1_acc, &rho);
-        ristretto255::point_add_assign(&mut big_c1_acc, &proof.x3);
+        ristretto255::point_add_assign(&mut big_c1_acc, &proof.x1);
 
-        let big_c2_acc = ristretto255::point_sub(big_c2, &d);
-        ristretto255::point_mul_assign(&mut big_c2_acc, &proof.alpha5);
-        ristretto255::point_add_assign(&mut big_c2_acc, &g_alpha2);
+        let big_c2_acc = ristretto255::point_mul(big_c2, &proof.alpha3);
+        ristretto255::point_add_assign(&mut big_c2_acc, &g_alpha1);
         assert!(ristretto255::point_equals(&big_c1_acc, &big_c2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
 
-        // \rho * c + X_4 =? \alpha_2 * g + \alpha_4 * h
+        // \rho * c + X_2 =? \alpha_1 * g + \alpha_2 * h
         let c_acc = ristretto255::point_mul(c, &rho);
-        ristretto255::point_add_assign(&mut c_acc, &proof.x4);
+        ristretto255::point_add_assign(&mut c_acc, &proof.x2);
 
-        let h_alpha4_acc = ristretto255::point_mul(h, &proof.alpha4);
-        ristretto255::point_add_assign(&mut h_alpha4_acc, &g_alpha2);
-        assert!(ristretto255::point_equals(&c_acc, &h_alpha4_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
+        let h_alpha2_acc = ristretto255::point_mul(h, &proof.alpha2);
+        ristretto255::point_add_assign(&mut h_alpha2_acc, &g_alpha1);
+        assert!(ristretto255::point_equals(&c_acc, &h_alpha2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
     }
 
     //
@@ -310,7 +287,7 @@ module veiled_coin::sigma_protos {
 
     /// Deserializes and returns an `WithdrawalSubproof` given its byte representation.
     public fun deserialize_withdrawal_subproof(proof_bytes: vector<u8>): Option<WithdrawalSubproof> {
-        if (vector::length<u8>(&proof_bytes) != 288) {
+        if (vector::length<u8>(&proof_bytes) != 160) {
             return std::option::none<WithdrawalSubproof>()
         };
 
@@ -327,20 +304,6 @@ module veiled_coin::sigma_protos {
             return std::option::none<WithdrawalSubproof>()
         };
         let x2 = std::option::extract<RistrettoPoint>(&mut x2);
-
-        let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let x3 = ristretto255::new_point_from_bytes(x3_bytes);
-        if (!std::option::is_some<RistrettoPoint>(&x3)) {
-            return std::option::none<WithdrawalSubproof>()
-        };
-        let x3 = std::option::extract<RistrettoPoint>(&mut x3);
-
-        let x4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let x4 = ristretto255::new_point_from_bytes(x4_bytes);
-        if (!std::option::is_some<RistrettoPoint>(&x4)) {
-            return std::option::none<WithdrawalSubproof>()
-        };
-        let x4 = std::option::extract<RistrettoPoint>(&mut x4);
 
         let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
@@ -363,22 +326,8 @@ module veiled_coin::sigma_protos {
         };
         let alpha3 = std::option::extract(&mut alpha3);
 
-        let alpha4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let alpha4 = ristretto255::new_scalar_from_bytes(alpha4_bytes);
-        if (!std::option::is_some(&alpha4)) {
-            return std::option::none<WithdrawalSubproof>()
-        };
-        let alpha4 = std::option::extract(&mut alpha4);
-
-        let alpha5_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let alpha5 = ristretto255::new_scalar_from_bytes(alpha5_bytes);
-        if (!std::option::is_some(&alpha5)) {
-            return std::option::none<WithdrawalSubproof>()
-        };
-        let alpha5 = std::option::extract(&mut alpha5);
-
         std::option::some(WithdrawalSubproof {
-            x1, x2, x3, x4, alpha1, alpha2, alpha3, alpha4, alpha5
+            x1, x2, alpha1, alpha2, alpha3
         })
     }
 
@@ -478,17 +427,14 @@ module veiled_coin::sigma_protos {
     /// $\Sigma$-protocol.
     fun fiat_shamir_withdrawal_subproof_challenge(
         sender_pk: &elgamal::CompressedPubkey,
-        sender_amount_ct: &elgamal::Ciphertext,
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
+        amount: &Scalar,
         x1: &RistrettoPoint,
-        x2: &RistrettoPoint,
-        x3: &RistrettoPoint,
-        x4: &RistrettoPoint): Scalar
+        x2: &RistrettoPoint): Scalar
     {
         let y = elgamal::pubkey_to_compressed_point(sender_pk);
         let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
-        let (big_c, d) = elgamal::ciphertext_as_points(sender_amount_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
 
         let bytes = vector::empty<u8>();
@@ -501,12 +447,9 @@ module veiled_coin::sigma_protos {
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
-        vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(big_c))); 
-        vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(d))); 
+        vector::append<u8>(&mut bytes, ristretto255::scalar_to_bytes(&amount));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
-        vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
-        vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x4)));
 
         ristretto255::new_scalar_from_sha2_512(bytes)
     }
@@ -572,7 +515,6 @@ module veiled_coin::sigma_protos {
         sender_pk: &elgamal::CompressedPubkey,
         sender_sk: &elgamal::Scalar,
         sender_curr_balance_ct: &elgamal::Ciphertext,
-        sender_amount_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
         amount_rand: &Scalar,
         new_balance_val: &Scalar,
@@ -582,71 +524,44 @@ module veiled_coin::sigma_protos {
         let x1 = ristretto255::random_scalar();
         let x2 = ristretto255::random_scalar();
         let x3 = ristretto255::random_scalar();
-        let x4 = ristretto255::random_scalar();
-        let x5 = ristretto255::random_scalar();
         let source_pk_point = elgamal::pubkey_to_point(sender_pk);
         let h = pedersen::randomness_base_for_bulletproof();
         let (c1, c2) = ristretto255::ciphertext_as_points(sender_curr_balance_ct);
-        let (c, d) = ristretto255::ciphertext_as_points(sender_transfer_ct);
 
-        // X1 <- x3 * g + x1 * y
-        let big_x1 = ristretto255::point_mul(x1, &source_pk_point);
-        let g_x3 = ristretto255::basepoint_mul(&x3);
-        ristretto255::point_add_assign(&mut big_x1, &g_x3);
+        let g_x1 = ristretto255::basepoint_mul(&x1);
+        // X1 <- x1 * g + x3 * C2
+        let big_x1 = ristretto255::point_mul(c2, &x3);
+        ristretto255::point_add_assign(&mut big_x1, g_x1); 
 
-        // X2 <- x1 * g
-        let big_x2 = ristretto255::basepoint_mul(&x1);
-
-        let g_x2 = ristretto255::basepoint_mul(&x2);
-        // X3 <- x2 * g + x5 * (C_2 - D)
-        let big_x3 = ristretto255::point_sub(c2, &d);
-        ristretto255::point_mul_assign(&mut big_x3, &proof.x5);
-        ristretto255::point_add_assign(&mut big_x3, &g_x2); 
-
-        // X4 <- x2 * g + x4 * h
-        let big_x4 = ristretto255::point_mul(h, &proof.x4);
-        ristretto255::point_add_assign(&mut big_x4, &g_x2);
+        // X2 <- x1 * g + x2 * h
+        let big_x2 = ristretto255::point_mul(h, &x2);
+        ristretto255::point_add_assign(&mut big_x2, &g_x1);
 
         let rho = fiat_shamir_withdrawal_subproof_challenge(
             sender_pk,
-            sender_amount_ct,
             sender_curr_balance_ct,
             sender_new_balance_comm,
             &big_x1,
-            &big_x2,
-            &big_x3,
-            &big_x4);
+            &big_x2);
 
-        // alpha1 <- x1 + rho * r
-        let alpha1 = ristretto255::scalar_mul(&rho, amount_rand);
+        // alpha1 <- x1 + rho * b
+        let alpha1 = ristretto255::scalar_mul(&rho, new_balance_val);
         ristretto255::scalar_add_assign(&mut alpha1, &x1);
 
-        // alpha2 <- x2 + rho * b
-        let alpha2 = ristretto255::scalar_mul(&rho, new_balance_val);
+        // alpha2 <- x2 + rho * r'
+        let alpha2 = ristretto255::scalar_mul(&rho, new_balance_comm_rand);
         ristretto255::scalar_add_assign(&mut alpha2, &x2);
 
-        // alpha3 <- x3 + rho * v
-        let alpha3 = ristretto255::scalar_mul(&rho, amount_val);
+        // alpha3 <- x3 + rho * sk
+        let alpha3 = ristretto255::scalar_mul(&rho, sender_sk);
         ristretto255::scalar_add_assign(&mut alpha3, &x3);
-
-        // alpha4 <- x4 + rho * r'
-        let alpha4 = ristretto255::scalar_mul(&rho, new_balance_comm_rand);
-        ristretto255::scalar_add_assign(&mut alpha4, &x4);
-
-        // alpha5 <- x5 + rho * sk
-        let alpha5 = ristretto255::scalar_mul(&rho, sender_sk);
-        ristretto255::scalar_add_assign(&mut alpha5, &x5);
 
         WithdrawalSubproof {
             x1: big_x1,
             x2: big_x2,
-            x3: big_x3,
-            x4: big_x4,
             alpha1,
             alpha2,
             alpha3,
-            alpha4,
-            alpha5,
         }
     }
 
@@ -753,22 +668,14 @@ module veiled_coin::sigma_protos {
         // it into a vector of bytes which is returned at the end.
         let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
         let x2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
-        let x3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x3));
-        let x4_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x4));
         let alpha1_bytes = ristretto255::scalar_to_bytes(&proof.alpha1);
         let alpha2_bytes = ristretto255::scalar_to_bytes(&proof.alpha2);
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
-        let alpha4_bytes = ristretto255::scalar_to_bytes(&proof.alpha4);
-        let alpha5_bytes = ristretto255::scalar_to_bytes(&proof.alpha5);
 
         let bytes = vector::empty<u8>();
-        vector::append<u8>(&mut bytes, alpha5_bytes);
-        vector::append<u8>(&mut bytes, alpha4_bytes);
         vector::append<u8>(&mut bytes, alpha3_bytes);
         vector::append<u8>(&mut bytes, alpha2_bytes);
         vector::append<u8>(&mut bytes, alpha1_bytes);
-        vector::append<u8>(&mut bytes, x4_bytes);
-        vector::append<u8>(&mut bytes, x3_bytes);
         vector::append<u8>(&mut bytes, x2_bytes);
         vector::append<u8>(&mut bytes, x1_bytes);
 
