@@ -12,7 +12,7 @@ module coin_listing {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
-    use std::string::String;
+    use std::string::{Self, String};
 
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::object::{Self, ConstructorRef, Object, ObjectCore};
@@ -39,6 +39,8 @@ module coin_listing {
     const ENOT_SELLER: u64 = 6;
 
     // Core data structures
+    const FIXED_PRICE_TYPE: vector<u8> = b"fixed price";
+    const AUCTION_TYPE: vector<u8> = b"auction";
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Fixed-price market place listing.
@@ -107,6 +109,7 @@ module coin_listing {
 
         events::emit_listing_placed(
             fee_schedule,
+            string::utf8(FIXED_PRICE_TYPE),
             object::object_address(&listing),
             signer::address_of(seller),
             price,
@@ -220,6 +223,7 @@ module coin_listing {
 
         events::emit_listing_placed(
             fee_schedule,
+            string::utf8(AUCTION_TYPE),
             object::object_address(&listing),
             signer::address_of(seller),
             starting_bid,
@@ -352,7 +356,7 @@ module coin_listing {
 
         let coins = coin::withdraw<CoinType>(purchaser, price);
 
-        complete_purchase(purchaser, signer::address_of(purchaser), object, coins)
+        complete_purchase(purchaser, signer::address_of(purchaser), object, coins, string::utf8(FIXED_PRICE_TYPE))
     }
 
     /// End a fixed price listing early.
@@ -374,6 +378,7 @@ module coin_listing {
 
         events::emit_listing_canceled(
             fee_schedule,
+            string::utf8(FIXED_PRICE_TYPE),
             listing_addr,
             actual_seller_addr,
             price,
@@ -472,7 +477,7 @@ module coin_listing {
             (seller, coin::zero<CoinType>())
         };
 
-        complete_purchase(completer, purchaser, object, coins);
+        complete_purchase(completer, purchaser, object, coins, string::utf8(AUCTION_TYPE));
     }
 
     inline fun complete_purchase<CoinType>(
@@ -480,6 +485,7 @@ module coin_listing {
         purchaser_addr: address,
         object: Object<Listing>,
         coins: Coin<CoinType>,
+        type: String,
     ) {
         let token_metadata = listing::token_metadata(object);
 
@@ -500,6 +506,7 @@ module coin_listing {
 
         events::emit_listing_filled(
             fee_schedule,
+            type,
             object::object_address(&object),
             seller,
             purchaser_addr,
