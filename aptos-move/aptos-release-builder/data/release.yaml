@@ -66,6 +66,6 @@ proposals:
       discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-39.md"
     execution_mode: MultiStep
     update_sequence:
-      - FeatureFlag:
-          enabled:
-            - fee_payer_enabled
+    - FeatureFlag:
+        enabled:
+          - gas_payer_enabled
