@@ -27,7 +27,7 @@ use dashmap::DashMap;
 use futures::channel::oneshot;
 use lru::LruCache;
 use rand::{rngs::OsRng, Rng};
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use tokio::runtime::Handle;
 
 #[tokio::test]
@@ -180,11 +180,7 @@ async fn test_remove_expired_optimistic_fetches() {
     assert_eq!(optimistic_fetches.len(), num_optimistic_fetches_in_batch);
 
     // Elapse a small amount of time (not enough to expire the optimistic fetches)
-    time_service
-        .clone()
-        .into_mock()
-        .advance_async(Duration::from_millis(max_optimistic_fetch_period_ms / 2))
-        .await;
+    utils::elapse_time(max_optimistic_fetch_period_ms / 2, &time_service).await;
 
     // Update the storage server summary so that there is new data
     let _ = update_storage_server_summary(cached_storage_server_summary.clone(), 1, 1);
@@ -220,11 +216,7 @@ async fn test_remove_expired_optimistic_fetches() {
     );
 
     // Elapse enough time to expire the first batch of optimistic fetches
-    time_service
-        .clone()
-        .into_mock()
-        .advance_async(Duration::from_millis(max_optimistic_fetch_period_ms))
-        .await;
+    utils::elapse_time(max_optimistic_fetch_period_ms, &time_service).await;
 
     // Remove the expired optimistic fetches and verify the first batch was removed
     let peers_with_ready_optimistic_fetches =
@@ -244,11 +236,7 @@ async fn test_remove_expired_optimistic_fetches() {
     assert_eq!(optimistic_fetches.len(), num_optimistic_fetches_in_batch);
 
     // Elapse enough time to expire the second batch of optimistic fetches
-    time_service
-        .clone()
-        .into_mock()
-        .advance_async(Duration::from_millis(max_optimistic_fetch_period_ms + 1))
-        .await;
+    utils::elapse_time(max_optimistic_fetch_period_ms + 1, &time_service).await;
 
     // Remove the expired optimistic fetches and verify the second batch was removed
     let peers_with_ready_optimistic_fetches =
