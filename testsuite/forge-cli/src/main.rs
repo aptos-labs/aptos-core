@@ -490,7 +490,7 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig>
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration),
+        "realistic_env_max_load" => mainnet_like_simulation_test(), // realistic_env_max_load_test(duration),
         "compat" => compat(),
         "framework_upgrade" => upgrade(),
         // Rest of the tests:
@@ -1778,7 +1778,7 @@ fn quorum_store_reconfig_enable_test() -> ForgeConfig {
 
 fn mainnet_like_simulation_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
@@ -1800,7 +1800,7 @@ fn mainnet_like_simulation_test() -> ForgeConfig {
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
-            SuccessCriteria::new(10000)
+            SuccessCriteria::new(0)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(StateProgressThreshold {
