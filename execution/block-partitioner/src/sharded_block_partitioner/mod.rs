@@ -26,6 +26,7 @@ use std::{
     },
     thread,
 };
+use std::env::VarError;
 
 mod conflict_detector;
 mod counters;
@@ -106,13 +107,14 @@ mod partitioning_shard;
 /// ```
 ///
 ///
-pub static MAX_ALLOWED_PARTITIONING_ROUNDS: usize = 8;
 pub struct ShardedBlockPartitioner {
     num_shards: usize,
     control_txs: Vec<Sender<ControlMsg>>,
     result_rxs: Vec<Receiver<PartitioningResp>>,
     shard_threads: Vec<thread::JoinHandle<()>>,
 }
+
+pub static MAX_ALLOWED_PARTITIONING_ROUNDS: usize = 8;
 
 impl ShardedBlockPartitioner {
     pub fn new(num_shards: usize) -> Self {
@@ -421,7 +423,13 @@ impl BlockPartitioner for ShardedBlockPartitioner {
     ) -> Vec<SubBlocksForShard<Transaction>> {
         assert_eq!(self.num_shards, num_executor_shards);
         let analyzed_transactions = analyze_block(transactions);
-        self.partition(analyzed_transactions, 2, 0.95)
+        let max_partitioning_rounds = std::env::var("SHARDED_PARTITIONER__MAX_ROUNDS").ok()
+            .map_or(None, |v|v.parse::<usize>().ok())
+            .unwrap_or(4);
+        let cross_shard_dep_avoid_threshold = std::env::var("SHARDED_PARTITIONER__CROSS_SHARD_DEP_AVOID_THRESHOLD").ok()
+            .map_or(None, |v|v.parse::<usize>().ok())
+            .unwrap_or(95) as f32 / 100.0;
+        self.partition(analyzed_transactions, max_partitioning_rounds, cross_shard_dep_avoid_threshold)
     }
 }
 impl Drop for ShardedBlockPartitioner {

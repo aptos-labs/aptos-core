@@ -34,6 +34,7 @@ use std::{
         Arc, Mutex,
     },
 };
+use std::cmp::min;
 
 pub struct ShardedExecutorClient {
     num_shards: ShardId,
@@ -220,6 +221,8 @@ impl ShardedExecutorClient {
     }
 }
 
+const OPTIMAL_BLOCKSTM_CONCURRENCY_LEVEL: usize = 32;
+
 impl BlockExecutorClient for ShardedExecutorClient {
     fn execute_block<S: StateView + Sync + Send>(
         &self,
@@ -241,7 +244,7 @@ impl BlockExecutorClient for ShardedExecutorClient {
                 Ok(v) if v.as_str() == "1" => {
                     if round == num_rounds - 1 {
                         if self.shard_id == self.num_shards - 1 {
-                            concurrency_level * self.num_shards
+                            min(concurrency_level * self.num_shards, OPTIMAL_BLOCKSTM_CONCURRENCY_LEVEL)
                         } else {
                             1
                         }
