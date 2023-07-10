@@ -339,7 +339,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
         .start_timer();
     let validation_results = transactions
         .iter()
-        .map(|t| smp.validator.read().validate_transaction(t.0.clone()))
+        .map(|t| smp.validator.read().validate_transaction(1, t.0.clone()))
         .collect::<Vec<_>>();
     vm_validation_timer.stop_and_record();
     {

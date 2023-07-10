@@ -11,7 +11,7 @@ use better_any::{Tid, TidAble};
 use move_binary_format::errors::Location;
 use std::{
     cell::RefCell,
-    collections::{btree_map, BTreeMap}
+    collections::{btree_map, BTreeMap},
 };
 
 pub type TxnIndex = u32;
@@ -49,7 +49,7 @@ impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
     pub fn new(
-        txn_idx: TxnIndex, 
+        txn_idx: TxnIndex,
         txn_hash: [u8; 32],
         resolver: &'a dyn AggregatorResolver,
         aggregator_enabled: bool,
@@ -57,7 +57,7 @@ impl<'a> NativeAggregatorContext<'a> {
         Self {
             txn_hash,
             resolver,
-            aggregator_data: RefCell::new(AggregatorData::new(((txn_idx+1) as u64) << 32)),
+            aggregator_data: RefCell::new(AggregatorData::new(((txn_idx + 1) as u64) << 32)),
             aggregator_enabled,
         }
     }

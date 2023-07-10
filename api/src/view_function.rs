@@ -79,6 +79,7 @@ impl ViewFunctionApi {
             })?;
 
         let return_vals = AptosVM::execute_view_function(
+            0,
             &state_view,
             entry_func.module().clone(),
             entry_func.function().to_owned(),

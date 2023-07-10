@@ -48,6 +48,7 @@ fn failed_transaction_cleanup_test() {
 
     // TYPE_MISMATCH should be kept and charged.
     let out1 = aptos_vm.failed_transaction_cleanup(
+        0,
         VMStatus::error(StatusCode::TYPE_MISMATCH, None),
         &mut gas_meter,
         &txn_data,
@@ -66,6 +67,7 @@ fn failed_transaction_cleanup_test() {
 
     // Invariant violations should be charged.
     let out2 = aptos_vm.failed_transaction_cleanup(
+        0,
         VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None),
         &mut gas_meter,
         &txn_data,

@@ -23,8 +23,15 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use std::{cell::RefCell, fmt::Debug, hash::Hash, sync::Arc};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::{
+    cell::RefCell,
+    fmt::Debug,
+    hash::Hash,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -179,7 +186,7 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X:
     base_view: &'a S,
     latest_view: ViewMapKind<'a, T, X>,
     txn_idx: TxnIndex,
-    id_counter: AtomicU32
+    id_counter: AtomicU32,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
@@ -192,7 +199,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             base_view,
             latest_view: ViewMapKind::MultiVersion(map),
             txn_idx,
-            id_counter: AtomicU32::new(0)
+            id_counter: AtomicU32::new(0),
         }
     }
 
@@ -205,7 +212,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             base_view,
             latest_view: ViewMapKind::Unsync(map),
             txn_idx,
-            id_counter: AtomicU32::new(0)
+            id_counter: AtomicU32::new(0),
         }
     }
 

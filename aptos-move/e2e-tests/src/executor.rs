@@ -500,6 +500,7 @@ impl FakeExecutor {
 
         let (_status, output, gas_profiler) =
             AptosVM::execute_user_transaction_with_custom_gas_meter(
+                0,
                 &self.data_store,
                 &txn,
                 &log_context,
@@ -564,7 +565,7 @@ impl FakeExecutor {
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let vm = AptosVM::new(self.get_state_view());
-        vm.validate_transaction(txn, &self.data_store)
+        vm.validate_transaction(0, txn, &self.data_store)
     }
 
     pub fn get_state_view(&self) -> &FakeDataStore {
@@ -676,7 +677,7 @@ impl FakeExecutor {
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
             let mut session =
-                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+                vm.new_session(0, &remote_view, SessionId::void(), self.aggregator_enabled);
             session
                 .execute_function_bypass_visibility(
                     &Self::module(module_name),
@@ -724,7 +725,8 @@ impl FakeExecutor {
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+        let mut session =
+            vm.new_session(0, &remote_view, SessionId::void(), self.aggregator_enabled);
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),
@@ -755,6 +757,7 @@ impl FakeExecutor {
     ) -> Result<Vec<Vec<u8>>, Error> {
         // No gas limit
         AptosVM::execute_view_function(
+            0,
             self.get_state_view(),
             module_id,
             func_name,

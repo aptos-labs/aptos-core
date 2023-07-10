@@ -13,7 +13,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_view::AccountView,
     on_chain_config::OnChainConfigPayload,
-    transaction::{SignedTransaction, VMValidatorResult}
+    transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::AptosVM;
 use fail::fail_point;
@@ -28,7 +28,11 @@ pub trait TransactionValidation: Send + Sync + Clone {
     type ValidationInstance: aptos_vm::VMValidator;
 
     /// Validate a txn from client
-    fn validate_transaction(&self, txn_idx: TxnIndex, _txn: SignedTransaction) -> Result<VMValidatorResult>;
+    fn validate_transaction(
+        &self,
+        txn_idx: TxnIndex,
+        _txn: SignedTransaction,
+    ) -> Result<VMValidatorResult>;
 
     /// Restart the transaction validation instance
     fn restart(&mut self, config: OnChainConfigPayload) -> Result<()>;
@@ -67,7 +71,11 @@ impl VMValidator {
 impl TransactionValidation for VMValidator {
     type ValidationInstance = AptosVM;
 
-    fn validate_transaction(&self, txn_idx: TxnIndex, txn: SignedTransaction) -> Result<VMValidatorResult> {
+    fn validate_transaction(
+        &self,
+        txn_idx: TxnIndex,
+        txn: SignedTransaction,
+    ) -> Result<VMValidatorResult> {
         fail_point!("vm_validator::validate_transaction", |_| {
             Err(anyhow::anyhow!(
                 "Injected error in vm_validator::validate_transaction"

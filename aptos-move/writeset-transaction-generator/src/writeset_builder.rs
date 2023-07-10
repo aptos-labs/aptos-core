@@ -108,7 +108,12 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
     }
 }
 
-pub fn build_changeset<S: StateView, F>(txn_idx: TxnIndex, state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
+pub fn build_changeset<S: StateView, F>(
+    txn_idx: TxnIndex,
+    state_view: &S,
+    procedure: F,
+    chain_id: u8,
+) -> ChangeSet
 where
     F: FnOnce(&mut GenesisSession),
 {
