@@ -8,19 +8,15 @@ use crate::{
     },
     structure_from_ty_arg,
 };
+use aptos_native_interface::{SafeNativeContext, SafeNativeError, SafeNativeResult};
 #[cfg(feature = "testing")]
 use ark_ff::Field;
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::InternalGas;
-use move_vm_runtime::native_functions::NativeContext;
 #[cfg(feature = "testing")]
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
-};
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 #[cfg(feature = "testing")]
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 #[cfg(feature = "testing")]
 use std::{collections::VecDeque, rc::Rc};
 
@@ -45,20 +41,18 @@ macro_rules! ark_rand_internal {
     ($context:expr, $typ:ty) => {{
         let element = <$typ>::rand(&mut test_rng());
         match store_element!($context, element) {
-            Ok(new_handle) => Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                Value::u64(new_handle as u64)
-            ])),
-            Err(abort_code) => Ok(NativeResult::err(InternalGas::zero(), abort_code)),
+            Ok(new_handle) => Ok(smallvec![Value::u64(new_handle as u64)]),
+            Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),
         }
     }};
 }
 
 #[cfg(feature = "testing")]
 pub fn rand_insecure_internal(
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
     match structure_opt {
@@ -79,10 +73,8 @@ pub fn rand_insecure_internal(
             let k_bigint: ark_ff::BigInteger256 = k.into();
             let element = BLS12381_GT_GENERATOR.pow(k_bigint);
             match store_element!(context, element) {
-                Ok(handle) => Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-                    Value::u64(handle as u64)
-                ])),
-                Err(abort_code) => Ok(NativeResult::err(InternalGas::zero(), abort_code)),
+                Ok(handle) => Ok(smallvec![Value::u64(handle as u64)]),
+                Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),
             }
         },
         _ => unreachable!(),

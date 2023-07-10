@@ -17,9 +17,12 @@ anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-gas-algebra = { workspace = true }
+aptos-gas-schedule = { workspace = true } 
 aptos-move-stdlib = { workspace = true }
+aptos-native-interface = { workspace = true }
 aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-ec = { workspace = true }
@@ -34,6 +37,7 @@ blst = { workspace = true }
 clap = { workspace = true }
 codespan-reporting = { workspace = true }
 curve25519-dalek = { workspace = true }
+either = { workspace = true }
 flate2 = { workspace = true }
 hex = { workspace = true }
 include_dir = { workspace = true }
@@ -50,7 +54,6 @@ move-package = { workspace = true }
 move-prover = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
 move-stackless-bytecode = { workspace = true }
-move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num-traits = { workspace = true }
@@ -75,7 +78,7 @@ thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 
 [dev-dependencies]
-aptos-gas = { workspace = true }
+aptos-gas-meter = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 claims = { workspace = true }

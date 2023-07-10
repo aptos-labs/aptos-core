@@ -206,7 +206,6 @@ dependencies = [
  "aptos-debugger",
  "aptos-faucet-core",
  "aptos-framework",
- "aptos-gas",
  "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-genesis",
@@ -290,13 +289,13 @@ dependencies = [
  "aptos-crypto",
  "aptos-language-e2e-tests",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "bcs 0.1.4",
  "better_any",
  "claims",
  "move-binary-format",
  "move-core-types",
- "move-table-extension",
  "once_cell",
  "smallvec",
 ]
@@ -313,7 +312,8 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
@@ -1007,7 +1007,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
- "aptos-gas",
+ "aptos-gas-meter",
  "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-logger",
@@ -1015,6 +1015,7 @@ dependencies = [
  "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
@@ -1026,7 +1027,6 @@ dependencies = [
  "move-compiler",
  "move-core-types",
  "move-resource-viewer",
- "move-table-extension",
  "move-vm-runtime",
  "move-vm-test-utils",
  "tokio",
@@ -1414,12 +1414,15 @@ dependencies = [
  "anyhow",
  "aptos-aggregator",
  "aptos-crypto",
- "aptos-gas",
  "aptos-gas-algebra",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-move-stdlib",
+ "aptos-native-interface",
  "aptos-sdk-builder",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
  "ark-bls12-381",
@@ -1436,6 +1439,7 @@ dependencies = [
  "clap 4.3.5",
  "codespan-reporting",
  "curve25519-dalek",
+ "either",
  "flate2",
  "hex",
  "include_dir 0.7.2",
@@ -1453,7 +1457,6 @@ dependencies = [
  "move-prover",
  "move-prover-boogie-backend",
  "move-stackless-bytecode",
- "move-table-extension",
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-types",
@@ -1528,32 +1531,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-gas"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-framework",
- "aptos-gas-algebra",
- "aptos-gas-schedule",
- "aptos-global-constants",
- "aptos-logger",
- "aptos-move-stdlib",
- "aptos-package-builder",
- "aptos-types",
- "aptos-vm-types",
- "bcs 0.1.4",
- "clap 4.3.5",
- "either",
- "move-binary-format",
- "move-core-types",
- "move-model",
- "move-table-extension",
- "move-vm-types",
- "paste",
- "tempfile",
-]
-
-[[package]]
 name = "aptos-gas-algebra"
 version = "0.0.1"
 dependencies = [
@@ -1562,13 +1539,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-gas-meter"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
+ "aptos-logger",
+ "aptos-types",
+ "aptos-vm-types",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-types",
+]
+
+[[package]]
 name = "aptos-gas-profiling"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-framework",
- "aptos-gas",
  "aptos-gas-algebra",
+ "aptos-gas-meter",
  "aptos-package-builder",
  "aptos-types",
  "inferno",
@@ -1586,11 +1577,26 @@ dependencies = [
  "aptos-gas-algebra",
  "aptos-global-constants",
  "aptos-types",
- "aptos-vm-types",
  "either",
  "move-core-types",
  "move-vm-types",
  "paste",
+]
+
+[[package]]
+name = "aptos-gas-schedule-updator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-gas-schedule",
+ "aptos-package-builder",
+ "aptos-types",
+ "bcs 0.1.4",
+ "clap 4.3.5",
+ "move-core-types",
+ "move-model",
+ "tempfile",
 ]
 
 [[package]]
@@ -2046,18 +2052,20 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
  "aptos-gas-algebra",
+ "aptos-gas-meter",
  "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-keygen",
  "aptos-memory-usage-tracker",
  "aptos-proptest-helpers",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "goldenfile",
  "hex",
@@ -2065,7 +2073,6 @@ dependencies = [
  "move-command-line-common",
  "move-core-types",
  "move-ir-compiler",
- "move-table-extension",
  "move-vm-types",
  "num_cpus",
  "once_cell",
@@ -2127,8 +2134,8 @@ dependencies = [
 name = "aptos-memory-usage-tracker"
 version = "0.1.0"
 dependencies = [
- "aptos-gas",
  "aptos-gas-algebra",
+ "aptos-gas-meter",
  "aptos-types",
  "move-binary-format",
  "move-core-types",
@@ -2217,7 +2224,6 @@ dependencies = [
 name = "aptos-move-examples"
 version = "0.1.0"
 dependencies = [
- "aptos-gas",
  "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
@@ -2235,7 +2241,10 @@ name = "aptos-move-stdlib"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "aptos-gas-schedule",
+ "aptos-native-interface",
  "dir-diff",
+ "either",
  "file_diff",
  "hex",
  "log",
@@ -2281,6 +2290,20 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rayon",
+]
+
+[[package]]
+name = "aptos-native-interface"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
+ "aptos-types",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "smallvec",
 ]
 
 [[package]]
@@ -2719,7 +2742,7 @@ dependencies = [
  "aptos-build-info",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-schedule-updator",
  "aptos-genesis",
  "aptos-rest-client",
  "aptos-temppath",
@@ -3188,6 +3211,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-table-natives"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-gas-schedule",
+ "aptos-native-interface",
+ "aptos-types",
+ "better_any",
+ "move-binary-format",
+ "move-core-types",
+ "move-table-extension",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "sha3 0.9.1",
+ "smallvec",
+]
+
+[[package]]
 name = "aptos-telemetry"
 version = "0.1.0"
 dependencies = [
@@ -3330,7 +3372,7 @@ dependencies = [
  "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-executor-service",
- "aptos-gas",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-metrics-core",
@@ -3431,7 +3473,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-storage-interface",
@@ -3540,8 +3582,8 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-framework",
- "aptos-gas",
  "aptos-gas-algebra",
+ "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-infallible",
  "aptos-language-e2e-tests",
@@ -3550,7 +3592,9 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-move-stdlib",
  "aptos-mvhashmap",
+ "aptos-native-interface",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-utils",
  "aptos-vm-logging",
@@ -3563,7 +3607,6 @@ dependencies = [
  "move-bytecode-utils",
  "move-bytecode-verifier",
  "move-core-types",
- "move-table-extension",
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
@@ -3604,12 +3647,12 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
  "aptos-gas-schedule",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "move-core-types",
  "move-vm-types",
@@ -3641,8 +3684,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-cached-packages",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-move-stdlib",
+ "aptos-native-interface",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -3652,7 +3698,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-ir-compiler",
- "move-table-extension",
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
@@ -3666,10 +3711,13 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-types",
  "claims",
+ "either",
  "move-binary-format",
  "move-core-types",
 ]
@@ -3683,7 +3731,8 @@ dependencies = [
  "aptos-crypto",
  "aptos-db",
  "aptos-executor-test-helpers",
- "aptos-gas",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-scratchpad",
  "aptos-state-view",
  "aptos-storage-interface",
@@ -3720,10 +3769,11 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-schedule",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "handlebars",
  "move-command-line-common",
@@ -5772,9 +5822,9 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
  "aptos-gas-algebra",
  "aptos-gas-profiling",
+ "aptos-gas-schedule",
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
@@ -7575,7 +7625,9 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
@@ -7585,6 +7637,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-genesis",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "aptos-writeset-generator",
  "bcs 0.1.4",
  "fail 0.5.0",
@@ -11658,8 +11711,8 @@ dependencies = [
  "aptos-faucet-core",
  "aptos-forge",
  "aptos-framework",
- "aptos-gas",
  "aptos-gas-algebra",
+ "aptos-gas-schedule",
  "aptos-genesis",
  "aptos-global-constants",
  "aptos-indexer",

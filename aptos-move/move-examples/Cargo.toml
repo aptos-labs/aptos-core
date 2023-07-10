@@ -13,8 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-gas-schedule = { workspace = true }
-aptos-gas = { workspace = true }
+aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-types = { workspace = true }
 aptos-vm ={ workspace = true, features = ["testing"] }
 clap = { workspace = true }
