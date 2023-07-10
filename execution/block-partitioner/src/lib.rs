@@ -11,6 +11,7 @@ pub mod test_utils;
 use aptos_metrics_core::{exponential_buckets, register_histogram, Histogram};
 use aptos_types::{block_executor::partitioner::SubBlocksForShard, transaction::Transaction};
 use once_cell::sync::Lazy;
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 pub trait BlockPartitioner: Send {
     fn partition(
@@ -33,3 +34,19 @@ pub static APTOS_BLOCK_PARTITIONER_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static APTOS_BLOCK_ANALYZER_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_block_analyzer_seconds",
+        // metric description
+        "The total time spent in seconds of block analyzing.",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+        .unwrap()
+});
+
+pub fn analyze_block(txns: Vec<Transaction>) -> Vec<AnalyzedTransaction> {
+    let _timer = APTOS_BLOCK_ANALYZER_SECONDS.start_timer();
+    txns.into_iter().map(|t| t.into()).collect()
+}

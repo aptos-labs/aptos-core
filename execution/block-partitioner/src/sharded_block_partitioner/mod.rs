@@ -1,19 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    sharded_block_partitioner::{
-        cross_shard_messages::CrossShardMsg,
-        dependency_analysis::WriteSetWithTxnIndex,
-        messages::{
-            AddWithCrossShardDep, ControlMsg,
-            ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
-            DiscardCrossShardDep, PartitioningResp,
-        },
-        partitioning_shard::PartitioningShard,
+use crate::{sharded_block_partitioner::{
+    cross_shard_messages::CrossShardMsg,
+    dependency_analysis::WriteSetWithTxnIndex,
+    messages::{
+        AddWithCrossShardDep, ControlMsg,
+        ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
+        DiscardCrossShardDep, PartitioningResp,
     },
-    BlockPartitioner,
-};
+    partitioning_shard::PartitioningShard,
+}, BlockPartitioner, analyze_block};
 use aptos_logger::{error, info};
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId, SubBlocksForShard, TxnIndex},
@@ -423,7 +420,7 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
         assert_eq!(self.num_shards, num_executor_shards);
-        let analyzed_transactions = transactions.into_iter().map(|t| t.into()).collect();
+        let analyzed_transactions = analyze_block(transactions);
         self.partition(analyzed_transactions, 2, 0.95)
     }
 }

@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::BlockPartitioner;
+use crate::{analyze_block, BlockPartitioner};
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::{
@@ -23,7 +23,7 @@ impl BlockPartitioner for SimplePartitioner {
         txns: Vec<Transaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
-        let txns: Vec<AnalyzedTransaction> = txns.into_iter().map(|t| t.into()).collect();
+        let txns = analyze_block(txns);
 
         // Sender-to-keyset and keyset-to-sender lookup table.
         let mut senders_by_key: HashMap<StateKey, HashSet<Sender>> = HashMap::new();
