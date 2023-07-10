@@ -32,6 +32,8 @@ fungible asset to it. This emits an deposit event.
 -  [Function `transfer`](#0x1_primary_fungible_store_transfer)
 -  [Function `mint`](#0x1_primary_fungible_store_mint)
 -  [Function `burn`](#0x1_primary_fungible_store_burn)
+-  [Function `burn_as_owner`](#0x1_primary_fungible_store_burn_as_owner)
+-  [Function `purge_store`](#0x1_primary_fungible_store_purge_store)
 -  [Function `set_frozen_flag`](#0x1_primary_fungible_store_set_frozen_flag)
 -  [Function `withdraw_with_ref`](#0x1_primary_fungible_store_withdraw_with_ref)
 -  [Function `deposit_with_ref`](#0x1_primary_fungible_store_deposit_with_ref)
@@ -465,6 +467,59 @@ Burn from the primary store of <code>owner</code>.
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn">burn</a>(burn_ref: &BurnRef, owner: <b>address</b>, amount: u64) {
     <b>let</b> primary_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(owner, <a href="fungible_asset.md#0x1_fungible_asset_burn_ref_metadata">fungible_asset::burn_ref_metadata</a>(burn_ref));
     <a href="fungible_asset.md#0x1_fungible_asset_burn_from">fungible_asset::burn_from</a>(burn_ref, primary_store, amount);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_primary_fungible_store_burn_as_owner"></a>
+
+## Function `burn_as_owner`
+
+<code>owner</code> burns from the primary store.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn_as_owner">burn_as_owner</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn_as_owner">burn_as_owner</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;T&gt;, amount: u64) {
+    <b>let</b> primary_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), metadata);
+    <a href="fungible_asset.md#0x1_fungible_asset_burn_from_as_owner">fungible_asset::burn_from_as_owner</a>(owner, primary_store, amount);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_primary_fungible_store_purge_store"></a>
+
+## Function `purge_store`
+
+<code>owner</code> burns all from the primary store and then remove the store.
+Warning: Unrecoverable.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_purge_store">purge_store</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_purge_store">purge_store</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;T&gt;) {
+    <b>let</b> primary_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), metadata);
+    <a href="fungible_asset.md#0x1_fungible_asset_purge_store">fungible_asset::purge_store</a>(owner, primary_store);
 }
 </code></pre>
 

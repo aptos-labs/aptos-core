@@ -34,6 +34,8 @@ token are:
 -  [Function `royalty`](#0x4_token_royalty)
 -  [Function `borrow_mut`](#0x4_token_borrow_mut)
 -  [Function `burn`](#0x4_token_burn)
+-  [Function `burn_as_owner`](#0x4_token_burn_as_owner)
+-  [Function `burn_internal`](#0x4_token_burn_internal)
 -  [Function `set_description`](#0x4_token_set_description)
 -  [Function `set_name`](#0x4_token_set_name)
 -  [Function `set_uri`](#0x4_token_set_uri)
@@ -238,6 +240,16 @@ The URI is over the maximum length
 
 
 <pre><code><b>const</b> <a href="token.md#0x4_token_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
+</code></pre>
+
+
+
+<a name="0x4_token_ENOT_OWNER"></a>
+
+The provided signer is not the owner
+
+
+<pre><code><b>const</b> <a href="token.md#0x4_token_ENOT_OWNER">ENOT_OWNER</a>: u64 = 7;
 </code></pre>
 
 
@@ -882,7 +894,55 @@ Extracts the tokens address from a BurnRef.
     } <b>else</b> {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> burn_ref.self)
     };
+    <a href="token.md#0x4_token_burn_internal">burn_internal</a>(addr)
+}
+</code></pre>
 
+
+
+</details>
+
+<a name="0x4_token_burn_as_owner"></a>
+
+## Function `burn_as_owner`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_burn_as_owner">burn_as_owner</a>&lt;T: key&gt;(owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="token.md#0x4_token">token</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_burn_as_owner">burn_as_owner</a>&lt;T: key&gt;(owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="token.md#0x4_token">token</a>: Object&lt;T&gt;) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
+    <b>assert</b>!(is_owner(<a href="token.md#0x4_token">token</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x4_token_ENOT_OWNER">ENOT_OWNER</a>));
+    <a href="token.md#0x4_token_burn_internal">burn_internal</a>(<a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="token.md#0x4_token">token</a>))
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x4_token_burn_internal"></a>
+
+## Function `burn_internal`
+
+
+
+<pre><code><b>fun</b> <a href="token.md#0x4_token_burn_internal">burn_internal</a>(addr: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="token.md#0x4_token_burn_internal">burn_internal</a>(addr: <b>address</b>) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a> {
     <b>if</b> (<a href="royalty.md#0x4_royalty_exists_at">royalty::exists_at</a>(addr)) {
         <a href="royalty.md#0x4_royalty_delete">royalty::delete</a>(addr)
     };

@@ -11,7 +11,7 @@ module aptos_token_objects::token {
     use std::signer;
     use std::vector;
     use aptos_framework::event;
-    use aptos_framework::object::{Self, ConstructorRef, Object};
+    use aptos_framework::object::{Self, ConstructorRef, Object, is_owner};
     use aptos_token_objects::collection::{Self, Collection};
     use aptos_token_objects::royalty::{Self, Royalty};
 
@@ -27,6 +27,8 @@ module aptos_token_objects::token {
     const EURI_TOO_LONG: u64 = 5;
     /// The description is over the maximum length
     const EDESCRIPTION_TOO_LONG: u64 = 6;
+    /// The provided signer is not the owner
+    const ENOT_OWNER: u64 = 7;
 
     const MAX_TOKEN_NAME_LENGTH: u64 = 128;
     const MAX_URI_LENGTH: u64 = 512;
@@ -273,7 +275,15 @@ module aptos_token_objects::token {
         } else {
             option::extract(&mut burn_ref.self)
         };
+        burn_internal(addr)
+    }
 
+    public fun burn_as_owner<T: key>(owner: &signer, token: Object<T>) acquires Token {
+        assert!(is_owner(token, signer::address_of(owner)), error::permission_denied(ENOT_OWNER));
+        burn_internal(object::object_address(&token))
+    }
+
+    inline fun burn_internal(addr: address) acquires Token {
         if (royalty::exists_at(addr)) {
             royalty::delete(addr)
         };
@@ -531,6 +541,28 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
+    fun test_burn_as_owner_with_royalty(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        create_collection_helper(creator, collection_name, 1);
+        let constructor_ref = create_named_token(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            token_name,
+            option::some(royalty::create(1, 1, signer::address_of(creator))),
+            string::utf8(b"token uri"),
+        );
+        let token_addr = object::address_from_constructor_ref(&constructor_ref);
+        assert!(royalty::exists_at(token_addr), 1);
+        burn_as_owner(creator, object::address_to_object<Token>(token_addr));
+        assert!(!exists<Token>(token_addr), 2);
+        assert!(!royalty::exists_at(token_addr), 3);
+        assert!(object::is_object(token_addr), 4);
+    }
+
+    #[test(creator = @0x123)]
     fun test_create_from_account_burn_and_delete(creator: &signer) acquires Token {
         use aptos_framework::account;
 
@@ -555,7 +587,7 @@ module aptos_token_objects::token {
         assert!(!object::is_object(token_addr), 2);
     }
 
-    #[test(creator = @0x123,fx = @std)]
+    #[test(creator = @0x123, fx = @std)]
     fun test_create_burn_and_delete(creator: &signer, fx: signer) acquires Token {
         use aptos_framework::account;
         use std::features;

@@ -160,6 +160,19 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::burn_from(burn_ref, primary_store, amount);
     }
 
+    /// `owner` burns from the primary store.
+    public entry fun burn_as_owner<T: key>(owner: &signer, metadata: Object<T>, amount: u64) {
+        let primary_store = primary_store(signer::address_of(owner), metadata);
+        fungible_asset::burn_from_as_owner(owner, primary_store, amount);
+    }
+
+    /// `owner` burns all from the primary store and then remove the store.
+    /// Warning: Unrecoverable.
+    public entry fun purge_store<T: key>(owner: &signer, metadata: Object<T>) {
+        let primary_store = primary_store(signer::address_of(owner), metadata);
+        fungible_asset::purge_store(owner, primary_store);
+    }
+
     /// Freeze/Unfreeze the primary store of `owner`.
     public fun set_frozen_flag(transfer_ref: &TransferRef, owner: address, frozen: bool) acquires DeriveRefPod {
         let primary_store = ensure_primary_store_exists(owner, fungible_asset::transfer_ref_metadata(transfer_ref));
@@ -261,7 +274,11 @@ module aptos_framework::primary_fungible_store {
         transfer_with_ref(&transfer_ref, aaron_address, creator_address, 20);
         set_frozen_flag(&transfer_ref, aaron_address, false);
         assert!(!is_frozen(aaron_address, metadata), 6);
-        burn(&burn_ref, aaron_address, 50);
-        assert!(balance(aaron_address, metadata) == 0, 7);
+        burn(&burn_ref, aaron_address, 20);
+        burn_as_owner(aaron, metadata, 5);
+        assert!(balance(aaron_address, metadata) == 25, 7);
+        purge_store(aaron, metadata);
+        assert!(fungible_asset::supply(metadata) == option::some(50), 8);
+        assert!(!primary_store_exists(aaron_address, metadata), 9);
     }
 }

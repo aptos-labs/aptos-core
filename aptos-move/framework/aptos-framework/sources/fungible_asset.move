@@ -344,16 +344,34 @@ module aptos_framework::fungible_asset {
 
     /// Used to delete a store.  Requires the store to be completely empty prior to removing it
     public fun remove_store(delete_ref: &DeleteRef) acquires FungibleStore, FungibleAssetEvents {
-        let store = &object::object_from_delete_ref<FungibleStore>(delete_ref);
-        let addr = object::object_address(store);
+        remove_store_internal(object::address_from_delete_ref(delete_ref))
+    }
+
+    /// Burn the all the fungible asset from the given store and remove the store as the store owner.
+    public fun purge_store<T: key>(
+        owner: &signer,
+        store: Object<T>,
+    ) acquires FungibleStore, FungibleAssetEvents, Supply {
+        assert!(
+            object::is_owner(store, signer::address_of(owner)),
+            error::invalid_argument(ENOT_STORE_OWNER)
+        );
+        let balance = balance(store);
+        if (balance != 0) {
+            burn_from_as_owner(owner, store, balance);
+        };
+        remove_store_internal(object::object_address(&store))
+    }
+
+    inline fun remove_store_internal(store_addr: address) acquires FungibleStore, FungibleAssetEvents {
         let FungibleStore { metadata: _, balance, frozen: _ }
-            = move_from<FungibleStore>(addr);
+            = move_from<FungibleStore>(store_addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
         let FungibleAssetEvents {
             deposit_events,
             withdraw_events,
             frozen_events,
-        } = move_from<FungibleAssetEvents>(addr);
+        } = move_from<FungibleAssetEvents>(store_addr);
         event::destroy_handle(deposit_events);
         event::destroy_handle(withdraw_events);
         event::destroy_handle(frozen_events);
@@ -413,11 +431,15 @@ module aptos_framework::fungible_asset {
 
     /// Burns a fungible asset
     public fun burn(ref: &BurnRef, fa: FungibleAsset) acquires Supply {
+        assert!(ref.metadata == fa.metadata, error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH));
+        burn_internal(fa)
+    }
+
+    inline fun burn_internal(fa: FungibleAsset) acquires Supply {
         let FungibleAsset {
             metadata,
             amount,
         } = fa;
-        assert!(ref.metadata == metadata, error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH));
         decrease_supply(&metadata, amount);
     }
 
@@ -431,6 +453,20 @@ module aptos_framework::fungible_asset {
         assert!(metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
         burn(ref, withdraw_internal(store_addr, amount));
+    }
+
+    /// Burn the `amount` of the fungible asset from the given store.
+    public fun burn_from_as_owner<T: key>(
+        owner: &signer,
+        store: Object<T>,
+        amount: u64
+    ) acquires FungibleStore, FungibleAssetEvents, Supply {
+        assert!(
+            object::is_owner(store, signer::address_of(owner)),
+            error::invalid_argument(ENOT_STORE_OWNER)
+        );
+        let store_addr = object::object_address(&store);
+        burn_internal(withdraw_internal(store_addr, amount));
     }
 
     /// Withdraw `amount` of the fungible asset from the `store` ignoring `frozen`.
@@ -583,6 +619,8 @@ module aptos_framework::fungible_asset {
 
     #[test_only]
     use aptos_framework::account;
+    #[test_only]
+    use aptos_framework::object::object_address;
 
     #[test_only]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -698,6 +736,10 @@ module aptos_framework::fungible_asset {
 
         set_frozen_flag(&transfer_ref, aaron_store, true);
         assert!(is_frozen(aaron_store), 7);
+        // purge
+        purge_store(aaron, aaron_store);
+        assert!(!store_exists(object_address(&aaron_store)), 8);
+        assert!(supply(test_token) == option::some(10), 9);
     }
 
     #[test(creator = @0xcafe)]
