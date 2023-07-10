@@ -50,14 +50,17 @@ impl<'a> NativeAggregatorContext<'a> {
     /// passed into VM session.
     pub fn new(
         txn_idx: TxnIndex,
+        session_type: u8,
         txn_hash: [u8; 32],
         resolver: &'a dyn AggregatorResolver,
         aggregator_enabled: bool,
     ) -> Self {
+        let mut id_counter = ((txn_idx + 1) as u64) << 32;
+        id_counter += (session_type as u64) << 29;
         Self {
             txn_hash,
             resolver,
-            aggregator_data: RefCell::new(AggregatorData::new(((txn_idx + 1) as u64) << 32)),
+            aggregator_data: RefCell::new(AggregatorData::new(id_counter)),
             aggregator_enabled,
         }
     }
@@ -244,7 +247,7 @@ mod test {
     #[test]
     fn test_into_change_set() {
         let resolver = get_test_resolver();
-        let context = NativeAggregatorContext::new(30, [0; 32], &resolver, true);
+        let context = NativeAggregatorContext::new(30, 1, [0; 32], &resolver, true);
 
         test_set_up(&context, true);
         let AggregatorChangeSet { changes } = context.into_change_set();
@@ -282,7 +285,7 @@ mod test {
     #[test]
     fn test_into_change_set_aggregator_disabled() {
         let resolver = get_test_resolver();
-        let context = NativeAggregatorContext::new(30, [0; 32], &resolver, false);
+        let context = NativeAggregatorContext::new(30, 1, [0; 32], &resolver, false);
 
         test_set_up(&context, false);
         let AggregatorChangeSet { changes } = context.into_change_set();

@@ -96,11 +96,20 @@ impl MoveVmExt {
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
 
+        let session_type: u8 = match session_id {
+            SessionId::Txn { .. } => 1,
+            SessionId::BlockMeta { .. } => 2,
+            SessionId::Genesis { .. } => 3,
+            SessionId::Prologue { .. } => 4,
+            SessionId::Epilogue { .. } => 5,
+            SessionId::Void => 6,
+        };
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(
             txn_idx,
+            session_type,
             txn_hash,
             remote,
             aggregator_enabled,

@@ -27,8 +27,8 @@ use aptos_gas::{
     StorageGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_mvhashmap::types::TxnIndex;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
@@ -286,9 +286,9 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
-        let mut session = self
-            .0
-            .new_session(txn_idx, resolver, SessionId::epilogue_meta(txn_data), true);
+        let mut session =
+            self.0
+                .new_session(txn_idx, resolver, SessionId::epilogue_meta(txn_data), true);
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -1033,7 +1033,9 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
-        let mut session = self.0.new_session(txn_idx, resolver, SessionId::prologue(txn), true);
+        let mut session = self
+            .0
+            .new_session(txn_idx, resolver, SessionId::prologue(txn), true);
         if let Err(err) = self.validate_signature_checked_transaction(
             &mut session,
             resolver,
