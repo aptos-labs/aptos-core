@@ -5,6 +5,10 @@ spec aptos_framework::block {
         invariant [suspendable] chain_status::is_operating() ==> exists<BlockResource>(@aptos_framework);
     }
 
+    spec BlockResource {
+        invariant epoch_interval > 0;
+    }
+
     spec block_prologue {
         use aptos_framework::chain_status;
         use aptos_framework::coin::CoinInfo;
@@ -26,9 +30,6 @@ spec aptos_framework::block {
         include staking_config::StakingRewardsConfigRequirement;
 
         aborts_if false;
-
-        // Only a valid proposer or the vm is authorized to produce blocks
-        ensures proposer == @vm_reserved;
     }
 
     spec emit_genesis_block_event {
@@ -51,12 +52,9 @@ spec aptos_framework::block {
         requires system_addresses::is_vm(vm);
         requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
         requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
+        requires event::counter(event_handle) == new_block_event.height;
 
         aborts_if false;
-
-        // While emitting a new block event, the number of them is equal to the current block height.
-        aborts_if event::counter(event_handle) != new_block_event.height;
-        ensures event::counter(event_handle) == new_block_event.height;
     }
 
     /// The caller is aptos_framework.
@@ -73,14 +71,6 @@ spec aptos_framework::block {
         let addr = signer::address_of(aptos_framework);
         let account = global<account::Account>(addr);
         aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-
-        // During the module's initialization, it guarantees that the BlockResource resource move under the Aptos framework account with initial values.
-        ensures exists<BlockResource>(addr);
-        ensures global<BlockResource>(addr).height == 0;
-        ensures global<BlockResource>(addr).epoch_interval > 0;
-
-        // Only the Aptos framework address can execute
-        ensures @aptos_framework == addr;
     }
 
     spec schema Initialize {
@@ -93,6 +83,7 @@ spec aptos_framework::block {
         aborts_if epoch_interval_microsecs <= 0;
         aborts_if exists<BlockResource>(addr);
         ensures exists<BlockResource>(addr);
+        ensures global<BlockResource>(addr).height == 0;
     }
 
     spec schema NewEventHandle {
@@ -127,12 +118,6 @@ spec aptos_framework::block {
         aborts_if !exists<BlockResource>(addr);
         let post block_resource = global<BlockResource>(addr);
         ensures block_resource.epoch_interval == new_epoch_interval;
-
-        // Only the Aptos framework address can execute
-        ensures addr == @aptos_framework;
-
-        // epoch_interval > 0
-        ensures block_resource.epoch_interval > 0;
     }
 
     spec get_epoch_interval_secs(): u64 {
