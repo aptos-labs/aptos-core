@@ -1460,14 +1460,14 @@ fn realistic_env_max_load_test(duration: Duration) -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_initial_fullnode_count(0)
-        // .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
-        //     inner_traffic: EmitJobRequest::default()
-        //         .mode(EmitJobMode::MaxLoad {
-        //             mempool_backlog: 200000,
-        //         })
-        //         .init_gas_price_multiplier(20),
-        //     inner_success_criteria: SuccessCriteria::new(5000),
-        // }))
+        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
+            inner_traffic: EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 200000,
+                })
+                .init_gas_price_multiplier(20),
+            inner_success_criteria: SuccessCriteria::new(0),
+        }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
