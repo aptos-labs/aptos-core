@@ -217,6 +217,7 @@ async fn testnet_1() -> Result<()> {
     // create and fund account for tests
     let mut giray = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(giray.address(), 100_000_000).await?;
+    println!("{:?}", giray.address());
 
     // Step 1: Test new account creation and funding
     // this test is critical to pass for the next tests

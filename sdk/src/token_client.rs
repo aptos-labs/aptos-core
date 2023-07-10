@@ -3,12 +3,9 @@
 
 use crate::{
     bcs,
-    move_types::{
-        identifier::Identifier,
-        language_storage::ModuleId,
-    },
+    move_types::{identifier::Identifier, language_storage::ModuleId},
     rest_client::{Client as ApiClient, PendingTransaction},
-    transaction_builder::TransactionBuilder,
+    transaction_builder::{TransactionBuilder, TransactionFactory},
     types::{
         account_address::AccountAddress,
         chain_id::ChainId,
@@ -17,6 +14,7 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
+use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug)]
@@ -40,6 +38,7 @@ impl<'a> TokenClient<'a> {
     ) -> Result<PendingTransaction> {
         let options = options.unwrap_or_default();
 
+        // get chain id
         let chain_id = self
             .api_client
             .get_index()
@@ -47,34 +46,31 @@ impl<'a> TokenClient<'a> {
             .context("Failed to get chain ID")?
             .inner()
             .chain_id;
-        let transaction_builder = TransactionBuilder::new(
-            TransactionPayload::EntryFunction(EntryFunction::new(
-                ModuleId::new(
-                    AccountAddress::from_hex_literal("0x3").unwrap(),
-                    Identifier::new("token").unwrap(),
-                ),
-                Identifier::new("create_collection_script").unwrap(),
-                vec![],
-                vec![
-                    bcs::to_bytes(&name).unwrap(),
-                    bcs::to_bytes(&description).unwrap(),
-                    bcs::to_bytes(&uri).unwrap(),
-                    bcs::to_bytes(&max_amount).unwrap(),
-                    bcs::to_bytes(&vec![false, false, false]).unwrap(),
-                ],
-            )),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-                + options.timeout_secs,
-            ChainId::new(chain_id),
-        )
-        .sender(account.address())
-        .sequence_number(account.sequence_number())
-        .max_gas_amount(options.max_gas_amount)
-        .gas_unit_price(options.gas_unit_price);
-        let signed_txn = account.sign_with_transaction_builder(transaction_builder);
+
+        // create factory
+        let factory = TransactionFactory::new(ChainId::new(chain_id))
+            .with_gas_unit_price(options.gas_unit_price)
+            .with_max_gas_amount(options.max_gas_amount)
+            .with_transaction_expiration_time(options.timeout_secs);
+
+        // create payload
+        let payload = EntryFunctionCall::TokenCreateCollectionScript {
+            name: name.to_owned().into_bytes(),
+            description: description.to_owned().into_bytes(),
+            uri: uri.to_owned().into_bytes(),
+            maximum: max_amount,
+            mutate_setting: vec![false, false, false],
+        }
+        .encode();
+
+        // create transaction
+        let builder = factory
+            .payload(payload)
+            .sender(account.address())
+            .sequence_number(account.sequence_number());
+        let signed_txn = account.sign_with_transaction_builder(builder);
+
+        // submit and return
         Ok(self
             .api_client
             .submit(&signed_txn)
@@ -132,7 +128,6 @@ impl<'a> TokenClient<'a> {
                     // TODO: this is wrong
                     bcs::to_bytes(property_values.as_ref()).unwrap(),
                     bcs::to_bytes(property_types.as_ref()).unwrap(),
-
                 ],
             )),
             SystemTime::now()
@@ -154,7 +149,6 @@ impl<'a> TokenClient<'a> {
             .context("Failed to submit transfer transaction")?
             .into_inner())
     }
-
 }
 
 pub struct TransactionOptions {
