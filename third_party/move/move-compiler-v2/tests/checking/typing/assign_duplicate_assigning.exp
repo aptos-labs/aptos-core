@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: duplicate assignment to `x`
+  ┌─ tests/checking/typing/assign_duplicate_assigning.move:6:13
+  │
+6 │         (x, x) = (0, 0);
+  │             ^
+
+error: duplicate assignment to `f`
+  ┌─ tests/checking/typing/assign_duplicate_assigning.move:8:15
+  │
+8 │         (f, R{f}, f) = (0, R { f: 0 }, 0);
+  │               ^
+
+error: duplicate assignment to `f`
+  ┌─ tests/checking/typing/assign_duplicate_assigning.move:8:19
+  │
+8 │         (f, R{f}, f) = (0, R { f: 0 }, 0);
+  │                   ^

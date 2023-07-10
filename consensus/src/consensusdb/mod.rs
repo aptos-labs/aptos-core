@@ -7,11 +7,7 @@ mod consensusdb_test;
 mod schema;
 
 use crate::{
-    consensusdb::schema::{
-        block::BlockSchema,
-        quorum_certificate::QCSchema,
-        single_entry::{SingleEntryKey, SingleEntrySchema},
-    },
+    dag::{CertifiedNode, Node},
     error::DbError,
 };
 use anyhow::Result;
@@ -19,7 +15,13 @@ use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
-use schema::{BLOCK_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME};
+use schema::{
+    block::BlockSchema,
+    dag::{CertifiedNodeSchema, NodeSchema},
+    quorum_certificate::QCSchema,
+    single_entry::{SingleEntryKey, SingleEntrySchema},
+    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, NODE_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME,
+};
 use std::{collections::HashMap, iter::Iterator, path::Path, time::Instant};
 
 /// The name of the consensus db file
@@ -52,6 +54,8 @@ impl ConsensusDB {
             BLOCK_CF_NAME,
             QC_CF_NAME,
             SINGLE_ENTRY_CF_NAME,
+            NODE_CF_NAME,
+            CERTIFIED_NODE_CF_NAME,
         ];
 
         let path = db_root_path.as_ref().join(CONSENSUS_DB_NAME);
@@ -186,5 +190,35 @@ impl ConsensusDB {
         let mut iter = self.db.iter::<QCSchema>(ReadOptions::default())?;
         iter.seek_to_first();
         Ok(iter.collect::<Result<HashMap<HashValue, QuorumCert>>>()?)
+    }
+
+    pub fn save_node(&self, node: &Node) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.put::<NodeSchema>(&node.digest(), node)?;
+        self.commit(batch)?;
+        Ok(())
+    }
+
+    pub fn save_certified_node(&self, node: &CertifiedNode) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.put::<CertifiedNodeSchema>(&node.digest(), node)?;
+        self.commit(batch)?;
+        Ok(())
+    }
+
+    pub fn get_certified_nodes(&self) -> Result<HashMap<HashValue, CertifiedNode>, DbError> {
+        let mut iter = self
+            .db
+            .iter::<CertifiedNodeSchema>(ReadOptions::default())?;
+        iter.seek_to_first();
+        Ok(iter.collect::<Result<HashMap<HashValue, CertifiedNode>>>()?)
+    }
+
+    pub fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        digests
+            .iter()
+            .try_for_each(|hash| batch.delete::<CertifiedNodeSchema>(hash))?;
+        self.commit(batch)
     }
 }

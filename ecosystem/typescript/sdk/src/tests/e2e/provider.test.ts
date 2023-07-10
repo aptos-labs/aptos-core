@@ -1,24 +1,11 @@
-import { AptosAccount } from "../../account/aptos_account";
-import { AptosClient } from "../../providers/aptos_client";
-import { bcsSerializeBool } from "../../bcs";
 import { Provider } from "../../providers/provider";
-import { FaucetClient } from "../../plugins/faucet_client";
-import { TokenClient } from "../../plugins/token_client";
-import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
-import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
+import { Network, NetworkToIndexerAPI, NetworkToNodeAPI } from "../../utils";
 
 describe("Provider", () => {
-  const faucetClient = new FaucetClient(
-    "https://fullnode.testnet.aptoslabs.com",
-    "https://faucet.testnet.aptoslabs.com",
-    { TOKEN: FAUCET_AUTH_TOKEN },
-  );
-  const alice = new AptosAccount();
-
   it("uses provided network as API", async () => {
-    const provider = new Provider(Network.TESTNET);
-    expect(provider.aptosClient.nodeUrl).toBe(NetworkToNodeAPI[Network.TESTNET]);
-    expect(provider.indexerClient.endpoint).toBe(NetworkToIndexerAPI[Network.TESTNET]);
+    const provider = new Provider(Network.DEVNET);
+    expect(provider.aptosClient.nodeUrl).toBe(NetworkToNodeAPI[Network.DEVNET]);
+    expect(provider.indexerClient.endpoint).toBe(NetworkToIndexerAPI[Network.DEVNET]);
   });
 
   it("uses custom endpoints as API", async () => {
@@ -39,12 +26,12 @@ describe("Provider", () => {
   });
 
   it("has AptosClient method defined", () => {
-    const provider = new Provider(Network.TESTNET);
+    const provider = new Provider(Network.DEVNET);
     expect(provider.getAccount).toBeDefined();
   });
 
   it("has IndexerClient method defined", () => {
-    const provider = new Provider(Network.TESTNET);
+    const provider = new Provider(Network.DEVNET);
     expect(provider.getAccountNFTs).toBeDefined();
   });
 });

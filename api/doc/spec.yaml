@@ -9316,6 +9316,40 @@ components:
           $ref: '#/components/schemas/U64'
         account_address:
           $ref: '#/components/schemas/Address'
+    FeePayerSignature:
+      type: object
+      description: |-
+        Fee payer signature for fee payer transactions
+
+        This allows you to have transactions across multiple accounts and with a fee payer
+      required:
+      - sender
+      - secondary_signer_addresses
+      - secondary_signers
+      - fee_payer_address
+      - fee_payer_signer
+      properties:
+        sender:
+          $ref: '#/components/schemas/AccountSignature'
+        secondary_signer_addresses:
+          type: array
+          description: The other involved parties' addresses
+          items:
+            $ref: '#/components/schemas/Address'
+        secondary_signers:
+          type: array
+          description: The associated signatures, in the same order as the secondary
+            addresses
+          items:
+            $ref: '#/components/schemas/AccountSignature'
+        fee_payer_address:
+          allOf:
+          - $ref: '#/components/schemas/Address'
+          - description: The address of the paying party
+        fee_payer_signer:
+          allOf:
+          - $ref: '#/components/schemas/AccountSignature'
+          - description: The signature of the fee payer
     GasEstimation:
       type: object
       description: Struct holding the outputs of the estimate gas API
@@ -10088,12 +10122,14 @@ components:
       - $ref: '#/components/schemas/TransactionSignature_Ed25519Signature'
       - $ref: '#/components/schemas/TransactionSignature_MultiEd25519Signature'
       - $ref: '#/components/schemas/TransactionSignature_MultiAgentSignature'
+      - $ref: '#/components/schemas/TransactionSignature_FeePayerSignature'
       discriminator:
         propertyName: type
         mapping:
           ed25519_signature: '#/components/schemas/TransactionSignature_Ed25519Signature'
           multi_ed25519_signature: '#/components/schemas/TransactionSignature_MultiEd25519Signature'
           multi_agent_signature: '#/components/schemas/TransactionSignature_MultiAgentSignature'
+          fee_payer_signature: '#/components/schemas/TransactionSignature_FeePayerSignature'
     TransactionSignature_Ed25519Signature:
       allOf:
       - type: object
@@ -10104,6 +10140,16 @@ components:
             type: string
             example: ed25519_signature
       - $ref: '#/components/schemas/Ed25519Signature'
+    TransactionSignature_FeePayerSignature:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: fee_payer_signature
+      - $ref: '#/components/schemas/FeePayerSignature'
     TransactionSignature_MultiAgentSignature:
       allOf:
       - type: object

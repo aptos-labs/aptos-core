@@ -434,7 +434,7 @@ impl PerFunctionRelevance {
 
                     // make sure these two types unify before trying to instantiate them
                     let adapter = TypeUnificationAdapter::new_pair(&rel_ty, &inv_ty, true, true);
-                    if adapter.unify(Variance::Allow, false).is_none() {
+                    if adapter.unify(Variance::SpecVariance, false).is_none() {
                         continue;
                     }
 

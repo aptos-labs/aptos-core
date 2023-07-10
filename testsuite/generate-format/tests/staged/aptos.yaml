@@ -262,6 +262,21 @@ TransactionAuthenticator:
           - secondary_signers:
               SEQ:
                 TYPENAME: AccountAuthenticator
+    3:
+      FeePayer:
+        STRUCT:
+          - sender:
+              TYPENAME: AccountAuthenticator
+          - secondary_signer_addresses:
+              SEQ:
+                TYPENAME: AccountAddress
+          - secondary_signers:
+              SEQ:
+                TYPENAME: AccountAuthenticator
+          - fee_payer_address:
+              TYPENAME: AccountAddress
+          - fee_payer_signer:
+              TYPENAME: AccountAuthenticator
 TransactionPayload:
   ENUM:
     0:
