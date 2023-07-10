@@ -5,8 +5,8 @@ use crate::log::{
     CallFrame, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, FrameName, StorageFees,
     TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
-use aptos_gas::AptosGasMeter;
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
+use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };

@@ -343,33 +343,11 @@ impl ToUnit<MebiByte> for GibiByte {
     const MULTIPLIER: u64 = 1024;
 }
 
-impl ToUnitFractional<KibiByte> for Byte {
-    const DENOMINATOR: u64 = 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<MebiByte> for KibiByte {
-    const DENOMINATOR: u64 = 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<MebiByte> for Byte {
-    const DENOMINATOR: u64 = 1024 * 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<GibiByte> for MebiByte {
-    const DENOMINATOR: u64 = 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<GibiByte> for KibiByte {
-    const DENOMINATOR: u64 = 1024 * 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<GibiByte> for Byte {
-    const DENOMINATOR: u64 = 1024 * 1024 * 1024;
+impl<U, T> ToUnitFractional<U> for T
+where
+    U: ToUnit<T>,
+{
+    const DENOMINATOR: u64 = U::MULTIPLIER;
     const NOMINATOR: u64 = 1;
 }
 
@@ -387,6 +365,15 @@ pub trait ToUnitWithParams<P, U> {
 /// determined from the parameters dynamically.
 pub trait ToUnitFractionalWithParams<P, U> {
     fn ratio(params: &P) -> (u64, u64);
+}
+
+impl<P, U, T> ToUnitFractionalWithParams<P, U> for T
+where
+    U: ToUnitWithParams<P, T>,
+{
+    fn ratio(params: &P) -> (u64, u64) {
+        (1, <U as ToUnitWithParams<P, T>>::multiplier(params))
+    }
 }
 
 impl<U> GasQuantity<U> {
@@ -419,5 +406,14 @@ impl<U> GasQuantity<U> {
     {
         let (n, d) = <U as ToUnitFractionalWithParams<P, T>>::ratio(params);
         GasQuantity::new(apply_ratio_round_up(self.val, n, d))
+    }
+}
+/***************************************************************************************************
+ * Per Unit
+ *
+ **************************************************************************************************/
+impl<U1> GasQuantity<U1> {
+    pub fn per<U2>(self) -> GasQuantity<UnitDiv<U1, U2>> {
+        GasQuantity::new(self.into())
     }
 }

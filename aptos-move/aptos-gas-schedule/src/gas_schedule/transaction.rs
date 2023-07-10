@@ -1,7 +1,10 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::gas_params::AptosGasParameters;
+use crate::gas_schedule::VMGasParameters;
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
     GasScalingFactor, GasUnit, NumSlots,
@@ -10,16 +13,15 @@ use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
 use move_core_types::gas_algebra::{
-    InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes,
-    ToUnitFractionalWithParams, ToUnitWithParams,
+    InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
 };
 
 const GAS_SCALING_FACTOR: u64 = 1_000_000;
 
-crate::gas_params::macros::define_gas_parameters!(
+crate::gas_schedule::macros::define_gas_parameters!(
     TransactionGasParameters,
     "txn",
-    .txn,
+    VMGasParameters => .txn,
     [
         // The flat minimum amount of gas required for any transaction.
         // Charged at the start of execution.
@@ -180,7 +182,7 @@ use gas_params::*;
 impl TransactionGasParameters {
     // TODO(Gas): Right now we are relying on this to avoid div by zero errors when using the all-zero
     //            gas parameters. See if there's a better way we can handle this.
-    pub(crate) fn scaling_factor(&self) -> GasScalingFactor {
+    pub fn scaling_factor(&self) -> GasScalingFactor {
         match u64::from(self.gas_unit_scaling_factor) {
             0 => 1.into(),
             x => x.into(),
@@ -232,7 +234,7 @@ impl TransactionGasParameters {
     pub fn calculate_intrinsic_gas(
         &self,
         transaction_size: NumBytes,
-    ) -> impl GasExpression<AptosGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         let excess = transaction_size
             .checked_sub(self.large_transaction_cutoff)
             .unwrap_or_else(|| 0.into());
@@ -244,11 +246,5 @@ impl TransactionGasParameters {
 impl ToUnitWithParams<TransactionGasParameters, InternalGasUnit> for GasUnit {
     fn multiplier(params: &TransactionGasParameters) -> u64 {
         params.scaling_factor().into()
-    }
-}
-
-impl ToUnitFractionalWithParams<TransactionGasParameters, GasUnit> for InternalGasUnit {
-    fn ratio(params: &TransactionGasParameters) -> (u64, u64) {
-        (1, params.scaling_factor().into())
     }
 }

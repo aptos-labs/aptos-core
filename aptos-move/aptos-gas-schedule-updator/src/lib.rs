@@ -1,22 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::gas_meter::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
+//! This crate implements a script for generating governance proposals to update the
+//! on-chain gas schedule. It can be used as both a library and a standalone binary.
+//!
+//! The generated proposal includes a comment section, listing the contents of the
+//! gas schedule in a human readable format.
+
 use anyhow::Result;
-use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
+use aptos_gas_schedule::{
+    AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::on_chain_config::GasScheduleV2;
 use clap::Parser;
 use move_core_types::account_address::AccountAddress;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use std::path::{Path, PathBuf};
-
-pub fn current_gas_schedule() -> GasScheduleV2 {
-    GasScheduleV2 {
-        feature_version: LATEST_GAS_FEATURE_VERSION,
-        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(LATEST_GAS_FEATURE_VERSION),
-    }
-}
 
 fn generate_blob(writer: &CodeWriter, data: &[u8]) {
     emitln!(writer, "vector[");
@@ -42,7 +42,7 @@ fn generate_script(gas_schedule: &GasScheduleV2) -> Result<String> {
     assert!(gas_schedule_blob.len() < 65536);
 
     let writer = CodeWriter::new(Loc::default());
-    emitln!(writer, "// Gas schedule upgrade proposal\n");
+    emitln!(writer, "// Gas schedule update proposal\n");
 
     emitln!(
         writer,
@@ -102,12 +102,22 @@ fn aptos_framework_path() -> PathBuf {
     )
 }
 
+/// Command line arguments to the gas schedule update proposal generation tool.
 #[derive(Debug, Parser)]
 pub struct GenArgs {
     #[clap(short, long)]
     pub output: Option<String>,
 }
 
+/// Constructs the current gas schedule in on-chain format.
+pub fn current_gas_schedule() -> GasScheduleV2 {
+    GasScheduleV2 {
+        feature_version: LATEST_GAS_FEATURE_VERSION,
+        entries: AptosGasParameters::initial().to_on_chain_gas_schedule(LATEST_GAS_FEATURE_VERSION),
+    }
+}
+
+/// Entrypoint for the update proposal generation tool.
 pub fn generate_update_proposal(args: &GenArgs) -> Result<()> {
     let mut pack = PackageBuilder::new("GasScheduleUpdate");
 

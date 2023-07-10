@@ -22,11 +22,9 @@ use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
-use aptos_gas::{
-    AptosGasMeter, AptosGasParameters, ChangeSetConfigs, StandardGasAlgebra, StandardGasMeter,
-    StorageGasParameters,
-};
 use aptos_gas_algebra::Gas;
+use aptos_gas_meter::{AptosGasMeter, StandardGasAlgebra, StandardGasMeter};
+use aptos_gas_schedule::VMGasParameters;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::StateView;
@@ -48,7 +46,11 @@ use aptos_types::{
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
-use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput};
+use aptos_vm_types::{
+    change_set::VMChangeSet,
+    output::VMOutput,
+    storage::{ChangeSetConfigs, StorageGasParameters},
+};
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -1016,7 +1018,7 @@ impl AptosVM {
         Ok(MemoryTrackedGasMeter::new(StandardGasMeter::new(
             StandardGasAlgebra::new(
                 self.0.get_gas_feature_version(),
-                self.0.get_gas_parameters(log_context)?.clone(),
+                self.0.get_gas_parameters(log_context)?.vm.clone(),
                 self.0.get_storage_gas_parameters(log_context)?.clone(),
                 balance,
             ),
@@ -1159,7 +1161,7 @@ impl AptosVM {
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
         G: AptosGasMeter,
-        F: FnOnce(u64, AptosGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
+        F: FnOnce(u64, VMGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
     {
         // TODO(Gas): revisit this.
         let vm = AptosVM::new(state_view);
@@ -1168,7 +1170,7 @@ impl AptosVM {
         let balance = TransactionMetadata::new(txn).max_gas_amount();
         let mut gas_meter = make_gas_meter(
             vm.0.get_gas_feature_version(),
-            vm.0.get_gas_parameters(log_context)?.clone(),
+            vm.0.get_gas_parameters(log_context)?.vm.clone(),
             vm.0.get_storage_gas_parameters(log_context)?.clone(),
             balance,
         )?;
@@ -1408,7 +1410,7 @@ impl AptosVM {
         let mut gas_meter =
             MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
                 vm.0.get_gas_feature_version(),
-                vm.0.get_gas_parameters(&log_context)?.clone(),
+                vm.0.get_gas_parameters(&log_context)?.vm.clone(),
                 vm.0.get_storage_gas_parameters(&log_context)?.clone(),
                 gas_budget,
             )));
@@ -1851,7 +1853,7 @@ impl AptosSimulationVM {
         let mut gas_meter =
             MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
                 self.0 .0.get_gas_feature_version(),
-                gas_params.clone(),
+                gas_params.vm.clone(),
                 storage_gas_params.clone(),
                 txn_data.max_gas_amount(),
             )));
