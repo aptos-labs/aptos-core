@@ -363,7 +363,7 @@ async fn identify_expired_invalid_and_ready_fetches<T: StorageReaderInterface>(
         let optimistic_fetch = optimistic_fetch.value();
 
         // Gather the peer's highest synced version and epoch
-        if !optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
+        if !optimistic_fetch.is_expired(config.max_optimistic_fetch_period_ms) {
             let highest_known_version = optimistic_fetch.highest_known_version();
             let highest_known_epoch = optimistic_fetch.highest_known_epoch();
 
