@@ -373,6 +373,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-logging",
  "aptos-vm-validator",
  "bcs 0.1.4",
  "bytes",
@@ -635,6 +636,7 @@ dependencies = [
  "cfg_block",
  "get_if_addrs",
  "mirai-annotations",
+ "num_cpus",
  "poem-openapi",
  "rand 0.7.3",
  "serde 1.0.149",
@@ -658,6 +660,7 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-enum-conversion-derive",
  "aptos-event-notifications",
  "aptos-executor",
  "aptos-executor-test-helpers",
@@ -1006,6 +1009,7 @@ dependencies = [
  "aptos-gas",
  "aptos-gas-profiling",
  "aptos-logger",
+ "aptos-memory-usage-tracker",
  "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-state-view",
@@ -1025,6 +1029,17 @@ dependencies = [
  "move-vm-test-utils",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "aptos-enum-conversion-derive"
+version = "0.0.3"
+dependencies = [
+ "anyhow",
+ "proc-macro2 1.0.59",
+ "quote 1.0.28",
+ "syn 1.0.105",
+ "trybuild",
 ]
 
 [[package]]
@@ -1111,6 +1126,7 @@ name = "aptos-executor-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-config",
  "aptos-crypto",
@@ -1469,7 +1485,7 @@ name = "aptos-fuzz"
 version = "0.1.0"
 dependencies = [
  "aptos-fuzzer",
- "libfuzzer-sys 0.3.2",
+ "libfuzzer-sys",
  "once_cell",
 ]
 
@@ -1556,6 +1572,7 @@ dependencies = [
  "move-core-types",
  "move-vm-types",
  "regex",
+ "smallvec",
 ]
 
 [[package]]
@@ -1859,18 +1876,23 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
+ "aptos-protos",
  "aptos-runtimes",
  "async-trait",
  "backtrace",
+ "base64 0.13.0",
  "chrono",
  "clap 4.3.5",
+ "futures",
  "hostname",
  "once_cell",
+ "prost",
  "reqwest",
  "serde 1.0.149",
  "serde_json",
  "tokio",
  "toml 0.5.9",
+ "tonic",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2001,16 +2023,20 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
+ "aptos-gas-profiling",
  "aptos-keygen",
+ "aptos-memory-usage-tracker",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-logging",
  "bcs 0.1.4",
  "goldenfile",
  "hex",
@@ -2074,6 +2100,17 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "aptos-memory-usage-tracker"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas",
+ "aptos-types",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-types",
 ]
 
 [[package]]
@@ -3270,6 +3307,7 @@ name = "aptos-transaction-benchmarks"
 version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
+ "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-executor-service",
@@ -3487,6 +3525,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-memory-usage-tracker",
  "aptos-metrics-core",
  "aptos-move-stdlib",
  "aptos-mvhashmap",
@@ -3498,6 +3537,7 @@ dependencies = [
  "bcs 0.1.4",
  "dashmap",
  "fail 0.5.0",
+ "futures",
  "move-binary-format",
  "move-bytecode-utils",
  "move-bytecode-verifier",
@@ -3656,12 +3696,6 @@ dependencies = [
  "serde 1.0.149",
  "tempfile",
 ]
-
-[[package]]
-name = "arbitrary"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db55d72333851e17d572bec876e390cd3b11eb1ef53ae821dd9f3b653d2b4569"
 
 [[package]]
 name = "arbitrary"
@@ -4226,6 +4260,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "basic-toml"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c0de75129aa8d0cceaf750b89013f0e08804d6ec61416da787b35ad0d7cddf1"
+dependencies = [
+ "serde 1.0.149",
+]
+
+[[package]]
 name = "bcs"
 version = "0.1.4"
 source = "git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d#d31fab9d81748e2594be5cd5cdf845786a30562d"
@@ -4513,8 +4556,8 @@ checksum = "e3b5ca7a04898ad4bcd41c90c5285445ff5b791899bb1b0abdd2a2aa791211d7"
 name = "bytecode-verifier-libfuzzer"
 version = "0.0.0"
 dependencies = [
- "arbitrary 1.3.0",
- "libfuzzer-sys 0.4.6",
+ "arbitrary",
+ "libfuzzer-sys",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -5202,15 +5245,15 @@ dependencies = [
 
 [[package]]
 name = "crossterm"
-version = "0.21.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "486d44227f71a1ef39554c0dc47e44b9f4139927c75043312690c3f476d1d788"
+checksum = "e64e6c0fbe2c17357405f7c758c1ef960fce08bdfb2c03d88d2a18d7e09c4b67"
 dependencies = [
  "bitflags 1.3.2",
- "crossterm_winapi 0.8.0",
+ "crossterm_winapi",
  "libc",
- "mio 0.7.14",
- "parking_lot 0.11.2",
+ "mio",
+ "parking_lot 0.12.1",
  "signal-hook",
  "signal-hook-mio",
  "winapi 0.3.9",
@@ -5218,26 +5261,17 @@ dependencies = [
 
 [[package]]
 name = "crossterm"
-version = "0.22.1"
+version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c85525306c4291d1b73ce93c8acf9c339f9b213aef6c1d85c3830cbf1c16325c"
+checksum = "a84cda67535339806297f1b331d6dd6320470d2a0fe65381e79ee9e156dd3d13"
 dependencies = [
  "bitflags 1.3.2",
- "crossterm_winapi 0.9.0",
+ "crossterm_winapi",
  "libc",
- "mio 0.7.14",
- "parking_lot 0.11.2",
+ "mio",
+ "parking_lot 0.12.1",
  "signal-hook",
  "signal-hook-mio",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm_winapi"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a6966607622438301997d3dac0d2f6e9a90c68bb6bc1785ea98456ab93c0507"
-dependencies = [
  "winapi 0.3.9",
 ]
 
@@ -5708,6 +5742,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
+ "aptos-gas-profiling",
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
@@ -6330,9 +6365,9 @@ dependencies = [
  "aptos-consensus",
  "aptos-consensus-types",
  "aptos-types",
- "arbitrary 1.3.0",
+ "arbitrary",
  "bcs 0.1.4",
- "libfuzzer-sys 0.4.6",
+ "libfuzzer-sys",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -7512,6 +7547,7 @@ dependencies = [
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-memory-usage-tracker",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
@@ -7611,21 +7647,11 @@ checksum = "99227334921fae1a979cf0bfdfcc6b3e5ce376ef57e16fb6fb3ea2ed6095f80c"
 
 [[package]]
 name = "libfuzzer-sys"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d718794b8e23533b9069bd2c4597d69e41cc7ab1c02700a502971aca0cdcf24"
-dependencies = [
- "arbitrary 0.4.7",
- "cc",
-]
-
-[[package]]
-name = "libfuzzer-sys"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "beb09950ae85a0a94b27676cccf37da5ff13f27076aa1adbc6545dd0d0e1bd4e"
 dependencies = [
- "arbitrary 1.3.0",
+ "arbitrary",
  "cc",
  "once_cell",
 ]
@@ -8024,19 +8050,6 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.7.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8067b404fe97c70829f082dec8bcf4f71225d7eaea1d8645349cb76fa06205cc"
-dependencies = [
- "libc",
- "log",
- "miow",
- "ntapi",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "mio"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57ee1c23c7c63b0c9250c339ffdc69255f110b298b901b9f6c82547b7b87caaf"
@@ -8045,15 +8058,6 @@ dependencies = [
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.36.1",
-]
-
-[[package]]
-name = "miow"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
-dependencies = [
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -8193,7 +8197,7 @@ name = "move-binary-format"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "arbitrary 1.3.0",
+ "arbitrary",
  "indexmap",
  "move-core-types",
  "once_cell",
@@ -8255,7 +8259,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap 4.3.5",
- "crossterm 0.21.0",
+ "crossterm 0.26.1",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
@@ -8392,7 +8396,7 @@ name = "move-core-types"
 version = "0.0.4"
 dependencies = [
  "anyhow",
- "arbitrary 1.3.0",
+ "arbitrary",
  "bcs 0.1.4",
  "ethnum",
  "hex",
@@ -8600,6 +8604,7 @@ dependencies = [
  "once_cell",
  "regex",
  "serde 1.0.149",
+ "trace",
 ]
 
 [[package]]
@@ -9130,9 +9135,9 @@ checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "ntapi"
-version = "0.3.7"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c28774a7fd2fbb4f0babd8237ce554b73af68021b5f695a3cebd6c59bac0980f"
+checksum = "e8a3895c6391c39d7fe7ebc444a87eb2991b2a0bc718fdabd071eec617fc68e4"
 dependencies = [
  "winapi 0.3.9",
 ]
@@ -9168,6 +9173,16 @@ dependencies = [
  "proc-macro2 1.0.59",
  "quote 1.0.28",
  "syn 1.0.105",
+]
+
+[[package]]
+name = "nu-ansi-term"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a8165726e8236064dbb45459242600304b42a5ea24ee2948e18e023bf7ba84"
+dependencies = [
+ "overload",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -9464,6 +9479,12 @@ checksum = "628223faebab4e3e40667ee0b2336d34a5b960ff60ea743ddfdbcf7770bcfb66"
 dependencies = [
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "overload"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "owo-colors"
@@ -11471,7 +11492,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29ad2e15f37ec9a6cc544097b78a1ec90001e9f71b81338ca39f430adaca99af"
 dependencies = [
  "libc",
- "mio 0.7.14",
+ "mio",
  "signal-hook",
 ]
 
@@ -11861,9 +11882,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.24.7"
+version = "0.28.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54cb4ebf3d49308b99e6e9dc95e989e2fdbdc210e4f67c39db0bb89ba927001c"
+checksum = "b4c2f3ca6693feb29a89724516f016488e9aafc7f37264f898593ee4b942f31b"
 dependencies = [
  "cfg-if",
  "core-foundation-sys",
@@ -12162,7 +12183,7 @@ dependencies = [
  "bytes",
  "libc",
  "memchr",
- "mio 0.8.4",
+ "mio",
  "num_cpus",
  "parking_lot 0.12.1",
  "pin-project-lite",
@@ -12479,6 +12500,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
+name = "trace"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ad0c048e114d19d1140662762bfdb10682f3bc806d8be18af846600214dd9af"
+dependencies = [
+ "proc-macro2 1.0.59",
+ "quote 1.0.28",
+ "syn 1.0.105",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12504,9 +12536,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.29"
+version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aeea4303076558a00714b823f9ad67d58a3bbda1df83d8827d21193156e22f7"
+checksum = "0955b8137a1df6f1a2e9a37d8a6656291ff0297c1a97c24e0d8425fe2312f79a"
 dependencies = [
  "once_cell",
  "valuable",
@@ -12545,12 +12577,12 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.15"
+version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60db860322da191b40952ad9affe65ea23e7dd6a5c442c2c42865810c6ab8e6b"
+checksum = "30a651bc37f915e81f087d86e62a18eec5f79550c7faff886f7090b4ea757c77"
 dependencies = [
- "ansi_term",
  "matchers",
+ "nu-ansi-term",
  "once_cell",
  "regex",
  "serde 1.0.149",
@@ -12591,28 +12623,28 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "trybuild"
-version = "1.0.64"
+version = "1.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7f408301c7480f9e6294eb779cfc907f54bd901a9660ef24d7f233ed5376485"
+checksum = "501dbdbb99861e4ab6b60eb6a7493956a9defb644fd034bc4a5ef27c693c8a3a"
 dependencies = [
+ "basic-toml",
  "glob",
  "once_cell",
  "serde 1.0.149",
  "serde_derive",
  "serde_json",
  "termcolor",
- "toml 0.5.9",
 ]
 
 [[package]]
 name = "tui"
-version = "0.17.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23ed0a32c88b039b73f1b6c5acbd0554bfa5b6be94467375fd947c4de3a02271"
+checksum = "ccdd26cbd674007e649a272da4475fb666d3aa0ad0531da7136db6fab0e5bad1"
 dependencies = [
  "bitflags 1.3.2",
  "cassowary",
- "crossterm 0.22.1",
+ "crossterm 0.25.0",
  "unicode-segmentation",
  "unicode-width",
 ]

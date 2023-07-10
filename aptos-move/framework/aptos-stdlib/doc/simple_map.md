@@ -3,7 +3,7 @@
 
 # Module `0x1::simple_map`
 
-This module provides a solution for sorted maps, that is it has the properties that
+This module provides a solution for unsorted maps, that is it has the properties that
 1) Keys point to Values
 2) Each Key must be unique
 3) A Key can be found within O(N) time

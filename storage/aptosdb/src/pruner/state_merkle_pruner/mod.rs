@@ -134,6 +134,12 @@ where
         let metadata_pruner = StateMerkleMetadataPruner::new(state_merkle_db.metadata_db_arc());
         let metadata_progress = metadata_pruner.progress()?;
 
+        info!(
+            metadata_progress = metadata_progress,
+            "Created {} metadata pruner, start catching up all shards.",
+            S::name(),
+        );
+
         let shard_pruners = if state_merkle_db.sharding_enabled() {
             let num_shards = state_merkle_db.num_shards();
             let mut shard_pruners = Vec::with_capacity(num_shards as usize);

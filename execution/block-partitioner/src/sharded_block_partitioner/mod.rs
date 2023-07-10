@@ -14,7 +14,7 @@ use crate::sharded_block_partitioner::{
 use aptos_logger::{error, info};
 use aptos_metrics_core::{exponential_buckets, register_histogram, Histogram};
 use aptos_types::{
-    block_executor::partitioner::{ShardId, SubBlocksForShard, TxnIndex},
+    block_executor::partitioner::{RoundId, ShardId, SubBlocksForShard, TxnIndex},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
 use itertools::Itertools;
@@ -238,6 +238,7 @@ impl ShardedBlockPartitioner {
         current_round_start_index: TxnIndex,
         frozen_sub_blocks: Vec<SubBlocksForShard<Transaction>>,
         frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
+        round_id: RoundId,
     ) -> (
         Vec<SubBlocksForShard<Transaction>>,
         Vec<WriteSetWithTxnIndex>,
@@ -252,6 +253,7 @@ impl ShardedBlockPartitioner {
                     frozen_write_set_with_index.clone(),
                     current_round_start_index,
                     sub_blocks,
+                    round_id,
                 ))
             })
             .collect();
@@ -265,6 +267,7 @@ impl ShardedBlockPartitioner {
         remaining_txns_vec: Vec<Vec<AnalyzedTransaction>>,
         frozen_sub_blocks_by_shard: Vec<SubBlocksForShard<Transaction>>,
         frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
+        round_id: RoundId,
     ) -> (
         Vec<SubBlocksForShard<Transaction>>,
         Vec<WriteSetWithTxnIndex>,
@@ -281,6 +284,7 @@ impl ShardedBlockPartitioner {
                     index_offset,
                     frozen_write_set_with_index.clone(),
                     frozen_sub_blocks,
+                    round_id,
                 ));
                 index_offset += remaining_txns_len;
                 partitioning_msg
@@ -296,7 +300,7 @@ impl ShardedBlockPartitioner {
     pub fn partition(
         &self,
         transactions: Vec<AnalyzedTransaction>,
-        num_partitioning_round: usize,
+        num_partitioning_round: RoundId,
     ) -> Vec<SubBlocksForShard<Transaction>> {
         let _timer = APTOS_BLOCK_PARTITIONER_SECONDS.start_timer();
         let total_txns = transactions.len();
@@ -313,7 +317,7 @@ impl ShardedBlockPartitioner {
             frozen_sub_blocks.push(SubBlocksForShard::empty(shard_id))
         }
 
-        for _ in 0..num_partitioning_round {
+        for round_id in 0..num_partitioning_round {
             let (
                 updated_frozen_sub_blocks,
                 current_frozen_rw_set_with_index_vec,
@@ -323,6 +327,7 @@ impl ShardedBlockPartitioner {
                 current_round_start_index,
                 frozen_sub_blocks,
                 frozen_write_set_with_index.clone(),
+                round_id,
             );
             // Current round start index is the sum of the number of transactions in the frozen sub-blocks
             current_round_start_index = updated_frozen_sub_blocks
@@ -351,6 +356,7 @@ impl ShardedBlockPartitioner {
             txns_to_partition,
             frozen_sub_blocks,
             frozen_write_set_with_index,
+            num_partitioning_round,
         );
 
         // Assert rejected transactions are empty
@@ -407,7 +413,7 @@ mod tests {
     };
     use aptos_crypto::hash::CryptoHash;
     use aptos_types::{
-        block_executor::partitioner::{SubBlock, SubBlocksForShard, TxnIdxWithShardId},
+        block_executor::partitioner::{ShardedTxnIndex, SubBlock, SubBlocksForShard},
         transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
     };
     use move_core_types::account_address::AccountAddress;
@@ -723,7 +729,7 @@ mod tests {
             .for_each(|txn| {
                 let required_deps = txn
                     .cross_shard_dependencies
-                    .get_required_edge_for(TxnIdxWithShardId::new(6, 1))
+                    .get_required_edge_for(ShardedTxnIndex::new(6, 1, 0))
                     .unwrap();
                 // txn (6, 7) and 8 has conflict only on the coin store of account 7 as txn (6,7) are sending
                 // from account 7 and txn 8 is receiving in account 7
@@ -740,7 +746,7 @@ mod tests {
             .unwrap()
             .transactions[3]
             .cross_shard_dependencies
-            .get_dependent_edge_for(TxnIdxWithShardId::new(7, 2))
+            .get_dependent_edge_for(ShardedTxnIndex::new(7, 2, 1))
             .unwrap();
         assert_eq!(required_deps.len(), 1);
         assert_eq!(
@@ -753,7 +759,7 @@ mod tests {
             .unwrap()
             .transactions[3]
             .cross_shard_dependencies
-            .get_dependent_edge_for(TxnIdxWithShardId::new(8, 2))
+            .get_dependent_edge_for(ShardedTxnIndex::new(8, 2, 1))
             .unwrap();
         assert_eq!(required_deps.len(), 1);
         assert_eq!(

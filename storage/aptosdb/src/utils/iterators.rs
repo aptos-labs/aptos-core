@@ -22,6 +22,7 @@ use std::{iter::Peekable, marker::PhantomData};
 
 pub struct ContinuousVersionIter<I, T> {
     inner: I,
+    first_version: Version,
     expected_next_version: Version,
     end_version: Version,
     _phantom: PhantomData<T>,
@@ -40,8 +41,9 @@ where
             Some((version, transaction)) => {
                 ensure!(
                     version == self.expected_next_version,
-                    "{} iterator: expecting version {}, got {} from underlying iterator.",
+                    "{} iterator: first version {}, expecting version {}, got {} from underlying iterator.",
                     std::any::type_name::<T>(),
+                    self.first_version,
                     self.expected_next_version,
                     version,
                 );
@@ -85,6 +87,7 @@ where
     ) -> Result<ContinuousVersionIter<Self, T>> {
         Ok(ContinuousVersionIter {
             inner: self,
+            first_version,
             expected_next_version: first_version,
             end_version: first_version
                 .checked_add(limit as u64)

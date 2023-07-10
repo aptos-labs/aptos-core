@@ -182,7 +182,29 @@ impl LedgerDb {
         Ok(())
     }
 
+    // Only expect to be used by fast sync when it is finished.
     pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        info!("Fast sync is done, writing pruner progress {version} for all ledger sub pruners.");
+        self.event_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::EventPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
+        self.transaction_accumulator_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::TransactionAccumulatorPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
+        self.transaction_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::TransactionPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
+        self.transaction_info_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::TransactionInfoPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
+        self.write_set_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::WriteSetPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
         self.ledger_metadata_db.put::<DbMetadataSchema>(
             &DbMetadataKey::LedgerPrunerProgress,
             &DbMetadataValue::Version(version),

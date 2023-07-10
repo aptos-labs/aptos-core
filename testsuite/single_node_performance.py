@@ -120,6 +120,7 @@ class RunGroupKey:
 class RunResults:
     tps: float
     gps: float
+    gpt: float
     fraction_in_execution: float
     fraction_of_execution_in_vm: float
     fraction_in_commit: float
@@ -134,13 +135,23 @@ class RunGroupInstance:
     expected_tps: float
 
 
+def get_only(values):
+    assert len(values) == 1, "Multiple values parsed: " + str(values)
+    return values[0]
+
+
 def extract_run_results(output: str, execution_only: bool) -> RunResults:
     if execution_only:
         tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
         gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
+        gpt = float(
+            re.findall(r"Overall execution GPT: (\d+\.?\d*) gas/txn", output)[-1]
+        )
+
     else:
-        tps = float(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)[0])
-        gps = float(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)[-1])
+        tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
+        gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
+        gpt = float(get_only(re.findall(r"Overall GPT: (\d+\.?\d*) gas/txn", output)))
 
     fraction_in_execution = float(
         re.findall(r"Overall fraction of total: (\d+\.?\d*) in execution", output)[-1]
@@ -153,7 +164,12 @@ def extract_run_results(output: str, execution_only: bool) -> RunResults:
     )
 
     return RunResults(
-        tps, gps, fraction_in_execution, fraction_of_execution_in_vm, fraction_in_commit
+        tps,
+        gps,
+        gpt,
+        fraction_in_execution,
+        fraction_of_execution_in_vm,
+        fraction_in_commit,
     )
 
 
@@ -183,7 +199,7 @@ def print_table(
         field_name, _ = single_field
         headers.append(field_name)
     else:
-        headers.extend(["t/s", "exe/total", "vm/exe", "commit/total", "g/s"])
+        headers.extend(["t/s", "exe/total", "vm/exe", "commit/total", "g/s", "g/t"])
 
     rows = []
     for result in results:
@@ -213,6 +229,7 @@ def print_table(
             row.append(round(result.single_node_result.fraction_of_execution_in_vm, 3))
             row.append(round(result.single_node_result.fraction_in_commit, 3))
             row.append(int(round(result.single_node_result.gps)))
+            row.append(int(round(result.single_node_result.gpt)))
         rows.append(row)
 
     print(tabulate(rows, headers=headers))
@@ -279,6 +296,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "expected_tps": expected_tps,
                     "tps": single_node_result.tps,
                     "gps": single_node_result.gps,
+                    "gpt": single_node_result.gpt,
                     "code_perf_version": CODE_PERF_VERSION,
                 }
             )
