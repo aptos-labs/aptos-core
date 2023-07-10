@@ -12,11 +12,10 @@ use crate::{
     transaction_validation::APTOS_TRANSACTION_VALIDATION,
 };
 use aptos_framework::RuntimeModuleMetadataV1;
-use aptos_gas::{
-    AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
-    NativeGasParameters, StorageGasParameters, StoragePricing,
-};
 use aptos_gas_algebra::{Gas, GasExpression};
+use aptos_gas_schedule::{
+    AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
+};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -31,7 +30,10 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{
+    output::VMOutput,
+    storage::{ChangeSetConfigs, StorageGasParameters, StoragePricing},
+};
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
@@ -90,20 +92,20 @@ impl AptosVMImpl {
 
                 if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
                     // Overwrite table io gas parameters with global io pricing.
-                    let g = &mut gas_params.natives.table.common;
+                    let g = &mut gas_params.natives.table;
                     match gas_feature_version {
                         0..=1 => (),
                         2..=6 => {
-                            g.load_base_legacy = pricing.per_item_read * NumArgs::new(1);
-                            g.load_base_new = 0.into();
-                            g.load_per_byte = pricing.per_byte_read;
-                            g.load_failure = 0.into();
+                            g.common_load_base_legacy = pricing.per_item_read * NumArgs::new(1);
+                            g.common_load_base_new = 0.into();
+                            g.common_load_per_byte = pricing.per_byte_read;
+                            g.common_load_failure = 0.into();
                         },
                         7.. => {
-                            g.load_base_legacy = 0.into();
-                            g.load_base_new = pricing.per_item_read * NumArgs::new(1);
-                            g.load_per_byte = pricing.per_byte_read;
-                            g.load_failure = 0.into();
+                            g.common_load_base_legacy = 0.into();
+                            g.common_load_base_new = pricing.per_item_read * NumArgs::new(1);
+                            g.common_load_per_byte = pricing.per_byte_read;
+                            g.common_load_failure = 0.into();
                         },
                     }
                 }
@@ -116,12 +118,9 @@ impl AptosVMImpl {
         //            This only happens in a edge case that is probably related to write set transactions or genesis,
         //            which logically speaking, shouldn't be handled by the VM at all.
         //            We should clean up the logic here once we get that refactored.
-        let (native_gas_params, abs_val_size_gas_params) = match &gas_params {
-            Ok(gas_params) => (gas_params.natives.clone(), gas_params.misc.abs_val.clone()),
-            Err(_) => (
-                NativeGasParameters::zeros(),
-                AbstractValueSizeGasParameters::zeros(),
-            ),
+        let (native_gas_params, misc_gas_params) = match &gas_params {
+            Ok(gas_params) => (gas_params.natives.clone(), gas_params.vm.misc.clone()),
+            Err(_) => (NativeGasParameters::zeros(), MiscGasParameters::zeros()),
         };
 
         let features = Features::fetch_config(&storage).unwrap_or_default();
@@ -140,7 +139,7 @@ impl AptosVMImpl {
 
         let move_vm = MoveVmExt::new(
             native_gas_params,
-            abs_val_size_gas_params,
+            misc_gas_params,
             gas_feature_version,
             chain_id.id(),
             features.clone(),
@@ -213,7 +212,7 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let gas_params = self.get_gas_parameters(log_context)?;
-        let txn_gas_params = &gas_params.txn;
+        let txn_gas_params = &gas_params.vm.txn;
         let raw_bytes_len = txn_data.transaction_size;
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
@@ -282,7 +281,7 @@ impl AptosVMImpl {
         // underlying `RawTransaction`
         let intrinsic_gas = txn_gas_params
             .calculate_intrinsic_gas(raw_bytes_len)
-            .materialize(self.gas_feature_version, gas_params)
+            .evaluate(self.gas_feature_version, &gas_params.vm)
             .to_unit_round_up_with_params(txn_gas_params);
 
         if txn_data.max_gas_amount() < intrinsic_gas {

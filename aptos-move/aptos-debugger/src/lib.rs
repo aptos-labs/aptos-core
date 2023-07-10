@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Result};
-use aptos_gas::{
-    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasAlgebra,
-    StandardGasMeter,
-};
+use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_resource_viewer::{AnnotatedAccountStateBlob, AptosValueAnnotator};
 use aptos_rest_client::Client;
@@ -31,7 +28,7 @@ use aptos_vm::{
     AptosVM, VMExecutor,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput};
+use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput, storage::ChangeSetConfigs};
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
 
@@ -231,7 +228,7 @@ impl AptosDebugger {
         let features = Features::fetch_config(&state_view_storage).unwrap_or_default();
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
-            AbstractValueSizeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
             ChainId::test().id(),
             features,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_gas::gen::{generate_update_proposal, GenArgs};
+use aptos_gas_schedule_updator::{generate_update_proposal, GenArgs};
 
 #[test]
 fn can_generate_and_build_update_proposal() {

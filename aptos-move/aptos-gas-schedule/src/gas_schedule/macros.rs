@@ -19,7 +19,7 @@ macro_rules! define_gas_parameters {
     (
         $params_name: ident,
         $prefix: literal,
-        $(.$field: ident)*,
+        $env: ty => $(.$field: ident)*,
         [$(
             [$name: ident: $ty: ident, $key_bindings: tt, $initial: expr $(, $tn: ident)? $(,)?]
         ),* $(,)?]
@@ -35,7 +35,7 @@ macro_rules! define_gas_parameters {
                 let mut params = $params_name::zeros();
 
                 $(
-                    if let Some(key) = $crate::gas_params::macros::define_gas_parameters_extract_key_at_version!($key_bindings, feature_version) {
+                    if let Some(key) = $crate::gas_schedule::macros::define_gas_parameters_extract_key_at_version!($key_bindings, feature_version) {
                         let name = format!("{}.{}", $prefix, key);
                         params.$name = gas_schedule.get(&name).cloned().ok_or_else(|| format!("Gas parameter {} does not exist. Feature version: {}.", name, feature_version))?.into();
                     }
@@ -51,7 +51,7 @@ macro_rules! define_gas_parameters {
                 let mut output = vec![];
 
                 $(
-                    if let Some(key) = $crate::gas_params::macros::define_gas_parameters_extract_key_at_version!($key_bindings, feature_version) {
+                    if let Some(key) = $crate::gas_schedule::macros::define_gas_parameters_extract_key_at_version!($key_bindings, feature_version) {
                         output.push((format!("{}.{}", $prefix, key), self.$name.into()))
                     }
                 )*
@@ -78,9 +78,10 @@ macro_rules! define_gas_parameters {
 
         #[allow(unused)]
         pub mod gas_params {
+            use super::*;
             use aptos_gas_algebra::{GasExpression, GasExpressionVisitor, GasMul, GasAdd};
             use $crate::{
-                gas_params::AptosGasParameters,
+                gas_schedule::AptosGasParameters,
             };
             use std::ops::{Add, Mul};
             use move_core_types::gas_algebra::{GasQuantity, GasQuantityGetUnit};
@@ -93,21 +94,24 @@ macro_rules! define_gas_parameters {
 
             $(
                 paste::paste! {
+                    #[derive(Debug)]
                     #[doc = "Type representing the `" $name "` gas parameter."]
                     #[allow(non_camel_case_types)]
                     pub struct [<$name:upper>];
 
-                    impl GasExpression<AptosGasParameters> for [<$name:upper>] {
+                    impl GasExpression<$env> for [<$name:upper>] {
                         type Unit =  <super::$ty as GasQuantityGetUnit>::Unit;
 
-                        fn materialize(
+                        #[inline]
+                        fn evaluate(
                             &self,
                             _feature_version: u64,
-                            gas_params: &$crate::gas_params::AptosGasParameters,
+                            gas_params: &$env,
                         ) -> GasQuantity<Self::Unit> {
                             get!(gas_params, $name)
                         }
 
+                        #[inline]
                         fn visit(&self, visitor: &mut impl GasExpressionVisitor) {
                             visitor.gas_param::<Self>();
                         }
@@ -117,6 +121,7 @@ macro_rules! define_gas_parameters {
                     {
                         type Output = GasAdd<Self, T>;
 
+                        #[inline]
                         fn add(self, rhs: T) -> Self::Output {
                             GasAdd { left: self, right: rhs }
                         }
@@ -126,7 +131,26 @@ macro_rules! define_gas_parameters {
                     {
                         type Output = GasMul<Self, T>;
 
+                        #[inline]
                         fn mul(self, rhs: T) -> Self::Output {
+                            GasMul { left: self, right: rhs }
+                        }
+                    }
+
+                    impl Add<[<$name:upper>]> for GasQuantity<<super::$ty as GasQuantityGetUnit>::Unit> {
+                        type Output = GasAdd<Self, [<$name:upper>]>;
+
+                        #[inline]
+                        fn add(self, rhs: [<$name:upper>]) -> Self::Output {
+                            GasAdd { left: self, right: rhs }
+                        }
+                    }
+
+                    impl Mul<[<$name:upper>]> for GasQuantity<<super::$ty as GasQuantityGetUnit>::Unit> {
+                        type Output = GasMul<Self, [<$name:upper>]>;
+
+                        #[inline]
+                        fn mul(self, rhs: [<$name:upper>]) -> Self::Output {
                             GasMul { left: self, right: rhs }
                         }
                     }
@@ -136,11 +160,11 @@ macro_rules! define_gas_parameters {
 
         #[test]
         fn keys_should_be_unique_for_all_versions() {
-            for ver in 0..=aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION {
+            for ver in 0..=$crate::LATEST_GAS_FEATURE_VERSION {
                 let mut map = std::collections::BTreeMap::<&str, ()>::new();
 
                 $(
-                    if let Some(key) = $crate::params::define_gas_parameters_extract_key_at_version!($key_bindings, ver) {
+                    if let Some(key) = $crate::gas_schedule::macros::define_gas_parameters_extract_key_at_version!($key_bindings, ver) {
                         if map.insert(key, ()).is_some() {
                             panic!("duplicated key {} at version {}", key, ver);
                         }
