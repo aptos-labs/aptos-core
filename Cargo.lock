@@ -3536,6 +3536,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-vm-benchmarks"
+version = "0.1.0"
+dependencies = [
+ "aptos",
+ "aptos-cached-packages",
+ "aptos-framework",
+ "aptos-language-e2e-tests",
+ "aptos-types",
+ "bcs 0.1.4",
+ "clap 4.3.5",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-core-types",
+]
+
+[[package]]
 name = "aptos-vm-genesis"
 version = "0.1.0"
 dependencies = [
