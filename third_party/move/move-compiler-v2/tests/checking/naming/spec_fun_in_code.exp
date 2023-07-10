@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: no function named `M::foo` found
+  ┌─ tests/checking/naming/spec_fun_in_code.move:5:9
+  │
+5 │         foo(1) // not visible
+  │         ^^^^^^

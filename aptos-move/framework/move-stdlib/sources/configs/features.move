@@ -196,9 +196,9 @@ module std::features {
 
     /// Whether alternate gas payer is supported
     /// Lifetime: transient
-    const GAS_PAYER_ENABLED: u64 = 22;
-    public fun gas_payer_enabled(): bool acquires Features {
-        is_enabled(GAS_PAYER_ENABLED)
+    const FEE_PAYER_ENABLED: u64 = 22;
+    public fun fee_payer_enabled(): bool acquires Features {
+        is_enabled(FEE_PAYER_ENABLED)
     }
 
     /// Whether enable MOVE functions to call create_auid method to create AUIDs.

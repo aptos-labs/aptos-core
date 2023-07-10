@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: no function named `bar` found
+  ┌─ tests/checking/naming/unbound_unqualified_function.move:3:9
+  │
+3 │         bar();
+  │         ^^^^^
+
+error: no function named `bar` found
+  ┌─ tests/checking/naming/unbound_unqualified_function.move:4:17
+  │
+4 │         let x = bar();
+  │                 ^^^^^

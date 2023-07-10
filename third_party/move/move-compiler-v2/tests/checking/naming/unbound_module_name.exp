@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: undeclared `N::c`
+  ┌─ tests/checking/naming/unbound_module_name.move:7:17
+  │
+7 │         let x = N::c;
+  │                 ^^^^
+
+error: undeclared `M::c`
+  ┌─ tests/checking/naming/unbound_module_name.move:8:17
+  │
+8 │         let y = Self::c;
+  │                 ^^^^^^^
+
+error: undeclared `N::c`
+  ┌─ tests/checking/naming/unbound_module_name.move:9:13
+  │
+9 │         0 + N::c + Self::c;
+  │             ^^^^
+
+error: undeclared `M::c`
+  ┌─ tests/checking/naming/unbound_module_name.move:9:20
+  │
+9 │         0 + N::c + Self::c;
+  │                    ^^^^^^^

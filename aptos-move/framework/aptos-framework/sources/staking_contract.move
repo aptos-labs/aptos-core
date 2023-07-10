@@ -233,6 +233,17 @@ module aptos_framework::staking_contract {
         simple_map::contains_key(&store.staking_contracts, &operator)
     }
 
+    #[view]
+    /// Return the address of the stake pool to be created with the provided staker, operator and seed.
+    public fun get_expected_stake_pool_address(
+        staker: address,
+        operator: address,
+        contract_creation_seed: vector<u8>,
+    ): address {
+        let seed = create_resource_account_seed(staker, operator, contract_creation_seed);
+        account::create_resource_address(&staker, seed)
+    }
+
     /// Staker can call this function to create a simple staking contract with a specified operator.
     public entry fun create_staking_contract(
         staker: &signer,
@@ -670,13 +681,8 @@ module aptos_framework::staking_contract {
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability, OwnerCapability) {
         // Generate a seed that will be used to create the resource account that hosts the staking contract.
-        let seed = bcs::to_bytes(&signer::address_of(staker));
-        vector::append(&mut seed, bcs::to_bytes(&operator));
-        // Include a salt to avoid conflicts with any other modules out there that might also generate
-        // deterministic resource accounts for the same staker + operator addresses.
-        vector::append(&mut seed, SALT);
-        // Add an extra salt given by the staker in case an account with the same address has already been created.
-        vector::append(&mut seed, contract_creation_seed);
+        let seed = create_resource_account_seed(
+            signer::address_of(staker), operator, contract_creation_seed);
 
         let (stake_pool_signer, stake_pool_signer_cap) = account::create_resource_account(staker, seed);
         stake::initialize_stake_owner(&stake_pool_signer, 0, operator, voter);
@@ -720,6 +726,22 @@ module aptos_framework::staking_contract {
         });
 
         pool_u64::update_total_coins(distribution_pool, updated_total_coins);
+    }
+
+    /// Create the seed to derive the resource account address.
+    fun create_resource_account_seed(
+        staker: address,
+        operator: address,
+        contract_creation_seed: vector<u8>,
+    ): vector<u8> {
+        let seed = bcs::to_bytes(&staker);
+        vector::append(&mut seed, bcs::to_bytes(&operator));
+        // Include a salt to avoid conflicts with any other modules out there that might also generate
+        // deterministic resource accounts for the same staker + operator addresses.
+        vector::append(&mut seed, SALT);
+        // Add an extra salt given by the staker in case an account with the same address has already been created.
+        vector::append(&mut seed, contract_creation_seed);
+        seed
     }
 
     /// Create a new staking_contracts resource.
@@ -1257,6 +1279,12 @@ module aptos_framework::staking_contract {
         stake::end_epoch();
         let balance_2epoch = with_rewards(balance_1epoch - unpaid_commission);
         stake::assert_stake_pool(pool_address, balance_2epoch, 0, 0, with_rewards(unpaid_commission));
+    }
+
+    #[test(staker = @0xe256f4f4e2986cada739e339895cf5585082ff247464cab8ec56eea726bd2263, operator= @0x9f0a211d218b082987408f1e393afe1ba0c202c6d280f081399788d3360c7f09)]
+    public entry fun test_get_expected_stake_pool_address(staker: address, operator: address) {
+        let pool_address = get_expected_stake_pool_address(staker, operator, vector[0x42, 0x42]);
+        assert!(pool_address == @0x9d9648031ada367c26f7878eb0b0406ae6a969b1a43090269e5cdfabe1b48f0f, 0);
     }
 
     #[test_only]
