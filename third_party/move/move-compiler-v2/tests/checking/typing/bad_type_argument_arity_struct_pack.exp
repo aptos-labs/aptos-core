@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: generic count mismatch (expected 1 but found 0)
+  ┌─ tests/checking/typing/bad_type_argument_arity_struct_pack.move:7:9
+  │
+7 │         S<> { f: 0 };
+  │         ^^^^^^^^^^^^
+
+error: generic count mismatch (expected 1 but found 2)
+  ┌─ tests/checking/typing/bad_type_argument_arity_struct_pack.move:8:9
+  │
+8 │         S<u64, u64> { f: 0 };
+  │         ^^^^^^^^^^^^^^^^^^^^

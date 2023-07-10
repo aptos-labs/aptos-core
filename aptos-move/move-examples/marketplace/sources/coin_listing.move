@@ -352,7 +352,7 @@ module coin_listing {
 
         let coins = coin::withdraw<CoinType>(purchaser, price);
 
-        complete_purchase(signer::address_of(purchaser), object, coins)
+        complete_purchase(purchaser, signer::address_of(purchaser), object, coins)
     }
 
     /// End a fixed price listing early.
@@ -363,7 +363,7 @@ module coin_listing {
         let token_metadata = listing::token_metadata(object);
 
         let expected_seller_addr = signer::address_of(seller);
-        let (actual_seller_addr, fee_schedule) = listing::close(object, expected_seller_addr);
+        let (actual_seller_addr, fee_schedule) = listing::close(seller, object, expected_seller_addr);
         assert!(expected_seller_addr == actual_seller_addr, error::permission_denied(ENOT_SELLER));
 
         let listing_addr = object::object_address(&object);
@@ -444,6 +444,7 @@ module coin_listing {
     /// distributing out the asset to the winner or the auction seller if no one bid as well as
     /// giving any fees to the marketplace that hosted the auction.
     public entry fun complete_auction<CoinType>(
+        completer: &signer,
         object: Object<Listing>,
     ) acquires AuctionListing {
         let listing_addr = listing::assert_started(&object);
@@ -471,10 +472,11 @@ module coin_listing {
             (seller, coin::zero<CoinType>())
         };
 
-        complete_purchase(purchaser, object, coins);
+        complete_purchase(completer, purchaser, object, coins);
     }
 
     inline fun complete_purchase<CoinType>(
+        completer: &signer,
         purchaser_addr: address,
         object: Object<Listing>,
         coins: Coin<CoinType>,
@@ -483,7 +485,7 @@ module coin_listing {
 
         let price = coin::value(&coins);
         let (royalty_addr, royalty_charge) = listing::compute_royalty(object, price);
-        let (seller, fee_schedule) = listing::close(object, purchaser_addr);
+        let (seller, fee_schedule) = listing::close(completer, object, purchaser_addr);
 
         let commission_charge = fee_schedule::commission(fee_schedule, price);
         let commission = coin::extract(&mut coins, commission_charge);
@@ -765,7 +767,7 @@ module listing_tests {
 
         // End the auction as out of time
         test_utils::increment_timestamp(150);
-        coin_listing::complete_auction<AptosCoin>(listing);
+        coin_listing::complete_auction<AptosCoin>(aptos_framework, listing);
         assert!(object::owner(token) == purchaser_addr, 0);
         assert!(coin::balance<AptosCoin>(marketplace_addr) == 6, 0);
         assert!(coin::balance<AptosCoin>(seller_addr) == 10146, 0);
@@ -786,7 +788,7 @@ module listing_tests {
         assert!(coin::balance<AptosCoin>(seller_addr) == 9999, 0);
 
         test_utils::increment_timestamp(200);
-        coin_listing::complete_auction<AptosCoin>(listing);
+        coin_listing::complete_auction<AptosCoin>(aptos_framework, listing);
 
         assert!(object::owner(token) == seller_addr, 0);
         assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
@@ -1090,8 +1092,25 @@ module listing_tests {
             test_utils::setup(aptos_framework, marketplace, seller, purchaser);
 
         let (token_id, _fee_schedule, listing) = auction_listing_for_tokenv1(marketplace, seller);
-        let token_object = listing::listed_object(listing);
         coin_listing::purchase<AptosCoin>(purchaser, listing);
+        assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
+    }
+
+    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    fun test_auction_win_for_tokenv1_without_direct_transfer_and_non_winner_completer(
+        aptos_framework: &signer,
+        marketplace: &signer,
+        seller: &signer,
+        purchaser: &signer,
+    ) {
+        let (_marketplace_addr, _seller_addr, purchaser_addr) =
+            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+
+        let (token_id, _fee_schedule, listing) = auction_listing_for_tokenv1(marketplace, seller);
+        coin_listing::bid<AptosCoin>(purchaser, listing, 100);
+        test_utils::increment_timestamp(1000);
+        let token_object = listing::listed_object(listing);
+        coin_listing::complete_auction<AptosCoin>(aptos_framework, listing);
         listing::extract_tokenv1(purchaser, object::convert(token_object));
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
     }

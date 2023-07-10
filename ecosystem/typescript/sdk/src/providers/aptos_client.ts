@@ -457,7 +457,8 @@ export class AptosClient {
       body: signedTxn,
       endpoint: "transactions",
       originMethod: "submitSignedBCSTransaction",
-      overrides: { HEADERS: { "content-type": "application/x.aptos.signed_transaction+bcs" }, ...this.config },
+      contentType: "application/x.aptos.signed_transaction+bcs",
+      overrides: { ...this.config },
     });
     return data;
   }
@@ -495,7 +496,8 @@ export class AptosClient {
       endpoint: "transactions/simulate",
       params: queryParams,
       originMethod: "submitBCSSimulation",
-      overrides: { HEADERS: { "content-type": "application/x.aptos.signed_transaction+bcs" }, ...this.config },
+      contentType: "application/x.aptos.signed_transaction+bcs",
+      overrides: { ...this.config },
     });
     return data;
   }
@@ -735,7 +737,7 @@ export class AptosClient {
       endpoint: `tables/${handle}/item`,
       originMethod: "getTableItem",
       params: { ledger_version: query?.ledgerVersion?.toString() },
-      overrides: { HEADERS: { "content-type": "application/json" }, ...this.config },
+      overrides: { ...this.config },
     });
     return response.data;
   }
@@ -1056,7 +1058,7 @@ export class AptosClient {
       endpoint: "view",
       originMethod: "getTableItem",
       params: { ledger_version },
-      overrides: { HEADERS: { "content-type": "application/json" }, ...this.config },
+      overrides: { ...this.config },
     });
     return data;
   }
