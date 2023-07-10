@@ -19,7 +19,6 @@ This module defines a struct storing the metadata of the block and new block eve
 -  [Function `emit_genesis_block_event`](#0x1_block_emit_genesis_block_event)
 -  [Function `emit_writeset_block_event`](#0x1_block_emit_writeset_block_event)
 -  [Specification](#@Specification_1)
-    -  [Resource `BlockResource`](#@Specification_1_BlockResource)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `update_epoch_interval_microsecs`](#@Specification_1_update_epoch_interval_microsecs)
     -  [Function `get_epoch_interval_secs`](#@Specification_1_get_epoch_interval_secs)
@@ -570,50 +569,6 @@ new block event for WriteSetPayload.
 
 
 
-<a name="@Specification_1_BlockResource"></a>
-
-### Resource `BlockResource`
-
-
-<pre><code><b>struct</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> <b>has</b> key
-</code></pre>
-
-
-
-<dl>
-<dt>
-<code>height: u64</code>
-</dt>
-<dd>
- Height of the current block
-</dd>
-<dt>
-<code>epoch_interval: u64</code>
-</dt>
-<dd>
- Time period between epochs.
-</dd>
-<dt>
-<code>new_block_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;</code>
-</dt>
-<dd>
- Handle where events with the time of new blocks are emitted
-</dd>
-<dt>
-<code>update_epoch_interval_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_UpdateEpochIntervalEvent">block::UpdateEpochIntervalEvent</a>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-
-<pre><code><b>invariant</b> epoch_interval &gt; 0;
-</code></pre>
-
-
-
 <a name="@Specification_1_initialize"></a>
 
 ### Function `initialize`
@@ -636,6 +591,10 @@ The number of new events created does not exceed MAX_U64.
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 2 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
+<b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+<b>ensures</b> <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr).height == 0;
+<b>ensures</b> <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr).epoch_interval &gt; 0;
+<b>ensures</b> @aptos_framework == addr;
 </code></pre>
 
 
@@ -652,7 +611,6 @@ The number of new events created does not exceed MAX_U64.
     <b>aborts_if</b> epoch_interval_microsecs &lt;= 0;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
-    <b>ensures</b> <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr).height == 0;
 }
 </code></pre>
 
@@ -705,6 +663,8 @@ The BlockResource existed under the @aptos_framework.
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>let</b> <b>post</b> block_resource = <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>ensures</b> block_resource.epoch_interval == new_epoch_interval;
+    <b>ensures</b> addr == @aptos_framework;
+    <b>ensures</b> block_resource.epoch_interval &gt; 0;
 }
 </code></pre>
 
@@ -750,6 +710,7 @@ The BlockResource existed under the @aptos_framework.
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 <b>aborts_if</b> <b>false</b>;
+<b>ensures</b> proposer == @vm_reserved;
 </code></pre>
 
 
@@ -788,8 +749,9 @@ The BlockResource existed under the @aptos_framework.
 <b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_vm">system_addresses::is_vm</a>(vm);
 <b>requires</b> (proposer == @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == <a href="timestamp.md#0x1_timestamp">timestamp</a>);
 <b>requires</b> (proposer != @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &lt; <a href="timestamp.md#0x1_timestamp">timestamp</a>);
-<b>requires</b> <a href="event.md#0x1_event_counter">event::counter</a>(event_handle) == new_block_event.height;
 <b>aborts_if</b> <b>false</b>;
+<b>aborts_if</b> <a href="event.md#0x1_event_counter">event::counter</a>(event_handle) != new_block_event.height;
+<b>ensures</b> <a href="event.md#0x1_event_counter">event::counter</a>(event_handle) == new_block_event.height;
 </code></pre>
 
 
