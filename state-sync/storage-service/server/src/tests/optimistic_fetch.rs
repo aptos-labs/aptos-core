@@ -144,9 +144,9 @@ async fn test_peers_with_ready_optimistic_fetches() {
 #[tokio::test]
 async fn test_remove_expired_optimistic_fetches() {
     // Create a storage service config
-    let max_optimistic_fetch_period = 100;
+    let max_optimistic_fetch_period_ms = 100;
     let storage_service_config = StorageServiceConfig {
-        max_optimistic_fetch_period,
+        max_optimistic_fetch_period_ms,
         ..Default::default()
     };
 
@@ -183,7 +183,7 @@ async fn test_remove_expired_optimistic_fetches() {
     time_service
         .clone()
         .into_mock()
-        .advance_async(Duration::from_millis(max_optimistic_fetch_period / 2))
+        .advance_async(Duration::from_millis(max_optimistic_fetch_period_ms / 2))
         .await;
 
     // Update the storage server summary so that there is new data
@@ -223,7 +223,7 @@ async fn test_remove_expired_optimistic_fetches() {
     time_service
         .clone()
         .into_mock()
-        .advance_async(Duration::from_millis(max_optimistic_fetch_period))
+        .advance_async(Duration::from_millis(max_optimistic_fetch_period_ms))
         .await;
 
     // Remove the expired optimistic fetches and verify the first batch was removed
@@ -247,7 +247,7 @@ async fn test_remove_expired_optimistic_fetches() {
     time_service
         .clone()
         .into_mock()
-        .advance_async(Duration::from_millis(max_optimistic_fetch_period + 1))
+        .advance_async(Duration::from_millis(max_optimistic_fetch_period_ms + 1))
         .await;
 
     // Remove the expired optimistic fetches and verify the second batch was removed
