@@ -149,9 +149,6 @@ impl RandShares {
     }
 
     pub fn rounds(&self) -> Vec<Round> {
-        self.shares
-            .iter()
-            .map(|s| s.as_ref().unwrap().round())
-            .collect()
+        self.shares.iter().filter_map(|s| s.as_ref().map(|share| share.round())).collect()
     }
 }

@@ -119,9 +119,6 @@ impl RandDecisions {
     }
 
     pub fn rounds(&self) -> Vec<Round> {
-        self.decisions
-            .iter()
-            .map(|s| s.as_ref().unwrap().round())
-            .collect()
+        self.decisions.iter().filter_map(|s| s.as_ref().map(|share| share.round())).collect()
     }
 }
