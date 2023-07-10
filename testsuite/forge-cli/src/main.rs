@@ -10,7 +10,7 @@ use aptos_forge::{
     system_metrics::{MetricsThreshold, SystemMetricsThreshold},
     ForgeConfig, Options, *,
 };
-use aptos_logger::Level;
+use aptos_logger::{info, Level};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use aptos_testcases::{
@@ -42,6 +42,7 @@ use aptos_testcases::{
     CompositeNetworkTest,
 };
 use clap::{Parser, Subcommand};
+use futures::stream::{FuturesUnordered,StreamExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
@@ -54,7 +55,9 @@ use std::{
     thread,
     time::Duration,
 };
+use std::path::{Path, PathBuf};
 use tokio::runtime::Runtime;
+use tokio::select;
 use url::Url;
 
 #[cfg(unix)]
@@ -2066,6 +2069,85 @@ impl NetworkTest for EmitTransaction {
 
         Ok(())
     }
+}
+
+
+#[derive(Debug)]
+struct GatherMetrics;
+
+impl Test for GatherMetrics {
+    fn name(&self) -> &'static str {
+        "gather_metrics"
+    }
+}
+
+impl NetworkTest for GatherMetrics {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+        let runtime = ctx.runtime.handle();
+        runtime.block_on(gather_metrics_inner(ctx));
+
+        Ok(())
+    }
+}
+
+async fn gather_metrics_inner(ctx: &NetworkContext<'_>) {
+    let start = tokio::time::Instant::now();
+    gather_metrics_one(ctx).await;
+    tokio::time::sleep_until(start + ctx.global_duration - Duration::from_secs(10)).await;
+    gather_metrics_one(ctx).await;
+}
+
+async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
+    let handle = ctx.runtime.handle();
+    let outdir = Path::new("/tmp");
+    let mut gets = FuturesUnordered::new();
+    let now = chrono::prelude::Utc::now().format("%Y%m%d_%H%M%S%").to_string();
+    for val in ctx.swarm.validators() {
+        let mut url = val.inspection_service_endpoint();
+        let valname = val.peer_id().to_string();
+        url.set_path("metrics");
+        let fname = format!("{}.{}.metrics", now, valname);
+        let outpath : PathBuf = outdir.join(fname);
+        let th = handle.spawn(gather_metrics_to_file(url, outpath));
+        gets.push(th);
+    }
+    // join all the join handles
+    while !gets.is_empty() {
+        select! {
+            _ = gets.next() => {}
+        }
+    }
+}
+
+async fn gather_metrics_to_file(url: Url, outpath: PathBuf) {
+    let client = reqwest::Client::new();
+    match client.get(url).send().await {
+        Ok(response) => {
+            let url = response.url().clone();
+            let status = response.status();
+            if status.is_success() {
+                match response.text().await {
+                    Ok(text) => {
+                        match std::fs::write(outpath, text) {
+                            Ok(_) => {return;}
+                            Err(err) => {
+                                info!("could not write metrics: {}", err);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        info!("bad metrics GET: {} -> {}", url, err);
+                    }
+                }
+            } else {
+                info!("bad metrics GET: {} -> {}", url, status);
+            }
+        }
+        Err(err) => {
+            info!("bad metrics GET: {}", err);
+        }
+    }
+
 }
 
 #[cfg(test)]

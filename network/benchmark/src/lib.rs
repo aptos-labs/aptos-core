@@ -5,7 +5,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::{info, warn};
-use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
+use aptos_metrics_core::{register_int_counter_vec, IntCounterVec, IntCounter};
 use aptos_network::{
     application::interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
     protocols::{network::Event, rpc::error::RpcError, wire::handshake::v1::ProtocolId},
@@ -417,6 +417,7 @@ pub async fn rpc_sender(
                 }
                 let wrapper = BenchmarkMessage::DataSend(msg);
                 let result = network_client.send_to_peer_rpc(wrapper, Duration::from_secs(10), PeerNetworkId::new(network_id, peer_id));
+                rpc_messages("sent");
                 open_rpcs.push(result);
 
                 if nowu > next_blab {
@@ -432,19 +433,24 @@ pub async fn rpc_sender(
                     }
                 };
                 // handle rpc result
-                let nowu = time_service.now_unix_time().as_micros() as i64;
                 match result {
                     Err(err) => {
                         info!("benchmark [{},{}] rpc send err: {}", network_id, peer_id, err);
+                        rpc_messages("err");
                         // TODO: some error limit, or error-per-second limit, or specifically detect unrecoverable errors
                         return;
                     }
                     Ok(msg_wrapper) => {
+                        let nowu = time_service.now_unix_time().as_micros() as i64;
                         if let BenchmarkMessage::DataReply(msg) = msg_wrapper {
                             let send_dt = nowu - msg.your_send_micros;
                             info!("benchmark [{}] rpc at {} µs, took {} µs", msg.request_counter, nowu, send_dt);
+                            rpc_messages("ok");
+                            rpc_bytes("ok").inc_by(data_size as u64);
+                            rpc_micros("ok").inc_by(send_dt as u64);
                         } else {
-                            info!("benchmark [{}] rpc wat", counter);
+                            rpc_messages("bad");
+                            info!("benchmark [{}] rpc garbage reply", counter);
                         }
                     }
                 }
@@ -520,17 +526,41 @@ pub struct SendRecord {
     pub bytes_sent: usize,
 }
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+pub static APTOS_NETWORK_BENCHMARK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!("aptos_network_benchmark_rpc_messages", "Number of benchmark RPC messages", &["state"]).unwrap()
+});
+
+fn rpc_messages(
+    state_label: &'static str,
+) {
+    APTOS_NETWORK_BENCHMARK_RPC_MESSAGES.with_label_values(&[state_label]).inc();
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub static APTOS_NETWORK_BENCHMARK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_benchmark_rpc_bytes",
+        "Number of benchmark RPC bytes transferred",
+        &["state"]
+    ).unwrap()
+});
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub fn rpc_bytes(
+    state_label: &'static str,
+) -> IntCounter {
+    APTOS_NETWORK_BENCHMARK_RPC_BYTES.with_label_values(&[state_label])
+}
+
+
+pub static APTOS_NETWORK_BENCHMARK_RPC_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_benchmark_rpc_micros",
+        "Number of benchmark RPC microseconds used (hint: divide by _messages)",
+        &["state"]
+    ).unwrap()
+});
+
+pub fn rpc_micros(
+    state_label: &'static str,
+) -> IntCounter {
+    APTOS_NETWORK_BENCHMARK_RPC_MICROS.with_label_values(&[state_label])
 }
