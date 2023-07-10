@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::storage::DAGStorage;
 use crate::{
     dag::{
         dag_store::Dag,
@@ -28,6 +29,7 @@ pub(crate) struct DagDriver {
     current_round: Round,
     time_service: Arc<dyn TimeService>,
     rb_abort_handle: Option<AbortHandle>,
+    storage: Arc<dyn DAGStorage>,
 }
 
 impl DagDriver {
@@ -39,6 +41,7 @@ impl DagDriver {
         reliable_broadcast: Arc<ReliableBroadcast>,
         current_round: Round,
         time_service: Arc<dyn TimeService>,
+        storage: Arc<dyn DAGStorage>,
     ) -> Self {
         Self {
             author,
@@ -49,6 +52,7 @@ impl DagDriver {
             current_round,
             time_service,
             rb_abort_handle: None,
+            storage,
         }
     }
 
@@ -84,6 +88,9 @@ impl DagDriver {
             payload,
             strong_links,
         );
+        self.storage
+            .save_node(&new_node)
+            .expect("node must be saved");
         self.broadcast_node(new_node);
     }
 

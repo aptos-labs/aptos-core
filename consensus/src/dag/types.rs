@@ -275,6 +275,35 @@ impl TDAGMessage for Node {
     }
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug, Eq, Hash, Clone)]
+pub struct NodeId {
+    round: Round,
+    author: Author,
+}
+
+impl NodeId {
+    pub fn new(round: Round, author: Author) -> Self {
+        Self { round, author }
+    }
+
+    pub fn round(&self) -> Round {
+        self.round
+    }
+
+    pub fn author(&self) -> Author {
+        self.author
+    }
+}
+
+impl From<&Node> for NodeId {
+    fn from(node: &Node) -> Self {
+        Self {
+            round: node.metadata.round,
+            author: node.metadata.author,
+        }
+    }
+}
+
 /// Quorum signatures over the node digest
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct NodeCertificate {

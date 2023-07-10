@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::types::{CertifiedAck, CertifiedNode};
+use super::{
+    storage::DAGStorage,
+    types::{CertifiedAck, CertifiedNode},
+    NodeId,
+};
 use crate::{
     dag::{
         dag_network::{DAGNetworkSender, RpcHandler},
@@ -15,7 +19,7 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_types::{validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier};
 use futures::{stream::FuturesUnordered, StreamExt};
-use std::{collections::BTreeMap, future::Future, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, future::Future, mem, sync::Arc, time::Duration};
 use thiserror::Error as ThisError;
 
 pub trait BroadcastStatus {
@@ -97,6 +101,7 @@ pub struct NodeBroadcastHandler {
     signatures_by_round_peer: BTreeMap<Round, BTreeMap<Author, NodeDigestSignature>>,
     signer: ValidatorSigner,
     verifier: ValidatorVerifier,
+    storage: Arc<dyn DAGStorage>,
 }
 
 impl NodeBroadcastHandler {
@@ -104,17 +109,42 @@ impl NodeBroadcastHandler {
         dag: Arc<RwLock<Dag>>,
         signer: ValidatorSigner,
         verifier: ValidatorVerifier,
+        storage: Arc<dyn DAGStorage>,
     ) -> Self {
+        let mut signatures_by_round_peer = BTreeMap::new();
+        storage
+            .get_node_signatures()
+            .unwrap_or_default()
+            .into_iter()
+            .for_each(|(node_id, digest_sig)| {
+                signatures_by_round_peer
+                    .entry(node_id.round())
+                    .or_insert_with(BTreeMap::new)
+                    .insert(node_id.author(), digest_sig);
+            });
+
         Self {
             dag,
-            signatures_by_round_peer: BTreeMap::new(),
+            signatures_by_round_peer,
             signer,
             verifier,
+            storage,
         }
     }
 
-    pub fn gc_before_round(&mut self, min_round: Round) {
-        self.signatures_by_round_peer.retain(|r, _| r >= &min_round);
+    pub fn gc_before_round(&mut self, min_round: Round) -> anyhow::Result<()> {
+        let to_retain = self.signatures_by_round_peer.split_off(&min_round);
+        let to_delete = mem::replace(&mut self.signatures_by_round_peer, to_retain);
+
+        let to_delete = to_delete
+            .iter()
+            .flat_map(|(r, peer_and_digest)| {
+                peer_and_digest
+                    .iter()
+                    .map(|(author, _)| NodeId::new(*r, *author))
+            })
+            .collect();
+        self.storage.delete_node_signatures(to_delete)
     }
 
     fn validate(&self, node: &Node) -> anyhow::Result<()> {
@@ -171,13 +201,16 @@ impl RpcHandler for NodeBroadcastHandler {
             .signatures_by_round_peer
             .entry(node.metadata().round())
             .or_insert(BTreeMap::new());
-        // TODO(ibalajiarun): persist node before voting
         match signatures_by_peer.get(node.metadata().author()) {
             None => {
                 let signature = node.sign(&self.signer)?;
                 let digest_signature =
                     NodeDigestSignature::new(node.metadata().epoch(), node.digest(), signature);
+
+                self.storage
+                    .save_node_signature(&(&node).into(), &digest_signature)?;
                 signatures_by_peer.insert(*node.metadata().author(), digest_signature.clone());
+
                 Ok(digest_signature)
             },
             Some(ack) => Ok(ack.clone()),

@@ -7,7 +7,7 @@ mod consensusdb_test;
 mod schema;
 
 use crate::{
-    dag::{CertifiedNode, Node},
+    dag::{CertifiedNode, Node, NodeDigestSignature, NodeId},
     error::DbError,
 };
 use anyhow::Result;
@@ -17,7 +17,7 @@ use aptos_logger::prelude::*;
 use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
 use schema::{
     block::BlockSchema,
-    dag::{CertifiedNodeSchema, NodeSchema},
+    dag::{CertifiedNodeSchema, NodeDigestSignatureSchema, NodeSchema},
     quorum_certificate::QCSchema,
     single_entry::{SingleEntryKey, SingleEntrySchema},
     BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, NODE_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME,
@@ -197,6 +197,38 @@ impl ConsensusDB {
         batch.put::<NodeSchema>(&node.digest(), node)?;
         self.commit(batch)?;
         Ok(())
+    }
+
+    pub fn delete_node(&self, digest: HashValue) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.delete::<NodeSchema>(&digest)?;
+        self.commit(batch)
+    }
+
+    pub fn save_node_signature(
+        &self,
+        node_id: &NodeId,
+        node_digest_signature: &NodeDigestSignature,
+    ) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.put::<NodeDigestSignatureSchema>(node_id, node_digest_signature)?;
+        self.commit(batch)
+    }
+
+    pub fn get_node_signatures(&self) -> Result<HashMap<NodeId, NodeDigestSignature>, DbError> {
+        let mut iter = self
+            .db
+            .iter::<NodeDigestSignatureSchema>(ReadOptions::default())?;
+        iter.seek_to_first();
+        Ok(iter.collect::<Result<HashMap<NodeId, NodeDigestSignature>>>()?)
+    }
+
+    pub fn delete_node_signatures(&self, node_ids: Vec<NodeId>) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        node_ids
+            .iter()
+            .try_for_each(|node_id| batch.delete::<NodeDigestSignatureSchema>(node_id))?;
+        self.commit(batch)
     }
 
     pub fn save_certified_node(&self, node: &CertifiedNode) -> Result<(), DbError> {
