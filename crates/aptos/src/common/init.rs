@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::types::HardwareWalletOptions;
 use crate::{
     account::key_rotation::lookup_address,
     common::{
@@ -56,6 +57,9 @@ pub struct InitTool {
     /// and opened. Otherwise CLI would not be able to open the connection to your account
     #[clap(long)]
     pub ledger: bool,
+
+    #[clap(flatten)]
+    pub(crate) hardware_wallet_options: HardwareWalletOptions,
 
     #[clap(flatten)]
     pub rng_args: RngArgs,
@@ -138,8 +142,13 @@ impl CliCommand<()> for InitTool {
             Network::Custom => self.custom_network(&mut profile_config)?,
         }
 
-        // Fetch the top 5 (index 0-4) accounts from Ledger
-        let derivation_path = if self.ledger {
+        // Check if any ledger flag is set
+        let derivation_path = if let Some(deri_path) =
+            self.hardware_wallet_options.extract_derivation_path()?
+        {
+            Some(deri_path)
+        } else if self.ledger {
+            // Fetch the top 5 (index 0-4) accounts from Ledger
             let account_map = aptos_ledger::fetch_batch_accounts(Some(0..5))?;
             eprintln!(
                 "Please choose an index from the following {} ledger accounts, or choose an arbitrary index that you want to use:",
@@ -173,7 +182,7 @@ impl CliCommand<()> for InitTool {
         profile_config.derivation_path = derivation_path.clone();
 
         // Private key
-        let private_key = if self.ledger {
+        let private_key = if self.ledger || self.hardware_wallet_options.is_hardware_wallet() {
             // Private key stays in ledger
             None
         } else {
@@ -208,7 +217,7 @@ impl CliCommand<()> for InitTool {
         };
 
         // Public key
-        let public_key = if self.ledger {
+        let public_key = if self.ledger || self.hardware_wallet_options.is_hardware_wallet() {
             let pub_key = match aptos_ledger::get_public_key(
                 derivation_path
                     .ok_or(CliError::UnexpectedError(
