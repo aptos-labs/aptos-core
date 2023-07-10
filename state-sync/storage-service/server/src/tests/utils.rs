@@ -12,6 +12,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+use aptos_logger::Level;
 use aptos_storage_service_notifications::{
     StorageServiceNotificationSender, StorageServiceNotifier,
 };
@@ -23,7 +24,7 @@ use aptos_storage_service_types::{
     responses::{CompleteDataRange, DataResponse, StorageServerSummary, StorageServiceResponse},
     Epoch, StorageServiceError,
 };
-use aptos_time_service::MockTimeService;
+use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
@@ -42,6 +43,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use dashmap::DashMap;
+use futures::channel::oneshot::Receiver;
 use mockall::predicate::eq;
 use rand::{rngs::OsRng, Rng};
 use std::{sync::Arc, time::Duration};
@@ -256,6 +258,15 @@ pub fn configure_network_chunk_limit(
     }
 }
 
+/// Advances the mock time service by the specified number of milliseconds
+pub async fn elapse_time(time_ms: u64, time_service: &TimeService) {
+    time_service
+        .clone()
+        .into_mock()
+        .advance_async(Duration::from_millis(time_ms))
+        .await;
+}
+
 /// Sets an expectation on the given mock db for a call to fetch an epoch change proof
 pub fn expect_get_epoch_ending_ledger_infos(
     mock_db: &mut MockDatabaseReader,
@@ -362,6 +373,14 @@ pub async fn get_transactions_with_proof(
         include_events,
     });
     send_storage_request(mock_client, use_compression, data_request).await
+}
+
+/// Initializes the Aptos logger for tests
+pub fn initialize_logger() {
+    aptos_logger::Logger::builder()
+        .is_async(false)
+        .level(Level::Debug)
+        .build();
 }
 
 /// Sends the given storage request to the given client
@@ -513,4 +532,87 @@ pub async fn wait_for_active_optimistic_fetches(
         // Sleep for a while
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
+}
+
+/// Verifies that a new transaction outputs with proof response is received
+/// and that the response contains the correct data.
+pub async fn verify_new_transaction_outputs_with_proof(
+    mock_client: &mut MockClient,
+    receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
+    output_list_with_proof: TransactionOutputListWithProof,
+    expected_ledger_info: LedgerInfoWithSignatures,
+) {
+    match mock_client
+        .wait_for_response(receiver)
+        .await
+        .unwrap()
+        .get_data_response()
+        .unwrap()
+    {
+        DataResponse::NewTransactionOutputsWithProof((outputs_with_proof, ledger_info)) => {
+            assert_eq!(outputs_with_proof, output_list_with_proof);
+            assert_eq!(ledger_info, expected_ledger_info);
+        },
+        response => panic!(
+            "Expected new transaction outputs with proof but got: {:?}",
+            response
+        ),
+    };
+}
+
+/// Verifies that a new transactions or outputs with proof response is received
+/// and that the response contains the correct data.
+pub async fn verify_new_transactions_or_outputs_with_proof(
+    mock_client: &mut MockClient,
+    receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
+    expected_transaction_list_with_proof: Option<TransactionListWithProof>,
+    expected_output_list_with_proof: Option<TransactionOutputListWithProof>,
+    expected_ledger_info: LedgerInfoWithSignatures,
+) {
+    let response = mock_client.wait_for_response(receiver).await.unwrap();
+    match response.get_data_response().unwrap() {
+        DataResponse::NewTransactionsOrOutputsWithProof((
+            transactions_or_outputs_with_proof,
+            ledger_info,
+        )) => {
+            let (transactions_with_proof, outputs_with_proof) = transactions_or_outputs_with_proof;
+            if let Some(transactions_with_proof) = transactions_with_proof {
+                assert_eq!(
+                    transactions_with_proof,
+                    expected_transaction_list_with_proof.unwrap()
+                );
+            } else {
+                assert_eq!(
+                    outputs_with_proof.unwrap(),
+                    expected_output_list_with_proof.unwrap()
+                );
+            }
+            assert_eq!(ledger_info, expected_ledger_info);
+        },
+        response => panic!(
+            "Expected new transaction outputs with proof but got: {:?}",
+            response
+        ),
+    };
+}
+
+/// Verifies that a new transactions with proof response is received
+/// and that the response contains the correct data.
+pub async fn verify_new_transactions_with_proof(
+    mock_client: &mut MockClient,
+    receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
+    expected_transactions_with_proof: TransactionListWithProof,
+    expected_ledger_info: LedgerInfoWithSignatures,
+) {
+    let storage_service_response = mock_client.wait_for_response(receiver).await.unwrap();
+    match storage_service_response.get_data_response().unwrap() {
+        DataResponse::NewTransactionsWithProof((transactions_with_proof, ledger_info)) => {
+            assert_eq!(transactions_with_proof, expected_transactions_with_proof);
+            assert_eq!(ledger_info, expected_ledger_info);
+        },
+        response => panic!(
+            "Expected new transaction with proof but got: {:?}",
+            response
+        ),
+    };
 }
