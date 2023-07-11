@@ -96,7 +96,11 @@ impl<'a> Parser<'a> {
                 )
                 .await
                 {
-                    Ok(_) => self.log("Successfully saved JSON"),
+                    Ok(filename) => {
+                        self.model.cdn_image_uri =
+                            Some(format!("http://34.160.26.161/{}", filename));
+                        self.log("Successfully saved JSON")
+                    },
                     Err(e) => self.log(&e.to_string()),
                 }
             },
@@ -139,7 +143,11 @@ impl<'a> Parser<'a> {
                 )
                 .await
                 {
-                    Ok(_) => self.log("Successfully saved image"),
+                    Ok(filename) => {
+                        self.model.cdn_image_uri =
+                            Some(format!("http://34.160.26.161/{}", filename));
+                        self.log("Successfully saved image");
+                    },
                     Err(e) => self.log(&e.to_string()),
                 }
             },

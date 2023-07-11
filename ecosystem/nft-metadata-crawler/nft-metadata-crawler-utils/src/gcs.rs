@@ -14,11 +14,12 @@ pub async fn write_json_to_gcs(
     bucket: String,
     id: String,
     json: Value,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<String, Box<dyn Error + Send + Sync>> {
     let client = Client::new();
+    let filename = format!("json_{}.json", id);
     let url = format!(
-        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name=json_{}.json",
-        bucket, id
+        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
+        bucket, filename
     );
     let json_string = json.to_string();
 
@@ -31,7 +32,7 @@ pub async fn write_json_to_gcs(
         .await?;
 
     match res.status().as_u16() {
-        200..=299 => Ok(()),
+        200..=299 => Ok(filename),
         _ => {
             let text = res.text().await?;
             Err(format!("Error saving JSON to GCS {}", text).into())
@@ -45,7 +46,7 @@ pub async fn write_image_to_gcs(
     bucket: String,
     id: String,
     buffer: Vec<u8>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<String, Box<dyn Error + Send + Sync>> {
     let client = Client::new();
     let mut headers = HeaderMap::new();
 
@@ -58,9 +59,10 @@ pub async fn write_image_to_gcs(
         _ => "jpeg".to_string(),
     };
 
+    let filename = format!("image_{}.{}", id, extension);
     let url = format!(
-        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name=image_{}.{}",
-        bucket, id, extension
+        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
+        bucket, filename
     );
 
     headers.insert(
@@ -81,7 +83,7 @@ pub async fn write_image_to_gcs(
         .await?;
 
     match res.status().as_u16() {
-        200..=299 => Ok(()),
+        200..=299 => Ok(filename),
         _ => {
             let text = res.text().await?;
             Err(format!("Error saving image to GCS {}", text).into())
