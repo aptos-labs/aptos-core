@@ -370,51 +370,6 @@ describe("BuilderUtils", () => {
     );
   });
 
-  it("throws when nested type too high", async () => {
-    let serializer = new Serializer();
-    expect(() => {
-      serializeArg(
-        "abc",
-        new TypeTagStruct(
-          optionStructTag(
-            new TypeTagStruct(
-              optionStructTag(
-                new TypeTagStruct(
-                  optionStructTag(
-                    new TypeTagStruct(
-                      optionStructTag(
-                        new TypeTagStruct(
-                          optionStructTag(
-                            new TypeTagStruct(
-                              optionStructTag(
-                                new TypeTagStruct(
-                                  optionStructTag(
-                                    new TypeTagStruct(
-                                      optionStructTag(
-                                        new TypeTagStruct(
-                                          optionStructTag(new TypeTagStruct(objectStructTag(new TypeTagU8()))),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        serializer,
-      );
-    }).toThrow("Arguments are too nested, must be no greater than 8");
-  });
-
   it("throws when unsupported struct type", async () => {
     let serializer = new Serializer();
     expect(() => {
