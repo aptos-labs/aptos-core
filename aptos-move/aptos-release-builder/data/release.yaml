@@ -80,4 +80,4 @@ proposals:
         V2:
           transaction_shuffler_type:
             sender_aware_v1: 32
-          block_gas_limit : Some(35000)
+          block_gas_limit : 35000
