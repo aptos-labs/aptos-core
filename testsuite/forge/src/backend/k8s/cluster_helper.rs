@@ -146,7 +146,7 @@ async fn wait_nodes_stateful_set(
     // wait for all nodes healthy
     for node in nodes.values() {
         // retry every 10 seconds for 20 minutes
-        let retry_policy = RetryPolicy::fixed(Duration::from_secs(10)).with_max_retries(120);
+        let retry_policy = RetryPolicy::fixed(Duration::from_secs(10)).with_max_retries(360);
         wait_stateful_set(
             kube_client,
             kube_namespace,
