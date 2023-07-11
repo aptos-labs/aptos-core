@@ -9,7 +9,7 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::U64;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::coin_client::CoinClient;
-use aptos_sdk::token_client::TokenClient;
+use aptos_sdk::token_client::{TokenClient, CollectionData, MutabilityConfig};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
@@ -154,14 +154,18 @@ async fn test_mintnft(
     account: &mut LocalAccount,
 ) -> TestResult {
     // create collection
-    let collection_name = "test collection";
+    let collection_name = "test collection".to_string();
+    let collection_description = "collection description".to_string();
+    let collection_uri = "collection uri".to_string();
+    let collection_maximum = 1000;
+
     let pending_txn = match token_client
         .create_collection(
             account,
             &collection_name,
-            "collection desc",
-            "collection",
-            1000,
+            &collection_description,
+            &collection_uri,
+            collection_maximum,
             None,
         )
         .await
@@ -198,11 +202,25 @@ async fn test_mintnft(
     }
 
     // check collection metadata
-    let collection_data = match token_client.get_collection_data(account.address(), &collection_name).await {
+    let actual_collection_data = match token_client.get_collection_data(account.address(), &collection_name).await {
         Ok(txn) => txn,
         Err(e) => return TestResult::Error(e),
     };
-    println!("{:?}", collection_data);
+    let expected_collection_data = CollectionData {
+        name: collection_name,
+        description: collection_description,
+        uri: collection_uri,
+        maximum: collection_maximum,
+        mutability_config: MutabilityConfig {
+            description: false,
+            maximum: false,
+            uri: false,
+        },
+    };
+
+    if expected_collection_data != actual_collection_data {
+        return TestResult::Fail("wrong collection data");
+    }
 
     TestResult::Success
 }

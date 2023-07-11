@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Result};
 use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
-use serde_json::Value;
+use serde::Deserialize;
 
 #[derive(Clone, Debug)]
 pub struct TokenClient<'a> {
@@ -162,7 +162,7 @@ impl<'a> TokenClient<'a> {
         &self,
         creator: AccountAddress,
         collection_name: &str,
-    ) -> Result<Value> {
+    ) -> Result<CollectionData> {
         // get handle for collection_data
         let handle = match self.get_collection_data_handle(creator).await {
             Some(s) => AccountAddress::from_hex_literal(&s)?,
@@ -170,7 +170,7 @@ impl<'a> TokenClient<'a> {
         };
 
         // get table item with the handle
-        Ok(self
+        let value = self
             .api_client
             .get_table_item(
                 handle,
@@ -179,7 +179,17 @@ impl<'a> TokenClient<'a> {
                 collection_name,
             )
             .await?
-            .into_inner())
+            .into_inner();
+
+        // reconstruct from strings
+        let response: CollectionDataResponse = serde_json::from_value(value)?;
+        Ok(CollectionData {
+            name: response.name,
+            description: response.description,
+            uri: response.uri,
+            maximum: response.maximum.parse()?,
+            mutability_config: response.mutability_config,
+        })
     }
 }
 
@@ -207,4 +217,30 @@ pub struct RoyaltyOptions {
     pub royalty_payee_address: AccountAddress,
     pub royalty_points_denominator: u64,
     pub royalty_points_numerator: u64,
+}
+
+#[derive(Deserialize)]
+pub struct CollectionDataResponse {
+    name: String,
+    description: String,
+    uri: String,
+    maximum: String,
+    // supply: String,
+    mutability_config: MutabilityConfig,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CollectionData {
+    pub name: String,
+    pub description: String,
+    pub uri: String,
+    pub maximum: u64,
+    pub mutability_config: MutabilityConfig,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
+pub struct MutabilityConfig {
+    pub description: bool,
+    pub maximum: bool,
+    pub uri: bool,
 }
