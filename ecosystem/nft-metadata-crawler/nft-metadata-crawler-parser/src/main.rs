@@ -22,12 +22,12 @@ use tokio::task::JoinHandle;
 async fn process_response(
     res: Vec<String>,
     acks: &Vec<String>,
-    ts: &Box<dyn TokenSource>,
+    ts: &dyn TokenSource,
     subscription_name: &String,
     pool: &Pool<ConnectionManager<PgConnection>>,
 ) -> Result<Vec<(NFTMetadataCrawlerEntry, bool)>, Box<dyn Error + Send + Sync>> {
     let mut uris: Vec<(NFTMetadataCrawlerEntry, bool)> = Vec::new();
-    for (entry, ack) in res.into_iter().zip(acks.into_iter()) {
+    for (entry, ack) in res.into_iter().zip(acks.iter()) {
         let (entry_struct, force) = NFTMetadataCrawlerEntry::new(entry)?;
         let mut conn = pool.get()?;
         if nft_metadata_crawler_entry::table
@@ -46,7 +46,7 @@ async fn process_response(
                     entry_struct.last_transaction_version
                 );
                 let client = Client::new();
-                match send_ack(&client, ts.as_ref(), &subscription_name, &ack).await {
+                match send_ack(&client, ts, subscription_name, ack).await {
                     Ok(_) => println!(
                         "Transaction Version {}: Successfully acked",
                         entry_struct.last_transaction_version
@@ -127,12 +127,11 @@ async fn main() {
 
     while let Ok(r) = consume_from_queue(&client, ts.as_ref(), &subscription_name).await {
         let (res, acks): (Vec<String>, Vec<String>) = r.into_iter().unzip();
-        match process_response(res, &acks, &ts, &subscription_name, &pool).await {
+        match process_response(res, &acks, ts.as_ref(), &subscription_name, &pool).await {
             Ok(uris) => {
                 let handles: Vec<_> = uris
                     .into_iter()
                     .zip(acks.into_iter())
-                    .into_iter()
                     .map(|((uri, force), ack)| {
                         spawn_parser(
                             uri,
@@ -144,7 +143,7 @@ async fn main() {
                         )
                     })
                     .collect();
-                if let Ok(_) = future::try_join_all(handles).await {
+                if (future::try_join_all(handles).await).is_ok() {
                     println!("SUCCESS");
                 }
             },
