@@ -9,7 +9,6 @@ use crate::{
 use anyhow::{anyhow, Context, Result};
 use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Clone, Debug)]
 pub struct TokenClient<'a> {
