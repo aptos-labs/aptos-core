@@ -51,7 +51,7 @@ pub const CPU_FLAMEGRAPH_PATH: &str = "/cpu_flamegraph";
 pub const PROFILING_DASHBOARD: &str = "/profiling";
 pub const MEMORY_SVG_PATH: &str = "/memory_svg";
 pub const MEMORY_TXT_PATH: &str = "/memory_txt";
-pub const THREAD_DUMP_PATH: &str = "/thread_dump_start/{status}";
+pub const THREAD_DUMP_PATH: &str = "/thread_dump_start";
 pub const THREAD_DUMP_RESULT_PATH: &str = "/thread_dump_results";
 
 
@@ -169,27 +169,23 @@ async fn serve_requests(
             profiling::handle_profiling_request()
         },
         CPU_FLAMEGRAPH_PATH => {
-            //profiling dashboard
+            //shows cpu flamegraph
             cpu_flamegraph::handle_cpu_flamegraph_request()
         },
         MEMORY_SVG_PATH => {
-            //profiling dashboard
+            //shows memory svg
             memory_svg::handle_memory_svg_request()
         },
         MEMORY_TXT_PATH => {
-            //profiling dashboard
+            //shows memory txt
             memory_text::handle_memory_txt_request()
         },
-        path if path.starts_with("/thread_dump_start") => {
-            let mut parts = path.split('/');
-            let _ = parts.next(); // Ignore the first empty part
-            let _ = parts.next();
-            let status = parts.next().unwrap_or("");
-            //profiling dashboard
-            cpu_flamegraph::handle_cpu_flamegraph_request()
+        THREAD_DUMP_PATH => {
+            //starts thread dump
+            thread_dump::handle_thread_dump_request()
         },
         THREAD_DUMP_RESULT_PATH => {
-            //profiling dashboard
+            //shows thread dump
             thread_dump_result::handle_thread_dump_result_request()
         },
 
