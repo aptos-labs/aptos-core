@@ -10,7 +10,10 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
+use aptos_config::{
+    config::{StateSyncConfig, StorageServiceConfig},
+    network_id::PeerNetworkId,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_network::application::storage::PeersAndMetadata;
@@ -56,9 +59,9 @@ const CACHED_SUMMARY_UPDATE_CHANNEL_SIZE: usize = 1;
 /// service requests from clients.
 pub struct StorageServiceServer<T> {
     bounded_executor: BoundedExecutor,
-    config: StorageServiceConfig,
     network_requests: StorageServiceNetworkEvents,
     storage: T,
+    storage_service_config: StorageServiceConfig,
     time_service: TimeService,
 
     // A cached storage server summary to avoid hitting the DB for every
@@ -82,7 +85,7 @@ pub struct StorageServiceServer<T> {
 
 impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     pub fn new(
-        config: StorageServiceConfig,
+        config: StateSyncConfig,
         executor: Handle,
         storage: T,
         time_service: TimeService,
@@ -90,27 +93,35 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         network_requests: StorageServiceNetworkEvents,
         storage_service_listener: StorageServiceNotificationListener,
     ) -> Self {
-        let bounded_executor =
-            BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
+        // Extract the individual component configs
+        let aptos_data_client_config = config.aptos_data_client;
+        let storage_service_config = config.storage_service;
+
+        // Create the required components
+        let bounded_executor = BoundedExecutor::new(
+            storage_service_config.max_concurrent_requests as usize,
+            executor,
+        );
         let cached_storage_server_summary =
             Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
         let optimistic_fetches = Arc::new(DashMap::new());
         let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
-            config.max_lru_cache_size as usize,
+            storage_service_config.max_lru_cache_size as usize,
         )));
         let request_moderator = Arc::new(RequestModerator::new(
+            aptos_data_client_config,
             cached_storage_server_summary.clone(),
             peers_and_metadata,
-            config,
+            storage_service_config,
             time_service.clone(),
         ));
         let storage_service_listener = Some(storage_service_listener);
 
         Self {
-            config,
             bounded_executor,
-            storage,
             network_requests,
+            storage,
+            storage_service_config,
             time_service,
             cached_storage_server_summary,
             lru_response_cache,
@@ -146,7 +157,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     ) {
         // Clone all required components for the task
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
-        let config = self.config;
+        let config = self.storage_service_config;
         let storage = self.storage.clone();
         let time_service = self.time_service.clone();
 
@@ -211,7 +222,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         // Clone all required components for the task
         let bounded_executor = self.bounded_executor.clone();
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
-        let config = self.config;
+        let config = self.storage_service_config;
         let optimistic_fetches = self.optimistic_fetches.clone();
         let lru_response_cache = self.lru_response_cache.clone();
         let request_moderator = self.request_moderator.clone();
@@ -271,7 +282,7 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     /// peer states in the request moderator.
     async fn spawn_moderator_peer_refresher(&mut self) {
         // Clone all required components for the task
-        let config = self.config;
+        let config = self.storage_service_config;
         let request_moderator = self.request_moderator.clone();
         let time_service = self.time_service.clone();
 

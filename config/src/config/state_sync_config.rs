@@ -246,6 +246,8 @@ pub struct AptosDataClientConfig {
     pub max_num_in_flight_regular_polls: u64,
     /// Maximum number of output reductions before transactions are returned
     pub max_num_output_reductions: u64,
+    /// Maximum version lag we'll tolerate when sending optimistic fetch requests
+    pub max_optimistic_fetch_version_lag: u64,
     /// Maximum timeout (in ms) when waiting for a response (after exponential increases)
     pub max_response_timeout_ms: u64,
     /// Maximum number of state keys and values per chunk
@@ -272,7 +274,8 @@ impl Default for AptosDataClientConfig {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
-            max_response_timeout_ms: 60_000, // 60 seconds
+            max_optimistic_fetch_version_lag: 50_000, // Assumes 5K TPS for 10 seconds, which should be plenty
+            max_response_timeout_ms: 60_000,          // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
