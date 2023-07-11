@@ -20,6 +20,7 @@ impl<'a> TokenClient<'a> {
         Self { api_client }
     }
 
+    /// Gets chain ID for use in submitting transactions.
     async fn get_chain_id(&self) -> Result<ChainId> {
         let id = self
             .api_client
@@ -32,6 +33,8 @@ impl<'a> TokenClient<'a> {
         Ok(ChainId::new(id))
     }
 
+    /// Helper function to get the handle address of collection_data for 0x3::token::Collections
+    /// resources.
     async fn get_collection_data_handle(&self, address: AccountAddress) -> Option<String> {
         if let Ok(response) = self
             .api_client
@@ -52,6 +55,7 @@ impl<'a> TokenClient<'a> {
         }
     }
 
+    /// Creates a collection with the given fields.
     pub async fn create_collection(
         &self,
         account: &mut LocalAccount,
@@ -94,6 +98,7 @@ impl<'a> TokenClient<'a> {
             .into_inner())
     }
 
+    /// Creates a token with the given fields. Does not support property keys.
     pub async fn create_token(
         &self,
         account: &mut LocalAccount,
@@ -158,6 +163,7 @@ impl<'a> TokenClient<'a> {
             .into_inner())
     }
 
+    /// Retrieves collection data from the API.
     pub async fn get_collection_data(
         &self,
         creator: AccountAddress,
