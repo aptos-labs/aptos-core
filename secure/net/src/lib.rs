@@ -16,7 +16,6 @@
 //! Internally both the client and server leverage a NetworkStream that communications in blocks
 //! where a block is a length prefixed array of bytes.
 
-mod error;
 mod network_controller;
 
 use aptos_logger::{info, trace, warn, Schema};
