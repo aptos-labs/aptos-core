@@ -767,6 +767,23 @@ impl HardwareWalletOptions {
         }
     }
 
+    pub fn extract_public_key_and_address(
+        &self,
+    ) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
+        let derivation_path = self.extract_derivation_path()?;
+        match derivation_path {
+            Some(derivation_path) => {
+                let public_key = aptos_ledger::get_public_key(&derivation_path, false)?;
+                let address = account_address_from_public_key(&public_key);
+                Ok((public_key, address))
+            },
+            None => Err(CliError::CommandArgumentError(
+                "One of ['--derivation-path', '--derivation-index'] is missing or used incorrectly"
+                    .to_string(),
+            )),
+        }
+    }
+
     pub fn is_hardware_wallet(&self) -> bool {
         self.derivation_path.is_some() || self.derivation_index.is_some()
     }
@@ -1476,6 +1493,8 @@ pub struct TransactionOptions {
     pub(crate) sender_account: Option<AccountAddress>,
 
     #[clap(flatten)]
+    pub(crate) hardware_wallet_options: HardwareWalletOptions,
+    #[clap(flatten)]
     pub(crate) private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
     pub(crate) encoding_options: EncodingOptions,
@@ -1505,6 +1524,8 @@ impl TransactionOptions {
             || self.private_key_options.private_key_file.is_some()
         {
             Ok(AccountType::Local)
+        } else if self.hardware_wallet_options.is_hardware_wallet() {
+            Ok(AccountType::HardwareWallet)
         } else if let Some(profile) = CliConfig::load_profile(
             self.profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
@@ -1533,11 +1554,16 @@ impl TransactionOptions {
     }
 
     pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
-        self.private_key_options.extract_public_key_and_address(
-            self.encoding_options.encoding,
-            &self.profile_options,
-            self.sender_account,
-        )
+        match self.hardware_wallet_options.is_hardware_wallet() {
+            true => self
+                .hardware_wallet_options
+                .extract_public_key_and_address(),
+            false => self.private_key_options.extract_public_key_and_address(
+                self.encoding_options.encoding,
+                &self.profile_options,
+                self.sender_account,
+            ),
+        }
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
@@ -1634,7 +1660,6 @@ impl TransactionOptions {
                 sender_public_key.clone(),
                 Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
             );
-
             let txns = client
                 .simulate_with_gas_estimation(&signed_transaction, true, false)
                 .await?
@@ -1670,7 +1695,6 @@ impl TransactionOptions {
             .with_gas_unit_price(gas_unit_price)
             .with_max_gas_amount(max_gas)
             .with_transaction_expiration_time(self.gas_options.expiration_secs);
-
         match self.get_transaction_account_type() {
             Ok(AccountType::Local) => {
                 let (private_key, _) = self.get_key_and_address()?;
@@ -1686,13 +1710,21 @@ impl TransactionOptions {
                 Ok(response.into_inner())
             },
             Ok(AccountType::HardwareWallet) => {
-                let sender_account = &mut HardwareWalletAccount::new(
-                    sender_address,
-                    sender_public_key,
+                // Check if the derivation path is set from CLI, if not, use the one from profile
+                let derivation_path = if self.hardware_wallet_options.is_hardware_wallet() {
+                    self.hardware_wallet_options
+                        .extract_derivation_path()?
+                        .unwrap()
+                } else {
                     self.profile_options
                         .derivation_path()
                         .expect("derivative path is missing from profile")
-                        .unwrap(),
+                        .unwrap()
+                };
+                let sender_account = &mut HardwareWalletAccount::new(
+                    sender_address,
+                    sender_public_key,
+                    derivation_path,
                     HardwareWalletType::Ledger,
                     sequence_number,
                 );
@@ -1702,7 +1734,6 @@ impl TransactionOptions {
                     .submit_and_wait(&transaction)
                     .await
                     .map_err(|err| CliError::ApiError(err.to_string()))?;
-
                 Ok(response.into_inner())
             },
             Err(err) => Err(err),
