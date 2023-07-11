@@ -87,7 +87,7 @@ impl<'a> Parser<'a> {
             Ok(json) => {
                 self.log("Successfully parsed JSON");
 
-                // Write to GCS
+                // Write JSON to GCS
                 match write_json_to_gcs(
                     self.ts,
                     self.bucket.clone(),
@@ -97,7 +97,7 @@ impl<'a> Parser<'a> {
                 .await
                 {
                     Ok(filename) => {
-                        self.model.cdn_image_uri =
+                        self.model.cdn_json_uri =
                             Some(format!("http://34.160.26.161/{}", filename));
                         self.log("Successfully saved JSON")
                     },
@@ -133,7 +133,7 @@ impl<'a> Parser<'a> {
             Ok(new_img) => {
                 self.log("Successfully optimized image");
 
-                // Write to GCS
+                // Write image to GCS
                 match write_image_to_gcs(
                     self.ts,
                     self.format,
