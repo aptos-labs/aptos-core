@@ -29,11 +29,12 @@ use aptos_types::{
     block_executor::partitioner::{
         BlockExecutorTransactions, SubBlock, SubBlocksForShard, TransactionWithDependencies,
     },
+    contract_event::ContractEvent,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
-    write_set::WriteOp, contract_event::ContractEvent,
+    write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::output::VMOutput;
@@ -43,9 +44,9 @@ use rayon::{prelude::*, ThreadPool};
 use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
+    type Event = ContractEvent;
     type Key = StateKey;
     type Value = WriteOp;
-    type Event = ContractEvent;
 }
 
 // Wrapper to avoid orphan rule

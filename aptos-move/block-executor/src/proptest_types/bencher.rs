@@ -5,8 +5,8 @@
 use crate::{
     executor::BlockExecutor,
     proptest_types::types::{
-        EmptyDataView, ExpectedOutput, KeyType, Output, Task, Transaction, TransactionGen,
-        TransactionGenParams, ValueType, EventType
+        EmptyDataView, EventType, ExpectedOutput, KeyType, Output, Task, Transaction,
+        TransactionGen, TransactionGenParams, ValueType,
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
@@ -32,7 +32,7 @@ pub struct Bencher<K, V, E> {
 pub(crate) struct BencherState<
     K: Hash + Clone + Debug + Eq + PartialOrd + Ord,
     V: Clone + Eq + Arbitrary,
-    E: Send + Sync + Debug + Clone
+    E: Send + Sync + Debug + Clone,
 > where
     Vec<u8>: From<V>,
 {

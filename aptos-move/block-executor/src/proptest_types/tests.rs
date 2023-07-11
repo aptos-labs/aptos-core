@@ -6,12 +6,12 @@ use crate::{
     errors::Error,
     executor::BlockExecutor,
     proptest_types::types::{
-        DeltaDataView, EmptyDataView, ExpectedOutput, KeyType, Output, Task, Transaction,
-        TransactionGen, TransactionGenParams, ValueType, EventType
+        DeltaDataView, EmptyDataView, EventType, ExpectedOutput, KeyType, Output, Task,
+        Transaction, TransactionGen, TransactionGenParams, ValueType,
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::{executable::ExecutableTestType, contract_event::ContractEvent};
+use aptos_types::{contract_event::ContractEvent, executable::ExecutableTestType};
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -35,7 +35,7 @@ fn run_transactions<K, V, E>(
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Clone + 'static,
+    E: Send + Sync + Debug + Clone + 'static,
     Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
@@ -204,7 +204,10 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>, usize>,
+            NoOpTransactionCommitHook<
+                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+                usize,
+            >,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -257,7 +260,10 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>, usize>,
+            NoOpTransactionCommitHook<
+                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+                usize,
+            >,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -395,7 +401,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             incarnation,
             reads,
             writes_and_deltas,
-            events
+            events,
         } => {
             let mut new_writes_and_deltas = vec![];
             for (incarnation_writes, incarnation_deltas) in writes_and_deltas {
@@ -411,7 +417,7 @@ fn publishing_fixed_params_with_block_gas_limit(
                 incarnation: incarnation.clone(),
                 reads: reads.clone(),
                 writes_and_deltas: new_writes_and_deltas,
-                events: events.clone()
+                events: events.clone(),
             }
         },
         _ => {
@@ -435,7 +441,10 @@ fn publishing_fixed_params_with_block_gas_limit(
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>, usize>,
+        NoOpTransactionCommitHook<
+            Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+            usize,
+        >,
         ExecutableTestType,
     >::new(
         num_cpus::get(),
@@ -453,7 +462,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             incarnation,
             reads,
             writes_and_deltas,
-            events
+            events,
         } => {
             let mut new_reads = vec![];
             for incarnation_reads in reads {
@@ -467,7 +476,7 @@ fn publishing_fixed_params_with_block_gas_limit(
                 incarnation: incarnation.clone(),
                 reads: new_reads,
                 writes_and_deltas: writes_and_deltas.clone(),
-                events: events.clone()
+                events: events.clone(),
             }
         },
         _ => {
@@ -487,7 +496,10 @@ fn publishing_fixed_params_with_block_gas_limit(
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>, usize>,
+            NoOpTransactionCommitHook<
+                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+                usize,
+            >,
             ExecutableTestType,
         >::new(
             num_cpus::get(),

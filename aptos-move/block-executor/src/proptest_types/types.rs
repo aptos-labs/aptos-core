@@ -163,12 +163,8 @@ impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Transactio
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
-pub struct EventType<E: Send + Sync + Debug + Clone>(
-    pub E,
-    pub bool,
-);
+pub struct EventType<E: Send + Sync + Debug + Clone>(pub E, pub bool);
 
 #[derive(Clone, Copy)]
 pub struct TransactionGenParams {
@@ -215,7 +211,7 @@ pub enum Transaction<K, V, E> {
         /// Vector of all possible read-sets of the transaction execution (chosen round-robin depending
         /// on the incarnation counter value). Each read set is a vector of keys that are read.
         reads: Vec<Vec<K>>,
-        events: Vec<E>
+        events: Vec<E>,
     },
     /// Skip the execution of trailing transactions.
     SkipRest,
@@ -325,11 +321,14 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 allow_deletes,
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
-            events: vec![]
+            events: vec![],
         }
     }
 
-    pub fn materialize_with_deltas<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug + Clone>(
+    pub fn materialize_with_deltas<
+        K: Clone + Hash + Debug + Eq + Ord,
+        E: Send + Sync + Debug + Clone,
+    >(
         self,
         universe: &[K],
         delta_threshold: usize,
@@ -364,11 +363,14 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 allow_deletes,
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
-            events: vec![]
+            events: vec![],
         }
     }
 
-    pub fn materialize_disjoint_module_rw<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug + Clone>(
+    pub fn materialize_disjoint_module_rw<
+        K: Clone + Hash + Debug + Eq + Ord,
+        E: Send + Sync + Debug + Clone,
+    >(
         self,
         universe: &[K],
         // keys generated with indices from read_threshold to write_threshold will be
@@ -396,7 +398,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 false, // Module deletion isn't allowed
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
-            events: vec![]
+            events: vec![],
         }
     }
 }
@@ -405,11 +407,11 @@ impl<K, V, E> TransactionType for Transaction<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + Clone + 'static
+    E: Send + Sync + Debug + Clone + 'static,
 {
+    type Event = E;
     type Key = K;
     type Value = V;
-    type Event = E;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -429,7 +431,7 @@ impl<K, V, E> ExecutorTask for Task<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + Clone + 'static
+    E: Send + Sync + Debug + Clone + 'static,
 {
     type Argument = ();
     type Error = usize;
@@ -452,7 +454,7 @@ where
                 incarnation,
                 reads,
                 writes_and_deltas,
-                events
+                events,
             } => {
                 // Use incarnation counter value as an index to determine the read-
                 // and write-sets of the execution. Increment incarnation counter to
@@ -474,7 +476,7 @@ where
                 ExecutionStatus::Success(Output(
                     writes_and_deltas[write_idx].0.clone(),
                     writes_and_deltas[write_idx].1.clone(),
-                    vec![],
+                    events.to_vec(),
                     reads_result,
                     OnceCell::new(),
                 ))
@@ -498,7 +500,7 @@ impl<K, V, E> Output<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + Clone + 'static
+    E: Send + Sync + Debug + Clone + 'static,
 {
     pub(crate) fn delta_writes(&self) -> Vec<(K, WriteOp)> {
         if self.4.get().is_some() {
@@ -513,7 +515,7 @@ impl<K, V, E> TransactionOutput for Output<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + Clone + 'static
+    E: Send + Sync + Debug + Clone + 'static,
 {
     type Txn = Transaction<K, V, E>;
 
@@ -588,7 +590,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     incarnation,
                     writes_and_deltas,
                     reads,
-                    events
+                    events: _,
                 } => {
                     // Determine the read and write sets of the latest incarnation
                     // of the transaction. The index for choosing the read and
