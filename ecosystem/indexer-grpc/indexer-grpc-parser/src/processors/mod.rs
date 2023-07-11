@@ -3,6 +3,7 @@
 
 pub mod coin_processor;
 pub mod default_processor;
+pub mod default_processor_bq;
 pub mod processor_trait;
 pub mod stake_processor;
 pub mod token_processor;

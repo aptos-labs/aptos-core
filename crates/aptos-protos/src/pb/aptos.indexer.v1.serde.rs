@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated
 impl serde::Serialize for GetTransactionsRequest {
     #[allow(deprecated)]
@@ -38,11 +36,8 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "starting_version",
             "startingVersion",
-            "transactions_count",
             "transactionsCount",
-            "batch_size",
             "batchSize",
         ];
 
@@ -72,9 +67,9 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                         E: serde::de::Error,
                     {
                         match value {
-                            "startingVersion" | "starting_version" => Ok(GeneratedField::StartingVersion),
-                            "transactionsCount" | "transactions_count" => Ok(GeneratedField::TransactionsCount),
-                            "batchSize" | "batch_size" => Ok(GeneratedField::BatchSize),
+                            "startingVersion" => Ok(GeneratedField::StartingVersion),
+                            "transactionsCount" => Ok(GeneratedField::TransactionsCount),
+                            "batchSize" => Ok(GeneratedField::BatchSize),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -103,25 +98,25 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                             if starting_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startingVersion"));
                             }
-                            starting_version__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
-                            ;
+                            starting_version__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::TransactionsCount => {
                             if transactions_count__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactionsCount"));
                             }
-                            transactions_count__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
-                            ;
+                            transactions_count__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                         GeneratedField::BatchSize => {
                             if batch_size__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("batchSize"));
                             }
-                            batch_size__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
-                            ;
+                            batch_size__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                     }
                 }
@@ -167,7 +162,6 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
     {
         const FIELDS: &[&str] = &[
             "transactions",
-            "chain_id",
             "chainId",
         ];
 
@@ -197,7 +191,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                     {
                         match value {
                             "transactions" => Ok(GeneratedField::Transactions),
-                            "chainId" | "chain_id" => Ok(GeneratedField::ChainId),
+                            "chainId" => Ok(GeneratedField::ChainId),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -231,9 +225,9 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
-                            ;
+                            chain_id__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
+                            );
                         }
                     }
                 }

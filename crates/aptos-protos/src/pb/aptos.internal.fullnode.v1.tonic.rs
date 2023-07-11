@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated
 /// Generated client implementations.
 pub mod fullnode_data_client {
@@ -102,10 +100,10 @@ pub mod fullnode_data_client {
 pub mod fullnode_data_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with FullnodeDataServer.
+    ///Generated trait containing gRPC methods that should be implemented for use with FullnodeDataServer.
     #[async_trait]
     pub trait FullnodeData: Send + Sync + 'static {
-        /// Server streaming response type for the GetTransactionsFromNode method.
+        ///Server streaming response type for the GetTransactionsFromNode method.
         type GetTransactionsFromNodeStream: futures_core::Stream<
                 Item = Result<super::TransactionsFromNodeResponse, tonic::Status>,
             >

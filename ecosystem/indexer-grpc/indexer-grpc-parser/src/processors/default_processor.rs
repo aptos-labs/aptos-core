@@ -406,18 +406,28 @@ fn insert_table_metadata(
     Ok(())
 }
 
-#[async_trait]
-impl ProcessorTrait for DefaultTransactionProcessor {
-    fn name(&self) -> &'static str {
-        NAME
-    }
-
-    async fn process_transactions(
-        &self,
+impl DefaultTransactionProcessor {
+    pub fn get_models(
         transactions: Vec<Transaction>,
         start_version: u64,
         end_version: u64,
-    ) -> anyhow::Result<ProcessingResult> {
+    ) -> (
+        Vec<TransactionModel>,
+        (
+            Vec<UserTransactionModel>,
+            Vec<Signature>,
+            Vec<BlockMetadataTransactionModel>,
+        ),
+        Vec<EventModel>,
+        Vec<WriteSetChangeModel>,
+        (
+            Vec<MoveModule>,
+            Vec<MoveResource>,
+            Vec<TableItem>,
+            Vec<CurrentTableItem>,
+            Vec<TableMetadata>,
+        ),
+    ) {
         let (txns, txn_details, events, write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
@@ -468,13 +478,7 @@ impl ProcessorTrait for DefaultTransactionProcessor {
         current_table_items
             .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
         table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
-
-        let mut conn = self.get_conn();
-        let tx_result = insert_to_db(
-            &mut conn,
-            self.name(),
-            start_version,
-            end_version,
+        (
             txns,
             (user_transactions, signatures, block_metadata_transactions),
             events,
@@ -486,6 +490,35 @@ impl ProcessorTrait for DefaultTransactionProcessor {
                 current_table_items,
                 table_metadata,
             ),
+        )
+    }
+}
+
+#[async_trait]
+impl ProcessorTrait for DefaultTransactionProcessor {
+    fn name(&self) -> &'static str {
+        NAME
+    }
+
+    async fn process_transactions(
+        &self,
+        transactions: Vec<Transaction>,
+        start_version: u64,
+        end_version: u64,
+    ) -> anyhow::Result<ProcessingResult> {
+        let mut conn = self.get_conn();
+        let (txns, txn_details, events, write_set_changes, wsc_details) =
+            Self::get_models(transactions, start_version, end_version);
+        let tx_result = insert_to_db(
+            &mut conn,
+            self.name(),
+            start_version,
+            end_version,
+            txns,
+            txn_details,
+            events,
+            write_set_changes,
+            wsc_details,
         );
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),

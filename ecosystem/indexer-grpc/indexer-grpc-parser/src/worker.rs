@@ -67,6 +67,8 @@ impl Worker {
         starting_version: Option<u64>,
         number_concurrent_processing_tasks: Option<usize>,
         ans_address: Option<String>,
+        bigquery_project_id: Option<String>,
+        bigquery_dataset_name: Option<String>,
     ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
