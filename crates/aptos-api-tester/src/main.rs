@@ -9,7 +9,7 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::U64;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::coin_client::CoinClient;
-use aptos_sdk::token_client::{CollectionData, MutabilityConfig, TokenClient};
+use aptos_sdk::token_client::{CollectionData, CollectionMutabilityConfig, TokenClient};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
@@ -209,7 +209,7 @@ async fn test_mintnft(
         description: collection_description,
         uri: collection_uri,
         maximum: collection_maximum,
-        mutability_config: MutabilityConfig {
+        mutability_config: CollectionMutabilityConfig {
             description: false,
             maximum: false,
             uri: false,
