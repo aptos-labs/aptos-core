@@ -24,7 +24,7 @@ use proptest::{
 use rand::Rng;
 use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
-fn run_transactions<K, V>(
+fn run_transactions<K, V, E>(
     key_universe: &[K],
     transaction_gens: Vec<TransactionGen<V>>,
     abort_transactions: Vec<Index>,
@@ -35,6 +35,7 @@ fn run_transactions<K, V>(
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
+    E: Send + Sync + Clone + 'static,
     Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
@@ -63,10 +64,10 @@ fn run_transactions<K, V>(
 
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
-            Transaction<KeyType<K>, ValueType<V>, EventType<ContractEvent>>,
-            Task<KeyType<K>, ValueType<V>, EventType<ContractEvent>>,
+            Transaction<KeyType<K>, ValueType<V>, EventType<E>>,
+            Task<KeyType<K>, ValueType<V>, EventType<E>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-            NoOpTransactionCommitHook<Output<KeyType<K>, ValueType<V>>, usize>,
+            NoOpTransactionCommitHook<Output<KeyType<K>, ValueType<V>, EventType<E>>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),

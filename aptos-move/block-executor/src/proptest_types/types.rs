@@ -165,7 +165,7 @@ impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Transactio
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
-pub struct EventType<E: Send + Sync + Debug>(
+pub struct EventType<E: Send + Sync + Debug + Clone>(
     pub E,
     pub bool,
 );
@@ -302,7 +302,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         ret
     }
 
-    pub fn materialize<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug>(
+    pub fn materialize<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug + Clone>(
         self,
         universe: &[K],
         // Are writes and reads module access (same access path).
@@ -329,7 +329,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         }
     }
 
-    pub fn materialize_with_deltas<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug>(
+    pub fn materialize_with_deltas<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug + Clone>(
         self,
         universe: &[K],
         delta_threshold: usize,
@@ -368,7 +368,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         }
     }
 
-    pub fn materialize_disjoint_module_rw<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug>(
+    pub fn materialize_disjoint_module_rw<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug + Clone>(
         self,
         universe: &[K],
         // keys generated with indices from read_threshold to write_threshold will be
@@ -405,7 +405,7 @@ impl<K, V, E> TransactionType for Transaction<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + 'static
+    E: Send + Sync + Debug + Clone + 'static
 {
     type Key = K;
     type Value = V;
@@ -498,7 +498,7 @@ impl<K, V, E> Output<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + 'static
+    E: Send + Sync + Debug + Clone + 'static
 {
     pub(crate) fn delta_writes(&self) -> Vec<(K, WriteOp)> {
         if self.4.get().is_some() {

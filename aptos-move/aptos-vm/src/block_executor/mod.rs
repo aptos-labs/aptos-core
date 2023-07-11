@@ -45,6 +45,7 @@ use std::sync::Arc;
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
     type Value = WriteOp;
+    type Event = ContractEvent;
 }
 
 // Wrapper to avoid orphan rule

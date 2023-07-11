@@ -47,7 +47,7 @@ where
         Transaction<K, V, E>,
         Task<K, V, E>,
         DeltaDataView<K, V>,
-        NoOpTransactionCommitHook<Output<K, V>, usize>,
+        NoOpTransactionCommitHook<Output<K, V, E>, usize>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, None, None)
     .execute_transactions_parallel((), &transactions, &data_view);

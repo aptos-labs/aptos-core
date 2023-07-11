@@ -19,13 +19,13 @@ pub struct NoOpTransactionCommitHook<T, E> {
     phantom: std::marker::PhantomData<(T, E)>,
 }
 
-impl<T: TransactionOutput, E: Debug + Sync + Send> Default for NoOpTransactionCommitHook<T, E> {
+impl<T: TransactionOutput, E: Debug + Sync + Send + Clone> Default for NoOpTransactionCommitHook<T, E> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: TransactionOutput, E: Debug + Sync + Send> NoOpTransactionCommitHook<T, E> {
+impl<T: TransactionOutput, E: Debug + Sync + Send + Clone> NoOpTransactionCommitHook<T, E> {
     pub fn new() -> Self {
         Self {
             phantom: std::marker::PhantomData,
@@ -33,7 +33,7 @@ impl<T: TransactionOutput, E: Debug + Sync + Send> NoOpTransactionCommitHook<T, 
     }
 }
 
-impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitHook
+impl<T: TransactionOutput, E: Debug + Sync + Send + Clone> TransactionCommitHook
     for NoOpTransactionCommitHook<T, E>
 {
     type Output = T;

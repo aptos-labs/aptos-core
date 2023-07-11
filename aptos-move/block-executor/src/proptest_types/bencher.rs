@@ -32,7 +32,7 @@ pub struct Bencher<K, V, E> {
 pub(crate) struct BencherState<
     K: Hash + Clone + Debug + Eq + PartialOrd + Ord,
     V: Clone + Eq + Arbitrary,
-    E: Send + Sync + Debug
+    E: Send + Sync + Debug + Clone
 > where
     Vec<u8>: From<V>,
 {
@@ -44,7 +44,7 @@ impl<K, V, E> Bencher<K, V, E>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + Arbitrary + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Debug + 'static,
+    E: Send + Sync + Debug + Clone + 'static,
     Vec<u8>: From<V>,
 {
     pub fn new(transaction_size: usize, universe_size: usize) -> Self {
@@ -76,7 +76,7 @@ impl<K, V, E> BencherState<K, V, E>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Debug + 'static,
+    E: Send + Sync + Debug + Clone + 'static,
     Vec<u8>: From<V>,
 {
     /// Creates a new benchmark state with the given account universe strategy and number of
@@ -129,7 +129,7 @@ where
             Transaction<KeyType<K>, ValueType<V>, EventType<E>>,
             Task<KeyType<K>, ValueType<V>, EventType<E>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-            NoOpTransactionCommitHook<Output<KeyType<K>, ValueType<V>>, usize>,
+            NoOpTransactionCommitHook<Output<KeyType<K>, ValueType<V>, EventType<E>>, usize>,
             ExecutableTestType,
         >::new(num_cpus::get(), executor_thread_pool, None, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
