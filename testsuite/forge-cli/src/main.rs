@@ -1544,8 +1544,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
                 ["use_sharded_state_merkle_db"] = true.into();
 
-            helm_values["validator"]["resources"]["limits"]["cpu"] = 32.into();
-            helm_values["validator"]["resources"]["requests"]["cpu"] = 32.into();
+            helm_values["validator"]["resources"]["limits"]["cpu"] = 60.into();
+            helm_values["validator"]["resources"]["requests"]["cpu"] = 60.into();
             helm_values["validator"]["resources"]["limits"]["memory"] = "96Gi".into();
             helm_values["validator"]["resources"]["requests"]["memory"] = "96Gi".into();
         }))
