@@ -1510,7 +1510,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
-        .with_initial_fullnode_count(100)
+        // .with_initial_fullnode_count(100)
         .add_network_test(MultiRegionNetworkEmulationTest {
             override_config: None,
         })
@@ -1544,8 +1544,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
                 ["use_sharded_state_merkle_db"] = true.into();
 
-            helm_values["validator"]["resources"]["limits"]["cpu"] = 32.into();
-            helm_values["validator"]["resources"]["requests"]["cpu"] = 32.into();
+            helm_values["validator"]["resources"]["limits"]["cpu"] = 60.into();
+            helm_values["validator"]["resources"]["requests"]["cpu"] = 60.into();
             helm_values["validator"]["resources"]["limits"]["memory"] = "96Gi".into();
             helm_values["validator"]["resources"]["requests"]["memory"] = "96Gi".into();
         }))
