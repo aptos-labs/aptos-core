@@ -6,7 +6,9 @@ use crate::{
     models::stake_models::{
         delegator_activities::DelegatedStakingActivity,
         delegator_balances::{CurrentDelegatorBalance, CurrentDelegatorBalanceMap},
-        delegator_pools::{DelegatorPool, DelegatorPoolMap, DelegatorPoolBalance, CurrentDelegatorPoolBalance},
+        delegator_pools::{
+            CurrentDelegatorPoolBalance, DelegatorPool, DelegatorPoolBalance, DelegatorPoolMap,
+        },
         proposal_votes::ProposalVote,
         staking_pool_voter::{CurrentStakingPoolVoter, StakingPoolVoterMap},
     },

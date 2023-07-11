@@ -4,7 +4,13 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use crate::{models::{token_models::{token_utils::URI_LENGTH, v2_token_utils::ResourceReference}, default_models::move_resources::MoveResource}, utils::util::{deserialize_from_string, truncate_str}};
+use crate::{
+    models::{
+        default_models::move_resources::MoveResource,
+        token_models::{token_utils::URI_LENGTH, v2_token_utils::ResourceReference},
+    },
+    utils::util::{deserialize_from_string, truncate_str},
+};
 use anyhow::{Context, Result};
 use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
