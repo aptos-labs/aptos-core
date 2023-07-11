@@ -4,14 +4,11 @@
 use crate::{
     rest_client::{Client as ApiClient, PendingTransaction},
     transaction_builder::TransactionFactory,
-    types::{
-        account_address::AccountAddress,
-        chain_id::ChainId,
-        LocalAccount,
-    },
+    types::{account_address::AccountAddress, chain_id::ChainId, LocalAccount},
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
+use serde_json::Value;
 
 #[derive(Clone, Debug)]
 pub struct TokenClient<'a> {
@@ -33,6 +30,26 @@ impl<'a> TokenClient<'a> {
             .chain_id;
 
         Ok(ChainId::new(id))
+    }
+
+    async fn get_collection_data_handle(&self, address: AccountAddress) -> Option<String> {
+        if let Ok(response) = self
+            .api_client
+            .get_account_resource(address, "0x3::token::Collections")
+            .await
+        {
+            Some(
+                response
+                    .into_inner()?
+                    .data
+                    .get("collection_data")?
+                    .get("handle")?
+                    .as_str()?
+                    .to_owned(),
+            )
+        } else {
+            None
+        }
     }
 
     pub async fn create_collection(
@@ -138,6 +155,30 @@ impl<'a> TokenClient<'a> {
             .submit(&signed_txn)
             .await
             .context("Failed to submit transfer transaction")?
+            .into_inner())
+    }
+
+    pub async fn get_collection_data(
+        &self,
+        creator: AccountAddress,
+        collection_name: &str,
+    ) -> Result<Value> {
+        // get handle for collection_data
+        let handle = match self.get_collection_data_handle(creator).await {
+            Some(s) => AccountAddress::from_hex_literal(&s)?,
+            None => return Err(anyhow!("Couldn't retrieve handle for collections data")),
+        };
+
+        // get table item with the handle
+        Ok(self
+            .api_client
+            .get_table_item(
+                handle,
+                "0x1::string::String",
+                "0x3::token::CollectionData",
+                collection_name,
+            )
+            .await?
             .into_inner())
     }
 }
