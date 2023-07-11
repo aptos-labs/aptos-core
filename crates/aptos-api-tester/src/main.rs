@@ -145,7 +145,6 @@ async fn test_cointransfer(
         return TestResult::Fail("wrong balance at version before the coin transfer");
     }
 
-    // TODO: do we want to check transaction details returned by the API?
     TestResult::Success
 }
 
@@ -197,6 +196,13 @@ async fn test_mintnft(
         Ok(_) => {},
         Err(e) => return TestResult::Error(e.into()),
     }
+
+    // check collection metadata
+    let collection_data = match token_client.get_collection_data(account.address(), &collection_name).await {
+        Ok(txn) => txn,
+        Err(e) => return TestResult::Error(e),
+    };
+    println!("{:?}", collection_data);
 
     TestResult::Success
 }

@@ -2991,6 +2991,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde 1.0.149",
+ "serde_json",
  "tiny-bip39",
  "tokio",
  "url",
