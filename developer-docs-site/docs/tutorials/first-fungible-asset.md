@@ -43,7 +43,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
 Navigate to the TypeScript SDK directory:
 
 ```bash
-cd ~/aptos-core/ecosystem/typescript/sdk
+cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript
 ```
 
 Install the necessary dependencies:
@@ -55,7 +55,6 @@ pnpm install
 Run the TypeScript [`your_fungible_asset`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/examples/typescript/your_fungible_asset.ts) example:
 
 ```bash
-cd examples/typescript
 pnpm your_fungible_asset ~/aptos-core/aptos-move/move-examples/fungible_asset/fa_coin
 ```
 
@@ -193,7 +192,7 @@ So `Withdraw`, `Deposit`, and `Transfer` in the management module have different
 
 #### Step 4.3.1: Initializing "FACoin" metadata object
 
-After publish the module to the Aptos blockchain, the entity that published that coin type should initialize a metadata object describing the information about this FA:
+After publishing the module to the Aptos blockchain, the entity that published that coin type should initialize a metadata object describing the information about this FA:
 
 ```rust title="fa_coin.move snippet"
 :!: static/move-examples/fungible_asset/fa_coin/sources/FACoin.move initialize
@@ -230,7 +229,7 @@ Similarly, the module provides `burn`, `set_frozen_flag`, `transfer`, `Withdraw`
 Aptos provides several APIs to support FA flows with same names in different modules:
 
 - `fungible_asset::{transfer/withdraw/deposit}`: Move FA between different unfrozen fungible stores objects.
-- `fungible_asset::{transfer/withdraw/deposit}_with_ref`: Move FA between different fungible stores objects with the corresponding `TransferRef` regardless their frozen status.
+- `fungible_asset::{transfer/withdraw/deposit}_with_ref`: Move FA between different fungible stores objects with the corresponding `TransferRef` regardless of their frozen status.
 - `primary_fungible_store::{transfer/withdraw/deposit}`: Move FA between unfrozen primary stores of different accounts.
 
 :::tip important

@@ -1,6 +1,6 @@
 /// A 2-in-1 module that combines managed_fungible_asset and coin_example into one module that when deployed, the
 /// deployer will be creating a new managed fungible asset with the hardcoded supply config, name, symbol, and decimals.
-/// The address of the asset can be obtained via get_metadata(). As a simple version, it only deal with primary stores.
+/// The address of the asset can be obtained via get_metadata(). As a simple version, it only deals with primary stores.
 module FACoin::fa_coin {
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
     use aptos_framework::object::{Self, Object};
@@ -90,7 +90,7 @@ module FACoin::fa_coin {
         fungible_asset::set_frozen_flag(transfer_ref, wallet, true);
     }
 
-    /// Freeze an account so it cannot transfer or receive fungible assets.
+    /// Unfreeze an account so it can transfer or receive fungible assets.
     public entry fun unfreeze_account(admin: &signer, account: address) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
