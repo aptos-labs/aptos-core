@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 pub async fn publish_to_queue(
     client: &Client,
     msg: String,
-    ts: &Box<dyn TokenSource>,
+    ts: &dyn TokenSource,
     topic_name: &String,
     force: bool,
 ) -> Result<String, Box<dyn Error + Send + Sync>> {
@@ -36,7 +36,7 @@ pub async fn publish_to_queue(
 
 pub async fn consume_from_queue(
     client: &Client,
-    ts: &Box<dyn TokenSource>,
+    ts: &dyn TokenSource,
     subsctiption_name: &String,
 ) -> Result<Vec<(String, String)>, Box<dyn Error + Send + Sync>> {
     let url = format!(
@@ -67,13 +67,13 @@ pub async fn consume_from_queue(
         }
         Ok(links)
     } else {
-        return Err("No message found".into());
+        Err("No message found".into())
     }
 }
 
 pub async fn send_ack(
     client: &Client,
-    ts: &Box<dyn TokenSource>,
+    ts: &dyn TokenSource,
     subscription_name: &String,
     ack: &String,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {

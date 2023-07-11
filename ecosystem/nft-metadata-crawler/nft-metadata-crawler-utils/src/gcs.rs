@@ -11,16 +11,15 @@ use reqwest::{
 use serde_json::Value;
 
 pub async fn write_json_to_gcs(
-    ts: &Box<dyn TokenSource>,
+    ts: &dyn TokenSource,
     bucket: String,
     id: String,
     json: Value,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let client = Client::new();
     let url = format!(
-        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
-        bucket,
-        format!("json_{}.json", id)
+        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name=json_{}.json",
+        bucket, id
     );
     let json_string = json.to_string();
 
@@ -42,7 +41,7 @@ pub async fn write_json_to_gcs(
 }
 
 pub async fn write_image_to_gcs(
-    ts: &Box<dyn TokenSource>,
+    ts: &dyn TokenSource,
     img_format: ImageFormat,
     bucket: String,
     id: String,
@@ -61,9 +60,8 @@ pub async fn write_image_to_gcs(
     };
 
     let url = format!(
-        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
-        bucket,
-        format!("image_{}.{}", id, extension)
+        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name=image_{}.{}",
+        bucket, id, extension
     );
 
     headers.insert(
