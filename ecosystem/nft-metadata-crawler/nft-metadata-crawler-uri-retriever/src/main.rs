@@ -39,10 +39,7 @@ async fn main() {
             let mut parts = req.uri().path().trim_start_matches('/').split('/');
             let start = parts.next();
             let end = parts.next();
-            let force = match parts.next() {
-                Some("force") => true,
-                _ => false,
-            };
+            let force = matches!(parts.next(), Some("force"));
 
             match (start, end) {
                 (Some(start), Some(end)) => {
@@ -77,9 +74,9 @@ async fn main() {
                                 successes.join("\n")
                             ))))
                         } else {
-                            Ok::<_, Infallible>(Response::new(Body::from(format!(
-                                "Failed to process file"
-                            ))))
+                            Ok::<_, Infallible>(Response::new(Body::from(
+                                "Failed to process file".to_string(),
+                            )))
                         }
                     } else {
                         Ok::<_, Infallible>(Response::new(Body::from(
