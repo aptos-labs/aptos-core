@@ -46,7 +46,7 @@ async fn process_response(
                     entry_struct.last_transaction_version
                 );
                 let client = Client::new();
-                match send_ack(&client, &ts, &subscription_name, &ack).await {
+                match send_ack(&client, ts.as_ref(), &subscription_name, &ack).await {
                     Ok(_) => println!(
                         "Transaction Version {}: Successfully acked",
                         entry_struct.last_transaction_version
@@ -87,7 +87,7 @@ fn spawn_parser(
             match parser.parse(&mut conn).await {
                 Ok(()) => {
                     let client = Client::new();
-                    match send_ack(&client, &ts, &subscription_name, &ack).await {
+                    match send_ack(&client, ts.as_ref(), &subscription_name, &ack).await {
                         Ok(_) => {
                             println!(
                                 "Transaction Version {}: Successfully acked",
@@ -125,7 +125,7 @@ async fn main() {
     .await
     .expect("No token source");
 
-    while let Ok(r) = consume_from_queue(&client, &ts, &subscription_name).await {
+    while let Ok(r) = consume_from_queue(&client, ts.as_ref(), &subscription_name).await {
         let (res, acks): (Vec<String>, Vec<String>) = r.into_iter().unzip();
         match process_response(res, &acks, &ts, &subscription_name, &pool).await {
             Ok(uris) => {

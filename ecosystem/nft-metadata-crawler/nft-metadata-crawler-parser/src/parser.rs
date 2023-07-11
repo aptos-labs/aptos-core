@@ -92,7 +92,7 @@ impl<'a> Parser<'a> {
 
                 // Write to GCS
                 match write_json_to_gcs(
-                    &self.ts,
+                    self.ts.as_ref(),
                     self.bucket.clone(),
                     self.entry.token_data_id.clone(),
                     json,
@@ -134,7 +134,7 @@ impl<'a> Parser<'a> {
 
                 // Write to GCS
                 match write_image_to_gcs(
-                    &self.ts,
+                    self.ts.as_ref(),
                     self.format,
                     self.bucket.clone(),
                     self.entry.token_data_id.clone(),

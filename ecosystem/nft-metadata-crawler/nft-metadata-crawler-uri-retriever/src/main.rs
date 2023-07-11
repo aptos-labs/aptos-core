@@ -54,7 +54,7 @@ async fn main() {
                                 match publish_to_queue(
                                     &client,
                                     link.to_string(),
-                                    &ts,
+                                    ts.as_ref(),
                                     &topic_name,
                                     force,
                                 )
