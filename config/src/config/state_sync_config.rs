@@ -254,10 +254,10 @@ pub struct AptosDataClientConfig {
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
     pub max_transaction_output_chunk_size: u64,
+    /// Timeout (in ms) when waiting for an optimistic fetch response
+    pub optimistic_fetch_timeout_ms: u64,
     /// First timeout (in ms) when waiting for a response
     pub response_timeout_ms: u64,
-    /// Timeout (in ms) when waiting for a subscription response
-    pub subscription_timeout_ms: u64,
     /// Interval (in ms) between data summary poll loop executions
     pub summary_poll_loop_interval_ms: u64,
     /// Whether or not to request compression for incoming data
@@ -272,12 +272,12 @@ impl Default for AptosDataClientConfig {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
-            max_response_timeout_ms: 60000, // 60 seconds
+            max_response_timeout_ms: 60_000, // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
-            response_timeout_ms: 10000,    // 10 seconds
-            subscription_timeout_ms: 5000, // 5 seconds
+            optimistic_fetch_timeout_ms: 5000, // 5 seconds
+            response_timeout_ms: 10_000,       // 10 seconds
             summary_poll_loop_interval_ms: 200,
             use_compression: true,
         }

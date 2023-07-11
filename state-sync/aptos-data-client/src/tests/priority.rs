@@ -146,7 +146,7 @@ async fn prioritized_peer_request_selection() {
 }
 
 #[tokio::test]
-async fn prioritized_peer_subscription_selection() {
+async fn prioritized_peer_optimistic_fetch_selection() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
 
@@ -154,7 +154,7 @@ async fn prioritized_peer_subscription_selection() {
     let known_version = 10000000;
     let known_epoch = 10;
 
-    // Ensure the properties hold for both subscription requests
+    // Ensure the properties hold for both optimistic fetch requests
     let new_transactions_request =
         DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
             known_version,
