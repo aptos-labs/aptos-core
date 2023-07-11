@@ -151,4 +151,8 @@ impl RandShares {
     pub fn rounds(&self) -> Vec<Round> {
         self.shares.iter().filter_map(|s| s.as_ref().map(|share| share.round())).collect()
     }
+
+    pub fn timestamps(&self) -> Vec<u64> {
+        self.shares.iter().filter_map(|s| s.as_ref().map(|share| share.block_info().timestamp_usecs())).collect()
+    }
 }

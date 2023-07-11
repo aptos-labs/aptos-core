@@ -17,6 +17,7 @@ pub struct LogSchema {
     item_id: Option<HashValue>,
     rounds: Option<Vec<Round>>,
     first_round: Option<Round>,
+    timestamps: Option<Vec<u64>>,
 }
 
 #[derive(Serialize)]
@@ -57,6 +58,7 @@ impl LogSchema {
             item_id: None,
             rounds: None,
             first_round: None,
+            timestamps: None,
         }
     }
 }

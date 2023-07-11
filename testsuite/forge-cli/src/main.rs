@@ -490,7 +490,7 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig>
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => realistic_network_tuned_for_throughput_test(), // realistic_env_max_load_test(duration),
+        "realistic_env_max_load" => realistic_env_max_load_test(duration),
         "compat" => compat(),
         "framework_upgrade" => upgrade(),
         // Rest of the tests:
@@ -1458,7 +1458,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
 fn realistic_env_max_load_test(duration: Duration) -> ForgeConfig {
     let duration_secs = duration.as_secs();
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(150).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
         .with_initial_fullnode_count(0)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()

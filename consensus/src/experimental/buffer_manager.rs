@@ -233,7 +233,8 @@ impl BufferManager {
             let log_event = self
                 .new_log(LogEvent::BCastRandToAll)
                 .item_id(item_hash)
-                .rounds(rounds.clone());
+                .rounds(rounds.clone())
+                .timestamps(rand_shares.timestamps());
 
             if rounds.is_empty() {
                 info!(log_event, "item id {} rounds {:?} broadcast to all, item size {}", item_hash, rounds, item.get_blocks().len());
@@ -255,7 +256,8 @@ impl BufferManager {
                         .new_log(LogEvent::SendRandToLeader)
                         .remote_peer(leader)
                         .item_id(item_hash)
-                        .rounds(rounds.clone());
+                        .rounds(rounds.clone())
+                        .timestamps(rand_shares.timestamps());
 
                     if rounds.is_empty() {
                         info!(log_event, "item id {} rounds {:?} send to leader {}, item size {}", item_hash, rounds, leader, item.get_blocks().len());
@@ -293,7 +295,8 @@ impl BufferManager {
                     .new_log(LogEvent::LeaderReceiveRand)
                     .remote_peer(rand_shares.author())
                     .item_id(item_id)
-                    .rounds(rounds.clone());
+                    .rounds(rounds.clone())
+                    .timestamps(rand_shares.timestamps());
 
                 if rounds.is_empty() {
                     info!(log_event, "item id {} from node {} rounds {:?}, rand size {}", item_id, rand_shares.author(), rounds, rand_shares.shares().len());
@@ -328,11 +331,12 @@ impl BufferManager {
                                 // if we're one of the proposer for the first k proposal block,
                                 // we're responsible to broadcast the randomness decision
                                 if item.get_k_leaders(NUM_LEADERS, &self.verifier).contains(&self.author) {
-                                    let rounds = rand_shares.rounds();
+                                    let rounds = rand_decisions.rounds();
                                     let log_event = self
                                         .new_log(LogEvent::LeaderBCastRand)
                                         .item_id(item_id)
-                                        .rounds(rounds.clone());
+                                        .rounds(rounds.clone())
+                                        .timestamps(rand_decisions.timestamps());
 
                                     if rounds.is_empty() {
                                         info!(log_event, "item id {} rounds {:?} broadcast by {}, item size {}", item_id, rounds, self.author, item.get_blocks().len());
@@ -404,7 +408,8 @@ impl BufferManager {
                 let log_event = self
                     .new_log(LogEvent::ReceiveRand)
                     .item_id(item_id)
-                    .rounds(rounds.clone());
+                    .rounds(rounds.clone())
+                    .timestamps(rand_decisions.timestamps());
 
                 if rounds.is_empty() {
                     info!(log_event, "item id {} rounds {:?} receive by {}, item size {}", item_id, rounds, self.author, rand_decisions.decisions().len());
