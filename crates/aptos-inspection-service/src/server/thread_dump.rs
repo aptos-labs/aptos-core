@@ -13,36 +13,34 @@ use std::time::Duration;
 
 pub fn handle_thread_dump_request(status: &str) -> (StatusCode, Body, String) {
     let mut output = Vec::new();
-    for _ in 0..30 {
-        let trace = rstack_self::trace(Command::new("cargo").arg("run").arg("-p").arg("aptos-iuchild").arg("--release")).unwrap();
+    let trace = rstack_self::trace(Command::new("cargo").arg("run").arg("-p").arg("aptos-iuchild").arg("--release")).unwrap();
 
-        for thread in trace.threads() {
-            writeln!(output, "{} - {}", thread.id(), thread.name()).unwrap();
-            for frame in thread.frames() {
-                writeln!(output, "{:#016x}", frame.ip()).unwrap();
+    for thread in trace.threads() {
+        writeln!(output, "{} - {}", thread.id(), thread.name()).unwrap();
+        for frame in thread.frames() {
+            writeln!(output, "{:#016x}", frame.ip()).unwrap();
 
-                for symbol in frame.symbols() {
-                    write!(output, "    - {}", symbol.name().unwrap_or("????")).unwrap();
-                    if let Some(file) = symbol.file() {
-                        write!(output, " {}:{}", file.display(), symbol.line().unwrap_or(0)).unwrap();
-                    }
-                    writeln!(output).unwrap();
+            for symbol in frame.symbols() {
+                write!(output, "    - {}", symbol.name().unwrap_or("????")).unwrap();
+                if let Some(file) = symbol.file() {
+                    write!(output, " {}:{}", file.display(), symbol.line().unwrap_or(0)).unwrap();
                 }
+                writeln!(output).unwrap();
             }
-            writeln!(output).unwrap();
         }
-        thread::sleep(Duration::from_secs(2));
+        writeln!(output).unwrap();
     }
 
-    // Write the thread information to a file
-    let file_path = "thread_dump.txt";
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(file_path)
-        .expect("Failed to open the file");
 
-    file.write_all(&output).expect("Failed to write to the file");
+    // Write the thread information to a file
+let file_path = "thread_dump.txt";
+let mut file = OpenOptions::new()
+    .create(true)
+    .append(true)
+    .open(file_path)
+    .expect("Failed to open the file");
+
+file.write_all(&output).expect("Failed to write to the file");
 
     (
         StatusCode::OK,
