@@ -1510,7 +1510,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
-        .with_initial_fullnode_count(100)
+        //.with_initial_fullnode_count(100)
         .add_network_test(MultiRegionNetworkEmulationTest {
             override_config: None,
         })
