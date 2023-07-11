@@ -1,14 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::types::HardwareWalletOptions;
 use crate::{
     account::key_rotation::lookup_address,
     common::{
         types::{
             account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-            ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig,
-            ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
+            ConfigSearchMode, EncodingOptions, HardwareWalletOptions, PrivateKeyInputOptions,
+            ProfileConfig, ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
         },
         utils::{fund_account, prompt_yes_with_override, read_line, wait_for_transactions},
     },
@@ -182,7 +181,7 @@ impl CliCommand<()> for InitTool {
         profile_config.derivation_path = derivation_path.clone();
 
         // Private key
-        let private_key = if self.ledger || self.hardware_wallet_options.is_hardware_wallet() {
+        let private_key = if self.is_hardware_wallet() {
             // Private key stays in ledger
             None
         } else {
@@ -217,7 +216,7 @@ impl CliCommand<()> for InitTool {
         };
 
         // Public key
-        let public_key = if self.ledger || self.hardware_wallet_options.is_hardware_wallet() {
+        let public_key = if self.is_hardware_wallet() {
             let pub_key = match aptos_ledger::get_public_key(
                 derivation_path
                     .ok_or(CliError::UnexpectedError(
@@ -408,6 +407,10 @@ impl InitTool {
         };
         profile_config.faucet_url = faucet_url;
         Ok(())
+    }
+
+    fn is_hardware_wallet(&self) -> bool {
+        self.hardware_wallet_options.is_hardware_wallet() || self.ledger
     }
 }
 
