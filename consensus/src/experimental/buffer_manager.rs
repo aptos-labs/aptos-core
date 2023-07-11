@@ -40,8 +40,8 @@ use std::{sync::{
 use tokio::time::{Duration, Instant};
 
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 1500;
-pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 3000;
-pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 3000;
+pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 20000;
+pub const RAND_DECISION_REBROADCAST_INTERVAL_MS: u64 = 20000;
 
 pub const LOOP_INTERVAL_MS: u64 = 1500;
 
@@ -447,9 +447,9 @@ impl BufferManager {
 
     fn print_blocks(&mut self, blocks: Vec<ExecutedBlock>) {
         for block in blocks {
-            print!(" {} ", block.id());
+            print!(" {} ", block.round());
         }
-        println!();
+        // println!();
     }
 
     // helper function to prints the buffer_manager
