@@ -341,8 +341,8 @@ export class TokenClient {
 
     const multiAgentAuthenticator = new TxnBuilderTypes.TransactionAuthenticatorMultiAgent(
       senderAuthenticator,
-      [TxnBuilderTypes.AccountAddress.fromHex(receiver.address())],
-      [receiverAuthenticator],
+      [TxnBuilderTypes.AccountAddress.fromHex(receiver.address())], // Secondary signer addresses
+      [receiverAuthenticator], // Secondary signer authenticators
     );
 
     const bcsTxn = bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, multiAgentAuthenticator));
