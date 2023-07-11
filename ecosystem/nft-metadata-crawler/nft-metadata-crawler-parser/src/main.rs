@@ -21,7 +21,7 @@ use tokio::task::JoinHandle;
 
 async fn process_response(
     res: Vec<String>,
-    acks: &Vec<String>,
+    acks: &[String],
     ts: &dyn TokenSource,
     subscription_name: &String,
     pool: &Pool<ConnectionManager<PgConnection>>,
