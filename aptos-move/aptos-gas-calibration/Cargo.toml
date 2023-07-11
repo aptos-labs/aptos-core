@@ -1,0 +1,12 @@
+[package]
+name = "aptos-gas-calibration"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aptos-gas = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+move-binary-format = { workspace = true }
