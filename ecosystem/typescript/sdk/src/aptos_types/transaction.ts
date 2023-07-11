@@ -372,7 +372,7 @@ export abstract class RawTransactionWithData {
       case 0:
         return MultiAgentRawTransaction.load(deserializer);
       case 1:
-        return MultiAgentRawTransaction.load_fee_payer(deserializer);
+        return FeePayerRawTransaction.load(deserializer);
       default:
         throw new Error(`Unknown variant index for RawTransactionWithData: ${index}`);
     }
@@ -380,8 +380,6 @@ export abstract class RawTransactionWithData {
 }
 
 export class MultiAgentRawTransaction extends RawTransactionWithData {
-  private fee_payer_address?: AccountAddress;
-
   constructor(
     public readonly raw_txn: RawTransaction,
     public readonly secondary_signer_addresses: Seq<AccountAddress>,
@@ -389,45 +387,11 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
     super();
   }
 
-  set_fee_payer_address(fee_payer_address: AccountAddress): void {
-    this.fee_payer_address = fee_payer_address;
-  }
-
-  // Get the authenticator for this transaction, making sure that the multi-agent authenticator matches this
-  // multi-agent transaction. Ie. the secondary signers match and the optional fee payer matches.
-  get_authenticator(
-    sender: AccountAuthenticator,
-    secondary_signers: Seq<AccountAuthenticator>,
-    fee_payer?: AccountAuthenticator,
-  ): TransactionAuthenticatorMultiAgent {
-    if (secondary_signers.length !== this.secondary_signer_addresses.length) {
-      throw new Error("Number of secondary signers does not match.");
-    }
-    let fee_pay;
-    if (this.fee_payer_address) {
-      if (!fee_payer) {
-        throw new Error("No fee payer authenticator provided to match the fee payer of the transaction.");
-      }
-      fee_pay = { address: this.fee_payer_address, authenticator: fee_payer };
-    } else if (fee_payer) {
-        throw new Error("A fee payer authenticator provided while not a transaction with a fee payer.");
-      }
-    return new TransactionAuthenticatorMultiAgent(sender, this.secondary_signer_addresses, secondary_signers, fee_pay);
-  }
-
   serialize(serializer: Serializer): void {
-    if (!this.fee_payer_address) {
-      // enum variant index
-      serializer.serializeU32AsUleb128(0);
-      this.raw_txn.serialize(serializer);
-      serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
-    } else {
-      // enum variant index
-      serializer.serializeU32AsUleb128(1);
-      this.raw_txn.serialize(serializer);
-      serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
-      this.fee_payer_address.serialize(serializer);
-    }
+    // enum variant index
+    serializer.serializeU32AsUleb128(0);
+    this.raw_txn.serialize(serializer);
+    serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
   }
 
   static load(deserializer: Deserializer): MultiAgentRawTransaction {
@@ -436,11 +400,31 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
 
     return new MultiAgentRawTransaction(rawTxn, secondarySignerAddresses);
   }
+}
 
-  static load_fee_payer(deserializer: Deserializer): MultiAgentRawTransaction {
-    const ret = this.load(deserializer);
-    ret.set_fee_payer_address(AccountAddress.deserialize(deserializer));
-    return ret;
+export class FeePayerRawTransaction extends RawTransactionWithData {
+  constructor(
+    public readonly raw_txn: RawTransaction,
+    public readonly secondary_signer_addresses: Seq<AccountAddress>,
+    public readonly fee_payer_address: AccountAddress,
+  ) {
+    super();
+  }
+
+  serialize(serializer: Serializer): void {
+    // enum variant index
+    serializer.serializeU32AsUleb128(1);
+    this.raw_txn.serialize(serializer);
+    serializeVector<TransactionArgument>(this.secondary_signer_addresses, serializer);
+    this.fee_payer_address.serialize(serializer);
+  }
+
+  static load(deserializer: Deserializer): FeePayerRawTransaction {
+    const rawTxn = RawTransaction.deserialize(deserializer);
+    const secondarySignerAddresses = deserializeVector(deserializer, AccountAddress);
+    const feePayerAddress = AccountAddress.deserialize(deserializer);
+
+    return new FeePayerRawTransaction(rawTxn, secondarySignerAddresses, feePayerAddress);
   }
 }
 

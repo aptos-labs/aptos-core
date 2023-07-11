@@ -540,16 +540,16 @@ test(
     const aliceBefore = await getBalance(alice);
     const bobBefore = await getBalance(bob);
 
-    const txnHash = await tokenClient.directTransferToken(
+    const txnHash = await tokenClient.directTransferTokenWithFeePayer(
       alice,
       bob,
       alice.address(),
       collectionName,
       tokenName,
       1,
+      bob,
       propertyVersion,
       undefined,
-      bob,
     );
 
     await client.waitForTransaction(txnHash, { checkSuccess: true });
