@@ -483,29 +483,70 @@ pub struct RemoteFetchRequest {
     target: NodeMetadata,
     start_round: Round,
     exists_bitmask: Vec<Vec<bool>>,
+    missing_count: usize,
 }
 
 impl RemoteFetchRequest {
-    pub fn new(target: NodeMetadata, start_round: Round, exists_bitmask: Vec<Vec<bool>>) -> Self {
+    pub fn new(
+        target: NodeMetadata,
+        start_round: Round,
+        exists_bitmask: Vec<Vec<bool>>,
+        missing_count: usize,
+    ) -> Self {
         Self {
             target,
             start_round,
             exists_bitmask,
+            missing_count,
         }
+    }
+
+    pub fn target(&self) -> &NodeMetadata {
+        &self.target
+    }
+
+    pub fn start_round(&self) -> Round {
+        self.start_round
+    }
+
+    pub fn exists_bitmask(&self) -> &Vec<Vec<bool>> {
+        &self.exists_bitmask
+    }
+
+    pub fn missing_count(&self) -> usize {
+        self.missing_count
+    }
+}
+
+impl TDAGMessage for RemoteFetchRequest {
+    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(
+            self.target.round >= self.start_round + self.exists_bitmask.len() as u64,
+            "target node round should be greater or equal to highest requested round"
+        );
+
+        Ok(())
     }
 }
 
 /// Represents a response to FetchRequest, `certified_nodes` are indexed by [round][validator_index]
 /// It should fill in gaps from the `exists_bitmask` according to the parents from the `target_digest` node.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct FetchResponse {
     epoch: u64,
-    certifies_nodes: Vec<Vec<CertifiedNode>>,
+    certified_nodes: Vec<CertifiedNode>,
 }
 
 impl FetchResponse {
-    pub fn certified_nodes(self) -> Vec<Vec<CertifiedNode>> {
-        self.certifies_nodes
+    pub fn new(epoch: u64, certified_nodes: Vec<CertifiedNode>) -> Self {
+        Self {
+            epoch,
+            certified_nodes,
+        }
+    }
+
+    pub fn certified_nodes(self) -> Vec<CertifiedNode> {
+        self.certified_nodes
     }
 
     pub fn verify(

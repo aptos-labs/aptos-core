@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::RpcHandler;
 use crate::{
     dag::{
         dag_network::DAGNetworkSender,
@@ -9,11 +10,13 @@ use crate::{
     },
     network::TConsensusMsg,
 };
+use anyhow::ensure;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_types::epoch_state::EpochState;
 use std::{sync::Arc, time::Duration};
+use thiserror::Error as ThisError;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
@@ -88,10 +91,20 @@ impl DagFetcher {
                     local_request.notify();
                     continue;
                 }
+
+                let (lowest_round, bitmask, missing_nodes) =
+                    if let Some((lowest_round, bitmask, missing_nodes)) = dag_reader.bitmask() {
+                        (lowest_round, bitmask, missing_nodes)
+                    } else {
+                        error!("Incomplete round not found, but fetch request received");
+                        continue;
+                    };
+
                 RemoteFetchRequest::new(
                     local_request.node().metadata().clone(),
-                    dag_reader.lowest_round(),
-                    dag_reader.bitmask(),
+                    lowest_round,
+                    bitmask,
+                    missing_nodes,
                 )
             };
             let network_request = DAGMessage::from(remote_request.clone()).into_network_message();
@@ -103,17 +116,61 @@ impl DagFetcher {
                 .and_then(FetchResponse::try_from)
                 .and_then(|response| response.verify(&remote_request, &self.epoch_state.verifier))
             {
+                let ceritified_nodes = response.certified_nodes();
+                if ceritified_nodes.len() != remote_request.missing_count() {
+                    error!(
+                        "expected {} nodes, received {}",
+                        remote_request.missing_count(),
+                        ceritified_nodes.len()
+                    );
+                    continue;
+                }
                 // TODO: support chunk response or fallback to state sync
                 let mut dag_writer = self.dag.write();
-                for rounds in response.certified_nodes() {
-                    for node in rounds {
-                        if let Err(e) = dag_writer.add_node(node) {
-                            error!("Failed to add node {}", e);
-                        }
+                for node in ceritified_nodes {
+                    if let Err(e) = dag_writer.add_node(node) {
+                        error!("Failed to add node {}", e);
                     }
                 }
                 local_request.notify();
             }
         }
+    }
+}
+
+#[derive(Debug, ThisError)]
+pub enum FetchHandleError {
+    #[error("not enough nodes to satisfy request")]
+    NotEnoughNodes,
+}
+
+pub struct FetchHandler {
+    dag: Arc<RwLock<Dag>>,
+}
+
+impl FetchHandler {
+    pub fn new(dag: Arc<RwLock<Dag>>) -> Self {
+        Self { dag }
+    }
+}
+
+impl RpcHandler for FetchHandler {
+    type Request = RemoteFetchRequest;
+    type Response = FetchResponse;
+
+    fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
+        let dag_reader = self.dag.read();
+
+        let nodes = dag_reader.get_missing_nodes(message.start_round(), message.exists_bitmask());
+        // If this peer cannot satisfy the request, return an error.
+        ensure!(
+            nodes.len() == message.missing_count(),
+            FetchHandleError::NotEnoughNodes
+        );
+
+        Ok(FetchResponse::new(
+            message.target().epoch(),
+            nodes.iter().map(|n| n.as_ref().clone()).collect(),
+        ))
     }
 }

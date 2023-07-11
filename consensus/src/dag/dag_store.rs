@@ -231,6 +231,40 @@ impl Dag {
             })
     }
 
+    pub fn get_missing_nodes(
+        &self,
+        start_round: Round,
+        bitmask: &[Vec<bool>],
+    ) -> Vec<Arc<CertifiedNode>> {
+        bitmask
+            .iter()
+            .enumerate()
+            .flat_map(move |(round_idx, round)| {
+                round
+                    .iter()
+                    .enumerate()
+                    .filter_map(move |(author_idx, exists)| {
+                        if *exists {
+                            None
+                        } else {
+                            Some((start_round + (round_idx as u64), author_idx))
+                        }
+                    })
+            })
+            .filter_map(|(round, author_idx)| {
+                if let Some(Some(node)) = self
+                    .nodes_by_round
+                    .get(&round)
+                    .and_then(|round| round.get(author_idx))
+                {
+                    Some(node.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub fn get_strong_links_for_round(
         &self,
         round: Round,
@@ -253,8 +287,39 @@ impl Dag {
         }
     }
 
-    pub fn bitmask(&self) -> Vec<Vec<bool>> {
-        // TODO: extract local bitvec
-        todo!();
+    pub fn lowest_incomplete_round(&self) -> Option<Round> {
+        for (round, round_nodes) in &self.nodes_by_round {
+            if round_nodes.iter().any(|node| node.is_none()) {
+                return Some(*round);
+            }
+        }
+        None
+    }
+
+    pub fn bitmask(&self) -> Option<(Round, Vec<Vec<bool>>, usize)> {
+        let lowest_round = match self.lowest_incomplete_round() {
+            Some(lowest_round) => lowest_round,
+            None => return None,
+        };
+
+        let mut missing_count = 0;
+        let bitmask = self
+            .nodes_by_round
+            .iter()
+            .skip_while(|(round, _)| **round < lowest_round)
+            .map(|(_, round_nodes)| {
+                round_nodes
+                    .iter()
+                    .map(|node| {
+                        if node.is_none() {
+                            missing_count += 1;
+                        }
+                        node.is_some()
+                    })
+                    .collect()
+            })
+            .collect();
+
+        Some((lowest_round, bitmask, missing_count))
     }
 }
