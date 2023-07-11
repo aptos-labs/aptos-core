@@ -45,6 +45,13 @@ pub enum AggregatorID {
     Ephemeral(u128),
 }
 
+
+/// Uniquely identifies each aggregator snapshot instance during the block execution.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AggregatorSnapshotID {
+    pub key: u128,
+}
+
 impl AggregatorID {
     pub fn legacy(handle: TableHandle, key: AggregatorHandle) -> Self {
         AggregatorID::Legacy { handle, key }
@@ -114,6 +121,24 @@ impl History {
 /// Internal aggregator data structure.
 #[derive(Debug)]
 pub struct Aggregator {
+    // Describes a value of an aggregator.
+    value: u128,
+    // Describes a state of an aggregator.
+    state: AggregatorState,
+    // Describes an upper bound of an aggregator. If `value` exceeds it, the
+    // aggregator overflows.
+    // TODO: Currently this is a single u128 value since we use 0 as a trivial
+    // lower bound. If we want to support custom lower bounds, or have more
+    // complex postconditions, we should factor this out in its own struct.
+    limit: u128,
+    // Describes values seen by this aggregator. Note that if aggregator knows
+    // its value, then storing history doesn't make sense.
+    history: Option<History>,
+}
+
+/// Internal AggregatorSnapshot data structure.
+#[derive(Debug)]
+pub struct AggregatorSnapshot {
     // Describes a value of an aggregator.
     value: u128,
     // Describes a state of an aggregator.
@@ -292,6 +317,8 @@ pub struct AggregatorData {
     destroyed_aggregators: BTreeSet<AggregatorID>,
     // All aggregator instances that exist in the current transaction.
     aggregators: BTreeMap<AggregatorID, Aggregator>,
+    // All aggregatorsnapshot instances that exist in the current transaction.
+    aggregator_snapshots: BTreeMap<AggregatorSnapshotID, AggregatorSnapshot>,
     // Counter for generating identifiers for AggregatorSnapshots.
     pub id_counter: u64,
 }
