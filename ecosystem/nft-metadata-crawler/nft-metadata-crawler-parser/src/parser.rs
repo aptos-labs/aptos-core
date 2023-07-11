@@ -31,7 +31,7 @@ pub struct Parser<'a> {
     format: ImageFormat,
     target_size: (u32, u32),
     bucket: String,
-    ts: &'a Box<dyn TokenSource>,
+    ts: &'a dyn TokenSource,
     force: bool,
 }
 
@@ -41,7 +41,7 @@ impl<'a> Parser<'a> {
         ts: Option<(u32, u32)>,
         b: String,
         f: bool,
-        t: &'a Box<dyn TokenSource>,
+        t: &'a dyn TokenSource,
     ) -> Self {
         Self {
             model: NFTMetadataCrawlerURIs {
@@ -92,7 +92,7 @@ impl<'a> Parser<'a> {
 
                 // Write to GCS
                 match write_json_to_gcs(
-                    self.ts.as_ref(),
+                    self.ts,
                     self.bucket.clone(),
                     self.entry.token_data_id.clone(),
                     json,
@@ -134,7 +134,7 @@ impl<'a> Parser<'a> {
 
                 // Write to GCS
                 match write_image_to_gcs(
-                    self.ts.as_ref(),
+                    self.ts,
                     self.format,
                     self.bucket.clone(),
                     self.entry.token_data_id.clone(),
@@ -165,16 +165,14 @@ impl<'a> Parser<'a> {
         let modified_uri = if uri.starts_with("ipfs://") {
             uri.replace("ipfs://", "https://ipfs.com/ipfs/")
         } else {
-            uri.to_string()
+            uri
         };
 
-        let url = Url::parse(&modified_uri)?;
         let re = Regex::new(r"^(ipfs/)(?P<cid>[a-zA-Z0-9]+)(?P<path>/.*)?$")?;
 
-        let path = match url.path_segments() {
-            Some(segments) => Some(segments.collect::<Vec<_>>().join("/")),
-            None => None,
-        };
+        let path = Url::parse(&modified_uri)?
+            .path_segments()
+            .map(|segments| segments.collect::<Vec<_>>().join("/"));
 
         if let Some(captures) = re.captures(&path.unwrap_or_default()) {
             let cid = captures["cid"].to_string();
@@ -207,13 +205,20 @@ impl<'a> Parser<'a> {
         for _ in 0..3 {
             self.log(&format!("Sending request for token_uri {}", uri));
 
-            let response = reqwest::get(uri).await?;
-            let parsed_json = response.json::<Value>().await?;
-            if let Some(img) = parsed_json["image"].as_str() {
-                self.model.raw_image_uri = Some(img.to_string());
-                self.model.last_updated = Utc::now().naive_local();
+            let result: Result<Value, Box<dyn Error + Send + Sync>> = async {
+                let response = reqwest::get(&uri).await?;
+                let parsed_json = response.json::<Value>().await?;
+                if let Some(img) = parsed_json["image"].as_str() {
+                    self.model.raw_image_uri = Some(img.to_string());
+                    self.model.last_updated = Utc::now().naive_local();
+                }
+                Ok(parsed_json)
             }
-            return Ok(parsed_json);
+            .await;
+
+            if let Ok(parsed_json) = result {
+                return Ok(parsed_json);
+            }
         }
         Err("Error sending request x3, skipping JSON".into())
     }
@@ -242,12 +247,12 @@ impl<'a> Parser<'a> {
                     ImageFormat::Gif | ImageFormat::Avif => return Ok(img_bytes.to_vec()),
                     _ => match image::load_from_memory(&img_bytes) {
                         Ok(img) => {
-                            return Ok(self.to_bytes(resize(
+                            return self.to_bytes(resize(
                                 &img.to_rgb8(),
-                                self.target_size.0 as u32,
-                                self.target_size.1 as u32,
+                                self.target_size.0,
+                                self.target_size.1,
                                 FilterType::Gaussian,
-                            ))?)
+                            ))
                         },
                         Err(e) => {
                             return Err(format!("Error converting image to bytes: {}", e).into());

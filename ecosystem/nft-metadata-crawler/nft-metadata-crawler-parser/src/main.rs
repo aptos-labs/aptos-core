@@ -82,7 +82,7 @@ fn spawn_parser(
             .await
             .expect("No token source");
 
-            let mut parser = Parser::new(uri, Some((400, 400)), bucket, force, &ts);
+            let mut parser = Parser::new(uri, Some((400, 400)), bucket, force, ts.as_ref());
 
             match parser.parse(&mut conn).await {
                 Ok(()) => {
