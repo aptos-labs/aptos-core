@@ -1,0 +1,14 @@
+[package]
+name = "nft-metadata-crawler-utils"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = { workspace = true }
+google-cloud-auth = { workspace = true }
+image = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }

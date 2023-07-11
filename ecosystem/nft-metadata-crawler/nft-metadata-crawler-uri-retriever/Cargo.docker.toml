@@ -1,0 +1,17 @@
+[package]
+name = "nft-metadata-crawler-uri-retriever"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = "0.13.0"
+csv = "1.2.1"
+google-cloud-auth = "0.11.0"
+hyper = { version = "0.14.18", features = ["full"] }
+nft-metadata-crawler-utils = { path = "../nft-metadata-crawler-utils" }
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0.137", features = ["derive"] }
+serde_json = "1.0.0"
+tokio = { version = "1.21.0", features = ["full"] }
