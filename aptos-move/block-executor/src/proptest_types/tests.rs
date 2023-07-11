@@ -97,7 +97,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -107,7 +107,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -117,7 +117,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -127,7 +127,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -137,7 +137,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 }
 
@@ -156,7 +156,7 @@ fn dynamic_read_writes_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
     .expect("creating a new value should succeed")
     .current();
 
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], ContractEvent>(
         &universe,
         transaction_gen,
         vec![],
@@ -204,7 +204,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
+            NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -257,7 +257,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
+            NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -302,7 +302,7 @@ fn dynamic_read_writes_contended_with_block_gas_limit(
     .expect("creating a new value should succeed")
     .current();
 
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], ContractEvent>(
         &universe,
         transaction_gen,
         vec![],
@@ -331,7 +331,7 @@ fn module_publishing_fallback_with_block_gas_limit(
     .expect("creating a new value should succeed")
     .current();
 
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], ContractEvent>(
         &universe,
         transaction_gen.clone(),
         vec![],
@@ -340,7 +340,7 @@ fn module_publishing_fallback_with_block_gas_limit(
         (false, true),
         maybe_block_gas_limit,
     );
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], ContractEvent>(
         &universe,
         transaction_gen.clone(),
         vec![],
@@ -349,7 +349,7 @@ fn module_publishing_fallback_with_block_gas_limit(
         (false, true),
         maybe_block_gas_limit,
     );
-    run_transactions(
+    run_transactions::<[u8; 32], [u8; 32], ContractEvent>(
         &universe,
         transaction_gen,
         vec![],
@@ -435,7 +435,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
+        NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>, usize>,
         ExecutableTestType,
     >::new(
         num_cpus::get(),
@@ -487,7 +487,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>>, usize>,
+            NoOpTransactionCommitHook<Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -545,7 +545,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
     }
 
     #[test]
@@ -555,7 +555,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 10) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 10) as u64));
     }
 
     #[test]
@@ -565,7 +565,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
     }
 
     #[test]
@@ -575,7 +575,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
     }
 
     #[test]
@@ -585,7 +585,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
     }
 }
 

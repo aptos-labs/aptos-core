@@ -30,7 +30,7 @@ pub enum ExecutionStatus<T, E> {
 pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
     type Value: Send + Sync + Clone + TransactionWrite;
-    type Event: Send + Sync + Debug + Clone;
+    type Event: Send + Sync + Debug;
 }
 
 /// Inference result of a transaction.
