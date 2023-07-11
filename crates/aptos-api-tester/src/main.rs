@@ -9,7 +9,7 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::U64;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::coin_client::CoinClient;
-use aptos_sdk::token_client::{TokenClient, CollectionData, MutabilityConfig};
+use aptos_sdk::token_client::{CollectionData, MutabilityConfig, TokenClient};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
@@ -202,7 +202,10 @@ async fn test_mintnft(
     }
 
     // check collection metadata
-    let actual_collection_data = match token_client.get_collection_data(account.address(), &collection_name).await {
+    let actual_collection_data = match token_client
+        .get_collection_data(account.address(), &collection_name)
+        .await
+    {
         Ok(txn) => txn,
         Err(e) => return TestResult::Error(e),
     };
