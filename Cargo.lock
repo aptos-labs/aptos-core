@@ -3232,6 +3232,7 @@ dependencies = [
  "claims",
  "num-traits 0.2.15",
  "proptest",
+ "rand 0.7.3",
  "serde 1.0.149",
  "thiserror",
 ]
