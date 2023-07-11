@@ -6,7 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aptos-gas = { workspace = true }
+aptos-gas-meter = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-vm-types = { workspace = true }
 move-binary-format = { workspace = true }
+anyhow = { workspace = true }
