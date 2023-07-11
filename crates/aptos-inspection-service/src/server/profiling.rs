@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Read;
 
 pub fn handle_profiling_request() -> (StatusCode, Body, String) {
-    let mut file = File::open("./crates/aptos-inspection-service/src/server/profiling_dashboard/index.html").expect("Failed to open file");
+    let mut file = File::open("./crates/aptos-inspection-service/src/server/index.html").expect("Failed to open file");
 
     // Read the contents of the file into a string
     let mut contents = String::new();
