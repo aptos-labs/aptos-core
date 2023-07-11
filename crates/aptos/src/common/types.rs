@@ -739,6 +739,40 @@ pub trait ParsePrivateKey {
 }
 
 #[derive(Debug, Default, Parser)]
+pub struct HardwareWalletOptions {
+    /// Derivation Path of your account in hardware wallet
+    ///
+    /// e.g format - [m/44'/637'/0'/0'/0]
+    /// Make sure your wallet is unblocked and have Aptos opened
+    #[clap(long)]
+    pub derivation_path: Option<String>,
+
+    /// Index of your account in hardware wallet
+    ///
+    /// This is the simpler version of derivation path e.g format - [0]
+    /// we will translate this index into [m/44'/637'/0'/0'/0]
+    #[clap(long)]
+    pub derivation_index: Option<String>,
+}
+
+impl HardwareWalletOptions {
+    pub fn extract_derivation_path(&self) -> CliTypedResult<Option<String>> {
+        if let Some(derivation_path) = &self.derivation_path {
+            Ok(Some(derivation_path.clone()))
+        } else if let Some(derivation_index) = &self.derivation_index {
+            let derivation_path = format!("m/44'/637'/{}'/0'/0'", derivation_index);
+            Ok(Some(derivation_path))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn is_hardware_wallet(&self) -> bool {
+        self.derivation_path.is_some() || self.derivation_index.is_some()
+    }
+}
+
+#[derive(Debug, Default, Parser)]
 pub struct PrivateKeyInputOptions {
     /// Signing Ed25519 private key file path
     ///

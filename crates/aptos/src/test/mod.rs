@@ -548,6 +548,7 @@ impl CliTestFramework {
             encoding_options: EncodingOptions::default(),
             skip_faucet: false,
             ledger: false,
+            hardware_wallet_options: Default::default(),
         }
         .execute()
         .await
