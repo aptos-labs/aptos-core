@@ -215,7 +215,7 @@ impl BufferManager {
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
-        let item = BufferItem::new_ordered(ordered_blocks.clone(), ordered_proof.clone(), callback);
+        let item = BufferItem::new_ordered(ordered_blocks.clone(), ordered_proof.clone(), callback, self.author);
         let item_hash = item.get_hash();
 
         // Disseminate the VRF shares for the ordered blocks
@@ -237,10 +237,11 @@ impl BufferManager {
                 .timestamps(rand_shares.timestamps());
 
             if rounds.is_empty() {
-                info!(log_event, "item id {} rounds {:?} broadcast to all, item size {}", item_hash, rounds, item.get_blocks().len());
+                info!(log_event);
             } else {
-                info!(log_event.first_round(rounds[0]), "item id {} rounds {:?} broadcast to all, item size {}", item_hash, rounds, item.get_blocks().len());
+                info!(log_event.first_round(rounds[0]));
             }
+
             self.rand_msg_tx
                     .broadcast_rand_shares(rand_shares)
                     .await;
@@ -260,9 +261,9 @@ impl BufferManager {
                         .timestamps(rand_shares.timestamps());
 
                     if rounds.is_empty() {
-                        info!(log_event, "item id {} rounds {:?} send to leader {}, item size {}", item_hash, rounds, leader, item.get_blocks().len());
+                        info!(log_event);
                     } else {
-                        info!(log_event.first_round(rounds[0]), "item id {} rounds {:?} send to leader {}, item size {}", item_hash, rounds, leader, item.get_blocks().len());
+                        info!(log_event.first_round(rounds[0]));
                     }
 
                     for block in item.get_blocks() {
@@ -299,9 +300,9 @@ impl BufferManager {
                     .timestamps(rand_shares.timestamps());
 
                 if rounds.is_empty() {
-                    info!(log_event, "item id {} from node {} rounds {:?}, rand size {}", item_id, rand_shares.author(), rounds, rand_shares.shares().len());
+                    info!(log_event);
                 } else {
-                    info!(log_event.first_round(rounds[0]), "item id {} from node {} rounds {:?}, rand size {}", item_id, rand_shares.author(), rounds, rand_shares.shares().len());
+                    info!(log_event.first_round(rounds[0]));
                 }
 
                 println!("[rand debug] share {} from {} by leader {}", rand_shares.item_id(), rand_shares.author(), self.author);
@@ -320,7 +321,7 @@ impl BufferManager {
                     if current_cursor.is_some() {
                         let mut item = self.buffer.take(&current_cursor);
                         if item.is_ordered() && item.aggregate_rand_shares(self.item_to_rand_shares_map.get(&item_id).unwrap().clone()).is_ok() {
-                            let rand_decisions = RandDecisions::new(item_id, rand_shares.epoch(), item.gen_dummy_rand_decision_vec());
+                            let rand_decisions = RandDecisions::new(item_id, rand_shares.epoch(), item.gen_dummy_rand_decision_vec(), self.author);
                             item.update_rand_decisions(rand_decisions.clone());
 
                             if item.get_blocks().len() != rand_decisions.decisions().len() {
@@ -339,9 +340,9 @@ impl BufferManager {
                                         .timestamps(rand_decisions.timestamps());
 
                                     if rounds.is_empty() {
-                                        info!(log_event, "item id {} rounds {:?} broadcast by {}, item size {}", item_id, rounds, self.author, item.get_blocks().len());
+                                        info!(log_event);
                                     } else {
-                                        info!(log_event.first_round(rounds[0]), "item id {} rounds {:?} broadcast by {}, item size {}", item_id, rounds, self.author, item.get_blocks().len());
+                                        info!(log_event.first_round(rounds[0]));
                                     }
 
                                     for block in item.get_blocks() {
@@ -409,12 +410,13 @@ impl BufferManager {
                     .new_log(LogEvent::ReceiveRand)
                     .item_id(item_id)
                     .rounds(rounds.clone())
-                    .timestamps(rand_decisions.timestamps());
+                    .timestamps(rand_decisions.timestamps())
+                    .remote_peer(rand_decisions.author());
 
                 if rounds.is_empty() {
-                    info!(log_event, "item id {} rounds {:?} receive by {}, item size {}", item_id, rounds, self.author, rand_decisions.decisions().len());
+                    info!(log_event);
                 } else {
-                    info!(log_event.first_round(rounds[0]), "item id {} rounds {:?} receive by {}, item size {}", item_id, rounds, self.author, rand_decisions.decisions().len());
+                    info!(log_event.first_round(rounds[0]));
                 }
 
                 // todo: verify rand message, ignore invalid ones
@@ -835,6 +837,19 @@ impl BufferManager {
 
             let rand_shares = RandShares::new(cursor.unwrap(), self.author, item.epoch(), item.gen_dummy_rand_share_vec(self.author));
 
+            let rounds = rand_shares.rounds();
+            let log_event = self
+                .new_log(LogEvent::BCastShareToAllDueToTimeout)
+                .item_id(cursor.unwrap())
+                .rounds(rounds.clone())
+                .timestamps(rand_shares.timestamps());
+
+            if rounds.is_empty() {
+                info!(log_event);
+            } else {
+                info!(log_event.first_round(rounds[0]));
+            }
+
             self.rand_msg_tx
                 .broadcast_rand_shares(rand_shares)
                 .await;
@@ -865,7 +880,20 @@ impl BufferManager {
                 continue;
             }
             println!("rebroadcast_rand_decision_if_needed for item {:?}", cursor);
-            let rand_decision = RandDecisions::new(cursor.unwrap(), item.epoch(), item.gen_dummy_rand_decision_vec());
+            let rand_decision = RandDecisions::new(cursor.unwrap(), item.epoch(), item.gen_dummy_rand_decision_vec(), self.author);
+
+            let rounds = rand_decision.rounds();
+            let log_event = self
+                .new_log(LogEvent::BCastDecisionToAllDueToTimeout)
+                .item_id(cursor.unwrap())
+                .rounds(rounds.clone())
+                .timestamps(rand_decision.timestamps());
+
+            if rounds.is_empty() {
+                info!(log_event);
+            } else {
+                info!(log_event.first_round(rounds[0]));
+            }
 
             self.rand_msg_tx
                 .broadcast_rand_decisions(rand_decision)

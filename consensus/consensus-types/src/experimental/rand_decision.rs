@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::Round;
+use crate::common::{Round, Author};
 use aptos_crypto::HashValue;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{validator_verifier::ValidatorVerifier, block_info::BlockInfo};
@@ -64,6 +64,7 @@ pub struct RandDecisions {
     item_id: HashValue,   // hash of the ordered_item
     epoch: Epoch,
     decisions: Vec<Option<RandDecision>>,
+    author: Author,
 }
 
 // this is required by structured log
@@ -91,11 +92,13 @@ impl RandDecisions {
         item_id: HashValue,
         epoch: Epoch,
         decisions: Vec<Option<RandDecision>>,
+        author: Author,
     ) -> Self {
         Self {
             item_id,
             epoch,
             decisions,
+            author,
         }
     }
 
@@ -124,5 +127,9 @@ impl RandDecisions {
 
     pub fn timestamps(&self) -> Vec<u64> {
         self.decisions.iter().filter_map(|s| s.as_ref().map(|share| share.block_info().timestamp_usecs())).collect()
+    }
+
+    pub fn author(&self) -> Author {
+        self.author
     }
 }

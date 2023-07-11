@@ -46,6 +46,8 @@ pub enum LogEvent {
     LeaderBCastRand,
     ReceiveRand,
     BCastRandToAll,
+    BCastShareToAllDueToTimeout,
+    BCastDecisionToAllDueToTimeout,
 }
 
 impl LogSchema {

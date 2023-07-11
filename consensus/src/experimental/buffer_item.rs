@@ -148,6 +148,7 @@ impl BufferItem {
         ordered_blocks: Vec<ExecutedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
+        author: Author,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
             unverified_signatures: PartialSignatures::empty(),
@@ -155,7 +156,7 @@ impl BufferItem {
             callback,
             ordered_blocks,
             ordered_proof,
-            partial_rand_decision: RandDecisions::new(HashValue::default(), 0, vec![]),
+            partial_rand_decision: RandDecisions::new(HashValue::default(), 0, vec![], author),
         }))
     }
 
