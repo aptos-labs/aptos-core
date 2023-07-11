@@ -1560,6 +1560,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-gas-calibration"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
+ "aptos-vm-types",
+ "move-binary-format",
+]
+
+[[package]]
 name = "aptos-gas-meter"
 version = "0.1.0"
 dependencies = [
@@ -1571,24 +1583,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-vm-types",
-]
-
-[[package]]
-name = "aptos-gas-algebra"
-version = "0.0.1"
-dependencies = [
- "either",
- "move-core-types",
-]
-
-[[package]]
-name = "aptos-gas-calibration"
-version = "0.1.0"
-dependencies = [
- "aptos-gas",
- "aptos-gas-algebra",
- "aptos-gas-schedule",
- "move-binary-format",
 ]
 
 [[package]]
