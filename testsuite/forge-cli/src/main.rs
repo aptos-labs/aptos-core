@@ -1515,7 +1515,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             override_config: None,
         })
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 150000,
+            mempool_backlog: 500000,
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["validator"]["config"]["consensus"]
