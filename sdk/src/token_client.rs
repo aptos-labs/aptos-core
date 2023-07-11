@@ -8,7 +8,8 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Result};
 use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Clone, Debug)]
 pub struct TokenClient<'a> {
@@ -46,6 +47,28 @@ impl<'a> TokenClient<'a> {
                     .into_inner()?
                     .data
                     .get("collection_data")?
+                    .get("handle")?
+                    .as_str()?
+                    .to_owned(),
+            )
+        } else {
+            None
+        }
+    }
+
+    /// Helper function to get the handle address of token_data for 0x3::token::Collections
+    /// resources.
+    async fn get_token_data_handle(&self, address: AccountAddress) -> Option<String> {
+        if let Ok(response) = self
+            .api_client
+            .get_account_resource(address, "0x3::token::Collections")
+            .await
+        {
+            Some(
+                response
+                    .into_inner()?
+                    .data
+                    .get("token_data")?
                     .get("handle")?
                     .as_str()?
                     .to_owned(),
@@ -163,7 +186,7 @@ impl<'a> TokenClient<'a> {
             .into_inner())
     }
 
-    /// Retrieves collection data from the API.
+    /// Retrieves collection metadata from the API.
     pub async fn get_collection_data(
         &self,
         creator: AccountAddress,
@@ -196,6 +219,41 @@ impl<'a> TokenClient<'a> {
             maximum: response.maximum.parse()?,
             mutability_config: response.mutability_config,
         })
+    }
+
+    /// Retrieves token metadata from the API.
+    pub async fn get_token_data(
+        &self,
+        creator: AccountAddress,
+        collection_name: &str,
+        token_name: &str,
+    ) -> Result<Value> {
+        // get handle for token_data
+        let handle = match self.get_token_data_handle(creator).await {
+            Some(s) => AccountAddress::from_hex_literal(&s)?,
+            None => return Err(anyhow!("Couldn't retrieve handle for token data")),
+        };
+
+        // construct key for table lookup
+        let token_data_id = TokenDataId {
+            creator: creator.to_hex_literal(),
+            collection: collection_name.to_string(),
+            name: token_name.to_string(),
+        };
+
+        // get table item with the handle
+        let value = self
+            .api_client
+            .get_table_item(
+                handle,
+                "0x3::token::TokenDataId",
+                "0x3::token::TokenData",
+                token_data_id,
+            )
+            .await?
+            .into_inner();
+
+        Ok(value)
     }
 }
 
@@ -249,4 +307,11 @@ pub struct MutabilityConfig {
     pub description: bool,
     pub maximum: bool,
     pub uri: bool,
+}
+
+#[derive(Serialize)]
+struct TokenDataId {
+    creator: String,
+    collection: String,
+    name: String,
 }

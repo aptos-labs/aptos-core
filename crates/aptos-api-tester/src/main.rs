@@ -179,6 +179,8 @@ async fn test_mintnft(
     }
 
     // create token
+    let token_name = "test token".to_string();
+
     let pending_txn = match token_client
         .create_token(
             account,
@@ -202,15 +204,8 @@ async fn test_mintnft(
     }
 
     // check collection metadata
-    let actual_collection_data = match token_client
-        .get_collection_data(account.address(), &collection_name)
-        .await
-    {
-        Ok(txn) => txn,
-        Err(e) => return TestResult::Error(e),
-    };
     let expected_collection_data = CollectionData {
-        name: collection_name,
+        name: collection_name.clone(),
         description: collection_description,
         uri: collection_uri,
         maximum: collection_maximum,
@@ -220,10 +215,27 @@ async fn test_mintnft(
             uri: false,
         },
     };
+    let actual_collection_data = match token_client
+        .get_collection_data(account.address(), &collection_name)
+        .await
+    {
+        Ok(data) => data,
+        Err(e) => return TestResult::Error(e),
+    };
 
     if expected_collection_data != actual_collection_data {
         return TestResult::Fail("wrong collection data");
     }
+
+    // check token metadata
+    let actual_token_data = match token_client
+        .get_token_data(account.address(), &collection_name, &token_name)
+        .await
+    {
+        Ok(data) => data,
+        Err(e) => return TestResult::Error(e),
+    };
+    println!("{:?}", actual_token_data);
 
     TestResult::Success
 }
