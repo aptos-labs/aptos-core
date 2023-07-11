@@ -198,7 +198,12 @@ impl BlockExecutorClient for ShardedExecutorClient {
             let _timer = SHARDED_BLOCK_EXECUTION_SECONDS
                 .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
                 .start_timer();
-            info!("executing sub block for shard {} and round {}, number of txns {}", self.shard_id, round, sub_block.transactions.len());
+            info!(
+                "executing sub block for shard {} and round {}, number of txns {}",
+                self.shard_id,
+                round,
+                sub_block.transactions.len()
+            );
             result.push(self.execute_sub_block(
                 sub_block,
                 round,

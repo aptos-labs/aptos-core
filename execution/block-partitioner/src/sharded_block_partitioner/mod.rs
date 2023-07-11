@@ -365,7 +365,9 @@ impl ShardedBlockPartitioner {
                 return frozen_sub_blocks;
             }
 
-            if num_remaining_txns as f32 / total_txns as f32 <= 1 as f32 - cross_shard_dep_avoid_threshold {
+            if num_remaining_txns as f32 / total_txns as f32
+                <= 1_f32 - cross_shard_dep_avoid_threshold
+            {
                 break;
             }
         }
