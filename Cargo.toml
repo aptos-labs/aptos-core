@@ -10,6 +10,7 @@ members = [
     "aptos-move/aptos-debugger",
     "aptos-move/aptos-gas-algebra",
     "aptos-move/aptos-gas-meter",
+    "aptos-move/aptos-gas-calibration",
     "aptos-move/aptos-gas-profiling",
     "aptos-move/aptos-gas-schedule",
     "aptos-move/aptos-gas-schedule-updator",
