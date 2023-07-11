@@ -9,7 +9,10 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::U64;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::coin_client::CoinClient;
-use aptos_sdk::token_client::{CollectionData, CollectionMutabilityConfig, TokenClient};
+use aptos_sdk::token_client::{
+    CollectionData, CollectionMutabilityConfig, RoyaltyOptions, TokenClient, TokenData,
+    TokenMutabilityConfig,
+};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
@@ -180,16 +183,20 @@ async fn test_mintnft(
 
     // create token
     let token_name = "test token".to_string();
+    let token_description = "token description".to_string();
+    let token_uri = "token uri".to_string();
+    let token_maximum = 1000;
+    let token_supply = 10;
 
     let pending_txn = match token_client
         .create_token(
             account,
             &collection_name,
-            "test token",
-            "token desc",
-            10,
-            "token",
-            10,
+            &token_name,
+            &token_description,
+            token_supply,
+            &token_uri,
+            token_maximum,
             None,
             None,
         )
@@ -228,6 +235,26 @@ async fn test_mintnft(
     }
 
     // check token metadata
+    let expected_token_data = TokenData {
+        name: token_name.clone(),
+        description: token_description,
+        uri: token_uri,
+        maximum: token_maximum,
+        mutability_config: TokenMutabilityConfig {
+            description: false,
+            maximum: false,
+            properties: false,
+            royalty: false,
+            uri: false,
+        },
+        supply: token_supply,
+        royalty: RoyaltyOptions {
+            royalty_payee_address: account.address(),
+            royalty_points_denominator: 0,
+            royalty_points_numerator: 0,
+        },
+        largest_property_version: 0,
+    };
     let actual_token_data = match token_client
         .get_token_data(account.address(), &collection_name, &token_name)
         .await
@@ -235,7 +262,10 @@ async fn test_mintnft(
         Ok(data) => data,
         Err(e) => return TestResult::Error(e),
     };
-    println!("{:?}", actual_token_data);
+
+    if expected_token_data != actual_token_data {
+        return TestResult::Fail("wrong token data");
+    }
 
     TestResult::Success
 }

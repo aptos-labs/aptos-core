@@ -339,16 +339,16 @@ pub struct TokenDataResponse {
     largest_property_version: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TokenData {
-    name: String,
-    description: String,
-    uri: String,
-    maximum: u64,
-    supply: u64,
-    royalty: RoyaltyOptions,
-    mutability_config: TokenMutabilityConfig,
-    largest_property_version: u64,
+    pub name: String,
+    pub description: String,
+    pub uri: String,
+    pub maximum: u64,
+    pub supply: u64,
+    pub royalty: RoyaltyOptions,
+    pub mutability_config: TokenMutabilityConfig,
+    pub largest_property_version: u64,
 }
 
 #[derive(Deserialize)]
@@ -358,14 +358,14 @@ pub struct RoyaltyOptionsResponse {
     royalty_points_numerator: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct RoyaltyOptions {
     pub royalty_payee_address: AccountAddress,
     pub royalty_points_denominator: u64,
     pub royalty_points_numerator: u64,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq)]
 pub struct TokenMutabilityConfig {
     pub description: bool,
     pub maximum: bool,
