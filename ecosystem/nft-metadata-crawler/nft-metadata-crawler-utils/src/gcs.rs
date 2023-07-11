@@ -1,7 +1,5 @@
 // Copyright © Aptos Foundation
 
-use std::error::Error;
-
 use google_cloud_auth::token_source::TokenSource;
 use image::ImageFormat;
 use reqwest::{
@@ -9,6 +7,7 @@ use reqwest::{
     Client,
 };
 use serde_json::Value;
+use std::error::Error;
 
 pub async fn write_json_to_gcs(
     ts: &dyn TokenSource,

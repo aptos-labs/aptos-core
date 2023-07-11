@@ -1,7 +1,5 @@
 // Copyright © Aptos Foundation
 
-use std::{env, error::Error};
-
 use ::futures::future;
 use diesel::{
     r2d2::{ConnectionManager, Pool},
@@ -17,6 +15,7 @@ use nft_metadata_crawler_parser::{
 };
 use nft_metadata_crawler_utils::pubsub::{consume_from_queue, send_ack};
 use reqwest::Client;
+use std::{env, error::Error};
 use tokio::task::JoinHandle;
 
 async fn process_response(

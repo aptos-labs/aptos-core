@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 
-use std::error::Error;
-
 use google_cloud_auth::token_source::TokenSource;
 use reqwest::Client;
 use serde_json::{json, Value};
+use std::error::Error;
 
 pub async fn publish_to_queue(
     client: &Client,

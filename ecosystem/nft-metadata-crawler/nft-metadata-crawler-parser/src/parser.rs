@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 
-use std::{error::Error, io::Cursor};
-
+use crate::{
+    db::upsert_uris,
+    models::{NFTMetadataCrawlerEntry, NFTMetadataCrawlerURIs},
+    schema::nft_metadata_crawler_uris,
+};
 use chrono::Utc;
 use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
@@ -15,15 +18,9 @@ use image::{
 use nft_metadata_crawler_utils::gcs::{write_image_to_gcs, write_json_to_gcs};
 use regex::Regex;
 use reqwest::Client;
-
 use serde_json::Value;
+use std::{error::Error, io::Cursor};
 use url::Url;
-
-use crate::{
-    db::upsert_uris,
-    models::{NFTMetadataCrawlerEntry, NFTMetadataCrawlerURIs},
-    schema::nft_metadata_crawler_uris,
-};
 
 pub struct Parser<'a> {
     pub entry: NFTMetadataCrawlerEntry,

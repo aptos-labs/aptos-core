@@ -1,16 +1,15 @@
 // Copyright © Aptos Foundation
 
-use std::error::Error;
-
-use crate::{models::NFTMetadataCrawlerURIs, schema};
-
+use crate::{
+    models::{NFTMetadataCrawlerEntry, NFTMetadataCrawlerURIs},
+    schema,
+};
 use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
     upsert::excluded,
     ExpressionMethods, PgConnection, RunQueryDsl, SelectableHelper,
 };
-
-use crate::models::NFTMetadataCrawlerEntry;
+use std::error::Error;
 
 pub fn upsert_entry(
     conn: &mut PooledConnection<ConnectionManager<PgConnection>>,

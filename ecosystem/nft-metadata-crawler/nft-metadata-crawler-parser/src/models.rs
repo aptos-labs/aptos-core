@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 
-use std::error::Error;
-
 use chrono::{NaiveDateTime, Utc};
 use diesel::prelude::*;
+use std::error::Error;
 
 #[derive(Clone, Insertable, Queryable, Selectable)]
 #[diesel(table_name = crate::schema::nft_metadata_crawler_entry)]
