@@ -490,7 +490,7 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig>
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => mainnet_like_simulation_test(), // realistic_env_max_load_test(duration),
+        "realistic_env_max_load" => realistic_network_tuned_for_throughput_test(), // realistic_env_max_load_test(duration),
         "compat" => compat(),
         "framework_upgrade" => upgrade(),
         // Rest of the tests:
@@ -1543,6 +1543,11 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 true.into();
             helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
                 ["use_sharded_state_merkle_db"] = true.into();
+
+            helm_values["validator"]["resources"]["limits"]["cpu"] = 32.into();
+            helm_values["validator"]["resources"]["requests"]["cpu"] = 32.into();
+            helm_values["validator"]["resources"]["limits"]["memory"] = "96Gi".into();
+            helm_values["validator"]["resources"]["requests"]["memory"] = "96Gi".into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(8000)
