@@ -112,10 +112,16 @@ fn test_message_board() {
 
 #[test]
 fn test_fungible_asset() {
-    let named_address = BTreeMap::from([(
-        String::from("example_addr"),
-        AccountAddress::from_hex_literal("0xcafe").unwrap(),
-    )]);
+    let named_address = BTreeMap::from([
+        (
+            String::from("example_addr"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("FACoin"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
     run_tests_for_pkg(
         "fungible_asset/managed_fungible_asset",
         named_address.clone(),
@@ -128,7 +134,7 @@ fn test_fungible_asset() {
         "fungible_asset/preminted_managed_coin",
         named_address.clone(),
     );
-    run_tests_for_pkg("fungible_asset/simple_managed_coin", named_address);
+    run_tests_for_pkg("fungible_asset/fa_coin", named_address);
 }
 
 #[test]
@@ -202,4 +208,19 @@ fn test_nft_dao_test() {
         AccountAddress::from_hex_literal("0xcafe").unwrap(),
     )]);
     run_tests_for_pkg("dao/nft_dao", named_address);
+}
+
+#[test]
+fn test_swap() {
+    let named_address = BTreeMap::from([
+        (
+            String::from("deployer"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("swap"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("swap", named_address);
 }

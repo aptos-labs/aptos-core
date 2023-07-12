@@ -238,7 +238,12 @@ pub(crate) fn save_transactions_impl(
 ) -> Result<()> {
     // TODO(grao): Support splited ledger db here.
     for (idx, txn) in txns.iter().enumerate() {
-        transaction_store.put_transaction(first_version + idx as Version, txn, batch)?;
+        transaction_store.put_transaction(
+            first_version + idx as Version,
+            txn,
+            /*skip_index=*/ false,
+            batch,
+        )?;
     }
     ledger_store.put_transaction_infos(first_version, txn_infos, batch, batch)?;
     event_store.put_events_multiple_versions(first_version, events, batch)?;

@@ -114,7 +114,7 @@ impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
 #[derive(Debug, Default, Parser)]
 pub struct NetworkKeyInputOptions {
     /// x25519 Private key input file name
-    #[clap(long, group = "network_key_input", parse(from_os_str))]
+    #[clap(long, group = "network_key_input", value_parser)]
     private_network_key_file: Option<PathBuf>,
 
     /// x25519 Private key encoded in a type as shown in `encoding`
@@ -122,7 +122,7 @@ pub struct NetworkKeyInputOptions {
     private_network_key: Option<String>,
 
     /// x25519 Public key input file name
-    #[clap(long, group = "network_key_input", parse(from_os_str))]
+    #[clap(long, group = "network_key_input", value_parser)]
     public_network_key_file: Option<PathBuf>,
 
     /// x25519 Public key encoded in a type as shown in `encoding`

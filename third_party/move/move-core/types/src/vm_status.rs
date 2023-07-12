@@ -57,7 +57,11 @@ pub enum VMStatus {
     /// Indicates an error from the VM, e.g. OUT_OF_GAS, INVALID_AUTH_KEY, RET_TYPE_MISMATCH_ERROR
     /// etc.
     /// The code will neither EXECUTED nor ABORTED
-    Error(StatusCode, Option<String>),
+    Error {
+        status_code: StatusCode,
+        sub_status: Option<u64>,
+        message: Option<String>,
+    },
 
     /// Indicates an `abort` from inside Move code. Contains the location of the abort and the code
     MoveAbort(AbortLocation, /* code */ u64),
@@ -66,6 +70,7 @@ pub enum VMStatus {
     /// dividing by zero or a missing resource
     ExecutionFailure {
         status_code: StatusCode,
+        sub_status: Option<u64>,
         location: AbortLocation,
         function: u16,
         code_offset: u16,
@@ -126,13 +131,23 @@ pub enum StatusType {
 }
 
 impl VMStatus {
+    pub fn error(status_code: StatusCode, message: Option<String>) -> Self {
+        Self::Error {
+            status_code,
+            sub_status: None,
+            message,
+        }
+    }
+
     /// Return the status code for the `VMStatus`
     pub fn status_code(&self) -> StatusCode {
         match self {
             Self::Executed => StatusCode::EXECUTED,
             Self::MoveAbort(_, _) => StatusCode::ABORTED,
             Self::ExecutionFailure { status_code, .. } => *status_code,
-            Self::Error(code, _) => {
+            Self::Error {
+                status_code: code, ..
+            } => {
                 let code = *code;
                 debug_assert!(code != StatusCode::EXECUTED);
                 debug_assert!(code != StatusCode::ABORTED);
@@ -141,10 +156,21 @@ impl VMStatus {
         }
     }
 
+    pub fn sub_status(&self) -> Option<u64> {
+        match self {
+            Self::Error { sub_status, .. } | Self::ExecutionFailure { sub_status, .. } => {
+                *sub_status
+            },
+            Self::Executed | Self::MoveAbort(..) => None,
+        }
+    }
+
     /// Returns the message associated with the `VMStatus`, if any.
     pub fn message(&self) -> Option<&String> {
         match self {
-            Self::Error(_, message) | Self::ExecutionFailure { message, .. } => message.as_ref(),
+            Self::Error { message, .. } | Self::ExecutionFailure { message, .. } => {
+                message.as_ref()
+            },
             _ => None,
         }
     }
@@ -153,7 +179,7 @@ impl VMStatus {
     pub fn move_abort_code(&self) -> Option<u64> {
         match self {
             Self::MoveAbort(_, code) => Some(*code),
-            Self::Error(..) | Self::ExecutionFailure { .. } | Self::Executed => None,
+            Self::Error { .. } | Self::ExecutionFailure { .. } | Self::Executed => None,
         }
     }
 
@@ -172,7 +198,10 @@ impl VMStatus {
                 status_code: StatusCode::OUT_OF_GAS,
                 ..
             }
-            | VMStatus::Error(StatusCode::OUT_OF_GAS, _) => Ok(KeptVMStatus::OutOfGas),
+            | VMStatus::Error {
+                status_code: StatusCode::OUT_OF_GAS,
+                ..
+            } => Ok(KeptVMStatus::OutOfGas),
 
             VMStatus::ExecutionFailure {
                 status_code:
@@ -181,12 +210,13 @@ impl VMStatus {
                     | StatusCode::STORAGE_LIMIT_REACHED,
                 ..
             }
-            | VMStatus::Error(
-                StatusCode::EXECUTION_LIMIT_REACHED
-                | StatusCode::IO_LIMIT_REACHED
-                | StatusCode::STORAGE_LIMIT_REACHED,
-                _,
-            ) => Ok(KeptVMStatus::MiscellaneousError),
+            | VMStatus::Error {
+                status_code:
+                    StatusCode::EXECUTION_LIMIT_REACHED
+                    | StatusCode::IO_LIMIT_REACHED
+                    | StatusCode::STORAGE_LIMIT_REACHED,
+                ..
+            } => Ok(KeptVMStatus::MiscellaneousError),
 
             VMStatus::ExecutionFailure {
                 status_code: _status_code,
@@ -199,7 +229,9 @@ impl VMStatus {
                 function,
                 code_offset,
             }),
-            VMStatus::Error(code, _) => {
+            VMStatus::Error {
+                status_code: code, ..
+            } => {
                 match code.status_type() {
                     // Any unknown error should be discarded
                     StatusType::Unknown => Err(code),
@@ -250,6 +282,10 @@ impl fmt::Display for VMStatus {
             status = format!("{} with sub status {}", status, code);
         }
 
+        if let Some(msg) = self.message() {
+            status = format!("{} with message {}", status, msg);
+        }
+
         write!(f, "{}", status)
     }
 }
@@ -281,10 +317,15 @@ impl fmt::Debug for VMStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             VMStatus::Executed => write!(f, "EXECUTED"),
-            VMStatus::Error(code, msg) => f
+            VMStatus::Error {
+                status_code,
+                sub_status,
+                message,
+            } => f
                 .debug_struct("ERROR")
-                .field("status_code", code)
-                .field("message", msg)
+                .field("status_code", status_code)
+                .field("sub_status", sub_status)
+                .field("message", message)
                 .finish(),
             VMStatus::MoveAbort(location, code) => f
                 .debug_struct("ABORTED")
@@ -297,9 +338,11 @@ impl fmt::Debug for VMStatus {
                 function,
                 code_offset,
                 message,
+                sub_status,
             } => f
                 .debug_struct("EXECUTION_FAILURE")
                 .field("status_code", status_code)
+                .field("sub_status", sub_status)
                 .field("location", location)
                 .field("function_definition", function)
                 .field("code_offset", code_offset)
@@ -526,8 +569,8 @@ pub enum StatusCode {
     MULTISIG_TRANSACTION_NOT_FOUND = 33,
     MULTISIG_TRANSACTION_INSUFFICIENT_APPROVALS = 34,
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH_HASH = 35,
+    GAS_PAYER_ACCOUNT_MISSING = 36,
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_1 = 36,
     RESERVED_VALIDATION_ERROR_2 = 37,
     RESERVED_VALIDATION_ERROR_3 = 38,
     RESERVED_VALIDATION_ERROR_4 = 39,
@@ -841,13 +884,6 @@ impl From<StatusCode> for u64 {
     }
 }
 
-pub mod sub_status {
-    // Native Function Error sub-codes
-    pub const NFE_VECTOR_ERROR_BASE: u64 = 0;
-    // Failure in BCS deserialization
-    pub const NFE_BCS_SERIALIZATION_FAILURE: u64 = 0x1C5;
-}
-
 /// The `Arbitrary` impl only generates validation statuses since the full enum is too large.
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for StatusCode {
@@ -900,5 +936,25 @@ fn test_status_codes() {
         seen_statuses.insert(unwrapped_status);
         let to_major_status_code = u64::from(unwrapped_status);
         assert_eq!(*major_status_code, to_major_status_code);
+    }
+}
+
+pub mod sub_status {
+    // Native Function Error sub-codes
+    pub const NFE_VECTOR_ERROR_BASE: u64 = 0;
+    // Failure in BCS deserialization
+    pub const NFE_BCS_SERIALIZATION_FAILURE: u64 = 0x1C5;
+
+    pub mod unknown_invariant_violation {
+        // Paranoid Type checking returns an error
+        pub const EPARANOID_FAILURE: u64 = 0x1;
+
+        // Reference safety checks failure
+        pub const EREFERENCE_COUNTING_FAILURE: u64 = 0x2;
+    }
+
+    pub mod type_resolution_failure {
+        // User provided typetag failed to load.
+        pub const EUSER_TYPE_LOADING_FAILURE: u64 = 0x1;
     }
 }

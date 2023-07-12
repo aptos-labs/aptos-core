@@ -1,7 +1,5 @@
-query getTokenOwnersData($token_id: String, $property_version: numeric) {
-  current_token_ownerships(
-    where: { token_data_id_hash: { _eq: $token_id }, property_version: { _eq: $property_version } }
-  ) {
+query getTokenOwnersData($where_condition: current_token_ownerships_v2_bool_exp!) {
+  current_token_ownerships_v2(where: $where_condition) {
     owner_address
   }
 }

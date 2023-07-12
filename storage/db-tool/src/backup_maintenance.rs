@@ -19,13 +19,13 @@ pub enum Command {
 #[derive(Parser)]
 pub struct CompactionOpt {
     /// Specify how many epoch files to be merged in one compacted epoch ending metadata file
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     pub epoch_ending_file_compact_factor: usize,
     /// Specify how many state snapshot files to be merged in one compacted state snapshot metadata file
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     pub state_snapshot_file_compact_factor: usize,
     /// Specify how many transaction files to be merged in one transaction metadata file
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     pub transaction_file_compact_factor: usize,
     #[clap(flatten)]
     pub metadata_cache_opt: MetadataCacheOpt,
@@ -36,7 +36,7 @@ pub struct CompactionOpt {
     /// Specify how many seconds to keep compacted metadata file before moving them to backup folder
     #[clap(
         long,
-        default_value = "86400",
+        default_value_t = 86400,
         help = "Remove metadata files replaced by compaction after specified seconds. They were not replaced right away after compaction in case they are being read then."
     )]
     pub remove_compacted_file_after: u64,

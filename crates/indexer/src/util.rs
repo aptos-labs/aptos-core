@@ -43,7 +43,14 @@ pub fn ensure_not_negative(val: BigDecimal) -> BigDecimal {
 }
 
 pub fn parse_timestamp(ts: u64, version: i64) -> chrono::NaiveDateTime {
-    chrono::NaiveDateTime::from_timestamp_opt((ts / 1000000) as i64, 0)
+    let seconds = ts / 1000000;
+    let ns = (ts % 1000000 * 1000).try_into().unwrap_or_else(|_| {
+        panic!(
+            "Could not get nanoseconds for timestamp {:?} for version {}",
+            ts, version
+        )
+    });
+    chrono::NaiveDateTime::from_timestamp_opt(seconds as i64, ns)
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
@@ -189,7 +196,7 @@ pub fn convert_hex(val: String) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Datelike;
+    use chrono::{Datelike, Timelike};
     use serde::Serialize;
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -216,6 +223,7 @@ mod tests {
     fn test_parse_timestamp() {
         let ts = parse_timestamp(1649560602763949, 1);
         assert_eq!(ts.timestamp(), 1649560602);
+        assert_eq!(ts.nanosecond(), 763949000);
         assert_eq!(ts.year(), 2022);
 
         let ts2 = parse_timestamp_secs(600000000000000, 2);

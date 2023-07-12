@@ -1,0 +1,73 @@
+
+Diagnostics:
+error: invalid call of `M::foo`: expected `address` but found `bool` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:20:9
+   │
+20 │         foo(false, 0, S{});
+   │         ^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: expected `u64` but found `bool` for argument 2
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:21:9
+   │
+21 │         foo(@0x0, false, S{});
+   │         ^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: expected `M::S` but found `bool` for argument 3
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:22:9
+   │
+22 │         foo(@0x0, 0, false);
+   │         ^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: expected `u64` but found `bool` for argument 2
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:23:9
+   │
+23 │         foo(@0x0, false, false);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: expected `address` but found `bool` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:24:9
+   │
+24 │         foo(false, 0, false);
+   │         ^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: expected `address` but found `bool` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:25:9
+   │
+25 │         foo(false, false, S{});
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::foo`: expected `address` but found `bool` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:29:9
+   │
+29 │         X::foo(false, 0, X::s());
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::foo`: expected `u64` but found `bool` for argument 2
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:30:9
+   │
+30 │         X::foo(@0x0, false, X::s());
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::foo`: expected `X::S` but found `M::S` for argument 3
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:31:9
+   │
+31 │         X::foo(@0x0, 0, S{});
+   │         ^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::foo`: expected `u64` but found `bool` for argument 2
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:32:9
+   │
+32 │         X::foo(@0x0, false, S{});
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::foo`: expected `address` but found `bool` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:33:9
+   │
+33 │         X::foo(false, 0, S{});
+   │         ^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::foo`: expected `address` but found `bool` for argument 1
+   ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:34:9
+   │
+34 │         X::foo(false, false, X::s());
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

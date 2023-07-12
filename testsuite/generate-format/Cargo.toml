@@ -22,12 +22,12 @@ aptos-crypto-derive = { workspace = true }
 aptos-network = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+clap = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 rand = { workspace = true }
 serde = { workspace = true }
 serde-reflection = { workspace = true }
 serde_yaml = { workspace = true }
-structopt = { workspace = true }
 
 [[bin]]
 name = "compute"

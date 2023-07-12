@@ -251,6 +251,17 @@ module aptos_framework::coin {
     }
 
     #[view]
+    /// Returns `true` is account_addr has frozen the CoinStore or if it's not registered at all
+    public fun is_coin_store_frozen<CoinType>(account_addr: address): bool acquires CoinStore {
+        if(!is_account_registered<CoinType>(account_addr)) {
+          return true
+        };
+
+        let coin_store = borrow_global<CoinStore<CoinType>>(account_addr);
+        coin_store.frozen
+    }
+
+    #[view]
     /// Returns `true` if `account_addr` is registered to receive `CoinType`.
     public fun is_account_registered<CoinType>(account_addr: address): bool {
         exists<CoinStore<CoinType>>(account_addr)
@@ -878,6 +889,32 @@ module aptos_framework::coin {
         assert!(is_coin_initialized<FakeMoney>(), 1);
 
         move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
+    #[test(account = @0x1)]
+    public fun test_is_coin_store_frozen(account: signer) acquires CoinStore {
+        let account_addr = signer::address_of(&account);
+        // An non registered account is has a frozen coin store by default
+        assert!(is_coin_store_frozen<FakeMoney>(account_addr), 1);
+
+        account::create_account_for_test(account_addr);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&account, 18, true);
+
+        assert!(!is_coin_store_frozen<FakeMoney>(account_addr), 1);
+
+        // freeze account
+        freeze_coin_store(account_addr, &freeze_cap);
+        assert!(is_coin_store_frozen<FakeMoney>(account_addr), 1);
+
+        // unfreeze account
+        unfreeze_coin_store(account_addr, &freeze_cap);
+        assert!(!is_coin_store_frozen<FakeMoney>(account_addr), 1);
+
+        move_to(&account, FakeMoneyCapabilities {
             burn_cap,
             freeze_cap,
             mint_cap,

@@ -19,17 +19,17 @@ EXPECTED_TPS = {
     ("no-op", False, 1): (18800.0, True),
     ("no-op", False, 1000): (2980.0, True),
     ("coin-transfer", False, 1): (12600.0, True),
-    ("coin-transfer", True, 1): (22100.0, True),
+    ("coin-transfer", True, 1): (30000.0, True),
     ("account-generation", False, 1): (11000.0, True),
-    ("account-generation", True, 1): (20000.0, True),
+    ("account-generation", True, 1): (26000.0, True),
     # changed to not use account_pool. either recalibrate or add here to use account pool.
     ("account-resource32-b", False, 1): (15000.0, False),
     ("modify-global-resource", False, 1): (3700.0, True),
     ("modify-global-resource", False, 10): (10800.0, True),
     # seems to have changed, disabling as land_blocking, until recalibrated
-    ("publish-package", False, 1): (159.0, False),
+    ("publish-package", False, 1): (120.0, False),
     ("batch100-transfer", False, 1): (350, True),
-    ("batch100-transfer", True, 1): (630, True),
+    ("batch100-transfer", True, 1): (880, True),
     ("token-v1ft-mint-and-transfer", False, 1): (1650.0, True),
     ("token-v1ft-mint-and-transfer", False, 20): (7100.0, True),
     ("token-v1nft-mint-and-transfer-sequential", False, 1): (1100.0, True),
@@ -120,6 +120,7 @@ class RunGroupKey:
 class RunResults:
     tps: float
     gps: float
+    gpt: float
     fraction_in_execution: float
     fraction_of_execution_in_vm: float
     fraction_in_commit: float
@@ -134,13 +135,23 @@ class RunGroupInstance:
     expected_tps: float
 
 
+def get_only(values):
+    assert len(values) == 1, "Multiple values parsed: " + str(values)
+    return values[0]
+
+
 def extract_run_results(output: str, execution_only: bool) -> RunResults:
     if execution_only:
         tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
         gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
+        gpt = float(
+            re.findall(r"Overall execution GPT: (\d+\.?\d*) gas/txn", output)[-1]
+        )
+
     else:
-        tps = float(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)[0])
-        gps = float(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)[-1])
+        tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
+        gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
+        gpt = float(get_only(re.findall(r"Overall GPT: (\d+\.?\d*) gas/txn", output)))
 
     fraction_in_execution = float(
         re.findall(r"Overall fraction of total: (\d+\.?\d*) in execution", output)[-1]
@@ -153,7 +164,12 @@ def extract_run_results(output: str, execution_only: bool) -> RunResults:
     )
 
     return RunResults(
-        tps, gps, fraction_in_execution, fraction_of_execution_in_vm, fraction_in_commit
+        tps,
+        gps,
+        gpt,
+        fraction_in_execution,
+        fraction_of_execution_in_vm,
+        fraction_in_commit,
     )
 
 
@@ -183,7 +199,7 @@ def print_table(
         field_name, _ = single_field
         headers.append(field_name)
     else:
-        headers.extend(["t/s", "exe/total", "vm/exe", "commit/total", "g/s"])
+        headers.extend(["t/s", "exe/total", "vm/exe", "commit/total", "g/s", "g/t"])
 
     rows = []
     for result in results:
@@ -213,6 +229,7 @@ def print_table(
             row.append(round(result.single_node_result.fraction_of_execution_in_vm, 3))
             row.append(round(result.single_node_result.fraction_in_commit, 3))
             row.append(int(round(result.single_node_result.gps)))
+            row.append(int(round(result.single_node_result.gpt)))
         rows.append(row)
 
     print(tabulate(rows, headers=headers))
@@ -222,7 +239,7 @@ errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {BLOCK_SIZE} --concurrency-level {CONCURRENCY_LEVEL} --split-ledger-db --use-sharded-state-merkle-db create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {BLOCK_SIZE} --concurrency-level {CONCURRENCY_LEVEL} --split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -237,7 +254,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         executor_type = "native" if use_native_executor else "VM"
 
         use_native_executor_str = "--use-native-executor" if use_native_executor else ""
-        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --split-ledger-db --use-sharded-state-merkle-db run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         concurrency_level_results = {}
 
@@ -279,6 +296,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "expected_tps": expected_tps,
                     "tps": single_node_result.tps,
                     "gps": single_node_result.gps,
+                    "gpt": single_node_result.gpt,
                     "code_perf_version": CODE_PERF_VERSION,
                 }
             )

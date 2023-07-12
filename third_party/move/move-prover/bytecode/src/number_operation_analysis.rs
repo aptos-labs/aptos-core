@@ -289,7 +289,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                         move_model::ast::Operation::Bv2Int => {
                             global_state.update_node_oper(*id, Arithmetic, true);
                         },
-                        move_model::ast::Operation::Function(mid, sid, _) => {
+                        move_model::ast::Operation::SpecFunction(mid, sid, _) => {
                             let module_env = &self.func_target.global_env().get_module(*mid);
                             let callee_name = module_env
                                 .get_spec_fun(*sid)

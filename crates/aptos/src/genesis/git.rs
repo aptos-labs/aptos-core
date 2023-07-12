@@ -40,7 +40,7 @@ pub struct SetupGit {
     pub(crate) git_options: GitOptions,
 
     /// Path to the `Layout` file which defines where all the files are
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) layout_file: PathBuf,
 }
 
@@ -96,13 +96,13 @@ pub struct GitOptions {
     pub(crate) github_branch: String,
 
     /// Path to Github API token.  Token must have repo:* permissions
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) github_token_file: Option<PathBuf>,
 
     /// Path to local git repository
     ///
     /// Mutually exclusive with `--github-repository`
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) local_repository_dir: Option<PathBuf>,
 }
 

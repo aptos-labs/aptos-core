@@ -53,11 +53,7 @@ use crate::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::{
-        ledger_pruner_manager::LedgerPrunerManager, pruner_manager::PrunerManager, pruner_utils,
-        state_kv_pruner_manager::StateKvPrunerManager,
-        state_merkle_pruner_manager::StateMerklePrunerManager,
-    },
+    pruner::{LedgerPrunerManager, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     schema::*,
     stale_node_index::StaleNodeIndexSchema,
     stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
@@ -290,6 +286,7 @@ pub struct AptosDB {
     _rocksdb_property_reporter: RocksdbPropertyReporter,
     ledger_commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
+    skip_index_and_usage: bool,
 }
 
 impl AptosDB {
@@ -301,6 +298,7 @@ impl AptosDB {
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
+        skip_index_and_usage: bool,
     ) -> Self {
         let ledger_db = Arc::new(ledger_db);
         let state_merkle_db = Arc::new(state_merkle_db);
@@ -325,6 +323,7 @@ impl AptosDB {
             buffered_state_target_items,
             hack_for_tests,
             empty_buffered_state_for_restore,
+            skip_index_and_usage,
         ));
 
         let ledger_pruner =
@@ -346,6 +345,7 @@ impl AptosDB {
             ),
             ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
+            skip_index_and_usage,
         }
     }
 
@@ -379,6 +379,7 @@ impl AptosDB {
             buffered_state_target_items,
             readonly,
             empty_buffered_state_for_restore,
+            rocksdb_configs.skip_index_and_usage,
         );
 
         if !readonly && enable_indexer {
@@ -868,6 +869,7 @@ impl AptosDB {
         first_version: Version,
         expected_state_db_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
+        skip_index_and_usage: bool,
     ) -> Result<HashValue> {
         let new_root_hash = thread::scope(|s| {
             let _timer = OTHER_TIMERS_SECONDS
@@ -875,15 +877,19 @@ impl AptosDB {
                 .start_timer();
             // TODO(grao): Write progress for each of the following databases, and handle the
             // inconsistency at the startup time.
-            let t0 = s.spawn(|| self.commit_events(txns_to_commit, first_version));
+            let t0 =
+                s.spawn(|| self.commit_events(txns_to_commit, first_version, skip_index_and_usage));
             let t1 = s.spawn(|| self.commit_write_sets(txns_to_commit, first_version));
-            let t2 = s.spawn(|| self.commit_transactions(txns_to_commit, first_version));
+            let t2 = s.spawn(|| {
+                self.commit_transactions(txns_to_commit, first_version, skip_index_and_usage)
+            });
             let t3 = s.spawn(|| {
                 self.commit_state_kv_and_ledger_metadata(
                     txns_to_commit,
                     first_version,
                     expected_state_db_usage,
                     sharded_state_cache,
+                    skip_index_and_usage,
                 )
             });
             let t4 = s.spawn(|| self.commit_transaction_infos(txns_to_commit, first_version));
@@ -906,6 +912,7 @@ impl AptosDB {
         first_version: Version,
         expected_state_db_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
+        skip_index_and_usage: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_state_kv_and_ledger_metadata"])
@@ -928,7 +935,8 @@ impl AptosDB {
             &ledger_metadata_batch,
             &sharded_state_kv_batches,
             &state_kv_metadata_batch,
-            self.state_store.state_kv_db.enabled_sharding(),
+            self.state_store.state_kv_db.enabled_sharding() && !skip_index_and_usage,
+            skip_index_and_usage,
         )?;
 
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
@@ -967,6 +975,7 @@ impl AptosDB {
         &self,
         txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: Version,
+        skip_index: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_events"])
@@ -980,6 +989,7 @@ impl AptosDB {
                 self.event_store.put_events(
                     first_version + i as u64,
                     txn_to_commit.borrow().events(),
+                    skip_index,
                     &batch,
                 )?;
 
@@ -995,6 +1005,7 @@ impl AptosDB {
         &self,
         txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: Version,
+        skip_index: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transactions"])
@@ -1011,6 +1022,7 @@ impl AptosDB {
                         self.transaction_store.put_transaction(
                             chunk_first_version + i as u64,
                             txn_to_commit.borrow().transaction(),
+                            skip_index,
                             &batch,
                         )?;
 
@@ -2021,6 +2033,7 @@ impl DbWriter for AptosDB {
                 first_version,
                 latest_in_memory_state.current.usage(),
                 None,
+                /*skip_index_and_usage=*/ false,
             )?;
 
             {
@@ -2082,6 +2095,7 @@ impl DbWriter for AptosDB {
                 first_version,
                 latest_in_memory_state.current.usage(),
                 Some(sharded_state_cache),
+                self.skip_index_and_usage,
             )?;
 
             let _timer = OTHER_TIMERS_SECONDS

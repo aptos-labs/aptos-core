@@ -283,6 +283,63 @@ impl RawTransaction {
         ))
     }
 
+    /// Signs the given fee-payer `RawTransaction`, which is a transaction with secondary
+    /// signers and a gas payer in addition to a sender. The private keys of the sender, the
+    /// secondary signers, and gas payer signer are used to sign the transaction.
+    ///
+    /// The order and length of the secondary keys provided here have to match the order and
+    /// length of the `secondary_signers`.
+    pub fn sign_fee_payer(
+        self,
+        sender_private_key: &Ed25519PrivateKey,
+        secondary_signers: Vec<AccountAddress>,
+        secondary_private_keys: Vec<&Ed25519PrivateKey>,
+        fee_payer_address: AccountAddress,
+        fee_payer_private_key: &Ed25519PrivateKey,
+    ) -> Result<SignatureCheckedTransaction> {
+        let message = RawTransactionWithData::new_fee_payer(
+            self.clone(),
+            secondary_signers.clone(),
+            fee_payer_address,
+        );
+        let sender_signature = sender_private_key.sign(&message)?;
+        let sender_authenticator = AccountAuthenticator::ed25519(
+            Ed25519PublicKey::from(sender_private_key),
+            sender_signature,
+        );
+
+        if secondary_private_keys.len() != secondary_signers.len() {
+            return Err(format_err!(
+                "number of secondary private keys and number of secondary signers don't match"
+            ));
+        }
+        let mut secondary_authenticators = vec![];
+        for priv_key in secondary_private_keys {
+            let signature = priv_key.sign(&message)?;
+            secondary_authenticators.push(AccountAuthenticator::ed25519(
+                Ed25519PublicKey::from(priv_key),
+                signature,
+            ));
+        }
+
+        let fee_payer_signature = fee_payer_private_key.sign(&message)?;
+        let fee_payer_authenticator = AccountAuthenticator::ed25519(
+            Ed25519PublicKey::from(fee_payer_private_key),
+            fee_payer_signature,
+        );
+
+        Ok(SignatureCheckedTransaction(
+            SignedTransaction::new_fee_payer(
+                self,
+                sender_authenticator,
+                secondary_signers,
+                secondary_authenticators,
+                fee_payer_address,
+                fee_payer_authenticator,
+            ),
+        ))
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn multi_sign_for_testing(
         self,
@@ -366,9 +423,26 @@ pub enum RawTransactionWithData {
         raw_txn: RawTransaction,
         secondary_signer_addresses: Vec<AccountAddress>,
     },
+    MultiAgentWithFeePayer {
+        raw_txn: RawTransaction,
+        secondary_signer_addresses: Vec<AccountAddress>,
+        fee_payer_address: AccountAddress,
+    },
 }
 
 impl RawTransactionWithData {
+    pub fn new_fee_payer(
+        raw_txn: RawTransaction,
+        secondary_signer_addresses: Vec<AccountAddress>,
+        fee_payer_address: AccountAddress,
+    ) -> Self {
+        Self::MultiAgentWithFeePayer {
+            raw_txn,
+            secondary_signer_addresses,
+            fee_payer_address,
+        }
+    }
+
     pub fn new_multi_agent(
         raw_txn: RawTransaction,
         secondary_signer_addresses: Vec<AccountAddress>,
@@ -505,6 +579,27 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
+            size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_fee_payer(
+        raw_txn: RawTransaction,
+        sender: AccountAuthenticator,
+        secondary_signer_addresses: Vec<AccountAddress>,
+        secondary_signers: Vec<AccountAuthenticator>,
+        fee_payer_address: AccountAddress,
+        fee_payer_signer: AccountAuthenticator,
+    ) -> Self {
+        SignedTransaction {
+            raw_txn,
+            authenticator: TransactionAuthenticator::fee_payer(
+                sender,
+                secondary_signer_addresses,
+                secondary_signers,
+                fee_payer_address,
+                fee_payer_signer,
+            ),
             size: OnceCell::new(),
         }
     }

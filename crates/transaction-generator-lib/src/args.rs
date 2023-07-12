@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{EntryPoints, TransactionType};
-use clap::{ArgEnum, Parser};
+use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 /// Utility class for specifying transaction type with predefined configurations through CLI
-#[derive(Debug, Copy, Clone, ArgEnum, Default, Deserialize, Parser, Serialize)]
+#[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
     NoOp,
     NoOp2Signers,

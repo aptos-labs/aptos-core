@@ -119,7 +119,7 @@ impl VMExecutor for MockVM {
                 read_state_value_from_storage(
                     state_view,
                     &access_path_for_config(ValidatorSet::CONFIG_ID)
-                        .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES, None))?,
+                        .map_err(|_| VMStatus::error(StatusCode::TOO_MANY_TYPE_NODES, None))?,
                 );
                 read_state_value_from_storage(
                     state_view,
@@ -423,7 +423,6 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
         TransactionPayload::Multisig(_) => {
             unimplemented!("MockVM does not support multisig transaction payload.")
         },
-
         // Deprecated. Will be removed in the future.
         TransactionPayload::ModuleBundle(_) => {
             unimplemented!("MockVM does not support Module transaction payload.")

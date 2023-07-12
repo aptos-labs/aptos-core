@@ -78,6 +78,7 @@ pub(crate) fn update_store(
                 &sharded_state_kv_batches,
                 &state_kv_metadata_batch,
                 /*put_state_value_indices=*/ false,
+                /*skip_usage=*/ false,
             )
             .unwrap();
         store

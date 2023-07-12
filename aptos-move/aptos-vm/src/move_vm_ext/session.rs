@@ -59,6 +59,16 @@ pub enum SessionId {
         // id to identify this specific genesis build
         id: HashValue,
     },
+    Prologue {
+        sender: AccountAddress,
+        sequence_number: u64,
+        script_hash: Vec<u8>,
+    },
+    Epilogue {
+        sender: AccountAddress,
+        sequence_number: u64,
+        script_hash: Vec<u8>,
+    },
     // For those runs that are not a transaction and the output of which won't be committed.
     Void,
 }
@@ -86,6 +96,30 @@ impl SessionId {
         }
     }
 
+    pub fn prologue(txn: &SignatureCheckedTransaction) -> Self {
+        Self::prologue_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
+    }
+
+    pub fn prologue_meta(txn_data: &TransactionMetadata) -> Self {
+        Self::Prologue {
+            sender: txn_data.sender,
+            sequence_number: txn_data.sequence_number,
+            script_hash: txn_data.script_hash.clone(),
+        }
+    }
+
+    pub fn epilogue(txn: &SignatureCheckedTransaction) -> Self {
+        Self::epilogue_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
+    }
+
+    pub fn epilogue_meta(txn_data: &TransactionMetadata) -> Self {
+        Self::Epilogue {
+            sender: txn_data.sender,
+            sequence_number: txn_data.sequence_number,
+            script_hash: txn_data.script_hash.clone(),
+        }
+    }
+
     pub fn void() -> Self {
         Self::Void
     }
@@ -96,7 +130,9 @@ impl SessionId {
 
     pub fn sender(&self) -> Option<AccountAddress> {
         match self {
-            SessionId::Txn { sender, .. } => Some(*sender),
+            SessionId::Txn { sender, .. }
+            | SessionId::Prologue { sender, .. }
+            | SessionId::Epilogue { sender, .. } => Some(*sender),
             SessionId::BlockMeta { .. } | SessionId::Genesis { .. } | SessionId::Void => None,
         }
     }
@@ -359,13 +395,13 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let write_set = write_set_mut
             .freeze()
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))?;
+            .map_err(|_| VMStatus::error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
             .map(|(guid, seq_num, ty_tag, blob)| {
                 let key = bcs::from_bytes(guid.as_slice())
-                    .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH, None))?;
+                    .map_err(|_| VMStatus::error(StatusCode::EVENT_KEY_MISMATCH, None))?;
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
@@ -403,7 +439,7 @@ impl<'r> WriteOpConverter<'r> {
         use WriteOp::*;
 
         let existing_value_opt = self.remote.get_state_value(state_key).map_err(|_| {
-            VMStatus::Error(
+            VMStatus::error(
                 StatusCode::STORAGE_ERROR,
                 err_msg("Storage read failed when converting change set."),
             )
@@ -411,14 +447,14 @@ impl<'r> WriteOpConverter<'r> {
 
         let write_op = match (existing_value_opt, move_storage_op) {
             (None, Modify(_) | Delete) => {
-                return Err(VMStatus::Error(
+                return Err(VMStatus::error(
                     // Possible under speculative execution, returning storage error waiting for re-execution
                     StatusCode::STORAGE_ERROR,
                     err_msg("When converting write op: updating non-existent value."),
                 ));
             },
             (Some(_), New(_)) => {
-                return Err(VMStatus::Error(
+                return Err(VMStatus::error(
                     // Possible under speculative execution, returning storage error waiting for re-execution
                     StatusCode::STORAGE_ERROR,
                     err_msg("When converting write op: Recreating existing value."),
@@ -463,7 +499,7 @@ impl<'r> WriteOpConverter<'r> {
         let existing_value_opt = self
             .remote
             .get_state_value(state_key)
-            .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))?;
+            .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         let data = serialize(&value);
 
         let op = match existing_value_opt {

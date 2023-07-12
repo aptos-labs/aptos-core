@@ -1,0 +1,21 @@
+error[E02004]: invalid 'module' declaration
+   ┌─ tests/move_check/inlining/multiple_nesting.move:4:9
+   │
+ 4 │         mathtest2::mul_div2(c, a, b)
+   │         ^^^^^^^^^^^^^^^^^^^ '0x42::mathtest2' uses '0x42::mathtest'. This 'use' relationship creates a dependency cycle.
+   ·
+11 │         mathtest::mul_div(b, a, c)
+   │         ----------------- '0x42::mathtest' uses '0x42::mathtest2'
+
+error[E14001]: recursion during function inlining not allowed
+  ┌─ tests/move_check/inlining/multiple_nesting.move:4:20
+  │
+4 │         mathtest2::mul_div2(c, a, b)
+  │                    ^^^^^^^^ cyclic inlining:  -> mul_div -> mul_div2
+
+error[E14001]: recursion during function inlining not allowed
+   ┌─ tests/move_check/inlining/multiple_nesting.move:11:19
+   │
+11 │         mathtest::mul_div(b, a, c)
+   │                   ^^^^^^^ cyclic inlining:  -> mul_div2 -> mul_div
+

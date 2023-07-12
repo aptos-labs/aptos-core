@@ -300,6 +300,10 @@ impl FunctionTargetsHolder {
 }
 
 impl FunctionTargetPipeline {
+    pub fn is_empty(&self) -> bool {
+        self.processors.is_empty()
+    }
+
     /// Adds a processor to this pipeline. Processor will be called in the order they have been
     /// added.
     pub fn add_processor(&mut self, processor: Box<dyn FunctionTargetProcessor>) {

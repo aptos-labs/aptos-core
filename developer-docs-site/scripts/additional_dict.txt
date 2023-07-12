@@ -26,6 +26,7 @@ AptosCoin
 AptosLabs
 AptosNet
 AptosRelease
+AptosToken
 AptosWalletAdapterProvider
 BCS
 BFT
@@ -113,6 +114,7 @@ EpochChangeProof
 Ethereum
 ExternalMarkdown
 ExtendRef
+FACoin
 FAQ
 FLAC
 FA
@@ -582,3 +584,4 @@ ANSClient
 FaucetClient
 CoinClient
 RESTful
+FungibleAssetsClient

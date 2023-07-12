@@ -348,6 +348,45 @@ impl RosettaClient {
         .await
     }
 
+    pub async fn update_commission(
+        &self,
+        network_identifier: &NetworkIdentifier,
+        private_key: &Ed25519PrivateKey,
+        operator: Option<AccountAddress>,
+        new_commission_percentage: Option<u64>,
+        expiry_time_secs: u64,
+        sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
+    ) -> anyhow::Result<TransactionIdentifier> {
+        let sender = self
+            .get_account_address(network_identifier.clone(), private_key)
+            .await?;
+        let mut keys = HashMap::new();
+        keys.insert(sender, private_key);
+
+        let operations = vec![Operation::update_commission(
+            0,
+            None,
+            sender,
+            operator.map(AccountIdentifier::base_account),
+            new_commission_percentage,
+        )];
+
+        self.submit_operations(
+            sender,
+            network_identifier.clone(),
+            &keys,
+            operations,
+            expiry_time_secs,
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+            operator.is_none(),
+        )
+        .await
+    }
+
     pub async fn unlock_stake(
         &self,
         network_identifier: &NetworkIdentifier,
