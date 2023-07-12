@@ -101,6 +101,72 @@ fn native_read(
     Ok(smallvec![Value::u128(value)])
 }
 
+
+/***************************************************************************************************
+ * native fun deferred_read(aggregator: &Aggregator): AggregatorSnapshot;
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct DeferredReadGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_deferred_read(
+    gas_params: &DeferredReadGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 1);
+
+    context.charge(gas_params.base)?;
+
+    // Extract information from aggregator struct reference.
+    let (id, _limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+
+    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let Promise { value, id } = aggregator_data.deferred_read(id)?;
+
+    // TODO: Use the correct syntax to return a promise. Handle the case where id is None.
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        Value::u128(value)
+    ]))])
+}
+
+
+/***************************************************************************************************
+ * native fun deferred_read_u64(aggregator: &Aggregator): AggregatorSnapshot;
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+
+fn native_deferred_read_u64(
+    gas_params: &DeferredReadGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 1);
+
+    context.charge(gas_params.base)?;
+
+    // Extract information from aggregator struct reference.
+    let (id, _limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+
+    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let AggregatorSnapshot { value } = aggregator_data.deferred_read_u64(id)?;
+
+    // TODO: Use the correct syntax to return a promise. Handle the case where id is None.
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        Value::u64(value)
+    ]))])
+}
+
 /***************************************************************************************************
  * native fun sub(aggregator: &mut Aggregator, value: u128);
  *
@@ -185,6 +251,8 @@ fn native_destroy(
 pub struct GasParameters {
     pub add: AddGasParameters,
     pub read: ReadGasParameters,
+    // Using the same gas parameters for deferred_read and deferred_read_u64
+    pub deferred_read: DeferredReadGasParameters,
     pub sub: SubGasParameters,
     pub destroy: DestroyGasParameters,
 }
@@ -211,6 +279,24 @@ pub fn make_all(
                 timed_features.clone(),
                 features.clone(),
                 native_read,
+            ),
+        ),
+        (
+            "deferred_read",
+            make_safe_native(
+                gas_params.deferred_read,
+                timed_features.clone(),
+                features.clone(),
+                native_deferred_read,
+            ),
+        ),
+        (
+            "deferred_read_u64",
+            make_safe_native(
+                gas_params.deferred_read,
+                timed_features.clone(),
+                features.clone(),
+                native_deferred_read_u64,
             ),
         ),
         (

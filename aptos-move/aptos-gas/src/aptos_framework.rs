@@ -180,6 +180,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
 
     [.aggregator.add.base, "aggregator.add.base", 300 * MUL],
     [.aggregator.read.base, "aggregator.read.base", 300 * MUL],
+    // TODO: Find the right amount of gas to charge
+    [.aggregator.deferred_read.base, "aggregator.deferred_read.base", 300 * MUL],
     [.aggregator.sub.base, "aggregator.sub.base", 300 * MUL],
     [.aggregator.destroy.base, "aggregator.destroy.base", 500 * MUL],
     [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 500 * MUL],

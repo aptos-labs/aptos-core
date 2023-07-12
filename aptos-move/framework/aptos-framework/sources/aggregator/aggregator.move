@@ -29,6 +29,15 @@ module aptos_framework::aggregator {
         limit: u128,
     }
 
+    /// Represents snapshot of an aggregator at a particular point in time.
+    /// In storage, the value represents the materialized value of the aggregator
+    /// when the snapshot was created.
+    /// During the block execution, the value represents an identifier pointing to the
+    /// Rust `AggregatorSnapshot` which cointains additional details related.
+    struct AggregatorSnapshot has store {
+        value: u128
+    }
+
     /// Returns `limit` exceeding which aggregator overflows.
     public fun limit(aggregator: &Aggregator): u128 {
         aggregator.limit
@@ -43,6 +52,14 @@ module aptos_framework::aggregator {
     /// Returns a value stored in this aggregator.
     public native fun read(aggregator: &Aggregator): u128;
 
+    /// Returns a `AggregatorSnapshot` which acts as a placeholder for the aggregator read operation. 
+    /// The `AggregatorSnapshot` will be resolved (the aggregator read operation) will be performed
+    /// when the transaction is committed.
+    public native fun deferred_read(aggregator: &Aggregator): AggregatorSnapshot;
+
     /// Destroys an aggregator and removes it from its `AggregatorFactory`.
     public native fun destroy(aggregator: Aggregator);
+
+    /// Returns the value inside the aggregator snapshot.
+    public native fun get_value(snapshot: AggregatorSnapshot): u128;
 }

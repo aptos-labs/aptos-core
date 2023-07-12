@@ -252,6 +252,7 @@ impl GasParameters {
             aggregator: aggregator::GasParameters {
                 add: aggregator::AddGasParameters { base: 0.into() },
                 read: aggregator::ReadGasParameters { base: 0.into() },
+                deferred_read: aggregator::DeferredReadGasParameters { base: 0.into() },
                 sub: aggregator::SubGasParameters { base: 0.into() },
                 destroy: aggregator::DestroyGasParameters { base: 0.into() },
             },
