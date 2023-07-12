@@ -210,9 +210,7 @@ impl<'a> TokenClient<'a> {
             .await?
             .into_inner();
 
-        // reconstruct from strings
-        let response: CollectionData = serde_json::from_value(value)?;
-        Ok(response)
+        Ok(serde_json::from_value(value)?)
     }
 
     /// Retrieves token metadata from the API.
@@ -247,9 +245,7 @@ impl<'a> TokenClient<'a> {
             .await?
             .into_inner();
 
-        // reconstruct from strings
-        let response: TokenData = serde_json::from_value(value.clone())?;
-        Ok(response)
+        Ok(serde_json::from_value(value)?)
     }
 }
 
