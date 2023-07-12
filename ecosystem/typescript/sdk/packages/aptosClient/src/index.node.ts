@@ -9,7 +9,7 @@ export default async function aptosClient<Res>(requestOptions: AptosClientReques
 
   const request: OptionsOfJSONResponseBody = {
     http2: true,
-    searchParams: convertBigIntToNumber(params),
+    searchParams: convertBigIntToString(params),
     method,
     url,
     responseType: "json",
@@ -85,18 +85,17 @@ function parseHeaders<Res>(response: Response<Res>) {
 }
 
 /**
- * got supports only - string | number | boolean | null | undefined
- * in the searchParam props,
- * so if we have bigint type, convert it to Number
+ * got supports only - string | number | boolean | null | undefined as searchParam value,
+ * so if we have bigint type, convert it to string
  */
-function convertBigIntToNumber(obj: any): any {
+function convertBigIntToString(obj: any): any {
   const result: any = {};
   if (!obj) return result;
 
   Object.entries(obj).forEach(([key, value]) => {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       if (typeof value === "bigint") {
-        result[key] = Number(value);
+        result[key] = String(value);
       } else {
         result[key] = value;
       }

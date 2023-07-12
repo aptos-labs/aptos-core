@@ -38,13 +38,13 @@ async function request<Req, Res>(
     headers.Authorization = `Bearer ${overrides?.TOKEN}`;
   }
 
+  // make a call using the aptos-client package - TODO add a link to npm page
   const response = await aptosClient<Res>({ url, method, body, params, headers, overrides });
   return response;
 }
 
 /**
  * The main function to use when doing an API request.
- * Wraps axios error response with AptosApiError
  *
  * @param options AptosRequest
  * @returns the response or AptosApiError
