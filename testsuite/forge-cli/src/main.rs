@@ -1831,8 +1831,11 @@ fn mainnet_like_simulation_test() -> ForgeConfig {
 /// the multiregion forge cluster.
 fn multiregion_benchmark_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .add_network_test(PerformanceBenchmark)
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 500000,
+        }))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -1847,6 +1850,11 @@ fn multiregion_benchmark_test() -> ForgeConfig {
             helm_values["service"]["validator"]["internal"]["headless"] = true.into();
             helm_values["service"]["fullnode"]["internal"]["type"] = "ClusterIP".into();
             helm_values["service"]["fullnode"]["internal"]["headless"] = true.into();
+
+            helm_values["validator"]["resources"]["requests"]["cpu"] = 32.into();
+            helm_values["validator"]["resources"]["requests"]["memory"] = "96Gi".into();
+            helm_values["validator"]["resources"]["limits"]["cpu"] = 32.into();
+            helm_values["validator"]["resources"]["limits"]["memory"] = "96Gi".into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(4500)
