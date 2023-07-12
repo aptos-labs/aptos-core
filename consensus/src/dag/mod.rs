@@ -16,4 +16,4 @@ mod tests;
 mod types;
 
 pub use dag_network::RpcHandler;
-pub use types::{CertifiedNode, DAGNetworkMessage, Node};
+pub use types::{CertifiedNode, DAGNetworkMessage, Node, NodeDigestSignature, NodeId};

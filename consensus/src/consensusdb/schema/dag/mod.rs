@@ -9,7 +9,7 @@
 //! |   digest   |   node/certified node    |
 //! ```
 
-use crate::dag::{CertifiedNode, Node};
+use crate::dag::{CertifiedNode, Node, NodeDigestSignature, NodeId};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_schemadb::{
@@ -33,6 +33,35 @@ impl KeyCodec<NodeSchema> for HashValue {
 }
 
 impl ValueCodec<NodeSchema> for Node {
+    fn encode_value(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+pub const NODE_DIGEST_SIGNATURE_CF_NAME: ColumnFamilyName = "node_digest_signature";
+
+define_schema!(
+    NodeDigestSignatureSchema,
+    NodeId,
+    NodeDigestSignature,
+    NODE_DIGEST_SIGNATURE_CF_NAME
+);
+
+impl KeyCodec<NodeDigestSignatureSchema> for NodeId {
+    fn encode_key(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_key(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+impl ValueCodec<NodeDigestSignatureSchema> for NodeDigestSignature {
     fn encode_value(&self) -> Result<Vec<u8>> {
         Ok(bcs::to_bytes(&self)?)
     }

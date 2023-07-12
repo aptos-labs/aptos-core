@@ -77,9 +77,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
 /// Represents the metadata about the node, without payload and parents from Node
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct NodeMetadata {
-    epoch: u64,
-    round: Round,
-    author: Author,
+    node_id: NodeId,
     timestamp: u64,
     digest: HashValue,
 }
@@ -94,9 +92,11 @@ impl NodeMetadata {
         digest: HashValue,
     ) -> Self {
         Self {
-            epoch,
-            round,
-            author,
+            node_id: NodeId {
+                epoch,
+                round,
+                author,
+            },
             timestamp,
             digest,
         }
@@ -116,6 +116,14 @@ impl NodeMetadata {
 
     pub fn epoch(&self) -> u64 {
         self.epoch
+    }
+}
+
+impl Deref for NodeMetadata {
+    type Target = NodeId;
+
+    fn deref(&self) -> &Self::Target {
+        &self.node_id
     }
 }
 
@@ -160,9 +168,11 @@ impl Node {
 
         Self {
             metadata: NodeMetadata {
-                epoch,
-                round,
-                author,
+                node_id: NodeId {
+                    epoch,
+                    round,
+                    author,
+                },
                 timestamp,
                 digest,
             },
@@ -276,6 +286,45 @@ impl TDAGMessage for Node {
         // TODO: validate timestamp
 
         Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Eq, Hash, Clone)]
+pub struct NodeId {
+    epoch: u64,
+    round: Round,
+    author: Author,
+}
+
+impl NodeId {
+    pub fn new(epoch: u64, round: Round, author: Author) -> Self {
+        Self {
+            epoch,
+            round,
+            author,
+        }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn round(&self) -> Round {
+        self.round
+    }
+
+    pub fn author(&self) -> Author {
+        self.author
+    }
+}
+
+impl From<&Node> for NodeId {
+    fn from(node: &Node) -> Self {
+        Self {
+            epoch: node.metadata.epoch,
+            round: node.metadata.round,
+            author: node.metadata.author,
+        }
     }
 }
 
