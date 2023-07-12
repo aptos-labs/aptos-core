@@ -1291,7 +1291,7 @@ fn network_partition() -> ForgeConfig {
 
 fn compat() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .add_network_test(SimpleValidatorUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -1301,7 +1301,7 @@ fn compat() -> ForgeConfig {
 
 fn upgrade() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .add_network_test(FrameworkUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -1472,8 +1472,8 @@ fn realistic_env_max_load_test(duration: Duration, test_cmd: &TestCommand) -> Fo
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(5)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
