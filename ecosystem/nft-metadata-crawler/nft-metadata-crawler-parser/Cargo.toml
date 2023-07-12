@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+base64 = { workspace = true }
 chrono = { workspace = true }
 csv = { workspace = true }
 diesel = { workspace = true }
@@ -26,4 +27,12 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tonic = { version = "0.9", features = [
+    "tls",
+    "tls-roots",
+    "transport",
+    "prost",
+    "gzip",
+    "codegen",
+] }
 url = { workspace = true }

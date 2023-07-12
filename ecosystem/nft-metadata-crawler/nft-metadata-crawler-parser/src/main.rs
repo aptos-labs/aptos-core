@@ -13,10 +13,18 @@ use nft_metadata_crawler_parser::{
     db::upsert_entry, establish_connection_pool, models::NFTMetadataCrawlerEntry, parser::Parser,
     schema::nft_metadata_crawler_entry,
 };
-use nft_metadata_crawler_utils::pubsub::{consume_from_queue, send_ack};
+use nft_metadata_crawler_utils::{
+    pb::pubsub::v1::{subscriber_client::SubscriberClient, PullRequest},
+    pubsub::send_ack,
+};
 use reqwest::Client;
-use std::{env, error::Error};
+use std::{env, error::Error, time::Duration};
 use tokio::task::JoinHandle;
+use tonic::{
+    metadata::MetadataValue,
+    transport::{Channel, ClientTlsConfig},
+    Request,
+};
 
 async fn process_response(
     res: Vec<String>,
@@ -85,7 +93,10 @@ fn spawn_parser(
 
             match parser.parse(&mut conn).await {
                 Ok(()) => {
-                    let client = Client::new();
+                    let client = Client::builder()
+                        .timeout(Duration::from_secs(10))
+                        .build()
+                        .expect("Unable to create client");
                     match send_ack(&client, ts.as_ref(), &subscription_name, &ack).await {
                         Ok(_) => {
                             println!(
@@ -113,7 +124,7 @@ fn spawn_parser(
 async fn main() {
     println!("Starting parser");
     let pool = establish_connection_pool();
-    let client = Client::new();
+
     let subscription_name = env::var("SUBSCRIPTION_NAME").expect("No SUBSCRIPTION NAME");
     let bucket = env::var("BUCKET").expect("No BUCKET");
     let ts = create_token_source(Config {
@@ -124,8 +135,51 @@ async fn main() {
     .await
     .expect("No token source");
 
-    while let Ok(r) = consume_from_queue(&client, ts.as_ref(), &subscription_name).await {
-        let (res, acks): (Vec<String>, Vec<String>) = r.into_iter().unzip();
+    let channel = Channel::from_static("https://pubsub.googleapis.com")
+        .tls_config(ClientTlsConfig::new().domain_name("pubsub.googleapis.com"))
+        .expect("Unable to create channel")
+        .connect()
+        .await
+        .expect("Unable to connect to pubsub");
+
+    let mut grpc_client = SubscriberClient::new(channel);
+
+    let make_request = || async {
+        let mut request = Request::new(PullRequest {
+            subscription: subscription_name.clone(),
+            max_messages: 10,
+            return_immediately: false,
+        });
+
+        request.metadata_mut().insert(
+            "authorization",
+            MetadataValue::from_str(
+                format!(
+                    "Bearer {}",
+                    ts.token().await.expect("No token").access_token
+                )
+                .as_str(),
+            )
+            .expect("Unable to create metadata"),
+        );
+
+        request
+    };
+
+    while let Ok(response) = grpc_client.pull(make_request().await).await {
+        let res = response.into_inner();
+        let mut links = Vec::new();
+        for pubsub_msg in res.received_messages {
+            let message = pubsub_msg.message;
+            if let Some(msg) = message {
+                links.push((
+                    String::from_utf8(msg.data).expect("Unable to parse message"),
+                    String::from(pubsub_msg.ack_id),
+                ));
+            }
+        }
+
+        let (res, acks): (Vec<String>, Vec<String>) = links.into_iter().unzip();
         match process_response(res, &acks, ts.as_ref(), &subscription_name, &pool).await {
             Ok(uris) => {
                 let handles: Vec<_> = uris

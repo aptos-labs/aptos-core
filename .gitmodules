@@ -1,0 +1,3 @@
+[submodule "ecosystem/nft-metadata-crawler/nft-metadata-crawler-utils/googleapis"]
+	path = ecosystem/nft-metadata-crawler/nft-metadata-crawler-utils/googleapis
+	url = git@github.com:googleapis/googleapis.git
