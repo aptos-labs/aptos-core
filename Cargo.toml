@@ -100,6 +100,7 @@ members = [
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
     "crates/transaction-generator-lib",
+    "devtools/aptos-cargo-cli",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
@@ -411,6 +412,7 @@ aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
+aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
@@ -476,6 +478,7 @@ diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "5.0.1"
+determinator = "0.12.0"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
@@ -497,6 +500,7 @@ glob = "0.3.0"
 goldenfile = "1.1.0"
 google-cloud-pubsub = "0.18.0"
 google-cloud-storage = "0.13.0"
+guppy = "0.17.0"
 handlebars = "4.2.2"
 heck = "0.3.2"
 hex = "0.4.3"
