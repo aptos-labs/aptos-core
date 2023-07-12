@@ -138,7 +138,7 @@ impl<'a> TokenClient<'a> {
             .api_client
             .submit(&signed_txn)
             .await
-            .context("Failed to submit transfer transaction")?
+            .context("Failed to submit transaction")?
             .into_inner())
     }
 
@@ -203,7 +203,7 @@ impl<'a> TokenClient<'a> {
             .api_client
             .submit(&signed_txn)
             .await
-            .context("Failed to submit transfer transaction")?
+            .context("Failed to submit transaction")?
             .into_inner())
     }
 
@@ -295,16 +295,57 @@ impl<'a> TokenClient<'a> {
         // get table item with the handle
         let value = self
             .api_client
-            .get_table_item(
-                handle,
-                "0x3::token::TokenId",
-                "0x3::token::Token",
-                token_id,
-            )
+            .get_table_item(handle, "0x3::token::TokenId", "0x3::token::Token", token_id)
             .await?
             .into_inner();
 
         Ok(serde_json::from_value(value)?)
+    }
+
+    /// Transfers specified amount of tokens from account to receiver.
+    pub async fn offer_token(
+        &self,
+        account: &mut LocalAccount,
+        receiver: AccountAddress,
+        creator: AccountAddress,
+        collection_name: &str,
+        name: &str,
+        amount: u64,
+        property_version: Option<u64>,
+        options: Option<TransactionOptions>,
+    ) -> Result<PendingTransaction> {
+        // create factory
+        let options = options.unwrap_or_default();
+        let factory = TransactionFactory::new(self.get_chain_id().await?)
+            .with_gas_unit_price(options.gas_unit_price)
+            .with_max_gas_amount(options.max_gas_amount)
+            .with_transaction_expiration_time(options.timeout_secs);
+
+        // create payload
+        let payload = EntryFunctionCall::TokenTransfersOfferScript {
+            receiver,
+            creator,
+            collection: collection_name.to_owned().into_bytes(),
+            name: name.to_owned().into_bytes(),
+            property_version: property_version.unwrap_or(0),
+            amount,
+        }
+        .encode();
+
+        // create transaction
+        let builder = factory
+            .payload(payload)
+            .sender(account.address())
+            .sequence_number(account.sequence_number());
+        let signed_txn = account.sign_with_transaction_builder(builder);
+
+        // submit and return
+        Ok(self
+            .api_client
+            .submit(&signed_txn)
+            .await
+            .context("Failed to submit transaction")?
+            .into_inner())
     }
 }
 
