@@ -267,6 +267,20 @@ async fn test_mintnft(
         return TestResult::Fail("wrong token data");
     }
 
+    // get token balance
+    let expected_token_balance = U64(10);
+    let actual_token_balance = match token_client
+        .get_token(account.address(), &collection_name, &token_name)
+        .await
+    {
+        Ok(data) => data.amount,
+        Err(e) => return TestResult::Error(e),
+    };
+
+    if expected_token_balance != actual_token_balance {
+        return TestResult::Fail("wrong token balance");
+    }
+
     TestResult::Success
 }
 
