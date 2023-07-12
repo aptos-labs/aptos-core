@@ -61,7 +61,7 @@ pub(crate) trait VMAdapter {
     /// This function will first run the `execute_single_transaction` function
     /// with aggregators enabled. If there is an aggregator error (overflow/underflow),
     /// we are not sure if the error is triggered in the right location in the code.
-    /// Therefore, for proper error handlig, we will re-run the `execute_transaction`
+    /// Therefore, for proper error handling, we will re-run the `execute_transaction`
     /// function with aggregators disabled and output the final output.
     fn execute_single_transaction_sequential(
         &self,
