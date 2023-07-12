@@ -43,6 +43,7 @@ from cases.move import (
     test_move_run,
     test_move_view,
 )
+from cases.node import test_node_show_validator_set
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -131,6 +132,9 @@ def run_tests(run_helper):
     test_move_compile_script(run_helper)
     test_move_publish(run_helper)
     test_move_run(run_helper)
+
+    # Run node subcommand group tests.
+    test_node_show_validator_set(run_helper)
 
 
 def main():
