@@ -1,6 +1,7 @@
 #[test_only]
 module rewards_pool::test_helpers {
     use aptos_framework::account;
+    use aptos_framework::aptos_governance;
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::fungible_asset::{Self, FungibleAsset};
     use aptos_framework::object;
@@ -15,7 +16,7 @@ module rewards_pool::test_helpers {
     use std::vector;
 
     public fun set_up() {
-        features::change_for_test(vector[features::get_auids()], vector[]);
+        aptos_governance::toggle_features_for_test(vector[features::get_auids()], vector[]);
         timestamp::set_time_has_started_for_testing(&account::create_signer_for_test(@0x1));
         epoch::fast_forward(100);
     }
