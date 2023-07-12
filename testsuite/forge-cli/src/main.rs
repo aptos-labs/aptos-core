@@ -1880,8 +1880,8 @@ fn pfn_const_tps(
     add_network_emulation: bool,
 ) -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
         .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -1924,8 +1924,8 @@ fn pfn_performance(
 
     // Create the forge config
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(7)
         .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
