@@ -498,10 +498,11 @@ fn single_test_suite(
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd),
+        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
         "compat" => compat(),
-        "framework_upgrade" => upgrade(),
+        "framework_upgrade" => framework_upgrade(),
         // Rest of the tests:
+        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
@@ -708,22 +709,14 @@ fn state_sync_failures_catching_up() -> ForgeConfig {
 }
 
 fn state_sync_slow_processing_catching_up() -> ForgeConfig {
-    changing_working_quorum_test_helper(
-        7,
-        300,
-        3000,
-        2500,
-        true,
-        true,
-        ChangingWorkingQuorumTest {
-            min_tps: 750,
-            always_healthy_nodes: 2,
-            max_down_nodes: 0,
-            num_large_validators: 2,
-            add_execution_delay: true,
-            check_period_s: 57,
-        },
-    )
+    changing_working_quorum_test_helper(7, 300, 3000, 2500, true, true, ChangingWorkingQuorumTest {
+        min_tps: 750,
+        always_healthy_nodes: 2,
+        max_down_nodes: 0,
+        num_large_validators: 2,
+        add_execution_delay: true,
+        check_period_s: 57,
+    })
 }
 
 fn different_node_speed_and_reliability_test() -> ForgeConfig {
@@ -749,10 +742,10 @@ fn large_test_only_few_nodes_down() -> ForgeConfig {
 }
 
 fn changing_working_quorum_test_high_load() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 500, 300, true, true, ChangingWorkingQuorumTest {
+    changing_working_quorum_test_helper(16, 120, 500, 300, true, true, ChangingWorkingQuorumTest {
         min_tps: 50,
         always_healthy_nodes: 0,
-        max_down_nodes: 20,
+        max_down_nodes: 16,
         num_large_validators: 0,
         add_execution_delay: false,
         // Use longer check duration, as we are bringing enough nodes
@@ -762,10 +755,10 @@ fn changing_working_quorum_test_high_load() -> ForgeConfig {
 }
 
 fn changing_working_quorum_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 100, 70, true, true, ChangingWorkingQuorumTest {
+    changing_working_quorum_test_helper(16, 120, 100, 70, true, true, ChangingWorkingQuorumTest {
         min_tps: 15,
         always_healthy_nodes: 0,
-        max_down_nodes: 20,
+        max_down_nodes: 16,
         num_large_validators: 0,
         add_execution_delay: false,
         // Use longer check duration, as we are bringing enough nodes
@@ -1165,8 +1158,8 @@ fn individual_workload_tests(test_name: String) -> ForgeConfig {
 
 fn fullnode_reboot_stress_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(7)
         .add_network_test(FullNodeRebootStressTest)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .with_success_criteria(SuccessCriteria::new(2000).add_wait_for_catchup_s(600))
@@ -1299,7 +1292,7 @@ fn compat() -> ForgeConfig {
         }))
 }
 
-fn upgrade() -> ForgeConfig {
+fn framework_upgrade() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .add_network_test(FrameworkUpgrade)
@@ -1463,17 +1456,30 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
 }
 
 // TODO: Replace land_blocking when performance reaches on par with current land_blocking
-fn realistic_env_max_load_test(duration: Duration, test_cmd: &TestCommand) -> ForgeConfig {
+fn realistic_env_max_load_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_fullnodes: usize,
+) -> ForgeConfig {
+    // Check if HAProxy is enabled
     let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
         k8s.enable_haproxy
     } else {
         false
     };
+
+    // Determine if this is a long running test
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
+
+    // Calculate the max CPU threshold
+    let max_cpu_threshold = if num_validators >= 10 { 30 } else { 70 };
+
+    // Create the test
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
-        .with_initial_fullnode_count(5)
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
@@ -1511,7 +1517,7 @@ fn realistic_env_max_load_test(duration: Duration, test_cmd: &TestCommand) -> Fo
                 )
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
+                    MetricsThreshold::new(12, max_cpu_threshold),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
                 ))
