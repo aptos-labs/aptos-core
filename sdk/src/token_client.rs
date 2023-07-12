@@ -78,6 +78,27 @@ impl<'a> TokenClient<'a> {
         }
     }
 
+    /// Helper function to get the handle address of tokens for 0x3::token::TokenStore resources.
+    async fn get_tokens_handle(&self, address: AccountAddress) -> Option<String> {
+        if let Ok(response) = self
+            .api_client
+            .get_account_resource(address, "0x3::token::TokenStore")
+            .await
+        {
+            Some(
+                response
+                    .into_inner()?
+                    .data
+                    .get("tokens")?
+                    .get("handle")?
+                    .as_str()?
+                    .to_owned(),
+            )
+        } else {
+            None
+        }
+    }
+
     /// Creates a collection with the given fields.
     pub async fn create_collection(
         &self,
@@ -247,6 +268,44 @@ impl<'a> TokenClient<'a> {
 
         Ok(serde_json::from_value(value)?)
     }
+
+    /// Retrieves the information for a given token.
+    pub async fn get_token(
+        &self,
+        creator: AccountAddress,
+        collection_name: &str,
+        token_name: &str,
+    ) -> Result<Token> {
+        // get handle for tokens
+        let handle = match self.get_tokens_handle(creator).await {
+            Some(s) => AccountAddress::from_hex_literal(&s)?,
+            None => return Err(anyhow!("Couldn't retrieve handle for tokens")),
+        };
+
+        // construct key for table lookup
+        let token_id = TokenId {
+            token_data_id: TokenDataId {
+                creator: creator.to_hex_literal(),
+                collection: collection_name.to_string(),
+                name: token_name.to_string(),
+            },
+            property_version: U64(0),
+        };
+
+        // get table item with the handle
+        let value = self
+            .api_client
+            .get_table_item(
+                handle,
+                "0x3::token::TokenId",
+                "0x3::token::Token",
+                token_id,
+            )
+            .await?
+            .into_inner();
+
+        Ok(serde_json::from_value(value)?)
+    }
 }
 
 pub struct TransactionOptions {
@@ -285,13 +344,6 @@ pub struct CollectionMutabilityConfig {
     pub uri: bool,
 }
 
-#[derive(Serialize)]
-struct TokenDataId {
-    creator: String,
-    collection: String,
-    name: String,
-}
-
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TokenData {
     pub name: String,
@@ -318,4 +370,24 @@ pub struct TokenMutabilityConfig {
     pub properties: bool,
     pub royalty: bool,
     pub uri: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Token {
+    // id: TokenId,
+    pub amount: U64,
+    // todo: add property support
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct TokenId {
+    token_data_id: TokenDataId,
+    property_version: U64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct TokenDataId {
+    creator: String,
+    collection: String,
+    name: String,
 }
