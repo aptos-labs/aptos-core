@@ -1,6 +1,10 @@
 name: "execution-performance"
 on:
+  workflow_dispatch:
   pull_request:
+  schedule: 
+    # Run every four hours
+    - cron: "0 */4 * * *"
 
 jobs:
   execution-performance:
