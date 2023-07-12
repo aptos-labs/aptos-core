@@ -215,7 +215,7 @@ async fn test_mintnft(
         name: collection_name.clone(),
         description: collection_description,
         uri: collection_uri,
-        maximum: collection_maximum,
+        maximum: U64(collection_maximum),
         mutability_config: CollectionMutabilityConfig {
             description: false,
             maximum: false,
@@ -239,7 +239,7 @@ async fn test_mintnft(
         name: token_name.clone(),
         description: token_description,
         uri: token_uri,
-        maximum: token_maximum,
+        maximum: U64(token_maximum),
         mutability_config: TokenMutabilityConfig {
             description: false,
             maximum: false,
@@ -247,13 +247,13 @@ async fn test_mintnft(
             royalty: false,
             uri: false,
         },
-        supply: token_supply,
+        supply: U64(token_supply),
         royalty: RoyaltyOptions {
-            royalty_payee_address: account.address(),
-            royalty_points_denominator: 0,
-            royalty_points_numerator: 0,
+            payee_address: account.address(),
+            royalty_points_denominator: U64(0),
+            royalty_points_numerator: U64(0),
         },
-        largest_property_version: 0,
+        largest_property_version: U64(0),
     };
     let actual_token_data = match token_client
         .get_token_data(account.address(), &collection_name, &token_name)

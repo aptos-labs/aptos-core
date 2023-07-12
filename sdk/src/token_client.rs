@@ -7,6 +7,7 @@ use crate::{
     types::{account_address::AccountAddress, chain_id::ChainId, LocalAccount},
 };
 use anyhow::{anyhow, Context, Result};
+use aptos_api_types::U64;
 use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
 use serde::{Deserialize, Serialize};
 
@@ -144,9 +145,9 @@ impl<'a> TokenClient<'a> {
         let royalty_options = match royalty_options {
             Some(opt) => opt,
             None => RoyaltyOptions {
-                royalty_payee_address: account.address(),
-                royalty_points_denominator: 0,
-                royalty_points_numerator: 0,
+                payee_address: account.address(),
+                royalty_points_denominator: U64(0),
+                royalty_points_numerator: U64(0),
             },
         };
 
@@ -158,9 +159,9 @@ impl<'a> TokenClient<'a> {
             balance: supply,
             maximum: max_amount,
             uri: uri.to_owned().into_bytes(),
-            royalty_payee_address: royalty_options.royalty_payee_address,
-            royalty_points_denominator: royalty_options.royalty_points_denominator,
-            royalty_points_numerator: royalty_options.royalty_points_numerator,
+            royalty_payee_address: royalty_options.payee_address,
+            royalty_points_denominator: royalty_options.royalty_points_denominator.0,
+            royalty_points_numerator: royalty_options.royalty_points_numerator.0,
             mutate_setting: vec![false, false, false, false, false],
             // todo: add property support
             property_keys: vec![],
@@ -210,14 +211,8 @@ impl<'a> TokenClient<'a> {
             .into_inner();
 
         // reconstruct from strings
-        let response: CollectionDataResponse = serde_json::from_value(value)?;
-        Ok(CollectionData {
-            name: response.name,
-            description: response.description,
-            uri: response.uri,
-            maximum: response.maximum.parse()?,
-            mutability_config: response.mutability_config,
-        })
+        let response: CollectionData = serde_json::from_value(value)?;
+        Ok(response)
     }
 
     /// Retrieves token metadata from the API.
@@ -253,23 +248,8 @@ impl<'a> TokenClient<'a> {
             .into_inner();
 
         // reconstruct from strings
-        let response: TokenDataResponse = serde_json::from_value(value.clone())?;
-        Ok(TokenData {
-            name: response.name,
-            description: response.description,
-            uri: response.uri,
-            maximum: response.maximum.parse()?,
-            supply: response.supply.parse()?,
-            royalty: RoyaltyOptions {
-                royalty_payee_address: AccountAddress::from_hex_literal(
-                    response.royalty.payee_address.as_str(),
-                )?,
-                royalty_points_denominator: response.royalty.royalty_points_denominator.parse()?,
-                royalty_points_numerator: response.royalty.royalty_points_numerator.parse()?,
-            },
-            mutability_config: response.mutability_config,
-            largest_property_version: response.largest_property_version.parse()?,
-        })
+        let response: TokenData = serde_json::from_value(value.clone())?;
+        Ok(response)
     }
 }
 
@@ -293,22 +273,12 @@ impl Default for TransactionOptions {
     }
 }
 
-#[derive(Deserialize)]
-pub struct CollectionDataResponse {
-    name: String,
-    description: String,
-    uri: String,
-    maximum: String,
-    // supply: String,
-    mutability_config: CollectionMutabilityConfig,
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Deserialize)]
 pub struct CollectionData {
     pub name: String,
     pub description: String,
     pub uri: String,
-    pub maximum: u64,
+    pub maximum: U64,
     pub mutability_config: CollectionMutabilityConfig,
 }
 
@@ -326,42 +296,23 @@ struct TokenDataId {
     name: String,
 }
 
-#[derive(Deserialize)]
-pub struct TokenDataResponse {
-    name: String,
-    description: String,
-    uri: String,
-    maximum: String,
-    supply: String,
-    royalty: RoyaltyOptionsResponse,
-    mutability_config: TokenMutabilityConfig,
-    largest_property_version: String,
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Deserialize)]
 pub struct TokenData {
     pub name: String,
     pub description: String,
     pub uri: String,
-    pub maximum: u64,
-    pub supply: u64,
+    pub maximum: U64,
+    pub supply: U64,
     pub royalty: RoyaltyOptions,
     pub mutability_config: TokenMutabilityConfig,
-    pub largest_property_version: u64,
+    pub largest_property_version: U64,
 }
 
-#[derive(Deserialize)]
-pub struct RoyaltyOptionsResponse {
-    payee_address: String,
-    royalty_points_denominator: String,
-    royalty_points_numerator: String,
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Deserialize)]
 pub struct RoyaltyOptions {
-    pub royalty_payee_address: AccountAddress,
-    pub royalty_points_denominator: u64,
-    pub royalty_points_numerator: u64,
+    pub payee_address: AccountAddress,
+    pub royalty_points_denominator: U64,
+    pub royalty_points_numerator: U64,
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
