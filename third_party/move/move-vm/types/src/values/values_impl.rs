@@ -2913,6 +2913,45 @@ pub mod debug {
 }
 
 /***************************************************************************************
+*
+* Identifiers
+*
+*   Implementation of conversion between 64-bit identifiers and values.
+*   Used for value exchange.
+*
+**************************************************************************************/
+
+use crate::values::value_exchange::{ExchangeError, ExchangeResult, Identifier, TryAsIdentifier};
+
+impl TryAsIdentifier for Value {
+    fn try_as_identifier(&self) -> ExchangeResult<Identifier> {
+        self.0.try_as_identifier()
+    }
+}
+
+impl TryAsIdentifier for ValueImpl {
+    fn try_as_identifier(&self) -> ExchangeResult<Identifier> {
+        match self {
+            ValueImpl::U64(x) => Ok(Identifier(*x)),
+            ValueImpl::U128(x) => {
+                if *x > u64::MAX as u128 {
+                    Err(ExchangeError::new(&format!(
+                        "cannot have {} as identifier, the value is too big",
+                        self
+                    )))
+                } else {
+                    Ok(Identifier(*x as u64))
+                }
+            },
+            _ => Err(ExchangeError::new(&format!(
+                "interpreting {} as identifier is not supported",
+                self
+            ))),
+        }
+    }
+}
+
+/***************************************************************************************
  *
  * Serialization & Deserialization
  *
@@ -2931,6 +2970,7 @@ pub mod debug {
  *   is to involve an explicit representation of the type layout.
  *
  **************************************************************************************/
+use crate::values::ValueExchange;
 use serde::{
     de::Error as DeError,
     ser::{Error as SerError, SerializeSeq, SerializeTuple},
@@ -2938,26 +2978,73 @@ use serde::{
 };
 
 impl Value {
+    /// Deserializes bytes into a Move value as is.
     pub fn simple_deserialize(blob: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
-        bcs::from_bytes_seed(SeedWrapper { layout }, blob).ok()
+        bcs::from_bytes_seed(
+            SeedWrapper {
+                exchange: None,
+                layout,
+            },
+            blob,
+        )
+        .ok()
     }
 
+    /// Serializes a Move value into bytes as is.
     pub fn simple_serialize(&self, layout: &MoveTypeLayout) -> Option<Vec<u8>> {
         bcs::to_bytes(&AnnotatedValue {
+            exchange: None,
             layout,
             val: &self.0,
         })
         .ok()
     }
+
+    /// Deserializes bytes into a Move value, swapping marked values with
+    /// identifiers based an the `exchange`.
+    pub fn deserialize_with_exchange(
+        bytes: &[u8],
+        layout: &MoveTypeLayout,
+        exchange: &dyn ValueExchange,
+    ) -> Option<Value> {
+        let seed = SeedWrapper {
+            exchange: Some(exchange),
+            layout,
+        };
+        bcs::from_bytes_seed(seed, bytes).ok()
+    }
+
+    /// Serializes a Move value into bytes, also swapping marked identifiers
+    /// back.
+    pub fn serialize_with_exchange(
+        &self,
+        layout: &MoveTypeLayout,
+        exchange: &dyn ValueExchange,
+    ) -> Option<Vec<u8>> {
+        let value = AnnotatedValue {
+            exchange: Some(exchange),
+            layout,
+            val: &self.0,
+        };
+        bcs::to_bytes(&value).ok()
+    }
 }
 
 impl Struct {
     pub fn simple_deserialize(blob: &[u8], layout: &MoveStructLayout) -> Option<Struct> {
-        bcs::from_bytes_seed(SeedWrapper { layout }, blob).ok()
+        bcs::from_bytes_seed(
+            SeedWrapper {
+                exchange: None,
+                layout,
+            },
+            blob,
+        )
+        .ok()
     }
 
     pub fn simple_serialize(&self, layout: &MoveStructLayout) -> Option<Vec<u8>> {
         bcs::to_bytes(&AnnotatedValue {
+            exchange: None,
             layout,
             val: &self.fields,
         })
@@ -2965,9 +3052,14 @@ impl Struct {
     }
 }
 
-struct AnnotatedValue<'a, 'b, T1, T2> {
-    layout: &'a T1,
-    val: &'b T2,
+struct AnnotatedValue<'e, 'l, 'v, L, V> {
+    // Optional exchange so that values which are identifiers can be
+    // swapped back.
+    exchange: Option<&'e dyn ValueExchange>,
+    // Layout for guiding serialization.
+    layout: &'l L,
+    // Value to serialize.
+    val: &'v V,
 }
 
 fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
@@ -2976,7 +3068,7 @@ fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
     )
 }
 
-impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, ValueImpl> {
+impl<'e, 'l, 'v> serde::Serialize for AnnotatedValue<'e, 'l, 'v, MoveTypeLayout, ValueImpl> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match (self.layout, self.val) {
             (MoveTypeLayout::U8, ValueImpl::U8(x)) => serializer.serialize_u8(*x),
@@ -2990,6 +3082,7 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, ValueIm
 
             (MoveTypeLayout::Struct(struct_layout), ValueImpl::Container(Container::Struct(r))) => {
                 (AnnotatedValue {
+                    exchange: self.exchange,
                     layout: struct_layout,
                     val: &*r.borrow(),
                 })
@@ -3020,7 +3113,11 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, ValueIm
                         let v = r.borrow();
                         let mut t = serializer.serialize_seq(Some(v.len()))?;
                         for val in v.iter() {
-                            t.serialize_element(&AnnotatedValue { layout, val })?;
+                            t.serialize_element(&AnnotatedValue {
+                                exchange: self.exchange,
+                                layout,
+                                val,
+                            })?;
                         }
                         t.end()
                     },
@@ -3041,10 +3138,43 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, ValueIm
                     )));
                 }
                 (AnnotatedValue {
+                    exchange: self.exchange,
                     layout: &MoveTypeLayout::Address,
                     val: &v[0],
                 })
                 .serialize(serializer)
+            },
+
+            // Special case: aggregatable values.
+            (MoveTypeLayout::Tagged(tag, layout), val) => match tag {
+                LayoutTag::AggregatorLifting => {
+                    match self.exchange {
+                        Some(exchange) => {
+                            // If values are supposed to be exchanged, first re-interpret
+                            // the current value as ID and then get the actual value.
+                            // Then continue with serialization on a new value.
+                            let id = val.try_as_identifier().map_err(serde::ser::Error::custom)?;
+                            let value = exchange
+                                .claim_value(id)
+                                .map_err(serde::ser::Error::custom)?;
+                            AnnotatedValue {
+                                exchange: self.exchange,
+                                layout: layout.as_ref(),
+                                val: &value.0,
+                            }
+                            .serialize(serializer)
+                        },
+                        None => {
+                            // If did not exchange values, simply continue with serialization.
+                            AnnotatedValue {
+                                exchange: self.exchange,
+                                layout: layout.as_ref(),
+                                val,
+                            }
+                            .serialize(serializer)
+                        },
+                    }
+                },
             },
 
             (ty, val) => Err(invariant_violation::<S>(format!(
@@ -3055,7 +3185,7 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, ValueIm
     }
 }
 
-impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveStructLayout, Vec<ValueImpl>> {
+impl<'e, 'l, 'v> serde::Serialize for AnnotatedValue<'e, 'l, 'v, MoveStructLayout, Vec<ValueImpl>> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let values = &self.val;
         let fields = self.layout.fields();
@@ -3068,6 +3198,7 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveStructLayout, Vec<V
         let mut t = serializer.serialize_tuple(values.len())?;
         for (field_layout, val) in fields.iter().zip(values.iter()) {
             t.serialize_element(&AnnotatedValue {
+                exchange: self.exchange,
                 layout: field_layout,
                 val,
             })?;
@@ -3077,11 +3208,14 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveStructLayout, Vec<V
 }
 
 #[derive(Clone)]
-struct SeedWrapper<L> {
+struct SeedWrapper<'e, L> {
+    // Exchange to swap values with identifiers during deserialization.
+    exchange: Option<&'e dyn ValueExchange>,
+    // Layout to guide deserialization.
     layout: L,
 }
 
-impl<'d> serde::de::DeserializeSeed<'d> for SeedWrapper<&MoveTypeLayout> {
+impl<'d, 'e> serde::de::DeserializeSeed<'d> for SeedWrapper<'e, &MoveTypeLayout> {
     type Value = Value;
 
     fn deserialize<D: serde::de::Deserializer<'d>>(
@@ -3103,50 +3237,60 @@ impl<'d> serde::de::DeserializeSeed<'d> for SeedWrapper<&MoveTypeLayout> {
 
             L::Struct(struct_layout) => Ok(Value::struct_(
                 SeedWrapper {
+                    exchange: self.exchange,
                     layout: struct_layout,
                 }
                 .deserialize(deserializer)?,
             )),
 
-            L::Vector(layout) => {
-                let container = match &**layout {
-                    L::U8 => {
-                        Container::VecU8(Rc::new(RefCell::new(Vec::deserialize(deserializer)?)))
-                    },
-                    L::U16 => {
-                        Container::VecU16(Rc::new(RefCell::new(Vec::deserialize(deserializer)?)))
-                    },
-                    L::U32 => {
-                        Container::VecU32(Rc::new(RefCell::new(Vec::deserialize(deserializer)?)))
-                    },
-                    L::U64 => {
-                        Container::VecU64(Rc::new(RefCell::new(Vec::deserialize(deserializer)?)))
-                    },
-                    L::U128 => {
-                        Container::VecU128(Rc::new(RefCell::new(Vec::deserialize(deserializer)?)))
-                    },
-                    L::U256 => {
-                        Container::VecU256(Rc::new(RefCell::new(Vec::deserialize(deserializer)?)))
-                    },
-                    L::Bool => {
-                        Container::VecBool(Rc::new(RefCell::new(Vec::deserialize(deserializer)?)))
-                    },
-                    L::Address => Container::VecAddress(Rc::new(RefCell::new(Vec::deserialize(
-                        deserializer,
-                    )?))),
-                    layout => {
-                        let v = deserializer
-                            .deserialize_seq(VectorElementVisitor(SeedWrapper { layout }))?;
-                        Container::Vec(Rc::new(RefCell::new(v)))
-                    },
-                };
-                Ok(Value(ValueImpl::Container(container)))
+            L::Vector(layout) => Ok(match &**layout {
+                L::U8 => Value::vector_u8(Vec::deserialize(deserializer)?),
+                L::U16 => Value::vector_u16(Vec::deserialize(deserializer)?),
+                L::U32 => Value::vector_u32(Vec::deserialize(deserializer)?),
+                L::U64 => Value::vector_u64(Vec::deserialize(deserializer)?),
+                L::U128 => Value::vector_u128(Vec::deserialize(deserializer)?),
+                L::U256 => Value::vector_u256(Vec::deserialize(deserializer)?),
+                L::Bool => Value::vector_bool(Vec::deserialize(deserializer)?),
+                L::Address => Value::vector_address(Vec::deserialize(deserializer)?),
+                layout => {
+                    let v = deserializer.deserialize_seq(VectorElementVisitor(SeedWrapper {
+                        exchange: self.exchange,
+                        layout,
+                    }))?;
+                    let container = Container::Vec(Rc::new(RefCell::new(v)));
+                    Value(ValueImpl::Container(container))
+                },
+            }),
+
+            // Special case: aggregatable values.
+            L::Tagged(tag, layout) => match tag {
+                LayoutTag::AggregatorLifting => {
+                    // First, deserialize the marked value. This can be
+                    // done by inspecting the marked layout.
+                    let value = SeedWrapper {
+                        exchange: self.exchange,
+                        layout: layout.as_ref(),
+                    }
+                    .deserialize(deserializer)?;
+
+                    // Then check if value needs to be exchanged.
+                    Ok(match self.exchange {
+                        Some(exchange) => {
+                            let id = exchange
+                                .record_value(value)
+                                .map_err(serde::de::Error::custom)?;
+                            id.try_into_value(layout.as_ref())
+                                .map_err(serde::de::Error::custom)?
+                        },
+                        None => value,
+                    })
+                },
             },
         }
     }
 }
 
-impl<'d> serde::de::DeserializeSeed<'d> for SeedWrapper<&MoveStructLayout> {
+impl<'d> serde::de::DeserializeSeed<'d> for SeedWrapper<'_, &MoveStructLayout> {
     type Value = Struct;
 
     fn deserialize<D: serde::de::Deserializer<'d>>(
@@ -3154,15 +3298,17 @@ impl<'d> serde::de::DeserializeSeed<'d> for SeedWrapper<&MoveStructLayout> {
         deserializer: D,
     ) -> Result<Self::Value, D::Error> {
         let field_layouts = self.layout.fields();
-        let fields = deserializer
-            .deserialize_tuple(field_layouts.len(), StructFieldVisitor(field_layouts))?;
+        let fields = deserializer.deserialize_tuple(
+            field_layouts.len(),
+            StructFieldVisitor(self.exchange, field_layouts),
+        )?;
         Ok(Struct::pack(fields))
     }
 }
 
-struct VectorElementVisitor<'a>(SeedWrapper<&'a MoveTypeLayout>);
+struct VectorElementVisitor<'e, 'l>(SeedWrapper<'e, &'l MoveTypeLayout>);
 
-impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
+impl<'d, 'e, 'l> serde::de::Visitor<'d> for VectorElementVisitor<'e, 'l> {
     type Value = Vec<ValueImpl>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3181,9 +3327,9 @@ impl<'d, 'a> serde::de::Visitor<'d> for VectorElementVisitor<'a> {
     }
 }
 
-struct StructFieldVisitor<'a>(&'a [MoveTypeLayout]);
+struct StructFieldVisitor<'e, 'l>(Option<&'e dyn ValueExchange>, &'l [MoveTypeLayout]);
 
-impl<'d, 'a> serde::de::Visitor<'d> for StructFieldVisitor<'a> {
+impl<'d, 'e, 'l> serde::de::Visitor<'d> for StructFieldVisitor<'e, 'l> {
     type Value = Vec<Value>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3195,8 +3341,9 @@ impl<'d, 'a> serde::de::Visitor<'d> for StructFieldVisitor<'a> {
         A: serde::de::SeqAccess<'d>,
     {
         let mut val = Vec::new();
-        for (i, field_layout) in self.0.iter().enumerate() {
+        for (i, field_layout) in self.1.iter().enumerate() {
             if let Some(elem) = seq.next_element_seed(SeedWrapper {
+                exchange: self.0,
                 layout: field_layout,
             })? {
                 val.push(elem)
@@ -3613,6 +3760,10 @@ pub mod prop {
                 .collect::<Vec<_>>()
                 .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
                 .boxed(),
+
+            L::Tagged(tag, layout) => match tag {
+                LayoutTag::AggregatorLifting => value_strategy_with_layout(layout.as_ref()),
+            },
         }
     }
 
@@ -3634,6 +3785,7 @@ pub mod prop {
         leaf.prop_recursive(8, 32, 2, |inner| {
             prop_oneof![
                 1 => inner.clone().prop_map(|layout| L::Vector(Box::new(layout))),
+                1 => inner.clone().prop_map(|layout| L::Tagged(LayoutTag::AggregatorLifting, Box::new(layout))),
                 1 => vec(inner, 0..1).prop_map(|f_layouts| {
                      L::Struct(MoveStructLayout::new(f_layouts))}),
             ]
@@ -3648,11 +3800,16 @@ pub mod prop {
     }
 }
 
-use move_core_types::value::{MoveStruct, MoveValue};
+use move_core_types::value::{LayoutTag, MoveStruct, MoveValue};
 
 impl ValueImpl {
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
         use MoveTypeLayout as L;
+
+        // Make sure to strip all marks from the type layout.
+        if let L::Tagged(LayoutTag::AggregatorLifting, layout) = layout {
+            return self.as_move_value(layout.as_ref());
+        }
 
         match (layout, &self) {
             (L::U8, ValueImpl::U8(x)) => MoveValue::U8(*x),
