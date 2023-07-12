@@ -541,14 +541,14 @@ module veiled_coin::veiled_coin {
         let veiled_balance = elgamal::decompress_ciphertext(&veiled_coin_store.veiled_balance);
 
         // Create a (not-yet-secure) encryption of `amount`, since `amount` is a public argument here.
-        let veiled_amount = helpers::public_amount_to_veiled_balance(amount);
+        let scalar_amount = ristretto255::new_scalar_from_u32(amount);
 
         // Verify that `comm_new_balance` is a commitment to the remaing balance after withdrawing `amount`.
         sigma_protos::verify_withdrawal_subproof(
             &sender_pk,
             &veiled_balance,
             &comm_new_balance,
-            &veiled_amount,
+            &scalar_amount,
             &withdrawal_proof.sigma_proof);
 
         // Verify a ZK range proof on `comm_new_balance` (and thus on the remaining `veiled_balance`)
@@ -558,8 +558,10 @@ module veiled_coin::veiled_coin {
             &std::option::none(),
             &std::option::none());
 
+        let amount_ct = elgamal::new_ciphertext_no_randomness(&scalar_amount);
+
         // Withdraw `amount` from the veiled balance (leverages the homomorphism of the encryption scheme.)
-        elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_amount);
+        elgamal::ciphertext_sub_assign(&mut veiled_balance, &amount_ct);
 
         // Update the veiled balance to reflect the veiled withdrawal
         veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
@@ -596,8 +598,6 @@ module veiled_coin::veiled_coin {
 
         // Fetch the veiled balance of the veiled account
         let veiled_balance = elgamal::decompress_ciphertext(&sender_veiled_coin_store.veiled_balance);
-        // Update the account's veiled balance by homomorphically subtracting the veiled amount from the veiled balance.
-        elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_withdraw_amount);
 
         // Checks that `veiled_withdraw_amount` and `veiled_deposit_amount` encrypt the same amount of coins, under the
         // sender and recipient's PKs. Also checks this amount is committed inside `comm_amount`. Also, checks that the
@@ -608,9 +608,13 @@ module veiled_coin::veiled_coin {
             &veiled_withdraw_amount,
             &veiled_deposit_amount,
             &comm_amount,
-            &veiled_balance,
             &comm_new_balance,
+            &veiled_balance,
             &transfer_proof.sigma_proof);
+        
+        // Update the account's veiled balance by homomorphically subtracting the veiled amount from the veiled balance.
+        elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_withdraw_amount);
+
 
         // Verifies range proofs on the transferred amount and the remaining balance
         verify_range_proofs(
