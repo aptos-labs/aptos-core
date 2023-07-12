@@ -25,6 +25,8 @@ class AccountAddress:
     def __init__(self, address: bytes):
         self.address = address
 
+        # Note: The correctness of is_special relies on this check. Be careful when
+        # changing anything about this function.
         if len(address) != AccountAddress.LENGTH:
             raise Exception("Expected address of length 32")
 
@@ -36,7 +38,48 @@ class AccountAddress:
     def __str__(self):
         return self.hex()
 
+    def to_standard_string(self):
+        """
+        Represent an account address in a way that is compliant with the v1 address
+        standard. The standard is defined as part of AIP-40, read more here:
+        https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md
+
+        In short, all special addresses SHOULD be represented in SHORT form, e.g.
+
+        0x1
+
+        All other addresses MUST be represented in LONG form, e.g.
+
+        0x002098630cfad4734812fa37dc18d9b8d59242feabe49259e26318d468a99584
+
+        For an explanation of what defines a "special" address, see `is_special`.
+
+        All string representations of addresses MUST be prefixed with 0x.
+        """
+        suffix = self.address.hex()
+        if self.is_special():
+            suffix = suffix.lstrip("0") or "0"
+        return f"0x{suffix}"
+
+    def is_special(self):
+        """
+        Returns whether the address is a "special" address. Addresses are considered
+        special if the first 63 characters of the hex string are zero. In other words,
+        an address is special if the first 31 bytes are zero and the last byte is
+        smaller than than `0b10000` (16). In other words, special is defined as an address
+        that matches the following regex: `^0x0{63}[0-9a-f]$`. In short form this means
+        the addresses in the range from `0x0` to `0xf` (inclusive) are special.
+
+        For more details see the v1 address standard defined as part of AIP-40:
+        https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md
+        """
+        return all(b == 0 for b in self.address[:-1]) and self.address[-1] < 0b10000
+
     def hex(self) -> str:
+        """
+        NOTE: Prefer to_standard_string for representing instances of AccountAddress
+        as strings.
+        """
         return f"0x{self.address.hex()}"
 
     @staticmethod
@@ -167,3 +210,97 @@ class Test(unittest.TestCase):
             base_address, "bob's collection", "bob's token"
         )
         self.assertEqual(actual, expected)
+
+    def test_to_standard_string(self):
+        # Test special address: 0x0
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "0x0000000000000000000000000000000000000000000000000000000000000000"
+            ).to_standard_string(),
+            "0x0",
+        )
+
+        # Test special address: 0x1
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
+            ).to_standard_string(),
+            "0x1",
+        )
+
+        # Test special address: 0x4
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "0x0000000000000000000000000000000000000000000000000000000000000004"
+            ).to_standard_string(),
+            "0x4",
+        )
+
+        # Test special address: 0xf
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "0x000000000000000000000000000000000000000000000000000000000000000f"
+            ).to_standard_string(),
+            "0xf",
+        )
+
+        # Test special address from short no 0x: d
+        self.assertEqual(
+            AccountAddress.from_hex("d").to_standard_string(),
+            "0xd",
+        )
+
+        # Test non-special address from long:
+        # 0x0000000000000000000000000000000000000000000000000000000000000010
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "0x0000000000000000000000000000000000000000000000000000000000000010"
+            ).to_standard_string(),
+            "0x0000000000000000000000000000000000000000000000000000000000000010",
+        )
+
+        # Test non-special address from long:
+        # 0x000000000000000000000000000000000000000000000000000000000000001f
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "0x000000000000000000000000000000000000000000000000000000000000001f"
+            ).to_standard_string(),
+            "0x000000000000000000000000000000000000000000000000000000000000001f",
+        )
+
+        # Test non-special address from long:
+        # 0x00000000000000000000000000000000000000000000000000000000000000a0
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "0x00000000000000000000000000000000000000000000000000000000000000a0"
+            ).to_standard_string(),
+            "0x00000000000000000000000000000000000000000000000000000000000000a0",
+        )
+
+        # Test non-special address from long no 0x:
+        # ca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "ca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0"
+            ).to_standard_string(),
+            "0xca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0",
+        )
+
+        # Test non-special address from long no 0x:
+        # 1000000000000000000000000000000000000000000000000000000000000000
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "1000000000000000000000000000000000000000000000000000000000000000"
+            ).to_standard_string(),
+            "0x1000000000000000000000000000000000000000000000000000000000000000",
+        )
+
+        # Demonstrate that neither leading nor trailing zeroes get trimmed for
+        # non-special addresses:
+        # 0f00000000000000000000000000000000000000000000000000000000000000
+        self.assertEqual(
+            AccountAddress.from_hex(
+                "0f00000000000000000000000000000000000000000000000000000000000000"
+            ).to_standard_string(),
+            "0x0f00000000000000000000000000000000000000000000000000000000000000",
+        )
