@@ -155,6 +155,7 @@ async fn test_mintnft(
     client: &Client,
     token_client: &TokenClient<'_>,
     account: &mut LocalAccount,
+    receiver: &LocalAccount,
 ) -> TestResult {
     // create collection
     let collection_name = "test collection".to_string();
@@ -267,7 +268,25 @@ async fn test_mintnft(
         return TestResult::Fail("wrong token data");
     }
 
-    // get token balance
+    // offer token
+    let _ = match token_client
+        .offer_token(
+            account,
+            receiver.address(),
+            account.address(),
+            &collection_name,
+            &token_name,
+            2,
+            None,
+            None,
+        )
+        .await
+    {
+        Ok(_) => {},
+        Err(e) => return TestResult::Error(e),
+    };
+
+    // check token balance
     let expected_token_balance = U64(10);
     let actual_token_balance = match token_client
         .get_token(account.address(), &collection_name, &token_name)
@@ -296,6 +315,10 @@ async fn testnet_1() -> Result<()> {
     faucet_client.fund(giray.address(), 100_000_000).await?;
     println!("{:?}", giray.address());
 
+    let giray2 = LocalAccount::generate(&mut rand::rngs::OsRng);
+    faucet_client.create_account(giray2.address()).await?;
+    println!("{:?}", giray2.address());
+
     // Step 1: Test new account creation and funding
     // this test is critical to pass for the next tests
     let result = handle_result(test_newaccount(&client, &giray, 100_000_000)).await;
@@ -315,7 +338,7 @@ async fn testnet_1() -> Result<()> {
     .await;
 
     // Step 3: Test NFT minting
-    handle_result(test_mintnft(&client, &token_client, &mut giray)).await;
+    handle_result(test_mintnft(&client, &token_client, &mut giray, &giray2)).await;
 
     Ok(())
 }
