@@ -35,3 +35,13 @@ proposals:
           transaction_shuffler_type:
             sender_aware_v1: 32
           block_gas_limit : 35000
+  - name: enable_aptos_unique_identifiers
+    metadata:
+      title: "Enable Aptos Unique Identifiers"
+      description: "AIP-36: Support for aptos unique identifiers (generated using native function generate_unique_address)"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/154"
+    execution_mode: MultiStep
+    update_sequence:
+    - FeatureFlag:
+        enabled:
+          - aptos_unique_identifiers
