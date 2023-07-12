@@ -22,17 +22,12 @@ use std::sync::Arc;
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
 mod vm_validator_test;
-pub type TxnIndex = u32;
 
 pub trait TransactionValidation: Send + Sync + Clone {
     type ValidationInstance: aptos_vm::VMValidator;
 
     /// Validate a txn from client
-    fn validate_transaction(
-        &self,
-        txn_idx: TxnIndex,
-        _txn: SignedTransaction,
-    ) -> Result<VMValidatorResult>;
+    fn validate_transaction(&self, _txn: SignedTransaction) -> Result<VMValidatorResult>;
 
     /// Restart the transaction validation instance
     fn restart(&mut self, config: OnChainConfigPayload) -> Result<()>;
@@ -71,11 +66,7 @@ impl VMValidator {
 impl TransactionValidation for VMValidator {
     type ValidationInstance = AptosVM;
 
-    fn validate_transaction(
-        &self,
-        txn_idx: TxnIndex,
-        txn: SignedTransaction,
-    ) -> Result<VMValidatorResult> {
+    fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
         fail_point!("vm_validator::validate_transaction", |_| {
             Err(anyhow::anyhow!(
                 "Injected error in vm_validator::validate_transaction"
@@ -83,7 +74,7 @@ impl TransactionValidation for VMValidator {
         });
         use aptos_vm::VMValidator;
 
-        Ok(self.vm.validate_transaction(txn_idx, txn, &self.state_view))
+        Ok(self.vm.validate_transaction(txn, &self.state_view))
     }
 
     fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {

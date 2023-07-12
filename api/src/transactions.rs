@@ -1183,8 +1183,7 @@ impl TransactionsApi {
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let move_resolver = state_view.as_move_resolver();
         let version = ledger_info.version();
-        let (_, output) =
-            AptosVM::simulate_signed_transaction(version as u32, &txn, &move_resolver);
+        let (_, output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
         let exe_status = match output.status().clone() {

@@ -88,7 +88,7 @@ fn test_validate_transaction() {
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status(), None);
 }
 
@@ -109,7 +109,7 @@ fn test_validate_invalid_signature() {
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         program,
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::INVALID_SIGNATURE);
 }
 
@@ -136,7 +136,7 @@ fn test_validate_known_script_too_large_args() {
         0, /* max gas price */
         None,
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
         ret.status().unwrap(),
         StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE
@@ -158,7 +158,7 @@ fn test_validate_max_gas_units_above_max() {
         0,              /* max gas price */
         Some(u64::MAX), // Max gas units
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
         ret.status().unwrap(),
         StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND
@@ -192,7 +192,7 @@ fn test_validate_max_gas_units_below_min() {
         0,       /* max gas price */
         Some(0), // Max gas units
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
         ret.status().unwrap(),
         StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
@@ -237,7 +237,7 @@ fn test_validate_max_gas_price_above_bounds() {
         u64::MAX, /* max gas price */
         None,
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
         ret.status().unwrap(),
         StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND
@@ -264,7 +264,7 @@ fn test_validate_max_gas_price_below_bounds() {
         0, /* max gas price */
         None,
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status(), None);
     //assert_eq!(
     //    ret.status().unwrap().major_status,
@@ -289,7 +289,7 @@ fn test_validate_invalid_auth_key() {
         other_private_key.public_key(),
         Some(program),
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::INVALID_AUTH_KEY);
 }
 
@@ -310,7 +310,7 @@ fn test_validate_account_doesnt_exist() {
         1, /* max gas price */
         None,
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
         ret.status().unwrap(),
         StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
@@ -330,7 +330,7 @@ fn test_validate_sequence_number_too_new() {
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status(), None);
 }
 
@@ -347,7 +347,7 @@ fn test_validate_invalid_arguments() {
         aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
     );
-    let _ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let _ret = vm_validator.validate_transaction(transaction).unwrap();
     // TODO: Script arguement types are now checked at execution time. Is this an idea behavior?
     // assert_eq!(ret.status().unwrap().major_status, StatusCode::TYPE_MISMATCH);
 }
@@ -367,7 +367,7 @@ fn test_validate_expiration_time() {
         0,    /* gas_unit_price */
         None, /* max_gas_amount */
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::TRANSACTION_EXPIRED);
 }
 
@@ -384,6 +384,6 @@ fn test_validate_chain_id() {
         // all tests use ChainId::test() for chain_id, so pick something different
         ChainId::new(ChainId::test().id() + 1),
     );
-    let ret = vm_validator.validate_transaction(1, transaction).unwrap();
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::BAD_CHAIN_ID);
 }

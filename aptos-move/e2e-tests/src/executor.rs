@@ -573,7 +573,7 @@ impl FakeExecutor {
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let vm = AptosVM::new(self.get_state_view());
-        vm.validate_transaction(0, txn, &self.data_store)
+        vm.validate_transaction(txn, &self.data_store)
     }
 
     pub fn get_state_view(&self) -> &FakeDataStore {
@@ -765,7 +765,6 @@ impl FakeExecutor {
     ) -> Result<Vec<Vec<u8>>, Error> {
         // No gas limit
         AptosVM::execute_view_function(
-            0,
             self.get_state_view(),
             module_id,
             func_name,
