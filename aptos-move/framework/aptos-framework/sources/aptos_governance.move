@@ -642,7 +642,7 @@ module aptos_framework::aptos_governance {
     #[test_only]
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
     public fun toggle_features_for_test(enable: vector<u64>, disable: vector<u64>) {
-        features::change_feature_flags(account::create_signer_for_test(@0x1), enable, disable);
+        toggle_features(&account::create_signer_for_test(@0x1), enable, disable);
     }
 
     #[test_only]

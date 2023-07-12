@@ -1,8 +1,8 @@
 module rewards_pool::epoch {
     use aptos_framework::timestamp;
 
-    /// The epoch duration is fixed at 1 week (in seconds).
-    const EPOCH_DURATION: u64 = 604800;
+    /// The epoch duration is fixed at 1 day (in seconds).
+    const EPOCH_DURATION: u64 = 86400;
 
     #[view]
     public fun now(): u64 {
@@ -11,17 +11,17 @@ module rewards_pool::epoch {
 
     public inline fun duration(): u64 {
         // Equal to EPOCH_DURATION. Inline functions cannot use constants defined in their module.
-        604800
+        86400
     }
 
     public inline fun to_epoch(timestamp_secs: u64): u64 {
         // Equal to EPOCH_DURATION. Inline functions cannot use constants defined in their module.
-        timestamp_secs / 604800
+        timestamp_secs / 86400
     }
 
     public inline fun to_seconds(epoch: u64): u64 {
         // Equal to EPOCH_DURATION. Inline functions cannot use constants defined in their module.
-        epoch * 604800
+        epoch * 86400
     }
 
     #[test_only]
