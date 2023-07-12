@@ -21,6 +21,7 @@ pub struct CurrentStakingPoolVoter {
     pub staking_pool_address: String,
     pub voter_address: String,
     pub last_transaction_version: i64,
+    pub operator_address: String,
 }
 
 impl CurrentStakingPoolVoter {
@@ -35,11 +36,11 @@ impl CurrentStakingPoolVoter {
                 {
                     let staking_pool_address =
                         standardize_address(&write_resource.address.to_string());
-                    let voter_address = standardize_address(&inner.delegated_voter);
                     staking_pool_voters.insert(staking_pool_address.clone(), Self {
                         staking_pool_address,
-                        voter_address,
+                        voter_address: inner.get_delegated_voter(),
                         last_transaction_version: txn_version,
+                        operator_address: inner.get_operator_address(),
                     });
                 }
             }
