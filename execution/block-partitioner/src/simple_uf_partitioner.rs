@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{analyze_block, BlockPartitioner, scheduling};
+use crate::{analyze_block, BlockPartitioner};
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::{
@@ -13,13 +13,14 @@ use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::time::Instant;
+use crate::scheduling::assign_tasks_to_workers;
 use crate::union_find::UnionFind;
 
 type Sender = Option<AccountAddress>;
 
-pub struct SimplePartitioner {}
+pub struct SimpleUfPartitioner {}
 
-impl BlockPartitioner for SimplePartitioner {
+impl BlockPartitioner for SimpleUfPartitioner {
     fn partition(
         &self,
         txns: Vec<Transaction>,
@@ -32,6 +33,10 @@ impl BlockPartitioner for SimplePartitioner {
         // Sender-to-keyset and keyset-to-sender lookup table.
         let mut senders_by_key: HashMap<StateKey, HashSet<Sender>> = HashMap::new();
         let mut keys_by_sender: HashMap<Sender, HashSet<StateKey>> = HashMap::new();
+        let mut num_senders: usize = 0;
+        let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
+        let mut num_keys: usize = 0;
+        let mut key_ids_by_key: HashMap<StateKey, usize> = HashMap::new();
 
         // Sender-to-tidset look-up table.
         let mut txns_by_sender: HashMap<Sender, Vec<Transaction>> = HashMap::new();
@@ -40,8 +45,18 @@ impl BlockPartitioner for SimplePartitioner {
             let timer = Instant::now();
             for txn in txns.iter() {
                 let sender = txn.sender();
+                let sender_id = sender_ids_by_sender.entry(sender).or_insert_with(||{
+                    let ret = num_senders;
+                    num_senders += 1;
+                    ret
+                });
                 for write_hint in txn.write_hints() {
                     let key = write_hint.clone().into_state_key();
+                    let key_id = key_ids_by_key.entry(key.clone()).or_insert_with(||{
+                        let ret = num_keys;
+                        num_keys += 1;
+                        ret
+                    });
                     senders_by_key
                         .entry(key.clone())
                         .or_insert_with(HashSet::new)
@@ -74,28 +89,28 @@ impl BlockPartitioner for SimplePartitioner {
         let mut group_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
         {
             let timer = Instant::now();
-            for (sender, _tid_list) in txns_by_sender.iter() {
-                if !group_ids_by_sender.contains_key(sender) {
-                    // BFS initialization.
-                    let mut senders_to_explore: VecDeque<&Sender> = VecDeque::new();
-                    senders_to_explore.push_back(sender);
-                    group_ids_by_sender.insert(*sender, num_groups);
-
-                    while let Some(cur_sender) = senders_to_explore.pop_front() {
-                        for key in keys_by_sender.get(cur_sender).unwrap().iter() {
-                            for nxt_sender in senders_by_key.get(key).unwrap().iter() {
-                                if !group_ids_by_sender.contains_key(nxt_sender) {
-                                    senders_to_explore.push_back(nxt_sender);
-                                    group_ids_by_sender.insert(*nxt_sender, num_groups);
-                                }
-                            }
-                        }
-                    }
-
-                    num_groups += 1;
+            // The union-find approach.
+            let mut uf = UnionFind::new(num_senders + num_keys);
+            for (key, senders) in senders_by_key.iter() {
+                let key_id = *key_ids_by_key.get(key).unwrap();
+                let key_id_in_uf = num_senders + key_id;
+                for sender in senders.iter() {
+                    let sender_id= *sender_ids_by_sender.get(sender).unwrap();
+                    uf.union(key_id_in_uf, sender_id);
                 }
             }
-            println!("full_loop_approach_time={:?}", timer.elapsed());
+
+            let mut group_ids_by_set_id: HashMap<usize, usize> = HashMap::new();
+            for (sender, sender_id) in sender_ids_by_sender.iter() {
+                let set_id = uf.find(*sender_id);
+                let group_id = group_ids_by_set_id.entry(set_id).or_insert_with(||{
+                    let ret = num_groups;
+                    num_groups += 1;
+                    ret
+                });
+                group_ids_by_sender.insert(sender.clone(), *group_id);
+            }
+            println!("uf_approach_time={:?}", timer.elapsed());
         }
         /*
         Now group_ids_by_sender becomes:
@@ -129,7 +144,7 @@ impl BlockPartitioner for SimplePartitioner {
             .collect();
         // info!("group_sizes={:?}", &group_sizes);
         println!("max_group_size={:?}", group_sizes.iter().max());
-        let (_, shard_ids_by_gid) = scheduling::assign_tasks_to_workers(group_sizes, num_executor_shards);
+        let (_, shard_ids_by_gid) = assign_tasks_to_workers(group_sizes, num_executor_shards);
         println!("assign_time={:?}", timer.elapsed());
 
         let timer = Instant::now();

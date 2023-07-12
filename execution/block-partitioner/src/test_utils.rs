@@ -37,7 +37,7 @@ pub fn generate_test_account_for_address(account_address: AccountAddress) -> Tes
     }
 }
 
-pub fn create_non_conflicting_p2p_transaction() -> AnalyzedTransaction {
+pub fn create_non_conflicting_p2p_transaction() -> Transaction {
     // create unique sender and receiver accounts so that there is no conflict
     let mut sender = generate_test_account();
     let receiver = generate_test_account();
@@ -47,7 +47,7 @@ pub fn create_non_conflicting_p2p_transaction() -> AnalyzedTransaction {
 pub fn create_signed_p2p_transaction(
     sender: &mut TestAccount,
     receivers: Vec<&TestAccount>,
-) -> Vec<AnalyzedTransaction> {
+) -> Vec<Transaction> {
     let mut transactions = Vec::new();
     for (_, receiver) in receivers.iter().enumerate() {
         let transaction_payload = TransactionPayload::EntryFunction(EntryFunction::new(
@@ -75,7 +75,7 @@ pub fn create_signed_p2p_transaction(
             sender.private_key.public_key().clone(),
             sender.private_key.sign(&raw_transaction).unwrap(),
         ));
-        transactions.push(txn.into())
+        transactions.push(txn)
     }
     transactions
 }

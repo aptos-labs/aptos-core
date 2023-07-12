@@ -182,6 +182,7 @@ mod tests {
     };
     use itertools::Itertools;
     use std::sync::Arc;
+    use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
     #[test]
     fn test_create_dependent_edges() {
@@ -191,8 +192,9 @@ mod tests {
         let round_id = 999;
         let mut transactions_with_deps = Vec::new();
         for _ in 0..10 {
+            let txn: AnalyzedTransaction = create_non_conflicting_p2p_transaction().into();
             transactions_with_deps.push(TransactionWithDependencies::new(
-                create_non_conflicting_p2p_transaction(),
+                txn,
                 CrossShardDependencies::default(),
             ));
         }
