@@ -80,10 +80,7 @@ impl NetworkController {
         outbound_sender
     }
 
-    pub fn create_inbound_channel(
-        &mut self,
-        message_type: &'static str,
-    ) -> Receiver<Message> {
+    pub fn create_inbound_channel(&mut self, message_type: &'static str) -> Receiver<Message> {
         let (inbound_sender, inbound_receiver) = unbounded();
 
         self.inbound_handler
@@ -100,10 +97,10 @@ impl NetworkController {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use crossbeam_channel::{bounded, Select};
-    use aptos_config::utils;
     use crate::network_controller::{Message, NetworkController};
+    use aptos_config::utils;
+    use crossbeam_channel::{bounded, Select};
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     #[test]
     fn test_basic_send_receive() {
@@ -117,26 +114,28 @@ mod tests {
         let mut network_controller2 = NetworkController::new("test2", server_addr2, 1000);
 
         let test1_sender = network_controller2.create_outbound_channel(server_addr1, "test1");
-        let test1_receiver = network_controller1.create_inbound_channel( "test1");
+        let test1_receiver = network_controller1.create_inbound_channel("test1");
 
         let test2_sender = network_controller1.create_outbound_channel(server_addr2, "test2");
-        let test2_receiver = network_controller2.create_inbound_channel( "test2");
+        let test2_receiver = network_controller2.create_inbound_channel("test2");
 
         network_controller1.start();
         network_controller2.start();
 
         let test1_message = "test1".as_bytes().to_vec();
-        test1_sender.send(Message::new(test1_message.clone())).unwrap();
+        test1_sender
+            .send(Message::new(test1_message.clone()))
+            .unwrap();
 
         let test2_message = "test2".as_bytes().to_vec();
-        test2_sender.send(Message::new(test2_message.clone())).unwrap();
+        test2_sender
+            .send(Message::new(test2_message.clone()))
+            .unwrap();
 
         let received_test1_message = test1_receiver.recv().unwrap();
         assert_eq!(received_test1_message.data, test1_message);
 
         let received_test2_message = test2_receiver.recv().unwrap();
         assert_eq!(received_test2_message.data, test2_message);
-
     }
-
 }

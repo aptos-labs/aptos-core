@@ -53,15 +53,13 @@ impl OutboundHandler {
         let outbound_handlers = self.handlers.clone();
         let address = self.address;
         let network_clients = self.network_clients.clone();
-        thread::spawn(move || {
-            loop {
-                if let Err(e) = Self::process_one_outgoing_message(
-                    outbound_handlers.clone(),
-                    network_clients.clone(),
-                    &address,
-                ) {
-                    error!("Error processing outgoing message: {:?}", e);
-                }
+        thread::spawn(move || loop {
+            if let Err(e) = Self::process_one_outgoing_message(
+                outbound_handlers.clone(),
+                network_clients.clone(),
+                &address,
+            ) {
+                error!("Error processing outgoing message: {:?}", e);
             }
         });
     }

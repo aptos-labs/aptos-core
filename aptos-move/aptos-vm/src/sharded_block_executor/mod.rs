@@ -2,7 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{counters::NUM_EXECUTOR_SHARDS, executor_shard::ExecutorShard};
+use crate::sharded_block_executor::{
+    counters::NUM_EXECUTOR_SHARDS, local_executor_shard::LocalExecutorShard,
+};
 use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -25,6 +27,7 @@ mod counters;
 mod cross_shard_client;
 mod cross_shard_state_view;
 mod executor_shard;
+mod local_executor_shard;
 mod messages;
 pub mod sharded_executor_client;
 #[cfg(test)]
@@ -165,7 +168,7 @@ fn spawn_executor_shard<
     thread::Builder::new()
         .name(format!("executor-shard-{}", shard_id))
         .spawn(move || {
-            let executor_shard = ExecutorShard::new(
+            let executor_shard = LocalExecutorShard::new(
                 num_executor_shards,
                 executor_client,
                 shard_id,
