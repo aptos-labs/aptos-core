@@ -1,12 +1,20 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::types::Expression;
 use aptos_gas_algebra::GasExpressionVisitor;
 
+/*
+ * @notice: Visitor to traverse the Reverse Polish Notation
+ */
 pub struct CalibrationVisitor {
+    //// Holds the AST
     pub node: Vec<Expression>,
 }
 
+/*
+ * @notice: CalibrationVisitor implementation
+ */
 impl GasExpressionVisitor for CalibrationVisitor {
     fn add(&mut self) {
         let expr = Expression::Add {
