@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::algebra_helpers::{collect_terms, normalize};
 use crate::visitor::CalibrationVisitor;
@@ -9,11 +10,19 @@ use aptos_vm_types::storage::StorageGasParameters;
 use move_binary_format::errors::PartialVMResult;
 use std::collections::BTreeMap;
 
+/*
+ * @notice: Algebra to record abstract gas usage
+ */
 pub struct CalibrationAlgebra<A> {
+    //// GasAlgebra that is used to delegate work
     pub base: A,
+    //// Mapping of simplified like-terms
     pub coeff_buffer: BTreeMap<String, u64>,
 }
 
+/*
+ * @notice: Algebra implementation
+ */
 impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
     fn feature_version(&self) -> u64 {
         self.base.feature_version()
