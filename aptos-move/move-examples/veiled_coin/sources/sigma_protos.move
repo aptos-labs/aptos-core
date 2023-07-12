@@ -178,7 +178,7 @@ module veiled_coin::sigma_protos {
         let (bar_big_c, _) = elgamal::ciphertext_as_points(deposit_ct);
         let c = pedersen::commitment_as_point(comm_amount);
         let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
-        let c_prime = pedersen::commitment_as_point(sender_new_balance_comm);
+        //let c_prime = pedersen::commitment_as_point(sender_new_balance_comm);
 
         // TODO: Can be optimized so we don't re-serialize the proof for Fiat-Shamir
         let rho = fiat_shamir_transfer_subproof_challenge(
@@ -220,7 +220,6 @@ module veiled_coin::sigma_protos {
         ristretto255::point_add_assign(&mut big_c2_acc, &g_alpha3);
         assert!(ristretto255::point_equals(&big_c1_acc, &big_c2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
 
-        let g_alpha4 = ristretto255::basepoint_mul(&proof.alpha4);
         // \rho * c + X_5 =? \alpha_1 * g + \alpha_2 * h
         let c_acc = ristretto255::point_mul(c, &rho);
         ristretto255::point_add_assign(&mut c_acc, &proof.x5);
@@ -250,7 +249,7 @@ module veiled_coin::sigma_protos {
         proof: &WithdrawalSubproof)
     {
         let h = pedersen::randomness_base_for_bulletproof();
-        let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
+        //let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
         let (big_c1, big_c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
 
@@ -321,7 +320,7 @@ module veiled_coin::sigma_protos {
         let alpha2 = std::option::extract(&mut alpha2);
 
         let alpha3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let alpha3 = ristretto255::new_scalar_from_bytes(alpha2_bytes);
+        let alpha3 = ristretto255::new_scalar_from_bytes(alpha3_bytes);
         if (!std::option::is_some(&alpha3)) {
             return std::option::none<WithdrawalSubproof>()
         };
@@ -524,9 +523,9 @@ module veiled_coin::sigma_protos {
         let x1 = ristretto255::random_scalar();
         let x2 = ristretto255::random_scalar();
         let x3 = ristretto255::random_scalar();
-        let source_pk_point = elgamal::pubkey_to_point(sender_pk);
+        //let source_pk_point = elgamal::pubkey_to_point(sender_pk);
         let h = pedersen::randomness_base_for_bulletproof();
-        let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
+        let (_, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
 
         let g_x1 = ristretto255::basepoint_mul(&x1);
         // X1 <- x1 * g + x3 * C2
@@ -591,8 +590,8 @@ module veiled_coin::sigma_protos {
         let source_pk_point = elgamal::pubkey_to_point(sender_pk);
         let recipient_pk_point = elgamal::pubkey_to_point(recipient_pk);
         let h = pedersen::randomness_base_for_bulletproof();
-        let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
-        let (big_c, d) = elgamal::ciphertext_as_points(withdraw_ct);
+        let (_, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
+        let (_, d) = elgamal::ciphertext_as_points(withdraw_ct);
 
         // X1 <- x2 * g
         let big_x1 = ristretto255::basepoint_mul(&x2);
