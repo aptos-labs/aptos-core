@@ -3,7 +3,7 @@ lockfileVersion: '6.0'
 dependencies:
   aptos:
     specifier: latest
-    version: 1.9.1
+    version: 1.11.0
   dotenv:
     specifier: 16.0.1
     version: 16.0.1
@@ -116,8 +116,8 @@ packages:
     engines: {node: '>=0.4.0'}
     dev: true
 
-  /acorn@8.8.2:
-    resolution: {integrity: sha512-xjIYgE8HBrkpd/sJqOGNspf8uHG+NOHGOw6a/Urj8taM2EXfdNAH2oFcPeIFfsv3+kz/mJrS5VuMqbNLjCa2vw==}
+  /acorn@8.9.0:
+    resolution: {integrity: sha512-jaVNAFBHNLXspO543WnNNPZFRtavh3skAkITqD0/2aeMkKZTN+254PyhwxFYrk3vQ1xfY+2wbesJMs/JC8/PwQ==}
     engines: {node: '>=0.4.0'}
     hasBin: true
     dev: true
@@ -129,8 +129,8 @@ packages:
       color-convert: 1.9.3
     dev: true
 
-  /aptos@1.9.1:
-    resolution: {integrity: sha512-QM15VoQTtkTSppKGtwolAX2ZUZdYD4dRBQYm1oSimUrLI/bYjUejqMqxwZtTVvEw61lJv0l3wGdNIYH0luynqg==}
+  /aptos@1.11.0:
+    resolution: {integrity: sha512-hLoyocm3Mv9JQadUObgAJHI4OLJvg2UguOb5Hz7HBbZ05UrpKSCPPX4jTF5UJVlW8HS8b6QQT5dYYXLQHPosqg==}
     engines: {node: '>=11.0.0'}
     dependencies:
       '@noble/hashes': 1.1.3
@@ -1002,7 +1002,7 @@ packages:
       '@tsconfig/node14': 1.0.3
       '@tsconfig/node16': 1.0.4
       '@types/node': 18.6.2
-      acorn: 8.8.2
+      acorn: 8.9.0
       acorn-walk: 8.2.0
       arg: 4.1.3
       create-require: 1.1.1

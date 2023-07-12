@@ -11,6 +11,7 @@ use crate::{
     errors::*,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
@@ -69,20 +70,23 @@ enum CommitRole {
     Worker(Receiver<TxnIndex>),
 }
 
-pub struct BlockExecutor<T, E, S, X> {
-    // number of active concurrent tasks, corresponding to the maximum number of rayon
+pub struct BlockExecutor<T, E, S, L, X> {
+    // number of active concurrent tasks, corresponding
+    // to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
     maybe_block_gas_limit: Option<u64>,
-    phantom: PhantomData<(T, E, S, X)>,
+    transaction_commit_hook: Option<L>,
+    phantom: PhantomData<(T, E, S, L, X)>,
 }
 
-impl<T, E, S, X> BlockExecutor<T, E, S, X>
+impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
+    L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
@@ -91,6 +95,7 @@ where
         concurrency_level: usize,
         executor_thread_pool: Arc<ThreadPool>,
         maybe_block_gas_limit: Option<u64>,
+        transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
@@ -101,6 +106,7 @@ where
             concurrency_level,
             executor_thread_pool,
             maybe_block_gas_limit,
+            transaction_commit_hook,
             phantom: PhantomData,
         }
     }
@@ -497,6 +503,19 @@ where
             ));
         }
         last_input_output.record_delta_writes(txn_idx, delta_writes);
+        if let Some(txn_commit_listener) = &self.transaction_commit_hook {
+            let txn_output = last_input_output.txn_output(txn_idx).unwrap();
+            let execution_status = txn_output.output_status();
+
+            match execution_status {
+                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                    txn_commit_listener.on_transaction_committed(txn_idx, output);
+                },
+                ExecutionStatus::Abort(_) => {
+                    txn_commit_listener.on_execution_aborted(txn_idx);
+                },
+            }
+        }
     }
 
     fn work_task_with_scope(
@@ -733,9 +752,18 @@ where
                     let fee_statement = output.fee_statement();
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
                     Self::update_sequential_txn_gas_counters(&fee_statement);
+                    // No delta writes are needed for sequential execution.
+                    output.incorporate_delta_writes(vec![]);
+                    //
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_transaction_committed(idx as TxnIndex, &output);
+                    }
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
+                    }
                     // Record the status indicating abort.
                     return Err(Error::UserError(err));
                 },
@@ -808,12 +836,10 @@ where
                 base_view,
             )
         }
-
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
             drop(signature_verified_txns);
         });
-
         ret
     }
 }

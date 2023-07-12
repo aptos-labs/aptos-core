@@ -151,6 +151,7 @@ module marketplace::events {
     }
 
     struct ListingPlacedEvent has drop, store {
+        type: String,
         listing: address,
         seller: address,
         price: u64,
@@ -159,6 +160,7 @@ module marketplace::events {
 
     public(friend) fun emit_listing_placed<T: key>(
         marketplace: Object<T>,
+        type: String,
         listing: address,
         seller: address,
         price: u64,
@@ -166,6 +168,7 @@ module marketplace::events {
     ) acquires EventsV1 {
         let marketplace_events = get_events_v1(marketplace);
         event::emit_event(&mut marketplace_events.listing_placed_events, ListingPlacedEvent {
+            type,
             listing,
             seller,
             price,
@@ -174,6 +177,7 @@ module marketplace::events {
     }
 
     struct ListingCanceledEvent has drop, store {
+        type: String,
         listing: address,
         seller: address,
         price: u64,
@@ -182,6 +186,7 @@ module marketplace::events {
 
     public(friend) fun emit_listing_canceled<T: key>(
         marketplace: Object<T>,
+        type: String,
         listing: address,
         seller: address,
         price: u64,
@@ -189,6 +194,7 @@ module marketplace::events {
     ) acquires EventsV1 {
         let marketplace_events = get_events_v1(marketplace);
         event::emit_event(&mut marketplace_events.listing_canceled_events, ListingCanceledEvent {
+            type,
             listing,
             seller,
             price,
@@ -197,6 +203,7 @@ module marketplace::events {
     }
 
     struct ListingFilledEvent has drop, store {
+        type: String,
         listing: address,
         seller: address,
         purchaser: address,
@@ -208,6 +215,7 @@ module marketplace::events {
 
     public(friend) fun emit_listing_filled<T: key>(
         marketplace: Object<T>,
+        type: String,
         listing: address,
         seller: address,
         purchaser: address,
@@ -218,6 +226,7 @@ module marketplace::events {
     ) acquires EventsV1 {
         let marketplace_events = get_events_v1(marketplace);
         event::emit_event(&mut marketplace_events.listing_filled_events, ListingFilledEvent {
+            type,
             listing,
             seller,
             purchaser,

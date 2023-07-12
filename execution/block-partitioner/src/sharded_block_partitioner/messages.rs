@@ -2,7 +2,7 @@
 
 use crate::sharded_block_partitioner::dependency_analysis::WriteSetWithTxnIndex;
 use aptos_types::{
-    block_executor::partitioner::{SubBlocksForShard, TxnIndex},
+    block_executor::partitioner::{RoundId, SubBlocksForShard, TxnIndex},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
 use std::sync::Arc;
@@ -15,6 +15,7 @@ pub struct DiscardCrossShardDep {
     // This is the frozen sub block for the current shard and is passed because we want to modify
     // it to add dependency back edges.
     pub frozen_sub_blocks: SubBlocksForShard<Transaction>,
+    pub round_id: RoundId,
 }
 
 impl DiscardCrossShardDep {
@@ -23,12 +24,14 @@ impl DiscardCrossShardDep {
         prev_rounds_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         current_round_start_index: TxnIndex,
         frozen_sub_blocks: SubBlocksForShard<Transaction>,
+        round_id: RoundId,
     ) -> Self {
         Self {
             transactions,
             prev_rounds_write_set_with_index,
             current_round_start_index,
             frozen_sub_blocks,
+            round_id,
         }
     }
 }
@@ -39,6 +42,7 @@ pub struct AddWithCrossShardDep {
     // The frozen dependencies in previous chunks.
     pub prev_rounds_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     pub frozen_sub_blocks: SubBlocksForShard<Transaction>,
+    pub round_id: RoundId,
 }
 
 impl AddWithCrossShardDep {
@@ -47,12 +51,14 @@ impl AddWithCrossShardDep {
         index_offset: TxnIndex,
         prev_rounds_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         frozen_sub_blocks: SubBlocksForShard<Transaction>,
+        round_id: RoundId,
     ) -> Self {
         Self {
             transactions,
             index_offset,
             prev_rounds_write_set_with_index,
             frozen_sub_blocks,
+            round_id,
         }
     }
 }

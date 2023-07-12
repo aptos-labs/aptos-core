@@ -95,8 +95,11 @@ impl DagDriver {
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let task = self
             .reliable_broadcast
-            .broadcast(node, signature_builder)
-            .then(move |certificate| rb.broadcast(certificate, cert_ack_set));
+            .broadcast(node.clone(), signature_builder)
+            .then(move |certificate| {
+                let certified_node = CertifiedNode::new(node, certificate.signatures().to_owned());
+                rb.broadcast(certified_node, cert_ack_set)
+            });
         tokio::spawn(Abortable::new(task, abort_registration));
         if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
             prev_handle.abort();

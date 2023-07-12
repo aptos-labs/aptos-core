@@ -14,7 +14,7 @@ const PROTOCOL_VERSION: u64 = 1;
 #[tokio::test]
 async fn test_get_server_protocol_version() {
     // Create the storage client and server
-    let (mut mock_client, service, _, _) = MockClient::new(None, None);
+    let (mut mock_client, service, _, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Process a request to fetch the protocol version

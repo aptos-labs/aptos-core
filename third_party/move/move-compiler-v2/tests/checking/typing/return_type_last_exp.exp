@@ -1,0 +1,15 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        dummy_field: bool,
+    }
+    private fun t0() {
+        Tuple()
+    }
+    private fun t1() {
+        0
+    }
+    private fun t2() {
+        Tuple(0, false, pack M::R(false))
+    }
+} // end 0x8675309::M

@@ -1,40 +1,43 @@
-import { AnyNumber } from "../bcs";
-import { HexString, MaybeHexString } from "./hex_string";
+import { ClientConfig, get } from "../client";
 
 /// This function is a helper for paginating using a function wrapping an API
-export async function paginateWithCursor<T>(
-  apiFunction: (
-    address: string,
-    ledgerVersion?: string | undefined,
-    start?: string | undefined,
-    limit?: number | undefined,
-  ) => Promise<T[]>,
-  accountAddress: MaybeHexString,
-  limitPerRequest: number,
-  query?: { ledgerVersion?: AnyNumber },
-): Promise<T[]> {
+export async function paginateWithCursor<Req extends Record<string, any>, Res extends any[]>(options: {
+  url: string;
+  endpoint?: string;
+  body?: any;
+  params?: Req;
+  originMethod?: string;
+  overrides?: ClientConfig;
+}): Promise<Res> {
   const out = [];
   let cursor: string | undefined;
+  const requestParams = options.params as Req & { start?: string };
   // eslint-disable-next-line no-constant-condition
   while (true) {
+    requestParams.start = cursor;
     // eslint-disable-next-line no-await-in-loop
-    const response = await apiFunction(
-      HexString.ensure(accountAddress).hex(),
-      query?.ledgerVersion?.toString(),
-      cursor,
-      limitPerRequest,
-    );
-    // Response is the main response, i.e. the T[]. Attached to that are the headers as `__headers`.
+    const response = await get<Req, Res>({
+      url: options.url,
+      endpoint: options.endpoint,
+      params: requestParams,
+      originMethod: options.originMethod,
+      overrides: options.overrides,
+    });
     // eslint-disable-next-line no-underscore-dangle
-    cursor = (response as any).__headers["x-aptos-cursor"];
+    /**
+     * the cursor is a "state key" from the API prespective. Client
+     * should not need to "care" what it represents but just use it
+     * to query the next chunck of data.
+     */
+    cursor = response.headers["x-aptos-cursor"];
     // Now that we have the cursor (if any), we remove the headers before
     // adding these to the output of this function.
     // eslint-disable-next-line no-underscore-dangle
-    delete (response as any).__headers;
-    out.push(...response);
+    delete (response as any).headers;
+    out.push(...response.data);
     if (cursor === null || cursor === undefined) {
       break;
     }
   }
-  return out;
+  return out as any;
 }

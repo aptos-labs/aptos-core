@@ -45,6 +45,15 @@ pub enum StorageLocation {
     WildCardTable(TableHandle),
 }
 
+impl StorageLocation {
+    pub fn into_state_key(self) -> StateKey {
+        match self {
+            StorageLocation::Specific(state_key) => state_key,
+            _ => panic!("Cannot convert wildcard storage location to state key"),
+        }
+    }
+}
+
 impl AnalyzedTransaction {
     pub fn new(
         transaction: Transaction,
