@@ -470,13 +470,13 @@ where
 
     fn execute_transaction_in_sequential_execution(
         &self,
-        view: &impl TStateView<Key = K>,
-        txn: &Self::Txn,
-        txn_idx: TxnIndex,
+        _view: &impl TStateView<Key = K>,
+        _txn: &Self::Txn,
+        _txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
-        // As these functions are dummy, we reuse the code by calling
-        // `execute_transaction_in_parallel_execution` function
-        self.execute_transaction_in_parallel_execution(view, txn, txn_idx, true)
+        unreachable!(
+            "execute_transaction_in_sequential_execution is currently not being used in tests"
+        );
     }
 }
 
