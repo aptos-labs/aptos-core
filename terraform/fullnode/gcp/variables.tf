@@ -201,6 +201,18 @@ variable "manage_via_tf" {
 }
 
 variable "enable_vertical_pod_autoscaling" {
-  description = "vertical pod autoscaling"
+  description = "Vertical pod autoscaling to automatically adjust resource requests"
   default = false
 }
+
+variable "min_allowed_cpu_for_vertical_pod_autoscaling" {
+  description = "MinAllowed CPU for vertical pod autoscaling"
+  default = 1
+}
+
+variable "min_allowed_memory_for_vertical_pod_autoscaling" {
+  description = "MinAllowed memory for vertical pod autoscaling"
+  default = "16Gi"
+}
+
+

@@ -47,16 +47,12 @@ image:
   tag:
   # -- Image pull policy to use for fullnode images
   pullPolicy: IfNotPresent
-
-resources:
-  limits:
-    cpu: 14
-    memory: 26Gi
-  requests:
-    cpu: 14
-    memory: 26Gi
   
-verticalPodAutoscalingEnabled: true
+verticalPodAutoscalingEnabled:
+
+minAllowedForVpa:
+  cpu:
+  memory:
 
 nodeSelector: {}
 tolerations: []

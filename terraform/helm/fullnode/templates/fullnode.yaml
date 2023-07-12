@@ -23,7 +23,7 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
-        autoscaling.k8s.io/vertical-pod-autoscaler-enabled: "true"
+        autoscaling.k8s.io/vertical-pod-autoscaler-enabled: {{ .Values.verticalPodAutoscalingEnabled | quote }}
     spec:
       terminationGracePeriodSeconds: 0
       containers:
@@ -46,8 +46,6 @@ spec:
           {{- end }}
           # Start the node
           /usr/local/bin/aptos-node -f /opt/aptos/etc/fullnode.yaml
-        resources:
-          {{- toYaml .Values.resources | nindent 10 }}
         env:
         - name: RUST_LOG
           value: {{ .Values.rust_log }}

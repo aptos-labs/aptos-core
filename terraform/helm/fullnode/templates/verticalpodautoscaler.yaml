@@ -12,4 +12,10 @@ spec:
   updatePolicy:
     updateMode: "Auto"
     minReplicas: 1
+  resourcePolicy:
+    containerPolicies:
+      - containerName: "*"
+        minAllowed:
+          cpu: {{ .Values.minAllowedForVpa.cpu }}
+          memory: {{ .Values.minAllowedForVpa.memory }}
 {{- end -}}

@@ -80,7 +80,6 @@ resource "helm_release" "fullnode" {
   values = [
     jsonencode({
       imageTag = var.image_tag
-      deploy = 1
       manageImages = var.manage_via_tf # if we're managing the entire deployment via terraform, override the images as well
       chain = {
         era  = var.era
@@ -126,6 +125,10 @@ resource "helm_release" "fullnode" {
         }
       }
       verticalPodAutoscalingEnabled = var.enable_vertical_pod_autoscaling
+      minAllowedForVpa = {
+        cpu = var.min_allowed_cpu_for_vertical_pod_autoscaling
+        memory = var.min_allowed_memory_for_vertical_pod_autoscaling
+      }
     }),
     jsonencode(var.fullnode_helm_values),
     jsonencode(var.fullnode_helm_values_list == {} ? {} : var.fullnode_helm_values_list[count.index]),
