@@ -23,3 +23,13 @@ proposals:
     - FeatureFlag:
         enabled:
           - gas_payer_enabled
+  - name: enable_aptos_unique_identifiers
+    metadata:
+      title: "Enable Aptos Unique Identifiers"
+      description: "AIP-36: Support for aptos unique identifiers (generated using native function generate_unique_address)"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/154"
+    execution_mode: MultiStep
+    update_sequence:
+    - FeatureFlag:
+        enabled:
+          - aptos_unique_identifiers
