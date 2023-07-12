@@ -19,7 +19,7 @@ The Aptos Non-Fungible Token (NFT) Minting Tool allows NFT creators to upload as
 
 ### Install Aptos CLI
 
-[Install the Aptos CLI](../../tools/install-cli/index.md). The Aptos CLI is needed for compiling and deploying the minting contract.
+[Install the Aptos CLI](../../tools/aptos-cli/install-cli/index.md). The Aptos CLI is needed for compiling and deploying the minting contract.
 
 ### Configure Aptos account
 
@@ -83,7 +83,7 @@ Each pair of image and metadata files represent an NFT. E.g. `1.png` and `1.json
 ## Create an NFT project
 
 1. Create a project called `test` with the command: `aptos-mint init --name test --asset-path <decompressed-asset-folder>`
-Note: Set the `public_minting_start_time` to be a couple of minutes later to give the tool enough time to add tokens into the collection.
+   Note: Set the `public_minting_start_time` to be a couple of minutes later to give the tool enough time to add tokens into the collection.
 2. Change your current directory to `test` with the command: `cd test`
 
 ## Compile and publish the smart contract

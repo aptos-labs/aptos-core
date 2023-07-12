@@ -63,6 +63,7 @@ cargo run -p aptos-faucet-service -- run-simple --key <key> --node-url <node_url
 ```
 
 You can get the values above like this:
+
 - `key`: When you started the swarm, there was output like this: `The root (or mint) key for the swarm is: 0xf9f...`. This is the `key`.
 - `node_url`: When you started the swarm, there was output like this: `REST API is listening at: http://127.0.0.1:64566`. This is the `node_url`.
 
@@ -73,6 +74,7 @@ curl -X POST http://127.0.0.1:8081/mint?amount=<amount to mint>&pub_key=<public 
 ```
 
 As an alternative to using the faucet service, you may use the faucet CLI directly:
+
 ```
 cargo run -p aptos-faucet-cli -- --amount 10 --accounts <account_address> --key <private_key>
 ```
@@ -80,12 +82,13 @@ cargo run -p aptos-faucet-cli -- --amount 10 --accounts <account_address> --key 
 :::tip Faucet and Aptos CLI
 See more on how the faucet works in the [README](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet).
 
-Also see how to use the [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md#account-examples) with an existing faucet.
+Also see how to use the [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md#account-examples) with an existing faucet.
 :::
 
 ## Validator fullnodes
 
 To also run validator fullnodes inside the network, use the `--num-validator-fullnodes` flag. For example:
+
 ```bash
 cargo run -p aptos-forge-cli \
         -- \
@@ -97,6 +100,7 @@ cargo run -p aptos-forge-cli \
 ## Additional usage
 
 To see all tool usage options, run:
+
 ```bash
 cargo run -p aptos-forge-cli --help
 ```

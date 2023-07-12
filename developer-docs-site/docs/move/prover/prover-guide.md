@@ -10,21 +10,23 @@ This is the user guide for the Move Prover. This document accompanies the
 
 ## Running the Move Prover
 
-The Move Prover is invoked via the [Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md#move-examples). In order to call the CLI, you must have a [*Move package*](../book/packages.md) in place. In the simplest case, a Move package is defined by a directory with a set of `.move` files in it and a manifest of the name `Move.toml`. You can create a new Move package at a given location by running the command: `aptos move init --name <name>`
+The Move Prover is invoked via the [Aptos CLI](../../tools/aptos-cli/use-cli/use-aptos-cli.md#move-examples). In order to call the CLI, you must have a [_Move package_](../book/packages.md) in place. In the simplest case, a Move package is defined by a directory with a set of `.move` files in it and a manifest of the name `Move.toml`. You can create a new Move package at a given location by running the command: `aptos move init --name <name>`
 
 Once the package exists, call the Move Prover from the directory to be tested or by supplying its path to the `--package-dir` argument:
 
-  * Prove the sources of the package in the current directory:
-    ```shell
+- Prove the sources of the package in the current directory:
+  ```shell
   aptos move prove
   ```
 
-  * Prove the sources of the package at &lt;path&gt;:
-  ```shell
-  aptos move prove --package-dir <path>
-  ```
+````
 
-See example output and other available options in the [Proving Move](../../tools/aptos-cli-tool/use-aptos-cli.md#proving-move) section of Use Aptos CLI.
+* Prove the sources of the package at &lt;path&gt;:
+```shell
+aptos move prove --package-dir <path>
+````
+
+See example output and other available options in the [Proving Move](../../tools/aptos-cli/use-cli/use-aptos-cli.md#proving-move) section of Use Aptos CLI.
 
 ### Target filtering
 
@@ -91,7 +93,6 @@ proc_cores = 4
 
 > HINT: For local verification, you may want to set `proc_cores` to an aggressive number
 > (your actual cores) to speed up the turnaround cycle.
-
 
 ## Prover diagnosis
 

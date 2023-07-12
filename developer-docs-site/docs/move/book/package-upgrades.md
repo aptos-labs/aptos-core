@@ -33,6 +33,7 @@ version = "0.0.1"
 upgrade_policy = "compatible"
 ...
 ```
+
 :::tip Compatibility check
 Aptos checks compatibility at the time a Move package is published via an Aptos transaction. This transaction will abort if deemed incompatible.
 :::
@@ -42,7 +43,7 @@ Aptos checks compatibility at the time a Move package is published via an Aptos 
 To upgrade already published Move code, simply attempt to republish the code at
 the same address that it was previously published. This can be done by following the
 instructions for code compilation and publishing using the
-[Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md). For an example,
+[Aptos CLI](../../tools/aptos-cli/use-cli/use-aptos-cli.md). For an example,
 see the [Your First Move Module](../../tutorials/first-move-module.md) tutorial.
 
 ## Upgrade policies
@@ -51,12 +52,12 @@ There are two different upgrade policies currently supported by Aptos:
 
 - `compatible`: these upgrades must be backwards compatible, specifically:
   - For storage, all old struct declarations must be the same in
-    the new code. This ensures that the existing state of storage is 
-    correctly interpreted by the new code. However, new struct declarations 
+    the new code. This ensures that the existing state of storage is
+    correctly interpreted by the new code. However, new struct declarations
     can be added.
-  - For APIs, all existing public functions must have the same signature as 
+  - For APIs, all existing public functions must have the same signature as
     before. New functions, including public and entry functions, can be added.
-- `immutable`: the code is not upgradeable and is guaranteed to stay the same 
+- `immutable`: the code is not upgradeable and is guaranteed to stay the same
   forever.
 
 Those policies are ordered regarding strength such that `compatible < immutable`,
@@ -72,14 +73,16 @@ This is necessary so one can define an `immutable` package based on the standard
 libraries, which have the `compatible` policy to allow critical upgrades and fixes.
 
 ## Compatibility rules
+
 When using `compatible` upgrade policy, a module package can be upgraded. However, updates to existing modules already
 published previously need to be compatible and follow the rules below:
+
 - All existing structs' fields cannot be updated. This means no new fields can be added and existing fields cannot be
-modified. Struct abilities also cannot be changed (no new ones added or existing removed).
+  modified. Struct abilities also cannot be changed (no new ones added or existing removed).
 - All public and entry functions cannot change their signature (argument types, type argument, return types). However,
-argument names can change.
+  argument names can change.
 - Public(friend) functions are treated as private and thus their signature can arbitrarily change. This is safe as
-only modules in the same package can call friend functions anyway and they need to be updated if the signature changes.
+  only modules in the same package can call friend functions anyway and they need to be updated if the signature changes.
 
 When updating your modules, if you see an incompatible error, make sure to check the above rules and fix any violations.
 
@@ -101,8 +104,8 @@ As result, dependencies to upgradeable packages need to be handled with care:
   only by name (e.g. `module feature_v1` and `module feature_v2`). However,
   not all package owners like to publish their code as `immutable`, because this
   takes away the ability to fix bugs and update the code in place.
-- If you have a dependency to a `compatible` package, it is highly 
-  recommended you know and understand the entity publishing the package. 
+- If you have a dependency to a `compatible` package, it is highly
+  recommended you know and understand the entity publishing the package.
   The highest level of assurance is when the package is governed by a
   Decentralized Autonomous Organization (DAO) where no single user can initiate
   an upgrade; a vote or similar has to be taken. This is the case for the Aptos
@@ -110,9 +113,9 @@ As result, dependencies to upgradeable packages need to be handled with care:
 
 ## Programmatic upgrade
 
-In general, Aptos offers, via the Move module `aptos_framework::code`, 
+In general, Aptos offers, via the Move module `aptos_framework::code`,
 ways to publish code from anywhere in your smart contracts. However,
-notice that code published in the current transaction can be executed 
+notice that code published in the current transaction can be executed
 only after that transaction ends.
 
 The Aptos framework itself, including all the on-chain administration logic, is

@@ -19,9 +19,9 @@ As with the [Aptos Indexer](./indexing.md#rate-limits), the Aptos REST API has a
 
 Most integrations into the Aptos blockchain benefit from a holistic and comprehensive overview of the current and historical state of the blockchain. Aptos provides historical transactions, state, and events, all the result of transaction execution.
 
-* Historical transactions specify the execution status, output, and tie to related events. Each transaction has a unique version number associated with it that dictates its global sequential ordering in the history of the blockchain ledger.
-* The state is the representation of all transaction outputs up to a specific version. In other words, a state version is the accumulation of all transactions inclusive of that transaction version.
-* As transactions execute, they may emit events. [Events](../concepts/events.md) are hints about changes in on-chain data.
+- Historical transactions specify the execution status, output, and tie to related events. Each transaction has a unique version number associated with it that dictates its global sequential ordering in the history of the blockchain ledger.
+- The state is the representation of all transaction outputs up to a specific version. In other words, a state version is the accumulation of all transactions inclusive of that transaction version.
+- As transactions execute, they may emit events. [Events](../concepts/events.md) are hints about changes in on-chain data.
 
 :::important
 Ensure the [fullnode](../nodes/deployments.md) you're communicating with is up to date. The fullnode must reach the version containing your transaction to retrieve relevant data from it. There can be latency from the fullnodes retrieving state from [validator fullnodes](../concepts/fullnodes.md), which in turn rely upon [validator nodes](../concepts/validator-nodes.md) as the source of truth.
@@ -29,8 +29,8 @@ Ensure the [fullnode](../nodes/deployments.md) you're communicating with is up t
 
 The storage service on a node employs two forms of pruning that erase data from nodes:
 
-* state
-* events, transactions, and everything else
+- state
+- events, transactions, and everything else
 
 While either of these may be disabled, storing the state versions is not particularly sustainable.
 
@@ -38,28 +38,29 @@ Events and transactions pruning can be disabled via setting the [`enable_ledger_
 
 The REST API offers querying transactions and events in these ways:
 
-* [Transactions for an account](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_account_transactions)
-* [Transactions by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
-* [Events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
+- [Transactions for an account](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_account_transactions)
+- [Transactions by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
+- [Events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
 
 ## Reading state with the View function
 
 View functions do not modify blockchain state when called from the API. A [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) can be used to read potentially complex on-chain state using Move. For example, you can evaluate who has the highest bid in an auction contract. Here are related files:
 
-* [`view_function.rs`](https://github.com/aptos-labs/aptos-core/blob/main/api/src/tests/view_function.rs) for an example
-* related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code
-* [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
+- [`view_function.rs`](https://github.com/aptos-labs/aptos-core/blob/main/api/src/tests/view_function.rs) for an example
+- related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code
+- [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
 
 The view function operates like the [Aptos Simulation API](../guides/system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
 
 A function does not have to be immutable to be tagged as `#[view]`, but if the function is mutable it will not result in state mutation when called from the API.
 If you want to tag a mutable function as `#[view]`, consider making it private so that it cannot be maliciously called during runtime.
 
-In order to use the View functions, you need to [publish the module](../move/move-on-aptos/cli.md#publishing-a-move-package-with-a-named-address) through the [Aptos CLI](../tools/install-cli/index.md).
+In order to use the View functions, you need to [publish the module](../move/move-on-aptos/cli.md#publishing-a-move-package-with-a-named-address) through the [Aptos CLI](../tools/aptos-cli/install-cli/index.md).
 
 In the Aptos CLI, a view function request would look like this:
+
 ```
-aptos move view --function-id devnet::message::get_message --profile devnet --args address:devnet                   
+aptos move view --function-id devnet::message::get_message --profile devnet --args address:devnet
 {
   "Result": [
     "View functions rock!"
@@ -68,6 +69,7 @@ aptos move view --function-id devnet::message::get_message --profile devnet --ar
 ```
 
 In the TypeScript SDK, a view function request would look like this:
+
 ```
     const payload: Gen.ViewRequest = {
       function: "0x1::coin::balance",
@@ -84,7 +86,7 @@ The view function returns a list of values as a vector. By default, the results 
 
 ## Exchanging and tracking coins
 
-Aptos has a standard *Coin type* define in [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that symbolize the type parameter or use generic for `Coin<T>`.
+Aptos has a standard _Coin type_ define in [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that symbolize the type parameter or use generic for `Coin<T>`.
 
 Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
 
@@ -223,13 +225,14 @@ A transfer transaction would appear as follows:
 ```
 
 Here is a breakdown of the information in a transaction:
-* `version` indicates the globally unique identifier for this transaction, its ordered position in all the committed transactions on the blockchain
-* `sender` is the account address of the entity that submitted the transaction
-* `gas_used` is the units paid for executing the transaction
-* `success` and `vm_status` indicate whether or not the transaction successfully executed and any reasons why it might not have
-* `changes` include the final values for any state resources that have been modified during the execution of the transaction
-* `events` contain all the events emitted during the transaction execution
-* `timetstamp` is the near real-time timestamp of the transaction's execution
+
+- `version` indicates the globally unique identifier for this transaction, its ordered position in all the committed transactions on the blockchain
+- `sender` is the account address of the entity that submitted the transaction
+- `gas_used` is the units paid for executing the transaction
+- `success` and `vm_status` indicate whether or not the transaction successfully executed and any reasons why it might not have
+- `changes` include the final values for any state resources that have been modified during the execution of the transaction
+- `events` contain all the events emitted during the transaction execution
+- `timetstamp` is the near real-time timestamp of the transaction's execution
 
 If `success` is false, then `vm_status` will contain an error code or message that resulted in the transaction failing to succeed. When `success` is false, `changes` will be limited to gas deducted from the account and the sequence number incrementing. There will be no `events`.
 
@@ -281,6 +284,7 @@ When tracking full movement of coins, normally events are sufficient. `0x1::apto
 ### Tracking coin balance changes
 
 Consider the transaction from the earlier section, but now with an arbitrary coin `0x1337::my_coin::MyCoin` and some gas parameters changed:
+
 ```
 {
   "version": "13629679",
@@ -366,32 +370,38 @@ Consider the transaction from the earlier section, but now with an arbitrary coi
 ```
 
 There are three balance changes in this transaction:
+
 1. A withdrawal of `1000` of `0x1337::my_coin::MyCoin` from the transaction sending account `0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b`
 2. A deposit of `1000` of `0x1337::my_coin::MyCoin` to receiving account `0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e`
 3. A gas fee `2200` of `0x1::aptos_coin::AptosCoin` from the sending account `0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b`
 
 To retrieve the withdrawal information:
-1. Scan the `changes` for `0x1::coin::CoinStore<CoinType>`.  Note the `CoinType` is a generic signifying which coin is stored in the store.  In this example, the `CoinType` is `0x1337::my_coin::MyCoin`.
+
+1. Scan the `changes` for `0x1::coin::CoinStore<CoinType>`. Note the `CoinType` is a generic signifying which coin is stored in the store. In this example, the `CoinType` is `0x1337::my_coin::MyCoin`.
 2. Retrieve the `guid` for `withdraw_events`. In this example, the `guid` contains `addr` `0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b` and `creation_num` `3`.
-3. Scan for events with this `guid` and extract the event associated with it.  In this example, it is the `0x1::coin::WithdrawEvent`.
+3. Scan for events with this `guid` and extract the event associated with it. In this example, it is the `0x1::coin::WithdrawEvent`.
 4. Note the `amount` field will be the number of `CoinType` removed from the account in the `guid`. In this example, it is `1000`.
 
 To retrieve the deposit information, it's the same as withdrawal except:
+
 1. The `guid` used is under: `deposit_events`
 2. The `amount` will be a positive increase on the account's balance.
 3. The event's name will be: `0x1::coin::DepositEvent`
 
 To retrieve the gas fee:
-1. The `gas_used` field must be multiplied times the `gas_unit_price`.  In this example, `gas_used=20` and `gas_unit_price=110` so the total gas coins withdrawn is `2200`.
+
+1. The `gas_used` field must be multiplied times the `gas_unit_price`. In this example, `gas_used=20` and `gas_unit_price=110` so the total gas coins withdrawn is `2200`.
 2. Gas is always: `0x1::aptos_coin::AptosCoin`
 
 To retrieve information about the number of decimals of the coin:
+
 1. You can retrieve the number of decimals for a coin via its: `0x1::coin::CoinInfo<CoinType>`
-2. This will be located at the address of the coin type.  In this example, you would need to look up `0x1::coin::CoinInfo<0x1337::my_coin::MyCoin>` at address `0x1337`.
+2. This will be located at the address of the coin type. In this example, you would need to look up `0x1::coin::CoinInfo<0x1337::my_coin::MyCoin>` at address `0x1337`.
 
 :::tip
 If you always use the events in this manner, you won't miss any balance changes for an account.
 By monitoring the events, you will find all balance changes in the `0x1::coin::CoinStore`:
+
 1. Coin mints
 2. Coin burns
 3. Coin transfers

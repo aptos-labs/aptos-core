@@ -15,8 +15,8 @@ Our database restore tool lets you use the existing [public backup files](#publi
 
 Aptos Labs maintains a few publicly accessible database backups by continuously querying a local fullnode and storing the backup data in remote storage, such as Amazon S3 or Google Cloud Storage.
 
-|  | AWS Backup Data | Google Cloud Backup Data  |
-| --- | --- | --- |
+|         | AWS Backup Data                                                                       | Google Cloud Backup Data                                                        |
+| ------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Testnet | https://github.com/aptos-labs/aptos-networks/blob/main/testnet/backups/s3-public.yaml | https://github.com/aptos-labs/aptos-networks/blob/main/testnet/backups/gcs.yaml |
 | Mainnet | https://github.com/aptos-labs/aptos-networks/blob/main/mainnet/backups/s3-public.yaml | https://github.com/aptos-labs/aptos-networks/blob/main/mainnet/backups/gcs.yaml |
 
@@ -27,14 +27,16 @@ The backup files consist of three types of data that can be used to reconstruct 
 - `transaction` – It contains the raw transaction metadata, payload, the executed outputs of the transaction after VM, and the cryptographic proof of the transaction in the ledger history.
 
 Each type of data in the backup storage is organized as follows:
-- The metadata file in the metadata folder contains the range of each backup and the relative path to the backup folder. 
+
+- The metadata file in the metadata folder contains the range of each backup and the relative path to the backup folder.
 - The backup contains a manifest file and all the actual chunked data files.
 
 ![aptos-db-restore.png](../../../static/img/docs/aptos-db-restore.png)
 
 ## Restore a DB using the public backup files
 
-The [Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md) supports two kinds of restore operations by reading from the public backup files:
+The [Aptos CLI](../../tools/aptos-cli/use-cli/use-aptos-cli.md) supports two kinds of restore operations by reading from the public backup files:
+
 1. Recreating a database with minimal transaction history at a user-specified transaction version (or the latest version the backup has)
 2. Restoring the database over a specific period. In addition to the above, this option ensures that the recreated database carries the ledger history of the user-designated version range.
 
@@ -45,6 +47,7 @@ Aptos CLI 1.0.14 or newer is needed to perform these operations. Additionally, d
 The `aptos node bootstrap-db` command can quickly restore a database from the closest snapshot to a target version, but it does not restore the transaction history prior to the target version.
 
 Use the following options:
+
 - `target-version` – The sync will begin from this period onwards in the transaction history.
 - `command-adapter-config` – The path to one of the [YAML configuration files](#public-backup-files) that specifies the location of the public backup files and commands used by our backup and restore tool to interact with the remote storage.
 - `target-db-dir` – The target DB path.
@@ -52,7 +55,7 @@ Use the following options:
 Example command:
 
 ```bash
-aptos node bootstrap-db \ 
+aptos node bootstrap-db \
     --target-version 500000000 \
     --command-adapter-config /path/to/s3-public.yaml \
     --target-db-dir /path/to/local/db
@@ -63,6 +66,7 @@ aptos node bootstrap-db \
 The `aptos node bootstrap-db` command can restore the transaction history within a specified period, along with the state Merkle tree at the target version.
 
 Use the following options:
+
 - `ledger-history-start-version` – The version to which the DB will sync.
 - `target-version` – The sync will begin from this period onwards in the transaction history.
 - `command-adapter-config` – The path to one of the [YAML configuration files](#public-backup-files) that specifies the location of the public backup files and commands used by our backup and restore tool to interact with the remote storage.
@@ -71,17 +75,18 @@ Use the following options:
 Example command:
 
 ```bash
-aptos node bootstrap-db \ 
+aptos node bootstrap-db \
     --ledger-history-start-version 150000000 \
-    --target-version 155000000 
+    --target-version 155000000
     --command-adapter-config /path/to/s3-public.yaml \
     --target-db-dir /path/to/local/db
 ```
 
 ### Restore a fullnode with full history from genesis
+
 To restore a fullnode with full history from genesis, set `ledger-history-start-version` to 0 and disable the pruner by [disabling the ledger pruner](../../guides/data-pruning.md).
 
-Example command: 
+Example command:
 
 ```bash
 aptos node bootstrap-db \
@@ -90,7 +95,9 @@ aptos node bootstrap-db \
 --command-adapter-config /path/to/s3-public.yaml \
 --target-db-dir /path/to/local/db
 ```
+
 Disable the pruner in the node config to prevent the early history from being pruned when you start the node.
+
 ```Yaml
 storage:
  storage_pruner_config:

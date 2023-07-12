@@ -5,7 +5,7 @@ slug: "staking-pool-operations"
 
 # Staking Pool Operations
 
-This document describes how to perform [staking](../../../concepts/staking.md) pool operations. Note that a staking pool can only accept stake from the stake pool owner. You can stake only when you meet the minimum staking requirement. See also the related [Delegation Pool Operations](./delegation-pool-operations.md) instructions to accept stake from multiple delegators in order to reach the minimum. 
+This document describes how to perform [staking](../../../concepts/staking.md) pool operations. Note that a staking pool can only accept stake from the stake pool owner. You can stake only when you meet the minimum staking requirement. See also the related [Delegation Pool Operations](./delegation-pool-operations.md) instructions to accept stake from multiple delegators in order to reach the minimum.
 
 :::tip Minimum staking requirement
 The current required minimum for staking is 1 million APT.
@@ -33,7 +33,7 @@ The below CLI command examples use mainnet. Change the `--network` value for tes
 
 ## Perform pool owner operations
 
-This document describes how to [use the Aptos CLI](../../../tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
+This document describes how to [use the Aptos CLI](../../../tools/aptos-cli/use-cli/use-aptos-cli.md) to perform owner operations during validation.
 
 ### Owner operations with CLI
 
@@ -75,7 +75,7 @@ aptos account transfer \
 
 ```bash
 aptos stake set-operator \
-  --operator-address <new-operator-address> \ 
+  --operator-address <new-operator-address> \
   --profile mainnet-owner
 ```
 
@@ -83,7 +83,7 @@ aptos stake set-operator \
 
 ```bash
 aptos stake set-delegated-voter \
-  --voter-address <new-voter-address> \ 
+  --voter-address <new-voter-address> \
   --profile mainnet-owner
 ```
 
@@ -121,30 +121,30 @@ aptos stake withdraw-stake \
 
 ### 1. Initialize Aptos CLI
 
-  ```bash
-  aptos init --profile mainnet-operator \
-  --network mainnet \
-  --private-key <operator_account_private_key> \
-  --skip-faucet
-  ```
-  
+```bash
+aptos init --profile mainnet-operator \
+--network mainnet \
+--private-key <operator_account_private_key> \
+--skip-faucet
+```
+
 :::tip
 The `account_private_key` for the operator can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
 :::
 
-### 2. Check your validator account balance 
+### 2. Check your validator account balance
 
 Make sure you have enough APT to pay for gas. You can check for this either on the Aptos Explorer or using the CLI:
 
-- On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=Mainnet`, or 
+- On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=Mainnet`, or
 - Use the CLI:
 
   ```bash
   aptos account list --profile mainnet-operator
   ```
-    
+
 This will show you the coin balance you have in the validator account. You will see an output like below:
-    
+
 ```json
 "coin": {
     "value": "5000"
@@ -192,14 +192,14 @@ You can see it on the [Aptos Explorer](https://explorer.aptoslabs.com/validators
 :::
 
 ### 6. Check the validator set
-   
+
 When you join the validator set, your validator node will be in "Pending Active" state until the next epoch occurs. **During this time you might see errors like "No connected AptosNet peers". This is normal.** Run the below command to look for your validator in the "pending_active" list.
 
 ```bash
 aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.pending_active' | grep <pool_address>
 ```
 
-When the next epoch happens, the node will be moved into "active_validators" list.  Run the below command to see your validator in the "active_validators" list:
+When the next epoch happens, the node will be moved into "active_validators" list. Run the below command to see your validator in the "active_validators" list:
 
 ```bash
 aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active_validators' | grep <pool_address>
@@ -211,9 +211,9 @@ aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active
 Before you proceed, see [Validation on the Aptos blockchain](../../../concepts/staking.md#validation-on-the-aptos-blockchain) for a brief overview.
 :::
 
-To check the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields. 
+To check the details of your stake pool, run the below CLI command with the `get-stake-pool` option by providing the `--owner-address` and `--url` fields.
 
-The below command is for an example owner address `e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`. 
+The below command is for an example owner address `e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`.
 
 :::tip
 For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](../../deployments.md).
@@ -231,7 +231,7 @@ Example output:
 {
   "Result": [
     {
-      "state": "Active", 
+      "state": "Active",
       "pool_address": "25c3482850a188d8aa6edc5751846e1226a27863643f5ebc52be4f7d822264e3",
       "operator_address": "3bec5a529b023449dfc86e9a6b5b51bf75cec4a62bf21c15bbbef08a75f7038f",
       "voter_address": "3bec5a529b023449dfc86e9a6b5b51bf75cec4a62bf21c15bbbef08a75f7038f",
@@ -265,14 +265,17 @@ Example output:
 ### Description of output fields
 
 **state**
+
 - "Active": Validator is already in the validator set and proposing.
 - "Pending_active": Validator will be added to the validator set in the next epoch. **Do not try to join the validator set again before the arrival of next epoch, or else you will receive an error. **
 
 **pool_address**
-- Use this "pool_address" (not the operator address) in you `validator.yaml` file. If you mistakenly used the operator address, you will receive the message: "Validator not in validator set". 
+
+- Use this "pool_address" (not the operator address) in you `validator.yaml` file. If you mistakenly used the operator address, you will receive the message: "Validator not in validator set".
 
 **commission_percentage**
-- This can be set only by the stake pool owner. Operator receives the "commission_percentage" of the generated staking rewards. If you request the commission (you can do so by running the command `aptos stake request-commission`), then at the end of the `lockup_expiration_utc_time` the commission part of the rewards will go to the operator address while the rest will stay in the stake pool and belong to the owner. Here "the commission part of the rewards" means the value of **commission_not_yet_unlocked**. 
+
+- This can be set only by the stake pool owner. Operator receives the "commission_percentage" of the generated staking rewards. If you request the commission (you can do so by running the command `aptos stake request-commission`), then at the end of the `lockup_expiration_utc_time` the commission part of the rewards will go to the operator address while the rest will stay in the stake pool and belong to the owner. Here "the commission part of the rewards" means the value of **commission_not_yet_unlocked**.
 
   For example, in a scenario with a lock up of one month, you call `aptos stake request-commission` every month. This will pay out the commission that was accrued during the previous month but only when unlocked at the end of the previous month. Regardless of how often you run `aptos stake request-commission` during the month, the commission is only paid out upon the completion of `lockup_expiration_utc_time`.
 
@@ -280,15 +283,17 @@ Example output:
   Note that if you do not request commission for multiple months, your commission will accrue more due to compounding of the **commission_percentage** during these months.
   :::
 
-
 **commission_not_yet_unlocked**
+
 - The amount of commission (amount of APT) that is not yet unlocked. It will be unlocked at the `lockup_expiration_utc_time`. This is the total commission amount available to the operator, i.e., the staking rewards **only** to the operator. This does not include the staking rewards to the owner.
 
 **lockup_expiration_utc_time**
+
 - The date when the commission will unlock. However, this unlocked commission will not be auto-disbursed. It will only disburse when the command `aptos stake request-commission` is called again.
 
 **epoch_info**
-- Use the [Epoch Converter](https://www.epochconverter.com/) to convert the `unix_time` into human readable time. 
+
+- Use the [Epoch Converter](https://www.epochconverter.com/) to convert the `unix_time` into human readable time.
 
 ## Requesting commission
 
@@ -313,16 +318,14 @@ Month 3, Day 29, if you call the commission again, 30 days of commission would b
 
 You can call the command multiple times, and the amount you receive depends on the day when you requested commission unlock previously.
 
-
 Commission is unlocked when `request-commission` is called, the staker unlocks stake, or the staker switches operator. The commission will not be withdrawable until the end of the lockup period. Unlocked commission will continue to earn rewards until the lockup period expires.
-
 
 ## Checking your validator performance
 
 To see your validator performance in the current and past epochs and the rewards earned, run the below command. The output will show the validator's performance in block proposals, and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node get-performance --help` to see default values used.
 
 ```bash
-aptos node get-performance \ 
+aptos node get-performance \
   --pool-address <pool address> \
   --profile mainnet-operator
 ```
@@ -367,9 +370,11 @@ Example output:
 #### Description of fields
 
 **current_epoch_successful_proposals**
+
 - Successful leader-validator proposals during the current epoch. Also see [Validation on the Aptos blockchain](../../../concepts/staking.md#validation-on-the-aptos-blockchain) for the distinction between leader-validator and the voter-validator.
 
 **previous_epoch_rewards**
+
 - An ordered list of rewards earned (APT amounts) for the previous 10 epochs, starting with the 10 epoch in the past. In the above example, a reward of 12312716242 APT was earned 10 epochs past and a reward of 12313600288 APT was earned in the most recent epoch. If a reward is 0 for any epoch, then:
   - Either the validator was not part of the validator set in that epoch (could have been in either inactive or pending_active validator state), or
   - The validator missed all the leader proposals.

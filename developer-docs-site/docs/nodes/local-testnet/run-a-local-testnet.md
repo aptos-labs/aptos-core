@@ -30,34 +30,35 @@ The rest of this document describes:
 
 1. With your development environment ready, now you can start your testnet network. Before you proceed, make a note of the following:
 
-    :::tip
-     - When you run the below command to start the local testnet, your terminal will enter into an interactive mode, with a message `Aptos is running, press ctrl-c to exit`. Hence, you will need to open another shell terminal for the subsequent steps described in this section.
-     - After the below command runs, copy the `Test dir` information from the terminal output for the next step.
-    :::
+   :::tip
 
-    To start your testnet locally, run the following command:
+   - When you run the below command to start the local testnet, your terminal will enter into an interactive mode, with a message `Aptos is running, press ctrl-c to exit`. Hence, you will need to open another shell terminal for the subsequent steps described in this section.
+   - After the below command runs, copy the `Test dir` information from the terminal output for the next step.
+     :::
 
-    ```
-    CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p aptos-node -- --test
-    ```
+   To start your testnet locally, run the following command:
 
-    See below for an example of the partial output. Make a note of the `Test dir` from the output.
+   ```
+   CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p aptos-node -- --test
+   ```
 
-    ```
-    ...
-    ...
-    ...
+   See below for an example of the partial output. Make a note of the `Test dir` from the output.
 
-    Completed generating configuration:
-        Log file: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/validator.log"
-        Test dir: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/0/node.yaml"
-        Aptos root key path: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/mint.key"
-        Waypoint: 0:47e676b5fe38ebe2aec6053db7b3daa0b805693d6422e3475e46e89499464ecf
-        ChainId: TESTING
-        REST API endpoint: 0.0.0.0:8080
-        Fullnode network: /ip4/0.0.0.0/tcp/7180
-    Aptos is running, press ctrl-c to exit
-    ```
+   ```
+   ...
+   ...
+   ...
+
+   Completed generating configuration:
+       Log file: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/validator.log"
+       Test dir: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/0/node.yaml"
+       Aptos root key path: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/mint.key"
+       Waypoint: 0:47e676b5fe38ebe2aec6053db7b3daa0b805693d6422e3475e46e89499464ecf
+       ChainId: TESTING
+       REST API endpoint: 0.0.0.0:8080
+       Fullnode network: /ip4/0.0.0.0/tcp/7180
+   Aptos is running, press ctrl-c to exit
+   ```
 
 **NOTE**: The above command starts a local testnet with a single validator node. The command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, then use:
 
@@ -73,6 +74,7 @@ Faucets are stateless services that can be run in parallel with the testnet. A F
 2. Open a new shell terminal.
 3. Copy the _Aptos root key path_ from your terminal where you started the testnet, and use it to replace the `mint-key-file-path` in the below command.
 4. Run the following command to start a Faucet:
+
 ```
 cargo run --package aptos-faucet-service -- run-simple --key-file-path "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/mint.key" --node-url http://127.0.0.1:8080
 ```
@@ -97,17 +99,17 @@ Completed generating configuration:
 Aptos is running, press ctrl-c to exit
 ```
 
-Use the [Aptos CLI tool](../../tools/install-cli/index.md) to interact with your local testnet. The above output contains information you will use for starting the [Aptos CLI tool](../../tools/aptos-cli-tool/use-aptos-cli.md):
+Use the [Aptos CLI tool](../../tools/aptos-cli/install-cli/index.md) to interact with your local testnet. The above output contains information you will use for starting the [Aptos CLI tool](../../tools/aptos-cli/use-cli/use-aptos-cli.md):
 
-* `Aptos root key path`: The root key (also known as the mint or faucet key) controls the account that can mint tokens. Available in the docker compose folder under `aptos_root_key`.
-* `Waypoint`: A verifiable checkpoint of the blockchain (available in the docker compose folder under waypoint.txt)
-* `REST endpoint`: The endpoint for the REST service, e.g., `http://127.0.0.1:8080`.
-* `ChainId`: The chain ID uniquely distinguishes this network from other blockchain networks.
+- `Aptos root key path`: The root key (also known as the mint or faucet key) controls the account that can mint tokens. Available in the docker compose folder under `aptos_root_key`.
+- `Waypoint`: A verifiable checkpoint of the blockchain (available in the docker compose folder under waypoint.txt)
+- `REST endpoint`: The endpoint for the REST service, e.g., `http://127.0.0.1:8080`.
+- `ChainId`: The chain ID uniquely distinguishes this network from other blockchain networks.
 
 ## Next steps
 
 At this point, you will have a special root account at `0x1` that can perform the mint operation. Follow up with:
 
-* [Your first transaction](../../tutorials/first-transaction.md) to learn how to submit transactions.
-* [Your first Move module](../../tutorials/first-move-module.md) to learn how to create Move modules.
-* [Interacting with the Aptos Blockchain](../../tutorials/first-coin.md) to learn how to mint coins.
+- [Your first transaction](../../tutorials/first-transaction.md) to learn how to submit transactions.
+- [Your first Move module](../../tutorials/first-move-module.md) to learn how to create Move modules.
+- [Interacting with the Aptos Blockchain](../../tutorials/first-coin.md) to learn how to mint coins.

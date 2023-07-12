@@ -21,7 +21,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 ### Account Address
 
 - An **account address** is the address of an Aptos account.
-- Account address refers to a specific destination on the Aptos network. The address dictates the destination and source of a specific amount of assets exchanged by two parties on the blockchain. 
+- Account address refers to a specific destination on the Aptos network. The address dictates the destination and source of a specific amount of assets exchanged by two parties on the blockchain.
 - An Aptos address is a 64-character hex string, and sometimes it can be shortened by stripping leading 0s and prefixing `0x`. This makes a hex-encoded 32 byte Aptos account address.
 
 See [Accounts](../concepts/accounts.md) for more information.
@@ -36,7 +36,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 
 ### Aptos
 
-**Aptos** is a Layer 1 blockchain for everyone. It uses the Move programming language and launched its mainnet on 2022-10-17 to redefine the web3 user experience. The Aptos blockchain is dedicated to creating better user experiences through increased speed, security, scalability, reliability and usability with low transaction costs.  The word “Aptos" means "The People" in the Ohlone language. See the [Aptos White Paper](../aptos-white-paper/index.md) for more details.
+**Aptos** is a Layer 1 blockchain for everyone. It uses the Move programming language and launched its mainnet on 2022-10-17 to redefine the web3 user experience. The Aptos blockchain is dedicated to creating better user experiences through increased speed, security, scalability, reliability and usability with low transaction costs. The word “Aptos" means "The People" in the Ohlone language. See the [Aptos White Paper](../aptos-white-paper/index.md) for more details.
 
 ### AptosBFT
 
@@ -49,19 +49,19 @@ See [Accounts](../concepts/accounts.md) for more information.
 
 ### Aptos Name Service (ANS)
 
-- The **Aptos Name Service (ANS)** is a decentralized naming address service for the Aptos blockchain. An Aptos name is a human-readable *.apt* domain name that is used in place of a public key, for example *love.apt*. 
+- The **Aptos Name Service (ANS)** is a decentralized naming address service for the Aptos blockchain. An Aptos name is a human-readable _.apt_ domain name that is used in place of a public key, for example _love.apt_.
 - This service also allows users to register subdomain names in addition to the registered domain. Find out more at: [Aptosnames.com](https://www.aptosnames.com/)
 
 ### Aptos-core
 
 **Aptos-core** is the open source technology on which the Aptos Payment Network runs. Aptos-core contains software for
 
-* the Aptos blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
-* the validation process, which implements the consensus algorithm to validate transactions and add them to the Aptos blockchain immutable ledger.
+- the Aptos blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
+- the validation process, which implements the consensus algorithm to validate transactions and add them to the Aptos blockchain immutable ledger.
 
 ### Aptos Ecosystem
 
-- **Aptos ecosystem** refers to various components of the Aptos blockchain network and their interactions.  The Aptos ecosystem includes the community, community-driven projects, and events. See [Contribute to the Aptos Ecosystem](../community/index.md) for all possible ways to join Aptos.
+- **Aptos ecosystem** refers to various components of the Aptos blockchain network and their interactions. The Aptos ecosystem includes the community, community-driven projects, and events. See [Contribute to the Aptos Ecosystem](../community/index.md) for all possible ways to join Aptos.
 
 ### Aptos Explorer
 
@@ -69,9 +69,11 @@ See [Accounts](../concepts/accounts.md) for more information.
 - The Aptos Explorer help users validate their work in Aptos wallets and other tools in the blockchain. Find more details at [Use the Aptos Explorer](../guides/explore-aptos.md).
 
 ### Aptos Framework
+
 The **Aptos Framework** defines the public API for blockchain updates and the structure of on-chain data. It defines the business logic and access control for the three key pillars of Aptos functionality: payments, treasury, and on-chain governance. It is implemented as a set of modules written in the Move programming language and stored on-chain as Move bytecode.
 
 ### Aptos Node
+
 An **Aptos node** is a peer entity of the Aptos network that tracks the state of the Aptos blockchain. There are two types of Aptos nodes, [validators](#validator) and [fullnodes](#fullnode)).
 
 ### Aptos Protocol
@@ -112,7 +114,7 @@ An **Aptos node** is a peer entity of the Aptos network that tracks the state of
 
 ### CLI
 
-- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md). 
+- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md).
 
 ### Client
 
@@ -181,7 +183,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Faucet** is a service that mints APT on devnet and testnet. APT on these networks has no real world value, it is only for development purposes.
 - You can use the faucet in a few different ways:
-  - With the [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet).
+  - With the [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md#fund-an-account-with-the-faucet).
   - Through a wallet, such as Petra, Martian, or Pontem. You can find a full list [here](https://github.com/aptos-foundation/ecosystem-projects#wallets).
   - Using an SDK, for example by using the `FaucetClient` in the TypeScript SDK.
   - With a direct HTTP request. Learn how to do this [here](guides/system-integrators-guide.md#calling-the-faucet-other-languages).
@@ -193,7 +195,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 ### Fungible Asset
 
 - A **fungible asset** is an asset, such as a currency, share, in-game resource, etc., that is interchangeable with another identical asset without any loss in its value. For example, APT is a fungible asset because you can exchange one APT for another.
-- Follow the [Digital Asset Standards](../standards/index.md#digital-asset-standards) to create fungible assets on the Aptos blockchain. 
+- Follow the [Digital Asset Standards](../standards/index.md#digital-asset-standards) to create fungible assets on the Aptos blockchain.
 - Next generation of the Coin standard that addresses shortcomings of `aptos_framework::coin` such as lack of guaranteed enforcement of freeze and burn and advanced functionalities such as programmable transfers, e.g., approve in ERC-20.
 
 ### Fungible Token
@@ -445,7 +447,7 @@ To see example uses of transaction scripts, follow [Move scripts](../move/move-o
 
 ### Validator Nodes
 
-- **Validator nodes** are a unique class of fullnodes that take part in consensus, specifically a Byzantine Fault Tolerance (BFT) consensus protocol in Aptos. Validators agree upon transactions to be added to the Aptos blockchain as well as the order in which they are added. 
+- **Validator nodes** are a unique class of fullnodes that take part in consensus, specifically a Byzantine Fault Tolerance (BFT) consensus protocol in Aptos. Validators agree upon transactions to be added to the Aptos blockchain as well as the order in which they are added.
 
 ### Version
 

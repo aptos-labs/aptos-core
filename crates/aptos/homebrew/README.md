@@ -1,8 +1,8 @@
 # Homebrew Aptos
 
-Homebrew is a package manager that works for MacOS Silicon and Intel chips as well as Linux distributions like Debian and Ubuntu. 
+Homebrew is a package manager that works for MacOS Silicon and Intel chips as well as Linux distributions like Debian and Ubuntu.
 
-The [Aptos command line interface (CLI)](https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli) may be installed via [Homebrew](https://brew.sh/) for simplicity. This is an in-depth overview of Homebrew and the Aptos formula. In this guide, we go over each section of the Homebrew formula and steps to implement changes in the future.
+The [Aptos command line interface (CLI)](https://aptos.dev/cli-tools/aptos-cli/use-cli/install-aptos-cli) may be installed via [Homebrew](https://brew.sh/) for simplicity. This is an in-depth overview of Homebrew and the Aptos formula. In this guide, we go over each section of the Homebrew formula and steps to implement changes in the future.
 
 ## Quick guide
 
@@ -14,7 +14,7 @@ The [Aptos command line interface (CLI)](https://aptos.dev/cli-tools/aptos-cli-t
 
 To begin, first ensure that homebrew is correctly installed on your computer. Visit [brew.sh](https://brew.sh/) to learn how you can set it up!
 
-To test that it works correctly, try 
+To test that it works correctly, try
 
 ```bash
 brew help
@@ -48,7 +48,6 @@ Copy the `aptos.rb` file to your `homebrew` `formula` directory. For example, on
 ```bash
 /opt/homebrew/Library/Taps/homebrew/homebrew-core/Formula
 ```
-
 
 ### Development
 
@@ -117,7 +116,7 @@ class Aptos < Formula
 
 ### Livecheck
 
-[Brew livecheck](https://docs.brew.sh/Brew-Livecheck) uses strategies to find the newest version of a formula or cask’s software by checking upstream. The strategy used below checks for all `aptos-cli-v<SEMVER>` tags for `aptos-core`. The regex ensures that releases for other, non-CLI builds are not factored into livecheck. 
+[Brew livecheck](https://docs.brew.sh/Brew-Livecheck) uses strategies to find the newest version of a formula or cask’s software by checking upstream. The strategy used below checks for all `aptos-cli-v<SEMVER>` tags for `aptos-core`. The regex ensures that releases for other, non-CLI builds are not factored into livecheck.
 
 Livecheck is run on a schedule with BrewTestBot and will update the bottles automatically on a schedule to ensure they're up to date. For more info on how BrewTestBot and brew livecheck works, please see the [How does BrewTestBot work and when does it update formulae?](https://github.com/Homebrew/discussions/discussions/3083) discussion.
 
@@ -142,9 +141,8 @@ brew livecheck --debug aptos
 ### Depends on and installation
 
 - `depends_on` is for specifying other [homebrew formulas as dependencies](https://docs.brew.sh/Formula-Cookbook#specifying-other-formulae-as-dependencies).
-- Currently, we use v1.64 of Rust, as specified in the `Cargo.toml` file of the project. If we were to use the latest stable build of Rust 
-going forward, we would modify the formula slightly. See the comments below for more details.
-
+- Currently, we use v1.64 of Rust, as specified in the `Cargo.toml` file of the project. If we were to use the latest stable build of Rust
+  going forward, we would modify the formula slightly. See the comments below for more details.
 
 ```ruby
   # Installs listed homebrew dependencies before Aptos installation
@@ -162,9 +160,9 @@ going forward, we would modify the formula slightly. See the comments below for 
   end
 
   # Currently must compile with the same rustc version specified in the
-  # root Cargo.toml file of aptos-core (currently it is pegged to Rust 
+  # root Cargo.toml file of aptos-core (currently it is pegged to Rust
   # v1.64). In the future if it becomes compatible with the latest Rust
-  # toolchain, we can remove the use of rustup-init, replacing it with a 
+  # toolchain, we can remove the use of rustup-init, replacing it with a
   # depends_on "rust" => :build
   # above and build the binary without rustup as a dependency
   #

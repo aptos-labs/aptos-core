@@ -18,11 +18,11 @@ First, understand the data is almost identical between the two nodes. The VFN is
 To failover from an outdated or erroneous validator node to an updated and reliable validator fullnode, follow these steps:
 
 1. Ensure your machine meets the [validator hardware requirements](node-requirements.md#hardware-requirements).
-1. Update your validator fullnode with the latest version of the [Aptos CLI](../../../tools/install-cli/index.md)
+1. Update your validator fullnode with the latest version of the [Aptos CLI](../../../tools/aptos-cli/install-cli/index.md)
 1. Copy the configuration files between the two nodes. See the files in the [validator setup](running-validator-node/index.md) documentation you used for the full list.
 1. Synchonize data on the validator fullnode:
-   * For mainnet, use [state synchronization](../../../guides/state-sync.md).
-   * For devnet or testnet, [bootstrap a new fullnode from snapshot](../../full-node/bootstrap-fullnode.md).
+   - For mainnet, use [state synchronization](../../../guides/state-sync.md).
+   - For devnet or testnet, [bootstrap a new fullnode from snapshot](../../full-node/bootstrap-fullnode.md).
 
 ## Configure
 
@@ -59,6 +59,6 @@ With caution, you may also run multiple fullnodes on the Aptos network. Note tha
 To run multiple fullnodes and connect them to your validator:
 
 1. Connect only one fullnode using the `vfn` network configuration in the validator configuration `.yaml` file. This will be your single VFN (as registered on-chain) that other Aptos nodes will connect to.
-1. Connect the rest of your fullnodes to the validator using a `public` network configuration *and a different network identity* in the validator configuration `.yaml` file. These will be your additional VFNs that you can use for other purposes.
+1. Connect the rest of your fullnodes to the validator using a `public` network configuration _and a different network identity_ in the validator configuration `.yaml` file. These will be your additional VFNs that you can use for other purposes.
 
 Note that because the additional VFNs will not be registered on-chain, other nodes will not know their network addresses and will not be able to to connect to them. These would be for your use only.

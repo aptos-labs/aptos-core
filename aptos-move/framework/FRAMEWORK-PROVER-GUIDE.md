@@ -2,7 +2,7 @@ This guide gives some hints to troubleshoot issues when using the prover for spe
 
 ## Installation
 
-Please refer to the [doc](https://aptos.dev/tools/install-cli/install-move-prover/).
+Please refer to the [doc](https://aptos.dev/tools/aptos-cli/install-cli/install-move-prover/).
 
 ## Timeout
 
@@ -18,8 +18,8 @@ spec foo {
 
 ## Internal errors
 
-Bugs in the prover often lead to `boogie internal errors`. When it happens, you could try to locate the specs that causes this issue and comment them out. 
-If the error is caused by the Move code, e.g., `foo.move`, You could add the following code in `foo.spec.move` (create one if it does not exist) with 
+Bugs in the prover often lead to `boogie internal errors`. When it happens, you could try to locate the specs that causes this issue and comment them out.
+If the error is caused by the Move code, e.g., `foo.move`, You could add the following code in `foo.spec.move` (create one if it does not exist) with
 a `TODO` comment preferably containing the URL to the corresponding Github issue.
 
 ```move
@@ -27,13 +27,13 @@ spec module {
    pragma verify = false; // TODO: see issue <url>
 }
 ```
+
 After making these changes, please submit a Github issue for the prover team to fix.
 
 ## Suppressing prover tests
 
 Prover tests are land-blockers for PRs which change the Move code and/or specifications in the `framework` directory. To disable them locally for efficiency,
 you could use the command `cargo test --release -p aptos-framework -- --skip prover`.
-
 
 ## Specification guide
 

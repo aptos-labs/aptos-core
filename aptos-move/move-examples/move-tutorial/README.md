@@ -21,7 +21,7 @@ There are nine steps in total:
 - [Step 7: Use the Move prover](#step-7--use-the-move-prover)
 - [Step 8: Writing formal specifications for the `basic_coin` module](#step-8-write-formal-specifications-for-the-basic_coin-module)
 
-Each step is designed to be self-contained in the corresponding `step_x` directory. For example, if you would like to skip the contents in step 1 through 4, feel free to jump to step 5 since all the code we have written before step 5 will be in the `step_5` directory. At the end of some steps, we also include additional material on more advanced topics. 
+Each step is designed to be self-contained in the corresponding `step_x` directory. For example, if you would like to skip the contents in step 1 through 4, feel free to jump to step 5 since all the code we have written before step 5 will be in the `step_5` directory. At the end of some steps, we also include additional material on more advanced topics.
 
 Now let's get started!
 
@@ -35,7 +35,7 @@ You should obtain a copy of the content of the directory in which this `README.m
 step_1 step_2 step_2_sol step_3 ...
 ```
 
-You also need a recent version of the [Aptos CLI](../../../developer-docs-site/docs/tools/install-cli/index.md). This tutorial is written using the following version:
+You also need a recent version of the [Aptos CLI](../../../developer-docs-site/docs/tools/aptos-cli/install-cli/index.md). This tutorial is written using the following version:
 
 ```shell
 > aptos --version
@@ -43,7 +43,6 @@ aptos 1.0.7
 ```
 
 If you want to use an IDE for working through the examples, we recommend CLion/IntelliJ, which has good support for Aptos Move.
-
 
 ## Step 1: Writing my first Move module
 
@@ -100,10 +99,11 @@ module 0xCAFE::basic_coin {
 ```
 
 Let us take a look at this function and what it is saying:
-* It takes a [`&signer`](../../../developer-docs-site/docs/move/book/signer.md) reference ('`&`') -- an
+
+- It takes a [`&signer`](../../../developer-docs-site/docs/move/book/signer.md) reference ('`&`') -- an
   unforgeable token that represents control over a particular address, and
   a `value` to mint.
-* It creates a `Coin` with the given value and stores it under the
+- It creates a `Coin` with the given value and stores it under the
   `account` using the `move_to` operator.
 
 Let us make sure it builds! This can be done with the `aptos move compile` command from within the package directory ([`step_1/basic_coin`](./step_1/basic_coin/)):
@@ -115,49 +115,51 @@ aptos move compile
 <details>
 <summary>Advanced concepts and references</summary>
 
-* You can create an empty Move package by calling:
-    ```bash
-    aptos move init --name <pkg_name>
-    ```
-* Move code can also live in a number of other places. See the [Move
+- You can create an empty Move package by calling:
+  ```bash
+  aptos move init --name <pkg_name>
+  ```
+- Move code can also live in a number of other places. See the [Move
   book](../../../developer-docs-site/docs/guides/move-guides/book/packages.md) for more information on the
   Move package system.
-* More information on the `Move.toml` file can also be found in the [Package](../../../developer-docs-site/docs/move/book/packages.md#movetoml) section of the Move book.
-* Move also supports the idea of [named
+- More information on the `Move.toml` file can also be found in the [Package](../../../developer-docs-site/docs/move/book/packages.md#movetoml) section of the Move book.
+- Move also supports the idea of [named
   addresses](../../../developer-docs-site/docs/guides/move-guides/book/address.md#named-addresses); Named
   addresses are a way to parameterize Move source code so that you can compile
   the module using different values for `named_addr` to get different bytecode
   that you can deploy, depending on what address(es) you control. They are used quite frequently, and can be defined in the `Move.toml` file in the `[addresses]` section, like so:
-    ```
-    [addresses]
-    Somenamed_address = "0xC0FFEE"
-    ```
-* [Structures](../../../developer-docs-site/docs/move/book/structs-and-resources.md) in Move
+  ```
+  [addresses]
+  Somenamed_address = "0xC0FFEE"
+  ```
+- [Structures](../../../developer-docs-site/docs/move/book/structs-and-resources.md) in Move
   can be given different
   [abilities](../../../developer-docs-site/docs/move/book/abilities.md) that describe what
   can be done with that type. There are four different abilities:
-    - `copy`: Allows values of types with this ability to be copied.
-    - `drop`: Allows values of types with this ability to be popped/dropped.
-    - `store`: Allows values of types with this ability to exist inside a struct in global storage.
-    - `key`: Allows the type to serve as a key for global storage operations.
 
-    So in the `basic_coin` module we are saying that the `Coin` struct can be used as a key
-    in global storage and, because it has no other abilities, it cannot be
-    copied, dropped, or stored as a non-key value in storage. So you can't copy
-    coins, and you also can't lose coins by accident!
-* [Functions](../../../developer-docs-site/docs/move/book/functions.md) are default
-    private, and can also be `public`,
-    [`public(friend)`](../../../developer-docs-site/docs/move/book/friends.md).
-    A function marked as `entry` can be called as a transaction.
-* `move_to` is one of the [five different global storage
-  operators](../../../developer-docs-site/docs/guides/move-guides/book/global-storage-operators.md).
+  - `copy`: Allows values of types with this ability to be copied.
+  - `drop`: Allows values of types with this ability to be popped/dropped.
+  - `store`: Allows values of types with this ability to exist inside a struct in global storage.
+  - `key`: Allows the type to serve as a key for global storage operations.
+
+  So in the `basic_coin` module we are saying that the `Coin` struct can be used as a key
+  in global storage and, because it has no other abilities, it cannot be
+  copied, dropped, or stored as a non-key value in storage. So you can't copy
+  coins, and you also can't lose coins by accident!
+
+- [Functions](../../../developer-docs-site/docs/move/book/functions.md) are default
+  private, and can also be `public`,
+  [`public(friend)`](../../../developer-docs-site/docs/move/book/friends.md).
+  A function marked as `entry` can be called as a transaction.
+- `move_to` is one of the [five different global storage
+operators](../../../developer-docs-site/docs/guides/move-guides/book/global-storage-operators.md).
 </details>
 
 ## Step 2: Adding unit tests to my first Move module<span id="Step2"><span>
 
 Now that we've taken a look at our first Move module, we'll take a look at a
 test to make sure minting works the way we expect it to by changing directory
-to [`step_2/basic_coin`](./step_2/basic_coin).  Unit tests in Move are similar to
+to [`step_2/basic_coin`](./step_2/basic_coin). Unit tests in Move are similar to
 unit tests in Rust if you're familiar with them -- tests are annotated with
 `#[test]` and written like normal Move functions.
 
@@ -196,11 +198,12 @@ assertion fails the unit test will fail.
 <details>
 <summary>Advanced concepts and exercises</summary>
 
-* There are a number of [test-related annotations](https://github.com/move-language/move/blob/main/language/changes/4-unit-testing.md#testing-annotations-their-meaning-and-usage) that are worth exploring.
+- There are a number of [test-related annotations](https://github.com/move-language/move/blob/main/language/changes/4-unit-testing.md#testing-annotations-their-meaning-and-usage) that are worth exploring.
   You'll see some of these used in Step 5.
 
 #### Exercises
-* Change the assertion to `11` so that the test fails. Find a flag that you can
+
+- Change the assertion to `11` so that the test fails. Find a flag that you can
   pass to the `aptos move test` command that will dump the global state when
   the test fails. It should resemble:
   ```
@@ -222,7 +225,7 @@ assertion fails the unit test will fail.
   │       }
   └──────────────────
   ```
-* Find a flag that allows you to gather test coverage information, and
+- Find a flag that allows you to gather test coverage information, and
   then experiment with using the `aptos move coverage` command to examine
   coverage statistics and source coverage.
 
@@ -231,7 +234,7 @@ assertion fails the unit test will fail.
 ## Step 3: Designing my `basic_coin` module<span id="Step3"><span>
 
 In this section, we are going to design a module implementing a basic coin and balance interface, where coins can
-be minted and transferred between balances held under different addresses. 
+be minted and transferred between balances held under different addresses.
 
 > NOTE: The coin and balance interfaces are for illustration of Move concepts only. Aptos uses a different, richer [coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/coin.md#0x1_coin) contained in the Aptos framework.
 
@@ -254,7 +257,7 @@ public fun transfer(from: &signer, to: address, amount: u64) acquires Balance { 
 
 Next we look at the data structs we need for this module.
 
-A Move module doesn't have its own storage. Instead, Move *global storage* (what we call our
+A Move module doesn't have its own storage. Instead, Move _global storage_ (what we call our
 blockchain state) is indexed by addresses. Under each address there are Move modules (code) and Move resources (values).
 
 The global storage looks roughly like this in Rust syntax:
@@ -283,15 +286,19 @@ Roughly, the Move blockchain state should appear as:
 ![](diagrams/move_state.png)
 
 #### Advanced topics:
+
 <details>
 <summary><code>public(script)</code> functions</summary>
 
 Only functions with the `entry` qualifier can be invoked directly in transactions. So if you would like to call the `transfer`
 method directly from a transaction, you'll want to change its signature to:
+
 ```
 public entry fun transfer(from: signer, to: address, amount: u64) acquires Balance { ... }
 ```
+
 Read more on Move function [visibilities](../../../developer-docs-site/docs/move/book/functions.md#visibility).
+
 </details>
 <details>
 <summary>Comparison with Ethereum/Solidity</summary>
@@ -302,6 +309,7 @@ In most Ethereum [ERC-20](https://ethereum.org/en/developers/docs/standards/toke
 The Ethereum blockchain state might look like this:
 
 ![](diagrams/solidity_state.png)
+
 </details>
 
 ## Step 4: Implementing my `basic_coin` module<span id="Step4"><span>
@@ -314,11 +322,13 @@ implementation of the methods inside [`basic_coin.move`](./step_4/basic_coin/sou
 
 Let's first try building the code using this Move package by running the following command
 in the [`step_4/basic_coin`](./step_4/basic_coin) directory:
+
 ```bash
 aptos move compile
 ```
 
 ### Implementation of methods
+
 Now let's take a closer look at the implementation of the methods inside [`basic_coin.move`](./step_4/basic_coin/sources/basic_coin.move).
 
 <details>
@@ -334,15 +344,18 @@ This method uses a `move_to` operation to publish the resource:
 let empty_coin = Coin { value: 0 };
 move_to(account, Balance { coin:  empty_coin });
 ```
+
 </details>
 <details>
 <summary>Method <code>mint</code></summary>
 
 The `mint` method mints coins to a given account. Here we require that `mint` must be approved
 by the module owner. We enforce this using the assert statement:
+
 ```
 assert!(signer::address_of(&module_owner) == MODULE_OWNER, ENOT_MODULE_OWNER);
 ```
+
 Assert statements in Move can be used in this way: `assert!(<predicate>, <abort_code>);`. This means that if the `<predicate>`
 is false, then abort the transaction with `<abort_code>`. Here `MODULE_OWNER` and `ENOT_MODULE_OWNER` are both constants
 defined at the beginning of the module. The standard library's [`error`] module also defines common error categories we can use.
@@ -354,20 +367,24 @@ needs to be performed, as no changes from that transaction will be persisted to 
 [`error` module]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/sources/error.move
 
 We then deposit a coin with value `amount` to the balance of `mint_addr`:
+
 ```
 deposit(mint_addr, Coin { value: amount });
 ```
+
 </details>
 
 <details>
 <summary>Method <code>balance_of</code></summary>
 
 We use `borrow_global`, one of the global storage operators, to read from the global storage.
+
 ```
 borrow_global<Balance>(owner).coin.value
                  |       |       \    /
         resource type  address  field names
 ```
+
 </details>
 
 <details>
@@ -375,6 +392,7 @@ borrow_global<Balance>(owner).coin.value
 
 This function withdraws tokens from `from`'s balance and deposits the tokens into `to`s balance. Let us take a closer look
 at the `withdraw` helper function:
+
 ```
 fun withdraw(addr: address, amount: u64) : Coin acquires Balance {
     let balance = balance_of(addr);
@@ -384,19 +402,24 @@ fun withdraw(addr: address, amount: u64) : Coin acquires Balance {
     Coin { value: amount }
 }
 ```
+
 At the beginning of the method, we assert that the withdrawing account has enough balance. We then use `borrow_global_mut`
 to get a mutable reference to the global storage, and `&mut` is used to create a mutable [reference](../../../developer-docs-site/docs/move/book/references.md) to a field of a
 struct. We then modify the balance through this mutable reference and return a new coin with the withdrawn amount.
+
 </details>
 
 ### Exercises
+
 There are two `TODO`s in our module, left as exercises for the reader:
+
 - Finish implementing the `publish_balance` method.
 - Implement the `deposit` method.
 
 The solution to this exercise can be found in the [`step_4_sol`](./step_4_sol) directory.
 
 **Bonus exercise**
+
 - What would happen if we deposit too many tokens to a balance?
 
 ## Step 5: Adding and using unit tests with the `basic_coin` module<span id="Step5"><span>
@@ -453,6 +476,7 @@ building block for library code. In this section, we are going to make our simpl
 other user modules.
 
 First, we add type parameters to our data structs:
+
 ```
 struct Coin<phantom CoinType> has store {
     value: u64
@@ -464,6 +488,7 @@ struct Balance<phantom CoinType> has key {
 ```
 
 We also add type parameters to our methods in the same manner. For example, `withdraw` becomes the following:
+
 ```
 fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> acquires Balance {
     let balance = balance_of<CoinType>(addr);
@@ -473,6 +498,7 @@ fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> acquires Bal
     Coin<CoinType> { value: amount }
 }
 ```
+
 Take a look at [`step_6/basic_coin/sources/basic_coin.move`](./step_6/basic_coin/sources/basic_coin.move) to see the full implementation.
 
 We provide a little module called [`my_odd_coin`](./step_6/basic_coin/sources/my_odd_coin.move) that instantiates
@@ -480,6 +506,7 @@ the `Coin` type and customizes its transfer policy: only odd numbers of coins ca
 [`my_odd_coin`](./step_6/basic_coin/sources/my_odd_coin.move) to test this behavior. You can use the commands you learned in step 2 and step 5 to run the tests.
 
 #### Advanced topics
+
 <details>
 <summary><code>phantom</code> type parameters</summary>
 
@@ -488,17 +515,18 @@ to be phantom because `CoinType` is not used in the struct definition or is only
 parameter.
 
 Read more about [phantom type](../../../developer-docs-site/docs/move/book/generics.md#phantom-type-parameters) parameters in the Aptos Move Book.
+
 </details>
 
-## Step 7:  Use the Move Prover
-    
-> NOTE: Before running the Move Prover, ensure that the [Move Prover](../../../developer-docs-site/docs/tools/install-cli/install-move-prover.md) and associated tools are installed.
+## Step 7: Use the Move Prover
+
+> NOTE: Before running the Move Prover, ensure that the [Move Prover](../../../developer-docs-site/docs/tools/aptos-cli/install-cli/install-move-prover.md) and associated tools are installed.
 
 Smart contracts deployed on the blockchain may manipulate high-value assets. As a technique that uses strict
 mathematical methods to describe behavior and reason correctness of computer systems, formal verification
 has been used in blockchains to prevent bugs in smart contracts. The
 [Move Prover](../../../developer-docs-site/docs/move/prover/index.md)
-is an evolving formal verification tool for smart contracts written in the Move language. The user can employ the 
+is an evolving formal verification tool for smart contracts written in the Move language. The user can employ the
 [Move Prover](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/prover-guide.md) to specify
 functional properties of smart contracts
 using the [Move Specification Language (MSL)](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/spec-lang.md)
@@ -547,7 +575,9 @@ The Move Prover tells us we need to explicitly specify the condition under which
         aborts_if !exists<Balance<CoinType>>(owner);
     }
 ```
+
 After adding this condition, try running the `prove` command again to confirm that there are no verification errors:
+
 ```bash
 aptos move prove
 ```
@@ -561,11 +591,12 @@ Apart from the abort condition, we also want to define functional properties. In
 <summary> Method withdraw </summary>
 
 The signature of the method `withdraw` is given below:
+
 ```
 fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> acquires Balance
 ```
 
-The method withdraws tokens with value `amount` from the address `addr` and returns a created Coin of value `amount`.  The method `withdraw` aborts when 1) `addr` does not have the resource `Balance<CoinType>` or 2) the number of tokens in `addr` is smaller than `amount`. We can define conditions like this:
+The method withdraws tokens with value `amount` from the address `addr` and returns a created Coin of value `amount`. The method `withdraw` aborts when 1) `addr` does not have the resource `Balance<CoinType>` or 2) the number of tokens in `addr` is smaller than `amount`. We can define conditions like this:
 
 ```
     spec withdraw {
@@ -577,7 +608,7 @@ The method withdraws tokens with value `amount` from the address `addr` and retu
 
 As we can see here, a spec block can contain let bindings that introduce names for expressions. `global<T>(address): T` is a built-in function that returns the resource value at `addr`. `balance` is the number of tokens owned by `addr`. `exists<T>(address): bool` is a built-in function that returns `true` if the resource T exists at address. Two `aborts_if` clauses correspond to the two conditions mentioned above.
 
-In general, if a function has more than one `aborts_if` condition, those conditions are or-ed with each other. By default, if a user wants to specify aborts conditions, all possible conditions need to be listed. Otherwise, the Move Prover will generate a verification error. However, if `pragma aborts_if_is_partial` is defined in the spec block, the combined aborts condition (the or-ed individual conditions) only *imply* that the function aborts. 
+In general, if a function has more than one `aborts_if` condition, those conditions are or-ed with each other. By default, if a user wants to specify aborts conditions, all possible conditions need to be listed. Otherwise, the Move Prover will generate a verification error. However, if `pragma aborts_if_is_partial` is defined in the spec block, the combined aborts condition (the or-ed individual conditions) only _imply_ that the function aborts.
 
 Refer to the
 [MSL](https://github.com/move-language/move/blob/main/language/move-prover/doc/user/spec-lang.md) document for more information.
@@ -595,12 +626,11 @@ The next step is to define functional properties, which are described in the two
         ensures result == Coin<CoinType> { value: amount };
     }
 ```
+
 </details>
 
 <details>
 <summary> Method deposit </summary>
-
-
 
 The signature of the method `deposit` is given below:
 
@@ -630,7 +660,6 @@ Here `balance` represents the number of tokens in `addr` before execution, and `
 <details>
 
 <summary> Method transfer </summary>
-
 
 The signature of the method `transfer` is given below:
 
@@ -670,7 +699,6 @@ error: post-condition does not hold
 The property is not held when `addr_from` is equal to `to`. As a result, we could add an assertion `assert!(from_addr != to)` in the method to make sure that `addr_from` is not equal to `to`.
 
 </details>
-
 
 <details>
 
