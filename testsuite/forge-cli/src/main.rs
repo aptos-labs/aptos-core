@@ -238,7 +238,7 @@ fn main() -> Result<()> {
         // cmd input for test
         CliCommand::Test(ref test_cmd) => {
             // Identify the test suite to run
-            let mut test_suite = get_test_suite(suite_name, duration)?;
+            let mut test_suite = get_test_suite(suite_name, duration, test_cmd)?;
 
             // Identify the number of validators and fullnodes to run
             // (if overriding what test has specified)
@@ -445,7 +445,11 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
     }
 }
 
-fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig> {
+fn get_test_suite(
+    suite_name: &str,
+    duration: Duration,
+    test_cmd: &TestCommand,
+) -> Result<ForgeConfig> {
     match suite_name {
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
@@ -453,7 +457,7 @@ fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig> {
         // TODO(rustielin): verify each test suite
         "k8s_suite" => Ok(k8s_test_suite()),
         "chaos" => Ok(chaos_test_suite(duration)),
-        single_test => single_test_suite(single_test, duration),
+        single_test => single_test_suite(single_test, duration, test_cmd),
     }
 }
 
@@ -486,11 +490,15 @@ fn k8s_test_suite() -> ForgeConfig {
         .add_network_test(PerformanceBenchmark)
 }
 
-fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig> {
+fn single_test_suite(
+    test_name: &str,
+    duration: Duration,
+    test_cmd: &TestCommand,
+) -> Result<ForgeConfig> {
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration),
+        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd),
         "compat" => compat(),
         "framework_upgrade" => upgrade(),
         // Rest of the tests:
@@ -1455,8 +1463,14 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
 }
 
 // TODO: Replace land_blocking when performance reaches on par with current land_blocking
-fn realistic_env_max_load_test(duration: Duration) -> ForgeConfig {
+fn realistic_env_max_load_test(duration: Duration, test_cmd: &TestCommand) -> ForgeConfig {
+    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
+        k8s.enable_haproxy
+    } else {
+        false
+    };
     let duration_secs = duration.as_secs();
+    let long_running = duration_secs >= 2400;
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
@@ -1466,12 +1480,20 @@ fn realistic_env_max_load_test(duration: Duration) -> ForgeConfig {
                     mempool_backlog: 40000,
                 })
                 .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(5000),
+            inner_success_criteria: SuccessCriteria::new(
+                if ha_proxy {
+                    4700
+                } else if long_running {
+                    5500
+                } else {
+                    5000
+                },
+            ),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
-                (if duration_secs >= 1800 { 600 } else { 300 }).into();
+                (if long_running { 600 } else { 300 }).into();
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
