@@ -4,13 +4,13 @@ error: field `xx` not declared in struct `M::S`
 26 │       s.xx
    │       ^^^^
 
-error: expected `bool` but found `u64` in field selection
+error: expected `bool` but found `u64`
    ┌─ tests/sources/structs_err.move:31:7
    │
 31 │       s.x
    │       ^^^
 
-error: expected `bool` but found `u64` in name expression
+error: expected `bool` but found `u64`
    ┌─ tests/sources/structs_err.move:36:18
    │
 36 │       S{x: x, y: y, z: z}
@@ -22,7 +22,7 @@ error: missing fields `y`, `z`
 40 │       S{x: x}
    │       ^^^^^^^
 
-error: expected `bool` but found `u64` in pack expression
+error: expected `bool` but found `u64`
    ┌─ tests/sources/structs_err.move:45:7
    │
 45 │       G{x: x, y: y}

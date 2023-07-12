@@ -47,7 +47,7 @@ impl BlockPartitioningStage {
                 let last_txn = txns.pop().unwrap();
                 assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
-                let mut sub_blocks = partitioner.partition(analyzed_transactions, 2);
+                let mut sub_blocks = partitioner.partition(analyzed_transactions, 4, 0.95);
                 sub_blocks
                     .last_mut()
                     .unwrap()

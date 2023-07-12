@@ -8,6 +8,7 @@ use crate::{
     },
     network::{IncomingDAGRequest, TConsensusMsg},
 };
+use anyhow::bail;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
@@ -47,13 +48,20 @@ impl NetworkHandler {
     async fn start(mut self) {
         while let Some(msg) = self.dag_rpc_rx.next().await {
             if let Err(e) = self.process_rpc(msg).await {
-                warn!(error = ?e, "error sending rpc response for request");
+                warn!(error = ?e, "error processing rpc");
             }
         }
     }
 
     async fn process_rpc(&mut self, rpc_request: IncomingDAGRequest) -> anyhow::Result<()> {
-        let dag_message: DAGMessage = TConsensusMsg::from_network_message(rpc_request.req)?;
+        let dag_message: DAGMessage = rpc_request.req.try_into()?;
+
+        let author = dag_message
+            .author()
+            .map_err(|_| anyhow::anyhow!("unexpected rpc message {:?}", dag_message))?;
+        if author != rpc_request.sender {
+            bail!("message author and network author mismatch");
+        }
 
         // TODO: verify epoch number and author
 
@@ -79,11 +87,11 @@ impl NetworkHandler {
                     .to_bytes(&response_msg.into_network_message())
                     .map(Bytes::from)
             })
-            .map_err(RpcError::Error);
+            .map_err(RpcError::ApplicationError);
 
         rpc_request
             .response_sender
             .send(response)
-            .map_err(|_| anyhow::anyhow!("unable to process rpc"))
+            .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))
     }
 }

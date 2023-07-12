@@ -5,7 +5,7 @@ use crate::{
     dag::reliable_broadcast::BroadcastStatus, network::TConsensusMsg,
     network_interface::ConsensusMsg,
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
     bls12381,
@@ -234,6 +234,10 @@ impl Node {
     pub fn sign(&self, signer: &ValidatorSigner) -> Result<Signature, CryptoMaterialError> {
         let node_digest = NodeDigest::new(self.digest());
         signer.sign(&node_digest)
+    }
+
+    pub fn round(&self) -> Round {
+        self.metadata.round
     }
 }
 
@@ -523,6 +527,14 @@ impl DAGMessage {
             DAGMessage::TestAck(_) => "TestAck",
         }
     }
+
+    pub fn author(&self) -> anyhow::Result<Author> {
+        match self {
+            DAGMessage::NodeMsg(node) => Ok(node.metadata.author),
+            DAGMessage::CertifiedNodeMsg(node) => Ok(node.metadata.author),
+            _ => bail!("message does not support author field"),
+        }
+    }
 }
 
 impl TConsensusMsg for DAGMessage {
@@ -539,6 +551,14 @@ impl TConsensusMsg for DAGMessage {
             #[cfg(test)]
             DAGMessage::TestAck(_) => 1,
         }
+    }
+}
+
+impl TryFrom<DAGNetworkMessage> for DAGMessage {
+    type Error = anyhow::Error;
+
+    fn try_from(msg: DAGNetworkMessage) -> Result<Self, Self::Error> {
+        Ok(bcs::from_bytes(&msg.data)?)
     }
 }
 

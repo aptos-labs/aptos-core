@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unable to infer type: `M::S<?1>`
+  ┌─ tests/checking/typing/uninferred_type_unpack_bind.move:5:19
+  │
+5 │         let S{} = S{};
+  │                   ^^^

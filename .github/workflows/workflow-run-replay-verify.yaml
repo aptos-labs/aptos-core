@@ -80,7 +80,12 @@ jobs:
   replay-verify:
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 720 }}
     runs-on: ${{ inputs.RUNS_ON }}
+    strategy:
+        matrix:
+          number: [0, 1, 2, 3, 4, 5, 6, 7] # runner number
     steps:
+      - name: Echo Runner Number
+        run: echo "Runner is ${{ matrix.number }}"
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
           ref: ${{ inputs.GIT_SHA }}
@@ -101,7 +106,7 @@ jobs:
 
       - name: Run replay-verify in parallel
         shell: bash
-        run: testsuite/replay_verify.py
+        run: testsuite/replay_verify.py ${{ matrix.number }} 8 # first argument is the runner number, second argument is the total number of runners
         env:
           BUCKET: ${{ inputs.BUCKET }}
           SUB_DIR: ${{ inputs.SUB_DIR }}
