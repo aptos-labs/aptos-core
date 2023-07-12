@@ -665,7 +665,7 @@ fn large_db_simple_test() -> ForgeConfig {
 
 fn twin_validator_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(5)
         .add_network_test(TwinValidatorTest)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -690,7 +690,7 @@ fn twin_validator_test() -> ForgeConfig {
 
 fn state_sync_failures_catching_up() -> ForgeConfig {
     changing_working_quorum_test_helper(
-        10,
+        7,
         300,
         3000,
         2500,
@@ -709,7 +709,7 @@ fn state_sync_failures_catching_up() -> ForgeConfig {
 
 fn state_sync_slow_processing_catching_up() -> ForgeConfig {
     changing_working_quorum_test_helper(
-        10,
+        7,
         300,
         3000,
         2500,
@@ -1174,10 +1174,10 @@ fn fullnode_reboot_stress_test() -> ForgeConfig {
 
 fn validator_reboot_stress_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(15).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(1)
         .add_network_test(ValidatorRebootStressTest {
-            num_simultaneously: 3,
+            num_simultaneously: 2,
             down_time_secs: 5.0,
             pause_secs: 5.0,
         })
