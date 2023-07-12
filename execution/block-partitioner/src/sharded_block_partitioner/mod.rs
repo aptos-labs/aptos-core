@@ -27,6 +27,7 @@ use std::{
     thread,
 };
 use std::env::VarError;
+use crate::simple_partitioner::SimplePartitioner;
 
 mod conflict_detector;
 mod counters;
@@ -310,7 +311,6 @@ impl ShardedBlockPartitioner {
         max_partitioning_rounds: RoundId,
         cross_shard_dep_avoid_threshold: f32,
     ) -> Vec<SubBlocksForShard<Transaction>> {
-        let _timer = BLOCK_PARTITIONING_SECONDS.start_timer();
         let total_txns = transactions.len();
         assert!(
             max_partitioning_rounds >= 1,
@@ -327,6 +327,11 @@ impl ShardedBlockPartitioner {
 
         // First round, we filter all transactions with cross-shard dependencies
         let mut txns_to_partition = self.partition_by_senders(transactions);
+        self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_to_partition)
+    }
+
+    pub fn flatten_to_rounds(&self, max_partitioning_rounds: RoundId, cross_shard_dep_avoid_threshold: f32, mut txns_by_shard: Vec<Vec<AnalyzedTransaction>>) -> Vec<SubBlocksForShard<Transaction>> {
+        let total_txns: usize = txns_by_shard.iter().map(|txns_for_shard|txns_for_shard.len()).sum();
         let mut frozen_write_set_with_index = Arc::new(Vec::new());
         let mut current_round_start_index = 0;
         let mut frozen_sub_blocks: Vec<SubBlocksForShard<Transaction>> = vec![];
@@ -340,7 +345,7 @@ impl ShardedBlockPartitioner {
                 current_frozen_rw_set_with_index_vec,
                 discarded_txns_to_partition,
             ) = self.discard_txns_with_cross_shard_dependencies(
-                txns_to_partition,
+                txns_by_shard,
                 current_round_start_index,
                 frozen_sub_blocks,
                 frozen_write_set_with_index.clone(),
@@ -356,9 +361,9 @@ impl ShardedBlockPartitioner {
             frozen_sub_blocks = updated_frozen_sub_blocks;
             prev_frozen_write_set_with_index.extend(current_frozen_rw_set_with_index_vec);
             frozen_write_set_with_index = Arc::new(prev_frozen_write_set_with_index);
-            txns_to_partition = discarded_txns_to_partition;
+            txns_by_shard = discarded_txns_to_partition;
             current_round += 1;
-            let num_remaining_txns = txns_to_partition
+            let num_remaining_txns = txns_by_shard
                 .iter()
                 .map(|txns| txns.len())
                 .sum::<usize>();
@@ -375,8 +380,8 @@ impl ShardedBlockPartitioner {
         match std::env::var("SHARDED_PARTITIONER__MERGE_LAST_ROUND") {
             Ok(v) if v.as_str() == "1" => {
                 info!("Let the the last shard handle the leftover.");
-                let last_round_txns: Vec<AnalyzedTransaction> = txns_to_partition.into_iter().flatten().collect();
-                txns_to_partition = vec![vec![vec![]; self.num_shards - 1], vec![last_round_txns]].concat();
+                let last_round_txns: Vec<AnalyzedTransaction> = txns_by_shard.into_iter().flatten().collect();
+                txns_by_shard = vec![vec![vec![]; self.num_shards - 1], vec![last_round_txns]].concat();
             }
             _ => {}
         }
@@ -384,7 +389,7 @@ impl ShardedBlockPartitioner {
         // We just add cross shard dependencies for remaining transactions.
         let (frozen_sub_blocks, _, rejected_txns) = self.add_cross_shard_dependencies(
             current_round_start_index,
-            txns_to_partition,
+            txns_by_shard,
             frozen_sub_blocks,
             frozen_write_set_with_index,
             current_round,
@@ -402,15 +407,31 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         transactions: Vec<Transaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
+        let _timer = BLOCK_PARTITIONING_SECONDS.start_timer();
         assert_eq!(self.num_shards, num_executor_shards);
-        let analyzed_transactions = analyze_block(transactions);
         let max_partitioning_rounds = std::env::var("SHARDED_PARTITIONER__MAX_ROUNDS").ok()
             .map_or(None, |v|v.parse::<usize>().ok())
             .unwrap_or(4);
         let cross_shard_dep_avoid_threshold = std::env::var("SHARDED_PARTITIONER__CROSS_SHARD_DEP_AVOID_THRESHOLD").ok()
             .map_or(None, |v|v.parse::<usize>().ok())
             .unwrap_or(95) as f32 / 100.0;
-        let ret = self.partition(analyzed_transactions, max_partitioning_rounds, cross_shard_dep_avoid_threshold);
+        let ret = match std::env::var("SHARDED_PARTITIONER__INIT_WITH_SIMPLE_PARTITIONER") {
+            Ok(v) if v.as_str() == "1" => {
+                let simple_partitioner = SimplePartitioner{};
+                let matrix = simple_partitioner.partition(transactions, self.num_shards);
+                let txns_by_shard: Vec<Vec<AnalyzedTransaction>> = matrix.into_iter().map(|mut shard_assignment|{
+                    assert_eq!(1, shard_assignment.sub_blocks.len()); // Guaranteed by SimplePartitioner.
+                    let sub_block = shard_assignment.sub_blocks.pop().unwrap();
+                    sub_block.transactions.into_iter().map(|twd| twd.txn.into()).collect()
+                }).collect();
+                self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard)
+            }
+            _ => {
+                let analyzed_transactions = analyze_block(transactions);
+                let ret = self.partition(analyzed_transactions, max_partitioning_rounds, cross_shard_dep_avoid_threshold);
+                ret
+            }
+        };
         report_sub_block_matrix(&ret);
         ret
     }

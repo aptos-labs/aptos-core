@@ -13,7 +13,7 @@ mod union_find;
 pub mod test_utils;
 
 use std::collections::HashMap;
-use aptos_metrics_core::{exponential_buckets, Histogram, register_histogram};
+use aptos_metrics_core::{exponential_buckets, Histogram, HistogramVec, IntCounterVec, IntGaugeVec, register_histogram, register_histogram_vec, register_int_counter_vec};
 use aptos_types::{block_executor::partitioner::SubBlocksForShard, transaction::Transaction};
 use once_cell::sync::Lazy;
 use aptos_logger::info;
@@ -53,10 +53,42 @@ pub static APTOS_BLOCK_ANALYZER_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         .unwrap()
 });
 
+pub static APTOS_SUB_BLOCK_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "aptos_sub_block_size",
+        // metric description
+        "foo",
+        &["shard_id", "round_id"],
+    ).unwrap()
+});
+
+pub static APTOS_SUB_BLOCK_INBOUND_COST: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "aptos_sub_block_inbound_cost",
+        // metric description
+        "foo",
+        &["shard_id", "round_id"],
+    ).unwrap()
+});
+
+pub static APTOS_SUB_BLOCK_OUTBOUND_COST: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "aptos_sub_block_outbound_cost",
+        // metric description
+        "foo",
+        &["shard_id", "round_id"],
+    ).unwrap()
+});
+
+
 pub fn analyze_block(txns: Vec<Transaction>) -> Vec<AnalyzedTransaction> {
     let _timer = APTOS_BLOCK_ANALYZER_SECONDS.start_timer();
     txns.into_iter().map(|t| t.into()).collect()
 }
+
 
 pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
     let mut total_comm_cost = 0;
@@ -89,6 +121,12 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
             let inbound_cost: u64 = cur_sub_block_inbound_costs_by_key.iter().map(|(a,b)| *b).sum();
             let outbound_cost: u64 = cur_sub_block_outbound_costs_by_key.iter().map(|(a,b)| *b).sum();
             println!("MATRIX_REPORT: round={}, shard={}, sub_block_size={}, inbound_cost={}, outbound_cost={}", round_id, shard_id, sub_block.num_txns(), inbound_cost, outbound_cost);
+            let shard_id_str = shard_id.to_string();
+            let round_id_str = round_id.to_string();
+            let label_vec = [shard_id_str.as_str(), round_id_str.as_str()];
+            APTOS_SUB_BLOCK_SIZE.with_label_values(&label_vec).observe(sub_block.num_txns() as f64);
+            APTOS_SUB_BLOCK_INBOUND_COST.with_label_values(&label_vec).observe(inbound_cost as f64);
+            APTOS_SUB_BLOCK_OUTBOUND_COST.with_label_values(&label_vec).observe(outbound_cost as f64);
             total_comm_cost += inbound_cost + outbound_cost;
         }
     }

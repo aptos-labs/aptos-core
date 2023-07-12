@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::pipeline::ExecuteBlockMessage;
-use aptos_block_partitioner::{BlockPartitioner, APTOS_BLOCK_PARTITIONER_SECONDS};
+use aptos_block_partitioner::{BlockPartitioner, APTOS_BLOCK_PARTITIONER_SECONDS, report_sub_block_matrix};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
