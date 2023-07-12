@@ -114,6 +114,7 @@ EpochChangeProof
 Ethereum
 ExternalMarkdown
 ExtendRef
+FACoin
 FAQ
 FLAC
 FA

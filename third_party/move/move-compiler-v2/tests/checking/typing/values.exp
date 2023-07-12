@@ -1,0 +1,11 @@
+// ---- Model Dump
+module 0x8675309::M {
+    private fun t() {
+        0x1;
+        0;
+        10000;
+        true;
+        false;
+        Tuple()
+    }
+} // end 0x8675309::M
