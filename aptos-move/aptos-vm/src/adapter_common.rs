@@ -57,19 +57,6 @@ pub(crate) trait VMAdapter {
         aggregator_enabled: bool,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus>;
 
-    /// Execute a single transaction when running the block sequentially.
-    /// This function will first run the `execute_single_transaction` function
-    /// with aggregators enabled. If there is an aggregator error (overflow/underflow),
-    /// we are not sure if the error is triggered in the right location in the code.
-    /// Therefore, for proper error handling, we will re-run the `execute_transaction`
-    /// function with aggregators disabled and output the final output.
-    fn execute_single_transaction_sequential(
-        &self,
-        txn: &PreprocessedTransaction,
-        view: &impl StateView,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus>;
-
     fn validate_signature_checked_transaction(
         &self,
         session: &mut SessionExt,

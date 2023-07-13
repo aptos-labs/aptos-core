@@ -18,7 +18,7 @@ use crate::{
     verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
-use aptos_aggregator::delta_change_set::{DeltaChangeSet, EADD_OVERFLOW, ESUB_UNDERFLOW};
+use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
@@ -1826,26 +1826,6 @@ impl VMAdapter for AptosVM {
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
         })
-    }
-
-    fn execute_single_transaction_sequential(
-        &self,
-        txn: &PreprocessedTransaction,
-        view: &impl StateView,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
-        let is_aggregator_error = |vm_status: &VMStatus| matches!(vm_status, VMStatus::MoveAbort(_, code) if *code == EADD_OVERFLOW || *code == ESUB_UNDERFLOW);
-        match self
-            .execute_single_transaction(txn, &view, log_context, true)
-            .and_then(|(vm_status, vm_output, sender)| {
-                vm_output
-                    .try_materialize(view)
-                    .map(|vm_output| (vm_status, vm_output, sender))
-            }) {
-            res @ Ok(_) => res,
-            Err(e) if !is_aggregator_error(&e) => Err(e),
-            _ => self.execute_single_transaction(txn, &view, log_context, false),
-        }
     }
 }
 

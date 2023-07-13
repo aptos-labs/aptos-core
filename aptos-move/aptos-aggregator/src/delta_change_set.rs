@@ -397,6 +397,10 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
     }
 }
 
+pub fn is_aggregator_error(vm_status: &VMStatus) -> bool {
+    matches!(vm_status, VMStatus::MoveAbort(_, code) if *code == EADD_OVERFLOW || *code == ESUB_UNDERFLOW)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

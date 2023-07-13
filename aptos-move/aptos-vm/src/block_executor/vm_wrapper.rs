@@ -7,6 +7,7 @@ use crate::{
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
 };
+use aptos_aggregator::delta_change_set::is_aggregator_error;
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
@@ -85,10 +86,22 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
 
-        match self
+        let result = match self
             .vm
-            .execute_single_transaction_sequential(txn, &view, &log_context)
-        {
+            .execute_single_transaction(txn, &view, &log_context, true)
+            .and_then(|(vm_status, vm_output, sender)| {
+                vm_output
+                    .try_materialize(view)
+                    .map(|vm_output| (vm_status, vm_output, sender))
+            }) {
+            res @ Ok(_) => res,
+            Err(e) if !is_aggregator_error(&e) => Err(e),
+            _ => self
+                .vm
+                .execute_single_transaction(txn, &view, &log_context, false),
+        };
+
+        match result {
             Ok((vm_status, vm_output, sender)) => {
                 // Aggregators are already materialized by this point, so delta change set should be empty
                 assert!(vm_output.delta_change_set().is_empty());
