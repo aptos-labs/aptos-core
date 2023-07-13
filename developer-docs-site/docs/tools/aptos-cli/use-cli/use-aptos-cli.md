@@ -814,7 +814,7 @@ The `peer_config.yaml` file will be created in your current working directory, w
 
 ## Move Examples
 
-Move examples can be found in the [Move section](../../move/move-on-aptos/cli).
+Move examples can be found in the [Move section](../../../move/move-on-aptos/cli).
 
 ## Node command examples
 
