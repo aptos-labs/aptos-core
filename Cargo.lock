@@ -6652,6 +6652,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "google-cloud-googleapis"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a3b24a3f57be08afc02344e693afb55e48172c9c2ab86ff3fdb8efff550e4b9"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tonic 0.9.2",
+]
+
+[[package]]
 name = "google-cloud-metadata"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9237,6 +9248,7 @@ dependencies = [
  "diesel",
  "futures",
  "google-cloud-auth",
+ "google-cloud-googleapis",
  "hyper",
  "image",
  "nft-metadata-crawler-utils",
