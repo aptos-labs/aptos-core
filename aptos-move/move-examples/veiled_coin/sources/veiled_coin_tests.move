@@ -294,7 +294,7 @@ module veiled_coin::veiled_coin_tests {
 
         // The commitment to the sender's new balance can use fresh randomness as we don't use the 
         // new balance amount in a ciphertext
-        let new_balance_rand = ristretto255::random_scalar(); //ristretto255::scalar_neg(&amount_rand);
+        let new_balance_rand = ristretto255::random_scalar();
         let curr_balance_val = ristretto255::new_scalar_from_u32(150);
 
         // The sender's new balance is 150 - 50 = 100
@@ -363,8 +363,10 @@ module veiled_coin::veiled_coin_tests {
             sigma_proof_bytes);
         println(b"Transferred veiled coins");
 
+        // Compute the randomness of the sender's current balance
+        let balance_rand = ristretto255::scalar_neg(&amount_rand); 
         // Sanity check veiled balances
-        assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&sender), 100, &new_balance_rand, &sender_pk), 1);
+        assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&sender), 100, &balance_rand, &sender_pk), 1);
         assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&recipient), 50, &amount_rand, &recipient_pk), 1);
 
         assert!(veiled_coin::total_veiled_coins<coin::FakeMoney>() == total_veiled_coins, 1);
@@ -382,7 +384,7 @@ module veiled_coin::veiled_coin_tests {
 
         // Compute a pedersen commitment over the same values the range proof is done over to gurantee a binding commitment
         // to the sender's new balance. A sigma proof demonstrates the commitment and ciphertexts contain the same value and randomness
-        let new_curr_balance_ct = elgamal::new_ciphertext_with_basepoint(&new_curr_balance_val, &new_balance_rand, &sender_pk);
+        let new_curr_balance_ct = elgamal::new_ciphertext_with_basepoint(&new_curr_balance_val, &balance_rand, &sender_pk);
         let new_new_balance_comm = pedersen::new_commitment_for_bulletproof(&new_new_balance_val, &fresh_new_balance_rand);
         let new_new_balance_comm_bytes = pedersen::commitment_to_bytes(&new_new_balance_comm);
         let sigma_proof = sigma_protos::prove_withdrawal(
@@ -403,7 +405,7 @@ module veiled_coin::veiled_coin_tests {
         assert!(veiled_coin::total_veiled_coins<coin::FakeMoney>() == total_veiled_coins, 1);
 
         // Sanity check veiled balances
-        assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&sender), 0, &new_balance_rand, &sender_pk), 1);
+        assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&sender), 0, &balance_rand, &sender_pk), 1);
         assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&recipient), 50, &amount_rand, &recipient_pk), 1);
     }
 }
