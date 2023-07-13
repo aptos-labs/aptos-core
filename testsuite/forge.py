@@ -722,6 +722,7 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_NAMESPACE=context.forge_namespace,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
+            FORGE_TEST_SUITE=context.forge_test_suite,
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
