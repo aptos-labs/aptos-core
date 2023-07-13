@@ -90,6 +90,12 @@ module aptos_framework::code {
     /// Creating a package with incompatible upgrade policy is disabled.
     const EINCOMPATIBLE_POLICY_DISABLED: u64 = 0x8;
 
+    /// Cannot find specified package.
+    const EPACKAGE_NOT_FOUND: u64 = 0x9;
+
+    /// Only the source code for existing modules can be updated.
+    const EMODULE_NOT_FOUND: u64 = 0xA;
+
     /// Whether unconditional code upgrade with no compatibility check is allowed. This
     /// publication mode should only be used for modules which aren't shared with user others.
     /// The developer is responsible for not breaking memory layout of any resources he already
@@ -186,6 +192,35 @@ module aptos_framework::code {
     public entry fun publish_package_txn(owner: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>)
     acquires PackageRegistry {
         publish_package(owner, util::from_bytes<PackageMetadata>(metadata_serialized), code)
+    }
+
+    /// Allowing the owner of a package to upload source code after the package was published.
+    /// The source code will be mapped to existing list of modules in PackageRegistry by name. New modules and missing
+    /// ones will be ignored.
+    public entry fun add_source_code(
+        owner: &signer,
+        package_name: String,
+        modules: vector<vector<u8>>,
+    ) acquires PackageRegistry {
+        let package_registry = borrow_global_mut<PackageRegistry>(signer::address_of(owner));
+        let (found, i) = vector::find(&package_registry.packages, |p| {
+            let p: &PackageMetadata = p;
+            p.name == package_name
+        });
+        assert!(found, error::invalid_argument(EPACKAGE_NOT_FOUND));
+        let package_metadata = vector::borrow_mut(&mut package_registry.packages, i);
+        vector::for_each(modules, |serialized_module| {
+            let m = util::from_bytes<ModuleMetadata>(serialized_module);
+            let source = m.source;
+            let name = m.name;
+            let (found, index) = vector::find(&package_metadata.modules, |m| {
+                let m: &ModuleMetadata = m;
+                m.name == name
+            });
+            assert!(found, error::invalid_argument(EMODULE_NOT_FOUND));
+            let module_metadata = vector::borrow_mut(&mut package_metadata.modules, index);
+            module_metadata.source = source;
+        });
     }
 
     // Helpers

@@ -231,6 +231,14 @@ pub enum EntryFunctionCall {
         should_pass: bool,
     },
 
+    /// Allowing the owner of a package to upload source code after the package was published.
+    /// The source code will be mapped to existing list of modules in PackageRegistry by name. New modules and missing
+    /// ones will be ignored.
+    CodeAddSourceCode {
+        package_name: Vec<u8>,
+        modules: Vec<Vec<u8>>,
+    },
+
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
@@ -987,6 +995,10 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
+            CodeAddSourceCode {
+                package_name,
+                modules,
+            } => code_add_source_code(package_name, modules),
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -1920,6 +1932,27 @@ pub fn aptos_governance_vote(
             bcs::to_bytes(&stake_pool).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+/// Allowing the owner of a package to upload source code after the package was published.
+/// The source code will be mapped to existing list of modules in PackageRegistry by name. New modules and missing
+/// ones will be ignored.
+pub fn code_add_source_code(package_name: Vec<u8>, modules: Vec<Vec<u8>>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("code").to_owned(),
+        ),
+        ident_str!("add_source_code").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&package_name).unwrap(),
+            bcs::to_bytes(&modules).unwrap(),
         ],
     ))
 }
@@ -4171,6 +4204,17 @@ mod decoder {
         }
     }
 
+    pub fn code_add_source_code(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CodeAddSourceCode {
+                package_name: bcs::from_bytes(script.args().get(0)?).ok()?,
+                modules: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
@@ -5414,6 +5458,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_vote".to_string(),
             Box::new(decoder::aptos_governance_vote),
+        );
+        map.insert(
+            "code_add_source_code".to_string(),
+            Box::new(decoder::code_add_source_code),
         );
         map.insert(
             "code_publish_package_txn".to_string(),

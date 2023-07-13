@@ -20,6 +20,7 @@ This module supports functionality related to code management.
 -  [Function `initialize`](#0x1_code_initialize)
 -  [Function `publish_package`](#0x1_code_publish_package)
 -  [Function `publish_package_txn`](#0x1_code_publish_package_txn)
+-  [Function `add_source_code`](#0x1_code_add_source_code)
 -  [Function `check_upgradability`](#0x1_code_check_upgradability)
 -  [Function `check_coexistence`](#0x1_code_check_coexistence)
 -  [Function `check_dependencies`](#0x1_code_check_dependencies)
@@ -351,12 +352,32 @@ Package contains duplicate module names with existing modules publised in other 
 
 
 
+<a name="0x1_code_EMODULE_NOT_FOUND"></a>
+
+Only the source code for existing modules can be updated.
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_EMODULE_NOT_FOUND">EMODULE_NOT_FOUND</a>: u64 = 10;
+</code></pre>
+
+
+
 <a name="0x1_code_EPACKAGE_DEP_MISSING"></a>
 
 Dependency could not be resolved to any published package.
 
 
 <pre><code><b>const</b> <a href="code.md#0x1_code_EPACKAGE_DEP_MISSING">EPACKAGE_DEP_MISSING</a>: u64 = 5;
+</code></pre>
+
+
+
+<a name="0x1_code_EPACKAGE_NOT_FOUND"></a>
+
+Cannot find specified package.
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_EPACKAGE_NOT_FOUND">EPACKAGE_NOT_FOUND</a>: u64 = 9;
 </code></pre>
 
 
@@ -612,6 +633,55 @@ of current restrictions for txn parameters, the metadata needs to be passed in s
 <pre><code><b>public</b> entry <b>fun</b> <a href="code.md#0x1_code_publish_package_txn">publish_package_txn</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
 <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
     <a href="code.md#0x1_code_publish_package">publish_package</a>(owner, <a href="util.md#0x1_util_from_bytes">util::from_bytes</a>&lt;<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>&gt;(metadata_serialized), <a href="code.md#0x1_code">code</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_code_add_source_code"></a>
+
+## Function `add_source_code`
+
+Allowing the owner of a package to upload source code after the package was published.
+The source code will be mapped to existing list of modules in PackageRegistry by name. New modules and missing
+ones will be ignored.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="code.md#0x1_code_add_source_code">add_source_code</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, package_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, modules: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="code.md#0x1_code_add_source_code">add_source_code</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    package_name: String,
+    modules: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <b>let</b> package_registry = <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
+    <b>let</b> (found, i) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&package_registry.packages, |p| {
+        <b>let</b> p: &<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = p;
+        p.name == package_name
+    });
+    <b>assert</b>!(found, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="code.md#0x1_code_EPACKAGE_NOT_FOUND">EPACKAGE_NOT_FOUND</a>));
+    <b>let</b> package_metadata = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> package_registry.packages, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(modules, |serialized_module| {
+        <b>let</b> m = <a href="util.md#0x1_util_from_bytes">util::from_bytes</a>&lt;<a href="code.md#0x1_code_ModuleMetadata">ModuleMetadata</a>&gt;(serialized_module);
+        <b>let</b> source = m.source;
+        <b>let</b> name = m.name;
+        <b>let</b> (found, index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&package_metadata.modules, |m| {
+            <b>let</b> m: &<a href="code.md#0x1_code_ModuleMetadata">ModuleMetadata</a> = m;
+            m.name == name
+        });
+        <b>assert</b>!(found, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="code.md#0x1_code_EMODULE_NOT_FOUND">EMODULE_NOT_FOUND</a>));
+        <b>let</b> module_metadata = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> package_metadata.modules, index);
+        module_metadata.source = source;
+    });
 }
 </code></pre>
 
