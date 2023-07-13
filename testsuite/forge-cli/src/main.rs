@@ -557,6 +557,7 @@ fn single_test_suite(
         "pfn_performance" => pfn_performance(duration, false, false),
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
+        "gather_metrics" => gather_metrics(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1220,6 +1221,10 @@ fn network_bandwidth() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
         .add_network_test(NetworkBandwidthTest)
+}
+
+fn gather_metrics() -> ForgeConfig {
+    ForgeConfig::default().add_network_test(GatherMetrics)
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
@@ -2129,9 +2134,11 @@ impl NetworkTest for GatherMetrics {
 }
 
 async fn gather_metrics_inner(ctx: &NetworkContext<'_>) {
+    let gather_time = Duration::from_secs(60); // TODO: make configurable
     let start = tokio::time::Instant::now();
     gather_metrics_one(ctx).await;
-    tokio::time::sleep_until(start + ctx.global_duration - Duration::from_secs(10)).await;
+    info!("gather_metrics sleep for {}", gather_time.as_secs_f64());
+    tokio::time::sleep_until(start + gather_time).await;
     gather_metrics_one(ctx).await;
 }
 
@@ -2140,7 +2147,7 @@ async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
     let outdir = Path::new("/tmp");
     let mut gets = FuturesUnordered::new();
     let now = chrono::prelude::Utc::now()
-        .format("%Y%m%d_%H%M%S%")
+        .format("%Y%m%d_%H%M%S")
         .to_string();
     for val in ctx.swarm.validators() {
         let mut url = val.inspection_service_endpoint();
