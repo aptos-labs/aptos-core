@@ -269,6 +269,7 @@ pub fn setup_networks_and_get_interfaces(
             let benchmark_handle = register_client_and_service_with_network(
                 &mut network_builder,
                 network_id,
+                &network_config,
                 app_config,
             );
             benchmark_handles.push(benchmark_handle);

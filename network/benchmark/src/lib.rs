@@ -5,7 +5,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::{info, warn};
-use aptos_metrics_core::{register_int_counter_vec, IntCounterVec, IntCounter};
+use aptos_metrics_core::{register_int_counter_vec, IntCounter, IntCounterVec};
 use aptos_network::{
     application::interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
     protocols::{network::Event, rpc::error::RpcError, wire::handshake::v1::ProtocolId},
@@ -20,11 +20,7 @@ use futures::{
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Serialize};
-use std::{
-    ops::DerefMut,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{ops::DerefMut, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, select, sync::RwLock};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -107,6 +103,7 @@ async fn handle_direct(
                 PeerNetworkId::new(network_id, peer_id),
             );
             if let Err(err) = result {
+                direct_messages("rerr");
                 info!(
                     "benchmark ds [{}] could not reply: {}",
                     send.request_counter, err
@@ -120,14 +117,12 @@ async fn handle_direct(
                 reader.find(reply.request_counter)
             };
             if rec.request_counter == reply.request_counter {
-                info!(
-                    "benchmark ds [{}] {} bytes at {} in {} micros",
-                    rec.request_counter,
-                    rec.bytes_sent,
-                    receive_time,
-                    receive_time - rec.send_micros
-                );
+                let micros = receive_time - rec.send_micros;
+                direct_messages("ok");
+                direct_micros("ok", micros as u64);
+                direct_bytes("ok", rec.bytes_sent as u64);
             } else {
+                direct_messages("late");
                 info!(
                     "benchmark ds [{}] unk bytes in > {} micros",
                     reply.request_counter,
@@ -285,6 +280,8 @@ pub async fn run_benchmark_service(
     }
 }
 
+const BLAB_MICROS: i64 = 100_000;
+
 pub async fn direct_sender(
     node_config: NodeConfig,
     network_client: NetworkClient<BenchmarkMessage>,
@@ -334,29 +331,21 @@ pub async fn direct_sender(
             })
         }
         let wrapper = BenchmarkMessage::DataSend(msg);
-        let start_send: Instant = time_service.now();
         let result = network_client.send_to_peer(wrapper, PeerNetworkId::new(network_id, peer_id));
-        let send_end: Instant = time_service.now();
         if let Err(err) = result {
+            direct_messages("serr");
             info!(
                 "benchmark [{},{}] direct send err: {}",
                 network_id, peer_id, err
             );
-            // TODO: some error limit, or error-per-second limit, or specifically detect unrecoverable errors
             return;
         } else {
-            let send_dt = send_end.duration_since(start_send);
-            info!(
-                "benchmark direct[{}] at {} µs, took {} µs",
-                counter,
-                nowu,
-                send_dt.as_micros()
-            );
+            direct_messages("sent");
         }
 
         if nowu > next_blab {
             info!("benchmark ds counter={}", counter);
-            next_blab = nowu + 20_000;
+            next_blab = nowu + BLAB_MICROS;
         }
     }
 }
@@ -421,8 +410,8 @@ pub async fn rpc_sender(
                 open_rpcs.push(result);
 
                 if nowu > next_blab {
-                    info!("benchmark ds counter={}", counter);
-                    next_blab = nowu + 20_000;
+                    info!("benchmark rpc counter={}", counter);
+                    next_blab = nowu + BLAB_MICROS;
                 }
             }
             result = open_rpcs.next() => {
@@ -526,14 +515,64 @@ pub struct SendRecord {
     pub bytes_sent: usize,
 }
 
-pub static APTOS_NETWORK_BENCHMARK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("aptos_network_benchmark_rpc_messages", "Number of benchmark RPC messages", &["state"]).unwrap()
+pub static APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_benchmark_direct_messages",
+        "Number of benchmark direct messages",
+        &["state"]
+    )
+    .unwrap()
 });
 
-fn rpc_messages(
-    state_label: &'static str,
-) {
-    APTOS_NETWORK_BENCHMARK_RPC_MESSAGES.with_label_values(&[state_label]).inc();
+fn direct_messages(state_label: &'static str) {
+    APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGES
+        .with_label_values(&[state_label])
+        .inc();
+}
+
+pub static APTOS_NETWORK_BENCHMARK_DIRECT_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_benchmark_direct_bytes",
+        "Number of benchmark direct bytes",
+        &["state"]
+    )
+    .unwrap()
+});
+
+fn direct_bytes(state_label: &'static str, byte_count: u64) {
+    APTOS_NETWORK_BENCHMARK_DIRECT_BYTES
+        .with_label_values(&[state_label])
+        .inc_by(byte_count);
+}
+
+pub static APTOS_NETWORK_BENCHMARK_DIRECT_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_benchmark_direct_micros",
+        "Number of benchmark direct micros",
+        &["state"]
+    )
+    .unwrap()
+});
+
+fn direct_micros(state_label: &'static str, micros: u64) {
+    APTOS_NETWORK_BENCHMARK_DIRECT_MICROS
+        .with_label_values(&[state_label])
+        .inc_by(micros);
+}
+
+pub static APTOS_NETWORK_BENCHMARK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_benchmark_rpc_messages",
+        "Number of benchmark RPC messages",
+        &["state"]
+    )
+    .unwrap()
+});
+
+fn rpc_messages(state_label: &'static str) {
+    APTOS_NETWORK_BENCHMARK_RPC_MESSAGES
+        .with_label_values(&[state_label])
+        .inc();
 }
 
 pub static APTOS_NETWORK_BENCHMARK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -541,26 +580,23 @@ pub static APTOS_NETWORK_BENCHMARK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(||
         "aptos_network_benchmark_rpc_bytes",
         "Number of benchmark RPC bytes transferred",
         &["state"]
-    ).unwrap()
+    )
+    .unwrap()
 });
 
-pub fn rpc_bytes(
-    state_label: &'static str,
-) -> IntCounter {
+pub fn rpc_bytes(state_label: &'static str) -> IntCounter {
     APTOS_NETWORK_BENCHMARK_RPC_BYTES.with_label_values(&[state_label])
 }
-
 
 pub static APTOS_NETWORK_BENCHMARK_RPC_MICROS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_network_benchmark_rpc_micros",
         "Number of benchmark RPC microseconds used (hint: divide by _messages)",
         &["state"]
-    ).unwrap()
+    )
+    .unwrap()
 });
 
-pub fn rpc_micros(
-    state_label: &'static str,
-) -> IntCounter {
+pub fn rpc_micros(state_label: &'static str) -> IntCounter {
     APTOS_NETWORK_BENCHMARK_RPC_MICROS.with_label_values(&[state_label])
 }
