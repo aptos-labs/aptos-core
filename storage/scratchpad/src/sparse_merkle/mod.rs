@@ -101,7 +101,7 @@ use std::{
 };
 use thiserror::Error;
 
-type NodePosition = bitvec::vec::BitVec<bitvec::order::Msb0, u8>;
+type NodePosition = bitvec::vec::BitVec<u8, bitvec::order::Msb0>;
 const BITS_IN_NIBBLE: usize = 4;
 const BITS_IN_BYTE: usize = 8;
 

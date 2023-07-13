@@ -6,7 +6,9 @@ use crate::dag::{
     storage::DAGStorage,
     tests::helpers::new_certified_node,
     types::{CertifiedNode, Node},
+    NodeDigestSignature, NodeId,
 };
+use anyhow::Ok;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
@@ -14,6 +16,7 @@ use std::{collections::HashMap, sync::Arc};
 
 pub struct MockStorage {
     node_data: Mutex<HashMap<HashValue, Node>>,
+    node_signature_data: Mutex<HashMap<NodeId, NodeDigestSignature>>,
     certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
 }
 
@@ -21,6 +24,7 @@ impl MockStorage {
     pub fn new() -> Self {
         Self {
             node_data: Mutex::new(HashMap::new()),
+            node_signature_data: Mutex::new(HashMap::new()),
             certified_node_data: Mutex::new(HashMap::new()),
         }
     }
@@ -29,6 +33,33 @@ impl MockStorage {
 impl DAGStorage for MockStorage {
     fn save_node(&self, node: &Node) -> anyhow::Result<()> {
         self.node_data.lock().insert(node.digest(), node.clone());
+        Ok(())
+    }
+
+    fn delete_node(&self, digest: HashValue) -> anyhow::Result<()> {
+        self.node_data.lock().remove(&digest);
+        Ok(())
+    }
+
+    fn save_node_signature(
+        &self,
+        node_id: &NodeId,
+        node_digest_signature: &NodeDigestSignature,
+    ) -> anyhow::Result<()> {
+        self.node_signature_data
+            .lock()
+            .insert(node_id.clone(), node_digest_signature.clone());
+        Ok(())
+    }
+
+    fn get_node_signatures(&self) -> anyhow::Result<HashMap<NodeId, NodeDigestSignature>> {
+        Ok(self.node_signature_data.lock().clone())
+    }
+
+    fn delete_node_signatures(&self, node_ids: Vec<crate::dag::NodeId>) -> anyhow::Result<()> {
+        for node_id in node_ids {
+            self.node_signature_data.lock().remove(&node_id);
+        }
         Ok(())
     }
 
@@ -141,7 +172,7 @@ fn test_dag_recover_from_storage() {
     let storage = Arc::new(MockStorage::new());
     let mut dag = Dag::new(epoch_state.clone(), storage.clone());
 
-    let mut digests = vec![];
+    let mut metadatas = vec![];
 
     for round in 1..10 {
         let parents = dag
@@ -149,14 +180,14 @@ fn test_dag_recover_from_storage() {
             .unwrap_or_default();
         for signer in &signers[0..3] {
             let node = new_certified_node(round, signer.author(), parents.clone());
-            digests.push(node.digest());
+            metadatas.push(node.metadata().clone());
             assert!(dag.add_node(node).is_ok());
         }
     }
     let new_dag = Dag::new(epoch_state, storage.clone());
 
-    for digest in &digests {
-        assert!(new_dag.exists(digest));
+    for metadata in &metadatas {
+        assert!(new_dag.exists(metadata));
     }
 
     let new_epoch_state = Arc::new(EpochState {

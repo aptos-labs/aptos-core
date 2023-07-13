@@ -46,7 +46,7 @@ async fn test_get_epoch_ending_ledger_infos() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
         utils::update_storage_server_summary(&mut service, 1000, expected_end_epoch);
         tokio::spawn(service.start());
 
@@ -100,7 +100,7 @@ async fn test_get_epoch_ending_ledger_infos_chunk_limit() {
     let storage_request = StorageServiceRequest::new(data_request, true);
 
     // Create the storage client and server
-    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
     utils::update_storage_server_summary(&mut service, 1000, expected_end_epoch);
     tokio::spawn(service.start());
 
@@ -119,7 +119,7 @@ async fn test_get_epoch_ending_ledger_infos_chunk_limit() {
 #[tokio::test]
 async fn test_get_epoch_ending_ledger_infos_invalid() {
     // Create the storage client and server
-    let (mut mock_client, service, _, _) = MockClient::new(None, None);
+    let (mut mock_client, service, _, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Test invalid ranges
@@ -158,7 +158,7 @@ async fn test_get_epoch_ending_ledger_infos_not_serviceable() {
         let expected_end_epoch = start_epoch + chunk_size - 1;
 
         // Create the storage client and server (that cannot service the request)
-        let (mut mock_client, mut service, _, _) = MockClient::new(None, None);
+        let (mut mock_client, mut service, _, _, _) = MockClient::new(None, None);
         utils::update_storage_server_summary(&mut service, 1000, expected_end_epoch - 1);
         tokio::spawn(service.start());
 
@@ -256,7 +256,7 @@ async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
         };
 
         // Create the storage client and server
-        let (mut mock_client, mut service, _, _) =
+        let (mut mock_client, mut service, _, _, _) =
             MockClient::new(Some(db_reader), Some(storage_config));
         utils::update_storage_server_summary(&mut service, 1000, expected_end_epoch);
         tokio::spawn(service.start());

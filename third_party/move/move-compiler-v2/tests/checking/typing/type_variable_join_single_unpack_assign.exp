@@ -1,0 +1,31 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct Box {
+        f1: #0,
+        f2: #0,
+    }
+    private fun new<T>() {
+        Abort(0)
+    }
+    private fun t0() {
+        {
+          let f1: u64;
+          {
+            let f2: u64;
+            M::Box<?5>{ f1: f1: u64, f2: f2: u64 } = M::new<u64>();
+            f1;
+            f2;
+            {
+              let f1: M::Box<u64>;
+              {
+                let f2: M::Box<u64>;
+                M::Box<?13>{ f1: f1: M::Box<u64>, f2: f2: M::Box<u64> } = M::new<M::Box<u64>>();
+                f1;
+                f2;
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0x8675309::M

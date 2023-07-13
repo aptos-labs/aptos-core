@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/pack_multiple.move:5:9
+  │
+5 │         Box { f: (0, 1) };
+  │         ^^^^^^^^^^^^^^^^^
