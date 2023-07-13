@@ -24,6 +24,7 @@ module token_offer {
     use marketplace::fee_schedule::{Self, FeeSchedule};
     use marketplace::listing::{Self, TokenV1Container};
     use aptos_token::token::TokenId;
+    use aptos_framework::aptos_account;
 
     /// No token offer defined.
     const ENO_TOKEN_OFFER: u64 = 1;
@@ -195,7 +196,7 @@ module token_offer {
     ) {
         let fee = fee_schedule::listing_fee(fee_schedule, total_to_extract);
         let fee_address = fee_schedule::fee_address(fee_schedule);
-        coin::transfer<CoinType>(purchaser, fee_address, fee);
+        aptos_account::transfer_coins<CoinType>(purchaser, fee_address, fee);
 
         let coins = coin::withdraw<CoinType>(purchaser, total_to_extract);
         move_to(offer_signer, CoinOffer { coins });
@@ -382,14 +383,14 @@ module token_offer {
 
         let royalty_charge = price * royalty_numerator / royalty_denominator;
         let royalties = coin::extract(&mut coins, royalty_charge);
-        coin::deposit(royalty_payee, royalties);
+        aptos_account::deposit_coins(royalty_payee, royalties);
 
         let fee_schedule = token_offer_obj.fee_schedule;
         let commission_charge = fee_schedule::commission(fee_schedule, price);
         let commission = coin::extract(&mut coins, commission_charge);
-        coin::deposit(fee_schedule::fee_address(fee_schedule), commission);
+        aptos_account::deposit_coins(fee_schedule::fee_address(fee_schedule), commission);
 
-        coin::deposit(seller, coins);
+        aptos_account::deposit_coins(seller, coins);
 
         events::emit_token_offer_filled(
             fee_schedule,
@@ -412,7 +413,7 @@ module token_offer {
     ) acquires CoinOffer, TokenOffer, TokenOfferTokenV1, TokenOfferTokenV2 {
         let token_offer_addr = object::object_address(&token_offer);
         let CoinOffer<CoinType> { coins } = move_from(token_offer_addr);
-        coin::deposit(object::owner(token_offer), coins);
+        aptos_account::deposit_coins(object::owner(token_offer), coins);
 
         let TokenOffer {
             fee_schedule: _,
@@ -736,7 +737,7 @@ module token_offer_tests {
         purchaser: &signer,
     ) {
         test_utils::setup(aptos_framework, marketplace, seller, purchaser);
-        let token = test_utils::mint_tokenv2(seller);
+        let _token = test_utils::mint_tokenv2(seller);
         let token_2 = test_utils::mint_tokenv2_additional(seller);
 
         let token_offer = token_offer::init_for_tokenv2<AptosCoin>(
