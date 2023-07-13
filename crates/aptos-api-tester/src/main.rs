@@ -7,6 +7,7 @@ use std::future::Future;
 
 use anyhow::{anyhow, Result};
 use aptos_api_types::U64;
+use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::coin_client::CoinClient;
 use aptos_sdk::token_client::{
@@ -31,14 +32,34 @@ static TESTNET_FAUCET_URL: Lazy<Url> =
 #[derive(Debug)]
 enum TestResult {
     Success,
+}
+
+#[derive(Debug)]
+enum TestFailure {
     Fail(&'static str),
     Error(anyhow::Error),
 }
 
-async fn handle_result<Fut: Future<Output = TestResult>>(fut: Fut) -> TestResult {
-    let result = fut.await;
-    println!("{:?}", result);
+impl From<RestError> for TestFailure {
+    fn from(e: RestError) -> TestFailure {
+        TestFailure::Error(e.into())
+    }
+}
 
+impl From<anyhow::Error> for TestFailure {
+    fn from(e: anyhow::Error) -> TestFailure {
+        TestFailure::Error(e)
+    }
+}
+
+async fn handle_result<Fut: Future<Output = Result<TestResult, TestFailure>>>(
+    fut: Fut,
+) -> Result<TestResult, TestFailure> {
+    let result = fut.await;
+    match &result {
+        Ok(success) => println!("{:?}", success),
+        Err(failure) => println!("{:?}", failure),
+    }
     result
 }
 
@@ -49,12 +70,9 @@ async fn test_newaccount(
     client: &Client,
     account: &LocalAccount,
     amount_funded: u64,
-) -> TestResult {
+) -> Result<TestResult, TestFailure> {
     // ask for account data
-    let response = match client.get_account(account.address()).await {
-        Ok(response) => response,
-        Err(e) => return TestResult::Error(e.into()),
-    };
+    let response = client.get_account(account.address()).await?;
 
     // check account data
     let expected_account = Account {
@@ -63,25 +81,24 @@ async fn test_newaccount(
     };
     let actual_account = response.inner();
 
-    if expected_account.authentication_key != actual_account.authentication_key {
-        return TestResult::Fail("wrong authentication key");
-    }
-    if expected_account.sequence_number != actual_account.sequence_number {
-        return TestResult::Fail("wrong sequence number");
+    if &expected_account != actual_account {
+        return Err(TestFailure::Fail("wrong account data"));
     }
 
     // check account balance
     let expected_balance = U64(amount_funded);
-    let actual_balance = match client.get_account_balance(account.address()).await {
-        Ok(response) => response.inner().coin.value,
-        Err(e) => return TestResult::Error(e.into()),
-    };
+    let actual_balance = client
+        .get_account_balance(account.address())
+        .await?
+        .inner()
+        .coin
+        .value;
 
     if expected_balance != actual_balance {
-        return TestResult::Fail("wrong balance");
+        return Err(TestFailure::Fail("wrong balance"));
     }
 
-    TestResult::Success
+    Ok(TestResult::Success)
 }
 
 /// Tests coin transfer. Checks that:
@@ -93,54 +110,61 @@ async fn test_cointransfer(
     account: &mut LocalAccount,
     receiver: AccountAddress,
     amount: u64,
-) -> TestResult {
+) -> Result<TestResult, TestFailure> {
     // get starting balance
-    let starting_receiver_balance = match client.get_account_balance(receiver).await {
-        Ok(response) => u64::from(response.inner().coin.value),
-        Err(e) => return TestResult::Error(e.into()),
-    };
+    let starting_receiver_balance = u64::from(
+        client
+            .get_account_balance(receiver)
+            .await?
+            .inner()
+            .coin
+            .value,
+    );
 
     // transfer coins to static account
-    let pending_txn = match coin_client.transfer(account, receiver, amount, None).await {
-        Ok(txn) => txn,
-        Err(e) => return TestResult::Error(e),
-    };
-    let response = match client.wait_for_transaction(&pending_txn).await {
-        Ok(response) => response,
-        Err(e) => return TestResult::Error(e.into()),
-    };
+    let pending_txn = coin_client
+        .transfer(account, receiver, amount, None)
+        .await?;
+    let response = client.wait_for_transaction(&pending_txn).await?;
 
     // check receiver balance
     let expected_receiver_balance = U64(starting_receiver_balance + amount);
-    let actual_receiver_balance = match client.get_account_balance(receiver).await {
-        Ok(response) => response.inner().coin.value,
-        Err(e) => return TestResult::Error(e.into()),
-    };
+    let actual_receiver_balance = client
+        .get_account_balance(receiver)
+        .await?
+        .inner()
+        .coin
+        .value;
 
     if expected_receiver_balance != actual_receiver_balance {
-        return TestResult::Fail("wrong balance after coin transfer");
+        return Err(TestFailure::Fail("wrong balance after coin transfer"));
     }
 
     // check account balance with a lower version number
     let version = match response.inner().version() {
         Some(version) => version,
-        _ => return TestResult::Error(anyhow!("transaction did not return version")),
+        _ => {
+            return Err(TestFailure::Error(anyhow!(
+                "transaction did not return version"
+            )))
+        },
     };
 
     let expected_balance_at_version = U64(starting_receiver_balance);
-    let actual_balance_at_version = match client
+    let actual_balance_at_version = client
         .get_account_balance_at_version(receiver, version - 1)
-        .await
-    {
-        Ok(response) => response.inner().coin.value,
-        Err(e) => return TestResult::Error(e.into()),
-    };
+        .await?
+        .inner()
+        .coin
+        .value;
 
     if expected_balance_at_version != actual_balance_at_version {
-        return TestResult::Fail("wrong balance at version before the coin transfer");
+        return Err(TestFailure::Fail(
+            "wrong balance at version before the coin transfer",
+        ));
     }
 
-    TestResult::Success
+    Ok(TestResult::Success)
 }
 
 async fn test_mintnft(
@@ -148,14 +172,14 @@ async fn test_mintnft(
     token_client: &TokenClient<'_>,
     account: &mut LocalAccount,
     receiver: &mut LocalAccount,
-) -> TestResult {
+) -> Result<TestResult, TestFailure> {
     // create collection
     let collection_name = "test collection".to_string();
     let collection_description = "collection description".to_string();
     let collection_uri = "collection uri".to_string();
     let collection_maximum = 1000;
 
-    let pending_txn = match token_client
+    let pending_txn = token_client
         .create_collection(
             account,
             &collection_name,
@@ -164,15 +188,8 @@ async fn test_mintnft(
             collection_maximum,
             None,
         )
-        .await
-    {
-        Ok(txn) => txn,
-        Err(e) => return TestResult::Error(e),
-    };
-    match client.wait_for_transaction(&pending_txn).await {
-        Ok(_) => {},
-        Err(e) => return TestResult::Error(e.into()),
-    }
+        .await?;
+    client.wait_for_transaction(&pending_txn).await?;
 
     // create token
     let token_name = "test token".to_string();
@@ -181,7 +198,7 @@ async fn test_mintnft(
     let token_maximum = 1000;
     let token_supply = 10;
 
-    let pending_txn = match token_client
+    let pending_txn = token_client
         .create_token(
             account,
             &collection_name,
@@ -193,15 +210,8 @@ async fn test_mintnft(
             None,
             None,
         )
-        .await
-    {
-        Ok(txn) => txn,
-        Err(e) => return TestResult::Error(e),
-    };
-    match client.wait_for_transaction(&pending_txn).await {
-        Ok(_) => {},
-        Err(e) => return TestResult::Error(e.into()),
-    }
+        .await?;
+    client.wait_for_transaction(&pending_txn).await?;
 
     // check collection metadata
     let expected_collection_data = CollectionData {
@@ -215,16 +225,12 @@ async fn test_mintnft(
             uri: false,
         },
     };
-    let actual_collection_data = match token_client
+    let actual_collection_data = token_client
         .get_collection_data(account.address(), &collection_name)
-        .await
-    {
-        Ok(data) => data,
-        Err(e) => return TestResult::Error(e),
-    };
+        .await?;
 
     if expected_collection_data != actual_collection_data {
-        return TestResult::Fail("wrong collection data");
+        return Err(TestFailure::Fail("wrong collection data"));
     }
 
     // check token metadata
@@ -248,20 +254,16 @@ async fn test_mintnft(
         },
         largest_property_version: U64(0),
     };
-    let actual_token_data = match token_client
+    let actual_token_data = token_client
         .get_token_data(account.address(), &collection_name, &token_name)
-        .await
-    {
-        Ok(data) => data,
-        Err(e) => return TestResult::Error(e),
-    };
+        .await?;
 
     if expected_token_data != actual_token_data {
-        return TestResult::Fail("wrong token data");
+        return Err(TestFailure::Fail("wrong token data"));
     }
 
     // offer token
-    let pending_txn = match token_client
+    let pending_txn = token_client
         .offer_token(
             account,
             receiver.address(),
@@ -272,33 +274,23 @@ async fn test_mintnft(
             None,
             None,
         )
-        .await
-    {
-        Ok(txn) => txn,
-        Err(e) => return TestResult::Error(e),
-    };
-    match client.wait_for_transaction(&pending_txn).await {
-        Ok(_) => {},
-        Err(e) => return TestResult::Error(e.into()),
-    }
+        .await?;
+    client.wait_for_transaction(&pending_txn).await?;
 
     // check token balance for the sender
     let expected_sender_token_balance = U64(8);
-    let actual_sender_token_balance = match token_client
+    let actual_sender_token_balance = token_client
         .get_token(
             account.address(),
             account.address(),
             &collection_name,
             &token_name,
         )
-        .await
-    {
-        Ok(data) => data.amount,
-        Err(e) => return TestResult::Error(e),
-    };
+        .await?
+        .amount;
 
     if expected_sender_token_balance != actual_sender_token_balance {
-        return TestResult::Fail("wrong token balance");
+        return Err(TestFailure::Fail("wrong token balance"));
     }
 
     // check that token store isn't initialized for the receiver
@@ -311,12 +303,16 @@ async fn test_mintnft(
         )
         .await
     {
-        Ok(_) => return TestResult::Fail("found tokens for receiver when shouldn't"),
+        Ok(_) => {
+            return Err(TestFailure::Fail(
+                "found tokens for receiver when shouldn't",
+            ))
+        },
         Err(_) => {},
     }
 
     // claim token
-    let pending_txn = match token_client
+    let pending_txn = token_client
         .claim_token(
             receiver,
             account.address(),
@@ -326,36 +322,26 @@ async fn test_mintnft(
             None,
             None,
         )
-        .await
-    {
-        Ok(txn) => txn,
-        Err(e) => return TestResult::Error(e),
-    };
-    match client.wait_for_transaction(&pending_txn).await {
-        Ok(_) => {},
-        Err(e) => return TestResult::Error(e.into()),
-    }
+        .await?;
+    client.wait_for_transaction(&pending_txn).await?;
 
     // check token balance for the receiver
     let expected_receiver_token_balance = U64(2);
-    let actual_receiver_token_balance = match token_client
+    let actual_receiver_token_balance = token_client
         .get_token(
             receiver.address(),
             account.address(),
             &collection_name,
             &token_name,
         )
-        .await
-    {
-        Ok(data) => data.amount,
-        Err(e) => return TestResult::Error(e),
-    };
+        .await?
+        .amount;
 
     if expected_receiver_token_balance != actual_receiver_token_balance {
-        return TestResult::Fail("wrong token balance");
+        return Err(TestFailure::Fail("wrong token balance"));
     }
 
-    TestResult::Success
+    Ok(TestResult::Success)
 }
 
 async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
@@ -374,14 +360,13 @@ async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
 
     // Test new account creation and funding
     // this test is critical to pass for the next tests
-    let result = handle_result(test_newaccount(&client, &giray, 100_000_000)).await;
-    match result {
-        TestResult::Success => {},
-        _ => return Err(anyhow!("returning early because new account test failed")),
+    match handle_result(test_newaccount(&client, &giray, 100_000_000)).await {
+        Err(_) => return Err(anyhow!("returning early because new account test failed")),
+        _ => {},
     }
 
     // Flow 1: Coin transfer
-    handle_result(test_cointransfer(
+    let _ = handle_result(test_cointransfer(
         &client,
         &coin_client,
         &mut giray,
@@ -391,7 +376,7 @@ async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
     .await;
 
     // Flow 2: NFT transfer
-    handle_result(test_mintnft(
+    let _ = handle_result(test_mintnft(
         &client,
         &token_client,
         &mut giray,
