@@ -282,7 +282,7 @@ impl CollectionV2 {
     }
 
     /// TODO: Change this to a KV store
-    pub fn get_by_table_handle(
+    fn get_by_table_handle(
         conn: &mut PgPoolConnection,
         table_handle: &str,
     ) -> anyhow::Result<String> {

@@ -7,7 +7,9 @@
 use super::token_utils::{NAME_LENGTH, URI_LENGTH};
 use crate::{
     models::{
-        coin_models::v2_fungible_asset_utils::{FungibleAssetMetadata, FungibleAssetSupply, FungibleAssetStore},
+        coin_models::v2_fungible_asset_utils::{
+            FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
+        },
         move_resources::MoveResource,
         v2_objects::CurrentObjectPK,
     },
