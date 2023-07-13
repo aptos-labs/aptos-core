@@ -3,6 +3,9 @@
 # tests against a local devnet, testnet, and mainnet. We also run the TS SDK tests for
 # the indexer, though those run against the production indexer for now.
 
+env:
+  GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 name: "TS SDK E2E Tests"
 on:
   pull_request_target:
@@ -13,7 +16,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+  id-token: write # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
 
 jobs:
   # Note on the job-level `if` conditions:
@@ -34,6 +37,8 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -52,6 +57,8 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -70,6 +77,8 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -111,4 +120,3 @@ jobs:
           max_attempts: 3
           timeout_minutes: 20
           command: cd ./ecosystem/typescript/sdk && pnpm run test:indexer
-
