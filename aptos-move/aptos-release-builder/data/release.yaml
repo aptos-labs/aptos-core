@@ -23,16 +23,6 @@ proposals:
     - FeatureFlag:
         enabled:
           - gas_payer_enabled
-  - name: enable_aptos_unique_identifiers
-    metadata:
-      title: "Enable Aptos Unique Identifiers"
-      description: "AIP-36: Support for aptos unique identifiers (generated using native function generate_unique_address)"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/154"
-    execution_mode: MultiStep
-    update_sequence:
-    - FeatureFlag:
-        enabled:
-          - aptos_unique_identifiers
   - name: enable_block_gas_limit
     metadata:
       title: "Enable Block Gas Limit"
@@ -45,3 +35,26 @@ proposals:
           transaction_shuffler_type:
             sender_aware_v1: 32
           block_gas_limit : 35000
+  - name: enable_aptos_unique_identifiers
+    metadata:
+      title: "Enable Aptos Unique Identifiers"
+      description: "AIP-36: Support for aptos unique identifiers (generated using native function generate_unique_address)"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/154"
+    execution_mode: MultiStep
+    update_sequence:
+    - FeatureFlag:
+        enabled:
+          - aptos_unique_identifiers
+  - name: enable_partial_voting
+    metadata:
+      title: "Enable partial voting"
+      description: "AIP-28:  Partial voting for on chain governance."
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8090"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-28.md"
+    execution_mode: MultiStep
+    update_sequence:
+    - RawScript: /aptos/aptos-move/aptos-release-builder/data/proposals/aip_28_initialization.move
+    - FeatureFlag:
+        enabled:
+          - partial_governance_voting
+          - delegation_pool_partial_governance_voting
