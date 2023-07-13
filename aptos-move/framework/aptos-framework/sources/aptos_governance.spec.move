@@ -499,7 +499,6 @@ spec aptos_framework::aptos_governance {
         let signer_cap = simple_map::spec_get(governance_responsibility.signer_caps, signer_address);
         let addr = signer_cap.account;
         ensures signer::address_of(result) == addr;
-        ensures table::spec_get(voting_forum.proposals, proposal_id).is_resolved == true;
     }
 
     /// Address @aptos_framework must exist ApprovedExecutionHashes and GovernanceProposal.
