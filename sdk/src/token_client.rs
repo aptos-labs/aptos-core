@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{anyhow, Context, Result};
 use aptos_api_types::U64;
 use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
-use aptos_types::transaction::{SignedTransaction, TransactionPayload};
+use aptos_types::transaction::TransactionPayload;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
@@ -100,12 +100,13 @@ impl<'a> TokenClient<'a> {
         }
     }
 
-    async fn build_and_sign_transaction(
+    /// Helper function to take care of a transaction after creating the payload.
+    async fn build_and_submit_transaction(
         &self,
         account: &mut LocalAccount,
         payload: TransactionPayload,
         options: TransactionOptions,
-    ) -> Result<SignedTransaction> {
+    ) -> Result<PendingTransaction> {
         // create factory
         let factory = TransactionFactory::new(self.get_chain_id().await?)
             .with_gas_unit_price(options.gas_unit_price)
@@ -118,7 +119,16 @@ impl<'a> TokenClient<'a> {
             .sender(account.address())
             .sequence_number(account.sequence_number());
 
-        Ok(account.sign_with_transaction_builder(builder))
+        // sign transaction
+        let signed_txn = account.sign_with_transaction_builder(builder);
+
+        // submit and return
+        Ok(self
+            .api_client
+            .submit(&signed_txn)
+            .await
+            .context("Failed to submit transaction")?
+            .into_inner())
     }
 
     /// Creates a collection with the given fields.
@@ -141,18 +151,8 @@ impl<'a> TokenClient<'a> {
         }
         .encode();
 
-        // create signed transaction
-        let signed_txn = self
-            .build_and_sign_transaction(account, payload, options.unwrap_or_default())
-            .await?;
-
-        // submit and return
-        Ok(self
-            .api_client
-            .submit(&signed_txn)
-            .await
-            .context("Failed to submit transaction")?
-            .into_inner())
+        // create and submit transaction
+        self.build_and_submit_transaction(account, payload, options.unwrap_or_default()).await
     }
 
     /// Creates a token with the given fields. Does not support property keys.
@@ -382,18 +382,8 @@ impl<'a> TokenClient<'a> {
         }
         .encode();
 
-        // create signed transaction
-        let signed_txn = self
-            .build_and_sign_transaction(account, payload, options.unwrap_or_default())
-            .await?;
-
-        // submit and return
-        Ok(self
-            .api_client
-            .submit(&signed_txn)
-            .await
-            .context("Failed to submit transaction")?
-            .into_inner())
+        // create and submit transaction
+        self.build_and_submit_transaction(account, payload, options.unwrap_or_default()).await
     }
 }
 
