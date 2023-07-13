@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::Error, BlockExecutionRequest, BlockExecutionResult, ExecuteBlockCommand};
+use crate::{error::Error, RemoteExecutionRequest, RemoteExecutionResult, ExecuteBlockCommand};
 use aptos_logger::error;
 use aptos_retrier::{fixed_retry_strategy, retry};
 use aptos_secure_net::NetworkClient;
@@ -33,8 +33,8 @@ impl RemoteExecutorClient {
 
     fn execute_block_inner(
         &self,
-        execution_request: BlockExecutionRequest,
-    ) -> Result<BlockExecutionResult, Error> {
+        execution_request: RemoteExecutionRequest,
+    ) -> Result<RemoteExecutionResult, Error> {
         let input_message = bcs::to_bytes(&execution_request)?;
         let mut network_client = self.network_client.lock().unwrap();
         network_client.write(&input_message)?;
@@ -44,8 +44,8 @@ impl RemoteExecutorClient {
 
     fn execute_block_with_retry(
         &self,
-        execution_request: BlockExecutionRequest,
-    ) -> BlockExecutionResult {
+        execution_request: RemoteExecutionRequest,
+    ) -> RemoteExecutionResult {
         retry(fixed_retry_strategy(5, 20), || {
             let res = self.execute_block_inner(execution_request.clone());
             if let Err(e) = &res {
@@ -65,7 +65,7 @@ impl BlockExecutorClient for RemoteExecutorClient {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
-        let input = BlockExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
+        let input = RemoteExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
             sub_blocks,
             state_view: S::as_in_memory_state_view(state_view),
             concurrency_level,

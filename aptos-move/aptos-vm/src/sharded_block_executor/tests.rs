@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    sharded_block_executor::sharded_executor_client::ShardedExecutorClient, AptosVM,
+    sharded_block_executor::local_executor_shard::LocalExecutorShard, AptosVM,
     ShardedBlockExecutor, VMExecutor,
 };
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
@@ -112,9 +112,8 @@ fn test_sharded_block_executor_no_conflict() {
     }
     let partitioner = ShardedBlockPartitioner::new(num_shards);
     let partitioned_txns = partitioner.partition(transactions.clone(), 2, 0.9);
-    let executor_clients =
-        ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(2));
-    let sharded_block_executor = ShardedBlockExecutor::new(executor_clients);
+    let executor_shards = LocalExecutorShard::create_local_executor_shards(num_shards, Some(2));
+    let sharded_block_executor = ShardedBlockExecutor::new(executor_shards);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
@@ -176,9 +175,9 @@ fn sharded_block_executor_with_conflict(concurrency: usize) {
         .map(|t| t.into_txn())
         .collect::<Vec<_>>();
 
-    let executor_clients =
-        ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(concurrency));
-    let sharded_block_executor = ShardedBlockExecutor::new(executor_clients);
+    let executor_shards =
+        LocalExecutorShard::create_local_executor_shards(num_shards, Some(concurrency));
+    let sharded_block_executor = ShardedBlockExecutor::new(executor_shards);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
@@ -239,9 +238,9 @@ fn sharded_block_executor_with_random_transfers(concurrency: usize) {
         .map(|t| t.into_txn())
         .collect::<Vec<_>>();
 
-    let executor_clients =
-        ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(concurrency));
-    let sharded_block_executor = ShardedBlockExecutor::new(executor_clients);
+    let executor_shards =
+        LocalExecutorShard::create_local_executor_shards(num_shards, Some(concurrency));
+    let sharded_block_executor = ShardedBlockExecutor::new(executor_shards);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),

@@ -32,6 +32,7 @@ use proptest::{
     test_runner::TestRunner,
 };
 use std::{net::SocketAddr, sync::Arc, time::Instant};
+use aptos_vm::sharded_block_executor::local_executor_shard::LocalExecutorShard;
 
 pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
@@ -192,7 +193,7 @@ struct TransactionBenchState<S> {
     num_transactions: usize,
     strategy: S,
     account_universe: AccountUniverse,
-    parallel_block_executor: Option<Arc<ShardedBlockExecutor<FakeDataStore>>>,
+    parallel_block_executor: Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorShard<FakeDataStore>>>>,
     block_partitioner: Option<ShardedBlockPartitioner>,
     validator_set: ValidatorSet,
     state_view: Arc<FakeDataStore>,

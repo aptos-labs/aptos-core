@@ -12,6 +12,7 @@ mod inbound_handler;
 mod outbound_handler;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[allow(dead_code)]
 pub struct NetworkMessage {
     pub sender: SocketAddr,
     pub message: Message,
@@ -19,6 +20,7 @@ pub struct NetworkMessage {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, Hash, PartialEq)]
+#[allow(dead_code)]
 pub struct MessageType {
     message_type: String,
 }
@@ -44,6 +46,7 @@ impl NetworkMessage {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[allow(dead_code)]
 pub struct Message {
     pub data: Vec<u8>,
 }
@@ -52,8 +55,13 @@ impl Message {
     pub fn new(data: Vec<u8>) -> Self {
         Self { data }
     }
+
+    pub fn to_bytes(self) -> Vec<u8> {
+        self.data
+    }
 }
 
+#[allow(dead_code)]
 pub struct NetworkController {
     inbound_handler: InboundHandler,
     outbound_handler: OutboundHandler,
@@ -99,7 +107,6 @@ impl NetworkController {
 mod tests {
     use crate::network_controller::{Message, NetworkController};
     use aptos_config::utils;
-    use crossbeam_channel::{bounded, Select};
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     #[test]

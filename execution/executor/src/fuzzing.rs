@@ -23,7 +23,10 @@ use aptos_types::{
     },
     vm_status::VMStatus,
 };
-use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
+use aptos_vm::{
+    sharded_block_executor::{executor_shard::ExecutorShard, ShardedBlockExecutor},
+    VMExecutor,
+};
 use std::sync::Arc;
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
@@ -69,9 +72,15 @@ impl TransactionBlockExecutor for FakeVM {
 }
 
 impl VMExecutor for FakeVM {
+<<<<<<< HEAD
     fn execute_block_sharded<S: StateView + Send + Sync>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
         _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+=======
+    fn execute_block_sharded<S: StateView + Send + Sync, E: ExecutorShard<S>>(
+        _sharded_block_executor: &ShardedBlockExecutor<S, E>,
+        _block: Vec<SubBlocksForShard<Transaction>>,
+>>>>>>> 7440efc4c2 (Refactor local executor shard: Local tests work, before adding remote executor shard)
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

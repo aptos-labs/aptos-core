@@ -26,6 +26,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
+crossbeam-channel = { workspace = true }
 itertools = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

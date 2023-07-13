@@ -17,12 +17,10 @@ use aptos_types::{
     transaction::analyzed_transaction::AnalyzedTransaction,
     write_set::TransactionWrite,
 };
+use crossbeam_channel::{Receiver, Sender};
 use std::{
     collections::{HashMap, HashSet},
-    sync::{
-        mpsc::{Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
 
 pub struct CrossShardCommitReceiver {}
@@ -35,7 +33,7 @@ impl CrossShardCommitReceiver {
         loop {
             let msg = message_rx.recv().unwrap();
             match msg {
-                CrossShardMsg::RemoteTxnWriteMsg(txn_commit_msg) => {
+                RemoteTxnWriteMsg(txn_commit_msg) => {
                     let (state_key, write_op) = txn_commit_msg.take();
                     cross_shard_state_view
                         .set_value(&state_key, write_op.and_then(|w| w.as_state_value()));

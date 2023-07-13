@@ -13,6 +13,7 @@ use std::{
     thread,
 };
 
+#[allow(dead_code)]
 pub struct InboundHandler {
     server: Arc<Mutex<NetworkServer>>,
     // Used to route incoming messages to correct channel.

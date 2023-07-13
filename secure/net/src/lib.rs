@@ -16,7 +16,7 @@
 //! Internally both the client and server leverage a NetworkStream that communications in blocks
 //! where a block is a length prefixed array of bytes.
 
-mod network_controller;
+pub mod network_controller;
 
 use aptos_logger::{info, trace, warn, Schema};
 use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};

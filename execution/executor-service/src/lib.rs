@@ -12,16 +12,17 @@ mod error;
 pub mod process_executor_service;
 pub mod remote_executor_client;
 pub mod remote_executor_service;
+mod remote_executor_shard;
 #[cfg(test)]
 mod thread_executor_service;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct BlockExecutionResult {
+pub struct RemoteExecutionResult {
     pub inner: Result<Vec<Vec<TransactionOutput>>, VMStatus>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum BlockExecutionRequest {
+pub enum RemoteExecutionRequest {
     ExecuteBlock(ExecuteBlockCommand),
 }
 

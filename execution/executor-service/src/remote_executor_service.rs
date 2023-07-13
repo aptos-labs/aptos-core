@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::Error, remote_executor_client::RemoteExecutorClient, BlockExecutionRequest,
-    BlockExecutionResult,
+    error::Error, remote_executor_client::RemoteExecutorClient, RemoteExecutionRequest,
+    RemoteExecutionResult,
 };
 use aptos_logger::{error, info};
 use aptos_secure_net::NetworkServer;
@@ -19,6 +19,16 @@ pub struct ExecutorService {
 }
 
 impl ExecutorService {
+    // pub fn new(
+    //     shard_id: ShardId,
+    //     num_shards: usize,
+    //     num_threads: usize,
+    //     controller: &NetworkController,
+    //     cross_shard_txs: Vec<Vec<Sender<CrossShardMsg>>>,
+    //     cross_shard_rxs: Vec<Receiver<CrossShardMsg>>,
+    // ) -> Self {
+    //
+    // }
     pub fn new(num_executor_threads: usize) -> Self {
         Self {
             client: VMExecutorClient::new(num_executor_threads),
@@ -33,17 +43,17 @@ impl ExecutorService {
 
     pub fn handle_execution_request(
         &self,
-        execution_request: BlockExecutionRequest,
-    ) -> Result<BlockExecutionResult, Error> {
+        execution_request: RemoteExecutionRequest,
+    ) -> Result<RemoteExecutionResult, Error> {
         let result = match execution_request {
-            BlockExecutionRequest::ExecuteBlock(command) => self.client.execute_block(
+            RemoteExecutionRequest::ExecuteBlock(command) => self.client.execute_block(
                 command.sub_blocks,
                 &command.state_view,
                 command.concurrency_level,
                 command.maybe_block_gas_limit,
             ),
         };
-        Ok(BlockExecutionResult { inner: result })
+        Ok(RemoteExecutionResult { inner: result })
     }
 }
 
