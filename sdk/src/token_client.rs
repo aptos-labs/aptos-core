@@ -9,6 +9,7 @@ use crate::{
 use anyhow::{anyhow, Context, Result};
 use aptos_api_types::U64;
 use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
+use aptos_types::transaction::{SignedTransaction, TransactionPayload};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
@@ -99,6 +100,27 @@ impl<'a> TokenClient<'a> {
         }
     }
 
+    async fn build_and_sign_transaction(
+        &self,
+        account: &mut LocalAccount,
+        payload: TransactionPayload,
+        options: TransactionOptions,
+    ) -> Result<SignedTransaction> {
+        // create factory
+        let factory = TransactionFactory::new(self.get_chain_id().await?)
+            .with_gas_unit_price(options.gas_unit_price)
+            .with_max_gas_amount(options.max_gas_amount)
+            .with_transaction_expiration_time(options.timeout_secs);
+
+        // create transaction
+        let builder = factory
+            .payload(payload)
+            .sender(account.address())
+            .sequence_number(account.sequence_number());
+
+        Ok(account.sign_with_transaction_builder(builder))
+    }
+
     /// Creates a collection with the given fields.
     pub async fn create_collection(
         &self,
@@ -109,13 +131,6 @@ impl<'a> TokenClient<'a> {
         max_amount: u64,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
-        // create factory
-        let options = options.unwrap_or_default();
-        let factory = TransactionFactory::new(self.get_chain_id().await?)
-            .with_gas_unit_price(options.gas_unit_price)
-            .with_max_gas_amount(options.max_gas_amount)
-            .with_transaction_expiration_time(options.timeout_secs);
-
         // create payload
         let payload = EntryFunctionCall::TokenCreateCollectionScript {
             name: name.to_owned().into_bytes(),
@@ -126,12 +141,10 @@ impl<'a> TokenClient<'a> {
         }
         .encode();
 
-        // create transaction
-        let builder = factory
-            .payload(payload)
-            .sender(account.address())
-            .sequence_number(account.sequence_number());
-        let signed_txn = account.sign_with_transaction_builder(builder);
+        // create signed transaction
+        let signed_txn = self
+            .build_and_sign_transaction(account, payload, options.unwrap_or_default())
+            .await?;
 
         // submit and return
         Ok(self
@@ -359,13 +372,6 @@ impl<'a> TokenClient<'a> {
         property_version: Option<u64>,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
-        // create factory
-        let options = options.unwrap_or_default();
-        let factory = TransactionFactory::new(self.get_chain_id().await?)
-            .with_gas_unit_price(options.gas_unit_price)
-            .with_max_gas_amount(options.max_gas_amount)
-            .with_transaction_expiration_time(options.timeout_secs);
-
         // create payload
         let payload = EntryFunctionCall::TokenTransfersClaimScript {
             sender,
@@ -376,12 +382,10 @@ impl<'a> TokenClient<'a> {
         }
         .encode();
 
-        // create transaction
-        let builder = factory
-            .payload(payload)
-            .sender(account.address())
-            .sequence_number(account.sequence_number());
-        let signed_txn = account.sign_with_transaction_builder(builder);
+        // create signed transaction
+        let signed_txn = self
+            .build_and_sign_transaction(account, payload, options.unwrap_or_default())
+            .await?;
 
         // submit and return
         Ok(self
