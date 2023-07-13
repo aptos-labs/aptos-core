@@ -19,22 +19,14 @@ use once_cell::sync::Lazy;
 use url::Url;
 
 // network urls
-// static DEVNET_NODE_URL: Lazy<Url> =
-//     Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
-// static DEVNET_FAUCET_URL: Lazy<Url> =
-//     Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
+static DEVNET_NODE_URL: Lazy<Url> =
+    Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
+static DEVNET_FAUCET_URL: Lazy<Url> =
+    Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
 static TESTNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
 static TESTNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
-
-// static accounts to use
-static TEST_ACCOUNT_1: Lazy<AccountAddress> = Lazy::new(|| {
-    AccountAddress::from_hex_literal(
-        "0xf6cee5c359839a321a08af6b8cfe4a6e439db46f4942e21b6845aa57d770efdb",
-    )
-    .unwrap()
-});
 
 #[derive(Debug)]
 enum TestResult {
@@ -99,17 +91,17 @@ async fn test_cointransfer(
     client: &Client,
     coin_client: &CoinClient<'_>,
     account: &mut LocalAccount,
-    address: AccountAddress,
+    receiver: AccountAddress,
     amount: u64,
 ) -> TestResult {
     // get starting balance
-    let starting_receiver_balance = match client.get_account_balance(address).await {
+    let starting_receiver_balance = match client.get_account_balance(receiver).await {
         Ok(response) => u64::from(response.inner().coin.value),
         Err(e) => return TestResult::Error(e.into()),
     };
 
     // transfer coins to static account
-    let pending_txn = match coin_client.transfer(account, address, amount, None).await {
+    let pending_txn = match coin_client.transfer(account, receiver, amount, None).await {
         Ok(txn) => txn,
         Err(e) => return TestResult::Error(e),
     };
@@ -120,7 +112,7 @@ async fn test_cointransfer(
 
     // check receiver balance
     let expected_receiver_balance = U64(starting_receiver_balance + amount);
-    let actual_receiver_balance = match client.get_account_balance(address).await {
+    let actual_receiver_balance = match client.get_account_balance(receiver).await {
         Ok(response) => response.inner().coin.value,
         Err(e) => return TestResult::Error(e.into()),
     };
@@ -137,7 +129,7 @@ async fn test_cointransfer(
 
     let expected_balance_at_version = U64(starting_receiver_balance);
     let actual_balance_at_version = match client
-        .get_account_balance_at_version(address, version - 1)
+        .get_account_balance_at_version(receiver, version - 1)
         .await
     {
         Ok(response) => response.inner().coin.value,
@@ -366,10 +358,8 @@ async fn test_mintnft(
     TestResult::Success
 }
 
-async fn testnet_1() -> Result<()> {
+async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
     // create clients
-    let client: Client = Client::new(TESTNET_NODE_URL.clone());
-    let faucet_client = FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone());
     let coin_client = CoinClient::new(&client);
     let token_client = TokenClient::new(&client);
 
@@ -382,7 +372,7 @@ async fn testnet_1() -> Result<()> {
     faucet_client.fund(giray2.address(), 100_000_000).await?;
     println!("{:?}", giray2.address());
 
-    // Step 1: Test new account creation and funding
+    // Test new account creation and funding
     // this test is critical to pass for the next tests
     let result = handle_result(test_newaccount(&client, &giray, 100_000_000)).await;
     match result {
@@ -390,17 +380,17 @@ async fn testnet_1() -> Result<()> {
         _ => return Err(anyhow!("returning early because new account test failed")),
     }
 
-    // Step 2: Test coin transfer
+    // Flow 1: Coin transfer
     handle_result(test_cointransfer(
         &client,
         &coin_client,
         &mut giray,
-        *TEST_ACCOUNT_1,
+        giray2.address(),
         1_000,
     ))
     .await;
 
-    // Step 3: Test NFT minting
+    // Flow 2: NFT transfer
     handle_result(test_mintnft(
         &client,
         &token_client,
@@ -414,7 +404,21 @@ async fn testnet_1() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let _ = testnet_1().await;
+    // test flows on testnet
+    println!("testing testnet...");
+    let _ = test_flows(
+        Client::new(TESTNET_NODE_URL.clone()),
+        FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone()),
+    )
+    .await;
+
+    // test flows on devnet
+    println!("testing devnet...");
+    let _ = test_flows(
+        Client::new(DEVNET_NODE_URL.clone()),
+        FaucetClient::new(DEVNET_FAUCET_URL.clone(), DEVNET_NODE_URL.clone()),
+    )
+    .await;
 
     Ok(())
 }
