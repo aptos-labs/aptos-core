@@ -168,13 +168,6 @@ impl<'a> TokenClient<'a> {
         royalty_options: Option<RoyaltyOptions>,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
-        // create factory
-        let options = options.unwrap_or_default();
-        let factory = TransactionFactory::new(self.get_chain_id().await?)
-            .with_gas_unit_price(options.gas_unit_price)
-            .with_max_gas_amount(options.max_gas_amount)
-            .with_transaction_expiration_time(options.timeout_secs);
-
         // set default royalty options
         let royalty_options = match royalty_options {
             Some(opt) => opt,
@@ -204,20 +197,8 @@ impl<'a> TokenClient<'a> {
         }
         .encode();
 
-        // create transaction
-        let builder = factory
-            .payload(payload)
-            .sender(account.address())
-            .sequence_number(account.sequence_number());
-        let signed_txn = account.sign_with_transaction_builder(builder);
-
-        // submit and return
-        Ok(self
-            .api_client
-            .submit(&signed_txn)
-            .await
-            .context("Failed to submit transaction")?
-            .into_inner())
+        // create and submit transaction
+        self.build_and_submit_transaction(account, payload, options.unwrap_or_default()).await
     }
 
     /// Retrieves collection metadata from the API.
@@ -328,13 +309,6 @@ impl<'a> TokenClient<'a> {
         property_version: Option<u64>,
         options: Option<TransactionOptions>,
     ) -> Result<PendingTransaction> {
-        // create factory
-        let options = options.unwrap_or_default();
-        let factory = TransactionFactory::new(self.get_chain_id().await?)
-            .with_gas_unit_price(options.gas_unit_price)
-            .with_max_gas_amount(options.max_gas_amount)
-            .with_transaction_expiration_time(options.timeout_secs);
-
         // create payload
         let payload = EntryFunctionCall::TokenTransfersOfferScript {
             receiver,
@@ -346,20 +320,8 @@ impl<'a> TokenClient<'a> {
         }
         .encode();
 
-        // create transaction
-        let builder = factory
-            .payload(payload)
-            .sender(account.address())
-            .sequence_number(account.sequence_number());
-        let signed_txn = account.sign_with_transaction_builder(builder);
-
-        // submit and return
-        Ok(self
-            .api_client
-            .submit(&signed_txn)
-            .await
-            .context("Failed to submit transaction")?
-            .into_inner())
+        // create and submit transaction
+        self.build_and_submit_transaction(account, payload, options.unwrap_or_default()).await
     }
 
     pub async fn claim_token(
