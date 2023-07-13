@@ -252,6 +252,8 @@ pub struct AptosDataClientConfig {
     pub max_response_timeout_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
+    /// Maximum version lag we'll tolerate when sending subscription requests
+    pub max_subscription_version_lag: u64,
     /// Maximum number of transactions per chunk
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
@@ -277,6 +279,7 @@ impl Default for AptosDataClientConfig {
             max_optimistic_fetch_version_lag: 50_000, // Assumes 5K TPS for 10 seconds, which should be plenty
             max_response_timeout_ms: 60_000,          // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
+            max_subscription_version_lag: 100_000, // Assumes 5K TPS for 20 seconds, which should be plenty
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000, // 5 seconds
