@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+anyhow = { workspace = true }
 pprof = { version = "0.11", features = ["flamegraph"]}
 backtrace = { version = "0.3" }
 jemallocator = { version = "0.3.2", features = [

@@ -17,19 +17,12 @@ use std::{
 };
 
 mod configuration;
-mod cpu_flamegraph;
-mod cpu_profiling;
 mod index;
 mod json_encoder;
-mod memory_profiling;
-mod memory_svg;
-mod memory_text;
 mod metrics;
 mod peer_information;
 mod profiling;
 mod system_information;
-mod thread_dump;
-mod thread_dump_result;
 
 pub mod utils;
 
@@ -153,12 +146,12 @@ async fn serve_requests(
         CPU_PROFILING_PATH => {
             // /cpu_profiling
             // Exposes the CPU usage
-            cpu_profiling::handle_cpu_profiling_request()
+            profiling::handle_cpu_profiling_request()
         },
         MEMORY_PROFILING_PATH => {
             // /memory_profiling
             // Exposes the memory usage
-            memory_profiling::handle_memory_profiling_request()
+            profiling::handle_memory_profiling_request()
         },
         PROFILING_DASHBOARD => {
             //profiling dashboard
@@ -166,23 +159,23 @@ async fn serve_requests(
         },
         CPU_FLAMEGRAPH_PATH => {
             //shows cpu flamegraph
-            cpu_flamegraph::handle_cpu_flamegraph_request()
+            profiling::handle_cpu_flamegraph_request()
         },
         MEMORY_SVG_PATH => {
             //shows memory svg
-            memory_svg::handle_memory_svg_request()
+            profiling::handle_memory_svg_request()
         },
         MEMORY_TXT_PATH => {
             //shows memory txt
-            memory_text::handle_memory_txt_request()
+            profiling::handle_memory_txt_request()
         },
         THREAD_DUMP_PATH => {
             //starts thread dump
-            thread_dump::handle_thread_dump_request()
+            profiling::handle_thread_dump_request()
         },
         THREAD_DUMP_RESULT_PATH => {
             //shows thread dump
-            thread_dump_result::handle_thread_dump_result_request()
+            profiling::handle_thread_dump_result_request()
         },
 
         _ => {
