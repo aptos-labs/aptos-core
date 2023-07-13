@@ -130,15 +130,8 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         );
     }
 
-    /// Return the amount of gas consumed by the transaction.
-    fn gas_used(&self) -> u64 {
-        self.committed_output
-            .get()
-            .map_or(0, |output| output.gas_used())
-    }
-
-    // Return the fee statement of the transaction.
-    // Should never be called after vm_output is consumed.
+    /// Return the fee statement of the transaction.
+    /// Should never be called after vm_output is consumed.
     fn fee_statement(&self) -> FeeStatement {
         self.vm_output
             .lock()
