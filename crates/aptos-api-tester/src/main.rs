@@ -167,6 +167,10 @@ async fn test_cointransfer(
     Ok(TestResult::Success)
 }
 
+/// Tests nft transfer. Checks that:
+///   - collection data exists
+///   - token data exists
+///   - token balance reflects transferred amount
 async fn test_mintnft(
     client: &Client,
     token_client: &TokenClient<'_>,
