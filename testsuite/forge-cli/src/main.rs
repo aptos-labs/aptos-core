@@ -42,11 +42,12 @@ use aptos_testcases::{
     CompositeNetworkTest,
 };
 use clap::{Parser, Subcommand};
-use futures::stream::{FuturesUnordered,StreamExt};
+use futures::stream::{FuturesUnordered, StreamExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
     num::NonZeroUsize,
+    path::{Path, PathBuf},
     process,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -55,9 +56,7 @@ use std::{
     thread,
     time::Duration,
 };
-use std::path::{Path, PathBuf};
-use tokio::runtime::Runtime;
-use tokio::select;
+use tokio::{runtime::Runtime, select};
 use url::Url;
 
 #[cfg(unix)]
@@ -2069,7 +2068,6 @@ impl NetworkTest for EmitTransaction {
     }
 }
 
-
 #[derive(Debug)]
 struct GatherMetrics;
 
@@ -2099,13 +2097,15 @@ async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
     let handle = ctx.runtime.handle();
     let outdir = Path::new("/tmp");
     let mut gets = FuturesUnordered::new();
-    let now = chrono::prelude::Utc::now().format("%Y%m%d_%H%M%S%").to_string();
+    let now = chrono::prelude::Utc::now()
+        .format("%Y%m%d_%H%M%S%")
+        .to_string();
     for val in ctx.swarm.validators() {
         let mut url = val.inspection_service_endpoint();
         let valname = val.peer_id().to_string();
         url.set_path("metrics");
         let fname = format!("{}.{}.metrics", now, valname);
-        let outpath : PathBuf = outdir.join(fname);
+        let outpath: PathBuf = outdir.join(fname);
         let th = handle.spawn(gather_metrics_to_file(url, outpath));
         gets.push(th);
     }
@@ -2125,27 +2125,24 @@ async fn gather_metrics_to_file(url: Url, outpath: PathBuf) {
             let status = response.status();
             if status.is_success() {
                 match response.text().await {
-                    Ok(text) => {
-                        match std::fs::write(outpath, text) {
-                            Ok(_) => {return;}
-                            Err(err) => {
-                                info!("could not write metrics: {}", err);
-                            }
-                        }
-                    }
+                    Ok(text) => match std::fs::write(outpath, text) {
+                        Ok(_) => {},
+                        Err(err) => {
+                            info!("could not write metrics: {}", err);
+                        },
+                    },
                     Err(err) => {
                         info!("bad metrics GET: {} -> {}", url, err);
-                    }
+                    },
                 }
             } else {
                 info!("bad metrics GET: {} -> {}", url, status);
             }
-        }
+        },
         Err(err) => {
             info!("bad metrics GET: {}", err);
-        }
+        },
     }
-
 }
 
 #[cfg(test)]
