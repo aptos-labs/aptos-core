@@ -300,6 +300,12 @@ async fn test_mintnft(
         Err(e) => return TestResult::Error(e),
     };
 
+    // check that token store isn't initialized for the receiver
+    match token_client.get_token(receiver.address(), &collection_name, &token_name).await {
+        Ok(_) => return TestResult::Fail("found tokens for receiver when shouldn't"),
+        Err(_) => {},
+    }
+
     if expected_sender_token_balance != actual_sender_token_balance {
         return TestResult::Fail("wrong token balance");
     }
