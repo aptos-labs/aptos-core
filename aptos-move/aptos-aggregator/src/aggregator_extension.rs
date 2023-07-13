@@ -10,6 +10,7 @@ use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
 use move_table_extension::TableHandle;
 use std::collections::{BTreeMap, BTreeSet};
+use std::cmp::min;
 
 /// Describes the state of each aggregator instance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,11 +23,11 @@ pub enum AggregatorState {
     NegativeDelta,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorHandle(pub AccountAddress);
 
 /// Uniquely identifies each aggregator instance in storage.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AggregatorID {
     // Aggregator V1 is implemented as a Table item, and so can be queried by the
     // state key.
@@ -47,9 +48,10 @@ pub enum AggregatorID {
 
 
 /// Uniquely identifies each aggregator snapshot instance during the block execution.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AggregatorSnapshotID {
-    pub key: u128,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AggregatorSnapshotID {
+    U128(u128),
+    U64(u64)
 }
 
 impl AggregatorID {
@@ -95,7 +97,7 @@ impl AggregatorID {
 ///
 /// TODO: while we support tracking of the history, it is not yet fully used on
 /// executor side because we don't know how to throw errors.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct History {
     pub max_positive: u128,
     pub min_negative: u128,
@@ -152,6 +154,8 @@ pub struct AggregatorSnapshot {
     // Describes values seen by this aggregator. Note that if aggregator knows
     // its value, then storing history doesn't make sense.
     history: Option<History>,
+    // The AggregatorID of the aggregator from which the snapshot is taken.
+    base_aggregator: AggregatorID
 }
 
 impl Aggregator {
@@ -298,7 +302,7 @@ impl Aggregator {
         self.history = None;
         Ok(self.value)
     }
-
+    
     /// Unpacks aggregator into its fields.
     pub fn into(self) -> (u128, AggregatorState, u128, Option<History>) {
         (self.value, self.state, self.limit, self.history)
@@ -398,6 +402,40 @@ impl AggregatorData {
     pub fn generate_id(&mut self) -> u64 {
         self.id_counter += 1;
         self.id_counter
+    }
+
+    pub fn deferred_read(&mut self,
+        id: &AggregatorID,
+    ) -> AggregatorSnapshotID {
+        let snapshot_id = self.generate_id() as u128;
+        let aggregator = self.aggregators.get(id).expect("Aggregator doesn't exist");
+        self.aggregator_snapshots.insert(AggregatorSnapshotID::U128(snapshot_id), 
+            AggregatorSnapshot {
+                value: aggregator.value,
+                state: aggregator.state,
+                limit: aggregator.limit,
+                history: aggregator.history.clone(),
+                base_aggregator: *id
+            }
+        );
+        AggregatorSnapshotID::U128(snapshot_id)
+    }
+
+    pub fn deferred_read_u64(&mut self,
+        id: &AggregatorID
+    ) -> AggregatorSnapshotID {
+        let snapshot_id = self.generate_id();
+        let aggregator = self.aggregators.get(id).expect("Aggregator doesn't exist");
+        self.aggregator_snapshots.insert(AggregatorSnapshotID::U64(snapshot_id), 
+            AggregatorSnapshot {
+                value: aggregator.value,
+                state: aggregator.state,
+                limit: min(aggregator.limit,u64::MAX as u128),
+                history: aggregator.history.clone(),
+                base_aggregator: *id
+            }
+        );
+        AggregatorSnapshotID::U64(snapshot_id)        
     }
 
     /// Unpacks aggregator data.
