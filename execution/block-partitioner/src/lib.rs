@@ -6,7 +6,6 @@ pub mod scheduling;
 pub mod no_op;
 pub mod sharded_block_partitioner;
 pub mod simple_partitioner;
-pub mod simple_uf_partitioner;
 pub mod beta;
 mod union_find;
 
