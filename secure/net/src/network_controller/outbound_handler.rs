@@ -32,7 +32,7 @@ impl OutboundHandler {
 
     pub fn register_handler(
         &self,
-        message_type: &'static str,
+        message_type: String,
         remote_addr: SocketAddr,
         receiver: Receiver<Message>,
     ) {
@@ -41,13 +41,9 @@ impl OutboundHandler {
             .lock()
             .unwrap()
             .entry(remote_addr)
-            .or_insert_with(|| NetworkClient::new(message_type, remote_addr, 5000));
+            .or_insert_with(|| NetworkClient::new(message_type.clone(), remote_addr, 5000));
         let mut handlers = self.handlers.lock().unwrap();
-        handlers.push((
-            receiver,
-            remote_addr,
-            MessageType::new(message_type.to_string()),
-        ));
+        handlers.push((receiver, remote_addr, MessageType::new(message_type)));
     }
 
     pub fn start(&mut self) {

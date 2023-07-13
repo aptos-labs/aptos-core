@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::Error, RemoteExecutionRequest, RemoteExecutionResult, ExecuteBlockCommand};
+use crate::{error::Error, ExecuteBlockCommand, RemoteExecutionRequest, RemoteExecutionResult};
 use aptos_logger::error;
 use aptos_retrier::{fixed_retry_strategy, retry};
 use aptos_secure_net::NetworkClient;
@@ -22,7 +22,7 @@ pub struct RemoteExecutorClient {
 impl RemoteExecutorClient {
     pub fn new(server_address: SocketAddr, network_timeout_ms: u64) -> Self {
         let network_client = NetworkClient::new(
-            "remote-executor-service",
+            "remote-executor-service".to_string(),
             server_address,
             network_timeout_ms,
         );

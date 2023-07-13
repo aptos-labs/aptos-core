@@ -1,19 +1,24 @@
 // Copyright © Aptos Foundation
 
-use std::sync::Arc;
 use crate::sharded_block_executor::{
-    executor_shard::ExecutorShard,
+    executor_shard::{CoordinatorClient, CrossShardClient, ExecutorShard},
     messages::CrossShardMsg,
-    sharded_executor_service::ShardedExecutorService, ExecutorShardCommand,
+    sharded_executor_service::ShardedExecutorService,
+    ExecutorShardCommand,
 };
 use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING_ROUNDS;
-use aptos_logger::{error};
+use aptos_logger::error;
 use aptos_state_view::StateView;
-use aptos_types::{block_executor::partitioner::ShardId, transaction::TransactionOutput};
-use crossbeam_channel::{unbounded, Receiver, Sender, SendError};
+use aptos_types::{
+    block_executor::partitioner::{RoundId, ShardId},
+    transaction::TransactionOutput,
+};
+use crossbeam_channel::{unbounded, Receiver, SendError, Sender};
 use move_core_types::vm_status::VMStatus;
-use std::thread;
-use crate::sharded_block_executor::executor_shard::CoordinatorClient;
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+};
 
 /// A block executor that receives transactions from a channel and executes them in parallel.
 /// It runs in the local machine.
@@ -31,15 +36,16 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
         cross_shard_txs: Vec<Vec<Sender<CrossShardMsg>>>,
         cross_shard_rxs: Vec<Receiver<CrossShardMsg>>,
     ) -> Self {
-
         let coordinator_client = Arc::new(LocalCoordinatorClient::new());
+        let cross_shard_client =
+            Arc::new(LocalCrossShardClient::new(cross_shard_txs, cross_shard_rxs));
+
         let executor_service = Arc::new(ShardedExecutorService::new(
             shard_id,
             num_shards,
             num_threads,
             coordinator_client,
-            cross_shard_txs,
-            cross_shard_rxs,
+            cross_shard_client,
         ));
         Self {
             shard_id,
@@ -88,9 +94,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> for LocalExecutorSha
         let executor_service = Arc::clone(&self.executor_service);
         let join_handle = thread::Builder::new()
             .name(format!("executor-shard-{}", self.shard_id))
-            .spawn(move || {
-                executor_service.start()
-            })
+            .spawn(move || executor_service.start())
             .unwrap();
         self.join_handle = Some(join_handle);
     }
@@ -123,8 +127,7 @@ pub struct LocalCoordinatorClient<S> {
 }
 
 impl<S> LocalCoordinatorClient<S> {
-    pub fn new(
-    ) -> Self {
+    pub fn new() -> Self {
         let (command_tx, command_rx) = unbounded();
         let (result_tx, result_rx) = unbounded();
         Self {
@@ -143,7 +146,10 @@ impl<S> Default for LocalCoordinatorClient<S> {
 }
 
 impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordinatorClient<S> {
-    fn send_execute_command(&self, execute_command: ExecutorShardCommand<S>) -> Result<(), SendError<ExecutorShardCommand<S>>> {
+    fn send_execute_command(
+        &self,
+        execute_command: ExecutorShardCommand<S>,
+    ) -> Result<(), SendError<ExecutorShardCommand<S>>> {
         self.command_tx.send(execute_command)
     }
 
@@ -155,7 +161,49 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
         self.command_rx.recv().unwrap()
     }
 
-    fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) -> Result<(), SendError<Result<Vec<Vec<TransactionOutput>>, VMStatus>>> {
-        self.result_tx.send(result)
+    fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
+        self.result_tx.send(result).unwrap()
+    }
+}
+
+pub struct LocalCrossShardClient {
+    // The senders of cross-shard messages to other shards per round.
+    message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
+    // The receivers of cross shard messages from other shards per round.
+    message_rxs: Arc<Vec<Mutex<Receiver<CrossShardMsg>>>>,
+}
+
+impl LocalCrossShardClient {
+    pub fn new(
+        cross_shard_txs: Vec<Vec<Sender<CrossShardMsg>>>,
+        cross_shard_rxs: Vec<Receiver<CrossShardMsg>>,
+    ) -> Self {
+        Self {
+            message_rxs: Arc::new(cross_shard_rxs.into_iter().map(Mutex::new).collect()),
+            message_txs: Arc::new(
+                cross_shard_txs
+                    .into_iter()
+                    .map(|inner_vec| inner_vec.into_iter().map(Mutex::new).collect())
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl CrossShardClient for LocalCrossShardClient {
+    fn send_cross_shard_msg(&self, shard_id: ShardId, round: RoundId, msg: CrossShardMsg) {
+        self.message_txs[shard_id][round]
+            .lock()
+            .unwrap()
+            .send(msg)
+            .unwrap()
+    }
+
+    fn receive_cross_shard_msg(&self, current_round: RoundId) -> CrossShardMsg {
+        self.message_rxs[current_round]
+            .lock()
+            .unwrap()
+            .recv()
+            .unwrap()
     }
 }

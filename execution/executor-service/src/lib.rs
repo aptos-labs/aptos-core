@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 
 mod error;
 pub mod process_executor_service;
+mod remote_cordinator_client;
+mod remote_cross_shard_client;
 pub mod remote_executor_client;
 pub mod remote_executor_service;
 mod remote_executor_shard;
@@ -37,4 +39,22 @@ pub struct ExecuteBlockCommand {
     pub(crate) state_view: InMemoryStateView,
     pub(crate) concurrency_level: usize,
     pub(crate) maybe_block_gas_limit: Option<u64>,
+}
+
+impl ExecuteBlockCommand {
+    pub fn into(
+        self,
+    ) -> (
+        SubBlocksForShard<Transaction>,
+        InMemoryStateView,
+        usize,
+        Option<u64>,
+    ) {
+        (
+            self.sub_blocks,
+            self.state_view,
+            self.concurrency_level,
+            self.maybe_block_gas_limit,
+        )
+    }
 }

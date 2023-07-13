@@ -1176,6 +1176,7 @@ name = "aptos-executor-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-partitioner",
  "aptos-config",
  "aptos-crypto",
  "aptos-executor-types",

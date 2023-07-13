@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 pub trait RemoteService {
     fn client(&self) -> SerializerClient {
         let network_client = NetworkClient::new(
-            "safety-rules",
+            "safety-rules".to_string(),
             self.server_address(),
             self.network_timeout_ms(),
         );

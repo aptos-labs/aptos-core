@@ -22,7 +22,10 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
-    sharded_block_executor::{block_executor_client::VMExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{
+        block_executor_client::VMExecutorClient, local_executor_shard::LocalExecutorShard,
+        ShardedBlockExecutor,
+    },
 };
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use once_cell::sync::Lazy;
@@ -32,7 +35,6 @@ use proptest::{
     test_runner::TestRunner,
 };
 use std::{net::SocketAddr, sync::Arc, time::Instant};
-use aptos_vm::sharded_block_executor::local_executor_shard::LocalExecutorShard;
 
 pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
@@ -193,7 +195,8 @@ struct TransactionBenchState<S> {
     num_transactions: usize,
     strategy: S,
     account_universe: AccountUniverse,
-    parallel_block_executor: Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorShard<FakeDataStore>>>>,
+    parallel_block_executor:
+        Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorShard<FakeDataStore>>>>,
     block_partitioner: Option<ShardedBlockPartitioner>,
     validator_set: ValidatorSet,
     state_view: Arc<FakeDataStore>,

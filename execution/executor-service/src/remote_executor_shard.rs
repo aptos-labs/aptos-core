@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use crate::{ExecuteBlockCommand, RemoteExecutionRequest, RemoteExecutionResult};
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -8,7 +9,6 @@ use aptos_types::{
 use aptos_vm::sharded_block_executor::{executor_shard::ExecutorShard, ExecutorShardCommand};
 use crossbeam_channel::{Receiver, Sender};
 use std::net::SocketAddr;
-use crate::{RemoteExecutionRequest, ExecuteBlockCommand, RemoteExecutionResult};
 
 /// A block executor that receives transactions from a channel and executes them in parallel.
 /// It runs in the local machine.
@@ -24,11 +24,12 @@ pub struct RemoteExecutorShard<S: StateView + Sync + Send + 'static> {
 impl<S: StateView + Sync + Send + 'static> RemoteExecutorShard<S> {
     pub fn _new(
         shard_id: ShardId,
-        remote_addr: SocketAddr,
+        remote_shard_addr: SocketAddr,
         controller: &mut NetworkController,
     ) -> Self {
-        let command_tx = controller.create_outbound_channel(remote_addr, "executor-shard-command");
-        let result_rx = controller.create_inbound_channel("executor-shard-result");
+        let command_tx = controller
+            .create_outbound_channel(remote_shard_addr, "executor-shard-command".to_string());
+        let result_rx = controller.create_inbound_channel("executor-shard-result".to_string());
         Self {
             shard_id,
             command_tx,
@@ -49,7 +50,12 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> for RemoteExecutorSh
 
     fn send_execute_command(&self, execute_command: ExecutorShardCommand<S>) {
         match execute_command {
-            ExecutorShardCommand::ExecuteSubBlocks(state_view, sub_blocks , concurrency, gas_limit) => {
+            ExecutorShardCommand::ExecuteSubBlocks(
+                state_view,
+                sub_blocks,
+                concurrency,
+                gas_limit,
+            ) => {
                 let execution_request = RemoteExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
                     sub_blocks,
                     // TODO: Avoid serializing this for each shard and serialize it once in the coordinator
@@ -57,11 +63,13 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> for RemoteExecutorSh
                     concurrency_level: concurrency,
                     maybe_block_gas_limit: gas_limit,
                 });
-                self.command_tx.send(Message::new(bcs::to_bytes(&execution_request).unwrap())).unwrap();
-            }
+                self.command_tx
+                    .send(Message::new(bcs::to_bytes(&execution_request).unwrap()))
+                    .unwrap();
+            },
             ExecutorShardCommand::Stop => {
                 // Do nothing
-            }
+            },
         }
     }
 

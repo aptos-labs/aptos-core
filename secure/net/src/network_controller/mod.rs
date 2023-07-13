@@ -78,7 +78,7 @@ impl NetworkController {
     pub fn create_outbound_channel(
         &mut self,
         remote_peer_addr: SocketAddr,
-        message_type: &'static str,
+        message_type: String,
     ) -> Sender<Message> {
         let (outbound_sender, outbound_receiver) = unbounded();
 
@@ -88,7 +88,7 @@ impl NetworkController {
         outbound_sender
     }
 
-    pub fn create_inbound_channel(&mut self, message_type: &'static str) -> Receiver<Message> {
+    pub fn create_inbound_channel(&mut self, message_type: String) -> Receiver<Message> {
         let (inbound_sender, inbound_receiver) = unbounded();
 
         self.inbound_handler
@@ -120,11 +120,13 @@ mod tests {
         let mut network_controller1 = NetworkController::new("test1", server_addr1, 1000);
         let mut network_controller2 = NetworkController::new("test2", server_addr2, 1000);
 
-        let test1_sender = network_controller2.create_outbound_channel(server_addr1, "test1");
-        let test1_receiver = network_controller1.create_inbound_channel("test1");
+        let test1_sender =
+            network_controller2.create_outbound_channel(server_addr1, "test1".to_string());
+        let test1_receiver = network_controller1.create_inbound_channel("test1".to_string());
 
-        let test2_sender = network_controller1.create_outbound_channel(server_addr2, "test2");
-        let test2_receiver = network_controller2.create_inbound_channel("test2");
+        let test2_sender =
+            network_controller1.create_outbound_channel(server_addr2, "test2".to_string());
+        let test2_receiver = network_controller2.create_inbound_channel("test2".to_string());
 
         network_controller1.start();
         network_controller2.start();

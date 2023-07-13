@@ -6,6 +6,7 @@ use crate::{
         counters::SHARDED_BLOCK_EXECUTION_SECONDS,
         cross_shard_client::{CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
+        executor_shard::{CoordinatorClient, CrossShardClient},
         messages::CrossShardMsg,
         ExecutorShardCommand,
     },
@@ -16,24 +17,16 @@ use aptos_types::{
     block_executor::partitioner::{ShardId, SubBlock, SubBlocksForShard},
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
-use crossbeam_channel::{Receiver, Sender};
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
-use std::{
-    collections::HashSet,
-    sync::{Arc, Mutex},
-};
-use crate::sharded_block_executor::executor_shard::CoordinatorClient;
+use std::{collections::HashSet, sync::Arc};
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     num_shards: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
     coordinator_client: Arc<dyn CoordinatorClient<S>>,
-    // The senders of cross-shard messages to other shards per round.
-    message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
-    // The receivers of cross shard messages from other shards per round.
-    message_rxs: Arc<Vec<Mutex<Receiver<CrossShardMsg>>>>,
+    cross_shard_client: Arc<dyn CrossShardClient>,
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
@@ -42,8 +35,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         num_shards: usize,
         num_threads: usize,
         coordinator_client: Arc<dyn CoordinatorClient<S>>,
-        message_txs: Vec<Vec<Sender<CrossShardMsg>>>,
-        message_rxs: Vec<Receiver<CrossShardMsg>>,
+        cross_shard_client: Arc<dyn CrossShardClient>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -58,13 +50,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             num_shards,
             executor_thread_pool,
             coordinator_client,
-            message_rxs: Arc::new(message_rxs.into_iter().map(Mutex::new).collect()),
-            message_txs: Arc::new(
-                message_txs
-                    .into_iter()
-                    .map(|inner_vec| inner_vec.into_iter().map(Mutex::new).collect())
-                    .collect(),
-            ),
+            cross_shard_client,
         }
     }
 
@@ -98,32 +84,23 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             round
         );
         let cross_shard_commit_sender =
-            CrossShardCommitSender::new(self.shard_id, self.message_txs.clone(), &sub_block);
+            CrossShardCommitSender::new(self.shard_id, self.cross_shard_client.clone(), &sub_block);
 
         let (callback, callback_receiver) = oneshot::channel();
 
-        let message_rxs = self.message_rxs.clone();
-        let self_message_tx = Arc::new(Mutex::new(
-            self.message_txs[self.shard_id][round]
-                .lock()
-                .unwrap()
-                .clone(),
-        ));
         let cross_shard_state_view =
             Arc::new(self.create_cross_shard_state_view(state_view, &sub_block));
-        let cross_shard_state_view_clone1 = cross_shard_state_view.clone();
+        let cross_shard_state_view_clone = cross_shard_state_view.clone();
+        let cross_shard_client = self.cross_shard_client.clone();
+        let cross_shard_client_clone = cross_shard_client.clone();
         let executor_thread_pool = self.executor_thread_pool.clone();
         self.executor_thread_pool.scope(|s| {
             s.spawn(move |_| {
-                if round != 0 {
-                    // If this is not the first round, start the cross-shard commit receiver.
-                    // this is a bit ugly, we can get rid of this when we have round number
-                    // information in the cross shard dependencies.
-                    CrossShardCommitReceiver::start(
-                        cross_shard_state_view_clone1,
-                        &message_rxs[round].lock().unwrap(),
-                    );
-                }
+                CrossShardCommitReceiver::start(
+                    cross_shard_state_view_clone,
+                    cross_shard_client,
+                    round,
+                );
             });
             s.spawn(move |_| {
                 let ret = BlockAptosVM::execute_block(
@@ -138,14 +115,12 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     maybe_block_gas_limit,
                     Some(cross_shard_commit_sender),
                 );
-                // Send a stop command to the cross-shard commit receiver.
-                if round != 0 {
-                    self_message_tx
-                        .lock()
-                        .unwrap()
-                        .send(CrossShardMsg::StopMsg)
-                        .unwrap();
-                }
+                // Send a self message to stop the cross-shard commit receiver.
+                cross_shard_client_clone.send_cross_shard_msg(
+                    self.shard_id,
+                    round,
+                    CrossShardMsg::StopMsg,
+                );
                 callback.send(ret).unwrap();
             });
         });
@@ -214,7 +189,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         maybe_block_gas_limit,
                     );
                     drop(state_view);
-                    self.coordinator_client.send_execution_result(ret).unwrap();
+                    self.coordinator_client.send_execution_result(ret);
                 },
                 ExecutorShardCommand::Stop => {
                     break;
@@ -225,7 +200,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
     }
 
     pub fn send_execute_command(&self, execute_command: ExecutorShardCommand<S>) {
-        self.coordinator_client.send_execute_command(execute_command).unwrap();
+        self.coordinator_client
+            .send_execute_command(execute_command)
+            .unwrap();
     }
 
     pub fn get_execution_result(&self) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
@@ -233,7 +210,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
     }
 
     pub fn stop(&self) {
-        if let Err(e) = self.coordinator_client.send_execute_command(ExecutorShardCommand::Stop) {
+        if let Err(e) = self
+            .coordinator_client
+            .send_execute_command(ExecutorShardCommand::Stop)
+        {
             error!(
                 "Failed to send stop command to shard {}: {:?}",
                 self.shard_id, e

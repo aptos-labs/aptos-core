@@ -31,7 +31,10 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
+use aptos_vm::{
+    sharded_block_executor::{executor_shard::ExecutorShard, ShardedBlockExecutor},
+    VMExecutor,
+};
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};

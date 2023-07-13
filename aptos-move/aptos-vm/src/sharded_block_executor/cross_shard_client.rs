@@ -4,6 +4,7 @@ use crate::{
     block_executor::AptosTransactionOutput,
     sharded_block_executor::{
         cross_shard_state_view::CrossShardStateView,
+        executor_shard::CrossShardClient,
         messages::{CrossShardMsg, CrossShardMsg::RemoteTxnWriteMsg, RemoteTxnWrite},
     },
 };
@@ -17,10 +18,9 @@ use aptos_types::{
     transaction::analyzed_transaction::AnalyzedTransaction,
     write_set::TransactionWrite,
 };
-use crossbeam_channel::{Receiver, Sender};
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 pub struct CrossShardCommitReceiver {}
@@ -28,10 +28,11 @@ pub struct CrossShardCommitReceiver {}
 impl CrossShardCommitReceiver {
     pub fn start<S: StateView + Sync + Send>(
         cross_shard_state_view: Arc<CrossShardStateView<S>>,
-        message_rx: &Receiver<CrossShardMsg>,
+        cross_shard_client: Arc<dyn CrossShardClient>,
+        round: RoundId,
     ) {
         loop {
-            let msg = message_rx.recv().unwrap();
+            let msg = cross_shard_client.receive_cross_shard_msg(round);
             match msg {
                 RemoteTxnWriteMsg(txn_commit_msg) => {
                     let (state_key, write_op) = txn_commit_msg.take();
@@ -48,8 +49,7 @@ impl CrossShardCommitReceiver {
 
 pub struct CrossShardCommitSender {
     shard_id: ShardId,
-    // The senders of cross-shard messages to other shards per round.
-    message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
+    cross_shard_client: Arc<dyn CrossShardClient>,
     // The hashmap of source txn index to hashmap of conflicting storage location to the
     // list shard id and round id. Please note that the transaction indices stored here is
     // global indices, so we need to convert the local index received from the parallel execution to
@@ -63,7 +63,7 @@ pub struct CrossShardCommitSender {
 impl CrossShardCommitSender {
     pub fn new(
         shard_id: ShardId,
-        message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
+        cross_shard_client: Arc<dyn CrossShardClient>,
         sub_block: &SubBlock<AnalyzedTransaction>,
     ) -> Self {
         let mut dependent_edges = HashMap::new();
@@ -96,7 +96,7 @@ impl CrossShardCommitSender {
 
         Self {
             shard_id,
-            message_txs,
+            cross_shard_client,
             dependent_edges,
             index_offset: sub_block.start_index as TxnIndex,
         }
@@ -119,11 +119,11 @@ impl CrossShardCommitSender {
                         state_key.clone(),
                         Some(write_op.clone()),
                     ));
-                    self.message_txs[*dependent_shard_id][*round_id]
-                        .lock()
-                        .unwrap()
-                        .send(message)
-                        .unwrap();
+                    self.cross_shard_client.send_cross_shard_msg(
+                        *dependent_shard_id,
+                        *round_id,
+                        message,
+                    );
                 }
             }
         }

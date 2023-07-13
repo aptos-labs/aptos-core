@@ -32,14 +32,14 @@ impl InboundHandler {
         }
     }
 
-    pub fn register_handler(&self, message_type: &'static str, sender: Sender<Message>) {
+    pub fn register_handler(&self, message_type: String, sender: Sender<Message>) {
         assert!(!self
             .inbound_handlers
             .lock()
             .unwrap()
-            .contains_key(&MessageType::new(message_type.to_string())));
+            .contains_key(&MessageType::new(message_type.clone())));
         let mut inbound_handlers = self.inbound_handlers.lock().unwrap();
-        inbound_handlers.insert(MessageType::new(message_type.to_string()), sender);
+        inbound_handlers.insert(MessageType::new(message_type), sender);
     }
 
     pub fn start(&mut self) {
