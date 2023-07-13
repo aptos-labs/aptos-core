@@ -16,7 +16,7 @@ use std::{
 };
 
 fn process_file() -> Result<Vec<String>, io::Error> {
-    let file = File::open("./test1000.csv")?;
+    let file = File::open("./test.csv")?;
     let reader = BufReader::new(file);
     reader.lines().collect()
 }

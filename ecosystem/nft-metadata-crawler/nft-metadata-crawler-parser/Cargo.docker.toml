@@ -11,6 +11,7 @@ csv = "1.2.1"
 diesel = { version = "2.1.0", features = ["chrono", "postgres", "r2d2"] }
 futures = "0.3.28"
 google-cloud-auth = "0.11.0"
+google-cloud-googleapis = { version = "0.10.0", features = ["pubsub"] }
 hyper = { version = "0.14.18", features = ["full"] }
 image = "0.24.5"
 nft-metadata-crawler-utils = { path = "../nft-metadata-crawler-utils" }

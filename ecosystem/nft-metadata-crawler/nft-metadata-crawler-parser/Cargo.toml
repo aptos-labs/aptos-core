@@ -19,6 +19,7 @@ csv = { workspace = true }
 diesel = { workspace = true }
 futures = { workspace = true }
 google-cloud-auth = { workspace = true }
+google-cloud-googleapis = { workspace = true }
 hyper = { workspace = true }
 image = { workspace = true }
 nft-metadata-crawler-utils = { workspace = true }

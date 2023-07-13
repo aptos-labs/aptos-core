@@ -9,14 +9,12 @@ use google_cloud_auth::{
     project::{create_token_source, Config},
     token_source::TokenSource,
 };
+use google_cloud_googleapis::pubsub::v1::{subscriber_client::SubscriberClient, PullRequest};
 use nft_metadata_crawler_parser::{
     db::upsert_entry, establish_connection_pool, models::NFTMetadataCrawlerEntry, parser::Parser,
     schema::nft_metadata_crawler_entry,
 };
-use nft_metadata_crawler_utils::{
-    pb::pubsub::v1::{subscriber_client::SubscriberClient, PullRequest},
-    pubsub::send_ack,
-};
+use nft_metadata_crawler_utils::pubsub::send_ack;
 use reqwest::Client;
 use std::{env, error::Error, time::Duration};
 use tokio::task::JoinHandle;
@@ -120,6 +118,7 @@ fn spawn_parser(
     }
 }
 
+#[allow(deprecated)]
 #[tokio::main]
 async fn main() {
     println!("Starting parser");
