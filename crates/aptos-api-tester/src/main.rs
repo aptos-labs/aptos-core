@@ -269,7 +269,7 @@ async fn test_mintnft(
     }
 
     // offer token
-    let _ = match token_client
+    let pending_txn = match token_client
         .offer_token(
             account,
             receiver.address(),
@@ -282,13 +282,17 @@ async fn test_mintnft(
         )
         .await
     {
-        Ok(_) => {},
+        Ok(txn) => txn,
         Err(e) => return TestResult::Error(e),
     };
+    match client.wait_for_transaction(&pending_txn).await {
+        Ok(_) => {},
+        Err(e) => return TestResult::Error(e.into()),
+    }
 
-    // check token balance
-    let expected_token_balance = U64(10);
-    let actual_token_balance = match token_client
+    // check token balance for the sender
+    let expected_sender_token_balance = U64(8);
+    let actual_sender_token_balance = match token_client
         .get_token(account.address(), &collection_name, &token_name)
         .await
     {
@@ -296,9 +300,12 @@ async fn test_mintnft(
         Err(e) => return TestResult::Error(e),
     };
 
-    if expected_token_balance != actual_token_balance {
+    if expected_sender_token_balance != actual_sender_token_balance {
         return TestResult::Fail("wrong token balance");
     }
+
+    // todo: check receiver balance
+    // todo: make getToken return token for non creator account
 
     TestResult::Success
 }
