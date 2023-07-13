@@ -33,3 +33,17 @@ pub mod aptos {
         }
     }
 }
+pub mod google {
+    // @@protoc_insertion_point(attribute:google.api)
+    pub mod api {
+        include!("google.api.rs");
+        // @@protoc_insertion_point(google.api)
+    }
+    pub mod pubsub {
+        // @@protoc_insertion_point(attribute:google.pubsub.v1)
+        pub mod v1 {
+            include!("google.pubsub.v1.rs");
+            // @@protoc_insertion_point(google.pubsub.v1)
+        }
+    }
+}

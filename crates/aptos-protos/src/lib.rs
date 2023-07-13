@@ -3,3 +3,4 @@
 
 mod pb;
 pub use pb::aptos::*;
+pub use pb::google::*;
