@@ -37,6 +37,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use itertools::Itertools;
+use move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -1695,15 +1696,51 @@ async fn parse_update_commission(
     Ok(operations)
 }
 
-// TODO: implement staking and withdrawals parsing
 async fn parse_delegation_pool_resource_changes(
     _owner_address: AccountAddress,
     _data: &[u8],
-    _events: &[ContractEvent],
-    _operation_index: u64,
+    events: &[ContractEvent],
+    mut operation_index: u64,
     _changes: &WriteSet,
 ) -> ApiResult<Vec<Operation>> {
-    let operations = Vec::new();
+    let mut operations = vec![];
+
+    for e in events {
+        let struct_tag = match e.type_tag() {
+            TypeTag::Struct(struct_tag) => struct_tag,
+            _ => continue,
+        };
+
+        match (
+            struct_tag.address,
+            struct_tag.module.as_str(),
+            struct_tag.name.as_str(),
+        ) {
+            (AccountAddress::ONE, DELEGATION_POOL_MODULE, WITHDRAW_STAKE_EVENT) => {
+                let event: WithdrawUndelegedEvent =
+                    if let Ok(event) = bcs::from_bytes(e.event_data()) {
+                        event
+                    } else {
+                        warn!(
+                            "Failed to parse withdraw undelegated event! Skipping for {}:{}",
+                            e.key().get_creator_address(),
+                            e.key().get_creation_number()
+                        );
+                        continue;
+                    };
+
+                operations.push(Operation::withdraw_undelegated_stake(
+                    operation_index,
+                    Some(OperationStatusType::Success),
+                    event.delegator_address,
+                    AccountIdentifier::base_account(event.pool_address),
+                    Some(event.amount_withdrawn),
+                ));
+                operation_index += 1;
+            },
+            _ => continue,
+        }
+    }
 
     Ok(operations)
 }
