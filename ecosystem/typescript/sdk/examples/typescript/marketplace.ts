@@ -165,7 +165,7 @@ export class Marketplace {
     );
   }
 
-  completeAuctionListing(listing: MaybeHexString, bid_amount: bigint, coin: string = APTOS_COIN): TransactionPayload {
+  completeAuctionListing(listing: MaybeHexString, coin: string = APTOS_COIN): TransactionPayload {
     return this.buildTransactionPayload(COIN_LISTING, "complete_auction", [coin], [HexString.ensure(listing).hex()]);
   }
 
@@ -329,30 +329,206 @@ export class Marketplace {
   // TODO: Listing view functions
 
   async feeAddress(feeSchedule: MaybeHexString, ledgerVersion?: bigint): Promise<HexString> {
-    let outputs = await this.view(FEE_SCHEDULE, "fee_address", [], [feeSchedule], ledgerVersion);
+    let outputs = await this.view(
+      FEE_SCHEDULE,
+      "fee_address",
+      [],
+      [HexString.ensure(feeSchedule).hex()],
+      ledgerVersion,
+    );
 
     return HexString.ensure(outputs[0].toString());
   }
 
   async listingFee(feeSchedule: MaybeHexString, ledgerVersion?: bigint): Promise<bigint> {
-    let outputs = await this.view(FEE_SCHEDULE, "listing_fee", [], [feeSchedule, 0], ledgerVersion);
+    let outputs = await this.view(
+      FEE_SCHEDULE,
+      "listing_fee",
+      [],
+      [HexString.ensure(feeSchedule).hex(), "0"],
+      ledgerVersion,
+    );
 
     return BigInt(outputs[0].toString());
   }
 
   async biddingFee(feeSchedule: MaybeHexString, ledgerVersion?: bigint): Promise<bigint> {
-    let outputs = await this.view(FEE_SCHEDULE, "bidding_fee", [], [feeSchedule, 0], ledgerVersion);
+    let outputs = await this.view(
+      FEE_SCHEDULE,
+      "bidding_fee",
+      [],
+      [HexString.ensure(feeSchedule).hex(), "0"],
+      ledgerVersion,
+    );
 
     return BigInt(outputs[0].toString());
   }
 
   async commission(feeSchedule: MaybeHexString, price: bigint, ledgerVersion?: bigint): Promise<bigint> {
-    let outputs = await this.view(FEE_SCHEDULE, "commission", [], [feeSchedule, price.toString(10)], ledgerVersion);
+    let outputs = await this.view(
+      FEE_SCHEDULE,
+      "commission",
+      [],
+      [HexString.ensure(feeSchedule).hex(), price.toString(10).toString()],
+      ledgerVersion,
+    );
 
     return BigInt(outputs[0].toString());
   }
 
+  async getListings(contractAddress: MaybeHexString, marketplace: String, isDeleted: boolean): Promise<any> {
+    // FIXME: Support pagination
+    // FIXME type the output
+    // FIXME add fee schedule
+    const query = `query GetListings($contract_address:String!, $marketplace: String!, $is_deleted: Boolean!) {
+                nft_marketplace_v2_current_nft_marketplace_listings(where: {
+                  contract_address: { _eq: $contract_address }
+                  marketplace: { _eq: $marketplace }
+                  is_deleted: { _eq: $is_deleted }
+                }) {
+                  current_token_data {
+                    collection_id
+                    token_data_id
+                    token_name
+                  }
+                  price
+                  listing_id
+                  is_deleted
+                  token_amount
+                  seller
+                  marketplace: marketplace
+                  contract_address
+                }
+            }`;
+    const variables = {
+      contract_address: HexString.ensure(contractAddress).hex(),
+      marketplace: marketplace,
+      is_deleted: isDeleted,
+    };
+
+    return await this.query_indexer(query, variables);
+  }
+
+  async getTokenAuctions(
+    contractAddress: MaybeHexString,
+    marketplace: String,
+    tokenAddress: MaybeHexString,
+    isDeleted: boolean,
+  ): Promise<any> {
+    const query = `query GetTokenAuctions($contract_address:String!, $marketplace: String!, $token_id: String!, $is_deleted: Boolean!) {
+            nft_marketplace_v2_current_nft_marketplace_auctions(where: {
+                contract_address: { _eq: $contract_address }
+                marketplace: { _eq: $marketplace }
+                is_deleted: { _eq: $is_deleted }
+                token_data_id: { _eq: $token_id }
+            }) {
+            buy_it_now_price
+            current_bid_price
+            current_bidder
+            current_token_data {
+              collection_id
+              token_data_id
+              token_name
+            }
+            expiration_time
+            is_deleted
+            listing_id
+            seller
+            starting_bid_price
+            token_amount
+          }
+        }`;
+    const variables = {
+      contract_address: HexString.ensure(contractAddress).hex(),
+      marketplace: marketplace,
+      token_id: HexString.ensure(tokenAddress).hex(),
+      is_deleted: isDeleted,
+    };
+
+    return await this.query_indexer(query, variables);
+  }
+
+  async getTokenOffers(
+    contractAddress: MaybeHexString,
+    marketplace: String,
+    tokenAddress: MaybeHexString,
+    isDeleted: boolean,
+  ): Promise<any> {
+    const query = `query GetTokenOffers($contract_address:String!, $marketplace: String!, $token_id: String!, $is_deleted: Boolean!) {
+            nft_marketplace_v2_current_nft_marketplace_token_offers(where: {
+                contract_address: { _eq: $contract_address }
+                marketplace: { _eq: $marketplace }
+                is_deleted: { _eq: $is_deleted }
+                token_data_id: { _eq: $token_id }
+            }) {
+                buyer
+                current_token_data {
+                    collection_id
+                    token_data_id
+                    token_name
+                }
+                expiration_time
+                is_deleted
+                offer_id
+                price
+                token_amount
+                token_standard
+            }
+        }`;
+    const variables = {
+      contract_address: HexString.ensure(contractAddress).hex(),
+      marketplace: marketplace,
+      token_id: HexString.ensure(tokenAddress).hex(),
+      is_deleted: isDeleted,
+    };
+
+    return await this.query_indexer(query, variables);
+  }
+
+  async getCollectionOffers(
+    contractAddress: MaybeHexString,
+    marketplace: String,
+    collectionAddress: MaybeHexString,
+    isDeleted: boolean,
+  ): Promise<any> {
+    const query = `query GetCollectionOffers($contract_address:String!, $marketplace: String!, $collection_id: String!, $is_deleted: Boolean!) {
+              nft_marketplace_v2_current_nft_marketplace_collection_offers(where: {
+                  contract_address: { _eq: $contract_address }
+                  marketplace: { _eq: $marketplace }
+                  is_deleted: { _eq: $is_deleted }
+                  collection_id: { _eq: $collection_id }
+              }) {
+                buyer
+                collection_id
+                collection_offer_id
+                current_collection_data {
+                  collection_name
+                }
+                expiration_time
+                is_deleted
+                item_price
+                remaining_token_amount
+              }
+            }`;
+    const variables = {
+      contract_address: HexString.ensure(contractAddress).hex(),
+      marketplace: marketplace,
+      collection_id: HexString.ensure(collectionAddress).hex(),
+      is_deleted: isDeleted,
+    };
+
+    return await this.query_indexer(query, variables);
+  }
+
   // Helpers
+
+  async query_indexer(query: string, variables?: {}) {
+    const graphqlQuery = {
+      query,
+      variables: variables,
+    };
+    return this.provider.queryIndexer(graphqlQuery);
+  }
 
   async view(module: string, func: string, typeArguments: string[], args: any[], ledgerVersion?: bigint) {
     return await this.provider.view(
