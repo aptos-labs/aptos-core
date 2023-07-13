@@ -722,6 +722,7 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_NAMESPACE=context.forge_namespace,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
+            FORGE_TEST_SUITE=sanitize_k8s_resource_name(context.forge_test_suite),
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
@@ -984,6 +985,23 @@ def image_exists(
         ).succeeded()
     else:
         raise Exception(f"Unknown cloud repo type: {cloud}")
+    
+def sanitize_k8s_resource_name(resource: str, max_length: int = 63) -> str:
+    sanitized_resource = ""
+    for i, c in enumerate(resource):
+        if i >= max_length:
+            break
+        if c.isalnum():
+            sanitized_resource += c
+        else:
+            sanitized_resource += "-"  # Replace the invalid character with a '-'
+
+    if sanitized_resource.endswith("-"):
+        sanitized_resource = (
+            sanitized_resource[:-1] + "0"
+        )  # Set the last character to '0'
+
+    return sanitized_resource
 
 
 def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> str:
@@ -996,21 +1014,7 @@ def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> s
     if not forge_resource.startswith("forge-"):
         raise Exception("Forge resource name must start with 'forge-'")
 
-    sanitized_namespace = ""
-    for i, c in enumerate(forge_resource):
-        if i >= max_length:
-            break
-        if c.isalnum():
-            sanitized_namespace += c
-        else:
-            sanitized_namespace += "-"  # Replace the invalid character with a '-'
-
-    if sanitized_namespace.endswith("-"):
-        sanitized_namespace = (
-            sanitized_namespace[:-1] + "0"
-        )  # Set the last character to '0'
-
-    return sanitized_namespace
+    return sanitize_k8s_resource_name(forge_resource, max_length=max_length)
 
 
 def create_forge_command(

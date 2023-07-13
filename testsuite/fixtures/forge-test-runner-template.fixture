@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/part-of: forge-test-runner
     forge-namespace: forge-potato
     forge-image-tag: forge_asdf
+    forge-test-suite: banana
 spec:
   restartPolicy: Never
   serviceAccountName: forge
@@ -30,6 +31,8 @@ spec:
       env:
         - name: FORGE_TRIGGERED_BY
           value: github-actions
+        - name: FORGE_TEST_SUITE
+          value: banana
         - name: PROMETHEUS_URL
           valueFrom:
             secretKeyRef:
