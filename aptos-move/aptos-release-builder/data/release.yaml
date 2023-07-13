@@ -45,3 +45,16 @@ proposals:
     - FeatureFlag:
         enabled:
           - aptos_unique_identifiers
+  - name: enable_partial_voting
+    metadata:
+      title: "Enable partial voting"
+      description: "AIP-28:  Partial voting for on chain governance."
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8090"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-28.md"
+    execution_mode: MultiStep
+    update_sequence:
+    - RawScript: /aptos/aptos-move/aptos-release-builder/data/proposals/aip_28_initialization.move
+    - FeatureFlag:
+        enabled:
+          - partial_governance_voting
+          - delegation_pool_partial_governance_voting
