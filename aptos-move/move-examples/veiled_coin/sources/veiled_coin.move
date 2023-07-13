@@ -32,7 +32,7 @@
 /// 1. *Veiled coin*: a coin whose value is secret; i.e., it is encrypted under the owner's public key.
 ///
 /// 2. *Veiled amount*: any amount that is secret because it was encrypted under some public key.
-/// 3. *Committed amount*: any amount that is secret because it was committed to (rather thna encrypted).
+/// 3. *Committed amount*: any amount that is secret because it was committed to (rather than encrypted).
 ///
 /// 4. *Veiled transaction*: a transaction that hides its amount transferred; i.e., a transaction whose amount is veiled.
 ///

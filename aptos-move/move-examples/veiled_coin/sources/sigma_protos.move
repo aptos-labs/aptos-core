@@ -10,33 +10,35 @@
 ///
 /// # WithdrawalSubproof: ElGamal-Pedersen equality
 ///
-/// This proof is used to provable convert an ElGamal ciphertext to a Pedersen commitment over which a ZK range proof
+/// This proof is used to provably convert an ElGamal ciphertext to a Pedersen commitment over which a ZK range proof
 /// can be securely computed. Otherwise, knowledge of the ElGamal SK breaks the binding of the 2nd component of the
 /// ElGamal ciphertext, making any ZK range proof over it useless.
+/// Because the sender cannot, after receiving a fully veiled transaction, compute their balance randomness, their
+/// updated balance ciphertext is computed in the relation, which is then linked to the Pedersen commitment of $b$. 
 ///
 /// The secret witness $w$ in this relation, known only to the sender of the TXN, consists of:
 ///  - $b$, sender's new balance, after the withdrawal from their veiled balance
-///  - $r$, randomness used to ElGamal-encrypt the sender's balance
+///  - $r$, randomness used to commit to $b$
+///  - $sk$, the sender's secret ElGamal encryption key
 ///
 /// (Note that the $\Sigma$-protocol's zero-knowledge property ensures the witness is not revealed.)
 ///
 /// The public statement $x$ in this relation consists of:
 ///  - $G$, basepoint of a given elliptic curve
 ///  - $H$, basepoint used for randomness in the Pedersen commitments
-///  - $Y$, sender's PK
-///  - $(c_1, c_2)$, ElGamal encryption of $b$ with randomness $r$
+///  - $(C_1, C_2)$, ElGamal encryption of the sender's current balance
 ///  - $c$, Pedersen commitment to $b$ with randomness $r$
+///  - $v$, the amount the sender is withdrawing
 ///
 /// The relation being proved is as follows:
 ///
 /// ```
 /// R(
-///     x = [ Y, (c_1, c_2), c, G, H]
-///     w = [ b, r ]
+///     x = [ (C_1, C_2), c, G, H, v]
+///     w = [ b, r, sk ]
 /// ) = {
-///     c1 = r G
-///     c2 = b G + r Y
-///     c  = b G + r H
+///     C_1 - vG = bG + skC_2
+///           c = bG + rH
 /// }
 /// ```
 ///
@@ -52,6 +54,7 @@
 ///  - $r$, randomness used to ElGamal-encrypt $v$
 ///  - $b$, sender's new balance after the transfer occurs
 ///  - $r_b$, randomness used to ElGamal-encrypt $b$
+///  - &sk$, the sender's secret ElGamal encryption key
 ///
 /// The public statement $x$ in this relation consists of:
 ///  - Public parameters
@@ -65,22 +68,22 @@
 ///    + $(C', D)$, ElGamal encryption of $v$, under the recipient's PK, using randomness $r$
 ///    + $c$, Pedersen commitment to $v$ using randomness $r$
 ///  - New balance encryption & commitment
-///    + $(c_1, c_2)$, ElGamal encryption of $b$, under the sender's PK, using randomness $r_b$
+///    + $(c_1, c_2)$, ElGamal encryption of the sender's *current* balance, under the sender's PK, using randomness $r_b$
+///    This is used to compute the sender's updated balance in the relation, as the sender cannot know their balance randomness
 ///    + $c'$, Pedersen commitment to $b$ using randomness $r_b$
 ///
 /// The relation being proved is:
 /// ```
 /// R(
 ///     x = [ Y, Y', (C, C', D), c, (c_1, c_2), c', G, H]
-///     w = [ v, r, b, r_b ]
+///     w = [ v, r, b, r_b, sk ]
 /// ) = {
-///     C  = v G + r Y
-///     C' = v G + r Y'
-///     D = r G
-///     c_1 =   b G + r_b Y
-///     c_2 = r_b G
-///     c' = b G + r_b H
-///     c  = v G +   r H
+///          C  = v G + r Y
+///          C' = v G + r Y'
+///           D = r G
+///     C_1 - C = bG + sk(C_2 - D)
+///           c = vG + rH
+///          c' = bG + r_bH
 /// }
 /// ```
 ///
@@ -89,8 +92,8 @@
 /// ElGamal-to-Pedersen conversion parts, as they can do ZK range proofs directly over ElGamal ciphertexts using their
 /// $\Sigma$-bullets modification of Bulletproofs.
 ///
-/// Note also that the equations $C_L - C = b' G + sk (C_R - D)$ and $Y = sk G$ in the Zether paper are enforced
-/// programmatically by this smart contract and so are not needed in our $\Sigma$-protocol.
+/// Note also that the equation $Y = sk G$ in the Zether paper is enforced
+/// programmatically by this smart contract and so is not needed in our $\Sigma$-protocol.
 module veiled_coin::sigma_protos {
     use std::error;
     use std::option::Option;
@@ -159,8 +162,8 @@ module veiled_coin::sigma_protos {
     /// encrypted in `withdraw_ct` (under `sender_pk`) and in `deposit_ct` (under `recipient_pk`), all three using the
     /// same randomness $r$.
     ///
-    /// In addition, it argues that the same balance $b$ is ElGamal-encrypted in `sender_new_balance_ct` under
-    /// `sender_pk` and Pedersen-committed in `sender_new_balance_comm`, both with the same randomness $r_b$.
+    /// In addition, it argues that the sender's new balance $b$ committed to by sender_new_balance_comm is the same
+    /// as the value encrypted by the ciphertext obtained by subtracting withdraw_ct from sender_curr_balance_ct
     public fun verify_transfer_subproof(
         sender_pk: &elgamal::CompressedPubkey,
         recipient_pk: &elgamal::CompressedPubkey,
@@ -240,7 +243,7 @@ module veiled_coin::sigma_protos {
     /// Verifies the $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
     ///
     /// Specifically, the proof argues that the same amount $v$ is Pedersen-committed in `sender_new_balance_comm` and
-    /// ElGamal-encrypted in `sender_new_balance_ct` (under `sender_pk`), both using the same randomness $r$.
+    /// ElGamal-encrypted in the ciphertext obtained by subtracting the ciphertext (vG, 0G) from sender_curr_balance_ct
     public fun verify_withdrawal_subproof(
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,

@@ -1,4 +1,4 @@
-/// Tests for veild coins.
+/// Tests for veiled coins.
 ///
 /// TODO: test that payments to self return successfully (ideally, they should do nothing)
 module veiled_coin::veiled_coin_tests {
