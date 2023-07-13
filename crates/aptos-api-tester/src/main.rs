@@ -293,7 +293,12 @@ async fn test_mintnft(
     // check token balance for the sender
     let expected_sender_token_balance = U64(8);
     let actual_sender_token_balance = match token_client
-        .get_token(account.address(), &collection_name, &token_name)
+        .get_token(
+            account.address(),
+            account.address(),
+            &collection_name,
+            &token_name,
+        )
         .await
     {
         Ok(data) => data.amount,
@@ -301,7 +306,15 @@ async fn test_mintnft(
     };
 
     // check that token store isn't initialized for the receiver
-    match token_client.get_token(receiver.address(), &collection_name, &token_name).await {
+    match token_client
+        .get_token(
+            receiver.address(),
+            account.address(),
+            &collection_name,
+            &token_name,
+        )
+        .await
+    {
         Ok(_) => return TestResult::Fail("found tokens for receiver when shouldn't"),
         Err(_) => {},
     }

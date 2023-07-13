@@ -272,12 +272,13 @@ impl<'a> TokenClient<'a> {
     /// Retrieves the information for a given token.
     pub async fn get_token(
         &self,
+        account: AccountAddress,
         creator: AccountAddress,
         collection_name: &str,
         token_name: &str,
     ) -> Result<Token> {
         // get handle for tokens
-        let handle = match self.get_tokens_handle(creator).await {
+        let handle = match self.get_tokens_handle(account).await {
             Some(s) => AccountAddress::from_hex_literal(&s)?,
             None => return Err(anyhow!("Couldn't retrieve handle for tokens")),
         };
