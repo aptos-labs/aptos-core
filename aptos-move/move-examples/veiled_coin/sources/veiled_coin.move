@@ -535,9 +535,8 @@ module veiled_coin::veiled_coin {
             error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED)
         );
 
-        // Fetch the sender's PK and veiled balance
+        // Fetch the sender's veiled balance
         let veiled_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
-        let sender_pk = veiled_coin_store.pk;
         let veiled_balance = elgamal::decompress_ciphertext(&veiled_coin_store.veiled_balance);
 
         // Create a (not-yet-secure) encryption of `amount`, since `amount` is a public argument here.
@@ -545,7 +544,6 @@ module veiled_coin::veiled_coin {
 
         // Verify that `comm_new_balance` is a commitment to the remaing balance after withdrawing `amount`.
         sigma_protos::verify_withdrawal_subproof(
-            &sender_pk,
             &veiled_balance,
             &comm_new_balance,
             &scalar_amount,

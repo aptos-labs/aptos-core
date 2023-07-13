@@ -178,7 +178,7 @@ module veiled_coin::sigma_protos {
         let (bar_big_c, _) = elgamal::ciphertext_as_points(deposit_ct);
         let c = pedersen::commitment_as_point(comm_amount);
         let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
-        //let c_prime = pedersen::commitment_as_point(sender_new_balance_comm);
+        let bar_c = pedersen::commitment_as_point(sender_new_balance_comm);
 
         // TODO: Can be optimized so we don't re-serialize the proof for Fiat-Shamir
         let rho = fiat_shamir_transfer_subproof_challenge(
@@ -229,12 +229,12 @@ module veiled_coin::sigma_protos {
         assert!(ristretto255::point_equals(&c_acc, &h_alpha2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
 
         // \rho * \bar{c} + X_6 =? \alpha_3 * g + \alpha_4 * h
-        let bar_big_c_acc = ristretto255::point_mul(bar_big_c, &rho);
-        ristretto255::point_add_assign(&mut bar_big_c_acc, &proof.x6);
+        let bar_c_acc = ristretto255::point_mul(bar_c, &rho);
+        ristretto255::point_add_assign(&mut bar_c_acc, &proof.x6);
 
         let h_alpha4_acc = ristretto255::point_mul(&h, &proof.alpha4);
         ristretto255::point_add_assign(&mut h_alpha4_acc, &g_alpha3);
-        assert!(ristretto255::point_equals(&bar_big_c_acc, &h_alpha4_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
+        assert!(ristretto255::point_equals(&bar_c_acc, &h_alpha4_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
     }
 
     /// Verifies the $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
@@ -242,19 +242,16 @@ module veiled_coin::sigma_protos {
     /// Specifically, the proof argues that the same amount $v$ is Pedersen-committed in `sender_new_balance_comm` and
     /// ElGamal-encrypted in `sender_new_balance_ct` (under `sender_pk`), both using the same randomness $r$.
     public fun verify_withdrawal_subproof(
-        sender_pk: &elgamal::CompressedPubkey,
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
         amount: &Scalar,
         proof: &WithdrawalSubproof)
     {
         let h = pedersen::randomness_base_for_bulletproof();
-        //let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
         let (big_c1, big_c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
 
         let rho = fiat_shamir_withdrawal_subproof_challenge(
-            sender_pk,
             sender_curr_balance_ct,
             sender_new_balance_comm,
             amount,
@@ -426,14 +423,12 @@ module veiled_coin::sigma_protos {
     /// Computes a Fiat-Shamir challenge `rho = H(G, H, Y, c_1, c_2, c, C, D, x_1, x_2, x_3, x_4)` for the `WithdrawalSubproof`
     /// $\Sigma$-protocol.
     fun fiat_shamir_withdrawal_subproof_challenge(
-        sender_pk: &elgamal::CompressedPubkey,
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
         amount: &Scalar,
         x1: &RistrettoPoint,
         x2: &RistrettoPoint): Scalar
     {
-        let y = elgamal::pubkey_to_compressed_point(sender_pk);
         let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
 
@@ -443,7 +438,6 @@ module veiled_coin::sigma_protos {
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::basepoint_compressed()));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(
             &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())));
-        vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&y));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
@@ -512,7 +506,6 @@ module veiled_coin::sigma_protos {
     /// Proves the $\Sigma$-protocol used for veiled-to-unveiled coin transfers.
     /// See top-level comments for a detailed description of the $\Sigma$-protocol
     public fun prove_withdrawal(
-        sender_pk: &elgamal::CompressedPubkey,
         sender_sk: &Scalar,
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
@@ -523,7 +516,6 @@ module veiled_coin::sigma_protos {
         let x1 = ristretto255::random_scalar();
         let x2 = ristretto255::random_scalar();
         let x3 = ristretto255::random_scalar();
-        //let source_pk_point = elgamal::pubkey_to_point(sender_pk);
         let h = pedersen::randomness_base_for_bulletproof();
         let (_, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
 
@@ -537,7 +529,6 @@ module veiled_coin::sigma_protos {
         ristretto255::point_add_assign(&mut big_x2, &g_x1);
 
         let rho = fiat_shamir_withdrawal_subproof_challenge(
-            sender_pk,
             sender_curr_balance_ct,
             sender_new_balance_comm,
             amount_val,
@@ -797,21 +788,22 @@ module veiled_coin::sigma_protos {
         let (sender_sk, sender_pk) = generate_elgamal_keypair();
 
         // Set the transferred amount to 50
-        let balance = ristretto255::new_scalar_from_u32(50);
+        let curr_balance = ristretto255::new_scalar_from_u32(100);
+        let new_balance = ristretto255::new_scalar_from_u32(75);
+        let amount_withdrawn = ristretto255::new_scalar_from_u32(25);
         let rand = ristretto255::random_scalar();
 
         // Encrypt the amount under the sender's PK
-        let balance_ct = elgamal::new_ciphertext_with_basepoint(&balance, &rand, &sender_pk);
+        let curr_balance_ct = elgamal::new_ciphertext_with_basepoint(&curr_balance, &rand, &sender_pk);
         // Commit to the amount
-        let balance_comm = pedersen::new_commitment_for_bulletproof(&balance, &rand);
+        let new_balance_comm = pedersen::new_commitment_for_bulletproof(&new_balance, &rand);
 
         let sigma_proof = prove_withdrawal(
-            &sender_pk,
             &sender_sk,
-            &balance_ct,
-            &balance_comm,
-            &balance,
-            &balance,
+            &curr_balance_ct,
+            &new_balance_comm,
+            &new_balance,
+            &amount_withdrawn,
             &rand,
         );
 
@@ -822,10 +814,9 @@ module veiled_coin::sigma_protos {
         };
 
         verify_withdrawal_subproof(
-            &sender_pk,
-            &balance_ct,
-            &balance_comm,
-            &balance,
+            &curr_balance_ct,
+            &new_balance_comm,
+            &amount_withdrawn,
             &sigma_proof
         );
     }

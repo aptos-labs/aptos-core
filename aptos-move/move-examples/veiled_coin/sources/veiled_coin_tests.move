@@ -169,7 +169,6 @@ module veiled_coin::veiled_coin_tests {
         // Compute a sigma proof which shows that the recipient's new balance ciphertext and commitment both encode
         // the same value. The commitment is necessary to ensure the value is binding
         let sigma_proof = prove_withdrawal(
-            &recipient_pk, 
             &recipient_sk, 
             &curr_balance_ct, 
             &new_balance_comm, 
@@ -239,7 +238,6 @@ module veiled_coin::veiled_coin_tests {
         let new_balance_comm_bytes = pedersen::commitment_to_bytes(&new_balance_comm);
 
         let sigma_proof = sigma_protos::prove_withdrawal(
-            &sender_pk,
             &sender_sk,
             &curr_balance_ct,
             &new_balance_comm,
@@ -388,7 +386,6 @@ module veiled_coin::veiled_coin_tests {
         let new_new_balance_comm = pedersen::new_commitment_for_bulletproof(&new_new_balance_val, &fresh_new_balance_rand);
         let new_new_balance_comm_bytes = pedersen::commitment_to_bytes(&new_new_balance_comm);
         let sigma_proof = sigma_protos::prove_withdrawal(
-            &sender_pk, 
             &sender_sk, 
             &new_curr_balance_ct, 
             &new_new_balance_comm, 
