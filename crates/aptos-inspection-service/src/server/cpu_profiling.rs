@@ -1,15 +1,10 @@
 // Copyright © Aptos Foundation
 
+use crate::server::utils::CONTENT_TYPE_JSON;
 use hyper::{Body, StatusCode};
-use crate::{
-    server::utils::CONTENT_TYPE_JSON
-};
-use std::{thread, time};
-use std::fs::File;
-
+use std::{fs::File, path::Path, thread, time};
 
 pub fn handle_cpu_profiling_request() -> (StatusCode, Body, String) {
-
     let guard = pprof::ProfilerGuard::new(100).unwrap();
     let five_secs = time::Duration::from_millis(5000);
     thread::sleep(five_secs);
@@ -26,5 +21,4 @@ pub fn handle_cpu_profiling_request() -> (StatusCode, Body, String) {
         Body::from("{\"id\": 12020}"),
         CONTENT_TYPE_JSON.into(),
     )
-
 }

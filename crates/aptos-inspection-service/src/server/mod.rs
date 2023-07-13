@@ -17,22 +17,21 @@ use std::{
 };
 
 mod configuration;
+mod cpu_flamegraph;
+mod cpu_profiling;
 mod index;
 mod json_encoder;
-mod metrics;
-mod peer_information;
-mod system_information;
-mod cpu_profiling;
 mod memory_profiling;
-mod profiling;
-mod cpu_flamegraph;
 mod memory_svg;
 mod memory_text;
+mod metrics;
+mod peer_information;
+mod profiling;
+mod system_information;
 mod thread_dump;
 mod thread_dump_result;
 
 pub mod utils;
-
 
 #[cfg(test)]
 mod tests;
@@ -53,9 +52,6 @@ pub const MEMORY_SVG_PATH: &str = "/memory_svg";
 pub const MEMORY_TXT_PATH: &str = "/memory_txt";
 pub const THREAD_DUMP_PATH: &str = "/thread_dump_start";
 pub const THREAD_DUMP_RESULT_PATH: &str = "/thread_dump_results";
-
-
-
 
 // Useful string constants
 pub const HEADER_CONTENT_TYPE: &str = "Content-Type";

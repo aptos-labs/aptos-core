@@ -65,6 +65,7 @@ members = [
     "crates/aptos-openapi",
     "crates/aptos-proptest-helpers",
     "crates/aptos-push-metrics",
+    "crates/aptos-profiler",
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
     "crates/aptos-retrier",
@@ -336,6 +337,7 @@ aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "network/peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "network/peer-monitoring-service/server" }
 aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
+aptso-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
 aptos-proxy = { path = "crates/proxy" }

@@ -16,7 +16,6 @@ pub const CONTENT_TYPE_TEXT: &str = "text/plain";
 pub const CONTENT_TYPE_SVG: &str = "image/svg+xml";
 pub const CONTENT_TYPE_HTML: &str = "text/html";
 
-
 /// Counter for the number of metrics in various states
 pub static NUM_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!("aptos_metrics", "Number of metrics in certain states", &[

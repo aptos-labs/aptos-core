@@ -1,22 +1,26 @@
 // Copyright © Aptos Foundation
 
-use hyper::{Body, StatusCode};
 use crate::server::utils::CONTENT_TYPE_TEXT;
-use std::env;
-use std::process::{Command, exit};
-use std::io::Write;
-use std::fs::OpenOptions;
-use std::process;
+use hyper::{Body, StatusCode};
+use std::{
+    env,
+    fs::OpenOptions,
+    io::Write,
+    process,
+    process::{exit, Command},
+};
 extern crate rstack_self;
-use std::thread;
-use std::time::Duration;
-use std::fs::File;
-
+use std::{fs::File, path::Path, thread, time::Duration};
 
 pub fn handle_thread_dump_request() -> (StatusCode, Body, String) {
-
-
-    let trace = rstack_self::trace(Command::new("cargo").arg("run").arg("-p").arg("aptos-iuchild").arg("--release")).unwrap();
+    let trace = rstack_self::trace(
+        Command::new("cargo")
+            .arg("run")
+            .arg("-p")
+            .arg("aptos-iuchild")
+            .arg("--release"),
+    )
+    .unwrap();
 
     // Open a file for writing
     let mut file = File::create("./thread_dump.txt").unwrap();
@@ -24,9 +28,5 @@ pub fn handle_thread_dump_request() -> (StatusCode, Body, String) {
     // Write the trace information to the file
     write!(file, "{:#?}", trace).unwrap();
 
-    (
-        StatusCode::OK,
-        Body::from("555"),
-        CONTENT_TYPE_TEXT.into(),
-    )
+    (StatusCode::OK, Body::from("555"), CONTENT_TYPE_TEXT.into())
 }

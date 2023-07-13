@@ -1,16 +1,10 @@
 // Copyright © Aptos Foundation
 
+use crate::server::utils::CONTENT_TYPE_TEXT;
 use hyper::{Body, StatusCode};
-use crate::{
-    server::utils::CONTENT_TYPE_TEXT
-};
-use std::thread;
-use std::time::Duration;
-use std::process::Command;
-
+use std::{path::Path, process::Command, thread, time::Duration};
 
 pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
-
     unsafe {
         let mut prof_active: bool = true;
 
@@ -62,9 +56,5 @@ pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
         println!("Command failed. Error:\n{}", stderr);
     }
 
-    (
-        StatusCode::OK,
-        Body::from("555"),
-        CONTENT_TYPE_TEXT.into(),
-    )
+    (StatusCode::OK, Body::from("555"), CONTENT_TYPE_TEXT.into())
 }

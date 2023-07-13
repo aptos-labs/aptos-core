@@ -3,17 +3,16 @@
 
 extern crate rstack_self;
 
-use std::env;
-use std::process::{Command, exit};
-use std::io::Write;
-use std::fs::File;
-use std::process;
-use std::thread;
-use std::time::Duration;
+use std::{
+    env,
+    fs::File,
+    io::Write,
+    process,
+    process::{exit, Command},
+    thread,
+    time::Duration,
+};
 
 fn main() {
-
     let _ = rstack_self::child();
-
-
 }
