@@ -348,6 +348,49 @@ impl<'a> TokenClient<'a> {
             .context("Failed to submit transaction")?
             .into_inner())
     }
+
+    pub async fn claim_token(
+        &self,
+        account: &mut LocalAccount,
+        sender: AccountAddress,
+        creator: AccountAddress,
+        collection_name: &str,
+        name: &str,
+        property_version: Option<u64>,
+        options: Option<TransactionOptions>,
+    ) -> Result<PendingTransaction> {
+        // create factory
+        let options = options.unwrap_or_default();
+        let factory = TransactionFactory::new(self.get_chain_id().await?)
+            .with_gas_unit_price(options.gas_unit_price)
+            .with_max_gas_amount(options.max_gas_amount)
+            .with_transaction_expiration_time(options.timeout_secs);
+
+        // create payload
+        let payload = EntryFunctionCall::TokenTransfersClaimScript {
+            sender,
+            creator,
+            collection: collection_name.to_owned().into_bytes(),
+            name: name.to_owned().into_bytes(),
+            property_version: property_version.unwrap_or(0),
+        }
+        .encode();
+
+        // create transaction
+        let builder = factory
+            .payload(payload)
+            .sender(account.address())
+            .sequence_number(account.sequence_number());
+        let signed_txn = account.sign_with_transaction_builder(builder);
+
+        // submit and return
+        Ok(self
+            .api_client
+            .submit(&signed_txn)
+            .await
+            .context("Failed to submit transaction")?
+            .into_inner())
+    }
 }
 
 pub struct TransactionOptions {

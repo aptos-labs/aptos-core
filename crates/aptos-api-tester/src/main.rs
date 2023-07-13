@@ -155,7 +155,7 @@ async fn test_mintnft(
     client: &Client,
     token_client: &TokenClient<'_>,
     account: &mut LocalAccount,
-    receiver: &LocalAccount,
+    receiver: &mut LocalAccount,
 ) -> TestResult {
     // create collection
     let collection_name = "test collection".to_string();
@@ -305,6 +305,10 @@ async fn test_mintnft(
         Err(e) => return TestResult::Error(e),
     };
 
+    if expected_sender_token_balance != actual_sender_token_balance {
+        return TestResult::Fail("wrong token balance");
+    }
+
     // check that token store isn't initialized for the receiver
     match token_client
         .get_token(
@@ -319,12 +323,45 @@ async fn test_mintnft(
         Err(_) => {},
     }
 
-    if expected_sender_token_balance != actual_sender_token_balance {
-        return TestResult::Fail("wrong token balance");
+    // claim token
+    let pending_txn = match token_client
+        .claim_token(
+            receiver,
+            account.address(),
+            account.address(),
+            &collection_name,
+            &token_name,
+            None,
+            None,
+        )
+        .await
+    {
+        Ok(txn) => txn,
+        Err(e) => return TestResult::Error(e),
+    };
+    match client.wait_for_transaction(&pending_txn).await {
+        Ok(_) => {},
+        Err(e) => return TestResult::Error(e.into()),
     }
 
-    // todo: check receiver balance
-    // todo: make getToken return token for non creator account
+    // check token balance for the receiver
+    let expected_receiver_token_balance = U64(2);
+    let actual_receiver_token_balance = match token_client
+        .get_token(
+            receiver.address(),
+            account.address(),
+            &collection_name,
+            &token_name,
+        )
+        .await
+    {
+        Ok(data) => data.amount,
+        Err(e) => return TestResult::Error(e),
+    };
+
+    if expected_receiver_token_balance != actual_receiver_token_balance {
+        return TestResult::Fail("wrong token balance");
+    }
 
     TestResult::Success
 }
@@ -341,8 +378,8 @@ async fn testnet_1() -> Result<()> {
     faucet_client.fund(giray.address(), 100_000_000).await?;
     println!("{:?}", giray.address());
 
-    let giray2 = LocalAccount::generate(&mut rand::rngs::OsRng);
-    faucet_client.create_account(giray2.address()).await?;
+    let mut giray2 = LocalAccount::generate(&mut rand::rngs::OsRng);
+    faucet_client.fund(giray2.address(), 100_000_000).await?;
     println!("{:?}", giray2.address());
 
     // Step 1: Test new account creation and funding
@@ -364,7 +401,13 @@ async fn testnet_1() -> Result<()> {
     .await;
 
     // Step 3: Test NFT minting
-    handle_result(test_mintnft(&client, &token_client, &mut giray, &giray2)).await;
+    handle_result(test_mintnft(
+        &client,
+        &token_client,
+        &mut giray,
+        &mut giray2,
+    ))
+    .await;
 
     Ok(())
 }
