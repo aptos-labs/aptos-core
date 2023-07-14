@@ -141,6 +141,7 @@ impl<'a> Parser<'a> {
         img_uri: String,
         animation_uri_option: Option<String>,
     ) {
+        // Optimize image
         match self.optimize_image(img_uri).await {
             Ok((new_img, format, raw_image_uri)) => {
                 info!(
@@ -185,6 +186,7 @@ impl<'a> Parser<'a> {
             },
         };
 
+        // Optimize animation if exists
         if let Some(animation_uri) = animation_uri_option {
             match self.optimize_image(animation_uri).await {
                 Ok((new_img, format, raw_animation_uri)) => {
