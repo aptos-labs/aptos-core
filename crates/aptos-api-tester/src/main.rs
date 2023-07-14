@@ -398,13 +398,13 @@ async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<H
 }
 
 /// Helper function that interacts with the message module.
-async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<()> {
+async fn set_message(client: &Client, account: &mut LocalAccount, message: &str) -> Result<()> {
     // create payload
     let payload = TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(account.address(), ident_str!("message").to_owned()),
         ident_str!("set_message").to_owned(),
         vec![],
-        vec![bcs::to_bytes("test message")?],
+        vec![bcs::to_bytes(message)?],
     ));
 
     // create and submit transaction
@@ -414,6 +414,21 @@ async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<()> 
     client.wait_for_transaction(&pending_txn).await?;
 
     Ok(())
+}
+
+async fn get_message(client: &Client, address: AccountAddress) -> Option<String> {
+    let resource = match client
+        .get_account_resource(
+            address,
+            format!("{}::message::MessageHolder", address.to_hex_literal()).as_str(),
+        )
+        .await
+    {
+        Ok(response) => response.into_inner()?,
+        Err(_) => return None,
+    };
+
+    Some(resource.data.get("message")?.as_str()?.to_owned())
 }
 
 /// Tests module publishing and interaction. Checks that:
@@ -438,9 +453,21 @@ async fn test_module(
     }
 
     // interact with module
-    set_message(client, account).await?;
+    let message = "test message";
+    set_message(client, account, message.clone()).await?;
 
-    // todo: get account resource to see that interaction worked
+    // check that the message is sent
+    let expected_message = message.to_string();
+    let actual_message = match get_message(client, account.address()).await {
+        Some(message) => message,
+        None => return Err(TestFailure::Error(anyhow!("module interaction isn't reflected")))
+    };
+
+    if expected_message != actual_message {
+        return Err(TestFailure::Fail(
+            "module interaction isn't reflected correctly",
+        ));
+    }
 
     Ok(TestResult::Success)
 }
