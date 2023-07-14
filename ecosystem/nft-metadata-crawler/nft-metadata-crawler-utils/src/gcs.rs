@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use anyhow::anyhow;
 use google_cloud_auth::token_source::TokenSource;
 use image::ImageFormat;
 use reqwest::{
@@ -7,14 +8,13 @@ use reqwest::{
     Client,
 };
 use serde_json::Value;
-use std::error::Error;
 
 pub async fn write_json_to_gcs(
     ts: &dyn TokenSource,
     bucket: String,
     id: String,
     json: Value,
-) -> Result<String, Box<dyn Error + Send + Sync>> {
+) -> anyhow::Result<String> {
     let client = Client::new();
     let filename = format!("json_{}.json", id);
     let url = format!(
@@ -35,7 +35,7 @@ pub async fn write_json_to_gcs(
         200..=299 => Ok(filename),
         _ => {
             let text = res.text().await?;
-            Err(format!("Error saving JSON to GCS {}", text).into())
+            Err(anyhow!("Error saving JSON to GCS {}", text))
         },
     }
 }
@@ -46,7 +46,7 @@ pub async fn write_image_to_gcs(
     bucket: String,
     id: String,
     buffer: Vec<u8>,
-) -> Result<String, Box<dyn Error + Send + Sync>> {
+) -> anyhow::Result<String> {
     let client = Client::new();
     let mut headers = HeaderMap::new();
 
@@ -87,7 +87,7 @@ pub async fn write_image_to_gcs(
         200..=299 => Ok(filename),
         _ => {
             let text = res.text().await?;
-            Err(format!("Error saving image to GCS {}", text).into())
+            Err(anyhow!("Error saving image to GCS {}", text))
         },
     }
 }

@@ -2,13 +2,32 @@
 
 use google_cloud_auth::project::{create_token_source, Config};
 use nft_metadata_crawler_parser::{establish_connection_pool, parser::Parser};
-use nft_metadata_crawler_utils::NFTMetadataCrawlerEntry;
+use nft_metadata_crawler_utils::{load_config_from_yaml, NFTMetadataCrawlerEntry};
+use serde::{Deserialize, Serialize};
 use tracing::info;
+
+#[derive(clap::Parser)]
+pub struct ServerArgs {
+    #[clap(short, long, value_parser)]
+    pub config_path: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ParserConfig {
+    pub google_application_credentials: String,
+    pub bucket: String,
+    pub subscription_name: String,
+    pub database_url: String,
+}
 
 #[tokio::main]
 async fn main() {
     info!("Starting Parser");
-    let pool = establish_connection_pool();
+    let args = <ServerArgs as clap::Parser>::parse();
+    let config =
+        load_config_from_yaml::<ParserConfig>(args.config_path).expect("Unable to load config");
+    let pool = establish_connection_pool(config.database_url.clone());
     let conn = pool.get().unwrap();
 
     // Temporary to test compilation

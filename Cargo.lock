@@ -9239,10 +9239,13 @@ checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 name = "nft-metadata-crawler-parser"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "base64 0.13.0",
  "chrono",
+ "clap 4.3.5",
  "csv",
  "diesel",
+ "field_count",
  "futures",
  "google-cloud-auth",
  "google-cloud-googleapis",
@@ -9254,6 +9257,7 @@ dependencies = [
  "serde 1.0.149",
  "serde_json",
  "tokio",
+ "tracing",
  "url",
 ]
 
@@ -9261,12 +9265,15 @@ dependencies = [
 name = "nft-metadata-crawler-utils"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "base64 0.13.0",
  "chrono",
  "google-cloud-auth",
  "image",
  "reqwest",
+ "serde 1.0.149",
  "serde_json",
+ "serde_yaml 0.8.26",
  "tokio",
 ]
 
