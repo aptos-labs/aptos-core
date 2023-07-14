@@ -106,7 +106,7 @@ The committed value given to the prover is too large.
 
 <a name="0x1_bulletproofs_MAX_RANGE_BITS"></a>
 
-The maximum range supported by the Bulletproofs library is [0, 2^{64}).
+The maximum range supported by the Bulletproofs library is $[0, 2^{64})$.
 
 
 <pre><code><b>const</b> <a href="bulletproofs.md#0x1_bulletproofs_MAX_RANGE_BITS">MAX_RANGE_BITS</a>: u64 = 64;
