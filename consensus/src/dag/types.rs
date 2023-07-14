@@ -658,7 +658,7 @@ impl TDAGMessage for TestAck {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DagSnapshotBitmask {
     bitmask: Vec<Vec<bool>>,
     first_round: Round,
