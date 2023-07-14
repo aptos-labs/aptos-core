@@ -15,7 +15,7 @@ use crate::{
             helpers::{new_certified_node, new_node},
         },
         types::{CertifiedAck, DAGMessage, NodeCertificate, TestAck, TestMessage},
-        NodeDigestSignature, NodeId, RpcHandler,
+        NodeId, RpcHandler, Vote,
     },
     network::TConsensusMsg,
     network_interface::ConsensusMsg,
@@ -203,10 +203,9 @@ async fn test_node_broadcast_receiver_succeed() {
 
     let mut rb_receiver = NodeBroadcastHandler::new(dag, signers[3].clone(), epoch_state, storage);
 
-    let expected_result = NodeDigestSignature::new(
-        0,
-        wellformed_node.digest(),
-        wellformed_node.sign(&signers[3]).unwrap(),
+    let expected_result = Vote::new(
+        wellformed_node.metadata().clone(),
+        wellformed_node.sign_vote(&signers[3]).unwrap(),
     );
     // expect an ack for a valid message
     assert_ok_eq!(rb_receiver.process(wellformed_node), expected_result);
@@ -234,12 +233,12 @@ async fn test_node_broadcast_receiver_failure() {
 
     // Round 0
     let node = new_node(0, 10, signers[0].author(), vec![]);
-    let node_sig = rb_receivers[1].process(node.clone()).unwrap();
+    let vote = rb_receivers[1].process(node.clone()).unwrap();
 
     // Round 1 with invalid parent
     let partial_sigs = PartialSignatures::new(BTreeMap::from([(
         signers[1].author(),
-        node_sig.signature().clone(),
+        vote.signature().clone(),
     )]));
     let node_cert = NodeCertificate::new(
         node.metadata().clone(),
@@ -304,14 +303,14 @@ fn test_node_broadcast_receiver_storage() {
     let sig = rb_receiver.process(node).expect("must succeed");
 
     assert_ok_eq!(
-        storage.get_node_signatures(),
+        storage.get_votes(),
         HashMap::from([(NodeId::new(0, 1, signers[0].author()), sig)])
     );
 
     let mut rb_receiver =
         NodeBroadcastHandler::new(dag, signers[3].clone(), epoch_state, storage.clone());
     assert_ok!(rb_receiver.gc_before_round(2));
-    assert_eq!(storage.get_node_signatures().unwrap().len(), 0);
+    assert_eq!(storage.get_votes().unwrap().len(), 0);
 }
 
 #[test]

@@ -10,7 +10,7 @@ use crate::{
     dag::{
         dag_network::{DAGNetworkSender, RpcHandler},
         dag_store::Dag,
-        types::{Node, NodeCertificate, NodeDigest, NodeDigestSignature, TDAGMessage},
+        types::{Node, NodeCertificate, TDAGMessage, Vote},
     },
     network::TConsensusMsg,
 };
@@ -99,7 +99,7 @@ pub enum NodeBroadcastHandleError {
 
 pub struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
-    signatures_by_round_peer: BTreeMap<Round, BTreeMap<Author, NodeDigestSignature>>,
+    votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
     signer: ValidatorSigner,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
@@ -113,11 +113,11 @@ impl NodeBroadcastHandler {
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
         let epoch = epoch_state.epoch;
-        let signatures_by_round_peer = read_signatures_from_storage(&storage, epoch);
+        let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
 
         Self {
             dag,
-            signatures_by_round_peer,
+            votes_by_round_peer,
             signer,
             epoch_state,
             storage,
@@ -125,8 +125,8 @@ impl NodeBroadcastHandler {
     }
 
     pub fn gc_before_round(&mut self, min_round: Round) -> anyhow::Result<()> {
-        let to_retain = self.signatures_by_round_peer.split_off(&min_round);
-        let to_delete = mem::replace(&mut self.signatures_by_round_peer, to_retain);
+        let to_retain = self.votes_by_round_peer.split_off(&min_round);
+        let to_delete = mem::replace(&mut self.votes_by_round_peer, to_retain);
 
         let to_delete = to_delete
             .iter()
@@ -136,7 +136,7 @@ impl NodeBroadcastHandler {
                     .map(|(author, _)| NodeId::new(self.epoch_state.epoch, *r, *author))
             })
             .collect();
-        self.storage.delete_node_signatures(to_delete)
+        self.storage.delete_votes(to_delete)
     }
 
     fn validate(&self, node: &Node) -> anyhow::Result<()> {
@@ -166,13 +166,9 @@ impl NodeBroadcastHandler {
         if !missing_parents.is_empty() {
             // For each missing parent, verify their signatures and voting power
             ensure!(
-                missing_parents.iter().all(|parent| {
-                    let node_digest = NodeDigest::new(*parent.metadata().digest());
-                    self.epoch_state
-                        .verifier
-                        .verify_multi_signatures(&node_digest, parent.signatures())
-                        .is_ok()
-                }),
+                missing_parents
+                    .iter()
+                    .all(|parent| { parent.verify(&self.epoch_state.verifier).is_ok() }),
                 NodeBroadcastHandleError::InvalidParent
             );
             // TODO: notify dag fetcher to fetch missing node and drop this node
@@ -183,53 +179,51 @@ impl NodeBroadcastHandler {
     }
 }
 
-fn read_signatures_from_storage(
+fn read_votes_from_storage(
     storage: &Arc<dyn DAGStorage>,
     epoch: u64,
-) -> BTreeMap<u64, BTreeMap<Author, NodeDigestSignature>> {
-    let mut signatures_by_round_peer = BTreeMap::new();
+) -> BTreeMap<u64, BTreeMap<Author, Vote>> {
+    let mut votes_by_round_peer = BTreeMap::new();
 
-    let all_node_signatures = storage.get_node_signatures().unwrap_or_default();
+    let all_votes = storage.get_votes().unwrap_or_default();
     let mut to_delete = vec![];
-    for (node_id, node_sig) in all_node_signatures {
+    for (node_id, vote) in all_votes {
         if node_id.epoch() == epoch {
-            signatures_by_round_peer
+            votes_by_round_peer
                 .entry(node_id.round())
                 .or_insert_with(BTreeMap::new)
-                .insert(node_id.author(), node_sig);
+                .insert(node_id.author(), vote);
         } else {
             to_delete.push(node_id);
         }
     }
-    if let Err(err) = storage.delete_node_signatures(to_delete) {
+    if let Err(err) = storage.delete_votes(to_delete) {
         error!("unable to clear old signatures: {}", err);
     }
 
-    signatures_by_round_peer
+    votes_by_round_peer
 }
 
 impl RpcHandler for NodeBroadcastHandler {
     type Request = Node;
-    type Response = NodeDigestSignature;
+    type Response = Vote;
 
     fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
         self.validate(&node)?;
 
-        let signatures_by_peer = self
-            .signatures_by_round_peer
+        let votes_by_peer = self
+            .votes_by_round_peer
             .entry(node.metadata().round())
             .or_insert(BTreeMap::new());
-        match signatures_by_peer.get(node.metadata().author()) {
+        match votes_by_peer.get(node.metadata().author()) {
             None => {
-                let signature = node.sign(&self.signer)?;
-                let digest_signature =
-                    NodeDigestSignature::new(node.metadata().epoch(), node.digest(), signature);
+                let signature = node.sign_vote(&self.signer)?;
+                let vote = Vote::new(node.metadata().clone(), signature);
 
-                self.storage
-                    .save_node_signature(&NodeId::from(&node), &digest_signature)?;
-                signatures_by_peer.insert(*node.metadata().author(), digest_signature.clone());
+                self.storage.save_vote(&node.id(), &vote)?;
+                votes_by_peer.insert(*node.metadata().author(), vote.clone());
 
-                Ok(digest_signature)
+                Ok(vote)
             },
             Some(ack) => Ok(ack.clone()),
         }

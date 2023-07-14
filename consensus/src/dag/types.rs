@@ -13,7 +13,7 @@ use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     CryptoMaterialError, HashValue,
 };
-use aptos_crypto_derive::CryptoHasher;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
@@ -28,7 +28,7 @@ pub trait TDAGMessage: Into<DAGMessage> + TryFrom<DAGMessage> {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
 }
 
-impl TDAGMessage for NodeDigestSignature {
+impl TDAGMessage for Vote {
     fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         todo!()
     }
@@ -75,7 +75,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
 }
 
 /// Represents the metadata about the node, without payload and parents from Node
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, CryptoHasher, BCSCryptoHash)]
 pub struct NodeMetadata {
     node_id: NodeId,
     timestamp: u64,
@@ -124,25 +124,6 @@ impl Deref for NodeMetadata {
 
     fn deref(&self) -> &Self::Target {
         &self.node_id
-    }
-}
-
-#[derive(Serialize)]
-pub struct NodeDigest {
-    digest: HashValue,
-}
-
-impl NodeDigest {
-    pub fn new(digest: HashValue) -> Self {
-        Self { digest }
-    }
-}
-
-impl CryptoHash for NodeDigest {
-    type Hasher = NodeHasher;
-
-    fn hash(&self) -> HashValue {
-        self.digest
     }
 }
 
@@ -241,9 +222,16 @@ impl Node {
         self.metadata.author()
     }
 
-    pub fn sign(&self, signer: &ValidatorSigner) -> Result<Signature, CryptoMaterialError> {
-        let node_digest = NodeDigest::new(self.digest());
-        signer.sign(&node_digest)
+    pub fn epoch(&self) -> u64 {
+        self.metadata.epoch
+    }
+
+    pub fn id(&self) -> NodeId {
+        NodeId::new(self.epoch(), self.round(), *self.author())
+    }
+
+    pub fn sign_vote(&self, signer: &ValidatorSigner) -> Result<Signature, CryptoMaterialError> {
+        signer.sign(self.metadata())
     }
 
     pub fn round(&self) -> Round {
@@ -318,16 +306,6 @@ impl NodeId {
     }
 }
 
-impl From<&Node> for NodeId {
-    fn from(node: &Node) -> Self {
-        Self {
-            epoch: node.metadata.epoch,
-            round: node.metadata.round,
-            author: node.metadata.author,
-        }
-    }
-}
-
 /// Quorum signatures over the node digest
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct NodeCertificate {
@@ -353,6 +331,10 @@ impl NodeCertificate {
 
     pub fn signatures(&self) -> &AggregateSignature {
         &self.signatures
+    }
+
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        Ok(verifier.verify_multi_signatures(self.metadata(), self.signatures())?)
     }
 }
 
@@ -388,26 +370,22 @@ impl TDAGMessage for CertifiedNode {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(self.digest() == self.calculate_digest(), "invalid digest");
 
-        let node_digest = NodeDigest::new(self.digest());
-
         verifier
-            .verify_multi_signatures(&node_digest, self.certificate().signatures())
+            .verify_multi_signatures(self.metadata(), self.certificate().signatures())
             .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct NodeDigestSignature {
-    epoch: u64,
-    digest: HashValue,
+pub struct Vote {
+    metadata: NodeMetadata,
     signature: bls12381::Signature,
 }
 
-impl NodeDigestSignature {
-    pub(crate) fn new(epoch: u64, digest: HashValue, signature: Signature) -> Self {
+impl Vote {
+    pub(crate) fn new(metadata: NodeMetadata, signature: Signature) -> Self {
         Self {
-            epoch,
-            digest,
+            metadata,
             signature,
         }
     }
@@ -434,12 +412,12 @@ impl SignatureBuilder {
 }
 
 impl BroadcastStatus for SignatureBuilder {
-    type Ack = NodeDigestSignature;
+    type Ack = Vote;
     type Aggregated = NodeCertificate;
     type Message = Node;
 
     fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
-        ensure!(self.metadata.digest == ack.digest, "Digest mismatch");
+        ensure!(self.metadata == ack.metadata, "Digest mismatch");
         self.partial_signatures.add_signature(peer, ack.signature);
         Ok(self
             .epoch_state
@@ -549,7 +527,7 @@ pub struct DAGNetworkMessage {
 #[derive(Clone, Serialize, Deserialize, Debug, EnumConversion)]
 pub enum DAGMessage {
     NodeMsg(Node),
-    NodeDigestSignatureMsg(NodeDigestSignature),
+    VoteMsg(Vote),
     CertifiedNodeMsg(CertifiedNode),
     CertifiedAckMsg(CertifiedAck),
     FetchRequest(RemoteFetchRequest),
@@ -565,7 +543,7 @@ impl DAGMessage {
     pub fn name(&self) -> &str {
         match self {
             DAGMessage::NodeMsg(_) => "NodeMsg",
-            DAGMessage::NodeDigestSignatureMsg(_) => "NodeDigestSignatureMsg",
+            DAGMessage::VoteMsg(_) => "VoteMsg",
             DAGMessage::CertifiedNodeMsg(_) => "CertifiedNodeMsg",
             DAGMessage::CertifiedAckMsg(_) => "CertifiedAckMsg",
             DAGMessage::FetchRequest(_) => "FetchRequest",
@@ -590,7 +568,7 @@ impl TConsensusMsg for DAGMessage {
     fn epoch(&self) -> u64 {
         match self {
             DAGMessage::NodeMsg(node) => node.metadata.epoch,
-            DAGMessage::NodeDigestSignatureMsg(signature) => signature.epoch,
+            DAGMessage::VoteMsg(vote) => vote.metadata.epoch,
             DAGMessage::CertifiedNodeMsg(node) => node.metadata.epoch,
             DAGMessage::CertifiedAckMsg(ack) => ack.epoch,
             DAGMessage::FetchRequest(req) => req.target.epoch,

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{types::NodeDigestSignature, NodeId};
+use super::{types::Vote, NodeId};
 use crate::{
     consensusdb::ConsensusDB,
     dag::{CertifiedNode, Node},
@@ -15,15 +15,11 @@ pub trait DAGStorage {
 
     fn delete_node(&self, digest: HashValue) -> anyhow::Result<()>;
 
-    fn save_node_signature(
-        &self,
-        node_id: &NodeId,
-        node_digest_signature: &NodeDigestSignature,
-    ) -> anyhow::Result<()>;
+    fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()>;
 
-    fn get_node_signatures(&self) -> anyhow::Result<HashMap<NodeId, NodeDigestSignature>>;
+    fn get_votes(&self) -> anyhow::Result<HashMap<NodeId, Vote>>;
 
-    fn delete_node_signatures(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()>;
+    fn delete_votes(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()>;
 
     fn save_certified_node(&self, node: &CertifiedNode) -> anyhow::Result<()>;
 
@@ -41,20 +37,16 @@ impl DAGStorage for ConsensusDB {
         Ok(self.delete_node(digest)?)
     }
 
-    fn save_node_signature(
-        &self,
-        node_id: &NodeId,
-        node_digest_signature: &NodeDigestSignature,
-    ) -> anyhow::Result<()> {
-        Ok(self.save_node_signature(node_id, node_digest_signature)?)
+    fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()> {
+        Ok(self.save_dag_vote(node_id, vote)?)
     }
 
-    fn get_node_signatures(&self) -> anyhow::Result<HashMap<NodeId, NodeDigestSignature>> {
-        Ok(self.get_node_signatures()?)
+    fn get_votes(&self) -> anyhow::Result<HashMap<NodeId, Vote>> {
+        Ok(self.get_dag_votes()?)
     }
 
-    fn delete_node_signatures(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        Ok(self.delete_node_signatures(node_ids)?)
+    fn delete_votes(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
+        Ok(self.delete_dag_votes(node_ids)?)
     }
 
     fn save_certified_node(&self, node: &CertifiedNode) -> anyhow::Result<()> {
