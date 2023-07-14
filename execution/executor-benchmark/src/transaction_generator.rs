@@ -28,6 +28,7 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -87,7 +88,7 @@ pub struct TransactionGenerator {
 
     /// Each generated block of transactions are sent to this channel. Using `SyncSender` to make
     /// sure if execution is slow to consume the transactions, we do not run out of memory.
-    block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
+    block_sender: Option<mpsc::SyncSender<Vec<AnalyzedTransaction>>>,
 
     /// Transaction Factory
     transaction_factory: TransactionFactory,
@@ -173,7 +174,7 @@ impl TransactionGenerator {
     pub fn new_with_existing_db<P: AsRef<Path>>(
         db: DbReaderWriter,
         genesis_key: Ed25519PrivateKey,
-        block_sender: mpsc::SyncSender<Vec<Transaction>>,
+        block_sender: mpsc::SyncSender<Vec<AnalyzedTransaction>>,
         db_dir: P,
         version: Version,
         num_main_signer_accounts: Option<usize>,
@@ -300,7 +301,7 @@ impl TransactionGenerator {
             .chain(once(Transaction::StateCheckpoint(HashValue::random())))
             .collect();
             self.version += transactions.len() as Version;
-
+            let transactions: Vec<AnalyzedTransaction> = transactions.into_iter().map(|t| t.into()).collect();
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
             }
@@ -347,6 +348,7 @@ impl TransactionGenerator {
                 })
                 .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
+            let transactions: Vec<AnalyzedTransaction> = transactions.into_iter().map(|t| t.into()).collect();
             self.version += transactions.len() as Version;
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
@@ -393,6 +395,7 @@ impl TransactionGenerator {
                 .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
+            let transactions: Vec<AnalyzedTransaction> = transactions.into_iter().map(|t| t.into()).collect();
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
             }
@@ -432,7 +435,7 @@ impl TransactionGenerator {
                 .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
-
+            let transactions: Vec<AnalyzedTransaction> = transactions.into_iter().map(|t| t.into()).collect();
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
             }

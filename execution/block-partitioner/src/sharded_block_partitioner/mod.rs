@@ -10,7 +10,7 @@ use crate::{sharded_block_partitioner::{
         DiscardCrossShardDep, PartitioningResp,
     },
     partitioning_shard::PartitioningShard,
-}, BlockPartitioner, analyze_block, report_sub_block_matrix};
+}, BlockPartitioner};
 use aptos_logger::{error, info};
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId, SubBlocksForShard, TxnIndex},
@@ -404,7 +404,7 @@ impl ShardedBlockPartitioner {
 impl BlockPartitioner for ShardedBlockPartitioner {
     fn partition(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
         let _timer = BLOCK_PARTITIONING_SECONDS.start_timer();
@@ -425,12 +425,10 @@ impl BlockPartitioner for ShardedBlockPartitioner {
                 self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard)
             }
             _ => {
-                let analyzed_transactions = analyze_block(transactions);
-                let ret = self.partition(analyzed_transactions, max_partitioning_rounds, cross_shard_dep_avoid_threshold);
+                let ret = self.partition(transactions, max_partitioning_rounds, cross_shard_dep_avoid_threshold);
                 ret
             }
         };
-        report_sub_block_matrix(&ret);
         ret
     }
 }

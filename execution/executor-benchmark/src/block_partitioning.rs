@@ -12,6 +12,7 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::{sync::Arc, time::Instant};
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 pub(crate) struct BlockPartitioningStage {
     num_executor_shards: usize,
@@ -28,7 +29,7 @@ impl BlockPartitioningStage {
         }
     }
 
-    pub fn process(&mut self, mut txns: Vec<Transaction>) -> ExecuteBlockMessage {
+    pub fn process(&mut self, mut txns: Vec<AnalyzedTransaction>) -> ExecuteBlockMessage {
         let current_block_start_time = Instant::now();
         info!(
             "In iteration {}, received {:?} transactions.",
@@ -39,8 +40,9 @@ impl BlockPartitioningStage {
         let block: ExecutableBlock<Transaction> = {
             let _timer = APTOS_BLOCK_PARTITIONER_SECONDS.start_timer();
             let last_txn = txns.pop().unwrap();
-            assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
+            assert!(matches!(last_txn.transaction(), &Transaction::StateCheckpoint(_)));
             let mut sub_blocks = self.partitioner.partition(txns, self.num_executor_shards);
+            report_sub_block_matrix(&sub_blocks);
             sub_blocks
                 .last_mut()
                 .unwrap()
@@ -49,7 +51,7 @@ impl BlockPartitioningStage {
                 .unwrap()
                 .transactions
                 .push(TransactionWithDependencies::new(
-                    last_txn,
+                    last_txn.into_txn(),
                     CrossShardDependencies::default(),
                 ));
             ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))

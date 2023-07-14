@@ -23,7 +23,7 @@ use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, Storag
 pub trait BlockPartitioner: Send {
     fn partition(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>>;
 }

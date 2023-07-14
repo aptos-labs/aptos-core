@@ -21,10 +21,9 @@ pub struct SimplePartitioner {}
 impl SimplePartitioner {
     /// If `maybe_load_imbalance_tolerance` is none,
     /// it is guaranteed that the returned txn groups do not have cross-group conflicts.
-    pub fn partition_inner(&self, txns: Vec<Transaction>, num_executor_shards: usize, maybe_load_imbalance_tolerance: Option<f32>) -> Vec<Vec<Transaction>> {
+    pub fn partition_inner(&self, txns: Vec<AnalyzedTransaction>, num_executor_shards: usize, maybe_load_imbalance_tolerance: Option<f32>) -> Vec<Vec<Transaction>> {
         let timer = Instant::now();
         let num_txns = txns.len();
-        let txns = analyze_block(txns);
         println!("analyze_time={:?}", timer.elapsed());
 
         // Sender-to-keyset and keyset-to-sender lookup table.
@@ -212,7 +211,7 @@ impl SimplePartitioner {
 impl BlockPartitioner for SimplePartitioner {
     fn partition(
         &self,
-        txns: Vec<Transaction>,
+        txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
         let txns_by_shard_id = self.partition_inner(txns, num_executor_shards, None);

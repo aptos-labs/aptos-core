@@ -20,10 +20,11 @@ use std::{
     sync::{atomic::AtomicUsize, mpsc},
     time::Duration,
 };
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 pub struct DbReliableTransactionSubmitter {
     pub db: DbReaderWriter,
-    pub block_sender: mpsc::SyncSender<Vec<Transaction>>,
+    pub block_sender: mpsc::SyncSender<Vec<AnalyzedTransaction>>,
 }
 
 #[async_trait]
@@ -57,6 +58,7 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
             txns.iter()
                 .map(|t| Transaction::UserTransaction(t.clone()))
                 .chain(once(Transaction::StateCheckpoint(HashValue::random())))
+                .map(|t| t.into())
                 .collect(),
         )?;
 

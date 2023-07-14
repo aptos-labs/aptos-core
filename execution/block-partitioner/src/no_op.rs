@@ -7,19 +7,20 @@ use aptos_types::{
     },
     transaction::Transaction,
 };
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 pub struct NoOpPartitioner {}
 
 impl BlockPartitioner for NoOpPartitioner {
     fn partition(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
         assert_eq!(1, num_executor_shards);
         let twds = transactions
             .into_iter()
-            .map(|t| TransactionWithDependencies::new(t, CrossShardDependencies::default()))
+            .map(|t| TransactionWithDependencies::new(t.into_txn(), CrossShardDependencies::default()))
             .collect();
         let sub_block = SubBlock::new(0, twds);
         let sub_block_list = SubBlocksForShard::new(0, vec![sub_block]);

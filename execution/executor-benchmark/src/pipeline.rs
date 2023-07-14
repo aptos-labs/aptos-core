@@ -26,6 +26,7 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 #[derive(Clone, Debug)]
 pub enum PartitionerImpl {
@@ -62,12 +63,12 @@ where
         config: PipelineConfig,
         // Need to specify num blocks, to size queues correctly, when delay_execution_start, split_stages or skip_commit are used
         num_blocks: Option<usize>,
-    ) -> (Self, mpsc::SyncSender<Vec<Transaction>>) {
+    ) -> (Self, mpsc::SyncSender<Vec<AnalyzedTransaction>>) {
         let parent_block_id = executor.committed_block_id();
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
 
-        let (raw_block_sender, raw_block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
+        let (raw_block_sender, raw_block_receiver) = mpsc::sync_channel::<Vec<AnalyzedTransaction>>(
             if config.delay_execution_start {
                 (num_blocks.unwrap() + 1).max(50)
             } else {
