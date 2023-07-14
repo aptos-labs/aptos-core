@@ -3,16 +3,21 @@
 
 #![forbid(unsafe_code)]
 
+use std::collections::BTreeMap;
 use std::future::Future;
+use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use aptos_api_types::U64;
+use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Account, Client, FaucetClient};
+use aptos_sdk::bcs;
 use aptos_sdk::coin_client::CoinClient;
 use aptos_sdk::token_client::{
-    CollectionData, CollectionMutabilityConfig, RoyaltyOptions, TokenClient, TokenData,
-    TokenMutabilityConfig,
+    build_and_submit_transaction, CollectionData, CollectionMutabilityConfig, RoyaltyOptions,
+    TokenClient, TokenData, TokenMutabilityConfig, TransactionOptions,
 };
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
@@ -348,6 +353,42 @@ async fn test_mintnft(
     Ok(TestResult::Success)
 }
 
+async fn test_module(
+    client: &Client,
+    account: &mut LocalAccount,
+) -> Result<TestResult, TestFailure> {
+    // get file to compile
+    let move_dir = PathBuf::from("/Users/ngk/Documents/aptos-core/aptos-move/move-examples/hello_blockchain");
+
+    // insert address
+    let mut named_addresses: BTreeMap<String, AccountAddress> = BTreeMap::new();
+    named_addresses.insert("hello_blockchain".to_string(), account.address());
+
+    // build options
+    let mut options: BuildOptions = BuildOptions::default();
+    options.named_addresses = named_addresses;
+
+    // build module
+    let package = BuiltPackage::build(move_dir, options)?;
+    let blobs = package.extract_code();
+    let metadata = package.extract_metadata()?;
+
+    // create payload
+    let payload = EntryFunctionCall::CodePublishPackageTxn {
+        metadata_serialized: bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+        code: blobs,
+    }
+    .encode();
+
+    // create and submit transaction
+    let pending_txn =
+        build_and_submit_transaction(&client, account, payload, TransactionOptions::default())
+            .await?;
+    client.wait_for_transaction(&pending_txn).await?;
+
+    Ok(TestResult::Success)
+}
+
 async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
     // create clients
     let coin_client = CoinClient::new(&client);
@@ -387,6 +428,9 @@ async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
         &mut giray2,
     ))
     .await;
+
+    // Flow 3: NFT transfer
+    let _ = handle_result(test_module(&client, &mut giray)).await;
 
     Ok(())
 }

@@ -12,6 +12,48 @@ use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
 use aptos_types::transaction::TransactionPayload;
 use serde::{Deserialize, Serialize};
 
+/// Gets chain ID for use in submitting transactions.
+async fn get_chain_id(client: &ApiClient) -> Result<ChainId> {
+    let id = client
+        .get_index()
+        .await
+        .context("Failed to get chain ID")?
+        .inner()
+        .chain_id;
+
+    Ok(ChainId::new(id))
+}
+
+/// Helper function to take care of a transaction after creating the payload.
+pub async fn build_and_submit_transaction(
+    client: &ApiClient,
+    account: &mut LocalAccount,
+    payload: TransactionPayload,
+    options: TransactionOptions,
+) -> Result<PendingTransaction> {
+    // create factory
+    let factory = TransactionFactory::new(get_chain_id(client).await?)
+        .with_gas_unit_price(options.gas_unit_price)
+        .with_max_gas_amount(options.max_gas_amount)
+        .with_transaction_expiration_time(options.timeout_secs);
+
+    // create transaction
+    let builder = factory
+        .payload(payload)
+        .sender(account.address())
+        .sequence_number(account.sequence_number());
+
+    // sign transaction
+    let signed_txn = account.sign_with_transaction_builder(builder);
+
+    // submit and return
+    Ok(client
+        .submit(&signed_txn)
+        .await
+        .context("Failed to submit transaction")?
+        .into_inner())
+}
+
 #[derive(Clone, Debug)]
 pub struct TokenClient<'a> {
     api_client: &'a ApiClient,
@@ -20,19 +62,6 @@ pub struct TokenClient<'a> {
 impl<'a> TokenClient<'a> {
     pub fn new(api_client: &'a ApiClient) -> Self {
         Self { api_client }
-    }
-
-    /// Gets chain ID for use in submitting transactions.
-    async fn get_chain_id(&self) -> Result<ChainId> {
-        let id = self
-            .api_client
-            .get_index()
-            .await
-            .context("Failed to get chain ID")?
-            .inner()
-            .chain_id;
-
-        Ok(ChainId::new(id))
     }
 
     /// Helper function to get the handle address of collection_data for 0x3::token::Collections
@@ -100,37 +129,6 @@ impl<'a> TokenClient<'a> {
         }
     }
 
-    /// Helper function to take care of a transaction after creating the payload.
-    async fn build_and_submit_transaction(
-        &self,
-        account: &mut LocalAccount,
-        payload: TransactionPayload,
-        options: TransactionOptions,
-    ) -> Result<PendingTransaction> {
-        // create factory
-        let factory = TransactionFactory::new(self.get_chain_id().await?)
-            .with_gas_unit_price(options.gas_unit_price)
-            .with_max_gas_amount(options.max_gas_amount)
-            .with_transaction_expiration_time(options.timeout_secs);
-
-        // create transaction
-        let builder = factory
-            .payload(payload)
-            .sender(account.address())
-            .sequence_number(account.sequence_number());
-
-        // sign transaction
-        let signed_txn = account.sign_with_transaction_builder(builder);
-
-        // submit and return
-        Ok(self
-            .api_client
-            .submit(&signed_txn)
-            .await
-            .context("Failed to submit transaction")?
-            .into_inner())
-    }
-
     /// Creates a collection with the given fields.
     pub async fn create_collection(
         &self,
@@ -152,7 +150,8 @@ impl<'a> TokenClient<'a> {
         .encode();
 
         // create and submit transaction
-        self.build_and_submit_transaction(account, payload, options.unwrap_or_default()).await
+        build_and_submit_transaction(self.api_client, account, payload, options.unwrap_or_default())
+            .await
     }
 
     /// Creates a token with the given fields. Does not support property keys.
@@ -198,7 +197,8 @@ impl<'a> TokenClient<'a> {
         .encode();
 
         // create and submit transaction
-        self.build_and_submit_transaction(account, payload, options.unwrap_or_default()).await
+        build_and_submit_transaction(self.api_client, account, payload, options.unwrap_or_default())
+            .await
     }
 
     /// Retrieves collection metadata from the API.
@@ -321,7 +321,8 @@ impl<'a> TokenClient<'a> {
         .encode();
 
         // create and submit transaction
-        self.build_and_submit_transaction(account, payload, options.unwrap_or_default()).await
+        build_and_submit_transaction(self.api_client, account, payload, options.unwrap_or_default())
+            .await
     }
 
     pub async fn claim_token(
@@ -345,7 +346,8 @@ impl<'a> TokenClient<'a> {
         .encode();
 
         // create and submit transaction
-        self.build_and_submit_transaction(account, payload, options.unwrap_or_default()).await
+        build_and_submit_transaction(self.api_client, account, payload, options.unwrap_or_default())
+            .await
     }
 }
 

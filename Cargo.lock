@@ -401,6 +401,7 @@ dependencies = [
  "anyhow",
  "aptos-api-types",
  "aptos-cached-packages",
+ "aptos-framework",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-types",
