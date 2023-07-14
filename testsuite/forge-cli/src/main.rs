@@ -10,7 +10,7 @@ use aptos_forge::{
     system_metrics::{MetricsThreshold, SystemMetricsThreshold},
     ForgeConfig, Options, *,
 };
-use aptos_logger::Level;
+use aptos_logger::{info, Level};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use aptos_testcases::{
@@ -42,10 +42,12 @@ use aptos_testcases::{
     CompositeNetworkTest,
 };
 use clap::{Parser, Subcommand};
+use futures::stream::{FuturesUnordered, StreamExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
     num::NonZeroUsize,
+    path::{Path, PathBuf},
     process,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -54,7 +56,7 @@ use std::{
     thread,
     time::Duration,
 };
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, select};
 use url::Url;
 
 #[cfg(unix)]
@@ -556,6 +558,7 @@ fn single_test_suite(
         "pfn_performance" => pfn_performance(duration, false, false),
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
+        "gather_metrics" => gather_metrics(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1211,6 +1214,13 @@ fn network_bandwidth() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
         .add_network_test(NetworkBandwidthTest)
+}
+
+fn gather_metrics() -> ForgeConfig {
+    ForgeConfig::default()
+        .add_network_test(GatherMetrics)
+        .add_network_test(Delay::new(60))
+        .add_network_test(GatherMetrics)
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
@@ -2111,6 +2121,100 @@ impl NetworkTest for EmitTransaction {
         ctx.report.report_txn_stats(self.name().to_string(), &stats);
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct Delay {
+    seconds: u64,
+}
+
+impl Delay {
+    fn new(seconds: u64) -> Self {
+        Self { seconds }
+    }
+}
+
+impl Test for Delay {
+    fn name(&self) -> &'static str {
+        "delay"
+    }
+}
+
+impl NetworkTest for Delay {
+    fn run(&self, _ctx: &mut NetworkContext<'_>) -> Result<()> {
+        info!("forge sleep {}", self.seconds);
+        std::thread::sleep(Duration::from_secs(self.seconds));
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct GatherMetrics;
+
+impl Test for GatherMetrics {
+    fn name(&self) -> &'static str {
+        "gather_metrics"
+    }
+}
+
+impl NetworkTest for GatherMetrics {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+        let runtime = ctx.runtime.handle();
+        runtime.block_on(gather_metrics_one(ctx));
+        Ok(())
+    }
+}
+
+async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
+    let handle = ctx.runtime.handle();
+    let outdir = Path::new("/tmp");
+    let mut gets = FuturesUnordered::new();
+    let now = chrono::prelude::Utc::now()
+        .format("%Y%m%d_%H%M%S")
+        .to_string();
+    for val in ctx.swarm.validators() {
+        let mut url = val.inspection_service_endpoint();
+        let valname = val.peer_id().to_string();
+        url.set_path("metrics");
+        let fname = format!("{}.{}.metrics", now, valname);
+        let outpath: PathBuf = outdir.join(fname);
+        let th = handle.spawn(gather_metrics_to_file(url, outpath));
+        gets.push(th);
+    }
+    // join all the join handles
+    while !gets.is_empty() {
+        select! {
+            _ = gets.next() => {}
+        }
+    }
+}
+
+async fn gather_metrics_to_file(url: Url, outpath: PathBuf) {
+    let client = reqwest::Client::new();
+    match client.get(url).send().await {
+        Ok(response) => {
+            let url = response.url().clone();
+            let status = response.status();
+            if status.is_success() {
+                match response.text().await {
+                    Ok(text) => match std::fs::write(outpath, text) {
+                        Ok(_) => {},
+                        Err(err) => {
+                            info!("could not write metrics: {}", err);
+                        },
+                    },
+                    Err(err) => {
+                        info!("bad metrics GET: {} -> {}", url, err);
+                    },
+                }
+            } else {
+                info!("bad metrics GET: {} -> {}", url, status);
+            }
+        },
+        Err(err) => {
+            info!("bad metrics GET: {}", err);
+        },
     }
 }
 
