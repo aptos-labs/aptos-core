@@ -1,4 +1,4 @@
-CREATE TABLE nft_metadata_crawler_uris (
+CREATE TABLE IF NOT EXISTS nft_metadata_crawler_uris (
   token_uri VARCHAR UNIQUE PRIMARY KEY NOT NULL,
   raw_image_uri VARCHAR,
   raw_animation_uri VARCHAR,
@@ -10,5 +10,5 @@ CREATE TABLE nft_metadata_crawler_uris (
   last_updated TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX nft_raw_image_uri ON nft_metadata_crawler_uris (raw_image_uri);
-CREATE INDEX nft_raw_animation_uri ON nft_metadata_crawler_uris (raw_animation_uri);
+CREATE INDEX IF NOT EXISTS nft_raw_image_uri ON nft_metadata_crawler_uris (raw_image_uri);
+CREATE INDEX IF NOT EXISTS nft_raw_animation_uri ON nft_metadata_crawler_uris (raw_animation_uri);

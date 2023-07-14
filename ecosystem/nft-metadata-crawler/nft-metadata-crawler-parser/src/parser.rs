@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 
-use crate::{db::upsert_uris, models::NFTMetadataCrawlerURIs, schema::nft_metadata_crawler_uris};
-use chrono::Utc;
+use crate::{
+    db::upsert_uris,
+    models::{NFTMetadataCrawlerURIs, NFTMetadataCrawlerURIsQuery},
+};
 use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
-    PgConnection, QueryDsl, RunQueryDsl,
+    PgConnection,
 };
 use google_cloud_auth::token_source::TokenSource;
 use image::{ImageBuffer, ImageFormat};
@@ -13,7 +15,7 @@ use nft_metadata_crawler_utils::{
     NFTMetadataCrawlerEntry,
 };
 use serde_json::Value;
-use std::error::Error;
+use tracing::{error, info};
 
 // Stuct that represents a parser for a single entry from queue
 pub struct Parser<'a> {
@@ -23,13 +25,20 @@ pub struct Parser<'a> {
     bucket: String,
     ts: &'a dyn TokenSource,
     force: bool,
+    conn: PooledConnection<ConnectionManager<PgConnection>>,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(e: NFTMetadataCrawlerEntry, b: String, f: bool, t: &'a dyn TokenSource) -> Self {
+    pub fn new(
+        entry: NFTMetadataCrawlerEntry,
+        bucket: String,
+        force: bool,
+        ts: &'a dyn TokenSource,
+        conn: PooledConnection<ConnectionManager<PgConnection>>,
+    ) -> Self {
         Self {
             model: NFTMetadataCrawlerURIs {
-                token_uri: e.token_uri.clone(),
+                token_uri: entry.token_uri.clone(),
                 raw_image_uri: None,
                 raw_animation_uri: None,
                 cdn_json_uri: None,
@@ -37,32 +46,31 @@ impl<'a> Parser<'a> {
                 cdn_animation_uri: None,
                 image_resizer_retry_count: 0,
                 json_parser_retry_count: 0,
-                last_updated: Utc::now().naive_utc(),
             },
-            entry: e,
+            entry,
             format: ImageFormat::Jpeg,
-            bucket: b,
-            ts: t,
-            force: f,
+            bucket,
+            ts,
+            force,
+            conn,
         }
     }
 
-    pub async fn parse(
-        &mut self,
-        conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub async fn parse(&mut self) -> anyhow::Result<()> {
         // Deduplication
-        if nft_metadata_crawler_uris::table
-            .find(&self.entry.token_uri)
-            .first::<NFTMetadataCrawlerURIs>(conn)
-            .is_ok()
+        if !self.force
+            && NFTMetadataCrawlerURIsQuery::get_by_token_uri(
+                self.entry.token_uri.clone(),
+                &mut self.conn,
+            )
+            .unwrap_or(None)
+            .is_some()
         {
-            if self.force {
-                self.log("Found URIs entry but forcing parse");
-            } else {
-                self.log("Skipping URI parse");
-                return Ok(());
-            }
+            info!(
+                last_transaction_version = self.entry.last_transaction_version,
+                "Skipping URI parse"
+            );
+            return Ok(());
         }
 
         // URI Parser
@@ -74,7 +82,10 @@ impl<'a> Parser<'a> {
         // JSON Parser
         match self.parse_json(json_uri).await {
             Ok(json) => {
-                self.log("Successfully parsed JSON");
+                info!(
+                    last_transaction_version = self.entry.last_transaction_version,
+                    "Successfully parsed JSON"
+                );
 
                 // Write JSON to GCS
                 match write_json_to_gcs(
@@ -89,21 +100,39 @@ impl<'a> Parser<'a> {
                         // Temporarily hardcode IP for load balancer testing
                         self.model.cdn_json_uri =
                             Some(format!("http://34.160.26.161/{}", filename));
-                        self.log("Successfully saved JSON")
+                        info!(
+                            last_transaction_version = self.entry.last_transaction_version,
+                            "Successfully saved JSON"
+                        )
                     },
-                    Err(e) => self.log(&e.to_string()),
+                    Err(e) => error!(
+                        last_transaction_version = self.entry.last_transaction_version,
+                        "{}",
+                        e.to_string()
+                    ),
                 }
             },
             Err(e) => {
                 self.model.json_parser_retry_count += 1;
-                self.log(&e.to_string())
+                error!(
+                    last_transaction_version = self.entry.last_transaction_version,
+                    "{}",
+                    e.to_string()
+                )
             },
         }
 
         // Save to Postgres
-        match upsert_uris(conn, self.model.clone()) {
-            Ok(_) => self.log("Successfully upserted JSON URIs"),
-            Err(e) => self.log(&e.to_string()),
+        match upsert_uris(&mut self.conn, self.model.clone()) {
+            Ok(_) => info!(
+                last_transaction_version = self.entry.last_transaction_version,
+                "Successfully upserted JSON URIs"
+            ),
+            Err(e) => error!(
+                last_transaction_version = self.entry.last_transaction_version,
+                "{}",
+                e.to_string()
+            ),
         }
 
         // URI Parser
@@ -121,7 +150,10 @@ impl<'a> Parser<'a> {
         // Image Optimizer
         match self.optimize_image(img_uri).await {
             Ok(new_img) => {
-                self.log("Successfully optimized image");
+                info!(
+                    last_transaction_version = self.entry.last_transaction_version,
+                    "Successfully optimized image"
+                );
 
                 // Write image to GCS
                 match write_image_to_gcs(
@@ -136,46 +168,61 @@ impl<'a> Parser<'a> {
                     Ok(filename) => {
                         self.model.cdn_image_uri =
                             Some(format!("http://34.160.26.161/{}", filename));
-                        self.log("Successfully saved image");
+                        info!(
+                            last_transaction_version = self.entry.last_transaction_version,
+                            "Successfully saved image"
+                        );
                     },
-                    Err(e) => self.log(&e.to_string()),
+                    Err(e) => error!(
+                        last_transaction_version = self.entry.last_transaction_version,
+                        "{}",
+                        e.to_string()
+                    ),
                 }
             },
             Err(e) => {
                 self.model.image_resizer_retry_count += 1;
-                self.log(&e.to_string())
+                error!(
+                    last_transaction_version = self.entry.last_transaction_version,
+                    "{}",
+                    e.to_string()
+                )
             },
         }
 
         // Save to Postgres
-        match upsert_uris(conn, self.model.clone()) {
-            Ok(_) => self.log("Successfully upserted image URIs"),
-            Err(e) => self.log(&e.to_string()),
+        match upsert_uris(&mut self.conn, self.model.clone()) {
+            Ok(_) => info!(
+                last_transaction_version = self.entry.last_transaction_version,
+                "Successfully upserted image URIs"
+            ),
+            Err(e) => error!(
+                last_transaction_version = self.entry.last_transaction_version,
+                "{}",
+                e.to_string()
+            ),
         }
 
         Ok(())
     }
 
     // Parse URI for IPFS CID and path
-    fn parse_uri(_uri: String) -> Result<String, Box<dyn Error + Send + Sync>> {
+    fn parse_uri(_uri: String) -> anyhow::Result<String> {
         todo!();
     }
 
     // HEAD request to get size of content
-    async fn _get_size(&mut self, _url: String) -> Result<u32, Box<dyn Error + Send + Sync>> {
+    async fn _get_size(&mut self, _url: String) -> anyhow::Result<u32> {
         todo!();
     }
 
     // Parse JSON for image URI
-    async fn parse_json(&mut self, _uri: String) -> Result<Value, Box<dyn Error + Send + Sync>> {
+    async fn parse_json(&mut self, _uri: String) -> anyhow::Result<Value> {
         todo!();
     }
 
     // Optimize and resize image
-    async fn optimize_image(
-        &mut self,
-        _img_uri: String,
-    ) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
+    async fn optimize_image(&mut self, _img_uri: String) -> anyhow::Result<Vec<u8>> {
         todo!();
     }
 
@@ -183,12 +230,7 @@ impl<'a> Parser<'a> {
     fn _to_bytes(
         &self,
         _image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>,
-    ) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
-        todo!();
-    }
-
-    // Function to help with logging
-    fn log(&self, _message: &str) {
+    ) -> anyhow::Result<Vec<u8>> {
         todo!();
     }
 }
