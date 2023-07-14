@@ -8,7 +8,7 @@ use std::future::Future;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
-use aptos_api_types::U64;
+use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_rest_client::error::RestError;
@@ -21,6 +21,9 @@ use aptos_sdk::token_client::{
 };
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
+use aptos_types::transaction::{EntryFunction, TransactionPayload};
+use move_core_types::ident_str;
+use move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use url::Url;
 
@@ -353,12 +356,11 @@ async fn test_mintnft(
     Ok(TestResult::Success)
 }
 
-async fn test_module(
-    client: &Client,
-    account: &mut LocalAccount,
-) -> Result<TestResult, TestFailure> {
+/// Helper function that publishes module and returns the bytecode.
+async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<HexEncodedBytes> {
     // get file to compile
-    let move_dir = PathBuf::from("/Users/ngk/Documents/aptos-core/aptos-move/move-examples/hello_blockchain");
+    let move_dir =
+        PathBuf::from("/Users/ngk/Documents/aptos-core/aptos-move/move-examples/hello_blockchain");
 
     // insert address
     let mut named_addresses: BTreeMap<String, AccountAddress> = BTreeMap::new();
@@ -374,17 +376,71 @@ async fn test_module(
     let metadata = package.extract_metadata()?;
 
     // create payload
-    let payload = EntryFunctionCall::CodePublishPackageTxn {
-        metadata_serialized: bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
-        code: blobs,
-    }
-    .encode();
+    let payload: aptos_types::transaction::TransactionPayload =
+        EntryFunctionCall::CodePublishPackageTxn {
+            metadata_serialized: bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+            code: blobs.clone(),
+        }
+        .encode();
 
     // create and submit transaction
     let pending_txn =
-        build_and_submit_transaction(&client, account, payload, TransactionOptions::default())
+        build_and_submit_transaction(client, account, payload, TransactionOptions::default())
             .await?;
     client.wait_for_transaction(&pending_txn).await?;
+
+    let blob = match blobs.get(0) {
+        Some(bytecode) => bytecode.clone(),
+        None => return Err(anyhow!("error while getting bytecode from blobs")),
+    };
+
+    Ok(HexEncodedBytes::from(blob))
+}
+
+/// Helper function that interacts with the message module.
+async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<()> {
+    // create payload
+    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(account.address(), ident_str!("message").to_owned()),
+        ident_str!("set_message").to_owned(),
+        vec![],
+        vec![bcs::to_bytes("test message")?],
+    ));
+
+    // create and submit transaction
+    let pending_txn =
+        build_and_submit_transaction(client, account, payload, TransactionOptions::default())
+            .await?;
+    client.wait_for_transaction(&pending_txn).await?;
+
+    Ok(())
+}
+
+/// Tests module publishing and interaction. Checks that:
+///   - module data exists
+async fn test_module(
+    client: &Client,
+    account: &mut LocalAccount,
+) -> Result<TestResult, TestFailure> {
+    // publish module
+    let blob = publish_module(client, account).await?;
+
+    // check module data
+    let response = client
+        .get_account_module(account.address(), "message")
+        .await?;
+
+    let expected_bytecode = &blob;
+    let actual_bytecode = &response.inner().bytecode;
+
+    if expected_bytecode != actual_bytecode {
+        return Err(TestFailure::Fail("wrong bytecode"));
+    }
+
+    // interact with module
+    set_message(client, account).await?;
+
+    // todo: get account resource to see that interaction worked
 
     Ok(TestResult::Success)
 }

@@ -24,3 +24,5 @@ rand = { workspace = true }
 anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-framework = { workspace = true }
+move-core-types = { workspace = true }
+
