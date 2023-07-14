@@ -286,21 +286,27 @@ async fn test_get_new_transactions_epoch_change() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_get_new_transactions_max_chunk() {
+    // Create a storage service config with a configured max chunk size
+    let max_transaction_chunk_size = 200;
+    let storage_service_config = StorageServiceConfig {
+        max_transaction_chunk_size,
+        ..StorageServiceConfig::default()
+    };
+
     // Test event inclusion
     for include_events in [true, false] {
         // Create test data
         let highest_version = 1034556;
         let highest_epoch = 343;
         let lowest_version = 3453;
-        let max_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
-        let requested_chunk_size = max_chunk_size + 1;
+        let requested_chunk_size = max_transaction_chunk_size + 1;
         let peer_version = highest_version - requested_chunk_size;
         let highest_ledger_info =
             utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version);
         let transaction_list_with_proof = utils::create_transaction_list_with_proof(
             peer_version + 1,
-            peer_version + requested_chunk_size,
-            peer_version + requested_chunk_size,
+            peer_version + max_transaction_chunk_size,
+            peer_version + max_transaction_chunk_size,
             include_events,
         );
 
@@ -310,7 +316,7 @@ async fn test_get_new_transactions_max_chunk() {
         utils::expect_get_transactions(
             &mut db_reader,
             peer_version + 1,
-            max_chunk_size,
+            max_transaction_chunk_size,
             highest_version,
             include_events,
             transaction_list_with_proof.clone(),
@@ -318,7 +324,7 @@ async fn test_get_new_transactions_max_chunk() {
 
         // Create the storage client and server
         let (mut mock_client, service, storage_service_notifier, mock_time, _) =
-            MockClient::new(Some(db_reader), None);
+            MockClient::new(Some(db_reader), Some(storage_service_config));
         let active_optimistic_fetches = service.get_optimistic_fetches();
         tokio::spawn(service.start());
 

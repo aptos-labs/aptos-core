@@ -354,8 +354,9 @@ mock! {
     }
 }
 
-/// Creates a mock db with the basic expectations required to handle optimistic fetch requests
-pub fn create_mock_db_for_optimistic_fetch(
+/// Creates a mock db with the basic expectations required to
+/// handle storage summary updates.
+fn create_mock_db_for_storage_summary_updates(
     highest_ledger_info_clone: LedgerInfoWithSignatures,
     lowest_version: Version,
 ) -> MockDatabaseReader {
@@ -376,6 +377,22 @@ pub fn create_mock_db_for_optimistic_fetch(
         .expect_is_state_merkle_pruner_enabled()
         .returning(move || Ok(true));
     db_reader
+}
+
+/// Creates a mock db with the basic expectations required to handle optimistic fetch requests
+pub fn create_mock_db_for_optimistic_fetch(
+    highest_ledger_info_clone: LedgerInfoWithSignatures,
+    lowest_version: Version,
+) -> MockDatabaseReader {
+    create_mock_db_for_storage_summary_updates(highest_ledger_info_clone, lowest_version)
+}
+
+/// Creates a mock db with the basic expectations required to handle subscription requests
+pub fn create_mock_db_for_subscription(
+    highest_ledger_info_clone: LedgerInfoWithSignatures,
+    lowest_version: Version,
+) -> MockDatabaseReader {
+    create_mock_db_for_storage_summary_updates(highest_ledger_info_clone, lowest_version)
 }
 
 /// Creates a mock database reader
