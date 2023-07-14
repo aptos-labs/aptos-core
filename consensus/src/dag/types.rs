@@ -481,23 +481,14 @@ impl BroadcastStatus for CertificateAckState {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RemoteFetchRequest {
     target: NodeMetadata,
-    start_round: Round,
-    exists_bitmask: Vec<Vec<bool>>,
-    missing_count: usize,
+    exists_bitmask: DagSnapshotBitmask,
 }
 
 impl RemoteFetchRequest {
-    pub fn new(
-        target: NodeMetadata,
-        start_round: Round,
-        exists_bitmask: Vec<Vec<bool>>,
-        missing_count: usize,
-    ) -> Self {
+    pub fn new(target: NodeMetadata, exists_bitmask: DagSnapshotBitmask) -> Self {
         Self {
             target,
-            start_round,
             exists_bitmask,
-            missing_count,
         }
     }
 
@@ -505,24 +496,16 @@ impl RemoteFetchRequest {
         &self.target
     }
 
-    pub fn start_round(&self) -> Round {
-        self.start_round
-    }
-
-    pub fn exists_bitmask(&self) -> &Vec<Vec<bool>> {
+    pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {
         &self.exists_bitmask
-    }
-
-    pub fn missing_count(&self) -> usize {
-        self.missing_count
     }
 }
 
 impl TDAGMessage for RemoteFetchRequest {
     fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
-            self.target.round >= self.start_round + self.exists_bitmask.len() as u64,
-            "target node round should be greater or equal to highest requested round"
+            self.target.round > self.exists_bitmask.last_round(),
+            "target node round should be strictly higher than the last bitmark round"
         );
 
         Ok(())
@@ -552,9 +535,16 @@ impl FetchResponse {
     pub fn verify(
         self,
         _request: &RemoteFetchRequest,
-        _validator_verifier: &ValidatorVerifier,
+        validator_verifier: &ValidatorVerifier,
     ) -> anyhow::Result<Self> {
-        todo!("verification");
+        ensure!(
+            self.certified_nodes
+                .iter()
+                .all(|node| node.verify(validator_verifier).is_ok()),
+            "unable to verify certified nodes"
+        );
+
+        Ok(self)
     }
 }
 
@@ -657,5 +647,39 @@ pub struct TestAck(pub Vec<u8>);
 impl TDAGMessage for TestAck {
     fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         todo!()
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DagSnapshotBitmask {
+    bitmask: Vec<Vec<bool>>,
+    first_round: Round,
+}
+
+impl DagSnapshotBitmask {
+    pub fn new(first_round: Round, bitmask: Vec<Vec<bool>>) -> Self {
+        Self {
+            bitmask,
+            first_round,
+        }
+    }
+
+    pub fn has(&self, round: Round, author_idx: usize) -> bool {
+        let round_idx = match round.checked_sub(self.first_round) {
+            Some(idx) => idx as usize,
+            None => return false,
+        };
+        self.bitmask
+            .get(round_idx)
+            .and_then(|round| round.get(author_idx))
+            .is_some()
+    }
+
+    pub fn last_round(&self) -> Round {
+        self.first_round + self.bitmask.len() as Round - 1
+    }
+
+    pub fn first_round(&self) -> Round {
+        self.first_round
     }
 }

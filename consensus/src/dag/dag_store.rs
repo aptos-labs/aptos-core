@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::types::{DagSnapshotBitmask, NodeMetadata};
 use crate::dag::{
     storage::DAGStorage,
-    types::{CertifiedNode, NodeCertificate, NodeMetadata},
+    types::{CertifiedNode, NodeCertificate},
 };
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
@@ -217,6 +218,7 @@ impl Dag {
         &self,
         from: &Arc<CertifiedNode>,
         until: Option<Round>,
+        filter: impl Fn(&NodeStatus) -> bool,
     ) -> impl Iterator<Item = &NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
         let mut reachable_filter = Self::reachable_filter(from.digest());
@@ -226,43 +228,8 @@ impl Dag {
             .flat_map(|(_, round_ref)| round_ref.iter())
             .flatten()
             .filter(move |node_status| {
-                matches!(node_status, NodeStatus::Unordered(_))
-                    && reachable_filter(node_status.as_node())
+                filter(node_status) && reachable_filter(node_status.as_node())
             })
-    }
-
-    pub fn get_missing_nodes(
-        &self,
-        start_round: Round,
-        bitmask: &[Vec<bool>],
-    ) -> Vec<Arc<CertifiedNode>> {
-        bitmask
-            .iter()
-            .enumerate()
-            .flat_map(move |(round_idx, round)| {
-                round
-                    .iter()
-                    .enumerate()
-                    .filter_map(move |(author_idx, exists)| {
-                        if *exists {
-                            None
-                        } else {
-                            Some((start_round + (round_idx as u64), author_idx))
-                        }
-                    })
-            })
-            .filter_map(|(round, author_idx)| {
-                if let Some(Some(node)) = self
-                    .nodes_by_round
-                    .get(&round)
-                    .and_then(|round| round.get(author_idx))
-                {
-                    Some(node.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
     }
 
     pub fn get_strong_links_for_round(
@@ -296,30 +263,23 @@ impl Dag {
         None
     }
 
-    pub fn bitmask(&self) -> Option<(Round, Vec<Vec<bool>>, usize)> {
+    pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
         let lowest_round = match self.lowest_incomplete_round() {
-            Some(lowest_round) => lowest_round,
-            None => return None,
+            Some(round) => round,
+            None => {
+                return DagSnapshotBitmask::new(self.highest_round() + 1, vec![vec![
+                    false;
+                    self.author_to_index.len()
+                ]]);
+            },
         };
 
-        let mut missing_count = 0;
         let bitmask = self
             .nodes_by_round
-            .iter()
-            .skip_while(|(round, _)| **round < lowest_round)
-            .map(|(_, round_nodes)| {
-                round_nodes
-                    .iter()
-                    .map(|node| {
-                        if node.is_none() {
-                            missing_count += 1;
-                        }
-                        node.is_some()
-                    })
-                    .collect()
-            })
+            .range(lowest_round..target_round)
+            .map(|(_, round_nodes)| round_nodes.iter().map(|node| node.is_some()).collect())
             .collect();
 
-        Some((lowest_round, bitmask, missing_count))
+        DagSnapshotBitmask::new(lowest_round, bitmask)
     }
 }

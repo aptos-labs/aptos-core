@@ -15,7 +15,7 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_types::epoch_state::EpochState;
-use std::{sync::Arc, time::Duration};
+use std::{ops::Deref, sync::Arc, time::Duration};
 use thiserror::Error as ThisError;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
@@ -91,20 +91,9 @@ impl DagFetcher {
                     local_request.notify();
                     continue;
                 }
-
-                let (lowest_round, bitmask, missing_nodes) =
-                    if let Some((lowest_round, bitmask, missing_nodes)) = dag_reader.bitmask() {
-                        (lowest_round, bitmask, missing_nodes)
-                    } else {
-                        error!("Incomplete round not found, but fetch request received");
-                        continue;
-                    };
-
                 RemoteFetchRequest::new(
                     local_request.node().metadata().clone(),
-                    lowest_round,
-                    bitmask,
-                    missing_nodes,
+                    dag_reader.bitmask(local_request.node().round()),
                 )
             };
             let network_request = DAGMessage::from(remote_request.clone()).into_network_message();
@@ -117,22 +106,21 @@ impl DagFetcher {
                 .and_then(|response| response.verify(&remote_request, &self.epoch_state.verifier))
             {
                 let ceritified_nodes = response.certified_nodes();
-                if ceritified_nodes.len() != remote_request.missing_count() {
-                    error!(
-                        "expected {} nodes, received {}",
-                        remote_request.missing_count(),
-                        ceritified_nodes.len()
-                    );
-                    continue;
-                }
                 // TODO: support chunk response or fallback to state sync
-                let mut dag_writer = self.dag.write();
-                for node in ceritified_nodes {
-                    if let Err(e) = dag_writer.add_node(node) {
-                        error!("Failed to add node {}", e);
+                {
+                    let mut dag_writer = self.dag.write();
+                    for node in ceritified_nodes {
+                        if let Err(e) = dag_writer.add_node(node) {
+                            error!("Failed to add node {}", e);
+                        }
                     }
                 }
-                local_request.notify();
+
+                if self.dag.read().all_exists(local_request.node().parents()) {
+                    local_request.notify();
+                } else {
+                    // TODO: implement retry logic
+                }
             }
         }
     }
@@ -140,8 +128,10 @@ impl DagFetcher {
 
 #[derive(Debug, ThisError)]
 pub enum FetchHandleError {
-    #[error("not enough nodes to satisfy request")]
-    NotEnoughNodes,
+    #[error("target node is not present")]
+    TargetNotPresent,
+    #[error("causal parents not present")]
+    NotPresent,
 }
 
 pub struct FetchHandler {
@@ -161,16 +151,25 @@ impl RpcHandler for FetchHandler {
     fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
         let dag_reader = self.dag.read();
 
-        let nodes = dag_reader.get_missing_nodes(message.start_round(), message.exists_bitmask());
-        // If this peer cannot satisfy the request, return an error.
-        ensure!(
-            nodes.len() == message.missing_count(),
-            FetchHandleError::NotEnoughNodes
-        );
+        let target_node = dag_reader
+            .get_node(message.target())
+            .ok_or(FetchHandleError::TargetNotPresent)?;
+
+        let certified_nodes: Vec<_> = dag_reader
+            .reachable(
+                &target_node,
+                Some(message.exists_bitmask().first_round()),
+                |_| true,
+            )
+            .skip(1) // Skip target node
+            .map(|node_status| node_status.as_node().clone().deref().clone())
+            .collect();
+
+        ensure!(certified_nodes.len() > 0, FetchHandleError::NotPresent);
 
         Ok(FetchResponse::new(
             message.target().epoch(),
-            nodes.iter().map(|n| n.as_ref().clone()).collect(),
+            certified_nodes,
         ))
     }
 }

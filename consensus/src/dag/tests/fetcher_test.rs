@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 
-use super::{dag_test::MockStorage, helpers::new_node};
+use super::dag_test::MockStorage;
 use crate::dag::{
     dag_fetcher::FetchHandler,
     dag_store::Dag,
     tests::helpers::new_certified_node,
-    types::{FetchResponse, RemoteFetchRequest},
+    types::{DagSnapshotBitmask, FetchResponse, RemoteFetchRequest},
     RpcHandler,
 };
 use aptos_infallible::RwLock;
@@ -34,26 +34,27 @@ fn test_dag_fetcher_receiver() {
         first_round_nodes.push(node);
     }
 
-    let target_node = new_node(2, 100, signers[0].author(), vec![]);
+    // Round 2 - node 0
+    let target_node = new_certified_node(2, signers[0].author(), vec![
+        first_round_nodes[0].certificate()
+    ]);
 
-    let request =
-        RemoteFetchRequest::new(target_node.metadata().clone(), 1, vec![vec![false; 4]], 4);
+    let request = RemoteFetchRequest::new(
+        target_node.metadata().clone(),
+        DagSnapshotBitmask::new(1, vec![vec![false; 4]]),
+    );
     assert_eq!(
-        fetcher.process(request).unwrap_err().to_string(),
-        "not enough nodes to satisfy request"
+        fetcher.process(request.clone()).unwrap_err().to_string(),
+        "target node is not present"
     );
 
-    // Round 1 - node 3
-    {
-        let node = new_certified_node(1, signers[3].author(), vec![]);
-        assert!(dag.write().add_node(node.clone()).is_ok());
-        first_round_nodes.push(node);
-    }
+    // Add Round 2 - node 0
+    assert!(dag.write().add_node(target_node.clone()).is_ok());
 
-    let request =
-        RemoteFetchRequest::new(target_node.metadata().clone(), 1, vec![vec![false; 4]], 4);
     assert_ok_eq!(
         fetcher.process(request),
-        FetchResponse::new(0, first_round_nodes)
+        FetchResponse::new(1, vec![first_round_nodes[0].clone()])
     );
 }
+
+// TODO: add more tests after commit rule tests
