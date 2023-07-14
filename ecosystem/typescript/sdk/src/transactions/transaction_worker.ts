@@ -10,18 +10,24 @@ export class TransactionWorker extends EventEmitter {
 
   readonly account: AptosAccount;
 
+  // current account sequence number
   readonly accountSequnceNumber: AccountSequenceNumber;
 
+  // process has started
   started: boolean;
 
+  // process has stopped
   stopped: boolean;
 
-  outstandingTransactions: Array<[Promise<PendingTransaction>, bigint]> = [];
-
-  processedTransactions: Array<[string, bigint, any]> = [];
-
+  // transactions payloads waiting to be generated and signed
   // TODO support entry function payload from ABI builder
   transactionsQueue: Array<TxnBuilderTypes.TransactionPayload> = [];
+
+  // signed transactions waiting to be submitted
+  outstandingTransactions: Array<[Promise<PendingTransaction>, bigint]> = [];
+
+  // transactions that have been submitted to chain
+  processedTransactions: Array<[string, bigint, any]> = [];
 
   constructor(provider: Provider, account: AptosAccount) {
     super();
@@ -32,6 +38,12 @@ export class TransactionWorker extends EventEmitter {
     this.accountSequnceNumber = new AccountSequenceNumber(provider, account);
   }
 
+  /**
+   * Gets the current account sequence number,
+   * generates the transaction with the account sequence number,
+   * adds the transaction to the outstanding transaction queue
+   * to be processed later.
+   */
   async submitTransactions() {
     try {
       if (this.transactionsQueue.length === 0) return;
@@ -46,6 +58,15 @@ export class TransactionWorker extends EventEmitter {
     }
   }
 
+  /**
+   * Reads the outstanding transaction queue and submits the transaction to chain.
+   *
+   * If the transaction has fulfilled, it pushes the transaction to the processed
+   * transactions queue and fires a transactionsFulfilled event.
+   *
+   * If the transaction has failed, it pushes the transaction to the processed
+   * transactions queue with the failure reason and fires a transactionsFailed event.
+   */
   async processTransactions() {
     try {
       const awaitingTransactions = [];
@@ -79,10 +100,20 @@ export class TransactionWorker extends EventEmitter {
     }
   }
 
+  /**
+   * Push transaction to the transactions queue
+   * @param payload Transaction payload
+   */
   async push(payload: TxnBuilderTypes.TransactionPayload): Promise<void> {
     await this.transactionsQueue.push(payload);
   }
 
+  /**
+   * Generates a signed transaction that can be submitted to chain
+   * @param account an Aptos account
+   * @param sequenceNumber a sequence number the transaction will be generated with
+   * @returns
+   */
   async generateNextTransaction(account: AptosAccount, sequenceNumber: bigint): Promise<Uint8Array | undefined> {
     if (this.transactionsQueue.length === 0) return undefined;
     const payload = await this.transactionsQueue.shift()!;
@@ -93,6 +124,9 @@ export class TransactionWorker extends EventEmitter {
     return signedTransaction;
   }
 
+  /**
+   * Starts transaction submission and transaction processing.
+   */
   async runTransactions() {
     try {
       while (!this.stopped) {
@@ -110,6 +144,9 @@ export class TransactionWorker extends EventEmitter {
     }
   }
 
+  /**
+   * Starts the transaction management process.
+   */
   start() {
     if (this.started) {
       throw new Error("worker has already started");
@@ -119,6 +156,9 @@ export class TransactionWorker extends EventEmitter {
     this.runTransactions();
   }
 
+  /**
+   * Stops the the transaction management process.
+   */
   stop() {
     if (this.stopped) {
       throw new Error("worker has already stopped");

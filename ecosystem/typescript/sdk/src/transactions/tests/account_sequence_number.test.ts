@@ -31,12 +31,13 @@ describe("account sequence number", () => {
   });
 
   it("updates with correct sequence number", async () => {
+    const seqNum = "2";
     getAccountSpy.mockResolvedValue({
-      sequence_number: "2",
+      sequence_number: seqNum,
       authentication_key: account.authKey().hex(),
     });
     await accountSequenceNumber.update();
-    expect(accountSequenceNumber.lastUncommintedNumber).toEqual(BigInt(2));
+    expect(accountSequenceNumber.lastUncommintedNumber).toEqual(BigInt(parseInt(seqNum)));
   });
 
   it(
@@ -57,22 +58,18 @@ describe("account sequence number", () => {
   it(
     "includes updated on-chain sequnce number in local sequence number",
     async () => {
+      const previousSeqNum = "5";
       getAccountSpy.mockResolvedValue({
-        sequence_number: "5",
+        sequence_number: previousSeqNum,
         authentication_key: account.authKey().hex(),
       });
       for (let seqNum = 0; seqNum < accountSequenceNumber.maximumInFlight; seqNum++) {
         lastSeqNumber = await accountSequenceNumber.nextSequenceNumber();
-        expect(lastSeqNumber).toEqual(BigInt(seqNum + 5));
+        expect(lastSeqNumber).toEqual(BigInt(seqNum + parseInt(previousSeqNum)));
       }
     },
     longTestTimeout,
   );
-
-  it("returns null if nextSequenceNumber blocks", async () => {
-    const res = await accountSequenceNumber.nextSequenceNumber(false);
-    expect(res).toBeNull();
-  });
 
   it("synchronize completes when local and on-chain sequnec number equal", async () => {
     const nextSequenceNumber = lastSeqNumber! + BigInt(1);

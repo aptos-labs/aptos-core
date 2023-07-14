@@ -24,7 +24,7 @@ async function main() {
     senders.push(new AptosAccount());
     recipients.push(new AptosAccount());
   }
-  console.log(`${senders.length * 2} sender and recipient accounts created`);
+  console.log(`${senders.length + recipients.length} sender and recipient accounts created`);
 
   // funds sender accounts
   const funds: Array<Promise<string[]>> = [];
@@ -49,7 +49,6 @@ async function main() {
   // send requests
   await Promise.all(balances);
 
-  //await Promise.all(balances);
   console.log(`${balances.length} sender account balances checked`);
 
   // create transactions
@@ -70,7 +69,7 @@ async function main() {
     }
   }
 
-  const batchTransactions = (payloads: any[], sender: AptosAccount) => {
+  const batchTransactions = (payloads: TxnBuilderTypes.Transaction[], sender: AptosAccount) => {
     const transactionWorker = new TransactionWorker(provider, sender);
     const waitFor: Array<Promise<void>> = [];
 
@@ -98,6 +97,7 @@ async function main() {
     }
   };
 
+  // emit batch transactions
   for (let i = 0; i < senders.length; i++) {
     batchTransactions(payloads, senders[i]);
   }
@@ -118,12 +118,10 @@ async function main() {
         `sender account ${currentAccount.authentication_key} final sequence number is ${currentAccount.sequence_number}`,
       );
     }
+    // exit for testing porpuses - this would stop the process. most cases we have all transactions
+    // commited, but in some rare cases we might be stopping it before last couple of transactions commited.
     exit(0);
   };
-}
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 main();

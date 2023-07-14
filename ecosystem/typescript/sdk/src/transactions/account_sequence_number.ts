@@ -18,6 +18,7 @@ export class AccountSequenceNumber {
 
   lock = false;
 
+  // up to 100 outstanding sequence numbers
   maximumInFlight = 100;
 
   sleepTime = 10;
@@ -32,10 +33,9 @@ export class AccountSequenceNumber {
   /**
    * Returns the next available sequnce number on this account
    *
-   * @param block
    * @returns next available sequnce number
    */
-  async nextSequenceNumber(block: boolean = true): Promise<bigint | null> {
+  async nextSequenceNumber(): Promise<bigint | null> {
     /*
     `lock` is used to prevent multiple coroutines from accessing a shared resource at the same time, 
     which can result in race conditions and data inconsistency.
@@ -60,9 +60,6 @@ export class AccountSequenceNumber {
 
         const startTime = now();
         while (this.currentNumber! - this.lastUncommintedNumber! >= this.maximumInFlight) {
-          if (!block) {
-            return null;
-          }
           await sleep(this.sleepTime);
           if (now() - startTime > this.maxWaitTime) {
             /* eslint-disable no-console */
@@ -104,7 +101,7 @@ export class AccountSequenceNumber {
   }
 
   /**
-   * Synchronizes local sequnce number with the sequnce number on chain for this account.
+   * Synchronizes local sequence number with the seqeunce number on chain for this account.
    *
    * Poll the network until all submitted transactions have either been committed or until
    * the maximum wait time has elapsed
