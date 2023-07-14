@@ -118,7 +118,19 @@ impl Indexer {
         }
 
         let mut batch = SchemaBatch::new();
-        table_info_parser.finish(&mut batch)?;
+        match table_info_parser.finish(&mut batch) {
+            Ok(_) => {},
+            Err(err) => {
+                aptos_logger::error!(first_version = first_version, end_version = end_version, error = ?&err);
+                write_sets
+                    .iter()
+                    .enumerate()
+                    .for_each(|(i, write_set)| {
+                        aptos_logger::error!(version = first_version as usize + i, write_set = ?write_set);
+                    });
+                bail!(err);
+            },
+        };
         batch.put::<IndexerMetadataSchema>(
             &MetadataKey::LatestVersion,
             &MetadataValue::Version(end_version - 1),

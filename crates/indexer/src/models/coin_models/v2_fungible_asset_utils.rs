@@ -88,6 +88,41 @@ pub struct FungibleAssetStore {
     pub frozen: bool,
 }
 
+impl FungibleAssetStore {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = format!(
+            "{}::{}::{}",
+            write_resource.data.typ.address,
+            write_resource.data.typ.module,
+            write_resource.data.typ.name
+        );
+        if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let V2FungibleAssetResource::FungibleAssetStore(inner) =
+            V2FungibleAssetResource::from_resource(
+                &type_str,
+                resource.data.as_ref().unwrap(),
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FungibleAssetSupply {
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -143,6 +178,18 @@ impl FungibleAssetSupply {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DepositEvent {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WithdrawEvent {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2FungibleAssetResource {
     FungibleAssetMetadata(FungibleAssetMetadata),
     FungibleAssetStore(FungibleAssetStore),
@@ -180,6 +227,33 @@ impl V2FungibleAssetResource {
         .context(format!(
             "Resource unsupported! Call is_resource_supported first. version {} type {}",
             txn_version, data_type
+        ))
+    }
+}
+
+pub enum FungibleAssetEvent {
+    DepositEvent(DepositEvent),
+    WithdrawEvent(WithdrawEvent),
+}
+
+impl FungibleAssetEvent {
+    pub fn from_event(
+        data_type: &str,
+        data: &serde_json::Value,
+        txn_version: i64,
+    ) -> Result<Option<Self>> {
+        match data_type {
+            "0x1::fungible_asset::DepositEvent" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::DepositEvent(inner)))
+            },
+            "0x1::fungible_asset::WithdrawEvent" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::WithdrawEvent(inner)))
+            },
+            _ => Ok(None),
+        }
+        .context(format!(
+            "version {} failed! failed to parse type {}, data {:?}",
+            txn_version, data_type, data
         ))
     }
 }
