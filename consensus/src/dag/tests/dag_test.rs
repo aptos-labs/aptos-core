@@ -6,7 +6,7 @@ use crate::dag::{
     storage::DAGStorage,
     tests::helpers::new_certified_node,
     types::{CertifiedNode, Node},
-    NodeDigestSignature, NodeId,
+    NodeId, Vote,
 };
 use anyhow::Ok;
 use aptos_crypto::HashValue;
@@ -16,7 +16,7 @@ use std::{collections::HashMap, sync::Arc};
 
 pub struct MockStorage {
     node_data: Mutex<HashMap<HashValue, Node>>,
-    node_signature_data: Mutex<HashMap<NodeId, NodeDigestSignature>>,
+    vote_data: Mutex<HashMap<NodeId, Vote>>,
     certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
 }
 
@@ -24,7 +24,7 @@ impl MockStorage {
     pub fn new() -> Self {
         Self {
             node_data: Mutex::new(HashMap::new()),
-            node_signature_data: Mutex::new(HashMap::new()),
+            vote_data: Mutex::new(HashMap::new()),
             certified_node_data: Mutex::new(HashMap::new()),
         }
     }
@@ -41,24 +41,18 @@ impl DAGStorage for MockStorage {
         Ok(())
     }
 
-    fn save_node_signature(
-        &self,
-        node_id: &NodeId,
-        node_digest_signature: &NodeDigestSignature,
-    ) -> anyhow::Result<()> {
-        self.node_signature_data
-            .lock()
-            .insert(node_id.clone(), node_digest_signature.clone());
+    fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()> {
+        self.vote_data.lock().insert(node_id.clone(), vote.clone());
         Ok(())
     }
 
-    fn get_node_signatures(&self) -> anyhow::Result<HashMap<NodeId, NodeDigestSignature>> {
-        Ok(self.node_signature_data.lock().clone())
+    fn get_votes(&self) -> anyhow::Result<HashMap<NodeId, Vote>> {
+        Ok(self.vote_data.lock().clone())
     }
 
-    fn delete_node_signatures(&self, node_ids: Vec<crate::dag::NodeId>) -> anyhow::Result<()> {
+    fn delete_votes(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
         for node_id in node_ids {
-            self.node_signature_data.lock().remove(&node_id);
+            self.vote_data.lock().remove(&node_id);
         }
         Ok(())
     }
