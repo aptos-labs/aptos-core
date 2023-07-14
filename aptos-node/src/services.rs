@@ -23,7 +23,6 @@ use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
-// use std::sync::RwLock;
 use tokio::runtime::{Handle, Runtime};
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
@@ -203,7 +202,6 @@ pub fn start_benchmark_service(
         TimeService::real(),
         shared,
     ));
-    // return runtime
 }
 
 /// Starts the telemetry service and grabs the build information

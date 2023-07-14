@@ -150,7 +150,10 @@ async fn handle_rpc(
             let reply = BenchmarkMessage::DataReply(reply);
             let reply_bytes = match protocol_id.to_bytes(&reply) {
                 Ok(rb) => rb,
-                Err(_) => return, // TODO: counter, log
+                Err(_) => {
+                    rpc_messages("err");
+                    return;
+                },
             };
             let reply_bytes: Bytes = reply_bytes.into();
             let result = sender.send(Ok(reply_bytes));
@@ -158,6 +161,7 @@ async fn handle_rpc(
                 match err {
                     Ok(_) => {}, // what? Ok inside Err?
                     Err(err) => {
+                        rpc_messages("err");
                         info!(
                             "benchmark rpc [{}] reply err: {}",
                             send.request_counter, err
@@ -167,7 +171,7 @@ async fn handle_rpc(
             }
         },
         BenchmarkMessage::DataReply(_) => {
-            // TODO: ERROR, log, counter, this should come back at the point of the RPC call, not here
+            rpc_messages("err");
         },
     }
 }
@@ -192,7 +196,6 @@ async fn handler_thread(
         match event {
             Event::Message(peer_id, wat) => {
                 let msg_wrapper: BenchmarkMessage = wat;
-                // TODO: counters, note blob size and increment message counter
                 handle_direct(
                     &network_client,
                     network_id,
@@ -280,6 +283,7 @@ pub async fn run_benchmark_service(
     }
 }
 
+// once every 0.1s log a message for something that may be happening 10_000 times per second
 const BLAB_MICROS: i64 = 100_000;
 
 pub async fn direct_sender(
@@ -426,7 +430,6 @@ pub async fn rpc_sender(
                     Err(err) => {
                         info!("benchmark [{},{}] rpc send err: {}", network_id, peer_id, err);
                         rpc_messages("err");
-                        // TODO: some error limit, or error-per-second limit, or specifically detect unrecoverable errors
                         return;
                     }
                     Ok(msg_wrapper) => {
@@ -464,7 +467,7 @@ impl Default for BenchmarkSharedState {
 impl BenchmarkSharedState {
     pub fn new() -> Self {
         BenchmarkSharedState {
-            sent: Vec::with_capacity(10000), // TODO: constant or config
+            sent: Vec::with_capacity(10000), // TODO: constant or config?
             sent_pos: 0,
         }
     }
