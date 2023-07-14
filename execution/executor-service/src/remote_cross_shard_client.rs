@@ -48,19 +48,30 @@ impl RemoteCrossShardClient {
 
 impl CrossShardClient for RemoteCrossShardClient {
     fn send_cross_shard_msg(&self, shard_id: ShardId, round: RoundId, msg: CrossShardMsg) {
+        let stop_message = matches!(msg, CrossShardMsg::StopMsg);
+        if stop_message  && round == 1 {
+            println!("RemoteCrossShardClient Sent stop message to shard {} for round {}", shard_id, round);
+        }
         let input_message = bcs::to_bytes(&msg).unwrap();
         let tx = self.message_txs[shard_id][round].lock().unwrap();
         tx.send(Message::new(input_message)).unwrap();
+
     }
 
     fn receive_cross_shard_msg(&self, current_round: RoundId) -> CrossShardMsg {
         //println!("Waiting to receive cross shard message for round {}", current_round);
         let rx = self.message_rxs[current_round].lock().unwrap();
         let message = rx.recv().unwrap();
-        if current_round == 1 {
-           println!("Received cross shard message for round {}", current_round);
-        }
+        // if current_round == 1 {
+        //    println!("Received cross shard message for round {}", current_round);
+        // }
         //println!("Received cross shard message for round {}", current_round);
-        bcs::from_bytes(&message.to_bytes()).unwrap()
+        let msg: CrossShardMsg =  bcs::from_bytes(&message.to_bytes()).unwrap();
+        let is_stop_msg = matches!(msg, CrossShardMsg::StopMsg);
+        if is_stop_msg {
+            println!("RemoteCrossShardClient Received stop message for round {}", current_round);
+        }
+        msg
+
     }
 }

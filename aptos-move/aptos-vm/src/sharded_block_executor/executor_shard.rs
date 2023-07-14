@@ -37,6 +37,7 @@ pub trait CoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
 // CrossShardClient is a trait that defines the interface for sending and receiving messages across
 // shards.
 pub trait CrossShardClient: Send + Sync {
+
     fn send_cross_shard_msg(&self, shard_id: ShardId, round: RoundId, msg: CrossShardMsg);
 
     fn receive_cross_shard_msg(&self, current_round: RoundId) -> CrossShardMsg;

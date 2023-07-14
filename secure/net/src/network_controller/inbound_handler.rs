@@ -15,14 +15,16 @@ use std::{
 
 #[allow(dead_code)]
 pub struct InboundHandler {
+    service: String,
     server: Arc<Mutex<NetworkServer>>,
     // Used to route incoming messages to correct channel.
     inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
 }
 
 impl InboundHandler {
-    pub fn new(service: &'static str, listen_addr: SocketAddr, timeout_ms: u64) -> Self {
+    pub fn new(service: String, listen_addr: SocketAddr, timeout_ms: u64) -> Self {
         Self {
+            service: service.clone(),
             server: Arc::new(Mutex::new(NetworkServer::new(
                 service,
                 listen_addr,
@@ -46,15 +48,32 @@ impl InboundHandler {
         let inbound_handlers = self.inbound_handlers.clone(); // Clone the hashmap for the thread
         let server_clone = self.server.clone(); // Clone the server to move into the thread
         // Spawn a thread to handle incoming messages
-        thread::spawn(move || {
+        let thread_name = format!("{}_network_inbound_handler", self.service);
+        let builder = thread::Builder::new().name(thread_name);
+        builder.spawn(move || {
             loop {
                 // Receive incoming messages from the server
                 if let Err(e) = Self::process_one_incoming_message(&server_clone, &inbound_handlers)
                 {
-                    error!("Error processing message: {:?}", e);
+                    println!("Error processing incoming messages: {:?}", e);
                 }
             }
-        });
+        }).expect("Failed to spawn network_inbound_handler thread");
+    }
+
+    // Helper function to short-circuit the network message not to be sent over the network for self messages
+    pub fn send_incoming_message_to_handler(
+        &self,
+        message_type: &MessageType,
+        message: Message,
+    ) {
+        // Check if there is a registered handler for the sender
+        if let Some(handler) = self.inbound_handlers.lock().unwrap().get(message_type) {
+            // Send the message to the registered handler
+            handler.send(message).unwrap();
+        } else {
+            println!("No handler registered for message type: {:?}", message_type);
+        }
     }
 
     fn process_one_incoming_message(
@@ -73,7 +92,7 @@ impl InboundHandler {
             // Send the message to the registered handler
             handler.send(msg)?;
         } else {
-            error!("No handler registered for sender: {:?}", sender);
+            println!("No handler registered for sender: {:?}", sender);
         }
         Ok(())
     }

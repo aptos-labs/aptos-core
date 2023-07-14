@@ -27,7 +27,8 @@ impl ExecutorService {
         coordinator_address: SocketAddr,
         remote_shard_addresses: Vec<SocketAddr>,
     ) -> Self {
-        let mut controller = NetworkController::new("executor_service", self_address, 5000);
+        let service_name = format!("executor_service-{}", shard_id);
+        let mut controller = NetworkController::new(service_name, self_address, 5000);
         let coordinator_client = Arc::new(RemoteCoordinatorClient::new(
             shard_id,
             &mut controller,

@@ -12,21 +12,26 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use crate::network_controller::inbound_handler::InboundHandler;
 
 #[allow(dead_code)]
 pub struct OutboundHandler {
+    service: String,
     network_clients: Arc<Mutex<HashMap<SocketAddr, NetworkClient>>>,
     address: SocketAddr,
     // Used to route outgoing messages to correct network client with the correct message type
     handlers: Arc<Mutex<Vec<(Receiver<Message>, SocketAddr, MessageType)>>>,
+    inbound_handler: Arc<Mutex<InboundHandler>>
 }
 
 impl OutboundHandler {
-    pub fn new(listen_addr: SocketAddr) -> Self {
+    pub fn new(service: String, listen_addr: SocketAddr, inbound_handler: Arc<Mutex<InboundHandler>>) -> Self {
         Self {
+            service,
             network_clients: Arc::new(Mutex::new(HashMap::new())),
             address: listen_addr,
             handlers: Arc::new(Mutex::new(Vec::new())),
+            inbound_handler
         }
     }
 
@@ -50,21 +55,26 @@ impl OutboundHandler {
         let outbound_handlers = self.handlers.clone();
         let address = self.address;
         let network_clients = self.network_clients.clone();
-        thread::spawn(move || loop {
+        let thread_name = format!("{}_network_outbound_handler", self.service);
+        let builder = thread::Builder::new().name(thread_name);
+        let inbound_handler = self.inbound_handler.clone();
+        builder.spawn(move || loop {
             if let Err(e) = Self::process_one_outgoing_message(
                 outbound_handlers.clone(),
                 network_clients.clone(),
                 &address,
+                inbound_handler.clone(),
             ) {
-                error!("Error processing outgoing message: {:?}", e);
+                println!("Error processing outgoing message: {:?}", e);
             }
-        });
+        }).expect("Failed to spawn outbound handler thread");
     }
 
     fn process_one_outgoing_message(
         outbound_handlers: Arc<Mutex<Vec<(Receiver<Message>, SocketAddr, MessageType)>>>,
         network_clients: Arc<Mutex<HashMap<SocketAddr, NetworkClient>>>,
         socket_addr: &SocketAddr,
+        inbound_handler: Arc<Mutex<InboundHandler>>,
     ) -> Result<(), Error> {
         let mut select = Select::new();
         let handlers = outbound_handlers.lock().unwrap();
@@ -77,6 +87,12 @@ impl OutboundHandler {
         let msg = oper.recv(&handlers[index].0)?;
         let remote_addr = &handlers[index].1;
         let message_type = &handlers[index].2;
+        if remote_addr == socket_addr {
+            // If the remote address is the same as the local address, then we are sending a message to ourselves
+            // so we should just pass it to the inbound handler
+            inbound_handler.lock().unwrap().send_incoming_message_to_handler(message_type, msg);
+            return Ok(());
+        }
         let mut binding = network_clients.lock().unwrap();
         let network_client = binding.get_mut(remote_addr).unwrap();
         let msg = bcs::to_bytes(&NetworkMessage::new(

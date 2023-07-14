@@ -155,9 +155,55 @@ pub fn test_sharded_block_executor_with_conflict<E: ExecutorShard<FakeDataStore>
     }
 
     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 2, 0.9);
+    let partitioned_txns = partitioner.partition(transactions.clone(), 4, 0.9);
 
     let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
+    let sharded_txn_output = sharded_block_executor
+        .execute_block(
+            Arc::new(executor.data_store().clone()),
+            partitioned_txns,
+            concurrency,
+            None,
+        )
+        .unwrap();
+
+    let unsharded_txn_output =
+        AptosVM::execute_block(execution_ordered_txns, &executor.data_store(), None).unwrap();
+    compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
+}
+
+pub fn sharded_block_executor_with_random_transfers<E: ExecutorShard<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
+    let mut rng = OsRng;
+    let max_accounts = 200;
+    let max_txns = 1000;
+    let num_accounts = rng.gen_range(1, max_accounts);
+    let mut accounts = Vec::new();
+    let mut executor = FakeExecutor::from_head_genesis();
+
+    for _ in 0..num_accounts {
+        let account = generate_account_at(&mut executor, AccountAddress::random());
+        accounts.push(Mutex::new(account));
+    }
+
+    let num_txns = rng.gen_range(1, max_txns);
+    let num_shards = sharded_block_executor.num_shards();
+
+    let mut transactions = Vec::new();
+
+    for _ in 0..num_txns {
+        let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
+        let sender = &mut accounts[indices.index(0)].lock().unwrap();
+        let receiver = &accounts[indices.index(1)].lock().unwrap();
+        let transfer_amount = rng.gen_range(1, 1000);
+        let txn = generate_p2p_txn(sender, receiver, transfer_amount);
+        transactions.push(txn)
+    }
+
+    let partitioner = ShardedBlockPartitioner::new(num_shards);
+    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
+
+    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
+
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),

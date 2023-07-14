@@ -270,7 +270,7 @@ impl NetworkClient {
 }
 
 pub struct NetworkServer {
-    service: &'static str,
+    service: String,
     listener: Option<TcpListener>,
     stream: Option<NetworkStream>,
     /// Read, Write, Connect timeout in milliseconds.
@@ -278,7 +278,7 @@ pub struct NetworkServer {
 }
 
 impl NetworkServer {
-    pub fn new(service: &'static str, listen: SocketAddr, timeout_ms: u64) -> Self {
+    pub fn new(service: String, listen: SocketAddr, timeout_ms: u64) -> Self {
         let listener = TcpListener::bind(listen);
         Self {
             service,
@@ -289,7 +289,7 @@ impl NetworkServer {
     }
 
     fn increment_counter(&self, method: Method, result: MethodResult) {
-        increment_counter(self.service, NetworkMode::Server, method, result)
+        increment_counter(&self.service, NetworkMode::Server, method, result)
     }
 
     /// If there isn't already a downstream client, it accepts. Otherwise it
@@ -303,9 +303,10 @@ impl NetworkServer {
         };
 
         if let Err((remote, err)) = &result {
+            println!("Error reading from the server: {:?} for remote addr {:?} ", err, remote);
             self.increment_counter(Method::Read, MethodResult::Failure);
             warn!(SecureNetLogSchema::new(
-                self.service,
+                &self.service,
                 NetworkMode::Server,
                 LogEvent::DisconnectedPeerOnRead,
             )
@@ -323,7 +324,7 @@ impl NetworkServer {
     /// Shutdown the internal network stream
     pub fn shutdown(&mut self) -> Result<(), Error> {
         info!(SecureNetLogSchema::new(
-            self.service,
+            &self.service,
             NetworkMode::Server,
             LogEvent::Shutdown,
         ));
@@ -347,7 +348,7 @@ impl NetworkServer {
         if let Err((remote, err)) = &result {
             self.increment_counter(Method::Write, MethodResult::Failure);
             warn!(SecureNetLogSchema::new(
-                self.service,
+                &self.service,
                 NetworkMode::Server,
                 LogEvent::DisconnectedPeerOnWrite,
             )
@@ -366,7 +367,7 @@ impl NetworkServer {
         if self.stream.is_none() {
             self.increment_counter(Method::Connect, MethodResult::Query);
             info!(SecureNetLogSchema::new(
-                self.service,
+                &self.service,
                 NetworkMode::Server,
                 LogEvent::ConnectionAttempt,
             ));
@@ -379,7 +380,7 @@ impl NetworkServer {
                     self.increment_counter(Method::Connect, MethodResult::Failure);
                     let err = err.into();
                     warn!(SecureNetLogSchema::new(
-                        self.service,
+                        &self.service,
                         NetworkMode::Server,
                         LogEvent::ConnectionSuccessful,
                     )
@@ -390,7 +391,7 @@ impl NetworkServer {
 
             self.increment_counter(Method::Connect, MethodResult::Success);
             info!(SecureNetLogSchema::new(
-                self.service,
+                &self.service,
                 NetworkMode::Server,
                 LogEvent::ConnectionSuccessful,
             )
@@ -525,7 +526,7 @@ mod test {
     fn test_ping() {
         let server_port = utils::get_available_port();
         let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port);
-        let mut server = NetworkServer::new("test", server_addr, TIMEOUT);
+        let mut server = NetworkServer::new("test".to_string(), server_addr, TIMEOUT);
         let mut client = NetworkClient::new("test".to_string(), server_addr, TIMEOUT);
 
         let data = vec![0, 1, 2, 3];
@@ -543,7 +544,7 @@ mod test {
     fn test_client_shutdown() {
         let server_port = utils::get_available_port();
         let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port);
-        let mut server = NetworkServer::new("test", server_addr, TIMEOUT);
+        let mut server = NetworkServer::new("test".to_string(), server_addr, TIMEOUT);
         let mut client = NetworkClient::new("test".to_string(), server_addr, TIMEOUT);
 
         let data = vec![0, 1, 2, 3];
@@ -565,7 +566,7 @@ mod test {
     fn test_server_shutdown() {
         let server_port = utils::get_available_port();
         let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port);
-        let mut server = NetworkServer::new("test", server_addr, TIMEOUT);
+        let mut server = NetworkServer::new("test".to_string(), server_addr, TIMEOUT);
         let mut client = NetworkClient::new("test".to_string(), server_addr, TIMEOUT);
 
         let data = vec![0, 1, 2, 3];
@@ -574,7 +575,7 @@ mod test {
         assert_eq!(data, result);
 
         server.shutdown().unwrap();
-        let mut server = NetworkServer::new("test", server_addr, TIMEOUT);
+        let mut server = NetworkServer::new("test".to_string(), server_addr, TIMEOUT);
 
         let data = vec![4, 5, 6, 7];
         // We aren't notified immediately that a server has shutdown, but it happens eventually
@@ -590,7 +591,7 @@ mod test {
     fn test_write_two_messages_buffered() {
         let server_port = utils::get_available_port();
         let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port);
-        let mut server = NetworkServer::new("test", server_addr, TIMEOUT);
+        let mut server = NetworkServer::new("test".to_string(), server_addr, TIMEOUT);
         let mut client = NetworkClient::new("test".to_string(), server_addr, TIMEOUT);
         let data1 = vec![0, 1, 2, 3];
         let data2 = vec![4, 5, 6, 7];
@@ -606,7 +607,7 @@ mod test {
     fn test_server_timeout() {
         let server_port = utils::get_available_port();
         let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port);
-        let mut server = NetworkServer::new("test", server_addr, TIMEOUT);
+        let mut server = NetworkServer::new("test".to_string(), server_addr, TIMEOUT);
         let mut client = NetworkClient::new("test".to_string(), server_addr, TIMEOUT);
         let data1 = vec![0, 1, 2, 3];
         let data2 = vec![4, 5, 6, 7];
@@ -631,7 +632,7 @@ mod test {
     fn test_client_timeout() {
         let server_port = utils::get_available_port();
         let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port);
-        let mut server = NetworkServer::new("test", server_addr, TIMEOUT);
+        let mut server = NetworkServer::new("test".to_string(), server_addr, TIMEOUT);
         let mut client = NetworkClient::new("test".to_string(), server_addr, TIMEOUT);
         let data1 = vec![0, 1, 2, 3];
         let data2 = vec![4, 5, 6, 7];
@@ -647,7 +648,7 @@ mod test {
         // Clean up old Server listener but keep the stream online. Start a new server, which will
         // be the one the client now connects to.
         server.listener = None;
-        let mut server2 = NetworkServer::new("test", server_addr, TIMEOUT);
+        let mut server2 = NetworkServer::new("test".to_string(), server_addr, TIMEOUT);
 
         // Client starts a new stream, success
         client.write(&data2).unwrap();

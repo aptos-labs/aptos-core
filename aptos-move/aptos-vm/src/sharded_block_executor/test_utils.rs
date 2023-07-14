@@ -173,11 +173,10 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorShard<FakeDataStore>> (sh
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }
 
-pub fn sharded_block_executor_with_random_transfers(concurrency: usize) {
+pub fn sharded_block_executor_with_random_transfers<E: ExecutorShard<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
     let mut rng = OsRng;
     let max_accounts = 200;
     let max_txns = 1000;
-    let max_num_shards = 32;
     let num_accounts = rng.gen_range(1, max_accounts);
     let mut accounts = Vec::new();
     let mut executor = FakeExecutor::from_head_genesis();
@@ -188,7 +187,7 @@ pub fn sharded_block_executor_with_random_transfers(concurrency: usize) {
     }
 
     let num_txns = rng.gen_range(1, max_txns);
-    let num_shards = rng.gen_range(1, max_num_shards);
+    let num_shards = sharded_block_executor.num_shards();
 
     let mut transactions = Vec::new();
 
@@ -206,9 +205,6 @@ pub fn sharded_block_executor_with_random_transfers(concurrency: usize) {
 
     let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
 
-    let executor_shards =
-        LocalExecutorShard::create_local_executor_shards(num_shards, Some(concurrency));
-    let sharded_block_executor = ShardedBlockExecutor::new(executor_shards);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),

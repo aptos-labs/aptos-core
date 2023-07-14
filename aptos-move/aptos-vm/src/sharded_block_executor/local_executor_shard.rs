@@ -38,7 +38,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
     ) -> Self {
         let coordinator_client = Arc::new(LocalCoordinatorClient::new());
         let cross_shard_client =
-            Arc::new(LocalCrossShardClient::new(cross_shard_txs, cross_shard_rxs));
+            Arc::new(LocalCrossShardClient::new(shard_id, cross_shard_txs, cross_shard_rxs));
 
         let executor_service = Arc::new(ShardedExecutorService::new(
             shard_id,
@@ -167,6 +167,7 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
 }
 
 pub struct LocalCrossShardClient {
+    shard_id: ShardId,
     // The senders of cross-shard messages to other shards per round.
     message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
     // The receivers of cross shard messages from other shards per round.
@@ -175,10 +176,12 @@ pub struct LocalCrossShardClient {
 
 impl LocalCrossShardClient {
     pub fn new(
+        shard_id: ShardId,
         cross_shard_txs: Vec<Vec<Sender<CrossShardMsg>>>,
         cross_shard_rxs: Vec<Receiver<CrossShardMsg>>,
     ) -> Self {
         Self {
+            shard_id,
             message_rxs: Arc::new(cross_shard_rxs.into_iter().map(Mutex::new).collect()),
             message_txs: Arc::new(
                 cross_shard_txs

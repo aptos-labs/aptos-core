@@ -6,6 +6,7 @@ use crate::network_controller::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 
 mod error;
 mod inbound_handler;
@@ -63,15 +64,17 @@ impl Message {
 
 #[allow(dead_code)]
 pub struct NetworkController {
-    inbound_handler: InboundHandler,
+    inbound_handler: Arc<Mutex<InboundHandler>>,
     outbound_handler: OutboundHandler,
 }
 
 impl NetworkController {
-    pub fn new(service: &'static str, listen_addr: SocketAddr, timeout_ms: u64) -> Self {
+    pub fn new(service: String, listen_addr: SocketAddr, timeout_ms: u64) -> Self {
+        let inbound_handler = Arc::new(Mutex::new(InboundHandler::new(service.clone(), listen_addr, timeout_ms)));
+        let outbound_handler = OutboundHandler::new(service.clone(), listen_addr, inbound_handler.clone());
         Self {
-            inbound_handler: InboundHandler::new(service, listen_addr, timeout_ms),
-            outbound_handler: OutboundHandler::new(listen_addr),
+            inbound_handler,
+            outbound_handler,
         }
     }
 
@@ -91,14 +94,14 @@ impl NetworkController {
     pub fn create_inbound_channel(&mut self, message_type: String) -> Receiver<Message> {
         let (inbound_sender, inbound_receiver) = unbounded();
 
-        self.inbound_handler
+        self.inbound_handler.lock().unwrap()
             .register_handler(message_type, inbound_sender);
 
         inbound_receiver
     }
 
     pub fn start(&mut self) {
-        self.inbound_handler.start();
+        self.inbound_handler.lock().unwrap().start();
         self.outbound_handler.start();
     }
 }
@@ -117,8 +120,8 @@ mod tests {
         let server_port2 = utils::get_available_port();
         let server_addr2 = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port2);
 
-        let mut network_controller1 = NetworkController::new("test1", server_addr1, 1000);
-        let mut network_controller2 = NetworkController::new("test2", server_addr2, 1000);
+        let mut network_controller1 = NetworkController::new("test1".to_string(), server_addr1, 1000);
+        let mut network_controller2 = NetworkController::new("test2".to_string(), server_addr2, 1000);
 
         let test1_sender =
             network_controller2.create_outbound_channel(server_addr1, "test1".to_string());

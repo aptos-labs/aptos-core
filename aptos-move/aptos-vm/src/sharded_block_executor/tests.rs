@@ -34,10 +34,20 @@ fn test_sharded_block_executor_with_conflict_sequential() {
 
 #[test]
 fn test_sharded_block_executor_with_random_transfers_parallel() {
-    test_utils::sharded_block_executor_with_random_transfers(4)
+    let mut rng = OsRng;
+    let max_num_shards = 32;
+    let num_shards = rng.gen_range(1, max_num_shards);
+    let executor_shards = LocalExecutorShard::create_local_executor_shards(num_shards, Some(4));
+    let sharded_block_executor = ShardedBlockExecutor::new(executor_shards);
+    test_utils::sharded_block_executor_with_random_transfers(sharded_block_executor, 4)
 }
 
 #[test]
 fn test_sharded_block_executor_with_random_transfers_sequential() {
-    test_utils::sharded_block_executor_with_random_transfers(1)
+    let mut rng = OsRng;
+    let max_num_shards = 32;
+    let num_shards = rng.gen_range(1, max_num_shards);
+    let executor_shards = LocalExecutorShard::create_local_executor_shards(num_shards, Some(1));
+    let sharded_block_executor = ShardedBlockExecutor::new(executor_shards);
+    test_utils::sharded_block_executor_with_random_transfers(sharded_block_executor, 1)
 }

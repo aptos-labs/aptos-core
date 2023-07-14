@@ -62,7 +62,7 @@ impl CrossShardStateValue {
 /// available in the hashmap, it will be fetched from the underlying base view.
 #[derive(Clone)]
 pub struct CrossShardStateView<'a, S> {
-    _shard_id: ShardId,
+    shard_id: ShardId,
     cross_shard_data: HashMap<StateKey, CrossShardStateValue>,
     base_view: &'a S,
 }
@@ -80,13 +80,13 @@ impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
         }
         Self {
             // Added for debugging purpose
-            _shard_id: shard_id,
+            shard_id,
             cross_shard_data,
             base_view,
         }
     }
 
-    #[cfg(test)]
+    //#[cfg(test)]
     fn waiting_count(&self) -> usize {
         self.cross_shard_data
             .values()

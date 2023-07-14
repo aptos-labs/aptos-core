@@ -59,7 +59,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorShard<S> {
         let listen_port = utils::get_available_port();
         let coordinator_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), listen_port);
         let mut controller =
-            NetworkController::new("remote-executor-coordinator", coordinator_address, 5000);
+            NetworkController::new("remote-executor-coordinator".to_string(), coordinator_address, 5000);
         let remote_shard_addresses = (0..num_shards)
             .map(|_| {
                 let listen_port = utils::get_available_port();

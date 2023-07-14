@@ -78,7 +78,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        trace!(
+        println!(
             "executing sub block for shard {} and round {}",
             self.shard_id,
             round
@@ -115,21 +115,19 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     maybe_block_gas_limit,
                     Some(cross_shard_commit_sender),
                 );
+                println!("executed sub block for shard {} and round {}", self.shard_id, round);
                 // Send a self message to stop the cross-shard commit receiver.
                 cross_shard_client_clone.send_cross_shard_msg(
                     self.shard_id,
                     round,
                     CrossShardMsg::StopMsg,
                 );
+                println!("sent stop message for shard {} and round {}", self.shard_id, round);
                 callback.send(ret).unwrap();
             });
         });
+        println!("waiting for sub block for shard {} and round {}", self.shard_id, round);
         let ret = block_on(callback_receiver).unwrap();
-        trace!(
-            "finished executing sub block for shard {} and round {}",
-            self.shard_id,
-            round
-        );
         ret
     }
 
@@ -158,6 +156,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 concurrency_level,
                 maybe_block_gas_limit,
             )?);
+            println!("Finished executing sub block for shard {} and round {}", self.shard_id, round);
         }
         Ok(result)
     }
