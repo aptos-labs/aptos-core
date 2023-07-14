@@ -502,10 +502,18 @@ impl RemoteFetchRequest {
 }
 
 impl TDAGMessage for RemoteFetchRequest {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             self.target.round > self.exists_bitmask.last_round(),
             "target node round should be strictly higher than the last bitmark round"
+        );
+
+        ensure!(
+            self.exists_bitmask
+                .bitmask
+                .iter()
+                .all(|round| round.len() == verifier.len()),
+            "invalid bitmask: each round length is not equal to validator count"
         );
 
         Ok(())
@@ -671,8 +679,8 @@ impl DagSnapshotBitmask {
         };
         self.bitmask
             .get(round_idx)
-            .and_then(|round| round.get(author_idx))
-            .is_some()
+            .and_then(|round| round.get(author_idx).cloned())
+            .unwrap_or(false)
     }
 
     pub fn last_round(&self) -> Round {
