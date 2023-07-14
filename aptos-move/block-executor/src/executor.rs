@@ -15,7 +15,7 @@ use crate::{
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
-use aptos_aggregator::delta_change_set::{deserialize, serialize};
+use aptos_aggregator::delta_change_set::serialize;
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
@@ -365,10 +365,9 @@ where
                 .materialize_delta(&k, txn_idx)
                 .unwrap_or_else(|op| {
                     let storage_value = base_view
-                        .get_state_value_bytes(&k)
-                        .expect("No base value for committed delta in storage")
-                        .map(|bytes| deserialize(&bytes))
-                        .expect("Cannot deserialize base value for committed delta");
+                        .get_state_value_u128(&k)
+                        .expect("Error reading the base value for committed delta in storage")
+                        .expect("No base value for committed delta in storage");
 
                     versioned_cache.set_aggregator_base_value(&k, storage_value);
                     op.apply_to(storage_value)
