@@ -14,36 +14,35 @@ from dataclasses import dataclass
 
 
 # numbers are based on the machine spec used by github action
+# Calibrate from https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
 # Local machine numbers will be higher.
 EXPECTED_TPS = {
-    ("no-op", False, 1): (18800.0, True),
-    ("no-op", False, 1000): (2980.0, True),
-    ("coin-transfer", False, 1): (12600.0, True),
-    ("coin-transfer", True, 1): (30000.0, True),
-    ("account-generation", False, 1): (11000.0, True),
-    ("account-generation", True, 1): (26000.0, True),
-    # changed to not use account_pool. either recalibrate or add here to use account pool.
-    ("account-resource32-b", False, 1): (15000.0, False),
-    ("modify-global-resource", False, 1): (3700.0, True),
-    ("modify-global-resource", False, 10): (10800.0, True),
-    # seems to have changed, disabling as land_blocking, until recalibrated
-    ("publish-package", False, 1): (120.0, False),
-    ("mix_publish_transfer", False, 1): (300.0, False),
-    ("batch100-transfer", False, 1): (350, True),
-    ("batch100-transfer", True, 1): (880, True),
-    ("token-v1ft-mint-and-transfer", False, 1): (1650.0, True),
-    ("token-v1ft-mint-and-transfer", False, 20): (7100.0, True),
-    ("token-v1nft-mint-and-transfer-sequential", False, 1): (1100.0, True),
-    ("token-v1nft-mint-and-transfer-sequential", False, 20): (5350.0, True),
-    ("token-v1nft-mint-and-transfer-parallel", False, 1): (1380.0, True),
-    ("token-v1nft-mint-and-transfer-parallel", False, 20): (5450.0, True),
+    ("no-op", False, 1): (18000.0, True),
+    ("no-op", False, 1000): (2800.0, True),
+    ("coin-transfer", False, 1): (12500.0, True),
+    ("coin-transfer", True, 1): (30300.0, True),
+    ("account-generation", False, 1): (10500.0, True),
+    ("account-generation", True, 1): (26500.0, True),
+    ("account-resource32-b", False, 1): (15400.0, True),
+    ("modify-global-resource", False, 1): (3400.0, True),
+    ("modify-global-resource", False, 10): (10100.0, True),
+    ("publish-package", False, 1): (120.0, True),
+    ("mix_publish_transfer", False, 1): (1400.0, False),
+    ("batch100-transfer", False, 1): (370, True),
+    ("batch100-transfer", True, 1): (940, True),
+    ("token-v1ft-mint-and-transfer", False, 1): (1550.0, True),
+    ("token-v1ft-mint-and-transfer", False, 20): (7000.0, True),
+    ("token-v1nft-mint-and-transfer-sequential", False, 1): (1000.0, True),
+    ("token-v1nft-mint-and-transfer-sequential", False, 20): (5150.0, True),
+    ("token-v1nft-mint-and-transfer-parallel", False, 1): (1300.0, True),
+    ("token-v1nft-mint-and-transfer-parallel", False, 20): (5300.0, True),
     # ("token-v1ft-mint-and-store", False): 1000.0,
     # ("token-v1nft-mint-and-store-sequential", False): 1000.0,
     # ("token-v1nft-mint-and-store-parallel", False): 1000.0,
-    ("no-op2-signers", False, 1): (18800.0, True),
-    ("no-op5-signers", False, 1): (18800.0, True),
-    ("token-v2-ambassador-mint", False, 1): (1750.0, True),
-    ("token-v2-ambassador-mint", False, 20): (5500.0, True),
+    ("no-op2-signers", False, 1): (18000.0, True),
+    ("no-op5-signers", False, 1): (18000.0, True),
+    ("token-v2-ambassador-mint", False, 1): (1500.0, True),
+    ("token-v2-ambassador-mint", False, 20): (5000.0, True),
 }
 
 NOISE_LOWER_LIMIT = 0.8
@@ -55,7 +54,7 @@ NOISE_UPPER_LIMIT_WARN = 1.05
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v3"
+CODE_PERF_VERSION = "v4"
 
 # use production concurrency level for assertions
 CONCURRENCY_LEVEL = 8
@@ -245,14 +244,20 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     results = []
 
-    for (transaction_type_name, use_native_executor, module_working_set_size), (
-        expected_tps,
-        check_active,
-    ) in EXPECTED_TPS.items():
+    for (
+        test_index,
+        (
+            (transaction_type_name, use_native_executor, module_working_set_size),
+            (
+                expected_tps,
+                check_active,
+            ),
+        ),
+    ) in enumerate(EXPECTED_TPS.items()):
         print(f"Testing {transaction_type_name}")
         if transaction_type_name == "mix_publish_transfer":
             transaction_type = "publish-package coin-transfer"
-            transaction_weights = "1 1000"
+            transaction_weights = "1 500"
         else:
             transaction_type = transaction_type_name
             transaction_weights = "1"
@@ -297,7 +302,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             json.dumps(
                 {
                     "grep": "grep_json_single_node_perf",
-                    "transaction_type": transaction_type,
+                    "transaction_type": transaction_type_name,
                     "module_working_set_size": module_working_set_size,
                     "executor_type": executor_type,
                     "block_size": cur_block_size,
@@ -306,6 +311,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "gps": single_node_result.gps,
                     "gpt": single_node_result.gpt,
                     "code_perf_version": CODE_PERF_VERSION,
+                    "test_index": test_index,
                 }
             )
         )
