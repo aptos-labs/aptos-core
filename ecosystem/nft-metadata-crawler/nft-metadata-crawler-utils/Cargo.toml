@@ -1,0 +1,22 @@
+[package]
+name = "nft-metadata-crawler-utils"
+description = "NFT Metadata Crawler Utils."
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+base64 = { workspace = true }
+chrono = { workspace = true }
+google-cloud-auth = { workspace = true }
+image = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
