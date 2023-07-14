@@ -2131,9 +2131,7 @@ struct Delay {
 
 impl Delay {
     fn new(seconds: u64) -> Self {
-        Self {
-            seconds,
-        }
+        Self { seconds }
     }
 }
 
