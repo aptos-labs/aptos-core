@@ -52,22 +52,23 @@ module drand::drand {
         bytes: vector<u8>
     }
 
-    /// Checks if the randomness in `bytes` verifies for the specified `round`.
-    /// If it verifies, returns the actual randomness, which is a hash function applied over `bytes`.
+    /// Checks if the randomness in `signature` verifies for the specified `round`.
+    /// If it verifies, returns the actual randomness, which is a hash function applied over `signature`.
     public fun verify_and_extract_randomness(
-        bytes: vector<u8>,
+        signature: vector<u8>,
         round: u64): Option<Randomness>
     {
         let pk = extract(&mut deserialize<G2, FormatG2Compr>(&DRAND_PUBKEY));
-        let sig = extract(&mut deserialize<G1, FormatG1Compr>(&bytes));
+        let sig = extract(&mut deserialize<G1, FormatG1Compr>(&signature));
         let msg_hash = hash_to<G1, HashG1XmdSha256SswuRo>(&DRAND_DST, &round_number_to_bytes(round));
         assert!(eq(&pairing<G1, G2, Gt>(&msg_hash, &pk), &pairing<G1, G2, Gt>(&sig, &one<G2>())), 1);
         option::some(Randomness {
-            bytes: sha3_256(bytes)
+            bytes: sha3_256(signature)
         })
     }
 
-    /// Returns a number in $[0, max)$ given some drand (verified) `randomness` and a `Type`.
+    /// Returns a uniform number in $[0, max)$ given some drand (verified) `randomness`.
+    /// (Technically, there is a small, computationally-indistinguishable bias in the number.)
     /// Note: This is a one-shot API that consumes the `randomness`.
     public fun random_number(randomness: Randomness, max: u64): u64 {
         assert!(vector::length(&randomness.bytes) >= 8, error::invalid_argument(E_INCORRECT_RANDOMNESS));
@@ -76,18 +77,17 @@ module drand::drand {
 
         // We can convert the 256 uniform bits in `randomness` into a uniform 64-bit number `w \in [0, max)` by
         // taking the last 128 bits in `randomness` modulo `max`.
-        let last_128_bits = vector::trim(&mut entropy, 16);
-        let num : u128 = 0;
-        let max_128 = (max as u128);
+        let num : u256 = 0;
+        let max_256 = (max as u256);
 
-        // Ugh, we have to manually deserialize this into a u64 (8 chunks of 8 bits each)
-        while (!vector::is_empty(&last_128_bits)) {
-            let byte = vector::pop_back(&mut last_128_bits);
+        // Ugh, we have to manually deserialize this into a u128
+        while (!vector::is_empty(&entropy)) {
+            let byte = vector::pop_back(&mut entropy);
             num = num << 8;
-            num = num + (byte as u128);
+            num = num + (byte as u256);
         };
 
-        ((num % max_128) as u64)
+        ((num % max_256) as u64)
     }
 
     /// Returns the next round `i` that `drand` will sign after having signed the round corresponding to the
