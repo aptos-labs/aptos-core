@@ -129,6 +129,10 @@ resource "helm_release" "fullnode" {
         cpu = var.min_allowed_cpu_for_vertical_pod_autoscaling
         memory = var.min_allowed_memory_for_vertical_pod_autoscaling
       }
+      maxAllowedForVpa = {
+        cpu = var.max_allowed_cpu_for_vertical_pod_autoscaling
+        memory = var.max_allowed_memory_for_vertical_pod_autoscaling
+      }
     }),
     jsonencode(var.fullnode_helm_values),
     jsonencode(var.fullnode_helm_values_list == {} ? {} : var.fullnode_helm_values_list[count.index]),

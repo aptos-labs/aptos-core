@@ -215,4 +215,15 @@ variable "min_allowed_memory_for_vertical_pod_autoscaling" {
   default = "16Gi"
 }
 
+variable "max_allowed_cpu_for_vertical_pod_autoscaling" {
+  description = "MaxAllowed CPU for vertical pod autoscaling"
+  default = 31
+}
+
+variable "max_allowed_memory_for_vertical_pod_autoscaling" {
+  description = "MaxAllowed memory for vertical pod autoscaling"
+  default = "116Gi"
+}
+
+
 

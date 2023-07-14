@@ -54,6 +54,10 @@ minAllowedForVpa:
   cpu:
   memory:
 
+maxAllowedForVpa:
+  cpu:
+  memory:
+
 nodeSelector: {}
 tolerations: []
 affinity: {}

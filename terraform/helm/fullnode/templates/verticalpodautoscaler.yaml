@@ -18,4 +18,7 @@ spec:
         minAllowed:
           cpu: {{ .Values.minAllowedForVpa.cpu }}
           memory: {{ .Values.minAllowedForVpa.memory }}
+        maxAllowed:
+          cpu: {{ .Values.maxAllowedForVpa.cpu }}
+          memory: {{ .Values.maxAllowedForVpa.memory }}
 {{- end -}}
