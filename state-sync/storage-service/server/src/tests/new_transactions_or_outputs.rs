@@ -404,20 +404,20 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
         let highest_version = 65660;
         let highest_epoch = 30;
         let lowest_version = 101;
-        let max_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
-        let requested_chunk_size = max_chunk_size + 1;
+        let max_transaction_output_chunk_size = 600;
+        let requested_chunk_size = max_transaction_output_chunk_size + 1;
         let peer_version = highest_version - requested_chunk_size;
         let highest_ledger_info =
             utils::create_test_ledger_info_with_sigs(highest_epoch, highest_version);
         let output_list_with_proof = utils::create_output_list_with_proof(
             peer_version + 1,
-            peer_version + requested_chunk_size,
+            peer_version + max_transaction_output_chunk_size,
             highest_version,
         );
         let transaction_list_with_proof = utils::create_transaction_list_with_proof(
             peer_version + 1,
             peer_version + 1,
-            peer_version + requested_chunk_size,
+            peer_version + max_transaction_output_chunk_size,
             false,
         ); // Creates a small transaction list
 
@@ -429,7 +429,7 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
             utils::expect_get_transaction_outputs(
                 &mut db_reader,
                 peer_version + 1,
-                (max_chunk_size as u32 / (u32::pow(2, i as u32))) as u64,
+                (max_transaction_output_chunk_size as u32 / (u32::pow(2, i as u32))) as u64,
                 highest_version,
                 output_list_with_proof.clone(),
             );
@@ -438,21 +438,25 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
             utils::expect_get_transactions(
                 &mut db_reader,
                 peer_version + 1,
-                max_chunk_size,
+                max_transaction_output_chunk_size,
                 highest_version,
                 false,
                 transaction_list_with_proof.clone(),
             );
         }
 
-        // Create the storage client and server
-        let storage_config = utils::configure_network_chunk_limit(
+        // Create the storage service config
+        let mut storage_service_config = utils::configure_network_chunk_limit(
             fallback_to_transactions,
             &output_list_with_proof,
             &transaction_list_with_proof,
         );
+        storage_service_config.max_transaction_output_chunk_size =
+            max_transaction_output_chunk_size;
+
+        // Create the storage client and server
         let (mut mock_client, service, storage_service_notifier, mock_time, _) =
-            MockClient::new(Some(db_reader), Some(storage_config));
+            MockClient::new(Some(db_reader), Some(storage_service_config));
         let active_optimistic_fetches = service.get_optimistic_fetches();
         tokio::spawn(service.start());
 
