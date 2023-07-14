@@ -1224,7 +1224,10 @@ fn network_bandwidth() -> ForgeConfig {
 }
 
 fn gather_metrics() -> ForgeConfig {
-    ForgeConfig::default().add_network_test(GatherMetrics)
+    ForgeConfig::default()
+        .add_network_test(GatherMetrics)
+        .add_network_test(Delay::new(60))
+        .add_network_test(GatherMetrics)
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
@@ -2116,6 +2119,33 @@ impl NetworkTest for EmitTransaction {
 }
 
 #[derive(Debug)]
+struct Delay {
+    seconds: u64,
+}
+
+impl Delay {
+    fn new(seconds: u64) -> Self {
+        Self {
+            seconds,
+        }
+    }
+}
+
+impl Test for Delay {
+    fn name(&self) -> &'static str {
+        "delay"
+    }
+}
+
+impl NetworkTest for Delay {
+    fn run(&self, _ctx: &mut NetworkContext<'_>) -> Result<()> {
+        info!("forge sleep {}", self.seconds);
+        std::thread::sleep(Duration::from_secs(self.seconds));
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
 struct GatherMetrics;
 
 impl Test for GatherMetrics {
@@ -2127,19 +2157,9 @@ impl Test for GatherMetrics {
 impl NetworkTest for GatherMetrics {
     fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let runtime = ctx.runtime.handle();
-        runtime.block_on(gather_metrics_inner(ctx));
-
+        runtime.block_on(gather_metrics_one(ctx));
         Ok(())
     }
-}
-
-async fn gather_metrics_inner(ctx: &NetworkContext<'_>) {
-    let gather_time = Duration::from_secs(60); // TODO: make configurable
-    let start = tokio::time::Instant::now();
-    gather_metrics_one(ctx).await;
-    info!("gather_metrics sleep for {}", gather_time.as_secs_f64());
-    tokio::time::sleep_until(start + gather_time).await;
-    gather_metrics_one(ctx).await;
 }
 
 async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
