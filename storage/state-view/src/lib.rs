@@ -36,6 +36,14 @@ pub trait TStateView {
         StateViewId::Miscellaneous
     }
 
+    /// Tries to interpret the state value as u128.
+    fn get_state_value_u128(&self, state_key: &Self::Key) -> Result<Option<u128>> {
+        match self.get_state_value_bytes(state_key)? {
+            Some(bytes) => Ok(Some(bcs::from_bytes(&bytes)?)),
+            None => Ok(None),
+        }
+    }
+
     /// Gets the state value bytes for a given state key.
     fn get_state_value_bytes(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
         let val_opt = self.get_state_value(state_key)?;

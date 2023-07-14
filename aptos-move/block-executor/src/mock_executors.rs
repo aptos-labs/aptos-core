@@ -9,7 +9,6 @@ use rayon::prelude::*;
 use thread_local::ThreadLocal;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
-use aptos_types::block_executor::partitioner::BlockExecutorTransactions;
 use aptos_types::executable::Executable;
 use crate::counters::PARALLEL_EXECUTION_SECONDS;
 use crate::errors::{Error, Result};
@@ -64,10 +63,7 @@ where
                         txn_idx,
                         true);
                     match execute_result {
-                        ExecutionStatus::Success(output) => {
-                            Ok(output)
-                        },
-                        ExecutionStatus::SkipRest(output) => {
+                        ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                             Ok(output)
                         },
                         ExecutionStatus::Abort(err) => {
@@ -96,15 +92,14 @@ impl<T, E, S, X> BlockExecutor for RunAllOnceInParallel<T, E, S, X>
     fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: BlockExecutorTransactions<T>,
+        signature_verified_block: Vec<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
 
-        let signature_verified_txns = signature_verified_block.into_txns();
         self.execute_transactions(
-            &signature_verified_txns,
-            0..signature_verified_txns.len() as TxnIndex,
+            &signature_verified_block,
+            0..signature_verified_block.len() as TxnIndex,
             &ThreadLocal::with_capacity(self.executor_thread_pool.current_num_threads()),
             &executor_arguments,
             base_view,

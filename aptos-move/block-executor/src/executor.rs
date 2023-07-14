@@ -593,6 +593,7 @@ where
         }
     }
 
+    // TODO: consider moving sequential execution to a separate BlockExecutor.
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,

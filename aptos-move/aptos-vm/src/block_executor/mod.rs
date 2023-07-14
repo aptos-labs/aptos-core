@@ -39,6 +39,7 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::sync::Arc;
+use aptos_block_executor::fast_path_executor::FastPathBlockExecutor;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -181,18 +182,31 @@ impl BlockAptosVM {
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
-        let executor = BlockSTMExecutor::<
+
+        // let executor = BlockSTMExecutor::<
+        //     PreprocessedTransaction,
+        //     AptosExecutorTask<S>,
+        //     S,
+        //     ExecutableTestType,
+        // >::new(
+        //     concurrency_level,
+        //     executor_thread_pool,
+        //     maybe_block_gas_limit,
+        //     transaction_commit_listener,
+        // );
+
+        // let fast_path_executor = FastPathBlockExecutor::with_fallback(
+        //     executor_thread_pool,
+        //     maybe_block_gas_limit,
+        //     fallback_executor,
+        // );
+
+        let executor = aptos_block_executor::mock_executors::RunAllOnceInParallel::<
             PreprocessedTransaction,
             AptosExecutorTask<S>,
             S,
-            L,
             ExecutableTestType,
-        >::new(
-            concurrency_level,
-            executor_thread_pool,
-            maybe_block_gas_limit,
-            transaction_commit_listener,
-        );
+        >::new(executor_thread_pool);
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {

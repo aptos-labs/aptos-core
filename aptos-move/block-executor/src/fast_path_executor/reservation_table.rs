@@ -2,10 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use dashmap::mapref::entry::Entry;
 use std::hash::Hash;
-
 use std::sync::atomic::{AtomicU32, Ordering};
+
+use dashmap::mapref::entry::Entry;
 
 /// TxnOrder represents the priorities of transactions.
 /// The smaller the order, the higher the priority.
@@ -25,7 +25,7 @@ pub trait ReservationTable<K> {
 
     /// Returns the order of the transaction that made the reservation to this key,
     /// or None if the key is not reserved.
-    fn get_reservation(&self, key: K) -> Option<TxnOrder>;
+    fn get_reservation(&self, key: &K) -> Option<TxnOrder>;
 }
 
 /// Simple `ReservationTable` implementation based on `DashMap`.
@@ -35,14 +35,23 @@ pub struct DashMapReservationTable<K> {
 }
 
 impl<K: Eq + Hash> DashMapReservationTable<K> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             reservations: dashmap::DashMap::new(),
         }
     }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            reservations: dashmap::DashMap::with_capacity(capacity),
+        }
+    }
 }
 
-impl<K: Eq + Hash + Sync + Send> ReservationTable<K> for DashMapReservationTable<K> {
+impl<K> ReservationTable<K> for DashMapReservationTable<K>
+where
+    K: Eq + Hash + Sync + Send,
+{
     fn make_reservation(&self, key: K, order: TxnOrder) -> bool {
         // Acquires a write lock on a `DashMap` shard for the duration of this method call.
         match self.reservations.entry(key) {
@@ -61,10 +70,10 @@ impl<K: Eq + Hash + Sync + Send> ReservationTable<K> for DashMapReservationTable
         }
     }
 
-    fn get_reservation(&self, key: K) -> Option<TxnOrder> {
+    fn get_reservation(&self, key: &K) -> Option<TxnOrder> {
         // Acquires a read lock on a `DashMap` shard.
         self.reservations
-            .get(&key)
+            .get(key)
             .map(|entry_ref| *entry_ref.value())
     }
 }
@@ -77,7 +86,7 @@ type AtomicTxnOrder = AtomicU32;
 /// of `AtomicTxnOrder`.
 /// However, a write lock is still necessary when some key is being reserved for the first
 /// time as a new entry needs to be inserted into the `DashMap`.
-struct OptimisticDashMapReservationTable<K> {
+pub struct OptimisticDashMapReservationTable<K> {
     reservations: dashmap::DashMap<K, AtomicTxnOrder>,
 }
 
@@ -87,9 +96,18 @@ impl<K: Eq + Hash> OptimisticDashMapReservationTable<K> {
             reservations: dashmap::DashMap::new(),
         }
     }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            reservations: dashmap::DashMap::with_capacity(capacity),
+        }
+    }
 }
 
-impl<K: Eq + Hash + Sync + Send> ReservationTable<K> for OptimisticDashMapReservationTable<K> {
+impl<K> ReservationTable<K> for OptimisticDashMapReservationTable<K>
+where
+    K: Eq + Hash + Sync + Send,
+{
     fn make_reservation(&self, key: K, order: TxnOrder) -> bool {
         if let Some(value) = self.reservations.get(&key) {
             // Update the reservation without taking a write lock using `fetch_min`.
@@ -117,10 +135,10 @@ impl<K: Eq + Hash + Sync + Send> ReservationTable<K> for OptimisticDashMapReserv
         }
     }
 
-    fn get_reservation(&self, key: K) -> Option<TxnOrder> {
+    fn get_reservation(&self, key: &K) -> Option<TxnOrder> {
         // TODO: consider relaxing the ordering constraint of `load`
         self.reservations
-            .get(&key)
+            .get(key)
             .map(|entry_ref| entry_ref.value().load(Ordering::SeqCst))
     }
 }

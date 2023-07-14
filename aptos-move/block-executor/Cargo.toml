@@ -28,6 +28,7 @@ claims = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
+futures = { workspace = true }
 move-binary-format = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }

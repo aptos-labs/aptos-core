@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    executor::BlockExecutor,
+    executor::BlockSTMExecutor,
     proptest_types::{
         baseline::BaselineOutput,
         types::{
@@ -44,7 +44,7 @@ where
             .unwrap(),
     );
 
-    let output = BlockExecutor::<
+    let output = BlockSTMExecutor::<
         MockTransaction<K, V>,
         MockTask<K, V>,
         DeltaDataView<K, V>,

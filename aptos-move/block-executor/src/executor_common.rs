@@ -18,6 +18,7 @@ pub trait BlockExecutor {
     /// The output must be *serializable*, meaning that it must be equivalent to
     /// executing the transactions in *some* total order (which may be different from the order
     /// of the transactions in the input).
+    /// Returns the transaction outputs in the serialization order.
     fn execute_block(
         &self,
         executor_arguments: <Self::ExecutorTask as ExecutorTask>::Argument,

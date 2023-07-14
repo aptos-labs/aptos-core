@@ -4,7 +4,7 @@
 
 use crate::{
     errors::Error,
-    executor::BlockExecutor,
+    executor::BlockSTMExecutor,
     proptest_types::{
         baseline::BaselineOutput,
         types::{
