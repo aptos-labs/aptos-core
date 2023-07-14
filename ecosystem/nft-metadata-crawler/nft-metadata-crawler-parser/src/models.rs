@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 
+use crate::schema::nft_metadata_crawler_uris;
 use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, PooledConnection},
 };
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
-
-use crate::schema::nft_metadata_crawler_uris;
 
 #[derive(Clone, Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(token_uri))]

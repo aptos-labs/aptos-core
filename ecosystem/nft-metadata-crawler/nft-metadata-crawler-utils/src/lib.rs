@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 
-use std::{fs::File, io::Read};
-
 use anyhow::Context;
 use chrono::{NaiveDateTime, Utc};
 use serde::Deserialize;
+use std::{fs::File, io::Read};
 
 pub mod gcs;
 
