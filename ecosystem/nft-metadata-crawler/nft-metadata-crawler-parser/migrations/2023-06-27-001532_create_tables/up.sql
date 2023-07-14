@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS nft_metadata_crawler_uris (
   cdn_json_uri VARCHAR,
   cdn_image_uri VARCHAR,
   cdn_animation_uri VARCHAR,
-  image_resizer_retry_count INT NOT NULL,
+  image_optimizer_retry_count INT NOT NULL,
   json_parser_retry_count INT NOT NULL,
   last_updated TIMESTAMP NOT NULL DEFAULT NOW()
 );

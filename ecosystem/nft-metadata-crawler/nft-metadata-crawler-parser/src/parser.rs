@@ -21,7 +21,6 @@ use tracing::{error, info};
 pub struct Parser<'a> {
     pub entry: NFTMetadataCrawlerEntry,
     model: NFTMetadataCrawlerURIs,
-    format: ImageFormat,
     bucket: String,
     ts: &'a dyn TokenSource,
     force: bool,
@@ -44,11 +43,10 @@ impl<'a> Parser<'a> {
                 cdn_json_uri: None,
                 cdn_image_uri: None,
                 cdn_animation_uri: None,
-                image_resizer_retry_count: 0,
+                image_optimizer_retry_count: 0,
                 json_parser_retry_count: 0,
             },
             entry,
-            format: ImageFormat::Jpeg,
             bucket,
             ts,
             force,
@@ -74,12 +72,27 @@ impl<'a> Parser<'a> {
         }
 
         // URI Parser
-        let json_uri = match Self::parse_uri(self.entry.token_uri.clone()) {
-            Ok(u) => u,
-            Err(_) => self.entry.token_uri.clone(),
-        };
+        let json_uri = self.handle_uri_parser_jsons();
 
         // JSON Parser
+        self.handle_json_parser(json_uri).await;
+
+        // Save to Postgres
+        self.save_to_postgres().await;
+
+        // URI Parser
+        let (img_uri, animation_uri) = self.handle_uri_parser_images();
+
+        // Image Optimizer
+        self.handle_image_optimizer(img_uri, animation_uri).await;
+
+        // Save to Postgres
+        self.save_to_postgres().await;
+
+        Ok(())
+    }
+
+    async fn handle_json_parser(&mut self, json_uri: String) {
         match self.parse_json(json_uri).await {
             Ok(json) => {
                 info!(
@@ -120,45 +133,27 @@ impl<'a> Parser<'a> {
                     e.to_string()
                 )
             },
-        }
-
-        // Save to Postgres
-        match upsert_uris(&mut self.conn, self.model.clone()) {
-            Ok(_) => info!(
-                last_transaction_version = self.entry.last_transaction_version,
-                "Successfully upserted JSON URIs"
-            ),
-            Err(e) => error!(
-                last_transaction_version = self.entry.last_transaction_version,
-                "{}",
-                e.to_string()
-            ),
-        }
-
-        // URI Parser
-        let raw_img_uri = self
-            .model
-            .raw_image_uri
-            .clone()
-            .unwrap_or(self.model.token_uri.clone());
-
-        let img_uri = match Self::parse_uri(raw_img_uri.clone()) {
-            Ok(u) => u,
-            Err(_) => raw_img_uri,
         };
+    }
 
-        // Image Optimizer
+    async fn handle_image_optimizer(
+        &mut self,
+        img_uri: String,
+        animation_uri_option: Option<String>,
+    ) {
         match self.optimize_image(img_uri).await {
-            Ok(new_img) => {
+            Ok((new_img, format, raw_image_uri)) => {
                 info!(
                     last_transaction_version = self.entry.last_transaction_version,
                     "Successfully optimized image"
                 );
 
+                self.model.raw_image_uri = Some(raw_image_uri);
+
                 // Write image to GCS
                 match write_image_to_gcs(
                     self.ts,
-                    self.format,
+                    format,
                     self.bucket.clone(),
                     self.entry.token_data_id.clone(),
                     new_img,
@@ -181,29 +176,102 @@ impl<'a> Parser<'a> {
                 }
             },
             Err(e) => {
-                self.model.image_resizer_retry_count += 1;
+                self.model.image_optimizer_retry_count += 1;
                 error!(
                     last_transaction_version = self.entry.last_transaction_version,
                     "{}",
                     e.to_string()
                 )
             },
-        }
+        };
 
-        // Save to Postgres
+        if let Some(animation_uri) = animation_uri_option {
+            match self.optimize_image(animation_uri).await {
+                Ok((new_img, format, raw_animation_uri)) => {
+                    info!(
+                        last_transaction_version = self.entry.last_transaction_version,
+                        "Successfully optimized image"
+                    );
+
+                    self.model.raw_animation_uri = Some(raw_animation_uri);
+
+                    // Write animation to GCS
+                    match write_image_to_gcs(
+                        self.ts,
+                        format,
+                        self.bucket.clone(),
+                        self.entry.token_data_id.clone(),
+                        new_img,
+                    )
+                    .await
+                    {
+                        Ok(filename) => {
+                            self.model.cdn_animation_uri =
+                                Some(format!("http://34.160.26.161/{}", filename));
+                            info!(
+                                last_transaction_version = self.entry.last_transaction_version,
+                                "Successfully saved image"
+                            );
+                        },
+                        Err(e) => error!(
+                            last_transaction_version = self.entry.last_transaction_version,
+                            "{}",
+                            e.to_string()
+                        ),
+                    }
+                },
+                Err(e) => {
+                    // Do not increment retry count for animation
+                    error!(
+                        last_transaction_version = self.entry.last_transaction_version,
+                        "{}",
+                        e.to_string()
+                    )
+                },
+            };
+        }
+    }
+
+    fn handle_uri_parser_jsons(&mut self) -> String {
+        match Self::parse_uri(self.entry.token_uri.clone()) {
+            Ok(u) => u,
+            Err(_) => self.entry.token_uri.clone(),
+        }
+    }
+
+    fn handle_uri_parser_images(&mut self) -> (String, Option<String>) {
+        let raw_img_uri = self
+            .model
+            .raw_image_uri
+            .clone()
+            .unwrap_or(self.model.token_uri.clone());
+
+        let img_uri = match Self::parse_uri(raw_img_uri.clone()) {
+            Ok(u) => u,
+            Err(_) => raw_img_uri,
+        };
+
+        let animation_uri = self
+            .model
+            .raw_animation_uri
+            .clone()
+            .and_then(|raw_animation_uri| Self::parse_uri(raw_animation_uri).ok());
+
+        (img_uri, animation_uri)
+    }
+
+    async fn save_to_postgres(&mut self) {
         match upsert_uris(&mut self.conn, self.model.clone()) {
             Ok(_) => info!(
                 last_transaction_version = self.entry.last_transaction_version,
-                "Successfully upserted image URIs"
+                "Successfully upserted URIs"
             ),
             Err(e) => error!(
                 last_transaction_version = self.entry.last_transaction_version,
                 "{}",
                 e.to_string()
             ),
-        }
-
-        Ok(())
+        };
     }
 
     // Parse URI for IPFS CID and path
@@ -222,7 +290,10 @@ impl<'a> Parser<'a> {
     }
 
     // Optimize and resize image
-    async fn optimize_image(&mut self, _img_uri: String) -> anyhow::Result<Vec<u8>> {
+    async fn optimize_image(
+        &mut self,
+        _img_uri: String,
+    ) -> anyhow::Result<(Vec<u8>, ImageFormat, String)> {
         todo!();
     }
 

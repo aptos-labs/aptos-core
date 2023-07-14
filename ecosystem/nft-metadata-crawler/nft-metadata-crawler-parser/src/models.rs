@@ -19,7 +19,7 @@ pub struct NFTMetadataCrawlerURIs {
     pub cdn_json_uri: Option<String>,
     pub cdn_image_uri: Option<String>,
     pub cdn_animation_uri: Option<String>,
-    pub image_resizer_retry_count: i32,
+    pub image_optimizer_retry_count: i32,
     pub json_parser_retry_count: i32,
 }
 
@@ -33,7 +33,7 @@ pub struct NFTMetadataCrawlerURIsQuery {
     pub cdn_json_uri: Option<String>,
     pub cdn_image_uri: Option<String>,
     pub cdn_animation_uri: Option<String>,
-    pub image_resizer_retry_count: i32,
+    pub image_optimizer_retry_count: i32,
     pub json_parser_retry_count: i32,
     pub last_updated: chrono::NaiveDateTime,
 }

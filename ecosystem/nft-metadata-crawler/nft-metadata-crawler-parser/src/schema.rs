@@ -10,7 +10,7 @@ diesel::table! {
         cdn_json_uri -> Nullable<Varchar>,
         cdn_image_uri -> Nullable<Varchar>,
         cdn_animation_uri -> Nullable<Varchar>,
-        image_resizer_retry_count -> Int4,
+        image_optimizer_retry_count -> Int4,
         json_parser_retry_count -> Int4,
         last_updated -> Timestamp,
     }
