@@ -8,8 +8,10 @@ specifiers:
   eslint: 8.23.0
   eslint-config-airbnb-base: 15.0.0
   eslint-config-airbnb-typescript: 17.0.0
+  eslint-config-prettier: 8.5.0
   eslint-plugin-import: 2.26.0
   got: ^11.0.0
+  prettier: 2.6.2
   ts-node: 10.9.1
   tsup: 6.2.3
   typescript: 4.8.2
@@ -25,7 +27,9 @@ devDependencies:
   eslint: 8.23.0
   eslint-config-airbnb-base: 15.0.0_faomjyrlgqmwswvqymymzkxcqi
   eslint-config-airbnb-typescript: 17.0.0_ormpz3f5cezs3vksgs6xr4qcde
+  eslint-config-prettier: 8.5.0_eslint@8.23.0
   eslint-plugin-import: 2.26.0_iepzrjnvahcxaf6zc7cutko6om
+  prettier: 2.6.2
   ts-node: 10.9.1_5rk5is433kn5wsyq4uz4766eya
   tsup: 6.2.3_s5ojjbx2isjkawqptqpitvy25q
   typescript: 4.8.2
@@ -999,6 +1003,15 @@ packages:
       eslint: 8.23.0
       eslint-config-airbnb-base: 15.0.0_faomjyrlgqmwswvqymymzkxcqi
       eslint-plugin-import: 2.26.0_iepzrjnvahcxaf6zc7cutko6om
+    dev: true
+
+  /eslint-config-prettier/8.5.0_eslint@8.23.0:
+    resolution: {integrity: sha512-obmWKLUNCnhtQRKc+tmnYuQl0pFU1ibYJQ5BGhTVB08bHe9wC8qUeG7c08dj9XX+AuPj1YSGSQIHl1pnDHZR0Q==}
+    hasBin: true
+    peerDependencies:
+      eslint: '>=7.0.0'
+    dependencies:
+      eslint: 8.23.0
     dev: true
 
   /eslint-import-resolver-node/0.3.7:
@@ -1988,6 +2001,12 @@ packages:
   /prelude-ls/1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
+    dev: true
+
+  /prettier/2.6.2:
+    resolution: {integrity: sha512-PkUpF+qoXTqhOeWL9fu7As8LXsIUZ1WYaJiY/a7McAQzxjk82OF0tibkFXVCDImZtWxbvojFjerkiLb0/q8mew==}
+    engines: {node: '>=10.13.0'}
+    hasBin: true
     dev: true
 
   /pump/3.0.0:

@@ -1,6 +1,7 @@
 {
   "name": "@aptos-labs/aptos-client",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "license": "Apache-2.0",
   "exports": {
     "browser": {
       "import": "./dist/browser/index.browser.mjs",
@@ -29,7 +30,9 @@
     "_build:browser": "tsup src/index.browser.ts --format cjs,esm --dts --out-dir dist/browser",
     "_build:node": "tsup src/index.node.ts --format cjs,esm --dts --out-dir dist/node",
     "_build:types": "tsc src/types.ts src/index.node.ts --outDir dist/types --declaration",
-    "lint": "eslint \"**/*.ts\""
+    "lint": "eslint \"**/*.ts\"",
+    "fmt": "pnpm _fmt --write",
+    "_fmt": "prettier 'src/**/*.ts' '.eslintrc.js'"
   },
   "dependencies": {
     "axios": "0.27.2",
@@ -41,6 +44,8 @@
     "tsup": "6.2.3",
     "typescript": "4.8.2",
     "eslint": "8.23.0",
+    "prettier": "2.6.2",
+    "eslint-config-prettier": "8.5.0",
     "eslint-config-airbnb-base": "15.0.0",
     "eslint-config-airbnb-typescript": "17.0.0",
     "eslint-plugin-import": "2.26.0",
