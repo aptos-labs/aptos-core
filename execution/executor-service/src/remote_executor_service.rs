@@ -4,7 +4,6 @@
 use crate::{
     remote_cordinator_client::RemoteCoordinatorClient,
     remote_cross_shard_client::RemoteCrossShardClient,
-    remote_executor_client::RemoteExecutorClient,
 };
 use aptos_secure_net::network_controller::NetworkController;
 use aptos_state_view::in_memory_state_view::InMemoryStateView;
@@ -15,6 +14,7 @@ use std::{net::SocketAddr, sync::Arc};
 /// A service that provides support for remote execution. Essentially, it reads a request from
 /// the remote executor client and executes the block locally and returns the result.
 pub struct ExecutorService {
+    controller: NetworkController,
     executor_service: Arc<ShardedExecutorService<InMemoryStateView>>,
 }
 
@@ -29,6 +29,7 @@ impl ExecutorService {
     ) -> Self {
         let mut controller = NetworkController::new("executor_service", self_address, 5000);
         let coordinator_client = Arc::new(RemoteCoordinatorClient::new(
+            shard_id,
             &mut controller,
             coordinator_address,
         ));
@@ -45,25 +46,16 @@ impl ExecutorService {
             cross_shard_client,
         ));
 
-        Self { executor_service }
+        Self {
+            controller,
+            executor_service
+        }
     }
 
-    pub fn start(&self) {
+    pub fn start(&mut self) {
+        self.controller.start();
         self.executor_service.start();
     }
-}
-
-pub trait RemoteExecutorService {
-    fn client(&self) -> RemoteExecutorClient {
-        RemoteExecutorClient::new(self.server_address(), self.network_timeout_ms())
-    }
-
-    fn server_address(&self) -> SocketAddr;
-
-    /// Network Timeout in milliseconds.
-    fn network_timeout_ms(&self) -> u64;
-
-    fn executor_threads(&self) -> usize;
 }
 
 #[cfg(test)]

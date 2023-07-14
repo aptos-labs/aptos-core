@@ -15,15 +15,15 @@ impl ProcessExecutorService {
         shard_id: ShardId,
         num_shards: usize,
         num_threads: usize,
-        self_address: SocketAddr,
         coordinator_address: SocketAddr,
         remote_shard_addresses: Vec<SocketAddr>,
     ) -> Self {
+        let self_address = remote_shard_addresses[shard_id];
         info!(
             "Starting process remote executor service on {}",
             self_address
         );
-        let executor_service = ExecutorService::new(
+        let mut executor_service = ExecutorService::new(
             shard_id,
             num_shards,
             num_threads,

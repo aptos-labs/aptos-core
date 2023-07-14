@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_executor_service::process_executor_service::ProcessExecutorService;
 use clap::Parser;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 

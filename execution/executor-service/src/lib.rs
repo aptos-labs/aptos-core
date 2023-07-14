@@ -15,12 +15,21 @@ mod remote_cross_shard_client;
 pub mod remote_executor_client;
 pub mod remote_executor_service;
 mod remote_executor_shard;
-#[cfg(test)]
 mod thread_executor_service;
+#[cfg(test)]
+mod tests;
+#[cfg(test)]
+mod test_utils;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RemoteExecutionResult {
     pub inner: Result<Vec<Vec<TransactionOutput>>, VMStatus>,
+}
+
+impl RemoteExecutionResult {
+    pub fn new(inner: Result<Vec<Vec<TransactionOutput>>, VMStatus>) -> Self {
+        Self { inner }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

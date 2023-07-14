@@ -44,8 +44,8 @@ impl InboundHandler {
 
     pub fn start(&mut self) {
         let inbound_handlers = self.inbound_handlers.clone(); // Clone the hashmap for the thread
-                                                              // Spawn a thread to handle incoming messages
         let server_clone = self.server.clone(); // Clone the server to move into the thread
+        // Spawn a thread to handle incoming messages
         thread::spawn(move || {
             loop {
                 // Receive incoming messages from the server

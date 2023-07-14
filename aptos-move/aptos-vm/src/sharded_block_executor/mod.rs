@@ -22,6 +22,8 @@ pub mod messages;
 pub mod sharded_executor_service;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod test_utils;
 
 /// Coordinator for sharded block executors that manages multiple shards and aggregates the results.
 pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>> {
@@ -50,6 +52,10 @@ impl<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>> ShardedBlockExec
             executor_shards,
             phantom: PhantomData,
         }
+    }
+
+    pub fn num_shards(&self) -> usize {
+        self.executor_shards.len()
     }
 
     /// Execute a block of transactions in parallel by splitting the block into num_remote_executors partitions and

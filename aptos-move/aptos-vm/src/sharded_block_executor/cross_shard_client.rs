@@ -40,6 +40,7 @@ impl CrossShardCommitReceiver {
                         .set_value(&state_key, write_op.and_then(|w| w.as_state_value()));
                 },
                 CrossShardMsg::StopMsg => {
+                    println!("Cross shard commit receiver stopped for round {}", round);
                     break;
                 },
             }

@@ -8,6 +8,7 @@ use std::{net::SocketAddr, thread, thread::JoinHandle};
 /// separate thread. This should be used for testing only.
 pub struct ThreadExecutorService {
     _child: JoinHandle<()>,
+    _self_address: SocketAddr,
 }
 
 impl ThreadExecutorService {
@@ -15,11 +16,11 @@ impl ThreadExecutorService {
         shard_id: ShardId,
         num_shards: usize,
         num_threads: usize,
-        self_address: SocketAddr,
         coordinator_address: SocketAddr,
         remote_shard_addresses: Vec<SocketAddr>,
     ) -> Self {
-        let executor_service = ExecutorService::new(
+        let self_address = remote_shard_addresses[shard_id];
+        let mut executor_service = ExecutorService::new(
             shard_id,
             num_shards,
             num_threads,
@@ -32,6 +33,9 @@ impl ThreadExecutorService {
             executor_service.start();
         });
 
-        Self { _child: child }
+        Self {
+            _child: child,
+            _self_address: self_address,
+        }
     }
 }

@@ -25,7 +25,7 @@ impl RemoteCrossShardClient {
         for remote_address in shard_addresses.iter() {
             let mut txs = vec![];
             for round in 0..MAX_ALLOWED_PARTITIONING_ROUNDS {
-                let message_type = format!("cross_shard{}", round);
+                let message_type = format!("cross_shard_{}", round);
                 let tx = controller.create_outbound_channel(*remote_address, message_type);
                 txs.push(Mutex::new(tx));
             }
@@ -34,7 +34,7 @@ impl RemoteCrossShardClient {
 
         // Create inbound channels for each round
         for round in 0..MAX_ALLOWED_PARTITIONING_ROUNDS {
-            let message_type = format!("cross_shard{}", round);
+            let message_type = format!("cross_shard_{}", round);
             let rx = controller.create_inbound_channel(message_type);
             message_rxs.push(Mutex::new(rx));
         }
@@ -54,8 +54,13 @@ impl CrossShardClient for RemoteCrossShardClient {
     }
 
     fn receive_cross_shard_msg(&self, current_round: RoundId) -> CrossShardMsg {
+        //println!("Waiting to receive cross shard message for round {}", current_round);
         let rx = self.message_rxs[current_round].lock().unwrap();
         let message = rx.recv().unwrap();
+        if current_round == 1 {
+           println!("Received cross shard message for round {}", current_round);
+        }
+        //println!("Received cross shard message for round {}", current_round);
         bcs::from_bytes(&message.to_bytes()).unwrap()
     }
 }
