@@ -15,6 +15,7 @@ use nft_metadata_crawler_utils::{
 use serde_json::Value;
 use std::error::Error;
 
+// Stuct that represents a parser for a single entry from queue
 pub struct Parser<'a> {
     pub entry: NFTMetadataCrawlerEntry,
     model: NFTMetadataCrawlerURIs,
@@ -50,6 +51,7 @@ impl<'a> Parser<'a> {
         &mut self,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        // Deduplication
         if nft_metadata_crawler_uris::table
             .find(&self.entry.token_uri)
             .first::<NFTMetadataCrawlerURIs>(conn)
@@ -84,6 +86,7 @@ impl<'a> Parser<'a> {
                 .await
                 {
                     Ok(filename) => {
+                        // Temporarily hardcode IP for load balancer testing
                         self.model.cdn_json_uri =
                             Some(format!("http://34.160.26.161/{}", filename));
                         self.log("Successfully saved JSON")
@@ -153,18 +156,22 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    // Parse URI for IPFS CID and path
     fn parse_uri(_uri: String) -> Result<String, Box<dyn Error + Send + Sync>> {
         todo!();
     }
 
+    // HEAD request to get size of content
     async fn _get_size(&mut self, _url: String) -> Result<u32, Box<dyn Error + Send + Sync>> {
         todo!();
     }
 
+    // Parse JSON for image URI
     async fn parse_json(&mut self, _uri: String) -> Result<Value, Box<dyn Error + Send + Sync>> {
         todo!();
     }
 
+    // Optimize and resize image
     async fn optimize_image(
         &mut self,
         _img_uri: String,
@@ -172,7 +179,7 @@ impl<'a> Parser<'a> {
         todo!();
     }
 
-    // Function that adds correct bytes to image
+    // Converts image buffer to bytes
     fn _to_bytes(
         &self,
         _image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>,
