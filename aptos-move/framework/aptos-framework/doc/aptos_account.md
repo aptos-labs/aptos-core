@@ -604,7 +604,7 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;AptosCoin&gt;{from: source};
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>) && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>).frozen;
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::account::Account&gt;(<b>to</b>);
-<b>ensures</b> <b>exists</b>&lt;AptosCoin&gt;(<b>to</b>);
+<b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<b>to</b>);
 </code></pre>
 
 
