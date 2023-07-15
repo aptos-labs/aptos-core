@@ -27,8 +27,17 @@ pub struct LiveVarInfoAtCodeOffset {
     pub after: BTreeSet<TempIndex>,
 }
 
+/// Auxiliary entry point for livevar analysis.
+pub fn run_livevar_analysis(
+    target: &FunctionTarget,
+    code: &[Bytecode],
+) -> BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset> {
+    LiveVarAnalysisProcessor::analyze(target, code)
+}
+
+/// Annotation which can be attached to function data.
 #[derive(Default, Clone)]
-pub struct LiveVarAnnotation(BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
+pub struct LiveVarAnnotation(pub BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
 
 impl LiveVarAnnotation {
     pub fn get_live_var_info_at(
