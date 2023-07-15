@@ -224,3 +224,18 @@ fn test_swap() {
     ]);
     run_tests_for_pkg("swap", named_address);
 }
+
+#[test]
+fn test_package_manager() {
+    let named_address = BTreeMap::from([
+        (
+            String::from("deployer"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("package"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("package_manager", named_address);
+}
