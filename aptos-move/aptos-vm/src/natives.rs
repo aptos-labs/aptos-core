@@ -13,6 +13,7 @@ use aptos_types::{
     on_chain_config::{Features, TimedFeatures},
 };
 use move_vm_runtime::native_functions::NativeFunctionTable;
+//use std::sync::{Arc, Mutex};
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{
@@ -54,6 +55,36 @@ pub fn aptos_natives(
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,
             &mut builder,
+        ))
+        .collect()
+}
+
+pub fn aptos_natives_abstract_usage(builder: &mut SafeNativeBuilder) -> NativeFunctionTable {
+    /*let mut builder = SafeNativeBuilder::new(
+        gas_feature_version,
+        native_gas_params,
+        misc_gas_params,
+        timed_features,
+        features,
+    );
+    builder.set_gas_hook(move |expression| {
+        //// closure function should take Expression node and put it into
+        //// shared buffer, a1 and a2
+        // a2.lock().unwrap().push(expression);
+        println!("expression: {:?}", expression);
+    });*/
+
+    #[allow(unreachable_code)]
+    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, builder)
+        .into_iter()
+        .filter(|(_, name, _, _)| name.as_str() != "vector")
+        .chain(aptos_framework::natives::all_natives(
+            CORE_CODE_ADDRESS,
+            &builder,
+        ))
+        .chain(aptos_table_natives::table_natives(
+            CORE_CODE_ADDRESS,
+            builder,
         ))
         .collect()
 }

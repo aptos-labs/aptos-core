@@ -1,14 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::algebra_helpers::{collect_terms, normalize};
+//use crate::algebra_helpers::{collect_terms, normalize};
+//use crate::types::Expression;
 use crate::visitor::CalibrationVisitor;
-use aptos_gas_algebra::{Fee, FeePerGasUnit, GasExpression, InternalGas, InternalGasUnit, Octa};
+use aptos_gas_algebra::{Fee, FeePerGasUnit,  Expression,GasExpression, InternalGas, InternalGasUnit, Octa};
 use aptos_gas_meter::GasAlgebra;
 use aptos_gas_schedule::VMGasParameters;
+//use aptos_native_interface::SafeNativeBuilder;
+//use aptos_types::on_chain_config::{Features, TimedFeatures};
 use aptos_vm_types::storage::StorageGasParameters;
 use move_binary_format::errors::PartialVMResult;
-use std::collections::BTreeMap;
+//use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 
 /*
  * @notice: Algebra to record abstract gas usage
@@ -17,7 +21,8 @@ pub struct CalibrationAlgebra<A> {
     //// GasAlgebra that is used to delegate work
     pub base: A,
     //// Mapping of simplified like-terms
-    pub coeff_buffer: BTreeMap<String, u64>,
+    //pub coeff_buffer: BTreeMap<String, u64>,
+    pub shared_buffer: Arc<Mutex<Vec<Expression>>>,
 }
 
 /*
@@ -45,18 +50,20 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit>,
     ) -> PartialVMResult<()> {
         //// Parse GasExpression from Reverse Polish Notation into Expression AST
-        let mut visitor = CalibrationVisitor { node: Vec::new() };
-        abstract_amount.visit(&mut visitor);
-        println!("visitor {:?}\n", visitor.node.first().unwrap());
+        //let mut visitor = CalibrationVisitor { node: Vec::new() };
+        //abstract_amount.visit(&mut visitor);
+        //println!("visitor {:?}\n", visitor.node.first().unwrap());
 
         //// Normalize (collect like terms, accept different formats)
-        let node = visitor.node.pop().unwrap();
-        let terms = normalize(node);
-        println!("terms {:?}\n", terms);
+        //let node = visitor.node.pop().unwrap();
+        let node = abstract_amount.to_dynamic();
+        self.shared_buffer.lock().unwrap().push(node);
+        //let terms = normalize(node);
+        //println!("terms {:?}\n", terms);
 
         //// Put into buffer
-        self.coeff_buffer = collect_terms(terms);
-        println!("map {:?}\n", self.coeff_buffer);
+        //self.coeff_buffer = collect_terms(terms);
+        //println!("map {:?}\n", self.coeff_buffer);
 
         Ok(())
     }

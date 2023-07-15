@@ -12,3 +12,17 @@ aptos-gas-schedule = { workspace = true }
 aptos-vm-types = { workspace = true }
 move-binary-format = { workspace = true }
 anyhow = { workspace = true }
+aptos-types = { workspace = true }
+aptos-native-interface = { workspace = true }
+aptos = { workspace = true }
+aptos-cached-packages = { workspace = true }
+aptos-framework = { workspace = true }
+aptos-language-e2e-tests = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+move-bytecode-source-map = { workspace = true }
+move-core-types = { workspace = true }
+aptos-move-stdlib = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-ir-compiler = { workspace = true }
+move-vm-test-utils = { workspace = true }
