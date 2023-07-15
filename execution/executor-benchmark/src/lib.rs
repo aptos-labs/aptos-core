@@ -98,7 +98,7 @@ fn create_checkpoint(
 pub fn run_benchmark<V>(
     block_size: usize,
     num_blocks: usize,
-    transaction_type: Option<TransactionType>,
+    transaction_mix: Option<Vec<(TransactionType, usize)>>,
     mut transactions_per_sender: usize,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
@@ -128,7 +128,7 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
-    let transaction_generator_creator = transaction_type.map(|transaction_type| {
+    let transaction_generator_creator = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
             num_existing_accounts,
@@ -136,14 +136,16 @@ pub fn run_benchmark<V>(
         );
 
         let mut num_accounts_to_skip = 0;
-        if let NonConflictingCoinTransfer{..} = transaction_type {
-            // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
-            // `3*block_size` addresses is required:
-            // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
-            if num_accounts_to_be_loaded < block_size * 3 {
-                panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
+        for (transaction_type, _) in &transaction_mix {
+            if let NonConflictingCoinTransfer{..} = transaction_type {
+                // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
+                // `3*block_size` addresses is required:
+                // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
+                if num_accounts_to_be_loaded < block_size * 3 {
+                    panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
+                }
+                num_accounts_to_skip = block_size;
             }
-            num_accounts_to_skip = block_size;
         }
 
         let accounts_cache =
@@ -152,7 +154,7 @@ pub fn run_benchmark<V>(
             accounts_cache.split(num_main_signer_accounts);
 
         init_workload::<V>(
-            transaction_type,
+            transaction_mix,
             main_signer_accounts,
             burner_accounts,
             db.clone(),
@@ -176,19 +178,22 @@ pub fn run_benchmark<V>(
         Pipeline::new(executor, version, pipeline_config.clone(), Some(num_blocks));
 
     let mut num_accounts_to_load = num_main_signer_accounts;
-    if let Some(NonConflictingCoinTransfer { .. }) = transaction_type {
-        // In case of non-conflicting coin transfer,
-        // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
-        // at least `block_size` number of accounts, all as signer only.
-        num_accounts_to_load = block_size;
-        if transactions_per_sender > 1 {
-            warn!(
-            "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
-        );
-            transactions_per_sender = 1;
+    if let Some(mix) = &transaction_mix {
+        for (transaction_type, _) in mix {
+            if let NonConflictingCoinTransfer { .. } = transaction_type {
+                // In case of non-conflicting coin transfer,
+                // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
+                // at least `block_size` number of accounts, all as signer only.
+                num_accounts_to_load = block_size;
+                if transactions_per_sender > 1 {
+                    warn!(
+                    "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
+                );
+                    transactions_per_sender = 1;
+                }
+            }
         }
     }
-
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
         genesis_key,
@@ -260,8 +265,8 @@ pub fn run_benchmark<V>(
     );
     info!(
         "Executed workload {}",
-        if let Some(ttype) = transaction_type {
-            format!("{:?} via txn generator", ttype)
+        if let Some(mix) = transaction_mix {
+            format!("{:?} via txn generator", mix)
         } else {
             "raw transfer".to_string()
         }
@@ -314,7 +319,7 @@ pub fn run_benchmark<V>(
 }
 
 fn init_workload<V>(
-    transaction_type: TransactionType,
+    transaction_mix: Vec<(TransactionType, usize)>,
     mut main_signer_accounts: Vec<LocalAccount>,
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
@@ -343,7 +348,7 @@ where
         };
 
         create_txn_generator_creator(
-            &[vec![(transaction_type, 1)]],
+            &[transaction_mix],
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
@@ -531,7 +536,7 @@ mod tests {
         super::run_benchmark::<E>(
             6, /* block_size */
             5, /* num_blocks */
-            transaction_type.map(|t| t.materialize(2, false)),
+            transaction_type.map(|t| vec![(t.materialize(2, false), 1)]),
             2,  /* transactions per sender */
             25, /* num_main_signer_accounts */
             30, /* num_dst_pool_accounts */

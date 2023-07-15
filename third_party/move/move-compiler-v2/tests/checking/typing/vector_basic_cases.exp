@@ -1,0 +1,30 @@
+// ---- Model Dump
+module 0x42::Test {
+    struct X {
+        dummy_field: bool,
+    }
+    private fun many() {
+        Vector<u8>(0, 1, 2);
+        Vector<u64>(0, 1, 2);
+        Vector<u128>(0, 1, 2);
+        Vector<address>(0x0, 0x1);
+        Vector<Test::X>(pack Test::X(false), pack Test::X(false));
+        Vector<vector<address>>(Vector<address>(), Vector<address>());
+        Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>(), Vector<address>()), Vector<vector<address>>());
+        Tuple()
+    }
+    private fun none() {
+        Vector<bool>();
+        Tuple()
+    }
+    private fun one() {
+        Vector<u8>(0);
+        Vector<u64>(0);
+        Vector<u128>(0);
+        Vector<address>(0x0);
+        Vector<Test::X>(pack Test::X(false));
+        Vector<vector<address>>(Vector<address>());
+        Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>()));
+        Tuple()
+    }
+} // end 0x42::Test

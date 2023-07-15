@@ -530,15 +530,16 @@ impl AptosVM {
         gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
-        let invariant_violation_error =
+        let invariant_violation_error = || {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("MultiSig transaction error".to_string())
-                .finish(Location::Undefined);
+                .finish(Location::Undefined)
+        };
         let provided_payload = if let Some(payload) = &txn_payload.transaction_payload {
-            bcs::to_bytes(&payload).map_err(|_| invariant_violation_error.clone())?
+            bcs::to_bytes(&payload).map_err(|_| invariant_violation_error())?
         } else {
             // Default to empty bytes if payload is not provided.
-            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error.clone())?
+            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| invariant_violation_error())?
         };
         // Failures here will be propagated back.
         let payload_bytes: Vec<Vec<u8>> = session

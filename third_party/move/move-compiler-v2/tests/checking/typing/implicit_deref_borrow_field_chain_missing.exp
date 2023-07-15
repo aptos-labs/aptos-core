@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: field `f` not declared in struct `M::X1`
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:7:9
+  │
+7 │         x1.f;
+  │         ^^^^
+
+error: field `f` not declared in struct `M::X2`
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:8:9
+  │
+8 │         x1.x2.f;
+  │         ^^^^^^^
+
+error: field `g` not declared in struct `M::X3`
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:9:9
+  │
+9 │         x1.x2.x3.g;
+  │         ^^^^^^^^^^
+
+error: type `u64` cannot be resolved as a struct
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:10:9
+   │
+10 │         x1.x2.x3.f.g;
+   │         ^^^^^^^^^^^^
+
+error: field `f` not declared in struct `M::X1`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:11:9
+   │
+11 │         x1_mut.f;
+   │         ^^^^^^^^
+
+error: field `f` not declared in struct `M::X2`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:12:9
+   │
+12 │         x1_mut.x2.f;
+   │         ^^^^^^^^^^^
+
+error: field `g` not declared in struct `M::X3`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:13:9
+   │
+13 │         x1_mut.x2.x3.g;
+   │         ^^^^^^^^^^^^^^
+
+error: type `u64` cannot be resolved as a struct
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:14:9
+   │
+14 │         x1_mut.x2.x3.f.g;
+   │         ^^^^^^^^^^^^^^^^

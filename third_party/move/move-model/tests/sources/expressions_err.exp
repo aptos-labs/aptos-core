@@ -10,7 +10,7 @@ error: no function named `not_declared` found
 17 │       not_declared()
    │       ^^^^^^^^^^^^^^
 
-error: expected `num` but found `bool` in expression
+error: expected `num` but found `bool`
    ┌─ tests/sources/expressions_err.move:22:7
    │
 22 │       false
@@ -22,7 +22,7 @@ error: invalid call of `>`: expected `num` but found `vector<num>` for argument 
 27 │       x > y
    │       ^^^^^
 
-error: expected `(num, bool)` but found `bool` in expression
+error: expected `(num, bool)` but found `bool`
    ┌─ tests/sources/expressions_err.move:32:7
    │
 32 │       false
@@ -34,7 +34,7 @@ error: invalid call of `M::wrongly_typed_callee`: expected `bool` but found `u25
 37 │     fun wrongly_typed_caller(): num { wrongly_typed_callee(1, 1) }
    │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `num` but found `bool` in expression
+error: expected `num` but found `bool`
    ┌─ tests/sources/expressions_err.move:41:80
    │
 41 │     fun wrongly_typed_fun_arg_caller(): num { wrongly_typed_fun_arg_callee(|x| false) }

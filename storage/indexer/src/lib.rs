@@ -35,7 +35,7 @@ use move_core_types::{
 };
 use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     convert::TryInto,
     sync::{atomic::Ordering, Arc},
 };
@@ -118,7 +118,19 @@ impl Indexer {
         }
 
         let mut batch = SchemaBatch::new();
-        table_info_parser.finish(&mut batch)?;
+        match table_info_parser.finish(&mut batch) {
+            Ok(_) => {},
+            Err(err) => {
+                aptos_logger::error!(first_version = first_version, end_version = end_version, error = ?&err);
+                write_sets
+                    .iter()
+                    .enumerate()
+                    .for_each(|(i, write_set)| {
+                        aptos_logger::error!(version = first_version as usize + i, write_set = ?write_set);
+                    });
+                bail!(err);
+            },
+        };
         batch.put::<IndexerMetadataSchema>(
             &MetadataKey::LatestVersion,
             &MetadataValue::Version(end_version - 1),
@@ -166,7 +178,7 @@ impl<'a> TableInfoParser<'a> {
                     match path {
                         Path::Code(_) => (),
                         Path::Resource(struct_tag) => self.parse_struct(struct_tag, bytes)?,
-                        Path::ResourceGroup(_struct_tag) => (),
+                        Path::ResourceGroup(_struct_tag) => self.parse_resource_group(bytes)?,
                     }
                 },
                 StateKeyInner::TableItem { handle, .. } => self.parse_table_item(*handle, bytes)?,
@@ -182,6 +194,15 @@ impl<'a> TableInfoParser<'a> {
                 .annotator
                 .view_value(&TypeTag::Struct(Box::new(struct_tag)), bytes)?,
         )
+    }
+
+    fn parse_resource_group(&mut self, bytes: &[u8]) -> Result<()> {
+        type ResourceGroup = BTreeMap<StructTag, Vec<u8>>;
+
+        for (struct_tag, bytes) in bcs::from_bytes::<ResourceGroup>(bytes)? {
+            self.parse_struct(struct_tag, &bytes)?;
+        }
+        Ok(())
     }
 
     fn parse_table_item(&mut self, handle: TableHandle, bytes: &'a [u8]) -> Result<()> {

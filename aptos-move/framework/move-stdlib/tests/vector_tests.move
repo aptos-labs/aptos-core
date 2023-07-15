@@ -515,6 +515,47 @@ module std::vector_tests {
     }
 
     #[test]
+    fun find_empty_not_has() {
+        let v = V::empty<u64>();
+        let (has, index) = V::find(&v, |_x| true);
+        assert!(!has, 0);
+        assert!(index == 0, 1);
+    }
+
+    #[test]
+    fun find_nonempty_not_has() {
+        let v = V::empty();
+        V::push_back(&mut v, 1);
+        V::push_back(&mut v, 2);
+        let (has, index) = V::find(&v, |x| *x == 3);
+        assert!(!has, 0);
+        assert!(index == 0, 1);
+    }
+
+    #[test]
+    fun find_nonempty_has() {
+        let v = V::empty();
+        V::push_back(&mut v, 1);
+        V::push_back(&mut v, 2);
+        V::push_back(&mut v, 3);
+        let (has, index) = V::find(&v, |x| *x == 2);
+        assert!(has, 0);
+        assert!(index == 1, 1);
+    }
+
+    #[test]
+    fun find_nonempty_has_multiple_occurences() {
+        let v = V::empty();
+        V::push_back(&mut v, 1);
+        V::push_back(&mut v, 2);
+        V::push_back(&mut v, 2);
+        V::push_back(&mut v, 3);
+        let (has, index) = V::find(&v, |x| *x == 2);
+        assert!(has, 0);
+        assert!(index == 1, 1);
+    }
+
+    #[test]
     fun length() {
         let empty = V::empty();
         assert!(V::length(&empty) == 0, 0);

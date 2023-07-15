@@ -225,6 +225,14 @@ export const stringStructTag = new StructTag(
   [],
 );
 
+export function optionStructTag(typeArg: TypeTag): StructTag {
+  return new StructTag(AccountAddress.fromHex("0x1"), new Identifier("option"), new Identifier("Option"), [typeArg]);
+}
+
+export function objectStructTag(typeArg: TypeTag): StructTag {
+  return new StructTag(AccountAddress.fromHex("0x1"), new Identifier("object"), new Identifier("Object"), [typeArg]);
+}
+
 function bail(message: string) {
   throw new TypeTagParserError(message);
 }
