@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod bytecode_generator;
-mod bytecode_pipeline;
 mod experiments;
+mod file_format_generator;
 mod options;
 
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 pub use experiments::*;
+use move_binary_format::file_format as FF;
 use move_model::{model::GlobalEnv, PackageInfo};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
@@ -52,7 +53,9 @@ pub fn run_move_compiler(
     } else {
         pipeline.run(&env, &mut targets)
     }
-    bail!("bytecode lowering not implemented")
+    run_file_format_gen(&env, &targets);
+    check_errors(&env, error_writer, "assembling errors")?;
+    Ok(())
 }
 
 /// Run the type checker and return the global env (with errors if encountered). The result
@@ -90,6 +93,13 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
         }
     }
     targets
+}
+
+pub fn run_file_format_gen(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+) -> Vec<FF::CompiledModule> {
+    file_format_generator::generate_file_format(env, targets)
 }
 
 /// Returns the bytecode processing pipeline.

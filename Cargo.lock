@@ -8562,6 +8562,7 @@ name = "move-compiler-v2"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
  "clap 3.2.23",
  "codespan",
  "codespan-reporting",
@@ -8569,7 +8570,10 @@ dependencies = [
  "ethnum",
  "itertools",
  "move-binary-format",
+ "move-command-line-common",
  "move-core-types",
+ "move-disassembler",
+ "move-ir-types",
  "move-model",
  "move-prover-test-utils",
  "move-stackless-bytecode",
