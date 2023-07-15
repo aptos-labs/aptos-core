@@ -1,0 +1,23 @@
+// ---- Model Dump
+module 0x42::tuple_invalid {
+    struct S {
+        f: u64,
+    }
+    private fun tuple(x: u64) {
+        Tuple(x, pack tuple_invalid::S(Add(x, 1)))
+    }
+    private fun use_tuple1(x: u64) {
+        {
+          let x: (u64, tuple_invalid::S) = tuple_invalid::tuple(x);
+          1
+        }
+    }
+} // end 0x42::tuple_invalid
+
+
+Diagnostics:
+error: cannot assign tuple type `(u64, tuple_invalid::S)` to single variable (use `(a, b, ..) = ..` instead)
+   ┌─ tests/bytecode-generator/tuple_invalid.move:12:13
+   │
+12 │         let x = tuple(x);
+   │             ^
