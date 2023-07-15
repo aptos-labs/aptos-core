@@ -6,10 +6,11 @@ use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
     nodes_healthcheck, wait_stateful_set, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode,
     NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME,
-    DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX,
-    FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_CHART_PATH, GENESIS_HELM_RELEASE_NAME, HELM_BIN,
-    KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS,
-    POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
+    DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
+    FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_CHART_PATH,
+    GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
+    NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
+    VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
@@ -623,9 +624,11 @@ pub fn construct_node_helm_values(
     value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
     value["labels"]["forge-image-tag"] = make_k8s_label(image_tag).into();
 
-    // if present, tag the node with the test suite name
+    // if present, tag the node with the test suite name and username
     let suite_name = env::var("FORGE_TEST_SUITE").unwrap_or(DEFAULT_TEST_SUITE_NAME.to_string());
     value["labels"]["forge-test-suite"] = make_k8s_label(suite_name).into();
+    let username = env::var("FORGE_USERNAME").unwrap_or(DEFAULT_USERNAME.to_string());
+    value["labels"]["forge-username"] = make_k8s_label(username).into();
 
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
@@ -662,9 +665,11 @@ pub fn construct_genesis_helm_values(
     value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
     value["labels"]["forge-image-tag"] = make_k8s_label(genesis_image_tag).into();
 
-    // if present, tag the node with the test suite name
+    // if present, tag the node with the test suite name and username
     let suite_name = env::var("FORGE_TEST_SUITE").unwrap_or(DEFAULT_TEST_SUITE_NAME.to_string());
     value["labels"]["forge-test-suite"] = make_k8s_label(suite_name).into();
+    let username = env::var("FORGE_USERNAME").unwrap_or(DEFAULT_USERNAME.to_string());
+    value["labels"]["forge-username"] = make_k8s_label(username).into();
 
     if let Some(config_fn) = genesis_helm_config_fn {
         (config_fn)(&mut value);
@@ -1100,6 +1105,7 @@ labels:
   forge-namespace: forge-123
   forge-image-tag: image
   forge-test-suite: unknown-testsuite
+  forge-username: unknown-username
 ";
         assert_eq!(node_helm_values, expected_helm_values);
     }
@@ -1134,6 +1140,7 @@ labels:
   forge-namespace: forge-123
   forge-image-tag: genesis_image
   forge-test-suite: unknown-testsuite
+  forge-username: unknown-username
 ";
         assert_eq!(genesis_helm_values, expected_helm_values);
         println!("{}", genesis_helm_values);

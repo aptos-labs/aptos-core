@@ -8,6 +8,7 @@ metadata:
     forge-namespace: {FORGE_NAMESPACE}
     forge-image-tag: {FORGE_IMAGE_TAG}
     forge-test-suite: {FORGE_TEST_SUITE}
+    forge-username: {FORGE_USERNAME}
 spec:
   restartPolicy: Never
   serviceAccountName: forge
@@ -33,6 +34,8 @@ spec:
           value: {FORGE_TRIGGERED_BY}
         - name: FORGE_TEST_SUITE
           value: {FORGE_TEST_SUITE}
+        - name: FORGE_USERNAME
+          value: {FORGE_USERNAME}
         - name: PROMETHEUS_URL
           valueFrom:
             secretKeyRef:

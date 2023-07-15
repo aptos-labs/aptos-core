@@ -51,3 +51,4 @@ pub const VALIDATOR_0_DATA_PERSISTENT_VOLUME_CLAIM_PREFIX: &str = "aptos-node-0-
 
 // metadata about the cluster
 pub const DEFAULT_TEST_SUITE_NAME: &str = "unknown-testsuite";
+pub const DEFAULT_USERNAME: &str = "unknown-username";

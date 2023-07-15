@@ -3,7 +3,7 @@
 
 use crate::{
     get_stateful_set_image, make_k8s_label, K8sNode, ReadWrite, Result, Version,
-    DEFAULT_TEST_SUITE_NAME, REST_API_SERVICE_PORT,
+    DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, REST_API_SERVICE_PORT,
     VALIDATOR_0_DATA_PERSISTENT_VOLUME_CLAIM_PREFIX, VALIDATOR_0_GENESIS_SECRET_PREFIX,
     VALIDATOR_0_STATEFUL_SET_NAME,
 };
@@ -124,16 +124,15 @@ fn create_fullnode_persistent_volume_claim(
 }
 
 fn create_fullnode_labels(fullnode_name: String) -> BTreeMap<String, String> {
-    // if present, tag the node with the test suite name
+    // if present, tag the node with the test suite name and username
     let suite_name = env::var("FORGE_TEST_SUITE").unwrap_or(DEFAULT_TEST_SUITE_NAME.to_string());
+    let username = env::var("FORGE_USERNAME").unwrap_or(DEFAULT_USERNAME.to_string());
 
     [
         ("app.kubernetes.io/name".to_string(), "fullnode".to_string()),
         ("app.kubernetes.io/instance".to_string(), fullnode_name),
-        (
-            "forge-test-suite".to_string(),
-            make_k8s_label(suite_name).into(),
-        ),
+        ("forge-test-suite".to_string(), make_k8s_label(suite_name)),
+        ("forge-username".to_string(), make_k8s_label(username)),
         (
             "app.kubernetes.io/part-of".to_string(),
             "forge-pfn".to_string(),

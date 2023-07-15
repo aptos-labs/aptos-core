@@ -8,6 +8,7 @@ metadata:
     forge-namespace: forge-potato
     forge-image-tag: forge_asdf
     forge-test-suite: banana
+    forge-username: banana-eater
 spec:
   restartPolicy: Never
   serviceAccountName: forge
@@ -33,6 +34,8 @@ spec:
           value: github-actions
         - name: FORGE_TEST_SUITE
           value: banana
+        - name: FORGE_USERNAME
+          value: banana-eater
         - name: PROMETHEUS_URL
           valueFrom:
             secretKeyRef:

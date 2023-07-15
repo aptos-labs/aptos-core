@@ -262,6 +262,7 @@ class ForgeContext:
     upgrade_image_tag: str
     forge_cluster: ForgeCluster
     forge_test_suite: str
+    forge_username: str
     forge_blocking: bool
 
     github_actions: str
@@ -723,6 +724,7 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
             FORGE_TEST_SUITE=sanitize_k8s_resource_name(context.forge_test_suite),
+            FORGE_USERNAME=sanitize_k8s_resource_name(context.forge_username),
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
@@ -985,7 +987,8 @@ def image_exists(
         ).succeeded()
     else:
         raise Exception(f"Unknown cloud repo type: {cloud}")
-    
+
+
 def sanitize_k8s_resource_name(resource: str, max_length: int = 63) -> str:
     sanitized_resource = ""
     for i, c in enumerate(resource):
@@ -1477,6 +1480,8 @@ def test(
 
     log.debug("forge_args: %s", forge_args)
 
+    # use the github actor username if possible
+    forge_username = os.getenv("GITHUB_ACTOR") or "unknown-username"
     forge_context = ForgeContext(
         shell=shell,
         filesystem=filesystem,
@@ -1493,6 +1498,7 @@ def test(
         forge_namespace=forge_namespace,
         forge_cluster=forge_cluster,
         forge_test_suite=forge_test_suite,
+        forge_username=forge_username,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
         github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}"
