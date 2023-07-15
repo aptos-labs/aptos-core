@@ -13,6 +13,8 @@ use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::time::Instant;
+use once_cell::sync::Lazy;
+use aptos_metrics_core::{HistogramVec, register_histogram_vec, exponential_buckets};
 use crate::union_find::UnionFind;
 
 type Sender = Option<AccountAddress>;
@@ -21,10 +23,13 @@ pub struct SimplePartitioner {}
 impl SimplePartitioner {
     /// If `maybe_load_imbalance_tolerance` is none,
     /// it is guaranteed that the returned txn groups do not have cross-group conflicts.
-    pub fn partition_inner(&self, txns: Vec<AnalyzedTransaction>, num_executor_shards: usize, maybe_load_imbalance_tolerance: Option<f32>) -> Vec<Vec<Transaction>> {
-        let timer = Instant::now();
+    pub fn partition(
+        &self,
+        txns: Vec<AnalyzedTransaction>,
+        num_executor_shards: usize,
+        maybe_load_imbalance_tolerance: Option<f32>
+    ) -> Vec<Vec<Transaction>> {
         let num_txns = txns.len();
-        println!("analyze_time={:?}", timer.elapsed());
 
         // Sender-to-keyset and keyset-to-sender lookup table.
         let mut senders_by_key: HashMap<StateKey, HashSet<Sender>> = HashMap::new();
@@ -38,16 +43,16 @@ impl SimplePartitioner {
         let mut num_senders: usize = 0;
         let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
         {
-            let timer = Instant::now();
-            for txn in txns.iter() {
+            let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
+            for (_tid, txn) in txns.into_iter().enumerate() {
                 let sender = txn.sender();
                 let _sender_id = sender_ids_by_sender.entry(sender).or_insert_with(||{
                     let ret = num_senders;
                     num_senders += 1;
                     ret
                 });
-                for write_hint in txn.write_hints() {
-                    let key = write_hint.clone().into_state_key();
+                for storage_location in txn.write_hints().iter().chain(txn.read_hints().iter()) {
+                    let key = storage_location.clone().into_state_key();
                     let _key_id = key_ids_by_key.entry(key.clone()).or_insert_with(||{
                         let ret = num_keys;
                         num_keys += 1;
@@ -62,15 +67,11 @@ impl SimplePartitioner {
                         .or_insert_with(HashSet::new)
                         .insert(key);
                 }
-            }
-
-            for (_tid, txn) in txns.into_iter().enumerate() {
                 txns_by_sender
                     .entry(txn.sender())
                     .or_insert_with(Vec::new)
                     .push(txn.into_txn());
             }
-            println!("preprocessing_time={:?}", timer.elapsed());
         }
 
         /*
@@ -85,7 +86,7 @@ impl SimplePartitioner {
         let mut group_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
         match std::env::var("SIMPLE_PARTITIONER__MERGE_WITH_UNION_FIND") {
             Ok(v) if v.as_str() == "1" => {
-                let timer = Instant::now();
+                let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["union_find"]).start_timer();
                 // The union-find approach.
                 let mut uf = UnionFind::new(num_senders + num_keys);
                 for (key, senders) in senders_by_key.iter() {
@@ -107,10 +108,9 @@ impl SimplePartitioner {
                     });
                     group_ids_by_sender.insert(sender.clone(), *group_id);
                 }
-                println!("uf_approach_time={:?}", timer.elapsed());
             }
             _ => {
-                let timer = Instant::now();
+                let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["group_with_bfs"]).start_timer();
                 for (sender, _tid_list) in txns_by_sender.iter() {
                     if !group_ids_by_sender.contains_key(sender) {
                         // BFS initialization.
@@ -132,7 +132,6 @@ impl SimplePartitioner {
                         num_groups += 1;
                     }
                 }
-                println!("full_loop_approach_time={:?}", timer.elapsed());
             }
         }
         /*
@@ -161,7 +160,7 @@ impl SimplePartitioner {
         let mut sub_groups: Vec<Vec<Sender>> = vec![vec![]; num_groups];
         let mut loads_by_sub_group: Vec<usize> = vec![0; num_groups];
         {
-            let timer = Instant::now();
+            let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["cap_group_size"]).start_timer();
             for (sender, txns) in txns_by_sender.iter() {
                 let group_id = *group_ids_by_sender.get(sender).unwrap();
                 let sub_group_id = cur_sug_group_ids_by_group_id[group_id];
@@ -175,7 +174,6 @@ impl SimplePartitioner {
                     loads_by_sub_group.push(txns.len());
                 }
             }
-            println!("sender_groups_update_time={:?}", timer.elapsed());
         }
         /*
         Now sub_groups becomes:
@@ -189,12 +187,9 @@ impl SimplePartitioner {
             [Z],
         ]
         */
-        let timer = Instant::now();
-        println!("max_group_size={:?}", loads_by_sub_group.iter().max());
         let (_, shard_ids_by_sub_group_id) = scheduling::assign_tasks_to_workers(loads_by_sub_group, num_executor_shards);
-        println!("assign_time={:?}", timer.elapsed());
 
-        let timer = Instant::now();
+        let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["build_return_object"]).start_timer();
         let mut txns_by_shard_id: Vec<Vec<Transaction>> = vec![vec![]; num_executor_shards];
         for (sub_group_id, sub_group) in sub_groups.into_iter().enumerate() {
             let shard_id = *shard_ids_by_sub_group_id.get(sub_group_id).unwrap();
@@ -203,7 +198,6 @@ impl SimplePartitioner {
                 txns_by_shard_id.get_mut(shard_id).unwrap().extend(txns);
             }
         }
-        println!("txns_by_shard_id_time={:?}", timer.elapsed());
         txns_by_shard_id
     }
 }
@@ -214,8 +208,8 @@ impl BlockPartitioner for SimplePartitioner {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
-        let txns_by_shard_id = self.partition_inner(txns, num_executor_shards, None);
-        let timer = Instant::now();
+        let txns_by_shard_id = self.partition(txns, num_executor_shards, None);
+        let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["convert_to_SBFSs"]).start_timer();
         let mut ret = Vec::with_capacity(num_executor_shards);
         let mut txn_counter: usize = 0;
         for (shard_id, txns) in txns_by_shard_id.into_iter().enumerate() {
@@ -228,9 +222,19 @@ impl BlockPartitioner for SimplePartitioner {
             let sub_block_list = SubBlocksForShard::new(shard_id, vec![aggregated_sub_block]);
             ret.push(sub_block_list);
         }
-        println!("build_ret_time={:?}", timer.elapsed());
         let worker_loads: Vec<usize> = ret.iter().map(|sbl| sbl.num_txns()).collect();
-        println!("worker_loads={:?}", worker_loads);
         ret
     }
 }
+
+pub static SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "simple_partitioner_misc_timers_seconds",
+        // metric description
+        "The time spent in seconds of miscellaneous phases of SimplePartitioner.",
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+        .unwrap()
+});

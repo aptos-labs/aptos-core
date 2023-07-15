@@ -2,8 +2,10 @@
 
 use std::collections::BinaryHeap;
 use itertools::Itertools;
+use crate::simple_partitioner::SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS;
 
 pub fn assign_tasks_to_workers(mut tasks: Vec<usize>, num_workers: usize) -> (usize, Vec<usize>) {
+    let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["schedule"]).start_timer();
     assert!(num_workers >= 1);
     tasks.sort_by(|a, b| b.cmp(a));
     let mut worker_prio_heap: BinaryHeap<(usize, usize)> =

@@ -418,7 +418,7 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         let ret = match std::env::var("SHARDED_PARTITIONER__INIT_WITH_SIMPLE_PARTITIONER") {
             Ok(v) if v.as_str() == "1" => {
                 let simple_partitioner = SimplePartitioner{};
-                let matrix = simple_partitioner.partition_inner(transactions, self.num_shards, Some(2.0));
+                let matrix = simple_partitioner.partition(transactions, self.num_shards, Some(2.0));
                 let txns_by_shard: Vec<Vec<AnalyzedTransaction>> = matrix.into_iter().map(|txns|{
                     txns.into_iter().map(|t| t.into()).collect()
                 }).collect();
