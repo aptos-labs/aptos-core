@@ -8,6 +8,28 @@ use std::{
     ops::{Add, Mul},
 };
 
+#[derive(Debug, Clone)]
+pub enum Expression {
+    //// Represent GasAdd
+    Add {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+    //// Represent GasMul
+    Mul {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+    //// Represent GasParam
+    GasParam {
+        name: String,
+    },
+    //// Represent GasValue
+    GasValue {
+        value: u64,
+    },
+}
+
 /***************************************************************************************************
  * Gas Expression & Visitor
  *
@@ -32,6 +54,57 @@ pub trait GasExpression<E> {
             inner: self,
             phantom: PhantomData,
         }
+    }
+
+    fn to_dynamic(&self) -> Expression {
+        pub struct Visitor {
+            //// Holds the AST
+            pub node: Vec<Expression>,
+        }
+
+        impl GasExpressionVisitor for Visitor {
+            fn add(&mut self) {
+                let expr = Expression::Add {
+                    left: (Box::new(self.node.pop().unwrap())),
+                    right: (Box::new(self.node.pop().unwrap())),
+                };
+                self.node.push(expr);
+            }
+
+            fn mul(&mut self) {
+                let expr = Expression::Mul {
+                    left: (Box::new(self.node.pop().unwrap())),
+                    right: (Box::new(self.node.pop().unwrap())),
+                };
+                self.node.push(expr);
+            }
+
+            fn gas_param<P>(&mut self) {
+                let tn = std::any::type_name::<P>().split("::");
+                let expr = Expression::GasParam {
+                    name: (tn.last().unwrap().to_string()),
+                };
+                self.node.push(expr);
+            }
+
+            fn quantity<U>(&mut self, quantity: GasQuantity<U>) {
+                let expr = Expression::GasValue {
+                    value: (quantity.into()),
+                };
+                self.node.push(expr);
+            }
+
+            fn per<U>(&mut self) {
+                return;
+            }
+        }
+
+        let mut visitor = Visitor { node: Vec::new() };
+        self.visit(&mut visitor);
+        visitor
+            .node
+            .pop()
+            .expect("there should be a root node in AST")
     }
 }
 

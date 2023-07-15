@@ -3,7 +3,7 @@
 
 use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
-    natives::aptos_natives,
+    natives::{aptos_natives, aptos_natives_abstract_usage},
 };
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
@@ -13,6 +13,7 @@ use aptos_framework::natives::{
     transaction_context::NativeTransactionContext,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
@@ -66,6 +67,42 @@ impl MoveVmExt {
                     timed_features,
                     features.clone(),
                 ),
+                VMConfig {
+                    verifier: verifier_config,
+                    max_binary_format_version,
+                    paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
+                    enable_invariant_violation_check_in_swap_loc,
+                    type_size_limit,
+                    max_value_nest_depth: Some(128),
+                },
+            )?,
+            chain_id,
+            features: Arc::new(features),
+        })
+    }
+
+    pub fn new_abstract_usage(
+        gas_feature_version: u64,
+        chain_id: u8,
+        features: Features,
+        timed_features: TimedFeatures,
+        builder: &mut SafeNativeBuilder,
+    ) -> VMResult<Self> {
+        // Note: binary format v6 adds a few new integer types and their corresponding instructions.
+        //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
+        //       the gas schedule hasn't been updated yet.
+        let max_binary_format_version =
+            get_max_binary_format_version(&features, gas_feature_version);
+
+        let enable_invariant_violation_check_in_swap_loc =
+            !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
+        let type_size_limit = true;
+
+        let verifier_config = verifier_config(&features, &timed_features);
+
+        Ok(Self {
+            inner: MoveVM::new_with_config(
+                aptos_natives_abstract_usage(builder),
                 VMConfig {
                     verifier: verifier_config,
                     max_binary_format_version,

@@ -1,0 +1,14 @@
+[package]
+name = 'hello-world'
+version = '1.0.0'
+authors = []
+
+[addresses]
+std = "0x1"
+aptos_std = "0x1"
+aptos_framework = "0x1"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosStdlib = { local = "../../../framework/aptos-stdlib" }
+MoveStdlib = { local = "../../../framework/move-stdlib" }

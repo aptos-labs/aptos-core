@@ -13,15 +13,18 @@ use crate::{
     golden_outputs::GoldenOutputs,
 };
 use anyhow::Error;
+use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
+use aptos_gas_algebra::Expression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{VMGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
+use aptos_native_interface::SafeNativeBuilder;
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -51,7 +54,7 @@ use aptos_vm::{
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::ChangeSetConfigs;
+use aptos_vm_types::storage::{StorageGasParameters, ChangeSetConfigs};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -65,7 +68,7 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -713,6 +716,97 @@ impl FakeExecutor {
             write_set
         };
         self.data_store.add_write_set(&write_set);
+    }
+
+    pub fn exec_abstract_usage(
+        &mut self,
+        module: &ModuleId,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> Vec<Expression> {
+        /*
+            * @notice: Define the shared buffers
+            */
+        let a1 = Arc::new(Mutex::new(Vec::<Expression>::new()));
+        let a2 = Arc::clone(&a1);
+
+        let write_set = {
+            // FIXME: should probably read the timestamp from storage.
+            let timed_features =
+                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+
+            let mut builder = SafeNativeBuilder::new(
+                LATEST_GAS_FEATURE_VERSION,
+                NativeGasParameters::zeros(),
+                MiscGasParameters::zeros(),
+                timed_features.clone(),
+                self.features.clone(),
+            );
+
+            builder.set_gas_hook(move |expression| {
+                println!("TEST PRINT expression {:?}", expression);
+                a2.lock().unwrap().push(expression);
+                println!("A2 VEC: {:?}", a2.lock().unwrap());
+            });
+
+            // TODO(Gas): we probably want to switch to non-zero costs in the future
+            let vm = MoveVmExt::new_abstract_usage(
+                LATEST_GAS_FEATURE_VERSION,
+                self.chain_id,
+                self.features.clone(),
+                timed_features,
+                &mut builder,
+            )
+            .unwrap();
+            let remote_view = StorageAdapter::new(&self.data_store);
+            let mut session =
+                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+
+            session
+                .execute_function_bypass_visibility(
+                    module,
+                    &Self::name(function_name),
+                    type_params,
+                    args,
+                    &mut StandardGasMeter::new(
+                        CalibrationAlgebra {
+                            base: StandardGasAlgebra::new(
+                                //// TODO: fill in these with proper values
+                                LATEST_GAS_FEATURE_VERSION,
+                                VMGasParameters::zeros(),
+                                StorageGasParameters::free_and_unlimited(),
+                                100000,
+                            ),
+                            //coeff_buffer: BTreeMap::new(),
+                            shared_buffer: Arc::clone(&a1),
+                        }
+                    ), // StandardGasMeter with CalibrationAlgebra
+                )
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Error calling {}.{}: {}",
+                        module.to_string().as_str(),
+                        function_name,
+                        e.into_vm_status()
+                    )
+                });
+
+            println!("A3 ARC: {:?}", a1.lock().unwrap());
+
+            let change_set = session
+                .finish(
+                    &mut (),
+                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                )
+                .expect("Failed to generate txn effects");
+            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            write_set
+        };
+        self.data_store.add_write_set(&write_set);
+
+        let a1_result = Arc::into_inner(a1);
+        a1_result.expect("should unwrap").lock().unwrap().to_vec()
     }
 
     pub fn exec(
