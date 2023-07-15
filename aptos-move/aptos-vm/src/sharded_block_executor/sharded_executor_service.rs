@@ -20,12 +20,13 @@ use aptos_types::{
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::{collections::HashSet, sync::Arc};
+use crate::sharded_block_executor::executor_shard::ExecutorToCoordinatorClient;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     num_shards: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    coordinator_client: Arc<dyn CoordinatorClient<S>>,
+    coordinator_client: Arc<dyn ExecutorToCoordinatorClient<S>>,
     cross_shard_client: Arc<dyn CrossShardClient>,
 }
 
@@ -34,7 +35,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         shard_id: ShardId,
         num_shards: usize,
         num_threads: usize,
-        coordinator_client: Arc<dyn CoordinatorClient<S>>,
+        coordinator_client: Arc<dyn ExecutorToCoordinatorClient<S>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
@@ -196,27 +197,5 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             }
         }
         trace!("Shard {} is shutting down", self.shard_id);
-    }
-
-    pub fn send_execute_command(&self, execute_command: ExecutorShardCommand<S>) {
-        self.coordinator_client
-            .send_execute_command(execute_command)
-            .unwrap();
-    }
-
-    pub fn get_execution_result(&self) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
-        self.coordinator_client.get_execution_result()
-    }
-
-    pub fn stop(&self) {
-        if let Err(e) = self
-            .coordinator_client
-            .send_execute_command(ExecutorShardCommand::Stop)
-        {
-            error!(
-                "Failed to send stop command to shard {}: {:?}",
-                self.shard_id, e
-            );
-        }
     }
 }

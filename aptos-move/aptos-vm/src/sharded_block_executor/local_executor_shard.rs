@@ -19,16 +19,17 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use futures::StreamExt;
 use aptos_types::block_executor::partitioner::SubBlocksForShard;
 use aptos_types::transaction::Transaction;
-use crate::sharded_block_executor::executor_shard::CoordinatorToExecutorShardClient;
+use crate::sharded_block_executor::executor_shard::{CoordinatorToExecutorClient, ExecutorToCoordinatorClient};
 
 /// A block executor that receives transactions from a channel and executes them in parallel.
 /// It runs in the local machine.
 pub struct LocalExecutorShard<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     executor_service: Arc<ShardedExecutorService<S>>,
-    join_handle: Option<thread::JoinHandle<()>>,
+    join_handle: thread::JoinHandle<()>,
 }
 
 impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
@@ -36,13 +37,14 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
         shard_id: ShardId,
         num_shards: usize,
         num_threads: usize,
+        command_rx: Receiver<ExecutorShardCommand<S>>,
+        result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
         cross_shard_txs: Vec<Vec<Sender<CrossShardMsg>>>,
         cross_shard_rxs: Vec<Receiver<CrossShardMsg>>,
     ) -> Self {
-        let coordinator_client = Arc::new(LocalCoordinatorClient1::new());
         let cross_shard_client =
             Arc::new(LocalCrossShardClient::new(shard_id, cross_shard_txs, cross_shard_rxs));
-
+        let coordinator_client = Arc::new(LocalCoordinatorClient::new(command_rx, result_tx));
         let executor_service = Arc::new(ShardedExecutorService::new(
             shard_id,
             num_shards,
@@ -50,22 +52,37 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
             coordinator_client,
             cross_shard_client,
         ));
+        let executor_service_clone = Arc::clone(&executor_service);
+        let join_handle = thread::Builder::new()
+            .name(format!("executor-shard-{}", shard_id))
+            .spawn(move || executor_service_clone.start())
+            .unwrap();
         Self {
             shard_id,
             executor_service,
-            join_handle: None,
+            join_handle,
         }
     }
 
-    pub fn create_local_executor_shards(
+    pub fn setup_local_executor_shards(
         num_shards: usize,
         num_threads: Option<usize>,
-    ) -> Vec<Self> {
+    ) -> (LocalExecutorClient<S>, Vec<Self>) {
         let num_threads = num_threads
             .unwrap_or_else(|| (num_cpus::get() as f64 / num_shards as f64).ceil() as usize);
         let mut cross_shard_msg_txs = vec![];
         let mut cross_shard_msg_rxs = vec![];
+        let mut command_txs = vec![];
+        let mut command_rxs = vec![];
+        let mut result_txs = vec![];
+        let mut result_rxs = vec![];
         for _ in 0..num_shards {
+            let (command_tx, command_rx) = unbounded();
+            let (result_tx, result_rx) = unbounded();
+            command_rxs.push(command_rx);
+            result_txs.push(result_tx);
+            command_txs.push(command_tx);
+            result_rxs.push(result_rx);
             let mut current_shard_msg_txs = vec![];
             let mut current_shard_msg_rxs = vec![];
             for _ in 0..MAX_ALLOWED_PARTITIONING_ROUNDS {
@@ -76,70 +93,49 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
             cross_shard_msg_txs.push(current_shard_msg_txs);
             cross_shard_msg_rxs.push(current_shard_msg_rxs);
         }
-        cross_shard_msg_rxs
-            .into_iter()
+        let executor_shards = command_rxs.into_iter().zip(result_txs.into_iter()).zip(cross_shard_msg_rxs.into_iter())
             .enumerate()
-            .map(|(shard_id, rxs)| {
+            .map(|(shard_id, ((command_rx, result_tx), cross_shard_rxs))| {
                 Self::new(
                     shard_id as ShardId,
                     num_shards,
                     num_threads,
+                    command_rx,
+                    result_tx,
                     cross_shard_msg_txs.clone(),
-                    rxs,
+                    cross_shard_rxs,
                 )
             })
-            .collect()
+            .collect();
+        let coordinator_client = LocalExecutorClient::new(command_txs, result_rxs);
+        (coordinator_client, executor_shards)
     }
 }
 
-impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> for LocalExecutorShard<S> {
-    fn start(&mut self) {
-        let executor_service = Arc::clone(&self.executor_service);
-        let join_handle = thread::Builder::new()
-            .name(format!("executor-shard-{}", self.shard_id))
-            .spawn(move || executor_service.start())
-            .unwrap();
-        self.join_handle = Some(join_handle);
-    }
-
-    fn stop(&mut self) {
-        self.executor_service.stop();
-        if let Some(executor_shard_thread) = self.join_handle.take() {
-            executor_shard_thread.join().unwrap_or_else(|e| {
-                error!("Failed to join executor shard thread: {:?}", e);
-            });
-        }
-    }
-
-    fn send_execute_command(&self, execute_command: ExecutorShardCommand<S>) {
-        self.executor_service.send_execute_command(execute_command);
-    }
-
-    fn get_execution_result(&self) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
-        self.executor_service.get_execution_result()
-    }
-}
-
-pub struct LocalCoordinatorClient<S> {
+pub struct LocalExecutorClient<S: StateView + Sync + Send + 'static> {
     // Channels to send execute block commands to the executor shards.
-    command_tx: Vec<Sender<ExecutorShardCommand<S>>>,
+    command_txs: Vec<Sender<ExecutorShardCommand<S>>>,
     // Channels to receive execution results from the executor shards.
-    result_rx: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
+    result_rxs: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
 }
 
-impl<S> LocalCoordinatorClient<S> {
+impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
     pub fn new(
         command_tx: Vec<Sender<ExecutorShardCommand<S>>>,
         result_rx: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
     ) -> Self {
         Self {
-            command_tx,
-            result_rx,
+            command_txs: command_tx,
+            result_rxs: result_rx,
         }
     }
 }
 
-impl<S: StateView + Sync + Send + 'static> CoordinatorToExecutorShardClient<S> for LocalCoordinatorClient<S> {
+impl<S: StateView + Sync + Send + 'static> CoordinatorToExecutorClient<S> for LocalExecutorClient<S> {
+    fn num_shards(&self) -> usize {
+        self.command_txs.len()
+    }
+
     fn execute_block(
         &self,
         state_view: Arc<S>,
@@ -147,66 +143,53 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorToExecutorShardClient<S> f
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>) {
         for (i, sub_blocks_for_shard) in block.into_iter().enumerate() {
-            self.command_tx[i].send_execute_command(ExecutorShardCommand::ExecuteSubBlocks(
+            self.command_txs[i].send(ExecutorShardCommand::ExecuteSubBlocks(
                 state_view.clone(),
                 sub_blocks_for_shard,
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
-            ))
+            )).unwrap();
         }
     }
 
     fn get_execution_result(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
         trace!("ShardedBlockExecutor Waiting for results");
-        self.result_rx.iter().enumerate().map(|(shard, rx)| {
-            trace!("ShardedBlockExecutor Waiting for result from shard {}", shard);
-            rx.recv().unwrap()?
-        }).collect()
+        let mut results = vec![];
+        for rx in self.result_rxs.iter() {
+            results.push(rx.recv().unwrap()?);
+        }
+        Ok(results)
     }
 }
 
-
-
-pub struct LocalCoordinatorClient1<S> {
-    // Channel to receive execute block commands from the coordinator.
-    command_tx: Sender<ExecutorShardCommand<S>>,
-    command_rx: Receiver<ExecutorShardCommand<S>>,
-    // Channel to send execution results to the coordinator.
-    result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
-    result_rx: Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
-}
-
-impl<S> LocalCoordinatorClient1<S> {
-    pub fn new() -> Self {
-        let (command_tx, command_rx) = unbounded();
-        let (result_tx, result_rx) = unbounded();
-        Self {
-            command_tx,
-            command_rx,
-            result_tx,
-            result_rx,
+impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {
+    fn drop(&mut self) {
+        for command_tx in self.command_txs.iter() {
+            let _ =  command_tx.send(ExecutorShardCommand::Stop);
         }
     }
 }
 
-impl<S> Default for LocalCoordinatorClient1<S> {
-    fn default() -> Self {
-        Self::new()
+
+pub struct LocalCoordinatorClient<S> {
+    command_rx: Receiver<ExecutorShardCommand<S>>,
+    // Channel to send execution results to the coordinator.
+    result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
+}
+
+impl<S> LocalCoordinatorClient<S> {
+    pub fn new(
+        command_rx: Receiver<ExecutorShardCommand<S>>,
+        result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
+    ) -> Self {
+        Self {
+            command_rx,
+            result_tx,
+        }
     }
 }
 
-impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordinatorClient1<S> {
-    fn send_execute_command(
-        &self,
-        execute_command: ExecutorShardCommand<S>,
-    ) -> Result<(), SendError<ExecutorShardCommand<S>>> {
-        self.command_tx.send(execute_command)
-    }
-
-    fn get_execution_result(&self) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
-        self.result_rx.recv().unwrap()
-    }
-
+impl<S: StateView + Sync + Send + 'static> ExecutorToCoordinatorClient<S> for LocalCoordinatorClient<S> {
     fn receive_execute_command(&self) -> ExecutorShardCommand<S> {
         self.command_rx.recv().unwrap()
     }

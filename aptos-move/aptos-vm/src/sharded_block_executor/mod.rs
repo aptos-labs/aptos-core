@@ -11,6 +11,7 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
+use crate::sharded_block_executor::executor_shard::CoordinatorToExecutorClient;
 
 pub mod block_executor_client;
 mod counters;
@@ -26,8 +27,8 @@ mod tests;
 mod test_utils;
 
 /// Coordinator for sharded block executors that manages multiple shards and aggregates the results.
-pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>> {
-    executor_shards: Vec<E>,
+pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: CoordinatorToExecutorClient<S>> {
+    executor_client: C,
     phantom: PhantomData<S>,
 }
 
@@ -41,21 +42,20 @@ pub enum ExecutorShardCommand<S> {
     Stop,
 }
 
-impl<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>> ShardedBlockExecutor<S, E> {
-    pub fn new(mut executor_shards: Vec<E>) -> Self {
+impl<S: StateView + Sync + Send + 'static, C: CoordinatorToExecutorClient<S>> ShardedBlockExecutor<S, C> {
+    pub fn new(mut executor_client: C) -> Self {
         info!(
             "Creating a new ShardedBlockExecutor with {} shards",
-            executor_shards.len()
+            executor_client.num_shards()
         );
-        executor_shards.iter_mut().for_each(|shard| shard.start());
         Self {
-            executor_shards,
+            executor_client,
             phantom: PhantomData,
         }
     }
 
     pub fn num_shards(&self) -> usize {
-        self.executor_shards.len()
+        self.executor_client.num_shards()
     }
 
     /// Execute a block of transactions in parallel by splitting the block into num_remote_executors partitions and
@@ -67,7 +67,7 @@ impl<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>> ShardedBlockExec
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let num_executor_shards = self.executor_shards.len();
+        let num_executor_shards = self.executor_client.num_shards();
         NUM_EXECUTOR_SHARDS.set(num_executor_shards as i64);
         assert_eq!(
             num_executor_shards,
@@ -75,21 +75,14 @@ impl<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>> ShardedBlockExec
             "Block must be partitioned into {} sub-blocks",
             num_executor_shards
         );
-        for (i, sub_blocks_for_shard) in block.into_iter().enumerate() {
-            self.executor_shards[i].send_execute_command(ExecutorShardCommand::ExecuteSubBlocks(
-                state_view.clone(),
-                sub_blocks_for_shard,
-                concurrency_level_per_shard,
-                maybe_block_gas_limit,
-            ))
-        }
+        self.executor_client.execute_block(
+            state_view,
+            block,
+            concurrency_level_per_shard,
+            maybe_block_gas_limit,
+        );
         // wait for all remote executors to send the result back and append them in order by shard id
-        let mut results = vec![];
-        trace!("ShardedBlockExecutor Waiting for results");
-        for i in 0..num_executor_shards {
-            trace!("ShardedBlockExecutor Waiting for result from shard {}", i);
-            results.push(self.executor_shards[i].get_execution_result()?);
-        }
+        let results = self.executor_client.get_execution_result()?;
         trace!("ShardedBlockExecutor Received all results");
         let num_rounds = results[0].len();
         let mut aggreate_results = vec![];
@@ -105,16 +98,5 @@ impl<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>> ShardedBlockExec
         }
 
         Ok(aggreate_results)
-    }
-}
-
-impl<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>> Drop
-    for ShardedBlockExecutor<S, E>
-{
-    /// Best effort stops all the executor shards and waits for the thread to finish.
-    fn drop(&mut self) {
-        for executor_shard in self.executor_shards.iter_mut() {
-            executor_shard.stop();
-        }
     }
 }

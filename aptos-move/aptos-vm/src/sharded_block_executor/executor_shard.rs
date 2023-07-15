@@ -37,8 +37,10 @@ pub trait CoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);
 }
 
-pub trait CoordinatorToExecutorShardClient<S: StateView + Sync + Send + 'static>: Send + Sync {
-    fn execute_block(&self,          state_view: Arc<S>,
+pub trait CoordinatorToExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
+    fn num_shards(&self) -> usize;
+    fn execute_block(&self,
+                     state_view: Arc<S>,
                      block: Vec<SubBlocksForShard<Transaction>>,
                      concurrency_level_per_shard: usize,
                      maybe_block_gas_limit: Option<u64>);
@@ -46,7 +48,7 @@ pub trait CoordinatorToExecutorShardClient<S: StateView + Sync + Send + 'static>
     fn get_execution_result(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus>;
 }
 
-pub trait ExecutorShardToCoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
+pub trait ExecutorToCoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn receive_execute_command(&self) -> ExecutorShardCommand<S>;
 
     fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);

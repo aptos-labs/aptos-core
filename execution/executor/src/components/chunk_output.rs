@@ -30,13 +30,35 @@ use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use once_cell::sync::Lazy;
 use std::{ops::Deref, sync::Arc, time::Duration};
+use aptos_vm::sharded_block_executor::local_executor_shard::{LocalCoordinatorClient, LocalExecutorClient};
+
+struct ExecutorData {
+    client: Mutex<Option<LocalExecutorClient<CachedStateView>>>,
+    executor_shards: Vec<LocalExecutorShard<CachedStateView>>,
+}
+
+impl ExecutorData {
+    pub fn take_client(&self) -> LocalExecutorClient<CachedStateView> {
+        self.client.lock().unwrap()
+            .take()
+            .expect("LocalExecutorClient should only be taken once")
+    }
+
+}
+
+pub static SHARDED_BLOCK_EXECUTOR_DATA: Lazy<ExecutorData> = Lazy::new(|| {
+    let (client, executor_shards) =
+        LocalExecutorShard::setup_local_executor_shards::<CachedStateView>(AptosVM::get_num_shards(), None);
+    ExecutorData {
+        client: Mutex::new(Some(client)),
+        executor_shards,
+    }
+});
 
 pub static SHARDED_BLOCK_EXECUTOR: Lazy<
-    Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorShard<CachedStateView>>>>,
+    Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
 > = Lazy::new(|| {
-    let executor_shards =
-        LocalExecutorShard::create_local_executor_shards(AptosVM::get_num_shards(), None);
-    Arc::new(Mutex::new(ShardedBlockExecutor::new(executor_shards)))
+    Arc::new(Mutex::new(ShardedBlockExecutor::new(SHARDED_BLOCK_EXECUTOR_DATA.take_client())))
 });
 
 pub struct ChunkOutput {

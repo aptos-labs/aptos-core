@@ -210,15 +210,9 @@ impl VMExecutor for MockVM {
         Ok(outputs)
     }
 
-<<<<<<< HEAD
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
-        _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
-=======
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>>(
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: CoordinatorToExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
-        _block: Vec<SubBlocksForShard<Transaction>>,
->>>>>>> 7440efc4c2 (Refactor local executor shard: Local tests work, before adding remote executor shard)
+        _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {

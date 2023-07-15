@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use aptos_crypto::hash::CryptoHash;
 use rand::Rng;
 use crate::{AptosVM, VMExecutor};
-use crate::sharded_block_executor::executor_shard::ExecutorShard;
+use crate::sharded_block_executor::executor_shard::{CoordinatorToExecutorClient, ExecutorShard};
 use crate::sharded_block_executor::local_executor_shard::LocalExecutorShard;
 use crate::sharded_block_executor::ShardedBlockExecutor;
 use aptos_types::{
@@ -103,7 +103,7 @@ pub fn compare_txn_outputs(
     }
 }
 
-pub fn test_sharded_block_executor_no_conflict<E: ExecutorShard<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>) {
+pub fn test_sharded_block_executor_no_conflict<E: CoordinatorToExecutorClient<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>) {
     let num_txns = 400;
     let num_shards = 8;
     let mut executor = FakeExecutor::from_head_genesis();
@@ -131,7 +131,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorShard<FakeDataStore>> 
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }
 
-pub fn sharded_block_executor_with_conflict<E: ExecutorShard<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
+pub fn sharded_block_executor_with_conflict<E: CoordinatorToExecutorClient<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
     let num_txns = 800;
     let num_shards = sharded_block_executor.num_shards();
     let num_accounts = 80;
@@ -173,7 +173,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorShard<FakeDataStore>> (sh
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }
 
-pub fn sharded_block_executor_with_random_transfers<E: ExecutorShard<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
+pub fn sharded_block_executor_with_random_transfers<E: CoordinatorToExecutorClient<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
     let mut rng = OsRng;
     let max_accounts = 200;
     let max_txns = 1000;
