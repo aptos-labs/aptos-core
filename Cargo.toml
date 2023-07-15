@@ -101,6 +101,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
+    "ecosystem/nft-metadata-crawler/nft-metadata-crawler-uri-retriever",
     "ecosystem/nft-metadata-crawler/nft-metadata-crawler-parser",
     "ecosystem/nft-metadata-crawler/nft-metadata-crawler-utils",
     "ecosystem/node-checker",

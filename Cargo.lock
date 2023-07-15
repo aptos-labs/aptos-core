@@ -9262,6 +9262,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "nft-metadata-crawler-uri-retriever"
+version = "0.1.0"
+dependencies = [
+ "base64 0.13.0",
+ "csv",
+ "google-cloud-auth",
+ "hyper",
+ "nft-metadata-crawler-utils",
+ "reqwest",
+ "serde 1.0.149",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "nft-metadata-crawler-utils"
 version = "0.1.0"
 dependencies = [

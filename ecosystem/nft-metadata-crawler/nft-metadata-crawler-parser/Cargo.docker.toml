@@ -1,0 +1,22 @@
+[package]
+name = "nft-metadata-crawler-parser"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chrono = "0.4.26"
+csv = "1.2.1"
+diesel = { version = "2.1.0", features = ["chrono", "postgres", "r2d2"] }
+futures = "0.3.28"
+google-cloud-auth = "0.11.0"
+hyper = { version = "0.14.18", features = ["full"] }
+image = "0.24.5"
+nft-metadata-crawler-utils = { path = "../nft-metadata-crawler-utils" }
+regex = "1.5.5"
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.0"
+tokio = { version = "1.21.0", features = ["full"] }
+url = { version = "2.2.2" }

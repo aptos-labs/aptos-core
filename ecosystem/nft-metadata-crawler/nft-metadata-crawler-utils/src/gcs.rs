@@ -69,7 +69,6 @@ pub async fn write_image_to_gcs(
         header::CONTENT_TYPE,
         format!("image/{}", extension).parse().unwrap(),
     );
-
     headers.insert(
         header::CONTENT_LENGTH,
         buffer.len().to_string().parse().unwrap(),
