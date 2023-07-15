@@ -36,16 +36,7 @@ impl<'a> Parser<'a> {
         conn: PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Self {
         Self {
-            model: NFTMetadataCrawlerURIs {
-                token_uri: entry.token_uri.clone(),
-                raw_image_uri: None,
-                raw_animation_uri: None,
-                cdn_json_uri: None,
-                cdn_image_uri: None,
-                cdn_animation_uri: None,
-                image_optimizer_retry_count: 0,
-                json_parser_retry_count: 0,
-            },
+            model: NFTMetadataCrawlerURIs::new(entry.token_uri.clone()),
             entry,
             bucket,
             ts,
@@ -71,22 +62,11 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
-        // URI Parser
         let json_uri = self.handle_uri_parser_jsons();
-
-        // JSON Parser
         self.handle_json_parser(json_uri).await;
-
-        // Save to Postgres
         self.save_to_postgres().await;
-
-        // URI Parser
         let (img_uri, animation_uri) = self.handle_uri_parser_images();
-
-        // Image Optimizer
         self.handle_image_optimizer(img_uri, animation_uri).await;
-
-        // Save to Postgres
         self.save_to_postgres().await;
 
         Ok(())

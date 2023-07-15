@@ -22,6 +22,21 @@ pub struct NFTMetadataCrawlerURIs {
     pub json_parser_retry_count: i32,
 }
 
+impl NFTMetadataCrawlerURIs {
+    pub fn new(token_uri: String) -> Self {
+        Self {
+            token_uri: token_uri.clone(),
+            raw_image_uri: None,
+            raw_animation_uri: None,
+            cdn_json_uri: None,
+            cdn_image_uri: None,
+            cdn_animation_uri: None,
+            image_optimizer_retry_count: 0,
+            json_parser_retry_count: 0,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(token_uri))]
 #[diesel(table_name = nft_metadata_crawler_uris)]
