@@ -1,0 +1,122 @@
+// ---- Model Dump
+module 0x42::operators {
+    private fun arithm(x: u64,y: u64) {
+        Add(x, Mod(Mul(Div(y, Sub(x, y)), y), x))
+    }
+    private fun bits(x: u64,y: u64) {
+        BitOr(BitAnd(Shl(x, y), x), Xor(Shr(y, x), y))
+    }
+    private fun bools(x: bool,y: bool) {
+        Or(Or(Or(And(x, y), And(x, Not(y))), And(Not(x), y)), And(Not(x), Not(y)))
+    }
+    private fun equality<T>(x: T,y: T) {
+        Eq<T>(x, y)
+    }
+    private fun inequality<T>(x: T,y: T) {
+        Neq<T>(x, y)
+    }
+    private fun order(x: u64,y: u64) {
+        And(And(And(Lt(x, y), Le(x, y)), Not(Gt(x, y))), Not(Ge(x, y)))
+    }
+} // end 0x42::operators
+
+============ initial bytecode ================
+
+[variant baseline]
+fun operators::arithm($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t6 := -($t0, $t1)
+  1: $t5 := /($t1, $t6)
+  2: $t4 := *($t5, $t1)
+  3: $t3 := %($t4, $t0)
+  4: $t2 := +($t0, $t3)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun operators::bits($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t4 := <<($t0, $t1)
+  1: $t3 := &($t4, $t0)
+  2: $t6 := >>($t1, $t0)
+  3: $t5 := ^($t6, $t1)
+  4: $t2 := |($t3, $t5)
+  5: return $t2
+}
+
+
+[variant baseline]
+fun operators::bools($t0: bool, $t1: bool): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool
+     var $t9: bool
+     var $t10: bool
+     var $t11: bool
+     var $t12: bool
+  0: $t5 := &&($t0, $t1)
+  1: $t7 := !($t1)
+  2: $t6 := &&($t0, $t7)
+  3: $t4 := ||($t5, $t6)
+  4: $t9 := !($t0)
+  5: $t8 := &&($t9, $t1)
+  6: $t3 := ||($t4, $t8)
+  7: $t11 := !($t0)
+  8: $t12 := !($t1)
+  9: $t10 := &&($t11, $t12)
+ 10: $t2 := ||($t3, $t10)
+ 11: return $t2
+}
+
+
+[variant baseline]
+fun operators::equality<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+  0: $t2 := ==($t0, $t1)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun operators::inequality<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+  0: $t2 := !=($t0, $t1)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun operators::order($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: bool
+     var $t9: bool
+     var $t10: bool
+  0: $t5 := <($t0, $t1)
+  1: $t6 := <=($t0, $t1)
+  2: $t4 := &&($t5, $t6)
+  3: $t8 := >($t0, $t1)
+  4: $t7 := !($t8)
+  5: $t3 := &&($t4, $t7)
+  6: $t10 := >=($t0, $t1)
+  7: $t9 := !($t10)
+  8: $t2 := &&($t3, $t9)
+  9: return $t2
+}
