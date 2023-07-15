@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use std::sync::Arc;
 use crate::sharded_block_executor::{messages::CrossShardMsg, ExecutorShardCommand};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -7,6 +8,8 @@ use aptos_types::{
     transaction::TransactionOutput,
 };
 use crossbeam_channel::SendError;
+use aptos_types::block_executor::partitioner::SubBlocksForShard;
+use aptos_types::transaction::Transaction;
 use move_core_types::vm_status::VMStatus;
 
 pub trait ExecutorShard<S: StateView + Sync + Send + 'static> {
@@ -29,6 +32,21 @@ pub trait CoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
 
     fn get_execution_result(&self) -> Result<Vec<Vec<TransactionOutput>>, VMStatus>;
 
+    fn receive_execute_command(&self) -> ExecutorShardCommand<S>;
+
+    fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);
+}
+
+pub trait CoordinatorToExecutorShardClient<S: StateView + Sync + Send + 'static>: Send + Sync {
+    fn execute_block(&self,          state_view: Arc<S>,
+                     block: Vec<SubBlocksForShard<Transaction>>,
+                     concurrency_level_per_shard: usize,
+                     maybe_block_gas_limit: Option<u64>);
+
+    fn get_execution_result(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus>;
+}
+
+pub trait ExecutorShardToCoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn receive_execute_command(&self) -> ExecutorShardCommand<S>;
 
     fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);

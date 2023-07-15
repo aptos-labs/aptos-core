@@ -7,7 +7,7 @@ use crate::sharded_block_executor::{
     ExecutorShardCommand,
 };
 use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING_ROUNDS;
-use aptos_logger::error;
+use aptos_logger::{error, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId},
@@ -19,6 +19,9 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use aptos_types::block_executor::partitioner::SubBlocksForShard;
+use aptos_types::transaction::Transaction;
+use crate::sharded_block_executor::executor_shard::CoordinatorToExecutorShardClient;
 
 /// A block executor that receives transactions from a channel and executes them in parallel.
 /// It runs in the local machine.
@@ -36,7 +39,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
         cross_shard_txs: Vec<Vec<Sender<CrossShardMsg>>>,
         cross_shard_rxs: Vec<Receiver<CrossShardMsg>>,
     ) -> Self {
-        let coordinator_client = Arc::new(LocalCoordinatorClient::new());
+        let coordinator_client = Arc::new(LocalCoordinatorClient1::new());
         let cross_shard_client =
             Arc::new(LocalCrossShardClient::new(shard_id, cross_shard_txs, cross_shard_rxs));
 
@@ -118,6 +121,53 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> for LocalExecutorSha
 }
 
 pub struct LocalCoordinatorClient<S> {
+    // Channels to send execute block commands to the executor shards.
+    command_tx: Vec<Sender<ExecutorShardCommand<S>>>,
+    // Channels to receive execution results from the executor shards.
+    result_rx: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
+}
+
+impl<S> LocalCoordinatorClient<S> {
+    pub fn new(
+        command_tx: Vec<Sender<ExecutorShardCommand<S>>>,
+        result_rx: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
+    ) -> Self {
+        Self {
+            command_tx,
+            result_rx,
+        }
+    }
+}
+
+impl<S: StateView + Sync + Send + 'static> CoordinatorToExecutorShardClient<S> for LocalCoordinatorClient<S> {
+    fn execute_block(
+        &self,
+        state_view: Arc<S>,
+        block: Vec<SubBlocksForShard<Transaction>>,
+        concurrency_level_per_shard: usize,
+        maybe_block_gas_limit: Option<u64>) {
+        for (i, sub_blocks_for_shard) in block.into_iter().enumerate() {
+            self.command_tx[i].send_execute_command(ExecutorShardCommand::ExecuteSubBlocks(
+                state_view.clone(),
+                sub_blocks_for_shard,
+                concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            ))
+        }
+    }
+
+    fn get_execution_result(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
+        trace!("ShardedBlockExecutor Waiting for results");
+        self.result_rx.iter().enumerate().map(|(shard, rx)| {
+            trace!("ShardedBlockExecutor Waiting for result from shard {}", shard);
+            rx.recv().unwrap()?
+        }).collect()
+    }
+}
+
+
+
+pub struct LocalCoordinatorClient1<S> {
     // Channel to receive execute block commands from the coordinator.
     command_tx: Sender<ExecutorShardCommand<S>>,
     command_rx: Receiver<ExecutorShardCommand<S>>,
@@ -126,7 +176,7 @@ pub struct LocalCoordinatorClient<S> {
     result_rx: Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
 }
 
-impl<S> LocalCoordinatorClient<S> {
+impl<S> LocalCoordinatorClient1<S> {
     pub fn new() -> Self {
         let (command_tx, command_rx) = unbounded();
         let (result_tx, result_rx) = unbounded();
@@ -139,13 +189,13 @@ impl<S> LocalCoordinatorClient<S> {
     }
 }
 
-impl<S> Default for LocalCoordinatorClient<S> {
+impl<S> Default for LocalCoordinatorClient1<S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordinatorClient<S> {
+impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordinatorClient1<S> {
     fn send_execute_command(
         &self,
         execute_command: ExecutorShardCommand<S>,

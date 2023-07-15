@@ -12,6 +12,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use aptos_retrier::{fixed_retry_strategy, retry};
 use crate::network_controller::inbound_handler::InboundHandler;
 
 #[allow(dead_code)]
@@ -59,14 +60,12 @@ impl OutboundHandler {
         let builder = thread::Builder::new().name(thread_name);
         let inbound_handler = self.inbound_handler.clone();
         builder.spawn(move || loop {
-            if let Err(e) = Self::process_one_outgoing_message(
+            Self::process_one_outgoing_message(
                 outbound_handlers.clone(),
                 network_clients.clone(),
                 &address,
                 inbound_handler.clone(),
-            ) {
-                println!("Error processing outgoing message: {:?}", e);
-            }
+            )
         }).expect("Failed to spawn outbound handler thread");
     }
 
@@ -75,7 +74,7 @@ impl OutboundHandler {
         network_clients: Arc<Mutex<HashMap<SocketAddr, NetworkClient>>>,
         socket_addr: &SocketAddr,
         inbound_handler: Arc<Mutex<InboundHandler>>,
-    ) -> Result<(), Error> {
+    ) {
         let mut select = Select::new();
         let handlers = outbound_handlers.lock().unwrap();
 
@@ -84,14 +83,14 @@ impl OutboundHandler {
         }
         let oper = select.select();
         let index = oper.index();
-        let msg = oper.recv(&handlers[index].0)?;
+        let msg = oper.recv(&handlers[index].0).unwrap();
         let remote_addr = &handlers[index].1;
         let message_type = &handlers[index].2;
         if remote_addr == socket_addr {
             // If the remote address is the same as the local address, then we are sending a message to ourselves
             // so we should just pass it to the inbound handler
             inbound_handler.lock().unwrap().send_incoming_message_to_handler(message_type, msg);
-            return Ok(());
+            return;
         }
         let mut binding = network_clients.lock().unwrap();
         let network_client = binding.get_mut(remote_addr).unwrap();
@@ -99,8 +98,10 @@ impl OutboundHandler {
             *socket_addr,
             msg,
             message_type.clone(),
-        ))?;
-        network_client.write(&msg)?;
-        Ok(())
+        )).unwrap();
+
+        retry(fixed_retry_strategy(5, 20), || {
+            network_client.write(&msg)
+        }).unwrap();
     }
 }

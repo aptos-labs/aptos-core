@@ -2959,6 +2959,7 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-retrier",
  "bcs 0.1.4",
  "crossbeam-channel",
  "once_cell",
