@@ -271,6 +271,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-abstract-gas-usage"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
+ "aptos-vm-types",
+ "move-binary-format",
+]
+
+[[package]]
 name = "aptos-accumulator"
 version = "0.1.0"
 dependencies = [
@@ -1565,11 +1576,25 @@ name = "aptos-gas-calibration"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos",
+ "aptos-cached-packages",
+ "aptos-framework",
  "aptos-gas-algebra",
  "aptos-gas-meter",
  "aptos-gas-schedule",
+ "aptos-language-e2e-tests",
+ "aptos-move-stdlib",
+ "aptos-native-interface",
+ "aptos-types",
  "aptos-vm-types",
+ "bcs 0.1.4",
+ "clap 4.3.5",
  "move-binary-format",
+ "move-bytecode-source-map",
+ "move-core-types",
+ "move-ir-compiler",
+ "move-vm-runtime",
+ "move-vm-test-utils",
 ]
 
 [[package]]
@@ -2083,6 +2108,7 @@ name = "aptos-language-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-abstract-gas-usage",
  "aptos-bitvec",
  "aptos-block-executor",
  "aptos-cached-packages",
@@ -2094,6 +2120,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-keygen",
  "aptos-memory-usage-tracker",
+ "aptos-native-interface",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-table-natives",

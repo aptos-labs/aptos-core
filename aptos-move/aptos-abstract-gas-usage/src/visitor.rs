@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::Expression;
-use aptos_gas_algebra::GasExpressionVisitor;
+use aptos_gas_algebra::{Expression, GasExpressionVisitor};
 
 /*
  * @notice: Visitor to traverse the Reverse Polish Notation
