@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aptos-sdk"
-version = "0.6.3"
+version = "0.6.4"
 description = "Aptos SDK"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 license = "Apache-2.0"
