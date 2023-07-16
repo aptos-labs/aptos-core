@@ -354,6 +354,14 @@ class RestClient:
         data = response.json()
         return len(data) == 1 and data[0]["type"] != "pending_transaction"
 
+    async def transaction_by_hash(self, txn_hash: str) -> Dict[str, Any]:
+        response = await self.client.get(
+            f"{self.base_url}/transactions/by_hash/{txn_hash}"
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+        return response.json()
+
     #
     # Transaction helpers
     #
