@@ -401,7 +401,7 @@ class AptosTokenClient:
         royalty_numerator: int,
         royalty_denominator: int,
     ) -> str:
-        payload = create_collection_payload(
+        payload = AptosTokenClient.create_collection_payload(
             description,
             max_supply,
             name,
@@ -465,7 +465,9 @@ class AptosTokenClient:
         uri: str,
         properties: PropertyMap,
     ) -> str:
-        payload = mint_token_payload(collection, description, name, uri, properties)
+        payload = AptosTokenClient.mint_token_payload(
+            collection, description, name, uri, properties
+        )
         signed_transaction = await self.client.create_bcs_signed_transaction(
             creator, payload
         )
@@ -605,3 +607,14 @@ class AptosTokenClient:
             creator, TransactionPayload(payload)
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
+
+    async def tokens_minted_from_transaction(
+        self, txn_hash: str
+    ) -> List[AccountAddress]:
+        output = await self.client.transaction_by_hash(txn_hash)
+        mints = []
+        for event in output["events"]:
+            if event["type"] != "0x4::collection::MintEvent":
+                continue
+            mints.append(AccountAddress.from_hex(event["data"]["token"]))
+        return mints
