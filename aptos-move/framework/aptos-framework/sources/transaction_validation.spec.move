@@ -175,6 +175,7 @@ spec aptos_framework::transaction_validation {
 
         aborts_if !account::exists_at(gas_payer);
         aborts_if !(fee_payer_public_key_hash == account::get_authentication_key(gas_payer));
+        aborts_if !features::spec_fee_payer_enabled();
     }
 
         /// Abort according to the conditions.

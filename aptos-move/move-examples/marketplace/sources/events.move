@@ -15,6 +15,7 @@ module marketplace::events {
     friend marketplace::collection_offer;
     friend marketplace::fee_schedule;
     friend marketplace::listing;
+    friend marketplace::token_offer;
 
     /// Marketplace does not have EventsV1
     const ENO_EVENTS_V1: u64 = 1;
@@ -30,6 +31,10 @@ module marketplace::events {
         collection_offer_placed_events: EventHandle<CollectionOfferPlacedEvent>,
         collection_offer_canceled_events: EventHandle<CollectionOfferCanceledEvent>,
         collection_offer_filled_events: EventHandle<CollectionOfferFilledEvent>,
+
+        token_offer_placed_events: EventHandle<TokenOfferPlacedEvent>,
+        token_offer_canceled_events: EventHandle<TokenOfferCanceledEvent>,
+        token_offer_filled_events: EventHandle<TokenOfferFilledEvent>,
     }
 
     // Initializers
@@ -43,6 +48,9 @@ module marketplace::events {
             collection_offer_placed_events: object::new_event_handle(fee_schedule_signer),
             collection_offer_canceled_events: object::new_event_handle(fee_schedule_signer),
             collection_offer_filled_events: object::new_event_handle(fee_schedule_signer),
+            token_offer_placed_events: object::new_event_handle(fee_schedule_signer),
+            token_offer_canceled_events: object::new_event_handle(fee_schedule_signer),
+            token_offer_filled_events: object::new_event_handle(fee_schedule_signer),
         };
         move_to(fee_schedule_signer, events);
     }
@@ -314,6 +322,85 @@ module marketplace::events {
         let marketplace_events = get_events_v1(marketplace);
         event::emit_event(&mut marketplace_events.collection_offer_filled_events, CollectionOfferFilledEvent {
             collection_offer,
+            purchaser,
+            seller,
+            price,
+            royalties,
+            commission,
+            token_metadata,
+        });
+    }
+
+    // Token offer events
+    struct TokenOfferPlacedEvent has drop, store {
+        token_offer: address,
+        purchaser: address,
+        price: u64,
+        token_metadata: TokenMetadata,
+    }
+
+    public(friend) fun emit_token_offer_placed<T: key>(
+        marketplace: Object<T>,
+        token_offer: address,
+        purchaser: address,
+        price: u64,
+        token_metadata: TokenMetadata,
+    ) acquires EventsV1 {
+        let marketplace_events = get_events_v1(marketplace);
+        event::emit_event(&mut marketplace_events.token_offer_placed_events, TokenOfferPlacedEvent {
+            token_offer,
+            purchaser,
+            price,
+            token_metadata,
+        });
+    }
+
+    struct TokenOfferCanceledEvent has drop, store {
+        token_offer: address,
+        purchaser: address,
+        price: u64,
+        token_metadata: TokenMetadata,
+    }
+
+    public(friend) fun emit_token_offer_canceled<T: key>(
+        marketplace: Object<T>,
+        token_offer: address,
+        purchaser: address,
+        price: u64,
+        token_metadata: TokenMetadata,
+    ) acquires EventsV1 {
+        let marketplace_events = get_events_v1(marketplace);
+        event::emit_event(&mut marketplace_events.token_offer_canceled_events, TokenOfferCanceledEvent {
+            token_offer,
+            purchaser,
+            price,
+            token_metadata,
+        });
+    }
+
+    struct TokenOfferFilledEvent has drop, store {
+        token_offer: address,
+        purchaser: address,
+        seller: address,
+        price: u64,
+        royalties: u64,
+        commission: u64,
+        token_metadata: TokenMetadata,
+    }
+
+    public(friend) fun emit_token_offer_filled<T: key>(
+        marketplace: Object<T>,
+        token_offer: address,
+        purchaser: address,
+        seller: address,
+        price: u64,
+        royalties: u64,
+        commission: u64,
+        token_metadata: TokenMetadata,
+    ) acquires EventsV1 {
+        let marketplace_events = get_events_v1(marketplace);
+        event::emit_event(&mut marketplace_events.token_offer_filled_events, TokenOfferFilledEvent {
+            token_offer,
             purchaser,
             seller,
             price,

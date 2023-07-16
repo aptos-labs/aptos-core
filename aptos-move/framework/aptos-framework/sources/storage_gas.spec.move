@@ -55,11 +55,22 @@ spec aptos_framework::storage_gas {
     spec new_gas_curve(min_gas: u64, max_gas: u64, points: vector<Point>): GasCurve {
         include NewGasCurveAbortsIf;
         include ValidatePointsAbortsIf;
+        ensures result == GasCurve {
+            min_gas,
+            max_gas,
+            points
+        };
     }
 
     spec new_usage_gas_config(target_usage: u64, read_curve: GasCurve, create_curve: GasCurve, write_curve: GasCurve): UsageGasConfig {
         aborts_if target_usage == 0;
         aborts_if target_usage > MAX_U64 / BASIS_POINT_DENOMINATION;
+        ensures result == UsageGasConfig {
+            target_usage,
+            read_curve,
+            create_curve,
+            write_curve,
+        };
     }
 
     spec new_storage_gas_config(item_config: UsageGasConfig, byte_config: UsageGasConfig): StorageGasConfig {

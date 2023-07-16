@@ -25,6 +25,7 @@ module collection_offer {
     use marketplace::events;
     use marketplace::fee_schedule::{Self, FeeSchedule};
     use marketplace::listing::{Self, TokenV1Container};
+    use aptos_framework::aptos_account;
 
     /// No collection offer defined.
     const ENO_COLLECTION_OFFER: u64 = 1;
@@ -42,7 +43,7 @@ module collection_offer {
     // Core data structures
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// Create a limed lifetime offer to buy tokens from a collection. The collection and
+    /// Create a timed offer to buy tokens from a collection. The collection and
     /// assets used to buy are stored in other resources within the object.
     struct CollectionOffer has key {
         fee_schedule: Object<FeeSchedule>,
@@ -197,7 +198,7 @@ module collection_offer {
     ) {
         let fee = fee_schedule::listing_fee(fee_schedule, total_to_extract);
         let fee_address = fee_schedule::fee_address(fee_schedule);
-        coin::transfer<CoinType>(purchaser, fee_address, fee);
+        aptos_account::transfer_coins<CoinType>(purchaser, fee_address, fee);
 
         let coins = coin::withdraw<CoinType>(purchaser, total_to_extract);
         move_to(offer_signer, CoinOffer { coins });
@@ -263,10 +264,10 @@ module collection_offer {
         property_version: u64,
     ): Option<Object<TokenV1Container>>
     acquires
-        CoinOffer,
-        CollectionOffer,
-        CollectionOfferTokenV1,
-        CollectionOfferTokenV2
+    CoinOffer,
+    CollectionOffer,
+    CollectionOfferTokenV1,
+    CollectionOfferTokenV2
     {
         let collection_offer_addr = object::object_address(&collection_offer);
         assert!(
@@ -389,14 +390,14 @@ module collection_offer {
 
         let royalty_charge = price * royalty_numerator / royalty_denominator;
         let royalties = coin::extract(&mut coins, royalty_charge);
-        coin::deposit(royalty_payee, royalties);
+        aptos_account::deposit_coins(royalty_payee, royalties);
 
         let fee_schedule = collection_offer_obj.fee_schedule;
         let commission_charge = fee_schedule::commission(fee_schedule, price);
         let commission = coin::extract(&mut coins, commission_charge);
-        coin::deposit(fee_schedule::fee_address(fee_schedule), commission);
+        aptos_account::deposit_coins(fee_schedule::fee_address(fee_schedule), commission);
 
-        coin::deposit(seller, coins);
+        aptos_account::deposit_coins(seller, coins);
 
         events::emit_collection_offer_filled(
             fee_schedule,
@@ -422,7 +423,7 @@ module collection_offer {
     ) acquires CoinOffer, CollectionOffer, CollectionOfferTokenV1, CollectionOfferTokenV2 {
         let collection_offer_addr = object::object_address(&collection_offer);
         let CoinOffer<CoinType> { coins } = move_from(collection_offer_addr);
-        coin::deposit(object::owner(collection_offer), coins);
+        aptos_account::deposit_coins(object::owner(collection_offer), coins);
 
         let CollectionOffer {
             fee_schedule: _,
