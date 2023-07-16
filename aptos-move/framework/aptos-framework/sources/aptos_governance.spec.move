@@ -97,6 +97,29 @@ spec aptos_framework::aptos_governance {
         ensures new_governance_config.required_proposer_stake == required_proposer_stake;
     }
 
+    /// Signer address must be @aptos_framework.
+    /// Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
+    spec toggle_features(
+        aptos_framework: &signer,
+        enable: vector<u64>,
+        disable: vector<u64>,
+    ) {
+        use aptos_framework::chain_status;
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
+        use aptos_framework::transaction_fee;
+
+        let addr = signer::address_of(aptos_framework);
+        aborts_if addr != @aptos_framework;
+
+        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
+        requires chain_status::is_operating();
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+        requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
+        include staking_config::StakingRewardsConfigRequirement;
+    }
+
     spec get_voting_duration_secs(): u64 {
         include AbortsIfNotGovernanceConfig;
     }
