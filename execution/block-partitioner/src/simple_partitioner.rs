@@ -28,7 +28,7 @@ impl SimplePartitioner {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
         maybe_load_imbalance_tolerance: Option<f32>
-    ) -> Vec<Vec<Transaction>> {
+    ) -> Vec<Vec<AnalyzedTransaction>> {
         match std::env::var("SIMPLE_PARTITIONER__MERGE_WITH_UNION_FIND") {
             Ok(v) if v.as_str() == "1" => self.partition_uf(txns, num_executor_shards, maybe_load_imbalance_tolerance),
             _ => self.partition_bfs(txns, num_executor_shards, maybe_load_imbalance_tolerance),
@@ -40,7 +40,7 @@ impl SimplePartitioner {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
         maybe_load_imbalance_tolerance: Option<f32>
-    ) -> Vec<Vec<Transaction>> {
+    ) -> Vec<Vec<AnalyzedTransaction>> {
         let num_txns = txns.len();
 
         let mut senders: Vec<Sender> = Vec::new();
@@ -48,7 +48,7 @@ impl SimplePartitioner {
         let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
         let mut key_ids_by_key: HashMap<StateKey, usize> = HashMap::new();
         let mut key_ids_by_sender_id: Vec<HashSet<usize>> = Vec::new();
-        let mut txns_by_sender_id: Vec<Vec<Transaction>> = Vec::new();
+        let mut txns_by_sender_id: Vec<Vec<AnalyzedTransaction>> = Vec::new();
         {
             let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
             for (_txn_id, txn) in txns.into_iter().enumerate() {
@@ -69,7 +69,7 @@ impl SimplePartitioner {
                     });
                     key_ids_by_sender_id[sender_id].insert(key_id);
                 }
-                txns_by_sender_id[sender_id].push(txn.into_txn());
+                txns_by_sender_id[sender_id].push(txn);
             }
             println!("preprocess_time={}", timer.stop_and_record());
         }
@@ -162,7 +162,7 @@ impl SimplePartitioner {
         let (_, shard_ids_by_sub_group_id) = scheduling::assign_tasks_to_workers(loads_by_sub_group, num_executor_shards);
 
         let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["build_return_object"]).start_timer();
-        let mut txns_by_shard_id: Vec<Vec<Transaction>> = vec![vec![]; num_executor_shards];
+        let mut txns_by_shard_id: Vec<Vec<AnalyzedTransaction>> = vec![vec![]; num_executor_shards];
         for (sender_id, txns) in txns_by_sender_id.into_iter().enumerate() {
             let group_id = *group_ids_by_sender_id.get(&sender_id).unwrap();
             let sub_group_id = cur_sug_group_ids_by_group_id[group_id];
@@ -177,7 +177,7 @@ impl SimplePartitioner {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
         maybe_load_imbalance_tolerance: Option<f32>
-    ) -> Vec<Vec<Transaction>> {
+    ) -> Vec<Vec<AnalyzedTransaction>> {
         let num_txns = txns.len();
 
         let mut senders: Vec<Sender> = Vec::new();
@@ -185,7 +185,7 @@ impl SimplePartitioner {
         let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
         let mut key_ids_by_key: HashMap<StateKey, usize> = HashMap::new();
         let mut key_ids_by_sender_id: Vec<HashSet<usize>> = Vec::new();
-        let mut txns_by_sender_id: Vec<Vec<Transaction>> = Vec::new();
+        let mut txns_by_sender_id: Vec<Vec<AnalyzedTransaction>> = Vec::new();
         let mut sender_ids_by_key_id: Vec<HashSet<usize>> = Vec::new();
         {
             let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
@@ -209,7 +209,7 @@ impl SimplePartitioner {
                     sender_ids_by_key_id[*key_id].insert(*sender_id);
                     key_ids_by_sender_id[*sender_id].insert(*key_id);
                 }
-                txns_by_sender_id[*sender_id].push(txn.into_txn());
+                txns_by_sender_id[*sender_id].push(txn);
             }
         }
 
@@ -302,7 +302,7 @@ impl SimplePartitioner {
         let (_, shard_ids_by_sub_group_id) = scheduling::assign_tasks_to_workers(loads_by_sub_group, num_executor_shards);
 
         let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["build_return_object"]).start_timer();
-        let mut txns_by_shard_id: Vec<Vec<Transaction>> = vec![vec![]; num_executor_shards];
+        let mut txns_by_shard_id: Vec<Vec<AnalyzedTransaction>> = vec![vec![]; num_executor_shards];
         for (sender_id, txns) in txns_by_sender_id.into_iter().enumerate() {
             let group_id = *group_ids_by_sender_id.get(&sender_id).unwrap();
             let sub_group_id = cur_sug_group_ids_by_group_id[group_id];
@@ -326,14 +326,13 @@ impl BlockPartitioner for SimplePartitioner {
         for (shard_id, txns) in txns_by_shard_id.into_iter().enumerate() {
             let twds: Vec<TransactionWithDependencies<Transaction>> = txns
                 .into_iter()
-                .map(|txn| TransactionWithDependencies::new(txn, CrossShardDependencies::default()))
+                .map(|txn| TransactionWithDependencies::new(txn.into(), CrossShardDependencies::default()))
                 .collect();
             let aggregated_sub_block = SubBlock::new(txn_counter, twds);
             txn_counter += aggregated_sub_block.num_txns();
             let sub_block_list = SubBlocksForShard::new(shard_id, vec![aggregated_sub_block]);
             ret.push(sub_block_list);
         }
-        let worker_loads: Vec<usize> = ret.iter().map(|sbl| sbl.num_txns()).collect();
         ret
     }
 }
