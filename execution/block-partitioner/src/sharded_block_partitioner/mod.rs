@@ -27,6 +27,7 @@ use std::{
     thread,
 };
 use std::env::VarError;
+use crate::sharded_block_partitioner::counters::SHARDED_PARTITIONER_MISC_SECONDS;
 use crate::simple_partitioner::SimplePartitioner;
 
 mod conflict_detector;
@@ -169,6 +170,7 @@ impl ShardedBlockPartitioner {
         &self,
         txns: Vec<AnalyzedTransaction>,
     ) -> Vec<Vec<AnalyzedTransaction>> {
+        let _timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["partition_by_senders"]).start_timer();
         let approx_txns_per_shard = (txns.len() as f64 / self.num_shards as f64).ceil() as usize;
         let mut sender_to_txns = HashMap::new();
         let mut sender_order = Vec::new(); // Track sender ordering
@@ -339,7 +341,8 @@ impl ShardedBlockPartitioner {
             frozen_sub_blocks.push(SubBlocksForShard::empty(shard_id))
         }
         let mut current_round = 0;
-        for _ in 0..max_partitioning_rounds - 1 {
+        for round_id in 0..max_partitioning_rounds - 1 {
+            let _timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
             let (
                 updated_frozen_sub_blocks,
                 current_frozen_rw_set_with_index_vec,
@@ -377,6 +380,7 @@ impl ShardedBlockPartitioner {
             }
         }
 
+        let _timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["last_round"]).start_timer();
         match std::env::var("SHARDED_PARTITIONER__MERGE_LAST_ROUND") {
             Ok(v) if v.as_str() == "1" => {
                 info!("Let the the last shard handle the leftover.");

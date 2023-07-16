@@ -5,8 +5,9 @@ use clap::Parser;
 use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Mutex, time::Instant};
-use aptos_block_partitioner::simple_partitioner::SimplePartitioner;
+use aptos_block_partitioner::simple_partitioner::{SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS, SimplePartitioner};
 use aptos_logger::{error, info};
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_types::transaction::Transaction;
 
 #[derive(Debug, Parser)]
@@ -39,7 +40,7 @@ fn main() {
     let partitioner = ShardedBlockPartitioner::new(args.num_shards);
     for _ in 0..args.num_blocks {
         println!("Creating {} transactions", args.block_size);
-        let transactions: Vec<Transaction> = (0..args.block_size)
+        let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
             .map(|_| {
                 // randomly select a sender and receiver from accounts
                 let mut rng = OsRng;
@@ -47,7 +48,7 @@ fn main() {
                 let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
                 let receiver = accounts[indices.index(1)].lock().unwrap();
                 let mut sender = accounts[indices.index(0)].lock().unwrap();
-                create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
+                create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0).into()
             })
             .collect();
         println!("Starting to partition");
