@@ -291,12 +291,12 @@ export class TokenClient {
    * Directly transfer the specified amount of tokens from account to receiver
    * using a single multi signature transaction.
    *
-   * @param sender AptosAccount where token from which tokens will be transfered
-   * @param receiver Hex-encoded 32 byte Aptos account address to which tokens will be transfered
+   * @param sender AptosAccount where token from which tokens will be transferred
+   * @param receiver Hex-encoded 32 byte Aptos account address to which tokens will be transferred
    * @param creator Hex-encoded 32 byte Aptos account address to which created tokens
    * @param collectionName Name of collection where token is stored
    * @param name Token name
-   * @param amount Amount of tokens which will be transfered
+   * @param amount Amount of tokens which will be transferred
    * @param property_version the version of token PropertyMap with a default value 0.
    * @returns The hash of the transaction submitted to the API
    */
@@ -346,6 +346,85 @@ export class TokenClient {
     );
 
     const bcsTxn = bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, multiAgentAuthenticator));
+
+    const transactionRes = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+
+    return transactionRes.hash;
+  }
+
+  /**
+   * Directly transfer the specified amount of tokens from account to receiver
+   * using a single multi signature transaction.
+   *
+   * @param sender AptosAccount where token from which tokens will be transferred
+   * @param receiver Hex-encoded 32 byte Aptos account address to which tokens will be transferred
+   * @param creator Hex-encoded 32 byte Aptos account address to which created tokens
+   * @param collectionName Name of collection where token is stored
+   * @param name Token name
+   * @param amount Amount of tokens which will be transferred
+   * @param fee_payer AptosAccount which will pay fee for transaction
+   * @param property_version the version of token PropertyMap with a default value 0.
+   * @returns The hash of the transaction submitted to the API
+   */
+  async directTransferTokenWithFeePayer(
+    sender: AptosAccount,
+    receiver: AptosAccount,
+    creator: MaybeHexString,
+    collectionName: string,
+    name: string,
+    amount: AnyNumber,
+    fee_payer: AptosAccount,
+    propertyVersion: AnyNumber = 0,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    const builder = new TransactionBuilderRemoteABI(this.aptosClient, { sender: sender.address(), ...extraArgs });
+    const rawTxn = await builder.build(
+      "0x3::token::direct_transfer_script",
+      [],
+      [creator, collectionName, name, propertyVersion, amount],
+    );
+
+    const feePayerTxn = new TxnBuilderTypes.FeePayerRawTransaction(
+      rawTxn,
+      [TxnBuilderTypes.AccountAddress.fromHex(receiver.address())],
+      TxnBuilderTypes.AccountAddress.fromHex(fee_payer.address()),
+    );
+
+    const senderSignature = new TxnBuilderTypes.Ed25519Signature(
+      sender.signBuffer(TransactionBuilder.getSigningMessage(feePayerTxn)).toUint8Array(),
+    );
+
+    const senderAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
+      new TxnBuilderTypes.Ed25519PublicKey(sender.signingKey.publicKey),
+      senderSignature,
+    );
+
+    const receiverSignature = new TxnBuilderTypes.Ed25519Signature(
+      receiver.signBuffer(TransactionBuilder.getSigningMessage(feePayerTxn)).toUint8Array(),
+    );
+
+    const receiverAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
+      new TxnBuilderTypes.Ed25519PublicKey(receiver.signingKey.publicKey),
+      receiverSignature,
+    );
+
+    const feePayerSignature = new TxnBuilderTypes.Ed25519Signature(
+      fee_payer.signBuffer(TransactionBuilder.getSigningMessage(feePayerTxn)).toUint8Array(),
+    );
+
+    const feePayerAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
+      new TxnBuilderTypes.Ed25519PublicKey(fee_payer.signingKey.publicKey),
+      feePayerSignature,
+    );
+
+    const txAuthenticatorFeePayer = new TxnBuilderTypes.TransactionAuthenticatorFeePayer(
+      senderAuthenticator,
+      [TxnBuilderTypes.AccountAddress.fromHex(receiver.address())],
+      [receiverAuthenticator],
+      { address: TxnBuilderTypes.AccountAddress.fromHex(fee_payer.address()), authenticator: feePayerAuthenticator },
+    );
+
+    const bcsTxn = bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, txAuthenticatorFeePayer));
 
     const transactionRes = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
 

@@ -6,7 +6,9 @@ use crate::dag::{
     storage::DAGStorage,
     tests::helpers::new_certified_node,
     types::{CertifiedNode, Node},
+    NodeId, Vote,
 };
+use anyhow::Ok;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
@@ -14,6 +16,7 @@ use std::{collections::HashMap, sync::Arc};
 
 pub struct MockStorage {
     node_data: Mutex<HashMap<HashValue, Node>>,
+    vote_data: Mutex<HashMap<NodeId, Vote>>,
     certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
 }
 
@@ -21,6 +24,7 @@ impl MockStorage {
     pub fn new() -> Self {
         Self {
             node_data: Mutex::new(HashMap::new()),
+            vote_data: Mutex::new(HashMap::new()),
             certified_node_data: Mutex::new(HashMap::new()),
         }
     }
@@ -29,6 +33,27 @@ impl MockStorage {
 impl DAGStorage for MockStorage {
     fn save_node(&self, node: &Node) -> anyhow::Result<()> {
         self.node_data.lock().insert(node.digest(), node.clone());
+        Ok(())
+    }
+
+    fn delete_node(&self, digest: HashValue) -> anyhow::Result<()> {
+        self.node_data.lock().remove(&digest);
+        Ok(())
+    }
+
+    fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()> {
+        self.vote_data.lock().insert(node_id.clone(), vote.clone());
+        Ok(())
+    }
+
+    fn get_votes(&self) -> anyhow::Result<HashMap<NodeId, Vote>> {
+        Ok(self.vote_data.lock().clone())
+    }
+
+    fn delete_votes(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
+        for node_id in node_ids {
+            self.vote_data.lock().remove(&node_id);
+        }
         Ok(())
     }
 
