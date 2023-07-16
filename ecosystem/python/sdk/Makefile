@@ -18,11 +18,7 @@ lint:
 	- poetry run flake8 aptos_sdk examples
 
 examples:
-	poetry run python -m examples.async-read-aggregator
-	poetry run python -m examples.async-simple-nft
-	poetry run python -m examples.async-simulate-transfer-coin
-	poetry run python -m examples.async-transfer-coin
-	poetry run python -m examples.async-transfer-two-by-two
+	poetry run python -m examples.aptos-token
 	poetry run python -m examples.read-aggregator
 	poetry run python -m examples.simple-nft
 	poetry run python -m examples.simulate-transfer-coin
