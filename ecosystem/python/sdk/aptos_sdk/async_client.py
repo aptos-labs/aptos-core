@@ -76,7 +76,7 @@ class RestClient:
     #
 
     async def account(
-        self, account_address: AccountAddress, ledger_version: int = None
+        self, account_address: AccountAddress, ledger_version: Optional[int] = None
     ) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
 
@@ -91,7 +91,7 @@ class RestClient:
         return response.json()
 
     async def account_balance(
-        self, account_address: AccountAddress, ledger_version: int = None
+        self, account_address: AccountAddress, ledger_version: Optional[int] = None
     ) -> int:
         """Returns the test coin balance associated with the account"""
         resource = await self.account_resource(
@@ -102,7 +102,7 @@ class RestClient:
         return int(resource["data"]["coin"]["value"])
 
     async def account_sequence_number(
-        self, account_address: AccountAddress, ledger_version: int = None
+        self, account_address: AccountAddress, ledger_version: Optional[int] = None
     ) -> int:
         account_res = await self.account(account_address, ledger_version)
         return int(account_res["sequence_number"])
@@ -111,7 +111,7 @@ class RestClient:
         self,
         account_address: AccountAddress,
         resource_type: str,
-        ledger_version: int = None,
+        ledger_version: Optional[int] = None,
     ) -> Dict[str, Any]:
         if not ledger_version:
             request = (
@@ -130,7 +130,7 @@ class RestClient:
     async def account_resources(
         self,
         account_address: AccountAddress,
-        ledger_version: int = None,
+        ledger_version: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         if not ledger_version:
             request = f"{self.base_url}/accounts/{account_address}/resources"
@@ -154,7 +154,7 @@ class RestClient:
         key_type: str,
         value_type: str,
         key: Any,
-        ledger_version: int = None,
+        ledger_version: Optional[int] = None,
     ) -> Any:
         if not ledger_version:
             request = f"{self.base_url}/tables/{handle}/item"

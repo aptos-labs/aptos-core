@@ -314,7 +314,7 @@ class ReadObject:
 
     def __str__(self) -> str:
         response = "ReadObject"
-        for (resource_obj, value) in self.resources.items():
+        for resource_obj, value in self.resources.items():
             response += f"\n\t{resource_obj.struct_tag}: {value}"
 
         return response
@@ -338,6 +338,7 @@ class AptosTokenClient:
                 resources[resource_obj] = resource_obj.parse(resource["data"])
         return ReadObject(resources)
 
+    @staticmethod
     def create_collection_payload(
         description: str,
         max_supply: int,
@@ -423,6 +424,7 @@ class AptosTokenClient:
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
 
+    @staticmethod
     def mint_token_payload(
         collection: str,
         description: str,
