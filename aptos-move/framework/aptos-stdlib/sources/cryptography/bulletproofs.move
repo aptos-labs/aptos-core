@@ -84,7 +84,7 @@ module aptos_std::bulletproofs {
     }
 
     /// Verifies a zero-knowledge range proof that the value `v` committed in `com` (as v * val_base + r * rand_base,
-    /// for some randomness `r`) satisfies $v \in [0, 2^{num_bits})$. Only works for `num_bits` \in {8, 16, 32, 64}.
+    /// for some randomness `r`) satisfies `v` in `[0, 2^num_bits)`. Only works for `num_bits` in `{8, 16, 32, 64}`.
     public fun verify_range_proof(
         com: &RistrettoPoint,
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
