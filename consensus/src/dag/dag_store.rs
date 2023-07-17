@@ -39,6 +39,7 @@ impl NodeStatus {
 }
 
 /// Data structure that stores the DAG representation, it maintains round based index.
+#[derive(Clone)]
 pub struct Dag {
     nodes_by_round: BTreeMap<Round, Vec<Option<NodeStatus>>>,
     /// Map between peer id to vector index
