@@ -6,7 +6,7 @@ use crate::{sharded_block_partitioner::{
     dependency_analysis::WriteSetWithTxnIndex,
     messages::{
         AddWithCrossShardDep, ControlMsg,
-        ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
+        ControlMsg::DiscardCrossShardDepReq,
         DiscardCrossShardDep, PartitioningResp,
     },
     partitioning_shard::PartitioningShard,
@@ -28,6 +28,8 @@ use std::{
 };
 use std::env::VarError;
 use std::time::Instant;
+use aptos_types::block_executor::partitioner::{CrossShardDependencies, ShardedTxnIndex, SubBlock, TransactionWithDependencies};
+use aptos_types::state_store::state_key::StateKey;
 use crate::sharded_block_partitioner::counters::SHARDED_PARTITIONER_MISC_SECONDS;
 use crate::simple_partitioner::SimplePartitioner;
 
@@ -216,88 +218,39 @@ impl ShardedBlockPartitioner {
     fn collect_partition_block_response(
         &self,
     ) -> (
-        Vec<SubBlocksForShard<Transaction>>,
-        Vec<WriteSetWithTxnIndex>,
+        Vec<Vec<AnalyzedTransaction>>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
-        let mut frozen_sub_blocks = Vec::new();
-        let mut frozen_write_set_with_index = Vec::new();
-        let mut rejected_txns_vec = Vec::new();
+        let mut accepted_txns_vec: Vec<Vec<AnalyzedTransaction>> = Vec::with_capacity(self.num_shards);
+        let mut rejected_txns_vec: Vec<Vec<AnalyzedTransaction>> = Vec::with_capacity(self.num_shards);
         for rx in &self.result_rxs {
             let PartitioningResp {
-                frozen_sub_blocks: frozen_chunk,
-                write_set_with_index,
-                discarded_txns: rejected_txns,
+                accepted_txns,
+                discarded_txns,
             } = rx.recv().unwrap();
-            frozen_sub_blocks.push(frozen_chunk);
-            frozen_write_set_with_index.push(write_set_with_index);
-            rejected_txns_vec.push(rejected_txns);
+            accepted_txns_vec.push(accepted_txns);
+            rejected_txns_vec.push(discarded_txns);
         }
-        (
-            frozen_sub_blocks,
-            frozen_write_set_with_index,
-            rejected_txns_vec,
-        )
+        (accepted_txns_vec, rejected_txns_vec)
     }
 
     fn discard_txns_with_cross_shard_dependencies(
         &self,
         txns_to_partition: Vec<Vec<AnalyzedTransaction>>,
-        current_round_start_index: TxnIndex,
-        frozen_sub_blocks: Vec<SubBlocksForShard<Transaction>>,
-        frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         round_id: RoundId,
     ) -> (
-        Vec<SubBlocksForShard<Transaction>>,
-        Vec<WriteSetWithTxnIndex>,
+        Vec<Vec<AnalyzedTransaction>>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
         let partition_block_msgs = txns_to_partition
             .into_iter()
-            .zip_eq(frozen_sub_blocks.into_iter())
-            .map(|(txns, sub_blocks)| {
-                DiscardCrossShardDepReq(DiscardCrossShardDep::new(
-                    txns,
-                    frozen_write_set_with_index.clone(),
-                    current_round_start_index,
-                    sub_blocks,
+            .map(|transactions| {
+                DiscardCrossShardDepReq(DiscardCrossShardDep {
+                    transactions,
                     round_id,
-                ))
+                })
             })
             .collect();
-        self.send_partition_msgs(partition_block_msgs);
-        self.collect_partition_block_response()
-    }
-
-    fn add_cross_shard_dependencies(
-        &self,
-        index_offset: usize,
-        remaining_txns_vec: Vec<Vec<AnalyzedTransaction>>,
-        frozen_sub_blocks_by_shard: Vec<SubBlocksForShard<Transaction>>,
-        frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
-        round_id: RoundId,
-    ) -> (
-        Vec<SubBlocksForShard<Transaction>>,
-        Vec<WriteSetWithTxnIndex>,
-        Vec<Vec<AnalyzedTransaction>>,
-    ) {
-        let mut index_offset = index_offset;
-        let partition_block_msgs = remaining_txns_vec
-            .into_iter()
-            .zip_eq(frozen_sub_blocks_by_shard.into_iter())
-            .map(|(remaining_txns, frozen_sub_blocks)| {
-                let remaining_txns_len = remaining_txns.len();
-                let partitioning_msg = AddCrossShardDepReq(AddWithCrossShardDep::new(
-                    remaining_txns,
-                    index_offset,
-                    frozen_write_set_with_index.clone(),
-                    frozen_sub_blocks,
-                    round_id,
-                ));
-                index_offset += remaining_txns_len;
-                partitioning_msg
-            })
-            .collect::<Vec<ControlMsg>>();
         self.send_partition_msgs(partition_block_msgs);
         self.collect_partition_block_response()
     }
@@ -330,59 +283,35 @@ impl ShardedBlockPartitioner {
 
         // First round, we filter all transactions with cross-shard dependencies
         let mut txns_to_partition = self.partition_by_senders(transactions);
-        self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_to_partition)
+        let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_to_partition);
+        let augmented_matrix = self.add_edges(matrix);
+        augmented_matrix
     }
 
-    pub fn flatten_to_rounds(&self, max_partitioning_rounds: RoundId, cross_shard_dep_avoid_threshold: f32, mut txns_by_shard: Vec<Vec<AnalyzedTransaction>>) -> Vec<SubBlocksForShard<Transaction>> {
+    pub fn flatten_to_rounds(&self, max_partitioning_rounds: RoundId, cross_shard_dep_avoid_threshold: f32, mut txns_by_shard: Vec<Vec<AnalyzedTransaction>>) -> Vec<Vec<Vec<AnalyzedTransaction>>> {
         let total_txns: usize = txns_by_shard.iter().map(|txns_for_shard|txns_for_shard.len()).sum();
-        let mut frozen_write_set_with_index = Arc::new(Vec::new());
-        let mut current_round_start_index = 0;
-        let mut frozen_sub_blocks: Vec<SubBlocksForShard<Transaction>> = vec![];
-        for shard_id in 0..self.num_shards {
-            frozen_sub_blocks.push(SubBlocksForShard::empty(shard_id))
-        }
+        let mut txn_matrix: Vec<Vec<Vec<AnalyzedTransaction>>> = Vec::new();
         let mut current_round = 0;
         for round_id in 0..max_partitioning_rounds - 1 {
             let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
             let (
-                updated_frozen_sub_blocks,
-                current_frozen_rw_set_with_index_vec,
-                discarded_txns_to_partition,
+                accepted_txns,
+                discarded_txns,
             ) = self.discard_txns_with_cross_shard_dependencies(
                 txns_by_shard,
-                current_round_start_index,
-                frozen_sub_blocks,
-                frozen_write_set_with_index.clone(),
                 current_round,
             );
-            // Current round start index is the sum of the number of transactions in the frozen sub-blocks
-            current_round_start_index = updated_frozen_sub_blocks
-                .iter()
-                .map(|sub_blocks| sub_blocks.num_txns())
-                .sum::<usize>();
-            let mut prev_frozen_write_set_with_index =
-                Arc::try_unwrap(frozen_write_set_with_index).unwrap();
-            frozen_sub_blocks = updated_frozen_sub_blocks;
-            prev_frozen_write_set_with_index.extend(current_frozen_rw_set_with_index_vec);
-            frozen_write_set_with_index = Arc::new(prev_frozen_write_set_with_index);
-            txns_by_shard = discarded_txns_to_partition;
+            txn_matrix.push(accepted_txns);
+            txns_by_shard = discarded_txns;
             current_round += 1;
-            let num_remaining_txns = txns_by_shard
-                .iter()
-                .map(|txns| txns.len())
-                .sum::<usize>();
-            // If there are no remaining transactions, we can stop partitioning
-            let time = timer.stop_and_record();
-            if num_remaining_txns == 0 {
-                return frozen_sub_blocks;
-            }
+            let num_remaining_txns: usize = txns_by_shard.iter().map(|txns| txns.len()).sum();
+            timer.stop_and_record();
 
             if num_remaining_txns as f32 / total_txns as f32 <= 1 as f32 - cross_shard_dep_avoid_threshold {
                 break;
             }
         }
 
-        let _timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["last_round"]).start_timer();
         match std::env::var("SHARDED_PARTITIONER__MERGE_LAST_ROUND") {
             Ok(v) if v.as_str() == "1" => {
                 info!("Let the the last shard handle the leftover.");
@@ -392,18 +321,68 @@ impl ShardedBlockPartitioner {
             _ => {}
         }
 
-        // We just add cross shard dependencies for remaining transactions.
-        let (frozen_sub_blocks, _, rejected_txns) = self.add_cross_shard_dependencies(
-            current_round_start_index,
-            txns_by_shard,
-            frozen_sub_blocks,
-            frozen_write_set_with_index,
-            current_round,
-        );
+        txn_matrix.push(txns_by_shard);
+        txn_matrix
+    }
 
-        // Assert rejected transactions are empty
-        assert!(rejected_txns.iter().all(|txns| txns.is_empty()));
-        frozen_sub_blocks
+    fn add_edges(&self, matrix: Vec<Vec<Vec<AnalyzedTransaction>>>) -> Vec<SubBlocksForShard<Transaction>> {
+        let _timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
+        let mut ret: Vec<SubBlocksForShard<Transaction>> = (0..self.num_shards).map(|shard_id| SubBlocksForShard { shard_id, sub_blocks: vec![] }).collect();
+        let mut global_txn_counter: usize = 0;
+        let mut global_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
+        for (round_id, row) in matrix.into_iter().enumerate() {
+            for (shard_id, txns) in row.into_iter().enumerate() {
+                let start_index_for_cur_sub_block = global_txn_counter;
+                let mut twds_for_cur_sub_block: Vec<TransactionWithDependencies<Transaction>> = Vec::with_capacity(txns.len());
+                let mut local_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
+                for txn in txns {
+                    let cur_sharded_txn_idx = ShardedTxnIndex {
+                        txn_index: global_txn_counter,
+                        shard_id,
+                        round_id,
+                    };
+                    let mut cur_txn_csd = CrossShardDependencies::default();
+                    for loc in txn.read_hints() {
+                        let key = loc.clone().into_state_key();
+                        match global_owners_of_key.get(&key) {
+                            Some(owner) => {
+                                ret.get_mut(owner.shard_id).unwrap()
+                                    .get_sub_block_mut(owner.round_id).unwrap()
+                                    .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc.clone()]);
+                                cur_txn_csd.add_required_edge(*owner, loc.clone());
+                            },
+                            None => {},
+                        }
+                    }
+
+                    for loc in txn.write_hints() {
+                        let key = loc.clone().into_state_key();
+                        local_owners_of_key.insert(key.clone(), cur_sharded_txn_idx);
+                        match global_owners_of_key.get(&key) {
+                            Some(owner) => {
+                                ret.get_mut(owner.shard_id).unwrap()
+                                    .get_sub_block_mut(owner.round_id).unwrap()
+                                    .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc.clone()]);
+                                cur_txn_csd.add_required_edge(*owner, loc.clone());
+                            },
+                            None => {},
+                        }
+                    }
+
+                    let twd = TransactionWithDependencies::new(txn.into(), cur_txn_csd);
+                    twds_for_cur_sub_block.push(twd);
+                    global_txn_counter += 1;
+                }
+
+                let cur_sub_block = SubBlock::new(start_index_for_cur_sub_block, twds_for_cur_sub_block);
+                ret.get_mut(shard_id).unwrap().add_sub_block(cur_sub_block);
+
+                for (key, owner) in local_owners_of_key {
+                    global_owners_of_key.insert(key, owner);
+                }
+            }
+        }
+        ret
     }
 }
 
@@ -424,8 +403,9 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         let ret = match std::env::var("SHARDED_PARTITIONER__INIT_WITH_SIMPLE_PARTITIONER") {
             Ok(v) if v.as_str() == "1" => {
                 let simple_partitioner = SimplePartitioner{};
-                let txns_by_shard_id = simple_partitioner.partition(transactions, self.num_shards, Some(2.0));
-                self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard_id)
+                let txns_by_shard_id = simple_partitioner.partition(transactions, self.num_shards);
+                let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard_id);
+                self.add_edges(matrix)
             }
             _ => {
                 let ret = self.partition(transactions, max_partitioning_rounds, cross_shard_dep_avoid_threshold);

@@ -28,7 +28,6 @@ impl SimplePartitioner {
         &self,
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
-        maybe_load_imbalance_tolerance: Option<f32>
     ) -> Vec<Vec<AnalyzedTransaction>> {
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
         let num_txns = txns.len();
@@ -88,9 +87,10 @@ impl SimplePartitioner {
         // If a sender group is too large,
         // break it into multiple sub-groups (and accept the fact that we will have cross-group conflicts),
         // each being small enough.
-        let sub_group_size_limit = maybe_load_imbalance_tolerance.map_or(u64::MAX, |k| {
-            ((num_txns as f32) * k / (num_executor_shards as f32)) as u64
-        });
+
+        let pct_imba_tolerance = std::env::var("SIMPLE_PARTITIONER__PCT_IMBA_TOLERANCE")
+            .ok().map_or(None, |s|s.parse::<usize>().ok());
+        let sub_group_size_limit = pct_imba_tolerance.map_or(u64::MAX, |pct| (num_txns * pct / (100 * num_executor_shards)) as u64);
 
         let capped_sender_groups: Vec<SenderGroup> = sender_groups_by_set_id.into_iter().flat_map(|(_set_id, sender_ids)|{
             let mut sub_groups: Vec<SenderGroup> = Vec::new();
@@ -143,7 +143,7 @@ impl BlockPartitioner for SimplePartitioner {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
-        let txns_by_shard_id = self.partition(txns, num_executor_shards, Some(2.0));
+        let txns_by_shard_id = self.partition(txns, num_executor_shards);
         let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_deps"]).start_timer();
         let mut ret: Vec<SubBlocksForShard<Transaction>> = Vec::with_capacity(num_executor_shards);
         let mut global_txn_counter: usize = 0;

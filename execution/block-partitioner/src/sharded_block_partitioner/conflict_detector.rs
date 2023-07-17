@@ -36,16 +36,13 @@ impl CrossShardConflictDetector {
         &mut self,
         txns: Vec<AnalyzedTransaction>,
         cross_shard_rw_set: &[RWSet],
-        prev_rounds_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> (
         Vec<AnalyzedTransaction>,
-        Vec<CrossShardDependencies>,
         Vec<AnalyzedTransaction>,
     ) {
         // Iterate through all the transactions and if any shard has taken read/write lock on the storage location
         // and has a higher priority than this shard id, then this transaction needs to be moved to the end of the block.
         let mut accepted_txns = Vec::new();
-        let mut accepted_txn_dependencies = Vec::new();
         let mut rejected_txns = Vec::new();
         let mut discarded_senders = HashSet::new();
         for (_, txn) in txns.into_iter().enumerate() {
@@ -60,21 +57,10 @@ impl CrossShardConflictDetector {
                 }
                 rejected_txns.push(txn);
             } else {
-                let cross_shard_deps = if self.round_id == 0 {
-                    // 1st-round txns always have 0 cross-shard dependencies.
-                    CrossShardDependencies::default()
-                } else {
-                    self.get_deps_for_frozen_txn(
-                        &txn,
-                        Arc::new(vec![WriteSetWithTxnIndex::default(); self.num_shards]),
-                        prev_rounds_rw_set_with_index.clone(),
-                    )
-                };
-                accepted_txn_dependencies.push(cross_shard_deps);
                 accepted_txns.push(txn);
             }
         }
-        (accepted_txns, accepted_txn_dependencies, rejected_txns)
+        (accepted_txns, rejected_txns)
     }
 
     /// Adds a cross shard dependency for a transaction. This can be done by finding the maximum transaction index
