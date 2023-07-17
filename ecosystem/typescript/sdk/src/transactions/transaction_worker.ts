@@ -1,10 +1,29 @@
+/**
+ * Provides a simple framework for receiving payloads to be processed.
+ *
+ * Once one `start()` the process, the worker acquires the current account next sequence number
+ * (by using the AccountSequenceNumber class), generates a signed transaction and pushes an async
+ * submission process into a `outstandingTransactions` queue.
+ * At the same time, the worker processes transactions by reading the `outstandingTransactions` queue
+ * and submits the next transaction to chain, it
+ * 1) waits for resolution of the submission process or get pre-execution validation error
+ * and 2) waits for the resolution of the execution process or get an execution error.
+ * The worker fires events for any submission and/or execution success and/or failure.
+ */
+
 import EventEmitter from "eventemitter3";
 import { AptosAccount } from "../account";
-import { PendingTransaction } from "../generated";
+import { PendingTransaction, Transaction } from "../generated";
 import { AptosClient, Provider } from "../providers";
 import { TxnBuilderTypes } from "../transaction_builder";
 import { AccountSequenceNumber } from "./account_sequence_number";
 
+// Events
+const transactionSent = "transactionSent";
+const sentFailed = "sentFailed";
+
+const transactionExecuted = "transactionExecuted";
+const executionFailed = "executionFailed";
 export class TransactionWorker extends EventEmitter {
   readonly provider: Provider;
 
@@ -27,15 +46,33 @@ export class TransactionWorker extends EventEmitter {
   outstandingTransactions: Array<[Promise<PendingTransaction>, bigint]> = [];
 
   // transactions that have been submitted to chain
-  processedTransactions: Array<[string, bigint, any]> = [];
+  sentTransactions: Array<[string, bigint, any]> = [];
 
-  constructor(provider: Provider, account: AptosAccount) {
+  // transactions that have been committed to chain
+  executedTransactions: Array<[string, bigint, any]> = [];
+
+  /**
+   * Provides a simple framework for receiving payloads to be processed.
+   *
+   * @param provider - a client provider
+   * @param sender - a sender as AptosAccount
+   * @param maxWaitTime - the max wait time to wait before resyncing the sequence number to the current on-chain state
+   * @param maximumInFlight - submit up to `maximumInFlight` transactions per account
+   * @param sleepTime - If `maximumInFlight` are in flight, wait `sleepTime` seconds before re-evaluating
+   */
+  constructor(
+    provider: Provider,
+    account: AptosAccount,
+    maxWaitTime: number,
+    maximumInFlight: number,
+    sleepTime: number,
+  ) {
     super();
     this.provider = provider;
     this.account = account;
     this.started = false;
     this.stopped = false;
-    this.accountSequnceNumber = new AccountSequenceNumber(provider, account);
+    this.accountSequnceNumber = new AccountSequenceNumber(provider, account, maxWaitTime, maximumInFlight, sleepTime);
   }
 
   /**
@@ -44,18 +81,14 @@ export class TransactionWorker extends EventEmitter {
    * adds the transaction to the outstanding transaction queue
    * to be processed later.
    */
-  async submitTransactions() {
-    try {
-      if (this.transactionsQueue.length === 0) return;
-      const sequenceNumber = await this.accountSequnceNumber.nextSequenceNumber();
-      if (sequenceNumber === null) return;
-      const transaction = await this.generateNextTransaction(this.account, sequenceNumber);
-      if (!transaction) return;
-      const pendingTransaction = this.provider.submitSignedBCSTransaction(transaction);
-      this.outstandingTransactions.push([pendingTransaction, sequenceNumber]);
-    } catch (error: any) {
-      throw new Error(error);
-    }
+  async submitNextTransaction() {
+    if (this.transactionsQueue.length === 0) return;
+    const sequenceNumber = await this.accountSequnceNumber.nextSequenceNumber();
+    if (sequenceNumber === null) return;
+    const transaction = await this.generateNextTransaction(this.account, sequenceNumber);
+    if (!transaction) return;
+    const pendingTransaction = this.provider.submitSignedBCSTransaction(transaction);
+    this.outstandingTransactions.push([pendingTransaction, sequenceNumber]);
   }
 
   /**
@@ -68,35 +101,58 @@ export class TransactionWorker extends EventEmitter {
    * transactions queue with the failure reason and fires a transactionsFailed event.
    */
   async processTransactions() {
-    try {
-      const awaitingTransactions = [];
-      const awaitingSequenceNumbers = [];
+    const awaitingTransactions = [];
+    const awaitingSequenceNumbers = [];
 
-      while (this.outstandingTransactions.length > 0) {
-        const [pendingTransaction, sequenceNumber] = this.outstandingTransactions.shift()!;
+    while (this.outstandingTransactions.length > 0) {
+      const [pendingTransaction, sequenceNumber] = this.outstandingTransactions.shift()!;
 
-        awaitingTransactions.push(pendingTransaction);
-        awaitingSequenceNumbers.push(sequenceNumber);
+      awaitingTransactions.push(pendingTransaction);
+      awaitingSequenceNumbers.push(sequenceNumber);
+    }
+
+    // send awaiting transactions to chain
+    const sentTransactions = await Promise.allSettled(awaitingTransactions);
+
+    for (let i = 0; i < sentTransactions.length && i < awaitingSequenceNumbers.length; i += 1) {
+      // check sent transaction status
+      const sentTransaction = sentTransactions[i];
+      const sequenceNumber = awaitingSequenceNumbers[i];
+      if (sentTransaction.status === "fulfilled") {
+        // transaction sent to chain
+        this.sentTransactions.push([sentTransaction.value.hash, sequenceNumber, null]);
+        this.emit(transactionSent, [this.sentTransactions.length, sentTransaction.value.hash]);
+        // check sent transaction execution
+        this.checkTransaction(sentTransaction, sequenceNumber);
+      } else {
+        // send transaction failed
+        this.sentTransactions.push([sentTransaction.status, sequenceNumber, sentTransaction.reason]);
+        this.emit(sentFailed, [this.sentTransactions.length, sentTransaction.reason]);
       }
+    }
+  }
 
-      try {
-        const outputs = await Promise.allSettled(awaitingTransactions);
-        for (let i = 0; i < outputs.length && i < awaitingSequenceNumbers.length; i += 1) {
-          const output = outputs[i];
-          const sequenceNumber = awaitingSequenceNumbers[i];
+  /**
+   * Once transaction has been sent to chain, we check for its execution status.
+   * @param sentTransaction transactions that were sent to chain and are now waiting to be executed
+   * @param sequenceNumber the account's sequence number that was sent with the transaction
+   */
+  async checkTransaction(sentTransaction: PromiseFulfilledResult<PendingTransaction>, sequenceNumber: bigint) {
+    const waitFor: Array<Promise<Transaction>> = [];
+    waitFor.push(this.provider.waitForTransactionWithResult(sentTransaction.value.hash, { checkSuccess: true }));
+    const sentTransactions = await Promise.allSettled(waitFor);
 
-          if (output.status === "fulfilled") {
-            this.processedTransactions.push([output.value.hash, sequenceNumber, null]);
-            this.emit("transactionsFulfilled", [this.processedTransactions.length, output.value.hash]);
-          } else {
-            this.processedTransactions.push([output.status, sequenceNumber, output.reason]);
-          }
-        }
-      } catch (error: any) {
-        throw new Error(error);
+    for (let i = 0; i < sentTransactions.length; i += 1) {
+      const executedTransaction = sentTransactions[i];
+      if (executedTransaction.status === "fulfilled") {
+        // transaction executed to chain
+        this.executedTransactions.push([executedTransaction.value.hash, sequenceNumber, null]);
+        this.emit(transactionExecuted, [this.executedTransactions.length, executedTransaction.value.hash]);
+      } else {
+        // transaction execution failed
+        this.executedTransactions.push([executedTransaction.status, sequenceNumber, executedTransaction.reason]);
+        this.emit(executionFailed, [this.executedTransactions.length, executedTransaction.reason]);
       }
-    } catch (error: any) {
-      throw new Error(error);
     }
   }
 
@@ -127,13 +183,13 @@ export class TransactionWorker extends EventEmitter {
   /**
    * Starts transaction submission and transaction processing.
    */
-  async runTransactions() {
+  async run() {
     try {
       while (!this.stopped) {
         /* eslint-disable no-await-in-loop, no-promise-executor-return */
-        await Promise.all([this.submitTransactions(), this.processTransactions()]);
+        await Promise.all([this.submitNextTransaction(), this.processTransactions()]);
         /** 
-         * since runTransactions() function runs continuously in a loop, it prevents the execution 
+         * since run() function runs continuously in a loop, it prevents the execution 
          * from reaching a callback function (e.g when client wants to gracefuly stop the worker). 
          * Add a small delay between iterations to allow other code to run
         /* eslint-disable no-await-in-loop */
@@ -153,7 +209,7 @@ export class TransactionWorker extends EventEmitter {
     }
     this.started = true;
     this.stopped = false;
-    this.runTransactions();
+    this.run();
   }
 
   /**

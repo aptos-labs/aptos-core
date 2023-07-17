@@ -18,7 +18,7 @@ describe("transactionWorker", () => {
   });
 
   test(
-    "index",
+    "submits 5 transactions to chain for a single account",
     (done) => {
       // Specify the number of assertions expected
       expect.assertions(1);
@@ -35,7 +35,7 @@ describe("transactionWorker", () => {
       const payloads = [...Array(5).fill(txn)];
 
       // start transactions worker
-      const transactionWorker = new TransactionWorker(provider, sender);
+      const transactionWorker = new TransactionWorker(provider, sender, 30, 100, 10);
       transactionWorker.start();
 
       // push transactions to queue

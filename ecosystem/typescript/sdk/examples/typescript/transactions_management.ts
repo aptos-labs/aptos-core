@@ -1,5 +1,20 @@
 /**
  * This example demonstrates how a client can utilize the TransactionWorker class.
+ *
+ * The TransactionWorker provides a simple framework for receiving payloads to be processed. It
+ * acquires an account new sequence number, produces a signed transaction and
+ * then submits the transaction. In other tasks, it waits for resolution of the submission
+ * process or get pre-execution validation error and waits for the resolution of the execution process
+ * or get an execution validation error.
+ *
+ * The TransactionWorker constructor accepts
+ * @param provider - a client provider
+ * @param sender - the sender account: AptosAccount
+ * @param maxWaitTime - the max wait time to wait before restarting the local sequence number to the current on-chain state
+ * @param maximumInFlight - submit up to `maximumInFlight` transactions per account
+ * @param sleepTime - If `maximumInFlight` are in flight, wait `sleepTime` seconds before re-evaluating
+ *
+ * Read more about it here {@link https://aptos.dev/guides/transaction-management}
  */
 
 import { AptosAccount, BCS, TxnBuilderTypes, TransactionWorker, FaucetClient, Provider, Types } from "aptos";
@@ -15,8 +30,9 @@ async function main() {
   const transactionsCount = 100;
   const totalTransactions = accountsCount * transactionsCount;
 
+  const start = Date.now() / 1000; // current time in seconds
+
   console.log("starting...");
-  console.log(new Date().toTimeString());
   // create senders and recipients accounts
   const senders: AptosAccount[] = [];
   const recipients: AptosAccount[] = [];
@@ -24,32 +40,32 @@ async function main() {
     senders.push(new AptosAccount());
     recipients.push(new AptosAccount());
   }
-  console.log(`${senders.length + recipients.length} sender and recipient accounts created`);
+  let last = Date.now() / 1000;
+  console.log(
+    `${senders.length} sender accounts and ${recipients.length} recipient accounts created in ${last - start} seconds`,
+  );
 
-  // funds sender accounts
+  // fund sender accounts
   const funds: Array<Promise<string[]>> = [];
 
   for (let i = 0; i < senders.length; i++) {
     funds.push(faucet.fundAccount(senders[i].address().noPrefix(), 10000000000));
   }
 
-  // send requests
   await Promise.all(funds);
-  console.log(`${funds.length} sender accounts funded`);
-  for (const acc in senders) {
-    const curr = senders[acc] as AptosAccount;
-    console.log(curr.address().hex());
-  }
+
+  last = Date.now() / 1000;
+  console.log(`${funds.length} sender accounts funded in ${last - start} seconds`);
 
   // read sender accounts
   const balances: Array<Promise<Types.AccountData>> = [];
   for (let i = 0; i < senders.length; i++) {
     balances.push(provider.getAccount(senders[i].address().hex()));
   }
-  // send requests
   await Promise.all(balances);
 
-  console.log(`${balances.length} sender account balances checked`);
+  last = Date.now() / 1000;
+  console.log(`${balances.length} sender account balances checked in ${last - start} seconds`);
 
   // create transactions
   const payloads: any[] = [];
@@ -69,37 +85,72 @@ async function main() {
     }
   }
 
-  const batchTransactions = (payloads: TxnBuilderTypes.Transaction[], sender: AptosAccount) => {
-    const transactionWorker = new TransactionWorker(provider, sender);
-    const waitFor: Array<Promise<void>> = [];
+  console.log(`sends ${totalTransactions * senders.length} transactions to chain....`);
+  // emit batch transactions
+  for (let i = 0; i < senders.length; i++) {
+    batchTransactions(payloads, senders[i]);
+  }
+
+  function batchTransactions(payloads: TxnBuilderTypes.Transaction[], sender: AptosAccount) {
+    const transactionWorker = new TransactionWorker(provider, sender, 30, 100, 10);
 
     transactionWorker.start();
 
-    transactionWorker.on("transactionsFulfilled", async (data) => {
-      /**
-       * data is an array with 2 elements
-       * data[0] = the amount of processed transactions
-       * data[1] = the hash value of the processed transaction
-       */
-      waitFor.push(provider.waitForTransaction(data[1], { checkSuccess: true }));
-      // all expected transactions have been fulfilled
+    registerToWorkerEvents(transactionWorker);
+
+    // push transactions to worker queue
+    for (const payload in payloads) {
+      transactionWorker.push(payloads[payload]);
+    }
+  }
+
+  function registerToWorkerEvents(transactionWorker: TransactionWorker) {
+    /**
+     * The callback from an event listener, i.e `data`, is an array with 2 elements
+     * data[0] - the amount of processed transactions
+     * data[1] -
+     * on a success event, is the hash value of the processed transaction
+     * on a failure event, is the reason for the failure
+     */
+    transactionWorker.on("transactionSent", async (data) => {
+      // all expected transactions have been sent
       if (data[0] === totalTransactions) {
-        await Promise.all(waitFor);
-        console.log("transactions submitted");
-        console.log(new Date().toTimeString());
+        last = Date.now() / 1000;
+        console.log(`transactions sent in ${last - start} seconds`);
+      }
+    });
+
+    transactionWorker.on("sentFailed", async (data) => {
+      /**
+       * transaction sent failed, up to the user to decide next steps.
+       * whether to stop the worker by transactionWorker.stop() and handle
+       * the error, or simply return the error to the end user.
+       * At this point, we have the failed transaction queue number
+       * and the transaction failure reason
+       */
+      console.log("sentFailed", data);
+    });
+
+    transactionWorker.on("transactionExecuted", async (data) => {
+      // all expected transactions have been executed
+      console.log(data);
+      if (data[0] === totalTransactions) {
+        last = Date.now() / 1000;
+        console.log(`transactions executed in ${last - start} seconds`);
         await checkAccounts();
       }
     });
 
-    // push transactions to queue
-    for (const payload in payloads) {
-      transactionWorker.push(payloads[payload]);
-    }
-  };
-
-  // emit batch transactions
-  for (let i = 0; i < senders.length; i++) {
-    batchTransactions(payloads, senders[i]);
+    transactionWorker.on("executionFailed", async (data) => {
+      /**
+       * transaction execution failed, up to the user to decide next steps.
+       * whether to stop the worker by transactionWorker.stop() and handle
+       * the error, or simply return the error to the end user.
+       * At this point, we have the failed transaction queue number
+       * and the transaction object data
+       */
+      console.log("executionFailed", data);
+    });
   }
 
   // check for account's sequence numbers
@@ -110,8 +161,8 @@ async function main() {
     }
 
     const res = await Promise.all(waitFor);
-    console.log(`transactions verified`);
-    console.log(new Date().toTimeString());
+    last = Date.now() / 1000;
+    console.log(`transactions verified in  ${last - start}  seconds`);
     for (const account in res) {
       const currentAccount = res[account] as Types.AccountData;
       console.log(
@@ -119,7 +170,7 @@ async function main() {
       );
     }
     // exit for testing porpuses - this would stop the process. most cases we have all transactions
-    // commited, but in some rare cases we might be stopping it before last couple of transactions commited.
+    // commited, but in some rare cases we might be stopping it before last couple of transactions have commited.
     exit(0);
   };
 }

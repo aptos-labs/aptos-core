@@ -6,7 +6,7 @@ import { getFaucetClient, longTestTimeout, PROVIDER_LOCAL_NETWORK_CONFIG } from 
 const provider = new Provider(PROVIDER_LOCAL_NETWORK_CONFIG);
 const account = new AptosAccount();
 const faucet = getFaucetClient();
-const accountSequenceNumber = new AccountSequenceNumber(provider, account);
+const accountSequenceNumber = new AccountSequenceNumber(provider, account, 30, 100, 10);
 let getAccountSpy: jest.SpyInstance;
 
 let lastSeqNumber: bigint | null;
