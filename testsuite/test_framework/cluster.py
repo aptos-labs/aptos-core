@@ -30,7 +30,7 @@ class GcpError(Exception):
 
 class GetPodsItemMetadata(TypedDict):
     name: str
-    labels: dict
+    labels: Dict[str, str]
 
 
 class GetPodsItemStatus(TypedDict):
@@ -52,7 +52,6 @@ class ForgeCluster:
     cloud: Cloud = Cloud.AWS
     region: Optional[str] = "us-west-2"
     kubeconf: Optional[str] = None
-    is_multiregion: bool = False
 
     def __repr__(self) -> str:
         return f"{self.cloud}/{self.region}/{self.name}"
@@ -60,10 +59,6 @@ class ForgeCluster:
     def set_kubeconf(self, kubeconf: str) -> ForgeCluster:
         self.kubeconf = kubeconf
         return self
-
-    @property
-    def kubectl_create_context_arg(self) -> List[str]:
-        return ["--context=karmada-apiserver"] if self.is_multiregion else []
 
     async def write(self, shell: Shell) -> None:
         assert self.kubeconf is not None, "kubeconf must be set"
@@ -92,7 +87,7 @@ class ForgeCluster:
         )
         pods_result: GetPodsResult = json.loads(pod_result)
         pods = pods_result["items"]
-        forge_jobs = []
+        forge_jobs: List[ForgeJob] = []
 
         # For each forge test runner pod, get the forge namespace and get the pods in that namespace
         # to infer the number of validators and fullnodes for each job
@@ -153,7 +148,7 @@ class ForgeCluster:
     async def write_cluster_config(
         self, shell: Shell, cluster_name: str, temp: str
     ) -> None:
-        if self.is_multiregion:
+        if cluster_name == "multiregion":
             cmd = [
                 "gcloud",
                 "secrets",
@@ -180,6 +175,8 @@ class ForgeCluster:
         elif self.cloud == Cloud.GCP:
             # set the KUBE_CONFIG to temp so the resulting kubeconfig is written to it
             os.environ["KUBECONFIG"] = temp
+            if self.region is None:
+                raise Exception("GCP region must be set")
             # The project must already be set via: gcloud config set project <project>
             cmd = [
                 "gcloud",
