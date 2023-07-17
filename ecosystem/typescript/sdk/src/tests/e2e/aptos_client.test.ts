@@ -48,6 +48,14 @@ test("gets genesis resources", async () => {
   expect(accountResource).toBeDefined();
 });
 
+// test("gets object", async () => {
+//   const client = new AptosClient(NODE_URL);
+//   const object = await client.getObjectResource("0xb584c623d565f87cc3c20df8fad99b9a1d2783d00e1ff00236faa05190a7ae4f");
+
+//   expect(object.type).toBeDefined();
+//   expect(object.data).toBeDefined();
+// });
+
 test("gets the Account resource", async () => {
   const client = new AptosClient(NODE_URL);
   const accountResource = await client.getAccountResource("0x1", account);

@@ -233,6 +233,25 @@ export class AptosClient {
     return data;
   }
 
+  /**
+   * Queries a 0x1::object::Object resource associated with given address
+   * @param address Hex-encoded 32 byte Aptos account address
+   * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
+   * @returns 0x1::object::Object resource
+   */
+    @parseApiError
+    async getObjectResource(
+      address: MaybeHexString,
+      query?: { ledgerVersion?: AnyNumber },
+    ): Promise<Gen.MoveResource> {
+      const resources = await this.getAccountResources(address, query);
+      if(resources.length !== 2 || resources.find((r) => r.type === "0x1::object::ObjectCore") === undefined) {
+        throw new Error("Invalid 0x1::object::Object address");
+      }
+
+      return resources.filter((r) => r.type !== "0x1::object::ObjectCore")[0];
+    }
+
   /** Generates a signed transaction that can be submitted to the chain for execution. */
   static generateBCSTransaction(accountFrom: AptosAccount, rawTxn: TxnBuilderTypes.RawTransaction): Uint8Array {
     const txnBuilder = new TransactionBuilderEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
