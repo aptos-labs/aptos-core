@@ -5,13 +5,10 @@
 //! This module implements the functionality to restore a `JellyfishMerkleTree` from small chunks
 //! of accounts.
 
-use crate::{
-    node_type::{
-        get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
-        NodeType,
-    },
-    NibbleExt, TreeReader, TreeWriter, IO_POOL, ROOT_NIBBLE_HEIGHT,
-};
+use crate::{node_type::{
+    get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
+    NodeType,
+}, NibbleExt, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT, IO_POOL};
 use anyhow::{ensure, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -27,6 +24,7 @@ use aptos_types::{
     transaction::Version,
 };
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use std::{
     cmp::Eq,
     collections::HashMap,
@@ -390,7 +388,10 @@ where
             let store = self.store.clone();
 
             IO_POOL.spawn(move || {
+                println!("bowu_1 {:?}", std::thread::current().name());
                 let res = store.write_node_batch(&frozen_nodes);
+                println!("bowu_2 {:?}", std::thread::current().name());
+
                 tx.send(res).unwrap();
             });
         } else {
