@@ -145,7 +145,8 @@ module aptos_framework::code {
         let allowed_deps = check_dependencies(addr, &pack);
 
         // Check package against conflicts
-        // ....
+        // To avoid prover compiler error on spec
+        // the package need to be an immutable variable
         let module_names = get_module_names(&pack);
         let package_immutable = &borrow_global<PackageRegistry>(addr).packages;
         let len = vector::length(package_immutable);
