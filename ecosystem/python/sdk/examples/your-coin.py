@@ -19,6 +19,7 @@ from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.async_client import FaucetClient, RestClient
 from aptos_sdk.bcs import Serializer
+from aptos_sdk.package_publisher import PackagePublisher
 from aptos_sdk.transactions import (
     EntryFunction,
     TransactionArgument,
@@ -113,7 +114,8 @@ async def main():
         metadata = f.read()
 
     print("\nPublishing MoonCoin package.")
-    txn_hash = await rest_client.publish_package(alice, metadata, [module])
+    package_publisher = PackagePublisher(rest_client)
+    txn_hash = await package_publisher.publish_package(alice, metadata, [module])
     await rest_client.wait_for_transaction(txn_hash)
     # <:!:publish
 
