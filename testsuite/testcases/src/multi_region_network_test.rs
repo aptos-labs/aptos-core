@@ -34,31 +34,28 @@ fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
     stats_table
 }
 
-/// Chunks the given set of peers into the number of specified groups
-pub(crate) fn chunk_peers(peers: Vec<Vec<PeerId>>, num_groups: usize) -> Vec<Vec<PeerId>> {
-    // Chunk the peers into exact groups
-    let approx_chunk_size = peers.len() / num_groups;
-    let chunks = peers.chunks_exact(approx_chunk_size);
-    let mut peer_chunks: Vec<Vec<PeerId>> = chunks
-        .clone()
-        .map(|chunk| chunk.iter().flatten().cloned().collect())
-        .collect();
-
-    // Get any remaining peers and add them to the first group
-    let remaining_peers: Vec<PeerId> = chunks
-        .remainder()
-        .iter()
-        // If `approx_peers_per_region` is 1, then it is possible we will have more regions than
-        // desired, so the remaining peers will be in the first group.
-        .chain(chunks.skip(num_groups).flatten())
-        .flatten()
-        .cloned()
-        .collect();
-    if !remaining_peers.is_empty() {
-        peer_chunks[0].append(remaining_peers.to_vec().as_mut());
+fn div_ceil(dividend: usize, divisor: usize) -> usize {
+    if dividend % divisor == 0 {
+        dividend / divisor
+    } else {
+        dividend / divisor + 1
     }
+}
 
-    peer_chunks
+/// Chunks the given set of peers into the specified number of chunks. The difference between the
+/// largest chunk and smallest chunk is at most one.
+pub(crate) fn chunk_peers(mut peers: Vec<Vec<PeerId>>, num_chunks: usize) -> Vec<Vec<PeerId>> {
+    let mut chunks = vec![];
+    let mut chunks_remaining = num_chunks;
+    while chunks_remaining > 0 {
+        let chunk_size = div_ceil(peers.len(), chunks_remaining);
+        let remaining = peers.split_off(chunk_size);
+        chunks.push(peers.iter().flatten().cloned().collect());
+        peers = remaining;
+
+        chunks_remaining -= 1;
+    }
+    chunks
 }
 
 /// Creates a table of peers grouped by region. The peers are divided into N groups, where N is the
