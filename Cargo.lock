@@ -3317,6 +3317,7 @@ dependencies = [
  "aptos-push-metrics",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-logging",
  "clap 4.3.5",
  "criterion",
  "criterion-cpu-time",
