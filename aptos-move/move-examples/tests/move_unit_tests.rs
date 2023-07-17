@@ -101,6 +101,11 @@ fn test_hello_blockchain() {
 }
 
 #[test]
+fn test_drand_lottery() {
+    test_common("drand");
+}
+
+#[test]
 fn test_marketplace() {
     test_common("marketplace")
 }
