@@ -6,6 +6,7 @@ use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
+    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
     write_set::{WriteOp, WriteSet},
@@ -17,15 +18,19 @@ use move_core_types::vm_status::VMStatus;
 #[derive(Debug, Clone)]
 pub struct VMOutput {
     change_set: VMChangeSet,
-    gas_used: u64,
+    fee_statement: FeeStatement,
     status: TransactionStatus,
 }
 
 impl VMOutput {
-    pub fn new(change_set: VMChangeSet, gas_used: u64, status: TransactionStatus) -> Self {
+    pub fn new(
+        change_set: VMChangeSet,
+        fee_statement: FeeStatement,
+        status: TransactionStatus,
+    ) -> Self {
         Self {
             change_set,
-            gas_used,
+            fee_statement,
             status,
         }
     }
@@ -35,13 +40,17 @@ impl VMOutput {
     pub fn empty_with_status(status: TransactionStatus) -> Self {
         Self {
             change_set: VMChangeSet::empty(),
-            gas_used: 0,
+            fee_statement: FeeStatement::zero(),
             status,
         }
     }
 
     pub fn unpack(self) -> (VMChangeSet, u64, TransactionStatus) {
-        (self.change_set, self.gas_used, self.status)
+        (self.change_set, self.fee_statement.gas_used(), self.status)
+    }
+
+    pub fn unpack_with_fee_statement(self) -> (VMChangeSet, FeeStatement, TransactionStatus) {
+        (self.change_set, self.fee_statement, self.status)
     }
 
     pub fn write_set(&self) -> &WriteSet {
@@ -57,7 +66,11 @@ impl VMOutput {
     }
 
     pub fn gas_used(&self) -> u64 {
-        self.gas_used
+        self.fee_statement.gas_used()
+    }
+
+    pub fn fee_statement(&self) -> &FeeStatement {
+        &self.fee_statement
     }
 
     pub fn status(&self) -> &TransactionStatus {
@@ -78,9 +91,13 @@ impl VMOutput {
         }
 
         // Try to materialize deltas and add them to the write set.
-        let (change_set, gas_used, status) = self.unpack();
+        let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
         let materialized_change_set = change_set.try_materialize(state_view)?;
-        Ok(VMOutput::new(materialized_change_set, gas_used, status))
+        Ok(VMOutput::new(
+            materialized_change_set,
+            fee_statement,
+            status,
+        ))
     }
 
     /// Converts VMOutput into TransactionOutput which can be used by storage

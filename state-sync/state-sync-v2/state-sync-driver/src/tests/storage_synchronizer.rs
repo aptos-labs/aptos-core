@@ -6,18 +6,18 @@ use crate::{
     metadata_storage::PersistentMetadataStorage,
     notification_handlers::{
         CommitNotification, CommitNotificationListener, CommittedTransactions,
-        ErrorNotificationListener, MempoolNotificationHandler,
+        ErrorNotificationListener, MempoolNotificationHandler, StorageServiceNotificationHandler,
     },
     storage_synchronizer::{StorageSynchronizer, StorageSynchronizerInterface},
     tests::{
         mocks::{
             create_mock_db_writer, create_mock_executor, create_mock_reader_writer,
-            create_mock_receiver, MockChunkExecutor,
+            create_mock_reader_writer_with_version, create_mock_receiver, MockChunkExecutor,
         },
         utils::{
             create_epoch_ending_ledger_info, create_event, create_output_list_with_proof,
             create_state_value_chunk_with_proof, create_transaction,
-            create_transaction_list_with_proof, verify_mempool_and_event_notification,
+            create_transaction_list_with_proof, verify_commit_notification,
         },
     },
 };
@@ -29,6 +29,7 @@ use aptos_executor_types::ChunkCommitNotification;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
@@ -61,9 +62,22 @@ async fn test_apply_transaction_outputs() {
         .expect_commit_chunk()
         .return_once(move || expected_commit_return);
 
+    // Create the mock DB reader/writer
+    let highest_synced_version = 1090;
+    let mock_reader_writer =
+        create_mock_reader_writer_with_version(None, None, highest_synced_version);
+
     // Create the storage synchronizer
-    let (_, _, event_subscription_service, mut mempool_listener, mut storage_synchronizer, _, _) =
-        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+    let (
+        _,
+        _,
+        event_subscription_service,
+        mut mempool_listener,
+        mut storage_service_listener,
+        mut storage_synchronizer,
+        _,
+        _,
+    ) = create_storage_synchronizer(chunk_executor, mock_reader_writer);
 
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
@@ -82,14 +96,18 @@ async fn test_apply_transaction_outputs() {
         .await
         .unwrap();
 
-    // Verify we get a mempool and event notification. Also verify that there's no pending data.
-    verify_mempool_and_event_notification(
+    // Verify that all components are notified
+    verify_commit_notification(
         Some(&mut event_listener),
         &mut mempool_listener,
+        &mut storage_service_listener,
         vec![transaction_to_commit],
         vec![event_to_commit],
+        highest_synced_version,
     )
     .await;
+
+    // Verify there's no pending data
     verify_no_pending_data(&storage_synchronizer);
 }
 
@@ -103,7 +121,7 @@ async fn test_apply_transaction_outputs_error() {
         .returning(|_, _, _| Err(format_err!("Failed to apply chunk!")));
 
     // Create the storage synchronizer
-    let (_, mut error_listener, _, _, mut storage_synchronizer, _, _) =
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _) =
         create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
 
     // Attempt to apply a chunk of outputs
@@ -136,7 +154,7 @@ async fn test_commit_chunk_error() {
         .return_once(|| Err(format_err!("Failed to commit chunk!")));
 
     // Create the storage synchronizer
-    let (_, mut error_listener, _, _, mut storage_synchronizer, _, _) =
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _) =
         create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
 
     // Attempt to execute a chunk of transactions
@@ -177,9 +195,22 @@ async fn test_execute_transactions() {
         .expect_commit_chunk()
         .return_once(move || expected_commit_return);
 
+    // Create the mock DB reader/writer
+    let highest_synced_version = 10101;
+    let mock_reader_writer =
+        create_mock_reader_writer_with_version(None, None, highest_synced_version);
+
     // Create the storage synchronizer
-    let (_, _, event_subscription_service, mut mempool_listener, mut storage_synchronizer, _, _) =
-        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+    let (
+        _,
+        _,
+        event_subscription_service,
+        mut mempool_listener,
+        mut storage_service_listener,
+        mut storage_synchronizer,
+        _,
+        _,
+    ) = create_storage_synchronizer(chunk_executor, mock_reader_writer);
 
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
@@ -198,14 +229,18 @@ async fn test_execute_transactions() {
         .await
         .unwrap();
 
-    // Verify we get a mempool and event notification. Also verify that there's no pending data.
-    verify_mempool_and_event_notification(
+    // Verify that all components are notified
+    verify_commit_notification(
         Some(&mut event_listener),
         &mut mempool_listener,
+        &mut storage_service_listener,
         vec![transaction_to_commit],
         vec![event_to_commit],
+        highest_synced_version,
     )
     .await;
+
+    // Verify there's no pending data
     verify_no_pending_data(&storage_synchronizer);
 }
 
@@ -219,7 +254,7 @@ async fn test_execute_transactions_error() {
         .returning(|_, _, _| Err(format_err!("Failed to execute chunk!")));
 
     // Create the storage synchronizer
-    let (_, mut error_listener, _, _, mut storage_synchronizer, _, _) =
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _) =
         create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
 
     // Attempt to execute a chunk of transactions
@@ -247,7 +282,7 @@ async fn test_initialize_state_synchronizer_missing_info() {
     output_list_with_proof.proof.transaction_infos = vec![]; // This is invalid!
 
     // Create the storage synchronizer
-    let (_, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+    let (_, _, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, None),
     );
@@ -275,7 +310,7 @@ async fn test_initialize_state_synchronizer_receiver_error() {
         .returning(|_, _| Err(format_err!("Failed to get snapshot receiver!")));
 
     // Create the storage synchronizer
-    let (_, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+    let (_, _, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, Some(db_writer)),
     );
@@ -339,7 +374,7 @@ async fn test_save_states_completion() {
         .returning(|_, _, _| Ok(()));
 
     // Create the storage synchronizer
-    let (mut commit_listener, _, _, _, mut storage_synchronizer, _, _) =
+    let (mut commit_listener, _, _, _, _, mut storage_synchronizer, _, _) =
         create_storage_synchronizer(
             chunk_executor,
             create_mock_reader_writer(None, Some(db_writer)),
@@ -374,7 +409,6 @@ async fn test_save_states_completion() {
         events: vec![expected_event.clone()],
         transactions: vec![expected_transaction.clone()],
     };
-
     verify_snapshot_commit_notification(
         &mut commit_listener,
         expected_committed_transactions.clone(),
@@ -404,7 +438,7 @@ async fn test_save_states_dropped_error_listener() {
         .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
 
     // Create the storage synchronizer (drop all listeners)
-    let (_, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+    let (_, _, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, Some(db_writer)),
     );
@@ -445,13 +479,14 @@ async fn test_save_states_invalid_chunk() {
         .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
 
     // Create the storage synchronizer
-    let (_, mut error_listener, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
-        create_mock_executor(),
-        create_mock_reader_writer(None, Some(db_writer)),
-    );
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _, _) =
+        create_storage_synchronizer(
+            create_mock_executor(),
+            create_mock_reader_writer(None, Some(db_writer)),
+        );
 
     // Initialize the state synchronizer
-    let _ = storage_synchronizer
+    let _join_handle = storage_synchronizer
         .initialize_state_synchronizer(
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),
@@ -471,7 +506,7 @@ async fn test_save_states_invalid_chunk() {
 #[should_panic]
 fn test_save_states_without_initialize() {
     // Create the storage synchronizer
-    let (_, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+    let (_, _, _, _, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, None),
     );
@@ -490,6 +525,7 @@ fn create_storage_synchronizer(
     ErrorNotificationListener,
     Arc<Mutex<EventSubscriptionService>>,
     MempoolNotificationListener,
+    StorageServiceNotificationListener,
     StorageSynchronizer<MockChunkExecutor, PersistentMetadataStorage>,
     JoinHandle<()>,
     JoinHandle<()>,
@@ -515,6 +551,12 @@ fn create_storage_synchronizer(
         StateSyncDriverConfig::default().mempool_commit_ack_timeout_ms,
     );
 
+    // Create the storage service handler
+    let (storage_service_notifier, storage_service_listener) =
+        aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
+    let storage_service_notification_handler =
+        StorageServiceNotificationHandler::new(storage_service_notifier);
+
     // Create the metadata storage
     let db_path = aptos_temppath::TempPath::new();
     let metadata_storage = PersistentMetadataStorage::new(db_path.path());
@@ -527,6 +569,7 @@ fn create_storage_synchronizer(
         error_notification_sender,
         event_subscription_service.clone(),
         mempool_notification_handler,
+        storage_service_notification_handler,
         metadata_storage,
         mock_reader_writer,
         None,
@@ -537,6 +580,7 @@ fn create_storage_synchronizer(
         error_notification_listener,
         event_subscription_service,
         mempool_notification_listener,
+        storage_service_listener,
         storage_synchronizer,
         executor_handle,
         committer_handle,

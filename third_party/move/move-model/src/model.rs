@@ -20,13 +20,17 @@ use crate::{
         Address, Attribute, ConditionKind, Exp, ExpData, GlobalInvariant, ModuleName, PropertyBag,
         PropertyValue, Spec, SpecBlockInfo, SpecFunDecl, SpecVarDecl, Value,
     },
+    code_writer::CodeWriter,
+    emit, emitln,
     intrinsics::IntrinsicsAnnotation,
     pragmas::{
         DELEGATE_INVARIANTS_TO_CALLER_PRAGMA, DISABLE_INVARIANTS_IN_BODY_PRAGMA, FRIEND_PRAGMA,
         INTRINSIC_PRAGMA, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
-    ty::{PrimitiveType, Type, TypeDisplayContext, TypeUnificationAdapter, Variance},
+    ty::{
+        PrimitiveType, ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
+    },
 };
 use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
 use codespan_reporting::{
@@ -64,7 +68,7 @@ use std::{
     cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
-    fmt::{self, Formatter},
+    fmt::{self, Formatter, Write},
     rc::Rc,
 };
 
@@ -996,7 +1000,7 @@ impl GlobalEnv {
             }
             assert_eq!(key.inst.len(), memory.inst.len());
             let adapter = TypeUnificationAdapter::new_vec(&memory.inst, &key.inst, true, true);
-            let rel = adapter.unify(Variance::Allow, true);
+            let rel = adapter.unify(Variance::SpecVariance, true);
             if rel.is_some() {
                 inv_ids.extend(val.clone());
             }
@@ -1748,6 +1752,50 @@ impl Default for GlobalEnv {
     }
 }
 
+impl GlobalEnv {
+    pub fn dump_env(&self) -> String {
+        let spool = self.symbol_pool();
+        let tctx = &self.get_type_display_ctx();
+        let writer = CodeWriter::new(self.internal_loc());
+        for module in self.get_modules() {
+            if !module.is_target() {
+                continue;
+            }
+            emitln!(writer, "module {} {{", module.get_full_name_str());
+            writer.indent();
+            for str in module.get_structs() {
+                emitln!(writer, "struct {} {{", str.get_name().display(spool));
+                writer.indent();
+                for fld in str.get_fields() {
+                    emitln!(
+                        writer,
+                        "{}: {},",
+                        fld.get_name().display(spool),
+                        fld.get_type().display(tctx)
+                    );
+                }
+                writer.unindent();
+                emitln!(writer, "}");
+            }
+            for fun in module.get_functions() {
+                emit!(writer, "{}", fun.get_header());
+                if let Some(exp) = fun.get_def() {
+                    emitln!(writer, " {");
+                    writer.indent();
+                    emitln!(writer, "{}", exp.display_for_fun(fun.clone()));
+                    writer.unindent();
+                    emitln!(writer, "}");
+                } else {
+                    emitln!(writer, ";");
+                }
+            }
+            writer.unindent();
+            emitln!(writer, "}} // end {}", module.get_full_name_str())
+        }
+        writer.extract_result()
+    }
+}
+
 // =================================================================================================
 /// # Module Environment
 
@@ -2202,12 +2250,13 @@ impl<'env> ModuleEnv<'env> {
             SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
             SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
             SignatureToken::Reference(t) => Type::Reference(
-                false,
+                ReferenceKind::Immutable,
                 Box::new(self.internal_globalize_signature(module, t)),
             ),
-            SignatureToken::MutableReference(t) => {
-                Type::Reference(true, Box::new(self.internal_globalize_signature(module, t)))
-            },
+            SignatureToken::MutableReference(t) => Type::Reference(
+                ReferenceKind::Mutable,
+                Box::new(self.internal_globalize_signature(module, t)),
+            ),
             SignatureToken::TypeParameter(index) => Type::TypeParameter(*index),
             SignatureToken::Vector(bt) => {
                 Type::Vector(Box::new(self.internal_globalize_signature(module, bt)))
@@ -2866,11 +2915,8 @@ pub struct FunctionData {
     /// Whether this is a native function
     pub(crate) is_native: bool,
 
-    /// Whether this an entry function.
-    pub(crate) is_entry: bool,
-
-    /// Whether this is an inline function.
-    pub(crate) is_inline: bool,
+    /// The kind of the function.
+    pub(crate) kind: FunctionKind,
 
     /// Attributes attached to this function.
     pub(crate) attributes: Vec<Attribute>,
@@ -2899,6 +2945,14 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the called functions.
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+}
+
+/// Kind of a function,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FunctionKind {
+    Regular,
+    Inline,
+    Entry,
 }
 
 #[derive(Debug, Clone)]
@@ -3131,14 +3185,14 @@ impl<'env> FunctionEnv<'env> {
         self.data.is_native
     }
 
-    /// Return true if the function is an entry fucntion
+    /// Return true if the function is an entry function
     pub fn is_entry(&self) -> bool {
-        self.data.is_entry
+        self.data.kind == FunctionKind::Entry
     }
 
-    /// Return true if the function is an inline fucntion
+    /// Return true if the function is an inline function
     pub fn is_inline(&self) -> bool {
-        self.data.is_inline
+        self.data.kind == FunctionKind::Inline
     }
 
     /// Return the visibility string for this function. Useful for formatted printing.
@@ -3498,6 +3552,53 @@ impl<'env> FunctionEnv<'env> {
         self.symbol_pool().string(self.get_name())
     }
 
+    /// Returns a string representation of the functions 'header', as it is declared in Move.
+    pub fn get_header(&self) -> String {
+        let mut s = String::new();
+        s.push_str(match self.data.visibility {
+            Visibility::Private => "private",
+            Visibility::Public => "public",
+            Visibility::Friend => "friend",
+        });
+        s.push_str(match self.data.kind {
+            FunctionKind::Regular => "",
+            FunctionKind::Inline => " inline",
+            FunctionKind::Entry => " entry",
+        });
+        if self.is_native() {
+            s.push_str(" native")
+        }
+        let spool = self.symbol_pool();
+        let tctx = &self.get_type_display_ctx();
+        let generics = if !self.data.type_params.is_empty() {
+            format!(
+                "<{}>",
+                self.data
+                    .type_params
+                    .iter()
+                    .map(|p| p.0.display(spool).to_string())
+                    .join(",")
+            )
+        } else {
+            "".to_owned()
+        };
+        let args = self
+            .data
+            .params
+            .iter()
+            .map(|p| format!("{}: {}", p.0.display(spool), p.1.display(tctx)))
+            .join(",");
+        write!(
+            s,
+            " fun {}{}({})",
+            self.get_name().display(spool),
+            generics,
+            args
+        )
+        .unwrap();
+        s
+    }
+
     /// Returns the function name with the module name excluding the address
     pub fn get_name_string(&self) -> Rc<str> {
         if self.module_env.is_script_module() {
@@ -3525,7 +3626,7 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
         let type_param_names = self
             .get_type_parameters()
             .iter()

@@ -1,7 +1,7 @@
 module aptos_std::type_info {
     use std::bcs;
-    use std::string;
     use std::features;
+    use std::string::{Self, String};
     use std::vector;
 
     //
@@ -47,9 +47,13 @@ module aptos_std::type_info {
         chain_id_internal()
     }
 
+    /// Return the `TypeInfo` struct containing  for the type `T`.
     public native fun type_of<T>(): TypeInfo;
 
-    public native fun type_name<T>(): string::String;
+    /// Return the human readable string for the type, including the address, module name, and any type arguments.
+    /// Example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
+    /// Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
+    public native fun type_name<T>(): String;
 
     native fun chain_id_internal(): u8;
 
@@ -65,12 +69,23 @@ module aptos_std::type_info {
         vector::length(&bcs::to_bytes(val_ref))
     }
 
+    #[test_only]
+    use aptos_std::table::Table;
+
     #[test]
-    fun test() {
+    fun test_type_of() {
         let type_info = type_of<TypeInfo>();
         assert!(account_address(&type_info) == @aptos_std, 0);
         assert!(module_name(&type_info) == b"type_info", 1);
         assert!(struct_name(&type_info) == b"TypeInfo", 2);
+    }
+
+    #[test]
+    fun test_type_of_with_type_arg() {
+        let type_info = type_of<Table<String, String>>();
+        assert!(account_address(&type_info) == @aptos_std, 0);
+        assert!(module_name(&type_info) == b"table", 1);
+        assert!(struct_name(&type_info) == b"Table<0x1::string::String, 0x1::string::String>", 2);
     }
 
     #[test(fx = @std)]
@@ -84,7 +99,7 @@ module aptos_std::type_info {
 
     #[test]
     fun test_type_name() {
-        use aptos_std::table::Table;
+
 
         assert!(type_name<bool>() == string::utf8(b"bool"), 0);
         assert!(type_name<u8>() == string::utf8(b"u8"), 1);

@@ -174,7 +174,7 @@ impl<'a> Context<'a> {
             .unwrap_or_else(|_| PathBuf::from("."))
             .to_string_lossy()
             .to_string()
-            + &std::path::MAIN_SEPARATOR.to_string();
+            + std::path::MAIN_SEPARATOR_STR;
         if file_path.starts_with(&current_dir) {
             file_path[current_dir.len()..].to_string()
         } else {
@@ -255,7 +255,6 @@ impl<'a> Context<'a> {
     pub fn derive_contracts(&self) -> Vec<Contract> {
         self.env
             .get_modules()
-            .into_iter()
             .filter_map(|ref m| {
                 if is_evm_contract_module(m) {
                     Some(self.extract_contract(m))

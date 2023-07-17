@@ -8,33 +8,29 @@ use crate::sharded_block_executor::{
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::transaction::TransactionOutput;
-use aptos_vm_logging::disable_speculative_logging;
 use move_core_types::vm_status::VMStatus;
 use std::sync::mpsc::{Receiver, Sender};
 
 /// A remote block executor that receives transactions from a channel and executes them in parallel.
 /// Currently it runs in the local machine and it will be further extended to run in a remote machine.
 pub struct ExecutorShard<S, E> {
+    num_shards: usize,
     shard_id: usize,
     executor_client: E,
     command_rx: Receiver<ExecutorShardCommand<S>>,
-    result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+    result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
 }
 
 impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard<S, E> {
     pub fn new(
-        num_executor_shards: usize,
+        num_shards: usize,
         executor_client: E,
         shard_id: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
-        result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+        result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
     ) -> Self {
-        if num_executor_shards > 1 {
-            // todo: speculative logging is not yet compatible with sharded block executor.
-            disable_speculative_logging();
-        }
-
         Self {
+            num_shards,
             shard_id,
             executor_client,
             command_rx,
@@ -43,10 +39,15 @@ impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard
     }
 
     pub fn start(&self) {
+        trace!(
+            "Shard starting, shard_id={}, num_shards={}.",
+            self.shard_id,
+            self.num_shards
+        );
         loop {
             let command = self.command_rx.recv().unwrap();
             match command {
-                ExecutorShardCommand::ExecuteBlock(
+                ExecutorShardCommand::ExecuteSubBlocks(
                     state_view,
                     transactions,
                     concurrency_level_per_shard,
@@ -55,7 +56,7 @@ impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
                         self.shard_id,
-                        transactions.len()
+                        transactions.num_txns()
                     );
                     let ret = self.executor_client.execute_block(
                         transactions,

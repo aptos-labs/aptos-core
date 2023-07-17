@@ -48,46 +48,49 @@
   "liveNow": false,
   "panels": [
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-      "editable": false,
-      "error": false,
-      "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
-      "fill": 0,
-      "fillGradient": 0,
-      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 0 },
-      "hiddenSeries": false,
-      "id": 6,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
       },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
-      "options": { "alertThreshold": true },
-      "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "span": 0,
-      "stack": false,
-      "steppedLine": false,
+      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 0 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "targets": [
         {
           "expr": "rate(container_cpu_usage_seconds_total{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", container=~\"$container\"}[$interval])",
@@ -97,17 +100,8 @@
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "CPU Usage",
-      "tooltip": { "shared": true, "sort": 0, "value_type": "individual" },
-      "type": "graph",
-      "xaxis": { "format": "", "logBase": 0, "mode": "time", "show": true, "values": [] },
-      "yaxes": [
-        { "format": "percentunit", "logBase": 1, "min": 0, "show": true },
-        { "format": "short", "logBase": 1, "show": true }
-      ],
-      "yaxis": { "align": false }
+      "type": "timeseries"
     },
     {
       "aliasColors": {},
@@ -141,7 +135,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -203,7 +197,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -268,7 +262,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -333,7 +327,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -397,7 +391,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -459,7 +453,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -521,7 +515,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
+      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -555,7 +549,7 @@
       "yaxis": { "align": false }
     }
   ],
-  "refresh": false,
+  "refresh": "",
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -730,8 +724,8 @@
         "multiFormat": "",
         "name": "interval",
         "options": [
-          { "selected": false, "text": "auto", "value": "$__auto_interval_interval" },
-          { "selected": true, "text": "1m", "value": "1m" },
+          { "selected": true, "text": "auto", "value": "$__auto_interval_interval" },
+          { "selected": false, "text": "1m", "value": "1m" },
           { "selected": false, "text": "5m", "value": "5m" },
           { "selected": false, "text": "10m", "value": "10m" },
           { "selected": false, "text": "30m", "value": "30m" },
@@ -760,6 +754,6 @@
   "timezone": "",
   "title": "system",
   "uid": "system",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

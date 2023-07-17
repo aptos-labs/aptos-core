@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: invalid call of `borrow_global`: generic count mismatch (expected 1 but found 2)
+  ┌─ tests/checking/naming/global_builtin_many_type_arguments.move:8:9
+  │
+8 │         borrow_global<R1, R2>(@0x1);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `exists`: generic count mismatch (expected 1 but found 3)
+  ┌─ tests/checking/naming/global_builtin_many_type_arguments.move:9:9
+  │
+9 │         exists<R1, R2, R3>(@0x1);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `move_from`: generic count mismatch (expected 1 but found 4)
+   ┌─ tests/checking/naming/global_builtin_many_type_arguments.move:10:17
+   │
+10 │         R1 {} = move_from<R1, R2, R3, R4>(@0x1);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `move_to`: generic count mismatch (expected 1 but found 5)
+   ┌─ tests/checking/naming/global_builtin_many_type_arguments.move:11:9
+   │
+11 │         move_to<R1, R2, R3, R4, R5>(account, R1{});
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

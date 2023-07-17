@@ -13,16 +13,19 @@
 //! | single entry key  | raw value bytes |
 //! ```
 
-use super::{ensure_slice_len_eq, SINGLE_ENTRY_CF_NAME};
+use super::ensure_slice_len_eq;
 use anyhow::{format_err, Result};
 use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
+    ColumnFamilyName,
 };
 use byteorder::ReadBytesExt;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use std::mem::size_of;
+
+pub const SINGLE_ENTRY_CF_NAME: ColumnFamilyName = "single_entry";
 
 define_schema!(
     SingleEntrySchema,

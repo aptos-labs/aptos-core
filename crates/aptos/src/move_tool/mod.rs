@@ -47,7 +47,7 @@ use aptos_types::{
     transaction::{TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
-use clap::{ArgEnum, Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{ColorChoice, StandardStream},
@@ -142,7 +142,7 @@ pub struct FrameworkPackageArgs {
     /// Local framework directory for the Aptos framework
     ///
     /// This is mutually exclusive with `--framework-git-rev`
-    #[clap(long, parse(from_os_str), group = "framework_package_args")]
+    #[clap(long, value_parser, group = "framework_package_args")]
     pub(crate) framework_local_dir: Option<PathBuf>,
 
     /// Skip pulling the latest git dependencies
@@ -165,13 +165,23 @@ impl FrameworkPackageArgs {
         const APTOS_FRAMEWORK: &str = "AptosFramework";
         const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
         const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
-        const DEFAULT_BRANCH: &str = "main";
+        const DEFAULT_BRANCH: &str = "mainnet";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), prompt_options)?;
         create_dir_if_not_exist(
             package_dir
                 .join(SourcePackageLayout::Sources.path())
+                .as_path(),
+        )?;
+        create_dir_if_not_exist(
+            package_dir
+                .join(SourcePackageLayout::Tests.path())
+                .as_path(),
+        )?;
+        create_dir_if_not_exist(
+            package_dir
+                .join(SourcePackageLayout::Scripts.path())
                 .as_path(),
         )?;
 
@@ -202,10 +212,13 @@ impl FrameworkPackageArgs {
             package: PackageInfo {
                 name: name.to_string(),
                 version: "1.0.0".to_string(),
-                author: None,
+                license: None,
+                authors: vec![],
             },
             addresses,
             dependencies,
+            dev_addresses: Default::default(),
+            dev_dependencies: Default::default(),
         };
 
         write_to_file(
@@ -229,7 +242,7 @@ pub struct InitPackage {
     pub(crate) name: String,
 
     /// Directory to create the new Move package
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) package_dir: Option<PathBuf>,
 
     /// Named addresses for the move binary
@@ -239,7 +252,7 @@ pub struct InitPackage {
     /// Example: alice=0x1234,bob=0x5678,greg=_
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
-    #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
+    #[clap(long, value_parser = crate::common::utils::parse_map::<String, MoveManifestAccountWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
 
     #[clap(flatten)]
@@ -301,6 +314,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                 .included_artifacts_args
                 .included_artifacts
                 .build_options(
+                    self.move_options.dev,
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
                     self.move_options.bytecode_version,
@@ -313,9 +327,9 @@ impl CliCommand<Vec<String>> for CompilePackage {
         }
         let ids = pack
             .modules()
-            .into_iter()
             .map(|m| m.self_id().to_string())
             .collect::<Vec<_>>();
+        // TODO: Also say how many scripts are compiled
         Ok(ids)
     }
 }
@@ -326,7 +340,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
 /// This can then be run with `aptos move run-script`
 #[derive(Parser)]
 pub struct CompileScript {
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub output_file: Option<PathBuf>,
     #[clap(flatten)]
     pub move_options: MovePackageDir,
@@ -359,6 +373,7 @@ impl CompileScript {
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             ..IncludedArtifacts::None.build_options(
+                self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
@@ -412,7 +427,7 @@ pub struct TestPackage {
     // TODO: Remove short, it's against the style guidelines, and update the name here
     #[clap(
         name = "instructions",
-        default_value = "100000",
+        default_value_t = 100000,
         short = 'i',
         long = "instructions"
     )]
@@ -435,6 +450,7 @@ impl CliCommand<&'static str> for TestPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         let mut config = BuildConfig {
+            dev_mode: self.move_options.dev,
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
             install_dir: self.move_options.output_dir.clone(),
@@ -444,6 +460,7 @@ impl CliCommand<&'static str> for TestPackage {
 
         // Build the Move model for extended checks
         let model = &build_model(
+            self.move_options.dev,
             self.move_options.get_package_path()?.as_path(),
             self.move_options.named_addresses(),
             None,
@@ -479,7 +496,7 @@ impl CliCommand<&'static str> for TestPackage {
             self.compute_coverage,
             &mut std::io::stdout(),
         )
-        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+        .map_err(|err| CliError::UnexpectedError(format!("Failed to run tests: {:#}", err)))?;
 
         // Print coverage summary if --coverage is set
         if self.compute_coverage {
@@ -549,6 +566,7 @@ impl CliCommand<&'static str> for ProvePackage {
 
         let result = task::spawn_blocking(move || {
             prover_options.prove(
+                move_options.dev,
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
                 move_options.bytecode_version,
@@ -587,6 +605,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             docgen_options,
         } = self;
         let build_options = BuildOptions {
+            dev: move_options.dev,
             with_srcs: false,
             with_abis: false,
             with_source_maps: false,
@@ -645,7 +664,7 @@ pub struct BuildPublishPayload {
     #[clap(flatten)]
     publish_package: PublishPackage,
     /// JSON output file to write publication transaction to
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub(crate) json_output_file: PathBuf,
 }
 
@@ -658,6 +677,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
             .included_artifacts_args
             .included_artifacts
             .build_options(
+                self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
@@ -689,7 +709,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
     }
 }
 
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum IncludedArtifacts {
     None,
     Sparse,
@@ -724,6 +744,7 @@ impl FromStr for IncludedArtifacts {
 impl IncludedArtifacts {
     pub(crate) fn build_options(
         self,
+        dev: bool,
         skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
@@ -731,6 +752,7 @@ impl IncludedArtifacts {
         use IncludedArtifacts::*;
         match self {
             None => BuildOptions {
+                dev,
                 with_srcs: false,
                 with_abis: false,
                 with_source_maps: false,
@@ -742,6 +764,7 @@ impl IncludedArtifacts {
                 ..BuildOptions::default()
             },
             Sparse => BuildOptions {
+                dev,
                 with_srcs: true,
                 with_abis: false,
                 with_source_maps: false,
@@ -752,6 +775,7 @@ impl IncludedArtifacts {
                 ..BuildOptions::default()
             },
             All => BuildOptions {
+                dev,
                 with_srcs: true,
                 with_abis: true,
                 with_source_maps: true,
@@ -896,6 +920,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
 
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts_args.included_artifacts.build_options(
+            move_options.dev,
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
             move_options.bytecode_version,
@@ -941,7 +966,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
 #[derive(Parser)]
 pub struct DownloadPackage {
     /// Address of the account containing the package
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     /// Name of the package
@@ -949,7 +974,7 @@ pub struct DownloadPackage {
     pub package: String,
 
     /// Directory to store downloaded package. Defaults to the current directory.
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub output_dir: Option<PathBuf>,
 
     #[clap(flatten)]
@@ -999,7 +1024,7 @@ impl CliCommand<&'static str> for DownloadPackage {
 #[derive(Parser)]
 pub struct VerifyPackage {
     /// Address of the account containing the package
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     /// Artifacts to be generated when building this package.
@@ -1026,6 +1051,7 @@ impl CliCommand<&'static str> for VerifyPackage {
             install_dir: self.move_options.output_dir.clone(),
             bytecode_version: self.move_options.bytecode_version,
             ..self.included_artifacts.build_options(
+                self.move_options.dev,
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
@@ -1063,7 +1089,7 @@ impl CliCommand<&'static str> for VerifyPackage {
 #[derive(Parser)]
 pub struct ListPackage {
     /// Address of the account for which to list packages.
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     /// Type of items to query
@@ -1078,7 +1104,7 @@ pub struct ListPackage {
     pub(crate) profile_options: ProfileOptions,
 }
 
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum MoveListQuery {
     Packages,
 }
@@ -1443,7 +1469,7 @@ impl FromStr for FunctionArgType {
 }
 
 /// A parseable arg with a type separated by a colon
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ArgWithType {
     pub(crate) _ty: FunctionArgType,
     pub(crate) _vector_depth: u8,

@@ -62,6 +62,6 @@ fn test_safety_data_upgrade() {
         preferred_round: 100,
         last_vote: None,
     };
-    let value = serde_json::to_value(&old_data).unwrap();
+    let value = serde_json::to_value(old_data).unwrap();
     let _: SafetyData = serde_json::from_value(value).unwrap();
 }

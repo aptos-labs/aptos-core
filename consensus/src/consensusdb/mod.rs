@@ -7,11 +7,7 @@ mod consensusdb_test;
 mod schema;
 
 use crate::{
-    consensusdb::schema::{
-        block::BlockSchema,
-        quorum_certificate::QCSchema,
-        single_entry::{SingleEntryKey, SingleEntrySchema},
-    },
+    dag::{CertifiedNode, Node, NodeId, Vote},
     error::DbError,
 };
 use anyhow::Result;
@@ -19,7 +15,13 @@ use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
-use schema::{BLOCK_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME};
+use schema::{
+    block::BlockSchema,
+    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema},
+    quorum_certificate::QCSchema,
+    single_entry::{SingleEntryKey, SingleEntrySchema},
+    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, NODE_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME,
+};
 use std::{collections::HashMap, iter::Iterator, path::Path, time::Instant};
 
 /// The name of the consensus db file
@@ -52,6 +54,8 @@ impl ConsensusDB {
             BLOCK_CF_NAME,
             QC_CF_NAME,
             SINGLE_ENTRY_CF_NAME,
+            NODE_CF_NAME,
+            CERTIFIED_NODE_CF_NAME,
         ];
 
         let path = db_root_path.as_ref().join(CONSENSUS_DB_NAME);
@@ -186,5 +190,61 @@ impl ConsensusDB {
         let mut iter = self.db.iter::<QCSchema>(ReadOptions::default())?;
         iter.seek_to_first();
         Ok(iter.collect::<Result<HashMap<HashValue, QuorumCert>>>()?)
+    }
+
+    pub fn save_node(&self, node: &Node) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.put::<NodeSchema>(&node.digest(), node)?;
+        self.commit(batch)?;
+        Ok(())
+    }
+
+    pub fn delete_node(&self, digest: HashValue) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.delete::<NodeSchema>(&digest)?;
+        self.commit(batch)
+    }
+
+    pub fn save_dag_vote(&self, node_id: &NodeId, vote: &Vote) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.put::<DagVoteSchema>(node_id, vote)?;
+        self.commit(batch)
+    }
+
+    pub fn get_dag_votes(&self) -> Result<HashMap<NodeId, Vote>, DbError> {
+        let mut iter = self.db.iter::<DagVoteSchema>(ReadOptions::default())?;
+        iter.seek_to_first();
+        Ok(iter.collect::<Result<HashMap<NodeId, Vote>>>()?)
+    }
+
+    pub fn delete_dag_votes(&self, node_ids: Vec<NodeId>) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        node_ids
+            .iter()
+            .try_for_each(|node_id| batch.delete::<DagVoteSchema>(node_id))?;
+        self.commit(batch)
+    }
+
+    pub fn save_certified_node(&self, node: &CertifiedNode) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.put::<CertifiedNodeSchema>(&node.digest(), node)?;
+        self.commit(batch)?;
+        Ok(())
+    }
+
+    pub fn get_certified_nodes(&self) -> Result<HashMap<HashValue, CertifiedNode>, DbError> {
+        let mut iter = self
+            .db
+            .iter::<CertifiedNodeSchema>(ReadOptions::default())?;
+        iter.seek_to_first();
+        Ok(iter.collect::<Result<HashMap<HashValue, CertifiedNode>>>()?)
+    }
+
+    pub fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        digests
+            .iter()
+            .try_for_each(|hash| batch.delete::<CertifiedNodeSchema>(hash))?;
+        self.commit(batch)
     }
 }

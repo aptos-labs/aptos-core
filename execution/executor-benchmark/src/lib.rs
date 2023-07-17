@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod account_generator;
+pub mod block_partitioning;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
@@ -17,6 +18,7 @@ use crate::{
     pipeline::Pipeline, transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
+use aptos_block_executor::counters as block_executor_counters;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
 use aptos_executor::{
@@ -30,13 +32,13 @@ use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
 use aptos_logger::{info, warn};
+use aptos_metrics_core::Histogram;
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
     TransactionType::NonConflictingCoinTransfer,
 };
-use aptos_vm::counters::TXN_GAS_USAGE;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use pipeline::PipelineConfig;
 use std::{
@@ -96,7 +98,7 @@ fn create_checkpoint(
 pub fn run_benchmark<V>(
     block_size: usize,
     num_blocks: usize,
-    transaction_type: Option<TransactionType>,
+    transaction_mix: Option<Vec<(TransactionType, usize)>>,
     mut transactions_per_sender: usize,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
@@ -106,6 +108,7 @@ pub fn run_benchmark<V>(
     pruner_config: PrunerConfig,
     split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
+    skip_index_and_usage: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -122,9 +125,10 @@ pub fn run_benchmark<V>(
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
+    config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
-    let transaction_generator_creator = transaction_type.map(|transaction_type| {
+    let transaction_generator_creator = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
             num_existing_accounts,
@@ -132,14 +136,16 @@ pub fn run_benchmark<V>(
         );
 
         let mut num_accounts_to_skip = 0;
-        if let NonConflictingCoinTransfer{..} = transaction_type {
-            // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
-            // `3*block_size` addresses is required:
-            // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
-            if num_accounts_to_be_loaded < block_size * 3 {
-                panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
+        for (transaction_type, _) in &transaction_mix {
+            if let NonConflictingCoinTransfer{..} = transaction_type {
+                // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
+                // `3*block_size` addresses is required:
+                // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
+                if num_accounts_to_be_loaded < block_size * 3 {
+                    panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
+                }
+                num_accounts_to_skip = block_size;
             }
-            num_accounts_to_skip = block_size;
         }
 
         let accounts_cache =
@@ -148,7 +154,7 @@ pub fn run_benchmark<V>(
             accounts_cache.split(num_main_signer_accounts);
 
         init_workload::<V>(
-            transaction_type,
+            transaction_mix,
             main_signer_accounts,
             burner_accounts,
             db.clone(),
@@ -160,6 +166,8 @@ pub fn run_benchmark<V>(
                 skip_commit: false,
                 allow_discards: false,
                 allow_aborts: false,
+                num_executor_shards: 1,
+                async_partitioning: false,
             },
         )
     });
@@ -170,19 +178,22 @@ pub fn run_benchmark<V>(
         Pipeline::new(executor, version, pipeline_config.clone(), Some(num_blocks));
 
     let mut num_accounts_to_load = num_main_signer_accounts;
-    if let Some(NonConflictingCoinTransfer { .. }) = transaction_type {
-        // In case of non-conflicting coin transfer,
-        // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
-        // at least `block_size` number of accounts, all as signer only.
-        num_accounts_to_load = block_size;
-        if transactions_per_sender > 1 {
-            warn!(
-            "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
-        );
-            transactions_per_sender = 1;
+    if let Some(mix) = &transaction_mix {
+        for (transaction_type, _) in mix {
+            if let NonConflictingCoinTransfer { .. } = transaction_type {
+                // In case of non-conflicting coin transfer,
+                // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
+                // at least `block_size` number of accounts, all as signer only.
+                num_accounts_to_load = block_size;
+                if transactions_per_sender > 1 {
+                    warn!(
+                    "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
+                );
+                    transactions_per_sender = 1;
+                }
+            }
         }
     }
-
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
         genesis_key,
@@ -193,7 +204,7 @@ pub fn run_benchmark<V>(
     );
 
     let mut start_time = Instant::now();
-    let start_gas = TXN_GAS_USAGE.get_sample_sum();
+    let start_gas_measurement = GasMesurement::start();
 
     let start_execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     let start_vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
@@ -245,7 +256,8 @@ pub fn run_benchmark<V>(
 
     let elapsed = start_time.elapsed().as_secs_f64();
     let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
-    let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
+    let (delta_gas, delta_gas_count) = start_gas_measurement.end();
+
     let delta_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_time;
     info!(
         "VM execution TPS {} txn/s",
@@ -253,14 +265,18 @@ pub fn run_benchmark<V>(
     );
     info!(
         "Executed workload {}",
-        if let Some(ttype) = transaction_type {
-            format!("{:?} via txn generator", ttype)
+        if let Some(mix) = transaction_mix {
+            format!("{:?} via txn generator", mix)
         } else {
             "raw transfer".to_string()
         }
     );
     info!("Overall TPS: {} txn/s", delta_v / elapsed);
     info!("Overall GPS: {} gas/s", delta_gas / elapsed);
+    info!(
+        "Overall GPT: {} gas/txn",
+        delta_gas / (delta_gas_count as f64).max(1.0)
+    );
 
     let time_in_execution =
         APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_execution_total;
@@ -303,7 +319,7 @@ pub fn run_benchmark<V>(
 }
 
 fn init_workload<V>(
-    transaction_type: TransactionType,
+    transaction_mix: Vec<(TransactionType, usize)>,
     mut main_signer_accounts: Vec<LocalAccount>,
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
@@ -332,7 +348,7 @@ where
         };
 
         create_txn_generator_creator(
-            &[vec![(transaction_type, 1)]],
+            &[transaction_mix],
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
@@ -358,6 +374,7 @@ pub fn add_accounts<V>(
     verify_sequence_numbers: bool,
     split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
+    skip_index_and_usage: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -379,6 +396,7 @@ pub fn add_accounts<V>(
         verify_sequence_numbers,
         split_ledger_db,
         use_sharded_state_merkle_db,
+        skip_index_and_usage,
         pipeline_config,
     );
 }
@@ -393,6 +411,7 @@ fn add_accounts_impl<V>(
     verify_sequence_numbers: bool,
     split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
+    skip_index_and_usage: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -402,6 +421,7 @@ fn add_accounts_impl<V>(
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
+    config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
     let version = db.reader.get_latest_version().unwrap();
@@ -499,12 +519,15 @@ mod tests {
             verify_sequence_numbers,
             false,
             false,
+            false,
             PipelineConfig {
                 delay_execution_start: false,
                 split_stages: false,
                 skip_commit: false,
                 allow_discards: false,
                 allow_aborts: false,
+                num_executor_shards: 1,
+                async_partitioning: false,
             },
         );
 
@@ -513,7 +536,7 @@ mod tests {
         super::run_benchmark::<E>(
             6, /* block_size */
             5, /* num_blocks */
-            transaction_type.map(|t| t.materialize(2, false)),
+            transaction_type.map(|t| vec![(t.materialize(2, false), 1)]),
             2,  /* transactions per sender */
             25, /* num_main_signer_accounts */
             30, /* num_dst_pool_accounts */
@@ -523,12 +546,15 @@ mod tests {
             NO_OP_STORAGE_PRUNER_CONFIG,
             false,
             false,
+            false,
             PipelineConfig {
                 delay_execution_start: false,
                 split_stages: true,
                 skip_commit: false,
                 allow_discards: false,
                 allow_aborts: false,
+                num_executor_shards: 1,
+                async_partitioning: false,
             },
         );
     }
@@ -547,5 +573,48 @@ mod tests {
     fn test_native_benchmark() {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<NativeExecutor>(None, false);
+    }
+}
+
+struct GasMesurement {
+    start_gas: f64,
+    start_gas_count: u64,
+}
+
+impl GasMesurement {
+    pub fn sequential_gas_counter() -> Histogram {
+        block_executor_counters::TXN_GAS.with_label_values(&[
+            block_executor_counters::Mode::SEQUENTIAL,
+            block_executor_counters::GasType::NON_STORAGE_GAS,
+        ])
+    }
+
+    pub fn parallel_gas_counter() -> Histogram {
+        block_executor_counters::TXN_GAS.with_label_values(&[
+            block_executor_counters::Mode::PARALLEL,
+            block_executor_counters::GasType::NON_STORAGE_GAS,
+        ])
+    }
+
+    pub fn start() -> Self {
+        let start_gas = Self::sequential_gas_counter().get_sample_sum()
+            + Self::parallel_gas_counter().get_sample_sum();
+        let start_gas_count = Self::sequential_gas_counter().get_sample_count()
+            + Self::parallel_gas_counter().get_sample_count();
+
+        Self {
+            start_gas,
+            start_gas_count,
+        }
+    }
+
+    pub fn end(self) -> (f64, u64) {
+        let delta_gas = (Self::sequential_gas_counter().get_sample_sum()
+            + Self::parallel_gas_counter().get_sample_sum())
+            - self.start_gas;
+        let delta_gas_count = (Self::sequential_gas_counter().get_sample_count()
+            + Self::parallel_gas_counter().get_sample_count())
+            - self.start_gas_count;
+        (delta_gas, delta_gas_count)
     }
 }

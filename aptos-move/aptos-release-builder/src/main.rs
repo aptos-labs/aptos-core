@@ -3,7 +3,10 @@
 
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, ValidCryptoMaterialStringExt};
-use aptos_release_builder::validate::{DEFAULT_RESOLUTION_TIME, FAST_RESOLUTION_TIME};
+use aptos_release_builder::{
+    initialize_aptos_core_path,
+    validate::{DEFAULT_RESOLUTION_TIME, FAST_RESOLUTION_TIME},
+};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -12,6 +15,8 @@ use std::path::PathBuf;
 pub struct Argument {
     #[clap(subcommand)]
     cmd: Commands,
+    #[clap(long)]
+    aptos_core_path: Option<PathBuf>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -68,6 +73,7 @@ pub enum InputOptions {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Argument::parse();
+    initialize_aptos_core_path(args.aptos_core_path.clone());
 
     // TODO: Being able to parse the release config from a TOML file to generate the proposals.
     match args.cmd {
@@ -155,4 +161,10 @@ async fn main() -> Result<()> {
                 .await
         },
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Argument::command().debug_assert()
 }

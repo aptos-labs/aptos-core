@@ -10,9 +10,8 @@ OS = "linux"
 
 IMAGES = {
     "debian": "debian:bullseye",
-    "rust": "rust:1.66.1-bullseye",
+    "rust": "rust:1.70.0-bullseye",
 }
-
 
 def update() -> int:
     script_dir = os.path.dirname(os.path.realpath(__file__))

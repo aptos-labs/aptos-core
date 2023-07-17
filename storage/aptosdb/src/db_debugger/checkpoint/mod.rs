@@ -12,7 +12,7 @@ pub struct Cmd {
     #[clap(flatten)]
     db_dir: DbDir,
 
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     output_dir: PathBuf,
 }
 

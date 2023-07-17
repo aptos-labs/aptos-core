@@ -10,7 +10,7 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_transaction_generator_lib::TransactionType;
+use aptos_transaction_generator_lib::args::TransactionTypeArg;
 use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant};
 
@@ -22,8 +22,7 @@ pub async fn emit_transactions(
         let cluster = Cluster::try_from_cluster_args(cluster_args)
             .await
             .context("Failed to build cluster")?;
-        return emit_transactions_with_cluster(&cluster, emit_args, cluster_args.reuse_accounts)
-            .await;
+        emit_transactions_with_cluster(&cluster, emit_args, cluster_args.reuse_accounts).await
     } else {
         let initial_delay_after_minting = emit_args.coordination_delay_between_instances.unwrap();
         let start_time = Instant::now();
@@ -84,58 +83,13 @@ pub async fn emit_transactions_with_cluster(
         StdRng::from_entropy(),
     );
 
-    let arg_transaction_types = args
-        .transaction_type
-        .iter()
-        .map(|t| {
-            t.materialize(
-                args.module_working_set_size.unwrap_or(1),
-                args.sender_use_account_pool.unwrap_or(false),
-            )
-        })
-        .collect::<Vec<_>>();
-
-    let arg_transaction_weights = if args.transaction_weights.is_empty() {
-        vec![1; arg_transaction_types.len()]
-    } else {
-        assert_eq!(
-            args.transaction_weights.len(),
-            arg_transaction_types.len(),
-            "Transaction types and weights need to be the same length"
-        );
-        args.transaction_weights.clone()
-    };
-    let arg_transaction_phases = if args.transaction_phases.is_empty() {
-        vec![0; arg_transaction_types.len()]
-    } else {
-        assert_eq!(
-            args.transaction_phases.len(),
-            arg_transaction_types.len(),
-            "Transaction types and phases need to be the same length"
-        );
-        args.transaction_phases.clone()
-    };
-
-    let mut transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>> = Vec::new();
-    for (transaction_type, (weight, phase)) in arg_transaction_types.into_iter().zip(
-        arg_transaction_weights
-            .into_iter()
-            .zip(arg_transaction_phases.into_iter()),
-    ) {
-        assert!(
-            phase <= transaction_mix_per_phase.len(),
-            "cannot skip phases ({})",
-            transaction_mix_per_phase.len()
-        );
-        if phase == transaction_mix_per_phase.len() {
-            transaction_mix_per_phase.push(Vec::new());
-        }
-        transaction_mix_per_phase
-            .get_mut(phase)
-            .unwrap()
-            .push((transaction_type, weight));
-    }
-
+    let transaction_mix_per_phase = TransactionTypeArg::args_to_transaction_mix_per_phase(
+        &args.transaction_type,
+        &args.transaction_weights,
+        &args.transaction_phases,
+        args.module_working_set_size.unwrap_or(1),
+        args.sender_use_account_pool.unwrap_or(false),
+    );
     let mut emit_job_request =
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
             .mode(emitter_mode)

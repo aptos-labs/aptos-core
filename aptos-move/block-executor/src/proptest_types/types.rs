@@ -16,6 +16,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     executable::ModulePath,
+    fee_statement::FeeStatement,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
@@ -515,6 +516,10 @@ where
 
     fn gas_used(&self) -> u64 {
         1
+    }
+
+    fn fee_statement(&self) -> FeeStatement {
+        FeeStatement::new(1, 1, 0, 0, 0)
     }
 }
 

@@ -44,7 +44,7 @@ pub struct BackupCoordinatorOpt {
     // Defaulting to 1 to try to always have the latest state snapshot.
     #[clap(
         long,
-        default_value = "1",
+        default_value_t = 1,
         help = "Frequency (in number of epochs) to take state snapshots at epoch ending versions. \
         Adjacent epochs share much of the state, so it's inefficient storage-wise and bandwidth-wise \
         to take it too frequently. However, a recent snapshot is obviously desirable if one intends \
@@ -60,7 +60,7 @@ pub struct BackupCoordinatorOpt {
     // from a 1K TPS chain, and a few minutes replay time.
     #[clap(
         long,
-        default_value = "1000000",
+        default_value_t = 1000000,
         help = "The frequency (in transaction versions) to take an incremental transaction backup. \
         Making a transaction backup every 10 Million versions will result in the latest transaction \
         to appear in the backup potentially 10 Million versions later. If the net work is running \

@@ -3,7 +3,7 @@ import json
 import os
 import unittest
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import (
     Any,
@@ -80,18 +80,28 @@ class AssertFixtureMixin:
     def assertFixture(
         self: HasAssertMultiLineEqual, test_str: str, fixture_name: str
     ) -> None:
+        fixture = None
         fixture_path = get_fixture_path(fixture_name)
         if os.getenv("FORGE_WRITE_FIXTURES") == "true":
             print(f"Writing fixture to {str(fixture_path)}")
             fixture_path.write_text(test_str)
             fixture = test_str
         else:
-            fixture = fixture_path.read_text()
+            try:
+                fixture = fixture_path.read_text()
+            except FileNotFoundError as e:
+                raise Exception(
+                    f"Fixture {fixture_path} is missing.\nRun with FORGE_WRITE_FIXTURES=true to update the fixtures"
+                ) from e
+            except Exception as e:
+                raise Exception(
+                    f"Failed while reading fixture:\n{e}\nRun with FORGE_WRITE_FIXTURES=true to update the fixtures"
+                ) from e
         temp = Path(tempfile.mkstemp()[1])
         temp.write_text(test_str)
         self.assertMultiLineEqual(
             test_str,
-            fixture,
+            fixture or "",
             f"Fixture {fixture_name} does not match"
             "\n"
             f"Wrote to {str(temp)} for comparison"
@@ -119,6 +129,7 @@ def fake_context(
     processes=None,
     time=None,
     mode=None,
+    multiregion=False,
 ) -> ForgeContext:
     return ForgeContext(
         shell=shell if shell else FakeShell(),
@@ -147,8 +158,11 @@ def fake_context(
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
         forge_namespace="forge-potato",
-        forge_cluster=ForgeCluster(name="tomato", kubeconf="kubeconf"),
+        forge_cluster=ForgeCluster(
+            name="tomato", kubeconf="kubeconf", is_multiregion=multiregion
+        ),
         forge_test_suite="banana",
+        forge_username="banana-eater",
         forge_blocking=True,
         github_actions="false",
         github_job_url="https://banana",
@@ -241,6 +255,14 @@ class ForgeRunnerTests(unittest.TestCase):
                     "kubectl --kubeconfig kubeconf get pods -n forge-potato",
                     RunResult(0, b"Pods"),
                 ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
             ]
         )
         forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
@@ -255,6 +277,67 @@ class ForgeRunnerTests(unittest.TestCase):
             },
         )
         context = fake_context(shell, filesystem, mode="k8s")
+        runner = K8sForgeRunner()
+        result = runner.run(context)
+        shell.assert_commands(self)
+        filesystem.assert_writes(self)
+        filesystem.assert_reads(self)
+        self.assertEqual(result.state, ForgeState.PASS, result.output)
+
+    def testK8sRunnerWithMultiregionCluster(self) -> None:
+        self.maxDiff = None
+        shell = SpyShell(
+            [
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver apply -n default -f temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --timeout=5m --for=condition=Ready pod/forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf logs -n default -f forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pod -n default forge-potato-1659078000-asdf -o jsonpath='{.status.phase}'",
+                    RunResult(0, b"Succeeded"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pods -n forge-potato",
+                    RunResult(0, b"Pods"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
+            ]
+        )
+        forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
+        template_fixture = get_fixture_path("forge-test-runner-template.fixture")
+        filesystem = SpyFilesystem(
+            {
+                "temp1": template_fixture.read_bytes(),
+            },
+            {
+                "forge-test-runner-template.yaml": FILE_NOT_FOUND,
+                "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(),
+            },
+        )
+        context = fake_context(shell, filesystem, mode="k8s", multiregion=True)
         runner = K8sForgeRunner()
         result = runner.run(context)
         shell.assert_commands(self)
@@ -541,10 +624,21 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
             "testFormatReport.fixture",
         )
 
+    def testSanitizeForgeNamespaceLastCharacter(self) -> None:
+        namespace_with_invalid_last_char = "forge-$$$"
+        namespace = sanitize_forge_resource_name(namespace_with_invalid_last_char)
+        self.assertEqual(namespace, "forge---0")
+
     def testSanitizeForgeNamespaceSlashes(self) -> None:
         namespace_with_slash = "forge-banana/apple"
         namespace = sanitize_forge_resource_name(namespace_with_slash)
         self.assertEqual(namespace, "forge-banana-apple")
+
+    def testSanitizeForgeNamespaceStartsWith(self) -> None:
+        namespace_with_invalid_start = "frog-"
+        self.assertRaises(
+            Exception, sanitize_forge_resource_name, namespace_with_invalid_start
+        )
 
     def testSanitizeForgeNamespaceTooLong(self) -> None:
         namespace_too_long = "forge-" + "a" * 10000
@@ -553,6 +647,16 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
             namespace,
             "forge-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         )
+
+    def testPossibleAuthFailureMessage(self) -> None:
+        result = ForgeResult.empty()
+        context = fake_context()
+        now = context.time.now()
+        result._start_time = now - timedelta(seconds=4800)
+        result._end_time = now
+        result.state = ForgeState.FAIL
+        output = result.format(context)
+        self.assertFixture(output, "testPossibleAuthFailureMessage.fixture")
 
 
 class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
@@ -627,6 +731,16 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 ),
                 FakeCommand(
                     "kubectl --kubeconfig temp1 get pods -n forge-perry-1659078000",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 delete pod -n default -l forge-namespace=forge-perry-1659078000 "
+                    "--force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 wait -n default --for=delete pod -l "
+                    "forge-namespace=forge-perry-1659078000",
                     RunResult(0, b""),
                 ),
             ]

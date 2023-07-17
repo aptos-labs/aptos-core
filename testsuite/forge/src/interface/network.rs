@@ -16,7 +16,7 @@ use tokio::runtime::Runtime;
 /// nodes which comprise the network.
 pub trait NetworkTest: Test {
     /// Executes the test against the given context.
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()>;
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()>;
 }
 
 pub struct NetworkContext<'t> {

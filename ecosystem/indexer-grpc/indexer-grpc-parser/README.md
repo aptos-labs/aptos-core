@@ -16,9 +16,21 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
     server_config:
         processor_name: default_processor
         postgres_connection_string: postgresql://postgres:@localhost:5432/postgres_v2
-        indexer_grpc_data_service_addresss: 127.0.0.1:50051
+        indexer_grpc_data_service_address: 127.0.0.1:50051
+        indexer_grpc_http2_ping_interval_in_secs: 60
+        indexer_grpc_http2_ping_timeout_in_secs: 10
         auth_token: AUTH_TOKEN
     ```
+
+#### Config Explanation
+
+* `processor_name`: purpose of this processor; also used for monitoring purpose.
+* `postgres_connection_string`: PostgresQL DB connection string
+* `indexer_grpc_data_service_address`: Data service non-TLS endpoint address.
+* `indexer_grpc_http2_ping_interval_in_secs`: client-side grpc HTTP2 ping interval.
+* `indexer_grpc_http2_ping_timeout_in_secs`: client-side grpc HTTP2 ping timeout.
+* `auth_token`: Auth token used for connection.
+
 
 ### Use docker image for existing parsers(Only for **Unix/Linux**)
 * Use the provided `Dockerfile` and `config.yaml`(update accordingly)

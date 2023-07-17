@@ -5,13 +5,12 @@
 use crate::{
     executor::BlockExecutor,
     proptest_types::types::{
-        EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
+        EmptyDataView, ExpectedOutput, KeyType, Output, Task, Transaction, TransactionGen,
         TransactionGenParams, ValueType,
     },
+    txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::{
-    block_executor::partitioner::ExecutableTransactions, executable::ExecutableTestType,
-};
+use aptos_types::executable::ExecutableTestType;
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
 use proptest::{
@@ -36,7 +35,7 @@ pub(crate) struct BencherState<
 > where
     Vec<u8>: From<V>,
 {
-    transactions: ExecutableTransactions<Transaction<KeyType<K>, ValueType<V>>>,
+    transactions: Vec<Transaction<KeyType<K>, ValueType<V>>>,
     expected_output: ExpectedOutput<ValueType<V>>,
 }
 
@@ -106,7 +105,7 @@ where
         let expected_output = ExpectedOutput::generate_baseline(&transactions, None, None);
 
         Self {
-            transactions: ExecutableTransactions::Unsharded(transactions),
+            transactions,
             expected_output,
         }
     }
@@ -127,8 +126,9 @@ where
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
+            NoOpTransactionCommitHook<Output<KeyType<K>, ValueType<V>>, usize>,
             ExecutableTestType,
-        >::new(num_cpus::get(), executor_thread_pool, None)
+        >::new(num_cpus::get(), executor_thread_pool, None, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
         self.expected_output.assert_output(&output);

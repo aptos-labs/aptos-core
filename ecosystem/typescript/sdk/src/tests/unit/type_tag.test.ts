@@ -1,11 +1,22 @@
 import {
+  objectStructTag,
   StructTag,
+  TypeTag,
   TypeTagAddress,
   TypeTagBool,
   TypeTagParser,
   TypeTagParserError,
+  TypeTagSigner,
   TypeTagStruct,
+  TypeTagU128,
+  TypeTagU16,
+  TypeTagU256,
+  TypeTagU32,
+  TypeTagU64,
+  TypeTagU8,
+  TypeTagVector,
 } from "../../aptos_types/type_tag";
+import { Deserializer, Serializer } from "../../bcs";
 
 const expectedTypeTag = {
   string: "0x0000000000000000000000000000000000000000000000000000000000000001::some_module::SomeResource",
@@ -97,6 +108,18 @@ describe("TypeTagParser", () => {
       expect(result instanceof TypeTagAddress).toBeTruthy();
     });
 
+    test("TypeTagParser successfully parses an Option type", () => {
+      const typeTag = "0x1::option::Option<u8>";
+      const parser = new TypeTagParser(typeTag);
+      const result = parser.parseTypeTag();
+
+      if (result instanceof TypeTagStruct) {
+        expect(result.value === objectStructTag(new TypeTagU8()));
+      } else {
+        fail(`Not an option ${result}`);
+      }
+    });
+
     test("TypeTagParser successfully parses a strcut with a nested Object type", () => {
       const typeTag = "0x1::some_module::SomeResource<0x1::object::Object<T>>";
       const parser = new TypeTagParser(typeTag);
@@ -135,5 +158,112 @@ describe("TypeTagParser", () => {
       const result = parser.parseTypeTag();
       expect(result instanceof TypeTagBool).toBeTruthy();
     });
+  });
+});
+
+describe("Deserialize TypeTags", () => {
+  test("deserializes a TypeTagBool correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagBool();
+
+    tag.serialize(serializer);
+
+    expect(TypeTag.deserialize(new Deserializer(serializer.getBytes()))).toBeInstanceOf(TypeTagBool);
+  });
+
+  test("deserializes a TypeTagU8 correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagU8();
+
+    tag.serialize(serializer);
+
+    expect(TypeTag.deserialize(new Deserializer(serializer.getBytes()))).toBeInstanceOf(TypeTagU8);
+  });
+
+  test("deserializes a TypeTagU16 correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagU16();
+
+    tag.serialize(serializer);
+
+    expect(TypeTag.deserialize(new Deserializer(serializer.getBytes()))).toBeInstanceOf(TypeTagU16);
+  });
+
+  test("deserializes a TypeTagU32 correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagU32();
+
+    tag.serialize(serializer);
+
+    expect(TypeTag.deserialize(new Deserializer(serializer.getBytes()))).toBeInstanceOf(TypeTagU32);
+  });
+
+  test("deserializes a TypeTagU64 correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagU64();
+
+    tag.serialize(serializer);
+
+    expect(TypeTag.deserialize(new Deserializer(serializer.getBytes()))).toBeInstanceOf(TypeTagU64);
+  });
+
+  test("deserializes a TypeTagU128 correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagU128();
+
+    tag.serialize(serializer);
+
+    expect(TypeTag.deserialize(new Deserializer(serializer.getBytes()))).toBeInstanceOf(TypeTagU128);
+  });
+
+  test("deserializes a TypeTagU256 correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagU256();
+
+    tag.serialize(serializer);
+
+    expect(TypeTag.deserialize(new Deserializer(serializer.getBytes()))).toBeInstanceOf(TypeTagU256);
+  });
+
+  test("deserializes a TypeTagAddress correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagAddress();
+
+    tag.serialize(serializer);
+
+    expect(TypeTag.deserialize(new Deserializer(serializer.getBytes()))).toBeInstanceOf(TypeTagAddress);
+  });
+
+  test("deserializes a TypeTagSigner correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagSigner();
+
+    tag.serialize(serializer);
+
+    expect(TypeTag.deserialize(new Deserializer(serializer.getBytes()))).toBeInstanceOf(TypeTagSigner);
+  });
+
+  test("deserializes a TypeTagVector correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagVector(new TypeTagU32());
+
+    tag.serialize(serializer);
+    const deserialized = TypeTag.deserialize(new Deserializer(serializer.getBytes())) as TypeTagVector;
+    expect(deserialized).toBeInstanceOf(TypeTagVector);
+    expect(deserialized.value).toBeInstanceOf(TypeTagU32);
+  });
+
+  test("deserializes a TypeTagStruct correctly", () => {
+    const serializer = new Serializer();
+    const tag = new TypeTagStruct(StructTag.fromString(expectedTypeTag.string));
+
+    tag.serialize(serializer);
+    const deserialized = TypeTag.deserialize(new Deserializer(serializer.getBytes())) as TypeTagStruct;
+    expect(deserialized).toBeInstanceOf(TypeTagStruct);
+    expect(deserialized.value).toBeInstanceOf(StructTag);
+    expect(deserialized.value.address.toHexString()).toEqual(expectedTypeTag.address);
+    expect(deserialized.value.module_name.value).toEqual("some_module");
+    expect(deserialized.value.name.value).toEqual("SomeResource");
+    expect(deserialized.value.type_args.length).toEqual(0);
   });
 });

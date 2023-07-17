@@ -7,7 +7,10 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
-use aptos_types::{access_path::AccessPath, executable::ModulePath, write_set::WriteOp};
+use aptos_types::{
+    access_path::AccessPath, executable::ModulePath, fee_statement::FeeStatement,
+    write_set::WriteOp,
+};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -25,14 +28,18 @@ type TxnInput<K> = Vec<ReadDescriptor<K>>;
 // When a transaction is committed, the output delta writes must be populated by
 // the WriteOps corresponding to the deltas in the corresponding outputs.
 #[derive(Debug)]
-struct TxnOutput<T: TransactionOutput, E: Debug> {
+pub(crate) struct TxnOutput<T: TransactionOutput, E: Debug> {
     output_status: ExecutionStatus<T, Error<E>>,
 }
 type KeySet<T> = HashSet<<<T as TransactionOutput>::Txn as Transaction>::Key>;
 
 impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
-    fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
+    pub fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
         Self { output_status }
+    }
+
+    pub fn output_status(&self) -> &ExecutionStatus<T, Error<E>> {
+        &self.output_status
     }
 }
 
@@ -218,13 +225,14 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.inputs[txn_idx as usize].load_full()
     }
 
-    pub fn gas_used(&self, txn_idx: TxnIndex) -> Option<u64> {
+    /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
+    pub fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
         {
-            ExecutionStatus::Success(output) => Some(output.gas_used()),
+            ExecutionStatus::Success(output) => Some(output.fee_statement()),
             _ => None,
         }
     }
@@ -237,6 +245,10 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         } else {
             unreachable!();
         }
+    }
+
+    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<TxnOutput<T, E>>> {
+        self.outputs[txn_idx as usize].load_full()
     }
 
     // Extracts a set of paths written or updated during execution from transaction

@@ -22,7 +22,10 @@ Standard math utilities missing in the Move Language.
     -  [Function `max`](#@Specification_1_max)
     -  [Function `min`](#@Specification_1_min)
     -  [Function `average`](#@Specification_1_average)
+    -  [Function `clamp`](#@Specification_1_clamp)
     -  [Function `pow`](#@Specification_1_pow)
+    -  [Function `floor_log2`](#@Specification_1_floor_log2)
+    -  [Function `sqrt`](#@Specification_1_sqrt)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -376,7 +379,8 @@ For functions that approximate a value it's useful to test a value is close
 to the most correct value up to last digit
 
 
-<pre><code><b>fun</b> <a href="math64.md#0x1_math64_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u64)
+<pre><code>#[testonly]
+<b>fun</b> <a href="math64.md#0x1_math64_assert_approx_the_same">assert_approx_the_same</a>(x: u128, y: u128, precission: u64)
 </code></pre>
 
 
@@ -403,6 +407,22 @@ to the most correct value up to last digit
 <a name="@Specification_1"></a>
 
 ## Specification
+
+
+
+<a name="0x1_math64_spec_pow"></a>
+
+
+<pre><code><b>fun</b> <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n: u64, e: u64): u64 {
+   <b>if</b> (e == 0) {
+       1
+   }
+   <b>else</b> {
+       n * <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n, e-1)
+   }
+}
+</code></pre>
+
 
 
 <a name="@Specification_1_max"></a>
@@ -459,6 +479,26 @@ to the most correct value up to last digit
 
 
 
+<a name="@Specification_1_clamp"></a>
+
+### Function `clamp`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_clamp">clamp</a>(x: u64, lower: u64, upper: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> (lower &lt;= upper);
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> (lower &lt;=x && x &lt;= upper) ==&gt; result == x;
+<b>ensures</b> (x &lt; lower) ==&gt; result == lower;
+<b>ensures</b> (upper &lt; x) ==&gt; result == upper;
+</code></pre>
+
+
+
 <a name="@Specification_1_pow"></a>
 
 ### Function `pow`
@@ -477,18 +517,40 @@ to the most correct value up to last digit
 
 
 
+<a name="@Specification_1_floor_log2"></a>
 
-<a name="0x1_math64_spec_pow"></a>
+### Function `floor_log2`
 
 
-<pre><code><b>fun</b> <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n: u64, e: u64): u64 {
-   <b>if</b> (e == 0) {
-       1
-   }
-   <b>else</b> {
-       n * <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n, e-1)
-   }
-}
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_floor_log2">floor_log2</a>(x: u64): u8
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] x == 0;
+<b>ensures</b> [abstract] <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(2, result) &lt;= x;
+<b>ensures</b> [abstract] x &lt; <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(2, result+1);
+</code></pre>
+
+
+
+<a name="@Specification_1_sqrt"></a>
+
+### Function `sqrt`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_sqrt">sqrt</a>(x: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] x &gt; 0 ==&gt; result * result &lt;= x;
+<b>ensures</b> [abstract] x &gt; 0 ==&gt; x &lt; (result+1) * (result+1);
 </code></pre>
 
 

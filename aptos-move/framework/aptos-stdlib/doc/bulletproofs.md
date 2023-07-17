@@ -144,7 +144,7 @@ Returns the maximum # of bits that the range proof system can verify proofs for.
 ## Function `range_proof_from_bytes`
 
 Deserializes a range proof from a sequence of bytes. The serialization format is the same as the format in
-the zkcrypto's <code><a href="bulletproofs.md#0x1_bulletproofs">bulletproofs</a></code> library (https://crates.io/crates/bulletproofs).
+the zkcrypto's <code><a href="bulletproofs.md#0x1_bulletproofs">bulletproofs</a></code> library (https://docs.rs/bulletproofs/4.0.0/bulletproofs/struct.RangeProof.html#method.from_bytes).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_range_proof_from_bytes">range_proof_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="bulletproofs.md#0x1_bulletproofs_RangeProof">bulletproofs::RangeProof</a>
@@ -236,7 +236,7 @@ WARNING: The DST check is VERY important for security as it prevents proofs comp
 ## Function `verify_range_proof`
 
 Verifies a zero-knowledge range proof that the value <code>v</code> committed in <code>com</code> (as v * val_base + r * rand_base,
-for some randomness <code>r</code>) satisfies $v \in [0, 2^{num_bits})$. Only works for <code>num_bits</code> \in {8, 16, 32, 64}.
+for some randomness <code>r</code>) satisfies <code>v</code> in <code>[0, 2^num_bits)</code>. Only works for <code>num_bits</code> in <code>{8, 16, 32, 64}</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof">verify_range_proof</a>(com: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">bulletproofs::RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool

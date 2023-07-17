@@ -1,48 +1,52 @@
 // Copyright © Aptos Foundation
 
-use crate::block_executor::BlockAptosVM;
+use crate::block_executor::{AptosTransactionOutput, BlockAptosVM};
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::ExecutableTransactions,
+    block_executor::partitioner::{BlockExecutorTransactions, SubBlocksForShard},
     transaction::{Transaction, TransactionOutput},
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
 pub trait BlockExecutorClient {
-    fn execute_block<S: StateView + Sync>(
+    fn execute_block<S: StateView + Sync + Send>(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: SubBlocksForShard<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus>;
+    ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus>;
 }
 
-impl BlockExecutorClient for LocalExecutorClient {
-    fn execute_block<S: StateView + Sync>(
+impl BlockExecutorClient for VMExecutorClient {
+    fn execute_block<S: StateView + Sync + Send>(
         &self,
-        transactions: Vec<Transaction>,
+        sub_blocks: SubBlocksForShard<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block(
+    ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
+        Ok(vec![BlockAptosVM::execute_block::<
+            _,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+        >(
             self.executor_thread_pool.clone(),
-            // TODO: (skedia) Change this to sharded transactions
-            ExecutableTransactions::Unsharded(transactions),
+            BlockExecutorTransactions::Sharded(sub_blocks),
             state_view,
             concurrency_level,
             maybe_block_gas_limit,
-        )
+            None,
+        )?])
     }
 }
 
-pub struct LocalExecutorClient {
+pub struct VMExecutorClient {
     executor_thread_pool: Arc<rayon::ThreadPool>,
 }
 
-impl LocalExecutorClient {
+impl VMExecutorClient {
     pub fn new(num_threads: usize) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -56,11 +60,11 @@ impl LocalExecutorClient {
         }
     }
 
-    pub fn create_local_clients(num_shards: usize, num_threads: Option<usize>) -> Vec<Self> {
+    pub fn create_vm_clients(num_shards: usize, num_threads: Option<usize>) -> Vec<Self> {
         let num_threads = num_threads
             .unwrap_or_else(|| (num_cpus::get() as f64 / num_shards as f64).ceil() as usize);
         (0..num_shards)
-            .map(|_| LocalExecutorClient::new(num_threads))
+            .map(|_| VMExecutorClient::new(num_threads))
             .collect()
     }
 }

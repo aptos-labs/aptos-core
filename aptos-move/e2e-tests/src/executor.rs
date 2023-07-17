@@ -14,13 +14,16 @@ use crate::{
 };
 use anyhow::Error;
 use aptos_bitvec::BitVec;
+use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas::{
-    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters,
+    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasMeter,
     LATEST_GAS_FEATURE_VERSION,
 };
+use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_keygen::KeyGen;
+use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -28,7 +31,7 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
-    block_executor::partitioner::ExecutableTransactions,
+    block_executor::partitioner::BlockExecutorTransactions,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     on_chain_config::{
@@ -36,19 +39,20 @@ use aptos_types::{
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
-        VMValidatorResult,
+        ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionPayload,
+        TransactionStatus, VMValidatorResult,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
 };
 use aptos_vm::{
-    block_executor::BlockAptosVM,
+    block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
+use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -282,12 +286,17 @@ impl FakeExecutor {
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
+        let data = self.new_account_data_at(addr);
+        data.account().clone()
+    }
+
+    pub fn new_account_data_at(&mut self, addr: AccountAddress) -> AccountData {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
         let data = AccountData::with_account(acc, 1_000_000_000_000_000, 0);
         self.add_account_data(&data);
-        data.account().clone()
+        data
     }
 
     /// Applies a [`WriteSet`] to this executor's data store.
@@ -415,11 +424,12 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block(
+        BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
-            ExecutableTransactions::Unsharded(txn_block),
+            BlockExecutorTransactions::Unsharded(txn_block),
             &self.data_store,
             usize::min(4, num_cpus::get()),
+            None,
             None,
         )
     }
@@ -428,7 +438,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let mut trace_map = TraceSeqMapping::default();
+        let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
 
         // dump serialized transaction details before execution, if tracing
         if let Some(trace_dir) = &self.trace_dir {
@@ -484,6 +494,49 @@ impl FakeExecutor {
         outputs
             .pop()
             .expect("A block with one transaction should have one output")
+    }
+
+    pub fn execute_transaction_with_gas_profiler(
+        &self,
+        txn: SignedTransaction,
+    ) -> anyhow::Result<(TransactionOutput, TransactionGasLog)> {
+        let txn = txn
+            .check_signature()
+            .expect("invalid signature for transaction");
+
+        let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
+
+        let (_status, output, gas_profiler) =
+            AptosVM::execute_user_transaction_with_custom_gas_meter(
+                &self.data_store,
+                &txn,
+                &log_context,
+                |gas_feature_version, gas_params, storage_gas_params, balance| {
+                    let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
+                        gas_feature_version,
+                        gas_params,
+                        storage_gas_params,
+                        balance,
+                    ));
+                    let gas_profiler = match txn.payload() {
+                        TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
+                        TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                        ),
+                        TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
+                        TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+                    };
+                    Ok(gas_profiler)
+                },
+            )?;
+
+        Ok((
+            output.into_transaction_output(self.get_state_view())?,
+            gas_profiler.finish(),
+        ))
     }
 
     fn trace<P: AsRef<Path>, T: Serialize>(dir: P, item: &T) -> usize {
@@ -606,6 +659,60 @@ impl FakeExecutor {
 
     pub fn get_block_time_seconds(&mut self) -> u64 {
         self.block_time / 1_000_000
+    }
+
+    //// exec_module is like exec(), however, we can run a Module published under
+    //// the creator address instead of 0x1, as what is currently done in exec.
+    pub fn exec_module(
+        &mut self,
+        module: &ModuleId,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) {
+        let write_set = {
+            // FIXME: should probably read the timestamp from storage.
+            let timed_features =
+                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+            // TODO(Gas): we probably want to switch to non-zero costs in the future
+            let vm = MoveVmExt::new(
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+                LATEST_GAS_FEATURE_VERSION,
+                self.chain_id,
+                self.features.clone(),
+                timed_features,
+            )
+            .unwrap();
+            let remote_view = StorageAdapter::new(&self.data_store);
+            let mut session =
+                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+            session
+                .execute_function_bypass_visibility(
+                    module,
+                    &Self::name(function_name),
+                    type_params,
+                    args,
+                    &mut UnmeteredGasMeter,
+                )
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Error calling {}.{}: {}",
+                        module.to_string().as_str(),
+                        function_name,
+                        e.into_vm_status()
+                    )
+                });
+            let change_set = session
+                .finish(
+                    &mut (),
+                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                )
+                .expect("Failed to generate txn effects");
+            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            write_set
+        };
+        self.data_store.add_write_set(&write_set);
     }
 
     pub fn exec(

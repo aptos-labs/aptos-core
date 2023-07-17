@@ -60,7 +60,7 @@ impl UrlArgs {
 #[derive(Debug, Parser)]
 pub struct NetworkArgs {
     /// ChainId to be used for the server e.g. TESTNET
-    #[clap(long, default_value = "TESTING")]
+    #[clap(long, default_value_t = ChainId::test())]
     pub chain_id: ChainId,
 }
 
@@ -107,4 +107,10 @@ impl From<BlockArgs> for Option<PartialBlockIdentifier> {
             })
         }
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    RosettaCliArgs::command().debug_assert()
 }

@@ -51,7 +51,7 @@ struct StandardRelease {
     /// The release target. One of head, devnet, testnet, or mainnet. Notice the type
     /// of target determines what packages are included in the release. For example,
     /// some packages may be available in testnet, but aren't in mainnet.
-    #[clap(long, default_value = "head")]
+    #[clap(long, default_value_t = ReleaseTarget::Head)]
     target: ReleaseTarget,
 
     /// Remove the source code from the release package to shrink its size.
@@ -63,4 +63,10 @@ impl StandardRelease {
     fn execute(self) -> anyhow::Result<()> {
         self.target.create_release(!self.without_source_code, None)
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Commands::command().debug_assert()
 }

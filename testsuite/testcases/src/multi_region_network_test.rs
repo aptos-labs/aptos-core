@@ -34,38 +34,40 @@ fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
     stats_table
 }
 
-pub(crate) fn chunk_validators(validators: Vec<PeerId>, num_groups: usize) -> Vec<Vec<PeerId>> {
-    let approx_chunk_size = validators.len() / num_groups;
+/// Chunks the given set of peers into the number of specified groups
+pub(crate) fn chunk_peers(peers: Vec<PeerId>, num_groups: usize) -> Vec<Vec<PeerId>> {
+    // Chunk the peers into exact groups
+    let approx_chunk_size = peers.len() / num_groups;
+    let chunks = peers.chunks_exact(approx_chunk_size);
+    let mut peer_chunks: Vec<Vec<PeerId>> = chunks.clone().map(|chunk| chunk.to_vec()).collect();
 
-    let chunks = validators.chunks_exact(approx_chunk_size);
-
-    let mut validator_chunks: Vec<Vec<PeerId>> =
-        chunks.clone().map(|chunk| chunk.to_vec()).collect();
-
-    // Get any remaining validators and add them to the first group
-    let remaining_validators: Vec<PeerId> = chunks
+    // Get any remaining peers and add them to the first group
+    let remaining_peers: Vec<PeerId> = chunks
         .remainder()
         .iter()
-        // If `approx_validators_per_region` is 1, then it is possible we will have more regions than desired, so the
-        // remaining validators will be in the first group.
+        // If `approx_peers_per_region` is 1, then it is possible we will have more regions than
+        // desired, so the remaining peers will be in the first group.
         .chain(chunks.skip(num_groups).flatten())
         .cloned()
         .collect();
-    if !remaining_validators.is_empty() {
-        validator_chunks[0].append(remaining_validators.to_vec().as_mut());
+    if !remaining_peers.is_empty() {
+        peer_chunks[0].append(remaining_peers.to_vec().as_mut());
     }
 
-    validator_chunks
+    peer_chunks
 }
 
-/// Creates a table of validators grouped by region. The validators divided into N groups, where N is the number of regions
-/// provided in the link stats table. Any remaining validators are added to the first group.
+/// Creates a table of peers grouped by region. The peers are divided into N groups, where N is the
+/// number of regions provided in the link stats table. Any remaining peers are added to the first
+/// group.
 fn create_link_stats_table_with_peer_groups(
-    validators: Vec<PeerId>,
+    peers: Vec<PeerId>,
     link_stats_table: &LinkStatsTable,
 ) -> LinkStatsTableWithPeerGroups {
-    assert!(validators.len() >= link_stats_table.len());
+    // Verify that we have enough peers to simulate the link stats table
+    assert!(peers.len() >= link_stats_table.len());
 
+    // Verify that we have the correct number of regions to simulate the link stats table
     let number_of_regions = link_stats_table.len();
     assert!(
         number_of_regions >= 2,
@@ -76,20 +78,20 @@ fn create_link_stats_table_with_peer_groups(
         "ChaosMesh only supports simulating up to 4 regions."
     );
 
-    let validator_chunks = chunk_validators(validators, number_of_regions);
-
-    let validator_groups = validator_chunks
+    // Create the link stats table with peer groups
+    let peer_chunks = chunk_peers(peers, number_of_regions);
+    let peer_groups = peer_chunks
         .into_iter()
         .zip(link_stats_table.iter())
         .map(|(chunk, (from_region, stats))| (from_region.clone(), chunk, stats.clone()))
         .collect();
 
-    validator_groups
+    peer_groups
 }
 
 // A map of "source" regions to a map of "destination" region to (bandwidth, latency)
 type LinkStatsTable = BTreeMap<String, BTreeMap<String, (u64, f64)>>;
-// A map of "source" regions to a tuple of (list of validators, map of "destination" region to (bandwidth, latency))
+// A map of "source" regions to a tuple of (list of peers, map of "destination" region to (bandwidth, latency))
 type LinkStatsTableWithPeerGroups = Vec<(String, Vec<PeerId>, BTreeMap<String, (u64, f64)>)>;
 
 #[derive(Clone)]
@@ -113,8 +115,8 @@ impl Default for InterRegionNetEmConfig {
 
 impl InterRegionNetEmConfig {
     // Creates GroupNetEm for inter-region network chaos
-    fn build(&self, validator_groups: &LinkStatsTableWithPeerGroups) -> Vec<GroupNetEm> {
-        let group_netems: Vec<GroupNetEm> = validator_groups
+    fn build(&self, peer_groups: &LinkStatsTableWithPeerGroups) -> Vec<GroupNetEm> {
+        let group_netems: Vec<GroupNetEm> = peer_groups
             .iter()
             .combinations(2)
             .map(|comb| {
@@ -167,8 +169,8 @@ impl Default for IntraRegionNetEmConfig {
 }
 
 impl IntraRegionNetEmConfig {
-    fn build(&self, validator_groups: LinkStatsTableWithPeerGroups) -> Vec<GroupNetEm> {
-        let group_netems: Vec<GroupNetEm> = validator_groups
+    fn build(&self, peer_groups: LinkStatsTableWithPeerGroups) -> Vec<GroupNetEm> {
+        let group_netems: Vec<GroupNetEm> = peer_groups
             .iter()
             .map(|(region, chunk, _)| {
                 let netem = GroupNetEm {
@@ -210,17 +212,25 @@ impl Default for MultiRegionNetworkEmulationConfig {
 }
 
 /// A test to emulate network conditions for a multi-region setup.
+#[derive(Default)]
 pub struct MultiRegionNetworkEmulationTest {
-    pub override_config: Option<MultiRegionNetworkEmulationConfig>,
+    network_emulation_config: MultiRegionNetworkEmulationConfig,
 }
 
 impl MultiRegionNetworkEmulationTest {
+    pub fn new_with_config(network_emulation_config: MultiRegionNetworkEmulationConfig) -> Self {
+        Self {
+            network_emulation_config,
+        }
+    }
+
+    /// Creates a new SwarmNetEm to be injected via chaos. Note: network
+    /// emulation is only done for the validators in the swarm (and not
+    /// the fullnodes).
     fn create_netem_chaos(&self, swarm: &mut dyn Swarm) -> SwarmNetEm {
         let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
-
-        let config = self.override_config.clone().unwrap_or_default();
-
-        create_multi_region_swarm_network_chaos(all_validators, &config)
+        let network_emulation_config = self.network_emulation_config.clone();
+        create_multi_region_swarm_network_chaos(all_validators, Some(network_emulation_config))
     }
 }
 
@@ -230,18 +240,29 @@ impl Test for MultiRegionNetworkEmulationTest {
     }
 }
 
-fn create_multi_region_swarm_network_chaos(
-    all_validators: Vec<PeerId>,
-    config: &MultiRegionNetworkEmulationConfig,
+/// Creates a SwarmNetEm to be injected via chaos. Network emulation
+/// is added to all the given peers using the specified config.
+pub fn create_multi_region_swarm_network_chaos(
+    all_peers: Vec<PeerId>,
+    network_emulation_config: Option<MultiRegionNetworkEmulationConfig>,
 ) -> SwarmNetEm {
-    let validator_groups =
-        create_link_stats_table_with_peer_groups(all_validators, &config.link_stats_table);
+    // Determine the network emulation config to use
+    let network_emulation_config = network_emulation_config.unwrap_or_default();
 
-    let inter_region_netem = config.inter_region_config.build(&validator_groups);
-    let intra_region_netem = config
+    // Create the link stats table for the peer groups
+    let peer_groups = create_link_stats_table_with_peer_groups(
+        all_peers,
+        &network_emulation_config.link_stats_table,
+    );
+
+    // Create the inter and intra network emulation configs
+    let inter_region_netem = network_emulation_config
+        .inter_region_config
+        .build(&peer_groups);
+    let intra_region_netem = network_emulation_config
         .intra_region_config
         .as_ref()
-        .map(|config| config.build(validator_groups))
+        .map(|config| config.build(peer_groups))
         .unwrap_or_default();
 
     SwarmNetEm {
@@ -264,7 +285,7 @@ impl NetworkLoadTest for MultiRegionNetworkEmulationTest {
 }
 
 impl NetworkTest for MultiRegionNetworkEmulationTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
@@ -278,34 +299,26 @@ mod tests {
     fn test_create_multi_region_swarm_network_chaos() {
         aptos_logger::Logger::new().init();
 
-        let config = MultiRegionNetworkEmulationConfig::default();
+        // Create a config with 8 peers and multiple regions
+        let all_peers = (0..8).map(|_| PeerId::random()).collect();
+        let netem = create_multi_region_swarm_network_chaos(all_peers, None);
 
-        let all_validators = (0..8).map(|_| PeerId::random()).collect();
-        let netem = create_multi_region_swarm_network_chaos(all_validators, &config);
-
+        // Verify the number of group netems
         assert_eq!(netem.group_netems.len(), 10);
 
-        let all_validators: Vec<PeerId> = (0..10).map(|_| PeerId::random()).collect();
-        let netem = create_multi_region_swarm_network_chaos(all_validators.clone(), &config);
+        // Create a config with 10 peers and multiple regions
+        let all_peers: Vec<PeerId> = (0..10).map(|_| PeerId::random()).collect();
+        let netem = create_multi_region_swarm_network_chaos(all_peers.clone(), None);
 
+        // Verify the resulting group netems
         assert_eq!(netem.group_netems.len(), 10);
         assert_eq!(netem.group_netems[0].source_nodes.len(), 4);
         assert_eq!(netem.group_netems[0].target_nodes.len(), 4);
         assert_eq!(netem.group_netems[0], GroupNetEm {
             name: "aws--ap-northeast-1-self-netem".to_owned(),
             rate_in_mbps: 10000,
-            source_nodes: vec![
-                all_validators[0],
-                all_validators[1],
-                all_validators[8],
-                all_validators[9],
-            ],
-            target_nodes: vec![
-                all_validators[0],
-                all_validators[1],
-                all_validators[8],
-                all_validators[9],
-            ],
+            source_nodes: vec![all_peers[0], all_peers[1], all_peers[8], all_peers[9],],
+            target_nodes: vec![all_peers[0], all_peers[1], all_peers[8], all_peers[9],],
             delay_latency_ms: 50,
             delay_jitter_ms: 5,
             delay_correlation_percentage: 50,

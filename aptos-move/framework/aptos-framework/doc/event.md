@@ -18,7 +18,10 @@ events emitted to a handle and emit events to the event store.
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
 -  [Specification](#@Specification_0)
     -  [Function `emit_event`](#@Specification_0_emit_event)
+    -  [Function `guid`](#@Specification_0_guid)
+    -  [Function `counter`](#@Specification_0_counter)
     -  [Function `write_to_event_store`](#@Specification_0_write_to_event_store)
+    -  [Function `destroy_handle`](#@Specification_0_destroy_handle)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -243,6 +246,39 @@ Destroy a unique handle.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> handle_ref.<a href="event.md#0x1_event_counter">counter</a> &lt; MAX_U64 ==&gt; handle_ref.counter == <b>old</b>(handle_ref.counter) + 1;
+</code></pre>
+
+
+
+<a name="@Specification_0_guid"></a>
+
+### Function `guid`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid">guid</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): &<a href="guid.md#0x1_guid_GUID">guid::GUID</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_0_counter"></a>
+
+### Function `counter`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_counter">counter</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -260,6 +296,22 @@ Native function use opaque.
 
 
 <pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_0_destroy_handle"></a>
+
+### Function `destroy_handle`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop, store&gt;(handle: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

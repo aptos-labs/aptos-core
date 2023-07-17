@@ -6,13 +6,16 @@
   "scripts": {
     "bcs_transaction": "ts-node bcs_transaction.ts",
     "multisig_account": "ts-node multisig_account.ts",
+    "multisig_managed_coin": "ts-node multisig_managed_coin.ts",
     "multisig_transaction": "ts-node multisig_transaction.ts",
     "simple_nft": "ts-node simple_nft.ts",
     "transfer_coin": "ts-node transfer_coin.ts",
     "test": "run-s bcs_transaction multisig_transaction simple_nft transfer_coin",
     "your_coin": "ts-node your_coin.ts",
+    "your_fungible_asset": "ts-node your_fungible_asset.ts",
     "call_aptos_cli": "ts-node call_aptos_cli.ts",
-    "ambassador": "ts-node ambassador"
+    "ambassador": "ts-node ambassador",
+    "knight": "ts-node knight"
   },
   "keywords": [],
   "author": "",

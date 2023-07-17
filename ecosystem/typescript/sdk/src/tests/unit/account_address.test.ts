@@ -78,7 +78,7 @@ describe("AccountAddress", () => {
     expect(AccountAddress.isValid(`0x00${ADDRESS_LONG}`)).toBe(false);
   });
 
-  it.only("standardize address", () => {
+  it("standardize address", () => {
     const validAddress = "0x08743724fea179336994e9a66cff08676e3be6f8b227450cb3148288ba20a2e5";
     expect(AccountAddress.standardizeAddress(validAddress)).toBe(validAddress);
 

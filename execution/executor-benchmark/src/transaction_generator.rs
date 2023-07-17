@@ -212,10 +212,10 @@ impl TransactionGenerator {
         let metadata = TestCase::P2p(P2pTestCase {
             num_accounts: self.num_existing_accounts + num_new_accounts,
         });
-        let serialized = toml::to_vec(&metadata).unwrap();
+        let serialized = toml::ser::to_string(&metadata).unwrap();
         let meta_file = path.as_ref().join(META_FILENAME);
         let mut file = File::create(meta_file).unwrap();
-        file.write_all(&serialized).unwrap();
+        file.write_all(serialized.as_bytes()).unwrap();
     }
 
     pub fn read_meta<P: AsRef<Path>>(path: &P) -> usize {
@@ -223,7 +223,9 @@ impl TransactionGenerator {
         File::open(filename).map_or(0, |mut file| {
             let mut contents = vec![];
             file.read_to_end(&mut contents).unwrap();
-            let test_case: TestCase = toml::from_slice(&contents).expect("Must exist.");
+            let test_case: TestCase =
+                toml::from_str(&String::from_utf8(contents).expect("Must be UTF8"))
+                    .expect("Must exist.");
             let TestCase::P2p(P2pTestCase { num_accounts }) = test_case;
             num_accounts
         })
@@ -412,7 +414,6 @@ impl TransactionGenerator {
         for _ in 0..num_blocks {
             // TODO: handle when block_size isn't divisible by transactions_per_sender
             let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
-                .into_iter()
                 .flat_map(|_| {
                     let (sender, receivers) = self
                         .main_signer_accounts

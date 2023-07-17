@@ -12,9 +12,10 @@ use crate::{
     genesis::git::{from_yaml, to_yaml},
     Tool,
 };
+use aptos_cli_common::generate_cli_completions;
 use async_trait::async_trait;
-use clap::{ArgEnum, CommandFactory, Parser};
-use clap_complete::{generate, Shell};
+use clap::{Parser, ValueEnum};
+use clap_complete::Shell;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf, str::FromStr};
 
@@ -24,7 +25,6 @@ use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf, str::FromStr};
 /// default configuration, and user specific settings.
 #[derive(Parser)]
 pub enum ConfigTool {
-    Init(crate::common::init::InitTool),
     GenerateShellCompletions(GenerateShellCompletions),
     SetGlobalConfig(SetGlobalConfig),
     ShowGlobalConfig(ShowGlobalConfig),
@@ -34,7 +34,6 @@ pub enum ConfigTool {
 impl ConfigTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            ConfigTool::Init(tool) => tool.execute_serialized_success().await,
             ConfigTool::GenerateShellCompletions(tool) => tool.execute_serialized_success().await,
             ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized().await,
             ConfigTool::ShowGlobalConfig(tool) => tool.execute_serialized().await,
@@ -49,12 +48,12 @@ impl ConfigTool {
 /// to install the completion file.
 #[derive(Parser)]
 pub struct GenerateShellCompletions {
-    /// Shell to generate completions for one of [bash, elvish, powershell, zsh]
-    #[clap(long)]
+    /// Shell to generate completions
+    #[clap(long, value_enum, ignore_case = true)]
     shell: Shell,
 
     /// File to output shell completions to
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     output_file: PathBuf,
 }
 
@@ -65,11 +64,8 @@ impl CliCommand<()> for GenerateShellCompletions {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let mut command = Tool::command();
-        let mut file = std::fs::File::create(self.output_file.as_path())
-            .map_err(|err| CliError::IO(self.output_file.display().to_string(), err))?;
-        generate(self.shell, &mut command, "aptos".to_string(), &mut file);
-        Ok(())
+        generate_cli_completions::<Tool>("aptos", self.shell, self.output_file.as_path())
+            .map_err(|err| CliError::IO(self.output_file.display().to_string(), err))
     }
 }
 
@@ -272,7 +268,7 @@ const WORKSPACE: &str = "workspace";
 ///
 /// Workspace allows for multiple configs based on location, where
 /// Global allows for one config for every part of the code
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, ArgEnum)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, ValueEnum)]
 pub enum ConfigType {
     /// Per system user configuration put in `<HOME>/.aptos`
     Global,
@@ -318,7 +314,7 @@ const ASSUME_NO: &str = "no";
 ///
 /// Option can be one of ["yes", "no", "prompt"], "yes" runs cli with "--assume-yes", where
 /// "no" runs cli with "--assume-no", default: "prompt"
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, ArgEnum)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, ValueEnum)]
 pub enum PromptResponseType {
     /// normal prompt
     Prompt,

@@ -9,7 +9,7 @@ use log::{debug, info, warn};
 use move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
 use move_core_types::account_address::AccountAddress;
 use move_model::{
-    ast::{Address, ModuleName, SpecBlockInfo, SpecBlockTarget},
+    ast::{Address, Attribute, AttributeValue, ModuleName, SpecBlockInfo, SpecBlockTarget},
     code_writer::{CodeWriter, CodeWriterLabel},
     emit, emitln,
     model::{
@@ -123,8 +123,8 @@ pub struct Docgen<'env> {
     /// Mapping from module id to the set of schemas defined in this module.
     /// We currently do not have this information in the environment.
     declared_schemas: BTreeMap<ModuleId, BTreeSet<Symbol>>,
-    /// A list of file names and output generated for those files.
-    output: Vec<(String, String)>,
+    /// A map of file names to output generated for each file.
+    output: BTreeMap<String, String>,
     /// Map from module id to information about this module.
     infos: BTreeMap<ModuleId, ModuleInfo>,
     /// Current code writer.
@@ -237,7 +237,15 @@ impl<'env> Docgen<'env> {
             if !info.is_included && m.is_target() {
                 self.gen_module(&m, &info);
                 let path = self.make_file_in_out_dir(&info.target_file);
-                self.output.push((path, self.writer.extract_result()));
+                match self.output.get_mut(&path) {
+                    Some(out) => {
+                        out.push_str("\n\n");
+                        out.push_str(&self.writer.extract_result());
+                    },
+                    None => {
+                        self.output.insert(path, self.writer.extract_result());
+                    },
+                }
             }
         }
 
@@ -250,7 +258,7 @@ impl<'env> Docgen<'env> {
             {
                 let trimmed_content = content.trim();
                 if !trimmed_content.is_empty() {
-                    for (_, out) in self.output.iter_mut() {
+                    for out in self.output.values_mut() {
                         out.push_str("\n\n");
                         out.push_str(trimmed_content);
                         out.push('\n');
@@ -265,6 +273,9 @@ impl<'env> Docgen<'env> {
         }
 
         self.output
+            .iter()
+            .map(|(a, b)| (a.clone(), b.clone()))
+            .collect()
     }
 
     /// Compute the schemas declared in all modules. This information is currently not directly
@@ -372,10 +383,10 @@ impl<'env> Docgen<'env> {
         }
 
         // Add result to output.
-        self.output.push((
+        self.output.insert(
             self.make_file_in_out_dir(output_file_name),
             self.writer.extract_result(),
-        ));
+        );
     }
 
     /// Compute ModuleInfo for all modules, considering root template content.
@@ -477,7 +488,7 @@ impl<'env> Docgen<'env> {
         }
     }
 
-    /// Make a file name in the output directory.
+    /// Makes a file name in the output directory.
     fn make_file_in_out_dir(&self, name: &str) -> String {
         if self.options.compile_relative_to_output_dir {
             name.to_string()
@@ -488,7 +499,7 @@ impl<'env> Docgen<'env> {
         }
     }
 
-    /// Make path relative to other path.
+    /// Makes path relative to other path.
     fn path_relative_to(&self, path: &Path, to: &Path) -> PathBuf {
         if path.is_absolute() || to.is_absolute() {
             path.to_path_buf()
@@ -498,6 +509,68 @@ impl<'env> Docgen<'env> {
                 result.push("..");
             }
             result.join(path)
+        }
+    }
+
+    /// Gets a readable version of an attribute.
+    fn gen_attribute(&self, attribute: &Attribute) -> String {
+        let annotation_body: String = match attribute {
+            Attribute::Apply(_node_id, symbol, attribute_vector) => {
+                let symbol_string = self.name_string(*symbol).to_string();
+                if attribute_vector.is_empty() {
+                    symbol_string
+                } else {
+                    let value_string = self.gen_attributes(attribute_vector).iter().join(", ");
+                    format!("{}({})", symbol_string, value_string)
+                }
+            },
+            Attribute::Assign(_node_id, symbol, attribute_value) => {
+                let symbol_string = self.name_string(*symbol).to_string();
+                match attribute_value {
+                    AttributeValue::Value(_node_id, value) => {
+                        let value_string = self.env.display(value);
+                        format!("{} = {}", symbol_string, value_string)
+                    },
+                    AttributeValue::Name(_node_id, module_name_option, symbol2) => {
+                        let symbol2_name = self.name_string(*symbol2).to_string();
+                        let module_prefix = match module_name_option {
+                            None => "".to_string(),
+                            Some(ref module_name) => {
+                                format!("{}::", module_name.display_full(self.env))
+                            },
+                        };
+                        format!("{} = {}{}", symbol_string, module_prefix, symbol2_name)
+                    },
+                }
+            },
+        };
+        annotation_body
+    }
+
+    /// Returns attributes as vector of Strings like #[attr].
+    fn gen_attributes(&self, attributes: &[Attribute]) -> Vec<String> {
+        if !attributes.is_empty() {
+            attributes
+                .iter()
+                .map(|attr| format!("#[{}]", self.gen_attribute(attr)))
+                .collect::<Vec<String>>()
+        } else {
+            vec![]
+        }
+    }
+
+    /// Emits a labelled md-formatted attributes list if attributes_slice is non-empty.
+    fn emit_attributes_list(&self, attributes_slice: &[Attribute]) {
+        // Any attributes
+        let attributes = self
+            .gen_attributes(attributes_slice)
+            .iter()
+            .map(|attr| format!("\n    - `{}`", attr))
+            .join("");
+        if !attributes.is_empty() {
+            emit!(self.writer, "\n\n- Attributes:");
+            emit!(self.writer, &attributes);
+            emit!(self.writer, "\n\n");
         }
     }
 
@@ -535,6 +608,9 @@ impl<'env> Docgen<'env> {
         );
 
         self.increment_section_nest();
+
+        // Emit a list of attributes if non-empty.
+        self.emit_attributes_list(module_env.get_attributes());
 
         // Document module overview.
         self.doc_text(module_env.get_doc());
@@ -973,11 +1049,17 @@ impl<'env> Docgen<'env> {
         let name = self.name_string(struct_env.get_name());
         let type_params = self.type_parameter_list_display(struct_env.get_type_parameters());
         let ability_tokens = self.ability_tokens(struct_env.get_abilities());
+        let attributes_string = self
+            .gen_attributes(struct_env.get_attributes())
+            .iter()
+            .map(|attr| format!("{}\n", attr))
+            .join("");
         if ability_tokens.is_empty() {
-            format!("struct {}{}", name, type_params)
+            format!("{}struct {}{}", attributes_string, name, type_params)
         } else {
             format!(
-                "struct {}{} has {}",
+                "{}struct {}{} has {}",
+                attributes_string,
                 name,
                 type_params,
                 ability_tokens.join(", ")
@@ -1080,8 +1162,14 @@ impl<'env> Docgen<'env> {
         } else {
             "".to_owned()
         };
+        let attributes_string = self
+            .gen_attributes(func_env.get_attributes())
+            .iter()
+            .map(|attr| format!("{}\n", attr))
+            .join("");
         format!(
-            "{}{}fun {}{}({}){}",
+            "{}{}{}fun {}{}({}){}",
+            attributes_string,
             func_env.visibility_str(),
             entry_str,
             name,

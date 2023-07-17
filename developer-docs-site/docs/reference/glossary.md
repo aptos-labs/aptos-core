@@ -179,9 +179,12 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ### Faucet
 
-- **Faucet** is the way to create Aptos currency with no real-world value, only on our devnet.
-- The Faucet is a service running along with the devnet. This service only exists to facilitate minting coins for the devnet.
-- You can use the Faucet by sending a request to create coins and transfer them into a given account on your behalf.
+- **Faucet** is a service that mints APT on devnet and testnet. APT on these networks has no real world value, it is only for development purposes.
+- You can use the faucet in a few different ways:
+  - With the [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet).
+  - Through a wallet, such as Petra, Martian, or Pontem. You can find a full list [here](https://github.com/aptos-foundation/ecosystem-projects#wallets).
+  - Using an SDK, for example by using the `FaucetClient` in the TypeScript SDK.
+  - With a direct HTTP request. Learn how to do this [here](guides/system-integrators-guide.md#calling-the-faucet-other-languages).
 
 ### Fullnodes
 

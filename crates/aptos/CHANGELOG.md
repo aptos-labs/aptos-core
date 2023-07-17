@@ -2,10 +2,18 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## In Progress
+## [2.0.2] - 2023/07/06
 ### Added
 - Added account lookup by authentication key
   - Example: `account lookup-address --auth-key {your_auth_key}`
+### Updated
+- Updated CLI source compilation to use rust toolchain version 1.7.0 (from 1.66.1).
+- Set 2 seconds timeout for telemetry
+### Removed
+- init command from config subcommand is removed. Please use init from the root command.
+  - Example: `aptos config init` -> `aptos init`
+### Fixed
+- Panic issue when running `aptos move test` is fixed - GitHub issue #8516
 
 ## [2.0.1] - 2023/06/05
 ### Fixed

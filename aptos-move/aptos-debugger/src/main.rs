@@ -27,7 +27,7 @@ pub struct Argument {
     #[clap(long)]
     limit: u64,
 
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     concurrency_level: usize,
 }
 
@@ -52,4 +52,10 @@ async fn main() -> Result<()> {
     );
 
     Ok(())
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Argument::command().debug_assert()
 }
