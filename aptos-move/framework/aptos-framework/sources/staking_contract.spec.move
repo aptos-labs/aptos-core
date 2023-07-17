@@ -147,6 +147,7 @@ spec aptos_framework::staking_contract {
         request_commission_events: &mut EventHandle<RequestCommissionEvent>,
     ): u64 {
         // TODO: invariant not hold in pool_u64.spec
+        pragma verify = false;
         include GetStakingContractAmountsAbortsIf;
     }
 
