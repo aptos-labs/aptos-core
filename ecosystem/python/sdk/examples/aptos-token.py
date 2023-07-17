@@ -60,7 +60,7 @@ async def main():
 
     # This is a hack, once we add support for reading events or indexer, this will be easier
     resp = await rest_client.account_resource(alice.address(), "0x1::account::Account")
-    creation_num = int(resp["data"]["guid_creation_num"])
+    int(resp["data"]["guid_creation_num"])
 
     txn_hash = await token_client.mint_token(
         alice,
@@ -72,16 +72,13 @@ async def main():
     )
     await rest_client.wait_for_transaction(txn_hash)
 
+    minted_tokens = await token_client.tokens_minted_from_transaction(txn_hash)
+    assert len(minted_tokens) == 1
+    token_addr = minted_tokens[0]
+
     collection_addr = AccountAddress.for_named_collection(
         alice.address(), collection_name
     )
-    token_addr = AccountAddress.for_guid_object(alice.address(), creation_num)
-    """
-    alice_address = AccountAddress.from_hex("0xa018017dc40fd081d2001acdb2660058ed2011f2790a42c2a40bab99909fbde5")
-    collection_addr = AccountAddress.for_named_collection(alice_address, collection_name)
-    token_addr = AccountAddress.for_named_token(alice_address, collection_name, token_name)
-    """
-
     collection_data = await token_client.read_object(collection_addr)
     print(f"Alice's collection: {collection_data}")
     token_data = await token_client.read_object(token_addr)

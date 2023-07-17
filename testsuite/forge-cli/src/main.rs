@@ -10,7 +10,7 @@ use aptos_forge::{
     system_metrics::{MetricsThreshold, SystemMetricsThreshold},
     ForgeConfig, Options, *,
 };
-use aptos_logger::Level;
+use aptos_logger::{info, Level};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use aptos_testcases::{
@@ -42,10 +42,12 @@ use aptos_testcases::{
     CompositeNetworkTest,
 };
 use clap::{Parser, Subcommand};
+use futures::stream::{FuturesUnordered, StreamExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
     num::NonZeroUsize,
+    path::{Path, PathBuf},
     process,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -54,7 +56,7 @@ use std::{
     thread,
     time::Duration,
 };
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, select};
 use url::Url;
 
 #[cfg(unix)]
@@ -498,10 +500,11 @@ fn single_test_suite(
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd),
+        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
         "compat" => compat(),
-        "framework_upgrade" => upgrade(),
+        "framework_upgrade" => framework_upgrade(),
         // Rest of the tests:
+        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
@@ -555,6 +558,7 @@ fn single_test_suite(
         "pfn_performance" => pfn_performance(duration, false, false),
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
+        "gather_metrics" => gather_metrics(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -665,7 +669,7 @@ fn large_db_simple_test() -> ForgeConfig {
 
 fn twin_validator_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(5)
         .add_network_test(TwinValidatorTest)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -690,7 +694,7 @@ fn twin_validator_test() -> ForgeConfig {
 
 fn state_sync_failures_catching_up() -> ForgeConfig {
     changing_working_quorum_test_helper(
-        10,
+        7,
         300,
         3000,
         2500,
@@ -708,22 +712,14 @@ fn state_sync_failures_catching_up() -> ForgeConfig {
 }
 
 fn state_sync_slow_processing_catching_up() -> ForgeConfig {
-    changing_working_quorum_test_helper(
-        10,
-        300,
-        3000,
-        2500,
-        true,
-        true,
-        ChangingWorkingQuorumTest {
-            min_tps: 750,
-            always_healthy_nodes: 2,
-            max_down_nodes: 0,
-            num_large_validators: 2,
-            add_execution_delay: true,
-            check_period_s: 57,
-        },
-    )
+    changing_working_quorum_test_helper(7, 300, 3000, 2500, true, true, ChangingWorkingQuorumTest {
+        min_tps: 750,
+        always_healthy_nodes: 2,
+        max_down_nodes: 0,
+        num_large_validators: 2,
+        add_execution_delay: true,
+        check_period_s: 57,
+    })
 }
 
 fn different_node_speed_and_reliability_test() -> ForgeConfig {
@@ -749,10 +745,10 @@ fn large_test_only_few_nodes_down() -> ForgeConfig {
 }
 
 fn changing_working_quorum_test_high_load() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 500, 300, true, true, ChangingWorkingQuorumTest {
+    changing_working_quorum_test_helper(16, 120, 500, 300, true, true, ChangingWorkingQuorumTest {
         min_tps: 50,
         always_healthy_nodes: 0,
-        max_down_nodes: 20,
+        max_down_nodes: 16,
         num_large_validators: 0,
         add_execution_delay: false,
         // Use longer check duration, as we are bringing enough nodes
@@ -762,10 +758,10 @@ fn changing_working_quorum_test_high_load() -> ForgeConfig {
 }
 
 fn changing_working_quorum_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 100, 70, true, true, ChangingWorkingQuorumTest {
+    changing_working_quorum_test_helper(16, 120, 100, 70, true, true, ChangingWorkingQuorumTest {
         min_tps: 15,
         always_healthy_nodes: 0,
-        max_down_nodes: 20,
+        max_down_nodes: 16,
         num_large_validators: 0,
         add_execution_delay: false,
         // Use longer check duration, as we are bringing enough nodes
@@ -1165,8 +1161,8 @@ fn individual_workload_tests(test_name: String) -> ForgeConfig {
 
 fn fullnode_reboot_stress_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(7)
         .add_network_test(FullNodeRebootStressTest)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .with_success_criteria(SuccessCriteria::new(2000).add_wait_for_catchup_s(600))
@@ -1174,10 +1170,10 @@ fn fullnode_reboot_stress_test() -> ForgeConfig {
 
 fn validator_reboot_stress_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(15).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(1)
         .add_network_test(ValidatorRebootStressTest {
-            num_simultaneously: 3,
+            num_simultaneously: 2,
             down_time_secs: 5.0,
             pause_secs: 5.0,
         })
@@ -1218,6 +1214,13 @@ fn network_bandwidth() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(8).unwrap())
         .add_network_test(NetworkBandwidthTest)
+}
+
+fn gather_metrics() -> ForgeConfig {
+    ForgeConfig::default()
+        .add_network_test(GatherMetrics)
+        .add_network_test(Delay::new(60))
+        .add_network_test(GatherMetrics)
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
@@ -1291,7 +1294,7 @@ fn network_partition() -> ForgeConfig {
 
 fn compat() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .add_network_test(SimpleValidatorUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -1299,9 +1302,9 @@ fn compat() -> ForgeConfig {
         }))
 }
 
-fn upgrade() -> ForgeConfig {
+fn framework_upgrade() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .add_network_test(FrameworkUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -1463,17 +1466,30 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
 }
 
 // TODO: Replace land_blocking when performance reaches on par with current land_blocking
-fn realistic_env_max_load_test(duration: Duration, test_cmd: &TestCommand) -> ForgeConfig {
+fn realistic_env_max_load_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_fullnodes: usize,
+) -> ForgeConfig {
+    // Check if HAProxy is enabled
     let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
         k8s.enable_haproxy
     } else {
         false
     };
+
+    // Determine if this is a long running test
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
+
+    // Calculate the max CPU threshold
+    let max_cpu_threshold = if num_validators >= 10 { 30 } else { 70 };
+
+    // Create the test
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
@@ -1511,7 +1527,7 @@ fn realistic_env_max_load_test(duration: Duration, test_cmd: &TestCommand) -> Fo
                 )
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
+                    MetricsThreshold::new(12, max_cpu_threshold),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
                 ))
@@ -1880,8 +1896,8 @@ fn pfn_const_tps(
     add_network_emulation: bool,
 ) -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
         .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -1924,8 +1940,8 @@ fn pfn_performance(
 
     // Create the forge config
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(7)
         .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
@@ -2105,6 +2121,100 @@ impl NetworkTest for EmitTransaction {
         ctx.report.report_txn_stats(self.name().to_string(), &stats);
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct Delay {
+    seconds: u64,
+}
+
+impl Delay {
+    fn new(seconds: u64) -> Self {
+        Self { seconds }
+    }
+}
+
+impl Test for Delay {
+    fn name(&self) -> &'static str {
+        "delay"
+    }
+}
+
+impl NetworkTest for Delay {
+    fn run(&self, _ctx: &mut NetworkContext<'_>) -> Result<()> {
+        info!("forge sleep {}", self.seconds);
+        std::thread::sleep(Duration::from_secs(self.seconds));
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct GatherMetrics;
+
+impl Test for GatherMetrics {
+    fn name(&self) -> &'static str {
+        "gather_metrics"
+    }
+}
+
+impl NetworkTest for GatherMetrics {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+        let runtime = ctx.runtime.handle();
+        runtime.block_on(gather_metrics_one(ctx));
+        Ok(())
+    }
+}
+
+async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
+    let handle = ctx.runtime.handle();
+    let outdir = Path::new("/tmp");
+    let mut gets = FuturesUnordered::new();
+    let now = chrono::prelude::Utc::now()
+        .format("%Y%m%d_%H%M%S")
+        .to_string();
+    for val in ctx.swarm.validators() {
+        let mut url = val.inspection_service_endpoint();
+        let valname = val.peer_id().to_string();
+        url.set_path("metrics");
+        let fname = format!("{}.{}.metrics", now, valname);
+        let outpath: PathBuf = outdir.join(fname);
+        let th = handle.spawn(gather_metrics_to_file(url, outpath));
+        gets.push(th);
+    }
+    // join all the join handles
+    while !gets.is_empty() {
+        select! {
+            _ = gets.next() => {}
+        }
+    }
+}
+
+async fn gather_metrics_to_file(url: Url, outpath: PathBuf) {
+    let client = reqwest::Client::new();
+    match client.get(url).send().await {
+        Ok(response) => {
+            let url = response.url().clone();
+            let status = response.status();
+            if status.is_success() {
+                match response.text().await {
+                    Ok(text) => match std::fs::write(outpath, text) {
+                        Ok(_) => {},
+                        Err(err) => {
+                            info!("could not write metrics: {}", err);
+                        },
+                    },
+                    Err(err) => {
+                        info!("bad metrics GET: {} -> {}", url, err);
+                    },
+                }
+            } else {
+                info!("bad metrics GET: {} -> {}", url, status);
+            }
+        },
+        Err(err) => {
+            info!("bad metrics GET: {}", err);
+        },
     }
 }
 

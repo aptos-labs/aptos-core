@@ -26,6 +26,7 @@ at the moment.**
 -  [Function `destroy`](#0x1_aggregator_destroy)
 -  [Specification](#@Specification_1)
     -  [Struct `Aggregator`](#@Specification_1_Aggregator)
+    -  [Function `limit`](#@Specification_1_limit)
     -  [Function `add`](#@Specification_1_add)
     -  [Function `sub`](#@Specification_1_sub)
     -  [Function `read`](#@Specification_1_read)
@@ -272,6 +273,78 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
+<a name="@Specification_1_limit"></a>
+
+### Function `limit`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_read"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_get_limit"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_get_handle"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_handle">spec_get_handle</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_get_key"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_key">spec_get_key</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_aggregator_set_val"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, v: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_aggregator_get_val"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
+
+
 <a name="@Specification_1_add"></a>
 
 ### Function `add`
@@ -345,60 +418,6 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-</code></pre>
-
-
-
-
-<a name="0x1_aggregator_spec_read"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
-
-
-
-
-<a name="0x1_aggregator_spec_get_limit"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
-
-
-
-
-<a name="0x1_aggregator_spec_get_handle"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_handle">spec_get_handle</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
-
-
-
-
-<a name="0x1_aggregator_spec_get_key"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_key">spec_get_key</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
-
-
-
-
-<a name="0x1_aggregator_spec_aggregator_set_val"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, v: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>;
-</code></pre>
-
-
-
-
-<a name="0x1_aggregator_spec_aggregator_get_val"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
 </code></pre>
 
 

@@ -542,6 +542,13 @@ module aptos_framework::aptos_governance {
         reconfiguration::reconfigure();
     }
 
+    /// Update feature flags and also trigger reconfiguration.
+    public fun toggle_features(aptos_framework: &signer, enable: vector<u64>, disable: vector<u64>) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        features::change_feature_flags(aptos_framework, enable, disable);
+        reconfiguration::reconfigure();
+    }
+
     /// Only called in testnet where the core resources account exists and has been granted power to mint Aptos coins.
     public fun get_signer_testnet_only(
         core_resources: &signer, signer_address: address): signer acquires GovernanceResponsbility {
@@ -630,6 +637,12 @@ module aptos_framework::aptos_governance {
         } else {
             resolve(proposal_id, signer_address)
         }
+    }
+
+    #[test_only]
+    /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
+    public fun toggle_features_for_test(enable: vector<u64>, disable: vector<u64>) {
+        toggle_features(&account::create_signer_for_test(@0x1), enable, disable);
     }
 
     #[test_only]
