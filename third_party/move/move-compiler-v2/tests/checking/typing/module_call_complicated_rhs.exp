@@ -1,0 +1,73 @@
+
+Diagnostics:
+error: invalid call of `M::foo`: argument count mismatch (expected 0 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:11:9
+   │
+11 │         foo (if (cond) () else ());
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:13:9
+   │
+13 │         baz (if (cond) (false, @0x0) else (true, @0x1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: argument count mismatch (expected 0 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:17:9
+   │
+17 │         foo(if (cond) () else ());
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:19:9
+   │
+19 │         baz(if (cond) (false, @0x0) else (true, @0x1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: argument count mismatch (expected 0 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:23:9
+   │
+23 │         foo({});
+   │         ^^^^^^^
+
+error: invalid call of `M::foo`: argument count mismatch (expected 0 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:24:9
+   │
+24 │         foo({ let _x = 0; });
+   │         ^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:31:9
+   │
+31 │         baz({ (a, x) });
+   │         ^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:32:9
+   │
+32 │         baz({ let a = false; (a, x) });
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::foo`: argument count mismatch (expected 0 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:36:9
+   │
+36 │         foo({});
+   │         ^^^^^^^
+
+error: invalid call of `M::foo`: argument count mismatch (expected 0 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:37:9
+   │
+37 │         foo({ let _x = 0; });
+   │         ^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:44:9
+   │
+44 │         baz({ (a, x) });
+   │         ^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call_complicated_rhs.move:45:9
+   │
+45 │         baz({ let a = false; (a, x) });
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

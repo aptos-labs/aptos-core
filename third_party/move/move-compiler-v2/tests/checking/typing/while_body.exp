@@ -1,0 +1,96 @@
+// ---- Model Dump
+module 0x8675309::M {
+    private fun t0(cond: bool) {
+        loop {
+          if cond {
+            Tuple()
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            Tuple()
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            Tuple()
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            {
+              let x: () = 0;
+              x;
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            if cond {
+              Tuple()
+            } else {
+              Tuple()
+            }
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            break
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            break
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            continue
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            continue
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            return Tuple()
+          } else {
+            break
+          }
+        };
+        loop {
+          if cond {
+            loop {
+              if cond {
+                break
+              } else {
+                break
+              }
+            }
+          } else {
+            break
+          }
+        }
+    }
+} // end 0x8675309::M

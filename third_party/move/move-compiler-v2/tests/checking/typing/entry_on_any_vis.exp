@@ -1,0 +1,12 @@
+// ---- Model Dump
+module 0x2::M {
+    private entry fun f1() {
+        Tuple()
+    }
+    public entry fun f2() {
+        Tuple()
+    }
+    friend entry fun f3() {
+        Tuple()
+    }
+} // end 0x2::M

@@ -20,6 +20,10 @@ on:
         type: string
         default: land_blocking
         description: Test suite to run
+      FORGE_CLUSTER_NAME:
+        required: false
+        type: string
+        description: The Forge k8s cluster to be used for test
 
 env:
   GIT_SHA: ${{ github.sha }}
@@ -41,12 +45,14 @@ jobs:
           echo "FORGE_IMAGE_TAG: ${{ inputs.FORGE_IMAGE_TAG }}"
           echo "FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}"
           echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
+          echo "FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}"
     outputs:
       gitSha: ${{ env.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
       forgeImageTag: ${{ inputs.FORGE_IMAGE_TAG }}
       forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
       forgeTestSuite: ${{ inputs.FORGE_TEST_SUITE }}
+      forgeClusterName: ${{ inputs.FORGE_CLUSTER_NAME }}
 
   adhoc-forge-test:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
@@ -58,3 +64,4 @@ jobs:
       FORGE_IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.forgeImageTag }}
       FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forgeTestSuite }}
       FORGE_RUNNER_DURATION_SECS: ${{ fromJSON(needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs) }} # fromJSON converts to integer
+      FORGE_CLUSTER_NAME: ${{ needs.determine-forge-run-metadata.outputs.forgeClusterName }}

@@ -9,7 +9,7 @@
 //! |   digest   |   node/certified node    |
 //! ```
 
-use crate::dag::{CertifiedNode, Node};
+use crate::dag::{CertifiedNode, Node, NodeId, Vote};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_schemadb::{
@@ -33,6 +33,30 @@ impl KeyCodec<NodeSchema> for HashValue {
 }
 
 impl ValueCodec<NodeSchema> for Node {
+    fn encode_value(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+pub const DAG_VOTE_CF_NAME: ColumnFamilyName = "dag_vote";
+
+define_schema!(DagVoteSchema, NodeId, Vote, DAG_VOTE_CF_NAME);
+
+impl KeyCodec<DagVoteSchema> for NodeId {
+    fn encode_key(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_key(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+impl ValueCodec<DagVoteSchema> for Vote {
     fn encode_value(&self) -> Result<Vec<u8>> {
         Ok(bcs::to_bytes(&self)?)
     }

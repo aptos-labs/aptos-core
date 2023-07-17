@@ -164,7 +164,7 @@ fn test_two_to_two_transfer_fee_payer_is_sender() {
 
 #[test]
 fn test_two_to_two_transfer_fee_payer_without_feature() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::GAS_PAYER_ENABLED]);
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());

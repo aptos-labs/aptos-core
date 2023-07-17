@@ -72,84 +72,104 @@ export function ensureBigInt(val: number | bigint | string): bigint {
 }
 
 export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializer) {
+  serializeArgInner(argVal, argType, serializer, 0);
+}
+
+function serializeArgInner(argVal: any, argType: TypeTag, serializer: Serializer, depth: number) {
   if (argType instanceof TypeTagBool) {
     serializer.serializeBool(ensureBoolean(argVal));
-    return;
-  }
-  if (argType instanceof TypeTagU8) {
+  } else if (argType instanceof TypeTagU8) {
     serializer.serializeU8(ensureNumber(argVal));
-    return;
-  }
-  if (argType instanceof TypeTagU16) {
+  } else if (argType instanceof TypeTagU16) {
     serializer.serializeU16(ensureNumber(argVal));
-    return;
-  }
-  if (argType instanceof TypeTagU32) {
+  } else if (argType instanceof TypeTagU32) {
     serializer.serializeU32(ensureNumber(argVal));
-    return;
-  }
-  if (argType instanceof TypeTagU64) {
+  } else if (argType instanceof TypeTagU64) {
     serializer.serializeU64(ensureBigInt(argVal));
-    return;
-  }
-  if (argType instanceof TypeTagU128) {
+  } else if (argType instanceof TypeTagU128) {
     serializer.serializeU128(ensureBigInt(argVal));
-    return;
-  }
-  if (argType instanceof TypeTagU256) {
+  } else if (argType instanceof TypeTagU256) {
     serializer.serializeU256(ensureBigInt(argVal));
-    return;
+  } else if (argType instanceof TypeTagAddress) {
+    serializeAddress(argVal, serializer);
+  } else if (argType instanceof TypeTagVector) {
+    serializeVector(argVal, argType, serializer, depth);
+  } else if (argType instanceof TypeTagStruct) {
+    serializeStruct(argVal, argType, serializer, depth);
+  } else {
+    throw new Error("Unsupported arg type.");
   }
-  if (argType instanceof TypeTagAddress) {
-    let addr: AccountAddress;
-    if (typeof argVal === "string" || argVal instanceof HexString) {
-      addr = AccountAddress.fromHex(argVal);
-    } else if (argVal instanceof AccountAddress) {
-      addr = argVal;
-    } else {
-      throw new Error("Invalid account address.");
-    }
-    addr.serialize(serializer);
-    return;
+}
+
+function serializeAddress(argVal: any, serializer: Serializer) {
+  let addr: AccountAddress;
+  if (typeof argVal === "string" || argVal instanceof HexString) {
+    addr = AccountAddress.fromHex(argVal);
+  } else if (argVal instanceof AccountAddress) {
+    addr = argVal;
+  } else {
+    throw new Error("Invalid account address.");
   }
-  if (argType instanceof TypeTagVector) {
-    // We are serializing a vector<u8>
-    if (argType.value instanceof TypeTagU8) {
-      if (argVal instanceof Uint8Array) {
-        serializer.serializeBytes(argVal);
-        return;
-      }
+  addr.serialize(serializer);
+}
 
-      if (typeof argVal === "string") {
-        serializer.serializeStr(argVal);
-        return;
-      }
+function serializeVector(argVal: any, argType: TypeTagVector, serializer: Serializer, depth: number) {
+  // We are serializing a vector<u8>
+  if (argType.value instanceof TypeTagU8) {
+    if (argVal instanceof Uint8Array) {
+      serializer.serializeBytes(argVal);
+      return;
     }
-
-    if (!Array.isArray(argVal)) {
-      throw new Error("Invalid vector args.");
+    if (argVal instanceof HexString) {
+      serializer.serializeBytes(argVal.toUint8Array());
+      return;
     }
-
-    serializer.serializeU32AsUleb128(argVal.length);
-
-    argVal.forEach((arg) => serializeArg(arg, argType.value, serializer));
-    return;
+    if (typeof argVal === "string") {
+      serializer.serializeStr(argVal);
+      return;
+    }
+    // If it isn't any of those types, then it must just be an actual array of numbers
   }
 
-  if (argType instanceof TypeTagStruct) {
-    const { address, module_name: moduleName, name } = (argType as TypeTagStruct).value;
-    if (
-      `${HexString.fromUint8Array(address.address).toShortString()}::${moduleName.value}::${name.value}` !==
-      "0x1::string::String"
-    ) {
-      throw new Error("The only supported struct arg is of type 0x1::string::String");
-    }
+  if (!Array.isArray(argVal)) {
+    throw new Error("Invalid vector args.");
+  }
+
+  serializer.serializeU32AsUleb128(argVal.length);
+
+  argVal.forEach((arg) => serializeArgInner(arg, argType.value, serializer, depth + 1));
+}
+
+function serializeStruct(argVal: any, argType: TypeTag, serializer: Serializer, depth: number) {
+  const { address, module_name: moduleName, name, type_args: typeArgs } = (argType as TypeTagStruct).value;
+  const structType = `${HexString.fromUint8Array(address.address).toShortString()}::${moduleName.value}::${name.value}`;
+  if (structType === "0x1::string::String") {
     assertType(argVal, ["string"]);
-
     serializer.serializeStr(argVal);
-    return;
+  } else if (structType === "0x1::object::Object") {
+    serializeAddress(argVal, serializer);
+  } else if (structType === "0x1::option::Option") {
+    if (typeArgs.length !== 1) {
+      throw new Error(`Option has the wrong number of type arguments ${typeArgs.length}`);
+    }
+    serializeOption(argVal, typeArgs[0], serializer, depth);
+  } else {
+    throw new Error("Unsupported struct type in function argument");
   }
-  throw new Error("Unsupported arg type.");
+}
+
+function serializeOption(argVal: any, argType: TypeTag, serializer: Serializer, depth: number) {
+  // For option, we determine if it's empty or not empty first
+  // empty option is nothing, we specifically check for undefined to prevent fuzzy matching
+  if (argVal === undefined) {
+    serializer.serializeU32AsUleb128(0);
+  } else {
+    // Something means we need an array of 1
+    serializer.serializeU32AsUleb128(1);
+
+    // Serialize the inner type arg, ensuring that depth is tracked
+    serializeArgInner(argVal, argType, serializer, depth + 1);
+  }
 }
 
 export function argToTransactionArgument(argVal: any, argType: TypeTag): TransactionArgument {

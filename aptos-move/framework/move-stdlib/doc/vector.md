@@ -34,6 +34,7 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `is_empty`](#0x1_vector_is_empty)
 -  [Function `contains`](#0x1_vector_contains)
 -  [Function `index_of`](#0x1_vector_index_of)
+-  [Function `find`](#0x1_vector_find)
 -  [Function `insert`](#0x1_vector_insert)
 -  [Function `remove`](#0x1_vector_remove)
 -  [Function `remove_value`](#0x1_vector_remove_value)
@@ -599,6 +600,46 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
         i = i + 1;
     };
     (<b>false</b>, 0)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_find"></a>
+
+## Function `find`
+
+Return <code>(<b>true</b>, i)</code> if there's an element that matches the predicate. If there are multiple elements that match
+the predicate, only the index of the first one is returned.
+Otherwise, returns <code>(<b>false</b>, 0)</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_find">find</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|bool): (bool, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_find">find</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|bool): (bool, u64) {
+    <b>let</b> find = <b>false</b>;
+    <b>let</b> found_index = 0;
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        // Cannot call <b>return</b> in an inline function so we need <b>to</b> resort <b>to</b> <b>break</b> here.
+        <b>if</b> (f(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i))) {
+            find = <b>true</b>;
+            found_index = i;
+            <b>break</b>
+        };
+        i = i + 1;
+    };
+    (find, found_index)
 }
 </code></pre>
 

@@ -1,0 +1,11 @@
+[package]
+name = "CoinWrapper"
+version = "0.0.0"
+
+[addresses]
+aptos_framework = "0x1"
+deployer = "_"
+swap = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
