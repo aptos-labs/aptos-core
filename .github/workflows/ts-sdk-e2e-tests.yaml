@@ -32,7 +32,7 @@ jobs:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
-  run-tests-devnet:
+  run-tests-main-branch:
     needs: [permission-check]
     runs-on: high-perf-docker
     steps:
@@ -49,47 +49,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - uses: ./.github/actions/run-ts-sdk-e2e-tests
         with:
-          NETWORK: devnet
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
-
-  run-tests-testnet:
-    needs: [permission-check]
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
-        with:
-          ref: ${{ env.GIT_SHA }}
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
-        with:
-          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - uses: ./.github/actions/run-ts-sdk-e2e-tests
-        with:
-          NETWORK: testnet
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
-
-  run-tests-mainnet:
-    needs: [permission-check]
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
-        with:
-          ref: ${{ env.GIT_SHA }}
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
-        with:
-          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - uses: ./.github/actions/run-ts-sdk-e2e-tests
-        with:
-          NETWORK: mainnet
+          BRANCH: main
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
 
   # Run the TS SDK indexer tests. Note: Unlike the above tests where everything is self

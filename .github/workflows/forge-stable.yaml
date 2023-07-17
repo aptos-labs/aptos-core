@@ -120,7 +120,7 @@ jobs:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-realistic-env-max-load-long-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 7200
-      FORGE_TEST_SUITE: realistic_env_max_load
+      FORGE_TEST_SUITE: realistic_env_max_load_large
       POST_TO_SLACK: true
 
   run-forge-realistic-env-load-sweep:
