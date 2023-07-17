@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use super::{
-    dag_fetcher::FetchHandler, reliable_broadcast::CertifiedNodeHandler, storage::DAGStorage,
+    dag_fetcher::FetchRequestHandler, reliable_broadcast::CertifiedNodeHandler, storage::DAGStorage,
     types::TDAGMessage,
 };
 use crate::{
@@ -26,7 +26,7 @@ struct NetworkHandler {
     dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
     node_receiver: NodeBroadcastHandler,
     certified_node_receiver: CertifiedNodeHandler,
-    fetch_receiver: FetchHandler,
+    fetch_receiver: FetchRequestHandler,
     epoch_state: Arc<EpochState>,
 }
 
@@ -48,7 +48,7 @@ impl NetworkHandler {
             ),
             certified_node_receiver: CertifiedNodeHandler::new(dag.clone()),
             epoch_state,
-            fetch_receiver: FetchHandler::new(dag),
+            fetch_receiver: FetchRequestHandler::new(dag),
         }
     }
 

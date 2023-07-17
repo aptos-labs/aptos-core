@@ -135,22 +135,22 @@ impl DagFetcher {
 }
 
 #[derive(Debug, ThisError)]
-pub enum FetchHandleError {
+pub enum FetchRequestHandleError {
     #[error("parents are missing")]
     ParentsMissing,
 }
 
-pub struct FetchHandler {
+pub struct FetchRequestHandler {
     dag: Arc<RwLock<Dag>>,
 }
 
-impl FetchHandler {
+impl FetchRequestHandler {
     pub fn new(dag: Arc<RwLock<Dag>>) -> Self {
         Self { dag }
     }
 }
 
-impl RpcHandler for FetchHandler {
+impl RpcHandler for FetchRequestHandler {
     type Request = RemoteFetchRequest;
     type Response = FetchResponse;
 
@@ -162,7 +162,7 @@ impl RpcHandler for FetchHandler {
                 .parents()
                 .iter()
                 .all(|metadata| dag_reader.get_node(metadata).is_some()),
-            FetchHandleError::ParentsMissing
+            FetchRequestHandleError::ParentsMissing
         );
 
         let certified_nodes: Vec<_> = dag_reader
