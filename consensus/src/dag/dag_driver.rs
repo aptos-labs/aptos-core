@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::storage::DAGStorage;
 use crate::{
     dag::{
         dag_store::Dag,
         reliable_broadcast::ReliableBroadcast,
-        types::{CertificateAckState, CertifiedNode, Node, NodeMetadata, SignatureBuilder},
+        types::{CertificateAckState, CertifiedNode, Node, NodeCertificate, SignatureBuilder},
     },
     state_replication::PayloadClient,
     util::time_service::TimeService,
@@ -19,7 +20,7 @@ use futures::{
 };
 use std::sync::Arc;
 
-struct DagDriver {
+pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
@@ -28,6 +29,7 @@ struct DagDriver {
     current_round: Round,
     time_service: Arc<dyn TimeService>,
     rb_abort_handle: Option<AbortHandle>,
+    storage: Arc<dyn DAGStorage>,
 }
 
 impl DagDriver {
@@ -39,7 +41,9 @@ impl DagDriver {
         reliable_broadcast: Arc<ReliableBroadcast>,
         current_round: Round,
         time_service: Arc<dyn TimeService>,
+        storage: Arc<dyn DAGStorage>,
     ) -> Self {
+        // TODO: rebroadcast nodes after recovery
         Self {
             author,
             epoch_state,
@@ -49,13 +53,14 @@ impl DagDriver {
             current_round,
             time_service,
             rb_abort_handle: None,
+            storage,
         }
     }
 
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let mut dag_writer = self.dag.write();
         let round = node.metadata().round();
-        if dag_writer.all_exists(node.parents().iter().map(|metadata| metadata.digest())) {
+        if dag_writer.all_exists(node.parents()) {
             dag_writer.add_node(node)?;
             if self.current_round == round {
                 let maybe_strong_links = dag_writer
@@ -70,7 +75,7 @@ impl DagDriver {
         Ok(())
     }
 
-    pub fn enter_new_round(&mut self, strong_links: Vec<NodeMetadata>) {
+    pub fn enter_new_round(&mut self, strong_links: Vec<NodeCertificate>) {
         // TODO: support pulling payload
         let payload = Payload::empty(false);
         // TODO: need to wait to pass median of parents timestamp
@@ -84,18 +89,25 @@ impl DagDriver {
             payload,
             strong_links,
         );
+        self.storage
+            .save_node(&new_node)
+            .expect("node must be saved");
         self.broadcast_node(new_node);
     }
 
     pub fn broadcast_node(&mut self, node: Node) {
         let rb = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
-        let signature_builder = SignatureBuilder::new(node.digest(), self.epoch_state.clone());
+        let signature_builder =
+            SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let task = self
             .reliable_broadcast
-            .broadcast(node, signature_builder)
-            .then(move |certificate| rb.broadcast(certificate, cert_ack_set));
+            .broadcast(node.clone(), signature_builder)
+            .then(move |certificate| {
+                let certified_node = CertifiedNode::new(node, certificate.signatures().to_owned());
+                rb.broadcast(certified_node, cert_ack_set)
+            });
         tokio::spawn(Abortable::new(task, abort_registration));
         if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
             prev_handle.abort();

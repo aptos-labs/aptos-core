@@ -1,0 +1,6 @@
+error[E14003]: feature not supported in inlined functions
+  ┌─ tests/move_check/inlining/native_inline.move:3:12
+  │
+3 │     public native inline fun foo();
+  │            ^^^^^^ inline function foo must not be native
+

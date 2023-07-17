@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: type `integer` cannot be resolved as a struct
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:6:9
+  │
+6 │         0.f;
+  │         ^^^
+
+error: type `integer` cannot be resolved as a struct
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:7:9
+  │
+7 │         0.g;
+  │         ^^^
+
+error: type `u64` cannot be resolved as a struct
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:8:9
+  │
+8 │         u.value;
+  │         ^^^^^^^
+
+error: type `bool` cannot be resolved as a struct
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:9:9
+  │
+9 │         cond.value;
+  │         ^^^^^^^^^^
+
+error: type `address` cannot be resolved as a struct
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:10:9
+   │
+10 │         addr.R;
+   │         ^^^^^^
+
+error: type `address` cannot be resolved as a struct
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:11:9
+   │
+11 │         addr.f;
+   │         ^^^^^^
+
+error: type `()` cannot be resolved as a struct
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:12:9
+   │
+12 │         ().R;
+   │         ^^^^
+
+error: type `(M::S, M::S)` cannot be resolved as a struct
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:13:9
+   │
+13 │         (S{f: 0}, S{f:0}).f;
+   │         ^^^^^^^^^^^^^^^^^^^

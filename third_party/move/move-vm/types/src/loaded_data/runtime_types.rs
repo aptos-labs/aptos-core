@@ -78,7 +78,10 @@ impl DepthFormula {
         }
         for (t_i, c_i) in terms {
             let Some(mut u_form) = map.remove(t_i) else {
-                return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(format!("{t_i:?} missing mapping")))
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("{t_i:?} missing mapping")),
+                );
             };
             u_form.scale(*c_i);
             formulas.push(u_form)

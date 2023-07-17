@@ -36,7 +36,7 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
         );
     } else {
         options
-            .prove(pkg_path.as_path(), BTreeMap::default(), None)
+            .prove(false, pkg_path.as_path(), BTreeMap::default(), None)
             .unwrap()
     }
 }

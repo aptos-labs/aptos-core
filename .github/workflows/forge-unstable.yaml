@@ -114,34 +114,6 @@ jobs:
       # This test suite is configured using the forge.py config test command
       FORGE_TEST_SUITE: continuous
 
-  run-forge-graceful-overload-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # GCP cluster
-      FORGE_CLUSTER_NAME: aptos-forge-0
-      FORGE_NAMESPACE: forge-graceful-overload-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800
-      FORGE_TEST_SUITE: graceful_overload
-      POST_TO_SLACK: true
-
-  run-forge-nft-mint-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # GCP cluster
-      FORGE_CLUSTER_NAME: aptos-forge-0
-      FORGE_NAMESPACE: forge-nft-mint-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: nft_mint
-      POST_TO_SLACK: true
-
   run-forge-state-sync-slow-processing-catching-up-test:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
@@ -170,34 +142,6 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: twin_validator_test
       POST_TO_SLACK: true
-
-  run-forge-three-region-different-node-speed:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # GCP cluster
-      FORGE_CLUSTER_NAME: aptos-forge-1
-      FORGE_NAMESPACE: forge-three-region-with-different-node-speed-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 3600
-      FORGE_TEST_SUITE: three_region_simulation_with_different_node_speed
-      FORGE_ENABLE_FAILPOINTS: true
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-
-  run-forge-different-node-speed-and-reliability-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-different-node-speed-and-reliability-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 900
-      FORGE_TEST_SUITE: different_node_speed_and_reliability_test
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-      FORGE_ENABLE_FAILPOINTS: true
 
   run-forge-state-sync-failures-catching-up-test:
     if: ${{ github.event_name != 'pull_request' }}

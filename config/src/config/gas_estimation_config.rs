@@ -9,10 +9,19 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct GasEstimationStaticOverride {
+    pub low: u64,
+    pub market: u64,
+    pub aggressive: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct GasEstimationConfig {
     /// A gate for computing GasEstimation. If false, just returns the default.
     pub enabled: bool,
+    /// Static values to override. If set, use these values instead of computing a GasEstimation.
+    pub static_override: Option<GasEstimationStaticOverride>,
     /// Number of transactions for blocks to be classified as full for gas estimation
     pub full_block_txns: usize,
     /// Maximum number of blocks read for low gas estimation
@@ -28,7 +37,8 @@ pub struct GasEstimationConfig {
 impl Default for GasEstimationConfig {
     fn default() -> GasEstimationConfig {
         GasEstimationConfig {
-            enabled: false,
+            enabled: true,
+            static_override: None,
             full_block_txns: 250,
             low_block_history: 10,
             market_block_history: 30,

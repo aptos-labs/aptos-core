@@ -7,3 +7,4 @@ export const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet
 //<:!:section_1
 
 export const aptosCoinStore = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
+export const fungibleStore = "0x1::fungible_asset::FungibleStore";

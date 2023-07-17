@@ -1,0 +1,18 @@
+// ---- Model Dump
+module 0x8675309::M {
+    private fun foo<T,U>(_x: T,_y: U) {
+        Tuple()
+    }
+    private fun t1() {
+        M::foo<bool, bool>(false, false);
+        M::foo<u64, bool>(0, false);
+        M::foo<bool, u64>(false, 0);
+        M::foo<u64, u64>(0, 0);
+        Tuple()
+    }
+    private fun t2<T,U,V>(t: T,u: U,v: V) {
+        M::foo<T, u64>(t, 0);
+        M::foo<U, V>(u, v);
+        Tuple()
+    }
+} // end 0x8675309::M

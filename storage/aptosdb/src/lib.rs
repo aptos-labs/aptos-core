@@ -53,11 +53,7 @@ use crate::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::{
-        ledger_pruner_manager::LedgerPrunerManager, pruner_manager::PrunerManager, pruner_utils,
-        state_kv_pruner_manager::StateKvPrunerManager,
-        state_merkle_pruner_manager::StateMerklePrunerManager,
-    },
+    pruner::{LedgerPrunerManager, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     schema::*,
     stale_node_index::StaleNodeIndexSchema,
     stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,

@@ -234,7 +234,7 @@ impl StoragePricing {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ChangeSetConfigs {
     gas_feature_version: u64,
     max_bytes_per_write_op: u64,
@@ -337,7 +337,7 @@ impl CheckChangeSet for ChangeSetConfigs {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StorageGasParameters {
     pub pricing: StoragePricing,
     pub change_set_configs: ChangeSetConfigs,

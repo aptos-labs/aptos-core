@@ -561,6 +561,7 @@ fn setup_node_network_interfaces(
 fn setup_node_network_interface(
     peer_network_id: PeerNetworkId,
 ) -> (NodeNetworkInterface, MempoolNetworkHandle) {
+    // Create the network sender and events receiver
     static MAX_QUEUE_SIZE: usize = 8;
     let (network_reqs_tx, network_reqs_rx) =
         aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
@@ -572,7 +573,7 @@ fn setup_node_network_interface(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );
-    let network_events = NetworkEvents::new(network_notifs_rx, conn_status_rx);
+    let network_events = NetworkEvents::new(network_notifs_rx, conn_status_rx, None);
 
     (
         NodeNetworkInterface {
