@@ -145,7 +145,7 @@ spec aptos_framework::vesting {
     }
 
     spec unlock_rewards(contract_address: address) {
-        // TODO: Calls `unlock_stake` which is not verified. 
+        // TODO: Calls `unlock_stake` which is not verified.
         // Current verification times out even with partial.
         pragma verify = false;
         pragma aborts_if_is_partial;
@@ -170,7 +170,7 @@ spec aptos_framework::vesting {
         let accumulated_rewards = total_active_stake - staking_contract.principal;
         let commission_amount = accumulated_rewards * staking_contract.commission_percentage / 100;
         let amount = total_active_stake - vesting_contract.remaining_grant - commission_amount;
-        
+
         include UnlockStakeAbortsIf { vesting_contract, amount };
     }
 
@@ -186,7 +186,7 @@ spec aptos_framework::vesting {
         // Current verification times out even with partial.
         pragma verify = false;
         pragma aborts_if_is_partial;
-        
+
         include UnlockRewardsAbortsIf;
     }
 
@@ -324,7 +324,7 @@ spec aptos_framework::vesting {
         account: &signer,
         contract_address: address,
         shareholder: address,
-    ) { 
+    ) {
         aborts_if !exists<VestingContract>(contract_address);
 
         let addr = signer::address_of(account);
@@ -401,7 +401,7 @@ spec aptos_framework::vesting {
         aborts_if !exists<coin::CoinStore<AptosCoin>>(resource_addr) && !aptos_std::type_info::spec_is_struct<AptosCoin>();
         aborts_if !exists<coin::CoinStore<AptosCoin>>(resource_addr) && ea && acc.guid_creation_num + 2 > MAX_U64;
         aborts_if !exists<coin::CoinStore<AptosCoin>>(resource_addr) && ea && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        ensures exists<account::Account>(resource_addr) && post_acc.authentication_key == account::ZERO_AUTH_KEY && 
+        ensures exists<account::Account>(resource_addr) && post_acc.authentication_key == account::ZERO_AUTH_KEY &&
                 exists<coin::CoinStore<AptosCoin>>(resource_addr);
         ensures signer::address_of(result_1) == resource_addr;
         ensures result_2.account == resource_addr;
@@ -422,7 +422,6 @@ spec aptos_framework::vesting {
     spec unlock_stake(vesting_contract: &VestingContract, amount: u64) {
         // TODO: Calls `staking_contract::unlock_stake` which is not verified.
         pragma aborts_if_is_partial;
-        
         include UnlockStakeAbortsIf;
     }
 
@@ -487,7 +486,7 @@ spec aptos_framework::vesting {
         let inactive_1 = stake_pool_1.inactive.value;
         let pending_inactive_1 = stake_pool_1.pending_inactive.value;
         let new_inactive_1 = inactive_1 + pending_inactive_1;
-        aborts_if inactive_state && timestamp::spec_now_seconds() >= stake_pool_1.locked_until_secs 
+        aborts_if inactive_state && timestamp::spec_now_seconds() >= stake_pool_1.locked_until_secs
             && inactive_1 + pending_inactive_1 > MAX_U64;
     }
 
