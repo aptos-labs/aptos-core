@@ -6,9 +6,10 @@ use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
 use aptos_types::{
+    contract_event::ReadWriteEvent,
     executable::ModulePath,
     fee_statement::FeeStatement,
-    write_set::{TransactionWrite, WriteOp}, contract_event::ReadWriteEvent,
+    write_set::{TransactionWrite, WriteOp},
 };
 use std::{fmt::Debug, hash::Hash};
 

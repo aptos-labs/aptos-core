@@ -6,12 +6,15 @@ use crate::{
     errors::Error,
     executor::BlockExecutor,
     proptest_types::types::{
-        DeltaDataView, EmptyDataView, EventType, ExpectedOutput, KeyType, Output, Task,
-        Transaction, TransactionGen, TransactionGenParams, ValueType,
+        DeltaDataView, EmptyDataView, ExpectedOutput, KeyType, Output, Task, Transaction,
+        TransactionGen, TransactionGenParams, ValueType,
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::{contract_event::{ContractEvent, ReadWriteEvent}, executable::ExecutableTestType};
+use aptos_types::{
+    contract_event::{ContractEvent, ReadWriteEvent},
+    executable::ExecutableTestType,
+};
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -64,10 +67,10 @@ fn run_transactions<K, V, E>(
 
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
-            Transaction<KeyType<K>, ValueType<V>, EventType<E>>,
-            Task<KeyType<K>, ValueType<V>, EventType<E>>,
+            Transaction<KeyType<K>, ValueType<V>, E>,
+            Task<KeyType<K>, ValueType<V>, E>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-            NoOpTransactionCommitHook<Output<KeyType<K>, ValueType<V>, EventType<E>>, usize>,
+            NoOpTransactionCommitHook<Output<KeyType<K>, ValueType<V>, E>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -201,11 +204,11 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             NoOpTransactionCommitHook<
-                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
                 usize,
             >,
             ExecutableTestType,
@@ -257,11 +260,11 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             NoOpTransactionCommitHook<
-                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
                 usize,
             >,
             ExecutableTestType,
@@ -438,11 +441,11 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     // Confirm still no intersection
     let output = BlockExecutor::<
-        Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
-        Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+        Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+        Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         NoOpTransactionCommitHook<
-            Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+            Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             usize,
         >,
         ExecutableTestType,
@@ -493,11 +496,11 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     for _ in 0..200 {
         let output = BlockExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             NoOpTransactionCommitHook<
-                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
                 usize,
             >,
             ExecutableTestType,

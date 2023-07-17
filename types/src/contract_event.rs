@@ -15,7 +15,6 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, ops::Deref};
 
-
 pub trait ReadWriteEvent {
     fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]);
     fn update_event_data(&mut self, event_data: &[u8]);
@@ -30,12 +29,18 @@ pub enum ContractEvent {
 impl ReadWriteEvent for ContractEvent {
     fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]) {
         match self {
-            ContractEvent::V0(event) => (*event.key(), event.sequence_number(), event.type_tag(), event.event_data())
+            ContractEvent::V0(event) => (
+                *event.key(),
+                event.sequence_number(),
+                event.type_tag(),
+                event.event_data(),
+            ),
         }
     }
+
     fn update_event_data(&mut self, event_data: &[u8]) {
         match self {
-            ContractEvent::V0(event) => { event.event_data = event_data.to_vec()}
+            ContractEvent::V0(event) => event.event_data = event_data.to_vec(),
         }
     }
 }

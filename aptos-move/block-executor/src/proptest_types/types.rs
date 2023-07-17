@@ -15,10 +15,11 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
+    contract_event::ReadWriteEvent,
     executable::ModulePath,
     fee_statement::FeeStatement,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
-    write_set::{TransactionWrite, WriteOp}, contract_event::ReadWriteEvent,
+    write_set::{TransactionWrite, WriteOp},
 };
 use claims::{assert_none, assert_ok};
 use once_cell::sync::OnceCell;
@@ -33,7 +34,7 @@ use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
-    }
+    },
 };
 
 // Should not be possible to overflow or underflow, as each delta is at
@@ -162,11 +163,6 @@ impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Transactio
         self.extract_raw_bytes().map(StateValue::new_legacy)
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
-pub struct EventType<E: Send + Sync + Debug + Clone + ReadWriteEvent>(pub E, pub bool);
-
-
 
 #[derive(Clone, Copy)]
 pub struct TransactionGenParams {
@@ -300,12 +296,15 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         ret
     }
 
-    pub fn materialize<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug + Clone + ReadWriteEvent>(
+    pub fn materialize<
+        K: Clone + Hash + Debug + Eq + Ord,
+        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+    >(
         self,
         universe: &[K],
         // Are writes and reads module access (same access path).
         module_access: (bool, bool),
-    ) -> Transaction<KeyType<K>, ValueType<V>, EventType<E>> {
+    ) -> Transaction<KeyType<K>, ValueType<V>, E> {
         let is_module_write = |_| -> bool { module_access.0 };
         let is_module_read = |_| -> bool { module_access.1 };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
@@ -335,7 +334,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         universe: &[K],
         delta_threshold: usize,
         allow_deletes: bool,
-    ) -> Transaction<KeyType<K>, ValueType<V>, EventType<E>> {
+    ) -> Transaction<KeyType<K>, ValueType<V>, E> {
         let is_module_write = |_| -> bool { false };
         let is_module_read = |_| -> bool { false };
         let is_delta = |i, v: &V| -> Option<DeltaOp> {
@@ -381,7 +380,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         // writes. This way there will be module accesses but no intersection.
         read_threshold: usize,
         write_threshold: usize,
-    ) -> Transaction<KeyType<K>, ValueType<V>, EventType<E>> {
+    ) -> Transaction<KeyType<K>, ValueType<V>, E> {
         assert!(read_threshold < universe.len());
         assert!(write_threshold > read_threshold);
         assert!(write_threshold < universe.len());
