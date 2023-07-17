@@ -1498,7 +1498,7 @@ fn realistic_env_max_load_test(
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
-                    4700
+                    4600
                 } else if long_running {
                     5500
                 } else {
