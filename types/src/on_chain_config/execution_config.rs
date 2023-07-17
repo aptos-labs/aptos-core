@@ -17,11 +17,12 @@ pub enum OnChainExecutionConfig {
 impl OnChainExecutionConfig {
     /// The type of the transaction shuffler being used.
     pub fn transaction_shuffler_type(&self) -> TransactionShufflerType {
-        match &self {
-            OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
-        }
+        TransactionShufflerType::SenderAwareV1(32)
+        // match &self {
+        //     OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
+        //     OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
+        //     OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
+        // }
     }
 
     /// The per-block gas limit being used.
@@ -76,7 +77,7 @@ pub struct ExecutionConfigV1 {
 impl Default for ExecutionConfigV1 {
     fn default() -> Self {
         Self {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
         }
     }
 }

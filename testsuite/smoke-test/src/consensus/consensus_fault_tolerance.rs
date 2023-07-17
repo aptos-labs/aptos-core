@@ -5,11 +5,12 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
     test_utils::{create_and_fund_account, transfer_coins_non_blocking},
 };
+use aptos_cached_packages::aptos_stdlib;
 use aptos_forge::{
     test_utils::consensus_utils::{
         no_failure_injection, test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
     },
-    LocalSwarm, Swarm, SwarmExt,
+    LocalSwarm, Swarm, SwarmExt, wait_for_all_nodes_to_catchup,
 };
 use aptos_logger::info;
 use rand::{self, rngs::SmallRng, Rng, SeedableRng};
@@ -18,7 +19,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{Duration, Instant},
+    time::{Duration, Instant}, collections::HashSet,
 };
 
 pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
@@ -456,4 +457,81 @@ async fn test_alternating_having_consensus() {
         }),
     )
     .await;
+}
+
+
+async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
+    let transaction_factory = swarm.aptos_public_info().transaction_factory();
+
+    let clients = swarm.get_all_nodes_clients_with_names();
+
+    let dst = create_and_fund_account(swarm, 10000000000).await;
+
+    let mut accounts = vec![];
+    let mut txns = vec![];
+    for _ in 0..2 {
+        let mut account = create_and_fund_account(swarm, 10000000000).await;
+
+        for _ in 0..5 {
+            let txn = account.sign_with_transaction_builder(transaction_factory.payload(
+                aptos_stdlib::aptos_coin_transfer(dst.address(), 10),
+            ));
+            txns.push(txn);
+        }
+        accounts.push(account);
+    }
+
+    let result = clients[0].1.submit_batch_bcs(&txns).await.unwrap().into_inner();
+    info!("result: {:?}", result);
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    wait_for_all_nodes_to_catchup(&clients, Duration::from_secs(30)).await.unwrap();
+
+    let committed_order = clients[0].1.get_transactions_bcs(None, Some(1000)).await.unwrap().into_inner();
+
+    info!("dst: {}, senders: {:?}", dst.address(), accounts.iter().map(|a| a.address()).collect::<Vec<_>>());
+    let mut block_txns = vec![];
+    for txn in committed_order {
+        match txn.transaction {
+            aptos_types::transaction::Transaction::UserTransaction(txn) => {
+                info!("from {}, seq_num {}", txn.sender(), txn.sequence_number());
+                block_txns.push(txn);
+            }
+            aptos_types::transaction::Transaction::BlockMetadata(b) => {
+                info!("block metadata {}", b.round());
+
+                let senders = accounts.iter().map(|a| a.address()).collect::<HashSet<_>>();
+                let mut changes = 0;
+                for i in 1..block_txns.len() {
+                    if block_txns[i-1].sender() != block_txns[i].sender() && senders.contains(&block_txns[i].sender()) {
+                        changes += 1;
+                    }
+                }
+                info!("block_txns.len: {}, changes: {}", block_txns.len(), changes);
+
+                if changes > 1 {
+                    assert!(expected_reordering, "changes: {}", changes);
+                }
+                if block_txns.len() >= 4 && changes == 1 {
+                    assert!(!expected_reordering, "changes: {}", changes)
+                }
+                block_txns.clear();
+            },
+            _ => {},
+        }
+    }
+}
+
+
+#[tokio::test]
+async fn test_reordering() {
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_init_config(Arc::new(move |_, config, _| {
+            config.consensus.wait_for_full_blocks_above_pending_blocks = 1;
+            config.consensus.wait_for_full_blocks_above_recent_fill_threshold = 0.1;
+        }))
+        .build()
+        .await;
+
+    assert_reordering(&mut swarm, true).await;
 }
