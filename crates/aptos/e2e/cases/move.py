@@ -200,3 +200,23 @@ def test_move_view(run_helper: RunHelper, test_name=None):
     response = json.loads(response.stdout)
     if response["Result"] == None or response["Result"][0] != True:
         raise TestError("View function did not return correct result")
+    
+    # Test view function with with u64 argument
+    expected_u64 = 123
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "view",
+            "--assume-yes",
+            "--function-id",
+            "default::cli_e2e_tests::test_u64",
+            "--args",
+            f"u64:{expected_u64}",
+        ],
+    )
+    
+    response = json.loads(response.stdout)
+    if response["Result"] == None or response["Result"][0] != "123":
+        raise TestError(f"View function [test_u64] did not return correct result")

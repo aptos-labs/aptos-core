@@ -257,6 +257,12 @@ module addr::cli_e2e_tests {
         }
     }
 
+    // The following functions are used to test input args
+    #[view]
+    public fun test_u64(n: u64): u64 {
+        n
+    }
+
     inline fun get_hero(creator: &address, collection: &String, name: &String): (Object<Hero>, &Hero) {
         let token_address = token::create_token_address(
             creator,
