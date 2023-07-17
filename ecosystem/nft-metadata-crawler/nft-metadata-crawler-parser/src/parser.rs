@@ -23,6 +23,7 @@ pub struct Parser {
     bucket: String,
     token: String,
     conn: PooledConnection<ConnectionManager<PgConnection>>,
+    cdn_prefix: String,
 }
 
 impl Parser {
@@ -31,6 +32,7 @@ impl Parser {
         bucket: String,
         token: String,
         conn: PooledConnection<ConnectionManager<PgConnection>>,
+        cdn_prefix: String,
     ) -> Self {
         Self {
             model: NFTMetadataCrawlerURIs::new(entry.token_uri.clone()),
@@ -38,9 +40,11 @@ impl Parser {
             bucket,
             token,
             conn,
+            cdn_prefix,
         }
     }
 
+    // Main parsing flow
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         // Deduplication
         if !self.entry.force
@@ -48,7 +52,7 @@ impl Parser {
                 self.entry.token_uri.clone(),
                 &mut self.conn,
             )
-            .unwrap_or(None)
+            .expect("Unable to get URIs")
             .is_some()
         {
             info!(
@@ -68,6 +72,7 @@ impl Parser {
         Ok(())
     }
 
+    // Calls and handles error for JSON parser
     async fn handle_json_parser(&mut self, json_uri: String) {
         match self.parse_json(json_uri).await {
             Ok(json) => {
@@ -86,9 +91,8 @@ impl Parser {
                 .await
                 {
                     Ok(filename) => {
-                        // Temporarily hardcode IP for load balancer testing
-                        self.model.cdn_json_uri =
-                            Some(format!("http://34.160.26.161/{}", filename));
+                        // Save CDN link to model if successful
+                        self.model.cdn_json_uri = Some(format!("{}/{}", self.cdn_prefix, filename));
                         info!(
                             last_transaction_version = self.entry.last_transaction_version,
                             "Successfully saved JSON"
@@ -102,6 +106,7 @@ impl Parser {
                 }
             },
             Err(e) => {
+                // Increment retry count for JSON
                 self.model.json_parser_retry_count += 1;
                 error!(
                     last_transaction_version = self.entry.last_transaction_version,
@@ -137,9 +142,10 @@ impl Parser {
                 )
                 .await
                 {
+                    // Save CDN link to model if successful
                     Ok(filename) => {
                         self.model.cdn_image_uri =
-                            Some(format!("http://34.160.26.161/{}", filename));
+                            Some(format!("{}/{}", self.cdn_prefix, filename));
                         info!(
                             last_transaction_version = self.entry.last_transaction_version,
                             "Successfully saved image"
@@ -153,6 +159,7 @@ impl Parser {
                 }
             },
             Err(e) => {
+                // Increment retry count for image
                 self.model.image_optimizer_retry_count += 1;
                 error!(
                     last_transaction_version = self.entry.last_transaction_version,
@@ -183,9 +190,10 @@ impl Parser {
                     )
                     .await
                     {
+                        // Save CDN link to model if successful
                         Ok(filename) => {
                             self.model.cdn_animation_uri =
-                                Some(format!("http://34.160.26.161/{}", filename));
+                                Some(format!("{}/{}", self.cdn_prefix, filename));
                             info!(
                                 last_transaction_version = self.entry.last_transaction_version,
                                 "Successfully saved image"
@@ -210,6 +218,7 @@ impl Parser {
         }
     }
 
+    // Calls and handles error for URI parser
     fn handle_uri_parser_jsons(&mut self) -> String {
         match Self::parse_uri(self.entry.token_uri.clone()) {
             Ok(u) => u,
@@ -217,18 +226,22 @@ impl Parser {
         }
     }
 
+    // Calls and handles error for URI parser for image and animation URIs
     fn handle_uri_parser_images(&mut self) -> (String, Option<String>) {
+        // Use token_uri if  not provided or the JSON parsing failed
         let raw_img_uri = self
             .model
             .raw_image_uri
             .clone()
             .unwrap_or(self.model.token_uri.clone());
 
+        // Parse URI to handle IPFS URIs
         let img_uri = match Self::parse_uri(raw_img_uri.clone()) {
             Ok(u) => u,
             Err(_) => raw_img_uri,
         };
 
+        // Skip if animation URI is not provided
         let animation_uri = self
             .model
             .raw_animation_uri
@@ -238,6 +251,7 @@ impl Parser {
         (img_uri, animation_uri)
     }
 
+    // Calls and handles error for upserting to Postgres
     async fn save_to_postgres(&mut self) {
         match upsert_uris(&mut self.conn, self.model.clone()) {
             Ok(_) => info!(

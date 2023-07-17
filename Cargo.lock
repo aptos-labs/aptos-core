@@ -9240,6 +9240,7 @@ name = "nft-metadata-crawler-parser"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-indexer-grpc-server-framework",
  "base64 0.13.0",
  "chrono",
  "clap 4.3.5",

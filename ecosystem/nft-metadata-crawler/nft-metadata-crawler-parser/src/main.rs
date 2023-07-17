@@ -36,6 +36,7 @@ pub struct ParserConfig {
     pub bucket: String,
     pub subscription_name: String,
     pub database_url: String,
+    pub cdn_prefix: String,
 }
 
 // Subscribes to PubSub and sends URIs to Channel
@@ -49,7 +50,7 @@ async fn process_response(
         let token = ts.token().await.expect("Unable to get token").access_token;
 
         // Pulls an entry from PubSub
-        let entries = consume_uris(1, &mut grpc_client, subscription_name.clone(), token).await?;
+        let entries = consume_uris(10, &mut grpc_client, subscription_name.clone(), token).await?;
 
         // Parses entry and sends to Channel
         for msg in entries.into_inner().received_messages {
@@ -60,8 +61,6 @@ async fn process_response(
                 sender.send((entry.clone(), ack))?;
             }
         }
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
 }
 
@@ -74,6 +73,7 @@ async fn spawn_parser(
     bucket: String,
     mut grpc_client: SubscriberClient<Channel>,
     subscription_name: String,
+    cdn_prefix: String,
 ) -> anyhow::Result<()> {
     let ts = get_token_source().await;
     loop {
@@ -86,8 +86,15 @@ async fn spawn_parser(
 
         let token = ts.token().await.expect("Unable to get token").access_token;
 
+        println!("Worker {} got entry", id);
         info!("Worker {} got entry", id);
-        let mut parser = Parser::new(entry, bucket.clone(), token.clone(), conn.get()?);
+        let mut parser = Parser::new(
+            entry,
+            bucket.clone(),
+            token.clone(),
+            conn.get()?,
+            cdn_prefix.clone(),
+        );
         parser.parse().await?;
 
         info!("Worker {} finished parsing", id);
@@ -155,6 +162,7 @@ async fn main() {
             config.bucket.clone(),
             grpc_client.clone(),
             config.subscription_name.clone(),
+            config.cdn_prefix.clone(),
         ));
 
         workers.push(worker);
