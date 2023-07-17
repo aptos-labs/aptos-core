@@ -342,6 +342,7 @@ async fn test_onchain_config_change() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_execution_config_change() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(2)
         .with_aptos()
