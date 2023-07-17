@@ -52,7 +52,7 @@ module aptos_std::bulletproofs {
     }
 
     /// Deserializes a range proof from a sequence of bytes. The serialization format is the same as the format in
-    /// the zkcrypto's `bulletproofs` library (https://crates.io/crates/bulletproofs).
+    /// the zkcrypto's `bulletproofs` library (https://docs.rs/bulletproofs/4.0.0/bulletproofs/struct.RangeProof.html#method.from_bytes).
     public fun range_proof_from_bytes(bytes: vector<u8>): RangeProof {
         RangeProof {
             bytes
