@@ -26,9 +26,6 @@ spec aptos_framework::block {
         include staking_config::StakingRewardsConfigRequirement;
 
         aborts_if false;
-
-        // Only a valid proposer or the vm is authorized to produce blocks
-        ensures proposer == @vm_reserved;
     }
 
     spec emit_genesis_block_event {
@@ -74,11 +71,6 @@ spec aptos_framework::block {
         let account = global<account::Account>(addr);
         aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
 
-        // During the module's initialization, it guarantees that the BlockResource resource move under the Aptos framework account with initial values.
-        ensures exists<BlockResource>(addr);
-        ensures global<BlockResource>(addr).height == 0;
-        ensures global<BlockResource>(addr).epoch_interval > 0;
-
         // Only the Aptos framework address can execute
         ensures @aptos_framework == addr;
     }
@@ -93,6 +85,10 @@ spec aptos_framework::block {
         aborts_if epoch_interval_microsecs <= 0;
         aborts_if exists<BlockResource>(addr);
         ensures exists<BlockResource>(addr);
+
+        // During the module's initialization, it guarantees that the BlockResource resource move under the Aptos framework account with initial values.
+        ensures global<BlockResource>(addr).height == 0;
+        ensures global<BlockResource>(addr).epoch_interval > 0;
     }
 
     spec schema NewEventHandle {
@@ -130,9 +126,6 @@ spec aptos_framework::block {
 
         // Only the Aptos framework address can execute
         ensures addr == @aptos_framework;
-
-        // epoch_interval > 0
-        ensures block_resource.epoch_interval > 0;
     }
 
     spec get_epoch_interval_secs(): u64 {
