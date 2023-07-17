@@ -170,6 +170,7 @@ module veiled_coin::veiled_coin_tests {
         // the same value. The commitment is necessary to ensure the value is binding
         let sigma_proof = prove_withdrawal(
             &recipient_sk, 
+            &recipient_pk, 
             &curr_balance_ct, 
             &new_balance_comm, 
             &recipient_new_balance, 
@@ -239,6 +240,7 @@ module veiled_coin::veiled_coin_tests {
 
         let sigma_proof = sigma_protos::prove_withdrawal(
             &sender_sk,
+            &sender_pk,
             &curr_balance_ct,
             &new_balance_comm,
             &sender_new_balance,
@@ -389,6 +391,7 @@ module veiled_coin::veiled_coin_tests {
         let new_new_balance_comm_bytes = pedersen::commitment_to_bytes(&new_new_balance_comm);
         let sigma_proof = sigma_protos::prove_withdrawal(
             &sender_sk, 
+            &sender_pk,
             &new_curr_balance_ct, 
             &new_new_balance_comm, 
             &new_new_balance_val, 

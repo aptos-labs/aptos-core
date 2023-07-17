@@ -29,16 +29,18 @@
 ///  - $(C_1, C_2)$, ElGamal encryption of the sender's current balance
 ///  - $c$, Pedersen commitment to $b$ with randomness $r$
 ///  - $v$, the amount the sender is withdrawing
+///  - $Y$, the sender's ElGamal encryption public key
 ///
 /// The relation being proved is as follows:
 ///
 /// ```
 /// R(
-///     x = [ (C_1, C_2), c, G, H, v]
+///     x = [ (C_1, C_2), c, G, H, Y, v]
 ///     w = [ b, r, sk ]
 /// ) = {
 ///    C_1 - v G = b G + sk C_2
 ///            c = b G + r H
+///            Y = sk G
 /// }
 /// ```
 ///
@@ -84,6 +86,7 @@
 ///    C_1 - C  = b G + sk (C_2 - D)
 ///          c  = v G + r H
 ///          c' = b G + r_b H
+///          Y  = sk G
 /// }
 /// ```
 ///
@@ -91,9 +94,6 @@
 /// $C'$ -> $\bar{C}$, $Y$ -> $y$, $Y'$ -> $\bar{y}$, $v$ -> $b^*$). Note that their relation does not include the
 /// ElGamal-to-Pedersen conversion parts, as they can do ZK range proofs directly over ElGamal ciphertexts using their
 /// $\Sigma$-bullets modification of Bulletproofs.
-///
-/// Note also that the equation $Y = sk G$ in the Zether paper is enforced
-/// programmatically by this smart contract and so is not needed in our $\Sigma$-protocol.
 module veiled_coin::sigma_protos {
     use std::error;
     use std::option::Option;
@@ -131,6 +131,7 @@ module veiled_coin::sigma_protos {
     struct WithdrawalSubproof has drop {
         x1: RistrettoPoint,
         x2: RistrettoPoint,
+        x3: RistrettoPoint,
         alpha1: Scalar,
         alpha2: Scalar,
         alpha3: Scalar,
@@ -145,6 +146,7 @@ module veiled_coin::sigma_protos {
         x4: RistrettoPoint,
         x5: RistrettoPoint,
         x6: RistrettoPoint,
+        x7: RistrettoPoint,
         alpha1: Scalar,
         alpha2: Scalar,
         alpha3: Scalar,
@@ -189,7 +191,7 @@ module veiled_coin::sigma_protos {
             withdraw_ct, deposit_ct, comm_amount,
             sender_curr_balance_ct, sender_new_balance_comm,
             &proof.x1, &proof.x2, &proof.x3, &proof.x4,
-            &proof.x5, &proof.x6);
+            &proof.x5, &proof.x6, &proof.x7);
 
         let g_alpha2 = ristretto255::basepoint_mul(&proof.alpha2);
         // \rho * D + X1 =? \alpha_2 * g
@@ -238,6 +240,13 @@ module veiled_coin::sigma_protos {
         let h_alpha4_acc = ristretto255::point_mul(&h, &proof.alpha4);
         ristretto255::point_add_assign(&mut h_alpha4_acc, &g_alpha3);
         assert!(ristretto255::point_equals(&bar_c_acc, &h_alpha4_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+
+        // \rho * Y + X_7 =? \alpha_5 * G
+        let y_acc = ristretto255::point_mul(&sender_pk_point, &rho);
+        ristretto255::point_add_assign(&mut y_acc, &proof.x7);
+        
+        let g_alpha5 = ristretto255::basepoint_mul(&proof.alpha5);
+        assert!(ristretto255::point_equals(&y_acc, &g_alpha5), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
     }
 
     /// Verifies the $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
@@ -245,6 +254,7 @@ module veiled_coin::sigma_protos {
     /// Specifically, the proof argues that the same amount $v$ is Pedersen-committed in `sender_new_balance_comm` and
     /// ElGamal-encrypted in the ciphertext obtained by subtracting the ciphertext (vG, 0G) from sender_curr_balance_ct
     public fun verify_withdrawal_subproof(
+        sender_pk: &elgamal::CompressedPubkey,
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
         amount: &Scalar,
@@ -253,13 +263,16 @@ module veiled_coin::sigma_protos {
         let h = pedersen::randomness_base_for_bulletproof();
         let (big_c1, big_c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
+        let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
 
         let rho = fiat_shamir_withdrawal_subproof_challenge(
+            sender_pk,
             sender_curr_balance_ct,
             sender_new_balance_comm,
             amount,
             &proof.x1,
-            &proof.x2);
+            &proof.x2,
+            &proof.x3);
 
         let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
         // \rho * (C_1 - v * g) + X_1 =? \alpha_1 * g + \alpha_3 * C_2
@@ -279,6 +292,13 @@ module veiled_coin::sigma_protos {
         let h_alpha2_acc = ristretto255::point_mul(&h, &proof.alpha2);
         ristretto255::point_add_assign(&mut h_alpha2_acc, &g_alpha1);
         assert!(ristretto255::point_equals(&c_acc, &h_alpha2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+
+        // \rho * Y + X_3 =? \alpha_3 * g
+        let y_acc = ristretto255::point_mul(&sender_pk_point, &rho);
+        ristretto255::point_add_assign(&mut y_acc, &proof.x3);
+
+        let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3);
+        assert!(ristretto255::point_equals(&y_acc, &g_alpha3), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
     }
 
     //
@@ -287,7 +307,7 @@ module veiled_coin::sigma_protos {
 
     /// Deserializes and returns an `WithdrawalSubproof` given its byte representation.
     public fun deserialize_withdrawal_subproof(proof_bytes: vector<u8>): Option<WithdrawalSubproof> {
-        if (vector::length<u8>(&proof_bytes) != 160) {
+        if (vector::length<u8>(&proof_bytes) != 192) {
             return std::option::none<WithdrawalSubproof>()
         };
 
@@ -304,6 +324,13 @@ module veiled_coin::sigma_protos {
             return std::option::none<WithdrawalSubproof>()
         };
         let x2 = std::option::extract<RistrettoPoint>(&mut x2);
+
+        let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x3 = ristretto255::new_point_from_bytes(x3_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x3)) {
+            return std::option::none<WithdrawalSubproof>()
+        };
+        let x3 = std::option::extract<RistrettoPoint>(&mut x3);
 
         let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
@@ -327,13 +354,13 @@ module veiled_coin::sigma_protos {
         let alpha3 = std::option::extract(&mut alpha3);
 
         std::option::some(WithdrawalSubproof {
-            x1, x2, alpha1, alpha2, alpha3
+            x1, x2, x3, alpha1, alpha2, alpha3
         })
     }
 
     /// Deserializes and returns a `TransferSubproof` given its byte representation.
     public fun deserialize_transfer_subproof(proof_bytes: vector<u8>): Option<TransferSubproof> {
-        if (vector::length<u8>(&proof_bytes) != 352) {
+        if (vector::length<u8>(&proof_bytes) != 384) {
             return std::option::none<TransferSubproof>()
         };
 
@@ -379,6 +406,13 @@ module veiled_coin::sigma_protos {
         };
         let x6 = std::option::extract<RistrettoPoint>(&mut x6);
 
+        let x7_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x7 = ristretto255::new_point_from_bytes(x7_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x7)) {
+            return std::option::none<TransferSubproof>()
+        };
+        let x7 = std::option::extract<RistrettoPoint>(&mut x7);
+
         let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
         if (!std::option::is_some(&alpha1)) {
@@ -415,7 +449,7 @@ module veiled_coin::sigma_protos {
         let alpha5 = std::option::extract(&mut alpha5);
 
         std::option::some(TransferSubproof {
-            x1, x2, x3, x4, x5, x6, alpha1, alpha2, alpha3, alpha4, alpha5
+            x1, x2, x3, x4, x5, x6, x7, alpha1, alpha2, alpha3, alpha4, alpha5
         })
     }
 
@@ -423,17 +457,20 @@ module veiled_coin::sigma_protos {
     // Private functions for Fiat-Shamir challenge derivation
     //
 
-    /// Computes a Fiat-Shamir challenge `rho = H(G, H, Y, c_1, c_2, c, C, D, x_1, x_2, x_3, x_4)` for the `WithdrawalSubproof`
+    /// Computes a Fiat-Shamir challenge `rho = H(G, H, Y, C_1, C_2, c, C, x_1, x_2, x_3)` for the `WithdrawalSubproof`
     /// $\Sigma$-protocol.
     fun fiat_shamir_withdrawal_subproof_challenge(
+        sender_pk: &elgamal::CompressedPubkey,
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
         amount: &Scalar,
         x1: &RistrettoPoint,
-        x2: &RistrettoPoint): Scalar
+        x2: &RistrettoPoint,
+        x3: &RistrettoPoint): Scalar
     {
         let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
+        let y = elgamal::pubkey_to_compressed_point(sender_pk); 
 
         let bytes = vector::empty<u8>();
 
@@ -441,17 +478,19 @@ module veiled_coin::sigma_protos {
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::basepoint_compressed()));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(
             &ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof())));
+        vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&y));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(c1)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(c2)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(c)));
         vector::append<u8>(&mut bytes, ristretto255::scalar_to_bytes(amount));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x1)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x2)));
+        vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x3)));
 
         ristretto255::new_scalar_from_sha2_512(bytes)
     }
 
-    /// Computes a Fiat-Shamir challenge `rho = H(G, H, Y, Y', C, D, c, c_1, c_2, \bar{c}, {X_i}_{i=1}^6)` for the
+    /// Computes a Fiat-Shamir challenge `rho = H(G, H, Y, Y', C, D, c, c_1, c_2, \bar{c}, {X_i}_{i=1}^7)` for the
     /// `TransferSubproof` $\Sigma$-protocol.
     fun fiat_shamir_transfer_subproof_challenge(
         sender_pk: &elgamal::CompressedPubkey,
@@ -466,7 +505,8 @@ module veiled_coin::sigma_protos {
         x3: &RistrettoPoint,
         x4: &RistrettoPoint,
         x5: &RistrettoPoint,
-        x6: &RistrettoPoint): Scalar
+        x6: &RistrettoPoint,
+        x7: &RistrettoPoint): Scalar
     {
         let y = elgamal::pubkey_to_compressed_point(sender_pk);
         let y_prime = elgamal::pubkey_to_compressed_point(recipient_pk);
@@ -497,6 +537,7 @@ module veiled_coin::sigma_protos {
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x4)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x5)));
         vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x6)));
+        vector::append<u8>(&mut bytes, ristretto255::point_to_bytes(&ristretto255::point_compress(x7)));
 
         ristretto255::new_scalar_from_sha2_512(bytes)
     }
@@ -510,6 +551,7 @@ module veiled_coin::sigma_protos {
     /// See top-level comments for a detailed description of the $\Sigma$-protocol
     public fun prove_withdrawal(
         sender_sk: &Scalar,
+        sender_pk: &elgamal::CompressedPubkey,
         sender_curr_balance_ct: &elgamal::Ciphertext,
         sender_new_balance_comm: &pedersen::Commitment,
         new_balance_val: &Scalar,
@@ -531,12 +573,20 @@ module veiled_coin::sigma_protos {
         let big_x2 = ristretto255::point_mul(&h, &x2);
         ristretto255::point_add_assign(&mut big_x2, &g_x1);
 
+        // X3 <- x3 * g
+        let big_x3 = ristretto255::basepoint_mul(&x3);
+
         let rho = fiat_shamir_withdrawal_subproof_challenge(
+            sender_pk,
             sender_curr_balance_ct,
             sender_new_balance_comm,
             amount_val,
             &big_x1,
-            &big_x2);
+            &big_x2,
+            &big_x3);
+
+        // X3 <- x3 * g
+        let big_x3 = ristretto255::basepoint_mul(&x3);
 
         // alpha1 <- x1 + rho * b
         let alpha1 = ristretto255::scalar_mul(&rho, new_balance_val);
@@ -553,6 +603,7 @@ module veiled_coin::sigma_protos {
         WithdrawalSubproof {
             x1: big_x1,
             x2: big_x2,
+            x3: big_x3,
             alpha1,
             alpha2,
             alpha3,
@@ -613,12 +664,15 @@ module veiled_coin::sigma_protos {
         let big_x6 = ristretto255::point_mul(&h, &x4);
         ristretto255::point_add_assign(&mut big_x6, &g_x3);
 
+        // X7 <- x5 * g
+        let big_x7 = ristretto255::basepoint_mul(&x5);
+
         let rho = fiat_shamir_transfer_subproof_challenge(
             sender_pk, recipient_pk,
             withdraw_ct, deposit_ct, comm_amount,
             sender_curr_balance_ct, sender_new_balance_comm,
             &big_x1, &big_x2, &big_x3, &big_x4,
-            &big_x5, &big_x6);
+            &big_x5, &big_x6, &big_x7);
 
         // alpha_1 <- x1 + rho * v
         let alpha1 = ristretto255::scalar_mul(&rho, amount_val);
@@ -647,6 +701,7 @@ module veiled_coin::sigma_protos {
             x4: big_x4,
             x5: big_x5,
             x6: big_x6,
+            x7: big_x7,
             alpha1,
             alpha2,
             alpha3,
@@ -662,6 +717,7 @@ module veiled_coin::sigma_protos {
         // it into a vector of bytes which is returned at the end.
         let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
         let x2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
+        let x3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x3));
         let alpha1_bytes = ristretto255::scalar_to_bytes(&proof.alpha1);
         let alpha2_bytes = ristretto255::scalar_to_bytes(&proof.alpha2);
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
@@ -670,6 +726,7 @@ module veiled_coin::sigma_protos {
         vector::append<u8>(&mut bytes, alpha3_bytes);
         vector::append<u8>(&mut bytes, alpha2_bytes);
         vector::append<u8>(&mut bytes, alpha1_bytes);
+        vector::append<u8>(&mut bytes, x3_bytes);
         vector::append<u8>(&mut bytes, x2_bytes);
         vector::append<u8>(&mut bytes, x1_bytes);
 
@@ -687,6 +744,7 @@ module veiled_coin::sigma_protos {
         let x4_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x4));
         let x5_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x5));
         let x6_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x6));
+        let x7_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x7));
         let alpha1_bytes = ristretto255::scalar_to_bytes(&proof.alpha1);
         let alpha2_bytes = ristretto255::scalar_to_bytes(&proof.alpha2);
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
@@ -699,6 +757,7 @@ module veiled_coin::sigma_protos {
         vector::append<u8>(&mut bytes, alpha3_bytes);
         vector::append<u8>(&mut bytes, alpha2_bytes);
         vector::append<u8>(&mut bytes, alpha1_bytes);
+        vector::append<u8>(&mut bytes, x7_bytes);
         vector::append<u8>(&mut bytes, x6_bytes);
         vector::append<u8>(&mut bytes, x5_bytes);
         vector::append<u8>(&mut bytes, x4_bytes);
@@ -803,6 +862,7 @@ module veiled_coin::sigma_protos {
 
         let sigma_proof = prove_withdrawal(
             &sender_sk,
+            &sender_pk,
             &curr_balance_ct,
             &new_balance_comm,
             &new_balance,
@@ -817,6 +877,7 @@ module veiled_coin::sigma_protos {
         };
 
         verify_withdrawal_subproof(
+            &sender_pk,
             &curr_balance_ct,
             &new_balance_comm,
             &amount_withdrawn,
