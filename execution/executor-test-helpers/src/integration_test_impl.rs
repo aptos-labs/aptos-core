@@ -31,9 +31,18 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use rand::SeedableRng;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
+    let path = aptos_temppath::TempPath::new();
+    path.create_as_dir().unwrap();
+    test_execution_with_storage_impl_inner(false, path.path())
+}
+
+pub fn test_execution_with_storage_impl_inner(
+    force_sharding: bool,
+    db_path: &Path,
+) -> Arc<AptosDB> {
     const B: u64 = 1_000_000_000;
 
     let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
@@ -45,9 +54,8 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         0,
     );
 
-    let path = aptos_temppath::TempPath::new();
-    path.create_as_dir().unwrap();
-    let (aptos_db, db, executor, waypoint) = create_db_and_executor(path.path(), &genesis_txn);
+    let (aptos_db, db, executor, waypoint) =
+        create_db_and_executor(db_path, &genesis_txn, force_sharding);
 
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
@@ -518,13 +526,16 @@ fn approx_eq(a: u64, b: u64) -> bool {
 pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     path: P,
     genesis: &Transaction,
+    force_sharding: bool, // if true force sharding db otherwise using default db
 ) -> (
     Arc<AptosDB>,
     DbReaderWriter,
     BlockExecutor<AptosVM>,
     Waypoint,
 ) {
-    let (db, dbrw) = DbReaderWriter::wrap(AptosDB::new_for_test(&path));
+    let (db, dbrw) = force_sharding
+        .then(|| DbReaderWriter::wrap(AptosDB::new_for_test_with_sharding(&path)))
+        .unwrap_or_else(|| DbReaderWriter::wrap(AptosDB::new_for_test(&path)));
     let waypoint = bootstrap_genesis::<AptosVM>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());
 
