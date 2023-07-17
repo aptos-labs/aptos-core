@@ -14,7 +14,7 @@
 /// can be securely computed. Otherwise, knowledge of the ElGamal SK breaks the binding of the 2nd component of the
 /// ElGamal ciphertext, making any ZK range proof over it useless.
 /// Because the sender cannot, after receiving a fully veiled transaction, compute their balance randomness, their
-/// updated balance ciphertext is computed in the relation, which is then linked to the Pedersen commitment of $b$. 
+/// updated balance ciphertext is computed in the relation, which is then linked to the Pedersen commitment of $b$.
 ///
 /// The secret witness $w$ in this relation, known only to the sender of the TXN, consists of:
 ///  - $b$, sender's new balance, after the withdrawal from their veiled balance
@@ -37,8 +37,8 @@
 ///     x = [ (C_1, C_2), c, G, H, v]
 ///     w = [ b, r, sk ]
 /// ) = {
-///     C_1 - vG = bG + skC_2
-///           c = bG + rH
+///    C_1 - v G = b G + sk C_2
+///            c = b G + r H
 /// }
 /// ```
 ///
@@ -53,8 +53,8 @@
 ///  - $v$, amount being transferred
 ///  - $r$, randomness used to ElGamal-encrypt $v$
 ///  - $b$, sender's new balance after the transfer occurs
-///  - $r_b$, randomness used to ElGamal-encrypt $b$
-///  - &sk$, the sender's secret ElGamal encryption key
+///  - $r_b$, randomness used to Pedersen commit $b$
+///  - $sk$, the sender's secret ElGamal encryption key
 ///
 /// The public statement $x$ in this relation consists of:
 ///  - Public parameters
@@ -68,22 +68,22 @@
 ///    + $(C', D)$, ElGamal encryption of $v$, under the recipient's PK, using randomness $r$
 ///    + $c$, Pedersen commitment to $v$ using randomness $r$
 ///  - New balance encryption & commitment
-///    + $(c_1, c_2)$, ElGamal encryption of the sender's *current* balance, under the sender's PK, using randomness $r_b$
-///    This is used to compute the sender's updated balance in the relation, as the sender cannot know their balance randomness
+///    + $(C_1, C_2)$, ElGamal encryption of the sender's *current* balance, under the sender's PK. This is used to
+///      compute the sender's updated balance in the relation, as the sender cannot know their balance randomness.
 ///    + $c'$, Pedersen commitment to $b$ using randomness $r_b$
 ///
 /// The relation being proved is:
 /// ```
 /// R(
-///     x = [ Y, Y', (C, C', D), c, (c_1, c_2), c', G, H]
+///     x = [ Y, Y', (C, C', D), c, (C_1, C_2), c', G, H ]
 ///     w = [ v, r, b, r_b, sk ]
 /// ) = {
 ///          C  = v G + r Y
 ///          C' = v G + r Y'
-///           D = r G
-///     C_1 - C = bG + sk(C_2 - D)
-///           c = vG + rH
-///          c' = bG + r_bH
+///          D  = r G
+///    C_1 - C  = b G + sk (C_2 - D)
+///          c  = v G + r H
+///          c' = b G + r_b H
 /// }
 /// ```
 ///
@@ -221,7 +221,7 @@ module veiled_coin::sigma_protos {
         let big_c2_acc = ristretto255::point_sub(c2, big_d);
         ristretto255::point_mul_assign(&mut big_c2_acc, &proof.alpha5);
         ristretto255::point_add_assign(&mut big_c2_acc, &g_alpha3);
-        assert!(ristretto255::point_equals(&big_c1_acc, &big_c2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
+        assert!(ristretto255::point_equals(&big_c1_acc, &big_c2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
 
         // \rho * c + X_5 =? \alpha_1 * g + \alpha_2 * h
         let c_acc = ristretto255::point_mul(c, &rho);
@@ -229,7 +229,7 @@ module veiled_coin::sigma_protos {
 
         let h_alpha2_acc = ristretto255::point_mul(&h, &proof.alpha2);
         ristretto255::point_add_assign(&mut h_alpha2_acc, &g_alpha1);
-        assert!(ristretto255::point_equals(&c_acc, &h_alpha2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
+        assert!(ristretto255::point_equals(&c_acc, &h_alpha2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
 
         // \rho * \bar{c} + X_6 =? \alpha_3 * g + \alpha_4 * h
         let bar_c_acc = ristretto255::point_mul(bar_c, &rho);
@@ -237,7 +237,7 @@ module veiled_coin::sigma_protos {
 
         let h_alpha4_acc = ristretto255::point_mul(&h, &proof.alpha4);
         ristretto255::point_add_assign(&mut h_alpha4_acc, &g_alpha3);
-        assert!(ristretto255::point_equals(&bar_c_acc, &h_alpha4_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
+        assert!(ristretto255::point_equals(&bar_c_acc, &h_alpha4_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
     }
 
     /// Verifies the $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
@@ -278,7 +278,7 @@ module veiled_coin::sigma_protos {
 
         let h_alpha2_acc = ristretto255::point_mul(&h, &proof.alpha2);
         ristretto255::point_add_assign(&mut h_alpha2_acc, &g_alpha1);
-        assert!(ristretto255::point_equals(&c_acc, &h_alpha2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
+        assert!(ristretto255::point_equals(&c_acc, &h_alpha2_acc), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
     }
 
     //
@@ -525,7 +525,7 @@ module veiled_coin::sigma_protos {
         let g_x1 = ristretto255::basepoint_mul(&x1);
         // X1 <- x1 * g + x3 * C2
         let big_x1 = ristretto255::point_mul(c2, &x3);
-        ristretto255::point_add_assign(&mut big_x1, &g_x1); 
+        ristretto255::point_add_assign(&mut big_x1, &g_x1);
 
         // X2 <- x1 * g + x2 * h
         let big_x2 = ristretto255::point_mul(&h, &x2);

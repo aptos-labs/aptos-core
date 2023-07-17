@@ -1,3 +1,6 @@
+/// **WARNING:** This is an **experimental, proof-of-concept** module! It is *NOT* production-ready and it will likely
+/// lead to loss of funds if used (or misused).
+///
 /// This module provides a veiled coin type, denoted `VeiledCoin<T>` that hides the value/denomination of a coin.
 /// Importantly, although veiled transactions hide the amount of coins sent they still leak the sender and recipient.
 ///
@@ -609,7 +612,7 @@ module veiled_coin::veiled_coin {
             &comm_new_balance,
             &veiled_balance,
             &transfer_proof.sigma_proof);
-        
+
         // Update the account's veiled balance by homomorphically subtracting the veiled amount from the veiled balance.
         elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_withdraw_amount);
 
