@@ -714,6 +714,10 @@ where
         }
     }
 
+    fn reexecute_transaction_if_aggregator_error(status: ExecutionStatus<Self::Output, Self::Error>) -> ExecutionStatus<Self::Output, Self::Error> {
+
+    }
+
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
@@ -734,6 +738,13 @@ where
                 txn,
                 idx as TxnIndex,
             );
+
+            let res = reexecute_transaction_if_aggregator_error(res);
+
+            // Reexecute the transaction if there is an aggregator error
+            if let ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) = res {
+                output.try_materialize(view);
+            }
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {

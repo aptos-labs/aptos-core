@@ -147,6 +147,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .fee_statement()
             .clone()
     }
+
+    fn try_materialize(&self) -> Result<AptosTransactionOutput, VMStatus> {
+        self.vm_output
+            .lock()
+            .try_materialize()
+    }
 }
 
 pub struct BlockAptosVM();
