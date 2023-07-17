@@ -31,30 +31,31 @@ impl SimplePartitioner {
     ) -> Vec<Vec<AnalyzedTransaction>> {
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
         let num_txns = txns.len();
-        let mut senders: Vec<Sender> = Vec::new();
+        let mut num_senders: usize = 0;
         let mut num_keys: usize = 0;
         let mut key_ids_by_sender_id: Vec<HashSet<usize>> = Vec::new();
-        let mut txns_by_sender_id: HashMap<usize, Vec<AnalyzedTransaction>> = HashMap::new();
+        let mut txns_by_sender_id: Vec<Vec<AnalyzedTransaction>> = Vec::new();
         let mut key_ids_by_key: HashMap<StateKey, usize> = HashMap::new();
         let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
         for (_txn_id, txn) in txns.into_iter().enumerate() {
             let sender = txn.sender();
-            let sender_id = *sender_ids_by_sender.entry(sender.clone()).or_insert_with(||{
-                let ret = senders.len();
-                senders.push(sender);
+            let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
+                let ret = num_senders;
+                num_senders += 1;
+                txns_by_sender_id.push(vec![]);
                 key_ids_by_sender_id.push(HashSet::new());
                 ret
             });
             for storage_location in txn.write_hints().iter().chain(txn.read_hints().iter()) {
-                let key = storage_location.clone().into_state_key();
-                let key_id = *key_ids_by_key.entry(key.clone()).or_insert_with(||{
+                let key = storage_location.maybe_state_key().unwrap().clone();
+                let key_id = *key_ids_by_key.entry(key).or_insert_with(||{
                     let ret = num_keys;
                     num_keys += 1;
                     ret
                 });
                 key_ids_by_sender_id[sender_id].insert(key_id);
             }
-            txns_by_sender_id.entry(sender_id).or_insert_with(Vec::new).push(txn);
+            txns_by_sender_id[sender_id].push(txn);
         }
         timer.stop_and_record();
 
@@ -68,16 +69,16 @@ impl SimplePartitioner {
         */
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["union_find"]).start_timer();
         // The union-find approach.
-        let mut uf = UnionFind::new(senders.len() + num_keys);
+        let mut uf = UnionFind::new(num_senders + num_keys);
         for (sender_id, key_ids) in key_ids_by_sender_id.iter().enumerate() {
             for &key_id in key_ids.iter() {
-                let key_id_in_uf = senders.len() + key_id;
+                let key_id_in_uf = num_senders + key_id;
                 uf.union(key_id_in_uf, sender_id);
             }
         }
 
         let mut sender_groups_by_set_id: HashMap<usize, Vec<usize>> = HashMap::new();
-        for sender_id in 0..senders.len() {
+        for sender_id in 0..num_senders {
             let set_id = uf.find(sender_id);
             sender_groups_by_set_id.entry(set_id).or_insert_with(Vec::new).push(sender_id);
         }
@@ -95,7 +96,7 @@ impl SimplePartitioner {
         let capped_sender_groups: Vec<SenderGroup> = sender_groups_by_set_id.into_iter().flat_map(|(_set_id, sender_ids)|{
             let mut sub_groups: Vec<SenderGroup> = Vec::new();
             for sender_id in sender_ids {
-                let num_txns_from_cur_sender = txns_by_sender_id.get(&sender_id).unwrap().len();
+                let num_txns_from_cur_sender = txns_by_sender_id[sender_id].len();
                 if sub_groups.len() == 0 || sub_groups.last().unwrap().total_load + num_txns_from_cur_sender as u64 >= sub_group_size_limit {
                     sub_groups.push(SenderGroup::default());
                 }
@@ -103,8 +104,15 @@ impl SimplePartitioner {
             }
             sub_groups
         }).collect();
-        timer.stop_and_record();
 
+        let mut group_ids_by_sender_id: Vec<usize> = vec![usize::MAX; num_senders];
+        for (gid, sender_group) in capped_sender_groups.iter().enumerate() {
+            for sender_id in sender_group.sender_ids.iter() {
+                group_ids_by_sender_id[*sender_id] = gid;
+            }
+        }
+        let duration = timer.stop_and_record();
+        // println!("cap_group_size={}", duration);
         /*
         Now capped_sender_groups becomes:
         [
@@ -123,16 +131,17 @@ impl SimplePartitioner {
         let (_, shard_ids_by_group_id) = scheduling::assign_tasks_to_workers(&loads_by_sub_group, num_executor_shards);
         timer.stop_and_record();
 
-        let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["build_return_object"]).start_timer();
+        let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["build_return_object"]).start_timer();
         let mut txns_by_shard_id: Vec<Vec<AnalyzedTransaction>> = vec![vec![]; num_executor_shards];
-        for (gid, group) in capped_sender_groups.into_iter().enumerate() {
-            let shard_id = shard_ids_by_group_id[gid];
-            let txns_for_shard = txns_by_shard_id.get_mut(shard_id).unwrap();
-            for sender_id in group.sender_ids {
-                let txns = txns_by_sender_id.remove(&sender_id).unwrap();
-                txns_for_shard.extend(txns);
-            }
+
+        for (sender_id, txns) in txns_by_sender_id.into_iter().enumerate() {
+            let group_id = group_ids_by_sender_id[sender_id];
+            let shard_id = shard_ids_by_group_id[group_id];
+            txns_by_shard_id.get_mut(shard_id).unwrap().extend(txns);
         }
+
+        let duration = timer.stop_and_record();
+        // println!("build_return_object={}", duration);
         txns_by_shard_id
     }
 }

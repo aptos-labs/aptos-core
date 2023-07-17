@@ -326,7 +326,7 @@ impl ShardedBlockPartitioner {
     }
 
     fn add_edges(&self, matrix: Vec<Vec<Vec<AnalyzedTransaction>>>) -> Vec<SubBlocksForShard<Transaction>> {
-        let _timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
+        let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
         let mut ret: Vec<SubBlocksForShard<Transaction>> = (0..self.num_shards).map(|shard_id| SubBlocksForShard { shard_id, sub_blocks: vec![] }).collect();
         let mut global_txn_counter: usize = 0;
         let mut global_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
@@ -343,8 +343,8 @@ impl ShardedBlockPartitioner {
                     };
                     let mut cur_txn_csd = CrossShardDependencies::default();
                     for loc in txn.read_hints() {
-                        let key = loc.clone().into_state_key();
-                        match global_owners_of_key.get(&key) {
+                        let key = loc.maybe_state_key().unwrap();
+                        match global_owners_of_key.get(key) {
                             Some(owner) => {
                                 ret.get_mut(owner.shard_id).unwrap()
                                     .get_sub_block_mut(owner.round_id).unwrap()
@@ -356,9 +356,9 @@ impl ShardedBlockPartitioner {
                     }
 
                     for loc in txn.write_hints() {
-                        let key = loc.clone().into_state_key();
+                        let key = loc.maybe_state_key().unwrap();
                         local_owners_of_key.insert(key.clone(), cur_sharded_txn_idx);
-                        match global_owners_of_key.get(&key) {
+                        match global_owners_of_key.get(key) {
                             Some(owner) => {
                                 ret.get_mut(owner.shard_id).unwrap()
                                     .get_sub_block_mut(owner.round_id).unwrap()

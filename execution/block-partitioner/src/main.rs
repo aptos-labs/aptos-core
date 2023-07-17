@@ -54,9 +54,9 @@ fn main() {
         println!("Starting to partition");
         let now = Instant::now();
         let result = BlockPartitioner::partition(&partitioner, transactions, args.num_shards);
-        report_sub_block_matrix(&result);
         let elapsed = now.elapsed();
         println!("Time taken to partition: {:?}", elapsed);
+        report_sub_block_matrix(&result);
     }
 }
 
