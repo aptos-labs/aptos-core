@@ -98,6 +98,22 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
+        {
+          type: "category",
+          label: "Building on Aptos -- The Book",
+          link: { type: "doc", id: "guides/aptos-book/index" },
+          collapsible: true,
+          collapsible: true,
+          items: [
+            "guides/aptos-book/introduction",
+            "guides/aptos-book/blockchain-basics",
+            "guides/aptos-book/introducing-move",
+            "guides/aptos-book/nesting-structures",
+            "guides/aptos-book/global-storage",
+            "guides/aptos-book/move-objects",
+            "guides/aptos-book/digital-assets",
+          ],
+        },
         "tutorials/first-transaction",
         "tutorials/your-first-nft",
         "tutorials/first-coin",

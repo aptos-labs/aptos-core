@@ -1,0 +1,11 @@
+[package]
+name = 'fight_the_baddies'
+version = '0.0.0'
+
+[addresses]
+fight_the_baddies = "_"
+
+[dependencies.AptosFramework]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'testnet'
+subdir = 'aptos-move/framework/aptos-framework'

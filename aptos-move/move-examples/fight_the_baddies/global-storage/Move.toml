@@ -1,0 +1,11 @@
+[package]
+name = 'FightTheBaddies'
+version = '0.0.2'
+
+[addresses]
+fight_the_baddies = "_"
+
+[dependencies.MoveStdlib]
+git = 'https://github.com/aptos-labs/aptos-core.git'
+rev = 'framework-mainnet'
+subdir = 'aptos-move/framework/move-stdlib'
