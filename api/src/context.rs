@@ -51,7 +51,7 @@ use futures::{channel::oneshot, SinkExt};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
     collections::{BTreeMap, HashMap},
-    ops::Bound::Included,
+    ops::{Bound::Included, Deref},
     sync::{Arc, RwLock, RwLockWriteGuard},
     time::Instant,
 };
@@ -832,8 +832,10 @@ impl Context {
         }
     }
 
-    fn cached_gas_estimation(&self, current_epoch: u64) -> Option<GasEstimation> {
-        let cache = self.gas_estimation_cache.read().unwrap();
+    fn cached_gas_estimation<T>(&self, cache: &T, current_epoch: u64) -> Option<GasEstimation>
+    where
+        T: Deref<Target = GasEstimationCache>,
+    {
         if let Some(epoch) = cache.last_updated_epoch {
             if let Some(time) = cache.last_updated_time {
                 if let Some(estimation) = cache.estimation {
@@ -900,17 +902,30 @@ impl Context {
         if !config.enabled {
             return Ok(self.default_gas_estimation(min_gas_unit_price));
         }
+        if let Some(static_override) = &config.static_override {
+            return Ok(GasEstimation {
+                deprioritized_gas_estimate: Some(static_override.low),
+                gas_estimate: static_override.market,
+                prioritized_gas_estimate: Some(static_override.aggressive),
+            });
+        }
 
         let epoch = ledger_info.epoch.0;
 
         // 0. (0) Return cached result if it exists
-        if let Some(cached_gas_estimation) = self.cached_gas_estimation(epoch) {
+        let cache = self.gas_estimation_cache.read().unwrap();
+        if let Some(cached_gas_estimation) = self.cached_gas_estimation(&cache, epoch) {
             return Ok(cached_gas_estimation);
         }
+        drop(cache);
 
         // 0. (1) Write lock and prepare cache
         let mut cache = self.gas_estimation_cache.write().unwrap();
-        // TODO: retry cached result after acquiring write lock
+        // Retry cached result after acquiring write lock
+        if let Some(cached_gas_estimation) = self.cached_gas_estimation(&cache, epoch) {
+            return Ok(cached_gas_estimation);
+        }
+        // Clear the cache if the epoch has changed
         if let Some(cached_epoch) = cache.last_updated_epoch {
             if cached_epoch != epoch {
                 cache.min_inclusion_prices.clear();
@@ -1038,7 +1053,7 @@ impl Context {
                 );
                 return Ok(self.default_gas_estimation(min_gas_unit_price));
             },
-            Some(price) => *price,
+            Some(price) => low_price.max(*price),
         };
 
         // (3) aggressive
@@ -1054,7 +1069,7 @@ impl Context {
                 );
                 return Ok(self.default_gas_estimation(min_gas_unit_price));
             },
-            Some(price) => *price,
+            Some(price) => market_price.max(*price),
         };
         // round up to next bucket
         let aggressive_price = self.next_bucket(p90_price);
@@ -1128,12 +1143,13 @@ impl Context {
                     let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
+                        .ok()
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
                     None => GasSchedule::fetch_config(&storage_adapter)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
-                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0)
+                            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()
                         })
                         .ok_or_else(|| {
                             E::internal_with_code(

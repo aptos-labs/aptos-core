@@ -6,14 +6,14 @@ use crate::common::types::{
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
-use clap::{ArgEnum, Parser};
+use clap::{Parser, ValueEnum};
 use serde_json::json;
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
 
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum ListQuery {
     Balance,
     Modules,
@@ -51,11 +51,11 @@ impl FromStr for ListQuery {
 #[derive(Debug, Parser)]
 pub struct ListAccount {
     /// Address of the account you want to list resources/modules/balance for
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: Option<AccountAddress>,
 
     /// Type of items to list: [balance, resources, modules]
-    #[clap(long, default_value_t = ListQuery::Resources)]
+    #[clap(long, value_enum, ignore_case = true, default_value_t = ListQuery::Resources)]
     pub(crate) query: ListQuery,
 
     #[clap(flatten)]

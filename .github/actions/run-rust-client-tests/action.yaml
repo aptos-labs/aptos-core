@@ -1,0 +1,24 @@
+name: "Run Rust Node Client Tests"
+description: |
+  Run the Rust Node Client (aptos-rest-client) tests against a local testnet built from a particular release branch
+inputs:
+  NETWORK:
+    description: "The network to use for running the local testnet, one of devnet / testnet / mainnet"
+    required: true
+  GCP_DOCKER_ARTIFACT_REPO:
+    description: "The GCP Docker artifact repository"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Run a local testnet.
+    - uses: ./.github/actions/run-local-testnet
+      with:
+        IMAGE_TAG: ${{ inputs.NETWORK }}
+        GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+
+    # Run the tests.
+    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+    - run: cargo run -p aptos-rest-client --example account -- --api-url 'http://127.0.0.1:8080/v1'
+      shell: bash

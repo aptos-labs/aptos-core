@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unable to infer type: `?0`
+  ┌─ tests/checking/typing/uninferred_type_call.move:3:9
+  │
+3 │         foo()
+  │         ^^^^^

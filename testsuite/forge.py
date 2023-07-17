@@ -156,15 +156,19 @@ class ForgeResult:
         assert self._end_time is not None, "end_time is not set"
         return self._end_time
 
+    @property
+    def duration(self) -> float:
+        return (self.end_time - self.start_time).total_seconds()
+
     @classmethod
-    def from_args(cls, state: ForgeState, output: str) -> "ForgeResult":
+    def from_args(cls, state: ForgeState, output: str) -> ForgeResult:
         result = cls()
         result.state = state
         result.output = output
         return result
 
     @classmethod
-    def empty(cls) -> "ForgeResult":
+    def empty(cls) -> ForgeResult:
         return cls.from_args(ForgeState.EMPTY, "")
 
     @classmethod
@@ -212,7 +216,7 @@ class ForgeResult:
         self.debugging_output = output
 
     def format(self, context: ForgeContext) -> str:
-        output_lines = []
+        output_lines: List[str] = []
         if not self.succeeded():
             output_lines.append(self.debugging_output)
         output_lines.extend(
@@ -221,6 +225,13 @@ class ForgeResult:
                 f"Forge {self.state.value.lower()}ed",
             ]
         )
+        if self.state == ForgeState.FAIL and self.duration > 3600:
+            output_lines.append(
+                "Forge took longer than 1 hour to run. This can cause the job to"
+                " fail even when the test is successful because of gcp + github"
+                " auth expiration. If you think this is the case please check the"
+                " GCP_AUTH_DURATION in the github workflow."
+            )
         return "\n".join(output_lines)
 
     def succeeded(self) -> bool:
@@ -251,6 +262,7 @@ class ForgeContext:
     upgrade_image_tag: str
     forge_cluster: ForgeCluster
     forge_test_suite: str
+    forge_username: str
     forge_blocking: bool
 
     github_actions: str
@@ -711,6 +723,8 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_NAMESPACE=context.forge_namespace,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
+            FORGE_TEST_SUITE=sanitize_k8s_resource_name(context.forge_test_suite),
+            FORGE_USERNAME=sanitize_k8s_resource_name(context.forge_username),
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
@@ -975,21 +989,35 @@ def image_exists(
         raise Exception(f"Unknown cloud repo type: {cloud}")
 
 
-def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> str:
-    """
-    Sanitize the intended forge resource name to be a valid k8s resource name
-    """
-    sanitized_namespace = ""
-    for i, c in enumerate(forge_resource):
+def sanitize_k8s_resource_name(resource: str, max_length: int = 63) -> str:
+    sanitized_resource = ""
+    for i, c in enumerate(resource):
         if i >= max_length:
             break
         if c.isalnum():
-            sanitized_namespace += c
+            sanitized_resource += c
         else:
-            sanitized_namespace += "-"
+            sanitized_resource += "-"  # Replace the invalid character with a '-'
+
+    if sanitized_resource.endswith("-"):
+        sanitized_resource = (
+            sanitized_resource[:-1] + "0"
+        )  # Set the last character to '0'
+
+    return sanitized_resource
+
+
+def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> str:
+    """
+    Sanitize the intended forge resource name to be a valid k8s resource name.
+    Resource names must be: (i) 63 characters or less; (ii) contain characters
+    that are alphanumeric, '-', or '.'; (iii) start and end with an alphanumeric
+    character; and (iv) start with "forge-".
+    """
     if not forge_resource.startswith("forge-"):
         raise Exception("Forge resource name must start with 'forge-'")
-    return sanitized_namespace
+
+    return sanitize_k8s_resource_name(forge_resource, max_length=max_length)
 
 
 def create_forge_command(
@@ -1452,6 +1480,8 @@ def test(
 
     log.debug("forge_args: %s", forge_args)
 
+    # use the github actor username if possible
+    forge_username = os.getenv("GITHUB_ACTOR") or "unknown-username"
     forge_context = ForgeContext(
         shell=shell,
         filesystem=filesystem,
@@ -1468,6 +1498,7 @@ def test(
         forge_namespace=forge_namespace,
         forge_cluster=forge_cluster,
         forge_test_suite=forge_test_suite,
+        forge_username=forge_username,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
         github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}"

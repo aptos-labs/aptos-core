@@ -9,13 +9,16 @@ use crate::{
     errors::AptosDbError,
     ledger_db::LedgerDb,
     schema::{
-        epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
-        transaction_accumulator::TransactionAccumulatorSchema,
+        db_metadata::DbMetadataKey, epoch_by_version::EpochByVersionSchema,
+        ledger_info::LedgerInfoSchema, transaction_accumulator::TransactionAccumulatorSchema,
         transaction_info::TransactionInfoSchema,
     },
-    utils::iterators::{EpochEndingLedgerInfoIter, ExpectContinuousVersions},
+    utils::{
+        get_progress,
+        iterators::{EpochEndingLedgerInfoIter, ExpectContinuousVersions},
+    },
 };
-use anyhow::{ensure, format_err, Result};
+use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher},
@@ -177,20 +180,12 @@ impl LedgerStore {
             .ok_or_else(|| format_err!("No TransactionInfo at version {}", version))
     }
 
-    pub fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>> {
-        let mut iter = self
-            .ledger_db
-            .transaction_info_db()
-            .iter::<TransactionInfoSchema>(ReadOptions::default())?;
-        iter.seek_to_last();
-        iter.next().transpose()
-    }
-
-    /// Get latest transaction info together with its version. Note that during node syncing, this
-    /// version can be greater than what's in the latest LedgerInfo.
-    pub fn get_latest_transaction_info(&self) -> Result<(Version, TransactionInfo)> {
-        self.get_latest_transaction_info_option()?
-            .ok_or_else(|| AptosDbError::NotFound(String::from("Genesis TransactionInfo.")).into())
+    pub fn get_latest_version(&self) -> Result<Version> {
+        get_progress(
+            self.ledger_db.metadata_db(),
+            &DbMetadataKey::OverallCommitProgress,
+        )?
+        .ok_or(anyhow!("No progress in db."))
     }
 
     /// Gets an iterator that yields `num_transaction_infos` transaction infos starting from

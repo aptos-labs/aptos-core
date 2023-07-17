@@ -158,6 +158,7 @@ impl Default for Account {
 pub struct TransactionBuilder {
     pub sender: Account,
     pub secondary_signers: Vec<Account>,
+    pub fee_payer: Option<Account>,
     pub sequence_number: Option<u64>,
     pub program: Option<TransactionPayload>,
     pub max_gas_amount: Option<u64>,
@@ -171,6 +172,7 @@ impl TransactionBuilder {
         Self {
             sender,
             secondary_signers: Vec::new(),
+            fee_payer: None,
             sequence_number: None,
             program: None,
             max_gas_amount: None,
@@ -182,6 +184,11 @@ impl TransactionBuilder {
 
     pub fn secondary_signers(mut self, secondary_signers: Vec<Account>) -> Self {
         self.secondary_signers = secondary_signers;
+        self
+    }
+
+    pub fn fee_payer(mut self, fee_payer: Account) -> Self {
+        self.fee_payer = Some(fee_payer);
         self
     }
 
@@ -263,7 +270,7 @@ impl TransactionBuilder {
             .iter()
             .map(|signer| *signer.address())
             .collect();
-        let secondary_private_keys = self
+        let secondary_private_keys: Vec<&Ed25519PrivateKey> = self
             .secondary_signers
             .iter()
             .map(|signer| &signer.privkey)
@@ -281,6 +288,38 @@ impl TransactionBuilder {
             &self.sender.privkey,
             secondary_signer_addresses,
             secondary_private_keys,
+        )
+        .unwrap()
+        .into_inner()
+    }
+
+    pub fn sign_fee_payer(self) -> SignedTransaction {
+        let secondary_signer_addresses: Vec<AccountAddress> = self
+            .secondary_signers
+            .iter()
+            .map(|signer| *signer.address())
+            .collect();
+        let secondary_private_keys: Vec<&Ed25519PrivateKey> = self
+            .secondary_signers
+            .iter()
+            .map(|signer| &signer.privkey)
+            .collect();
+        let fee_payer = self.fee_payer.unwrap();
+        RawTransaction::new(
+            *self.sender.address(),
+            self.sequence_number.expect("sequence number not set"),
+            self.program.expect("transaction payload not set"),
+            self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
+            self.gas_unit_price.unwrap_or(0),
+            self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
+            ChainId::test(),
+        )
+        .sign_fee_payer(
+            &self.sender.privkey,
+            secondary_signer_addresses,
+            secondary_private_keys,
+            *fee_payer.address(),
+            &fee_payer.privkey,
         )
         .unwrap()
         .into_inner()
@@ -354,6 +393,10 @@ impl AccountData {
     /// This constructor is non-deterministic and should not be used against golden file.
     pub fn new(balance: u64, sequence_number: u64) -> Self {
         Self::with_account(Account::new(), balance, sequence_number)
+    }
+
+    pub fn increment_sequence_number(&mut self) {
+        self.sequence_number += 1;
     }
 
     /// Creates a new `AccountData` with a new account.

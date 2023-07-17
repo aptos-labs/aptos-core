@@ -10,6 +10,7 @@ members = [
     "aptos-move/aptos-debugger",
     "aptos-move/aptos-gas",
     "aptos-move/aptos-gas-profiling",
+    "aptos-move/aptos-memory-usage-tracker",
     "aptos-move/aptos-release-builder",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
@@ -17,6 +18,7 @@ members = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
+    "aptos-move/aptos-vm-benchmarks",
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
@@ -45,6 +47,7 @@ members = [
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
+    "crates/aptos-enum-conversion-derive",
     "crates/aptos-faucet/cli",
     "crates/aptos-faucet/core",
     "crates/aptos-faucet/metrics-server",
@@ -124,6 +127,7 @@ members = [
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
     "state-sync/inter-component/mempool-notifications",
+    "state-sync/inter-component/storage-service-notifications",
     "state-sync/state-sync-v2/data-streaming-service",
     "state-sync/state-sync-v2/state-sync-driver",
     "state-sync/storage-service/client",
@@ -170,6 +174,7 @@ members = [
     "third_party/move/move-bytecode-verifier/transactional-tests",
     "third_party/move/move-command-line-common",
     "third_party/move/move-compiler",
+    "third_party/move/move-compiler-v2",
     "third_party/move/move-compiler/transactional-tests",
     "third_party/move/move-core/types",
     "third_party/move/move-ir-compiler",
@@ -240,7 +245,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.64"
+rust-version = "1.70"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -259,6 +264,7 @@ aptos-bitvec = { path = "crates/aptos-bitvec" }
 aptos-build-info = { path = "crates/aptos-build-info" }
 aptos-cached-packages = { path = "aptos-move/framework/cached-packages" }
 aptos-channels = { path = "crates/channel" }
+aptos-cli-common = { path = "crates/aptos-cli-common" }
 aptos-compression = { path = "crates/aptos-compression" }
 aptos-consensus = { path = "consensus" }
 aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
@@ -277,6 +283,7 @@ aptos-event-notifications = { path = "state-sync/inter-component/event-notificat
 aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
 aptos-block-partitioner = { path = "execution/block-partitioner" }
+aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
@@ -313,6 +320,7 @@ aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
 aptos-log-derive = { path = "crates/aptos-log-derive" }
 aptos-logger = { path = "crates/aptos-logger" }
+aptos-memory-usage-tracker = { path = "aptos-move/aptos-memory-usage-tracker" }
 aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
@@ -360,6 +368,7 @@ aptos-state-sync-driver = { path = "state-sync/state-sync-v2/state-sync-driver" 
 aptos-state-view = { path = "storage/state-view" }
 aptos-storage-interface = { path = "storage/storage-interface" }
 aptos-storage-service-client = { path = "state-sync/storage-service/client" }
+aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
 aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
@@ -388,6 +397,7 @@ aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" 
 # Please do not add any test features here: they should be declared by the individual crate.
 again = "0.1.2"
 anyhow = "1.0.62"
+anstyle = "1.0.1"
 arc-swap = "1.5.0"
 arr_macro = "0.1.3"
 ark-bls12-381 = "0.4.0"
@@ -396,7 +406,7 @@ ark-ff = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 assert_approx_eq = "1.1.0"
-assert_unordered = "0.1.1"
+assert_unordered = "0.3.5"
 async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.5.16"
@@ -406,7 +416,7 @@ backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
 bigdecimal = { version = "0.3.0", features = ["serde"] }
-bitvec = "0.19.4"
+bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.7"
@@ -416,8 +426,8 @@ chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 claims = "0.7"
-clap = { version = "3.2.23", features = ["derive", "env", "suggestions"] }
-clap_complete = "3.2.3"
+clap = { version = "4.3.5", features = ["derive", "unstable-styles"] }
+clap_complete = "4.3.1"
 cloud-storage = { version = "0.11.1", features = ["global-client"] }
 codespan-reporting = "0.11.1"
 console-subscriber = "0.1.8"
@@ -442,18 +452,17 @@ diesel = { version = "2.1.0", features = [
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
-dirs = "4.0.0"
+dirs = "5.0.1"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.8"
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 erased-serde = "0.3.13"
 event-listener = "2.5.3"
 fail = "0.5.0"
 field_count = "0.1.1"
 flate2 = "1.0.24"
-fs_extra = "1.2.0"
 futures = "= 0.3.24" # Previously futures v0.3.23 caused some consensus network_tests to fail. We now pin the dependency to v0.3.24.
 futures-channel = "= 0.3.24"
 futures-core = "0.3.25"
@@ -461,7 +470,6 @@ futures-util = "0.3.21"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 git2 = "0.16.1"
-git-version = "0.3.5"
 glob = "0.3.0"
 goldenfile = "1.1.0"
 handlebars = "4.2.2"
@@ -469,7 +477,6 @@ heck = "0.3.2"
 hex = "0.4.3"
 hkdf = "0.10.0"
 hostname = "0.3.1"
-http = "0.2.3"
 httpmock = "0.6"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
@@ -485,7 +492,7 @@ jemallocator = { version = "0.3.2", features = [
 ] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
-libfuzzer-sys = "=0.3.2"
+libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 log = "0.4.17"
 lru = "0.7.5"
@@ -493,7 +500,7 @@ lz4 = "1.24.0"
 maplit = "1.0.2"
 mime = "0.3.16"
 mirai-annotations = "1.12.0"
-mockall = "0.11.0"
+mockall = "0.11.4"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
 ntest = "0.9.0"
@@ -505,7 +512,6 @@ ouroboros = "0.15.6"
 owo-colors = "3.5.0"
 parking_lot = "0.12.0"
 paste = "1.0.7"
-pbjson = "0.4.0"
 percent-encoding = "2.1.0"
 pin-project = "1.0.10"
 poem = { version = "=1.3.55", features = ["anyhow", "rustls"] }
@@ -521,7 +527,6 @@ prometheus-parse = "0.2.4"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 prost = "0.11.3"
-prost-types = "0.10.1"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
@@ -565,10 +570,8 @@ stats_alloc = "0.1.8"
 status-line = "0.2.0"
 strum = "0.24.1"
 strum_macros = "0.24.2"
-structopt = "0.3.21"
-substreams = "0.0.17"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
-sysinfo = "0.24.2"
+sysinfo = "0.28.4"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
 textwrap = "0.15.0"
@@ -576,8 +579,8 @@ thiserror = "1.0.37"
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.34"
-tracing-subscriber = { version = "0.3.11", features = ["json", "env-filter"] }
-trybuild = "1.0.41"
+tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
+trybuild = "1.0.80"
 tokio = { version = "1.21.0", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-metrics = "0.1.0"
@@ -585,7 +588,7 @@ tokio-retry = "0.3.0"
 tokio-stream = "0.1.8"
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
-toml = "0.5.9"
+toml = "0.7.4"
 tonic = { version = "0.8.3", features = [
     "tls-roots",
     "transport",
@@ -598,11 +601,11 @@ ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
 ], default_features = false }
-url = { version = "2.2.2", features = ["serde"] }
+url = { version = "2.4.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
-walkdir = "2.3.2"
-warp = { version = "0.3.3", features = ["tls"] }
-warp-reverse-proxy = "0.5.0"
+walkdir = "2.3.3"
+warp = { version = "0.3.5", features = ["tls"] }
+warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
 x25519-dalek = "1.2.0"
 
@@ -615,6 +618,7 @@ move-cli = { path = "third_party/move/tools/move-cli" }
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
 move-compiler = { path = "third_party/move/move-compiler" }
+move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
 move-docgen = { path = "third_party/move/move-prover/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }

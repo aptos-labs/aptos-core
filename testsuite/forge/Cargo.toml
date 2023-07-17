@@ -17,6 +17,7 @@ again = { workspace = true }
 anyhow = { workspace = true, features = ["backtrace"] }
 aptos = { workspace = true }
 aptos-cached-packages = { workspace = true }
+aptos-cli-common = { workspace = true }
 aptos-config = { workspace = true }
 aptos-db = { workspace = true }
 aptos-framework = { workspace = true }
@@ -35,6 +36,7 @@ aptos-transaction-emitter-lib = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true, features = ["env", "unstable-styles"] }
 either = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
@@ -60,7 +62,6 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-structopt = { workspace = true }
 tempfile = { workspace = true }
 termcolor = { workspace = true }
 thiserror = { workspace = true }

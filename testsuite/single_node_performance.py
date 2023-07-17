@@ -14,35 +14,35 @@ from dataclasses import dataclass
 
 
 # numbers are based on the machine spec used by github action
+# Calibrate from https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
 # Local machine numbers will be higher.
 EXPECTED_TPS = {
-    ("no-op", False, 1): (18800.0, True),
-    ("no-op", False, 1000): (2980.0, True),
-    ("coin-transfer", False, 1): (12600.0, True),
-    ("coin-transfer", True, 1): (22100.0, True),
-    ("account-generation", False, 1): (11000.0, True),
-    ("account-generation", True, 1): (20000.0, True),
-    # changed to not use account_pool. either recalibrate or add here to use account pool.
-    ("account-resource32-b", False, 1): (15000.0, False),
-    ("modify-global-resource", False, 1): (3700.0, True),
-    ("modify-global-resource", False, 10): (10800.0, True),
-    # seems to have changed, disabling as land_blocking, until recalibrated
-    ("publish-package", False, 1): (159.0, False),
-    ("batch100-transfer", False, 1): (350, True),
-    ("batch100-transfer", True, 1): (630, True),
-    ("token-v1ft-mint-and-transfer", False, 1): (1650.0, True),
-    ("token-v1ft-mint-and-transfer", False, 20): (7100.0, True),
-    ("token-v1nft-mint-and-transfer-sequential", False, 1): (1100.0, True),
-    ("token-v1nft-mint-and-transfer-sequential", False, 20): (5350.0, True),
-    ("token-v1nft-mint-and-transfer-parallel", False, 1): (1380.0, True),
-    ("token-v1nft-mint-and-transfer-parallel", False, 20): (5450.0, True),
+    ("no-op", False, 1): (18000.0, True),
+    ("no-op", False, 1000): (2800.0, True),
+    ("coin-transfer", False, 1): (12500.0, True),
+    ("coin-transfer", True, 1): (30300.0, True),
+    ("account-generation", False, 1): (10500.0, True),
+    ("account-generation", True, 1): (26500.0, True),
+    ("account-resource32-b", False, 1): (15400.0, True),
+    ("modify-global-resource", False, 1): (3400.0, True),
+    ("modify-global-resource", False, 10): (10100.0, True),
+    ("publish-package", False, 1): (120.0, True),
+    ("mix_publish_transfer", False, 1): (1400.0, False),
+    ("batch100-transfer", False, 1): (370, True),
+    ("batch100-transfer", True, 1): (940, True),
+    ("token-v1ft-mint-and-transfer", False, 1): (1550.0, True),
+    ("token-v1ft-mint-and-transfer", False, 20): (7000.0, True),
+    ("token-v1nft-mint-and-transfer-sequential", False, 1): (1000.0, True),
+    ("token-v1nft-mint-and-transfer-sequential", False, 20): (5150.0, True),
+    ("token-v1nft-mint-and-transfer-parallel", False, 1): (1300.0, True),
+    ("token-v1nft-mint-and-transfer-parallel", False, 20): (5300.0, True),
     # ("token-v1ft-mint-and-store", False): 1000.0,
     # ("token-v1nft-mint-and-store-sequential", False): 1000.0,
     # ("token-v1nft-mint-and-store-parallel", False): 1000.0,
-    ("no-op2-signers", False, 1): (18800.0, True),
-    ("no-op5-signers", False, 1): (18800.0, True),
-    ("token-v2-ambassador-mint", False, 1): (1750.0, True),
-    ("token-v2-ambassador-mint", False, 20): (5500.0, True),
+    ("no-op2-signers", False, 1): (18000.0, True),
+    ("no-op5-signers", False, 1): (18000.0, True),
+    ("token-v2-ambassador-mint", False, 1): (1500.0, True),
+    ("token-v2-ambassador-mint", False, 20): (5000.0, True),
 }
 
 NOISE_LOWER_LIMIT = 0.8
@@ -54,7 +54,7 @@ NOISE_UPPER_LIMIT_WARN = 1.05
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v3"
+CODE_PERF_VERSION = "v4"
 
 # use production concurrency level for assertions
 CONCURRENCY_LEVEL = 8
@@ -120,6 +120,7 @@ class RunGroupKey:
 class RunResults:
     tps: float
     gps: float
+    gpt: float
     fraction_in_execution: float
     fraction_of_execution_in_vm: float
     fraction_in_commit: float
@@ -134,13 +135,23 @@ class RunGroupInstance:
     expected_tps: float
 
 
+def get_only(values):
+    assert len(values) == 1, "Multiple values parsed: " + str(values)
+    return values[0]
+
+
 def extract_run_results(output: str, execution_only: bool) -> RunResults:
     if execution_only:
         tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
         gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
+        gpt = float(
+            re.findall(r"Overall execution GPT: (\d+\.?\d*) gas/txn", output)[-1]
+        )
+
     else:
-        tps = float(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)[0])
-        gps = float(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)[-1])
+        tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
+        gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
+        gpt = float(get_only(re.findall(r"Overall GPT: (\d+\.?\d*) gas/txn", output)))
 
     fraction_in_execution = float(
         re.findall(r"Overall fraction of total: (\d+\.?\d*) in execution", output)[-1]
@@ -153,7 +164,12 @@ def extract_run_results(output: str, execution_only: bool) -> RunResults:
     )
 
     return RunResults(
-        tps, gps, fraction_in_execution, fraction_of_execution_in_vm, fraction_in_commit
+        tps,
+        gps,
+        gpt,
+        fraction_in_execution,
+        fraction_of_execution_in_vm,
+        fraction_in_commit,
     )
 
 
@@ -183,7 +199,7 @@ def print_table(
         field_name, _ = single_field
         headers.append(field_name)
     else:
-        headers.extend(["t/s", "exe/total", "vm/exe", "commit/total", "g/s"])
+        headers.extend(["t/s", "exe/total", "vm/exe", "commit/total", "g/s", "g/t"])
 
     rows = []
     for result in results:
@@ -213,6 +229,7 @@ def print_table(
             row.append(round(result.single_node_result.fraction_of_execution_in_vm, 3))
             row.append(round(result.single_node_result.fraction_in_commit, 3))
             row.append(int(round(result.single_node_result.gps)))
+            row.append(int(round(result.single_node_result.gpt)))
         rows.append(row)
 
     print(tabulate(rows, headers=headers))
@@ -222,22 +239,35 @@ errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {BLOCK_SIZE} --concurrency-level {CONCURRENCY_LEVEL} --split-ledger-db --use-sharded-state-merkle-db create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {BLOCK_SIZE} --concurrency-level {CONCURRENCY_LEVEL} --split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
 
-    for (transaction_type, use_native_executor, module_working_set_size), (
-        expected_tps,
-        check_active,
-    ) in EXPECTED_TPS.items():
-        print(f"Testing {transaction_type}")
+    for (
+        test_index,
+        (
+            (transaction_type_name, use_native_executor, module_working_set_size),
+            (
+                expected_tps,
+                check_active,
+            ),
+        ),
+    ) in enumerate(EXPECTED_TPS.items()):
+        print(f"Testing {transaction_type_name}")
+        if transaction_type_name == "mix_publish_transfer":
+            transaction_type = "publish-package coin-transfer"
+            transaction_weights = "1 500"
+        else:
+            transaction_type = transaction_type_name
+            transaction_weights = "1"
+
         cur_block_size = int(min([expected_tps, BLOCK_SIZE]))
 
         executor_type = "native" if use_native_executor else "VM"
 
         use_native_executor_str = "--use-native-executor" if use_native_executor else ""
-        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --split-ledger-db --use-sharded-state-merkle-db run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage run-executor --transaction-type {transaction_type} --transaction-weights {transaction_weights} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         concurrency_level_results = {}
 
@@ -253,7 +283,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         output = execute_command(test_db_command)
 
         current_run_key = RunGroupKey(
-            transaction_type, module_working_set_size, executor_type
+            transaction_type_name, module_working_set_size, executor_type
         )
         single_node_result = extract_run_results(output, execution_only=False)
 
@@ -272,14 +302,16 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             json.dumps(
                 {
                     "grep": "grep_json_single_node_perf",
-                    "transaction_type": transaction_type,
+                    "transaction_type": transaction_type_name,
                     "module_working_set_size": module_working_set_size,
                     "executor_type": executor_type,
                     "block_size": cur_block_size,
                     "expected_tps": expected_tps,
                     "tps": single_node_result.tps,
                     "gps": single_node_result.gps,
+                    "gpt": single_node_result.gpt,
                     "code_perf_version": CODE_PERF_VERSION,
+                    "test_index": test_index,
                 }
             )
         )

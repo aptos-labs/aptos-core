@@ -1036,6 +1036,7 @@ impl CliTestFramework {
 
     pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
         MovePackageDir {
+            dev: true,
             package_dir: Some(self.move_dir()),
             output_dir: None,
             named_addresses: Self::named_addresses(account_strs),

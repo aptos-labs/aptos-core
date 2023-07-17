@@ -94,6 +94,8 @@ module aptos_framework::multisig_account {
     /// Provided owners to remove and new owners overlap.
     const EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP: u64 = 18;
 
+    const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
+
     /// Represents a multisig account's configurations and transactions.
     /// This will be stored in the multisig account (created as a resource account separate from any owner accounts).
     struct MultisigAccount has key {
@@ -162,6 +164,21 @@ module aptos_framework::multisig_account {
 
     /// Used only for verifying multisig account creation on top of existing accounts.
     struct MultisigAccountCreationMessage has copy, drop {
+        // Chain id is included to prevent cross-chain replay.
+        chain_id: u8,
+        // Account address is included to prevent cross-account replay (when multiple accounts share the same auth key).
+        account_address: address,
+        // Sequence number is not needed for replay protection as the multisig account can only be created once.
+        // But it's included to ensure timely execution of account creation.
+        sequence_number: u64,
+        // The list of owners for the multisig account.
+        owners: vector<address>,
+        // The number of signatures required (signature threshold).
+        num_signatures_required: u64,
+    }
+
+    /// Used only for verifying multisig account creation on top of existing accounts and rotating the auth key to 0x0.
+    struct MultisigAccountCreationWithAuthKeyRevocationMessage has copy, drop {
         // Chain id is included to prevent cross-chain replay.
         chain_id: u8,
         // Account address is included to prevent cross-account replay (when multiple accounts share the same auth key).
@@ -374,6 +391,10 @@ module aptos_framework::multisig_account {
     /// This offers a migration path for an existing account with a multi-ed25519 auth key (native multisig account).
     /// In order to ensure a malicious module cannot obtain backdoor control over an existing account, a signed message
     /// with a valid signature from the account's auth key is required.
+    ///
+    /// Note that this does not revoke auth key-based control over the account. Owners should separately rotate the auth
+    /// key after they are fully migrated to the new multisig account. Alternatively, they can call
+    /// create_with_existing_account_and_revoke_auth_key instead.
     public entry fun create_with_existing_account(
         multisig_address: address,
         owners: vector<address>,
@@ -413,6 +434,64 @@ module aptos_framework::multisig_account {
             metadata_keys,
             metadata_values,
         );
+    }
+
+    /// Creates a new multisig account on top of an existing account and immediately rotate the origin auth key to 0x0.
+    ///
+    /// Note: If the original account is a resource account, this does not revoke all control over it as if any
+    /// SignerCapability of the resource account still exists, it can still be used to generate the signer for the
+    /// account.
+    public entry fun create_with_existing_account_and_revoke_auth_key(
+        multisig_address: address,
+        owners: vector<address>,
+        num_signatures_required: u64,
+        account_scheme: u8,
+        account_public_key: vector<u8>,
+        create_multisig_account_signed_message: vector<u8>,
+        metadata_keys: vector<String>,
+        metadata_values: vector<vector<u8>>,
+    ) acquires MultisigAccount {
+        // Verify that the `MultisigAccountCreationMessage` has the right information and is signed by the account
+        // owner's key.
+        let proof_challenge = MultisigAccountCreationWithAuthKeyRevocationMessage {
+            chain_id: chain_id::get(),
+            account_address: multisig_address,
+            sequence_number: account::get_sequence_number(multisig_address),
+            owners,
+            num_signatures_required,
+        };
+        account::verify_signed_message(
+            multisig_address,
+            account_scheme,
+            account_public_key,
+            create_multisig_account_signed_message,
+            proof_challenge,
+        );
+
+        // We create the signer for the multisig account here since this is required to add the MultisigAccount resource
+        // This should be safe and authorized because we have verified the signed message from the existing account
+        // that authorizes creating a multisig account with the specified owners and signature threshold.
+        let multisig_account = &create_signer(multisig_address);
+        create_with_owners_internal(
+            multisig_account,
+            owners,
+            num_signatures_required,
+            option::none<SignerCapability>(),
+            metadata_keys,
+            metadata_values,
+        );
+
+        // Rotate the account's auth key to 0x0, which effectively revokes control via auth key.
+        let multisig_address = address_of(multisig_account);
+        account::rotate_authentication_key_internal(multisig_account, ZERO_AUTH_KEY);
+        // This also needs to revoke any signer capability or rotation capability that exists for the account to
+        // completely remove all access to the account.
+        if (account::is_signer_capability_offered(multisig_address)) {
+            account::revoke_any_signer_capability(multisig_account);
+        };
+        if (account::is_rotation_capability_offered(multisig_address)) {
+            account::revoke_any_rotation_capability(multisig_account);
+        };
     }
 
     /// Creates a new multisig account and add the signer as a single owner.
@@ -1262,6 +1341,47 @@ module aptos_framework::multisig_account {
         );
         assert_multisig_account_exists(multisig_address);
         assert!(owners(multisig_address) == expected_owners, 0);
+    }
+
+    #[test]
+    public entry fun test_create_multisig_account_on_top_of_existing_multi_ed25519_account_and_revoke_auth_key()
+    acquires MultisigAccount {
+        setup();
+        let (curr_sk, curr_pk) = multi_ed25519::generate_keys(2, 3);
+        let pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&curr_pk);
+        let auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pk_unvalidated);
+        let multisig_address = from_bcs::to_address(auth_key);
+        create_account(multisig_address);
+
+        // Create both a signer capability and rotation capability offers
+        account::set_rotation_capability_offer(multisig_address, @0x123);
+        account::set_signer_capability_offer(multisig_address, @0x123);
+
+        let expected_owners = vector[@0x123, @0x124, @0x125];
+        let proof = MultisigAccountCreationWithAuthKeyRevocationMessage {
+            chain_id: chain_id::get(),
+            account_address: multisig_address,
+            sequence_number: account::get_sequence_number(multisig_address),
+            owners: expected_owners,
+            num_signatures_required: 2,
+        };
+        let signed_proof = multi_ed25519::sign_struct(&curr_sk, proof);
+        create_with_existing_account_and_revoke_auth_key(
+            multisig_address,
+            expected_owners,
+            2,
+            1, // MULTI_ED25519_SCHEME
+            multi_ed25519::unvalidated_public_key_to_bytes(&pk_unvalidated),
+            multi_ed25519::signature_to_bytes(&signed_proof),
+            vector[],
+            vector[],
+        );
+        assert_multisig_account_exists(multisig_address);
+        assert!(owners(multisig_address) == expected_owners, 0);
+        assert!(account::get_authentication_key(multisig_address) == ZERO_AUTH_KEY, 1);
+        // Verify that all capability offers have been wiped.
+        assert!(!account::is_rotation_capability_offered(multisig_address), 2);
+        assert!(!account::is_signer_capability_offered(multisig_address), 3);
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]

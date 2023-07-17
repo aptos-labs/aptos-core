@@ -34,6 +34,10 @@ spec aptos_framework::voting {
 
         requires chain_status::is_operating();
         include CreateProposalAbortsIf<ProposalType>{is_multi_step_proposal: false};
+        ensures result == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id;
+        ensures global<VotingForum<ProposalType>>(voting_forum_address).next_proposal_id
+            == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id + 1;
+        ensures  table::spec_contains(global<VotingForum<ProposalType>>(voting_forum_address).proposals, result);
     }
 
     // The min_vote_threshold lower thanearly_resolution_vote_threshold.
@@ -53,9 +57,15 @@ spec aptos_framework::voting {
         is_multi_step_proposal: bool,
     ): u64 {
         use aptos_framework::chain_status;
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
 
         requires chain_status::is_operating();
         include CreateProposalAbortsIf<ProposalType>;
+        ensures result == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id;
+        ensures global<VotingForum<ProposalType>>(voting_forum_address).next_proposal_id
+            == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id + 1;
+        ensures table::spec_contains(global<VotingForum<ProposalType>>(voting_forum_address).proposals, result);
+        ensures  table::spec_contains(global<VotingForum<ProposalType>>(voting_forum_address).proposals, result);
     }
 
     spec schema CreateProposalAbortsIf<ProposalType> {
@@ -188,7 +198,33 @@ spec aptos_framework::voting {
     spec fun spec_get_proposal_state<ProposalType>(
         voting_forum_address: address,
         proposal_id: u64,
-    ): u64;
+        voting_forum: VotingForum<ProposalType>
+    ): u64 {
+        let proposal = table::spec_get(voting_forum.proposals, proposal_id);
+        let early_resolution_threshold = option::spec_borrow(proposal.early_resolution_vote_threshold);
+        let voting_period_over = timestamp::now_seconds() > proposal.expiration_secs;
+        let be_resolved_early = option::spec_is_some(proposal.early_resolution_vote_threshold) &&
+            (proposal.yes_votes >= early_resolution_threshold ||
+                proposal.no_votes >= early_resolution_threshold);
+        let voting_closed = voting_period_over || be_resolved_early;
+        let proposal_vote_cond = (proposal.yes_votes > proposal.no_votes && proposal.yes_votes + proposal.no_votes >= proposal.min_vote_threshold);
+        if (voting_closed && proposal_vote_cond) {
+            PROPOSAL_STATE_SUCCEEDED
+        } else if (voting_closed && !proposal_vote_cond) {
+            PROPOSAL_STATE_FAILED
+        } else {
+            PROPOSAL_STATE_PENDING
+        }
+    }
+
+    spec fun spec_get_proposal_expiration_secs<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u64 {
+        let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::spec_get(voting_forum.proposals, proposal_id);
+        proposal.expiration_secs
+    }
 
     spec get_proposal_state<ProposalType: store>(
         voting_forum_address: address,
@@ -211,15 +247,7 @@ spec aptos_framework::voting {
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let voting_closed = voting_period_over || be_resolved_early;
-        // Voting Succeeded or Failed
-        ensures voting_closed ==> if (proposal.yes_votes > proposal.no_votes && proposal.yes_votes + proposal.no_votes >= proposal.min_vote_threshold) {
-            result == PROPOSAL_STATE_SUCCEEDED
-        } else {
-            result == PROPOSAL_STATE_FAILED
-        };
-
-        // Voting is Pending
-        ensures !voting_closed ==> result == PROPOSAL_STATE_PENDING;
+        ensures result == spec_get_proposal_state(voting_forum_address, proposal_id, voting_forum);
 
     }
 

@@ -6,7 +6,7 @@ use clap::Parser;
 use std::collections::BTreeMap;
 
 #[derive(Parser)]
-#[clap(author, version, about = "Lightweight Move package builder", long_about = None)]
+#[clap(author, version, about = "Lightweight Move package builder", long_about = None, disable_help_flag = true)]
 struct Args {
     input_path: std::path::PathBuf,
     output_path: Option<std::path::PathBuf>,
@@ -39,4 +39,10 @@ fn main() {
     build_config
         .compile_package(&args.input_path, &mut std::io::stdout())
         .unwrap();
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
 }

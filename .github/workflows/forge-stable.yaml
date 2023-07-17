@@ -120,7 +120,7 @@ jobs:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-realistic-env-max-load-long-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 7200
-      FORGE_TEST_SUITE: realistic_env_max_load
+      FORGE_TEST_SUITE: realistic_env_max_load_large
       POST_TO_SLACK: true
 
   run-forge-realistic-env-load-sweep:
@@ -210,7 +210,7 @@ jobs:
       FORGE_NAMESPACE: forge-haproxy-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 600
       FORGE_ENABLE_HAPROXY: true
-      FORGE_TEST_SUITE: land_blocking
+      FORGE_TEST_SUITE: realistic_env_max_load
       POST_TO_SLACK: true
 
   run-forge-fullnode-reboot-stress-test:
@@ -269,56 +269,3 @@ jobs:
       FORGE_TEST_SUITE: changing_working_quorum_test_high_load
       POST_TO_SLACK: true
       FORGE_ENABLE_FAILPOINTS: true
-
-  ### State sync Forge tests
-
-  run-forge-state-sync-perf-validator-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-validator-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # Run for 40 minutes
-      FORGE_RUNNER_DURATION_SECS: 2400
-      FORGE_TEST_SUITE: state_sync_perf_validators
-      POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
-
-  run-forge-state-sync-perf-fullnode-execute-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-execute-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # Run for 40 minutes
-      FORGE_RUNNER_DURATION_SECS: 2400
-      FORGE_TEST_SUITE: state_sync_perf_fullnodes_execute_transactions
-      POST_TO_SLACK: true
-
-  run-forge-state-sync-perf-fullnode-fast-sync-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-fast-sync-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # Run for 40 minutes
-      FORGE_RUNNER_DURATION_SECS: 2400
-      FORGE_TEST_SUITE: state_sync_perf_fullnodes_fast_sync
-      POST_TO_SLACK: true
-
-  run-forge-state-sync-perf-fullnode-apply-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-apply-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 2400
-      FORGE_TEST_SUITE: state_sync_perf_fullnodes_apply_outputs
-      POST_TO_SLACK: true

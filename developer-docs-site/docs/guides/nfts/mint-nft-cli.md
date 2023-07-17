@@ -71,10 +71,11 @@ In this section, we create a collection and token. This work maps to the demonst
 5. Receive output indicating success and resembling:
   ```shell
   No key given, generating key...
-  Account a233bf7be2b93f1e532f8ea88c49e0c70a873d082890b6d9685f89b5e40d50c2 does not exist, you will need to create and fund the account through a community faucet e.g. https://aptoslabs.com/testnet-faucet, or by transferring funds from another account
-  
+  Account abf6c939bfd8352b9769f9343dbc55a777349588a2ddc4668c8ddcd213169827 doesn't exist, creating it and funding it with 100000000 Octas
+  Account abf6c939bfd8352b9769f9343dbc55a777349588a2ddc4668c8ddcd213169827 funded successfully
+
   ---
-  Aptos CLI is now set up for account a233bf7be2b93f1e532f8ea88c49e0c70a873d082890b6d9685f89b5e40d50c2 as profile default!  Run `aptos --help` for more information about commands
+  Aptos CLI is now set up for account abf6c939bfd8352b9769f9343dbc55a777349588a2ddc4668c8ddcd213169827 as profile default!  Run `aptos --help` for more information about commands
   {
     "Result": "Success"
   }
@@ -122,7 +123,7 @@ aptos move publish --named-addresses mint_nft=a911e7374107ad434bbc5369289cf5855c
       "Result": {
         "transaction_hash": "0x576a2e9481e71b629335b98ea75c87d124e1b435e843e7a2ef8938ae21bebfa3",
         "gas_used": 11679,
-        "gas_unit_price": 100,  
+        "gas_unit_price": 100,
         "sender": "a911e7374107ad434bbc5369289cf5855c3b1a2938a6bfce0776c1d296271cde",
         "sequence_number": 0,
         "success": true,
@@ -348,7 +349,7 @@ cd aptos-move/move-examples/mint_nft/4-Getting-Production-Ready
 
 2. Edit `Move.toml` in that directory to replace `admin_addr = "0xbeef"` with the admin address we created in [3. Add admin account and functions](#3-add-admin-account-and-functions).
 
-2. Run the following CLI command to publish the module under a resource account, replacing `<seed>` and `<default-account-address>` with your own: 
+2. Run the following CLI command to publish the module under a resource account, replacing `<seed>` and `<default-account-address>` with your own:
 
 ```shell
 aptos move create-resource-account-and-publish-package --seed <seed> --address-name mint_nft --profile default --named-addresses source_addr=<default-account-address>

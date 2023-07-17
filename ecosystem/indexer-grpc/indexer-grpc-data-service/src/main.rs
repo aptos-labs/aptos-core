@@ -21,6 +21,12 @@ use tonic::{
     Request, Status,
 };
 
+// HTTP2 ping interval and timeout.
+// This can help server to garbage collect dead connections.
+// tonic server: https://docs.rs/tonic/latest/tonic/transport/server/struct.Server.html#method.http2_keepalive_interval
+const HTTP2_PING_INTERVAL_DURATION: std::time::Duration = std::time::Duration::from_secs(60);
+const HTTP2_PING_TIMEOUT_DURATION: std::time::Duration = std::time::Duration::from_secs(10);
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
@@ -39,10 +45,14 @@ pub struct NonTlsConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcDataServiceConfig {
+    // The address for TLS and non-TLS gRPC server to listen on.
     pub data_service_grpc_tls_config: Option<TlsConfig>,
     pub data_service_grpc_non_tls_config: Option<NonTlsConfig>,
+    // A list of auth tokens that are allowed to access the service.
     pub whitelisted_auth_tokens: Vec<String>,
+    // File store config.
     pub file_store_config: IndexerGrpcFileStoreConfig,
+    // Redis read replica address.
     pub redis_read_replica_address: String,
 }
 
@@ -101,6 +111,8 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 .ok_or_else(|| anyhow::anyhow!("Failed to parse grpc address"))?;
             tasks.push(tokio::spawn(async move {
                 Server::builder()
+                    .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
+                    .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))
                     .add_service(svc_with_interceptor_clone)
                     .add_service(reflection_service_clone)
                     .serve(grpc_address)
@@ -122,6 +134,8 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             let identity = tonic::transport::Identity::from_pem(cert, key);
             tasks.push(tokio::spawn(async move {
                 Server::builder()
+                    .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
+                    .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))
                     .tls_config(tonic::transport::ServerTlsConfig::new().identity(identity))?
                     .add_service(svc_with_interceptor)
                     .add_service(reflection_service)

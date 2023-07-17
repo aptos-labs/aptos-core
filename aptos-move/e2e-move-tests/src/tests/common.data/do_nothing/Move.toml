@@ -1,0 +1,6 @@
+[package]
+name = "do_nothing"
+version = "0.0.0"
+
+[dependencies]
+MoveStdlib = { local = "../../../../../framework/move-stdlib" }

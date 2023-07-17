@@ -112,7 +112,7 @@ pub struct BuildConfig {
     pub generate_abis: bool,
 
     /// Installation directory for compiled artifacts. Defaults to current directory.
-    #[clap(long = "install-dir", parse(from_os_str), global = true)]
+    #[clap(long = "install-dir", value_parser, global = true)]
     pub install_dir: Option<PathBuf>,
 
     /// Force recompilation of all packages
@@ -123,7 +123,7 @@ pub struct BuildConfig {
     #[clap(skip)]
     pub additional_named_addresses: BTreeMap<String, AccountAddress>,
 
-    #[clap(long = "arch", global = true, parse(try_from_str = Architecture::try_parse_from_str))]
+    #[clap(long = "arch", global = true, value_parser = Architecture::try_parse_from_str)]
     pub architecture: Option<Architecture>,
 
     /// Only fetch dependency repos to MOVE_HOME

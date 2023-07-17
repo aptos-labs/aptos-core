@@ -13,6 +13,7 @@ import {
   TransactionAuthenticatorMultiEd25519,
   SigningMessage,
   MultiAgentRawTransaction,
+  FeePayerRawTransaction,
   AccountAddress,
   EntryFunction,
   Identifier,
@@ -42,7 +43,7 @@ export { TypeTagParser } from "../aptos_types";
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
 
-type AnyRawTransaction = RawTransaction | MultiAgentRawTransaction;
+type AnyRawTransaction = RawTransaction | MultiAgentRawTransaction | FeePayerRawTransaction;
 
 /**
  * Function that takes in a Signing Message (serialized raw transaction)
@@ -77,6 +78,8 @@ export class TransactionBuilder<F extends SigningFn> {
     if (rawTxn instanceof RawTransaction) {
       hash.update(RAW_TRANSACTION_SALT);
     } else if (rawTxn instanceof MultiAgentRawTransaction) {
+      hash.update(RAW_TRANSACTION_WITH_DATA_SALT);
+    } else if (rawTxn instanceof FeePayerRawTransaction) {
       hash.update(RAW_TRANSACTION_WITH_DATA_SALT);
     } else {
       throw new Error("Unknown transaction type.");
@@ -232,7 +235,7 @@ export class TransactionBuilderABI {
    * Builds a TransactionPayload. For dApps, chain ID and account sequence numbers are only known to the wallet.
    * Instead of building a RawTransaction (requires chainID and sequenceNumber), dApps can build a TransactionPayload
    * and pass the payload to the wallet for signing and sending.
-   * @param func Fully qualified func names, e.g. 0x1::Coin::transfer
+   * @param func Fully qualified func names, e.g. 0x1::aptos_account::transfer
    * @param ty_tags TypeTag strings
    * @param args Function arguments
    * @returns TransactionPayload
@@ -269,7 +272,7 @@ export class TransactionBuilderABI {
 
   /**
    * Builds a RawTransaction
-   * @param func Fully qualified func names, e.g. 0x1::Coin::transfer
+   * @param func Fully qualified func names, e.g. 0x1::aptos_account::transfer
    * @param ty_tags TypeTag strings.
    * @example Below are valid value examples
    * ```
@@ -367,7 +370,7 @@ export class TransactionBuilderRemoteABI {
   /**
    * Builds a raw transaction. Only support script function a.k.a entry function payloads
    *
-   * @param func fully qualified function name in format <address>::<module>::<function>, e.g. 0x1::coins::transfer
+   * @param func fully qualified function name in format <address>::<module>::<function>, e.g. 0x1::coin::transfer
    * @param ty_tags
    * @param args
    * @returns RawTransaction
@@ -380,7 +383,7 @@ export class TransactionBuilderRemoteABI {
     if (funcNameParts.length !== 3) {
       throw new Error(
         // eslint-disable-next-line max-len
-        "'func' needs to be a fully qualified function name in format <address>::<module>::<function>, e.g. 0x1::coins::transfer",
+        "'func' needs to be a fully qualified function name in format <address>::<module>::<function>, e.g. 0x1::coin::transfer",
       );
     }
 

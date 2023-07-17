@@ -20,7 +20,7 @@ spec aptos_framework::staking_config {
             rewards_rate,
             fixed_point64::spec_create_from_u128((1u128)));
         invariant fixed_point64::spec_less_or_equal(min_rewards_rate, rewards_rate);
-        invariant rewards_rate_period_in_secs == ONE_YEAR_IN_SECS;
+        invariant rewards_rate_period_in_secs > 0;
         invariant fixed_point64::spec_ceil(rewards_rate_decrease_rate) <= 1;
     }
 
@@ -83,6 +83,7 @@ spec aptos_framework::staking_config {
     }
 
     spec calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {
+        pragma verify_duration_estimate = 120;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
         aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
@@ -155,7 +156,10 @@ spec aptos_framework::staking_config {
         use std::signer;
         include StakingRewardsConfigRequirement;
         let addr = signer::address_of(aptos_framework);
+        let staking_reward_config = borrow_global<StakingRewardsConfig>(@aptos_framework);
+
         aborts_if addr != @aptos_framework;
+        aborts_if staking_reward_config.rewards_rate_period_in_secs != rewards_rate_period_in_secs;
         include StakingRewardsConfigValidationAbortsIf;
         aborts_if !exists<StakingRewardsConfig>(addr);
     }
@@ -191,7 +195,7 @@ spec aptos_framework::staking_config {
 
     /// rewards_rate must be within [0, 1].
     /// min_rewards_rate must be not greater than rewards_rate.
-    /// rewards_rate_period_in_secs must equal to 1 year.
+    /// rewards_rate_period_in_secs must be greater than 0.
     /// rewards_rate_decrease_rate must be within [0,1].
     spec schema StakingRewardsConfigValidationAbortsIf {
         rewards_rate: FixedPoint64;
@@ -203,7 +207,7 @@ spec aptos_framework::staking_config {
             rewards_rate,
             fixed_point64::spec_create_from_u128((1u128)));
         aborts_if fixed_point64::spec_greater(min_rewards_rate, rewards_rate);
-        aborts_if rewards_rate_period_in_secs != ONE_YEAR_IN_SECS;
+        aborts_if rewards_rate_period_in_secs <= 0;
         aborts_if fixed_point64::spec_ceil(rewards_rate_decrease_rate) > 1;
     }
 
@@ -225,7 +229,7 @@ spec aptos_framework::staking_config {
             rewards_rate,
             fixed_point64::spec_create_from_u128((1u128)));
         requires fixed_point64::spec_less_or_equal(min_rewards_rate, rewards_rate);
-        requires rewards_rate_period_in_secs == ONE_YEAR_IN_SECS;
+        requires rewards_rate_period_in_secs > 0;
         requires last_rewards_rate_period_start_in_secs <= timestamp::spec_now_seconds();
         requires fixed_point64::spec_ceil(rewards_rate_decrease_rate) <= 1;
     }

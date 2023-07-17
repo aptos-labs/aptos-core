@@ -23,24 +23,12 @@ use proptest::{
 use rand::Rng;
 use std::collections::HashMap;
 
-fn save(store: &EventStore, version: Version, events: &[ContractEvent]) -> HashValue {
+fn save(store: &EventStore, version: Version, events: &[ContractEvent]) {
     let batch = SchemaBatch::new();
-    let root_hash = store.put_events(version, events, &batch).unwrap();
+    store
+        .put_events(version, events, /*skip_index=*/ true, &batch)
+        .unwrap();
     store.event_db.write_schemas(batch).unwrap();
-
-    root_hash
-}
-
-#[test]
-fn test_put_empty() {
-    let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
-    let store = &db.event_store;
-    let batch = SchemaBatch::new();
-    assert_eq!(
-        store.put_events(0, &[], &batch).unwrap(),
-        *ACCUMULATOR_PLACEHOLDER_HASH
-    );
 }
 
 #[test]
@@ -61,7 +49,7 @@ proptest! {
         let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.event_store;
 
-        let root_hash = save(store, 100, &events);
+        save(store, 100, &events);
 
         for (idx, expected_event) in events.iter().enumerate() {
             let event = store
@@ -180,7 +168,9 @@ fn test_index_get_impl(event_batches: Vec<Vec<ContractEvent>>) {
 
     let batch = SchemaBatch::new();
     event_batches.iter().enumerate().for_each(|(ver, events)| {
-        store.put_events(ver as u64, events, &batch).unwrap();
+        store
+            .put_events(ver as u64, events, /*skip_index=*/ false, &batch)
+            .unwrap();
     });
     store.event_db.write_schemas(batch);
     let ledger_version_plus_one = event_batches.len() as u64;
@@ -303,7 +293,9 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     // save events to db
     let batch = SchemaBatch::new();
     new_block_events.iter().for_each(|(ver, event)| {
-        store.put_events(*ver, &[event.clone()], &batch).unwrap();
+        store
+            .put_events(*ver, &[event.clone()], /*skip_index=*/ false, &batch)
+            .unwrap();
     });
     store.event_db.write_schemas(batch);
 

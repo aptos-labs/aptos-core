@@ -50,7 +50,7 @@ mod validator_cache;
 #[derive(Clone, Debug, Parser)]
 #[clap(name = "Aptos Telemetry Service", author, version)]
 pub struct AptosTelemetryServiceArgs {
-    #[clap(short = 'f', long, parse(from_os_str))]
+    #[clap(short = 'f', long, value_parser)]
     config_path: PathBuf,
 }
 
@@ -337,4 +337,10 @@ pub struct CustomEventConfig {
     pub project_id: String,
     pub dataset_id: String,
     pub table_id: String,
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    AptosTelemetryServiceArgs::command().debug_assert()
 }

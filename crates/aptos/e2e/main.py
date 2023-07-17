@@ -34,8 +34,15 @@ from cases.account import (
     test_account_fund_with_faucet,
     test_account_lookup_address,
 )
+from cases.config import test_config_show_profiles
 from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
-from cases.move import test_move_publish
+from cases.move import (
+    test_move_compile,
+    test_move_compile_script,
+    test_move_publish,
+    test_move_run,
+    test_move_view,
+)
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -107,6 +114,9 @@ def run_tests(run_helper):
     # Run init tests. We run these first to set up the CLI.
     test_init(run_helper)
 
+    # Run config tests.
+    test_config_show_profiles(run_helper)
+
     # Run account tests.
     test_account_fund_with_faucet(run_helper)
     test_account_create(run_helper)
@@ -116,7 +126,11 @@ def run_tests(run_helper):
     test_aptos_header_included(run_helper)
 
     # Run move subcommand group tests.
+    test_move_view(run_helper)
+    test_move_compile(run_helper)
+    test_move_compile_script(run_helper)
     test_move_publish(run_helper)
+    test_move_run(run_helper)
 
 
 def main():
@@ -169,9 +183,15 @@ def main():
         LOG.error("These tests failed:")
         for test_name, exception in test_results.failed:
             LOG.error(f"{test_name}: {exception}")
+        LOG.info("---")
+        LOG.info(
+            f"Debug these tests by checking the command, stdout, stderr, and any "
+            f"exception information if relevant in {args.working_directory}/out"
+        )
         return False
 
     LOG.info("All tests passed!")
+
     return True
 
 

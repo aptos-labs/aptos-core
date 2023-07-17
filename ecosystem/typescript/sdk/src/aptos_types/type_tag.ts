@@ -47,7 +47,7 @@ export class TypeTagBool extends TypeTag {
     serializer.serializeU32AsUleb128(0);
   }
 
-  static load(deserializer: Deserializer): TypeTagBool {
+  static load(_deserializer: Deserializer): TypeTagBool {
     return new TypeTagBool();
   }
 }
@@ -64,7 +64,7 @@ export class TypeTagU8 extends TypeTag {
 
 export class TypeTagU16 extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(1);
+    serializer.serializeU32AsUleb128(8);
   }
 
   static load(_deserializer: Deserializer): TypeTagU16 {
@@ -74,7 +74,7 @@ export class TypeTagU16 extends TypeTag {
 
 export class TypeTagU32 extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(1);
+    serializer.serializeU32AsUleb128(9);
   }
 
   static load(_deserializer: Deserializer): TypeTagU32 {
@@ -104,7 +104,7 @@ export class TypeTagU128 extends TypeTag {
 
 export class TypeTagU256 extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(1);
+    serializer.serializeU32AsUleb128(10);
   }
 
   static load(_deserializer: Deserializer): TypeTagU256 {
@@ -224,6 +224,14 @@ export const stringStructTag = new StructTag(
   new Identifier("String"),
   [],
 );
+
+export function optionStructTag(typeArg: TypeTag): StructTag {
+  return new StructTag(AccountAddress.fromHex("0x1"), new Identifier("option"), new Identifier("Option"), [typeArg]);
+}
+
+export function objectStructTag(typeArg: TypeTag): StructTag {
+  return new StructTag(AccountAddress.fromHex("0x1"), new Identifier("object"), new Identifier("Object"), [typeArg]);
+}
 
 function bail(message: string) {
   throw new TypeTagParserError(message);

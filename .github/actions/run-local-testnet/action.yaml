@@ -1,0 +1,43 @@
+name: "Run Local Testnet"
+description: |
+  Runs a local testnet from a Docker image built from a particular image tag
+inputs:
+  IMAGE_TAG:
+    description: "The image tag to use for running the local testnet, e.g. devnet / testnet / mainnet or some SHA"
+    required: true
+  GCP_DOCKER_ARTIFACT_REPO:
+    description: "The GCP Docker artifact repository"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Create a directory that we'll bindmount into the container into which it can
+    # store all its configuration and files.
+    - name: Create directory for testnet files
+      run: mkdir -p ${{ runner.temp }}/testnet
+      shell: bash
+
+    # Run a local testnet. We mount in the testnet directory we just created.
+    - run: docker run -p 8080:8080 -p 8081:8081 -v ${{ runner.temp }}/testnet:/testnet --name=local-testnet-${{ inputs.IMAGE_TAG }} --detach ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.IMAGE_TAG }} aptos node run-local-testnet --with-faucet --test-dir /testnet
+      shell: bash
+
+    # Install node + npm.
+    - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
+      with:
+        node-version-file: .node-version
+        registry-url: "https://registry.npmjs.org"
+
+    # Wait for the node API and faucet of the local testnet to start up.
+    - run: npm install -g wait-on
+      shell: bash
+    - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8080/v1
+      shell: bash
+    - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081
+      shell: bash
+
+    # Print the logs from the local testnet if the tests failed.
+    - name: Print local testnet logs if something failed
+      run: docker logs local-testnet-${{ inputs.IMAGE_TAG }}
+      shell: bash
+      if: ${{ failure() }}

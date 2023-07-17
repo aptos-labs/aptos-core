@@ -48,11 +48,21 @@ impl Mempool {
 
     /// This function will be called once the transaction has been stored.
     pub(crate) fn commit_transaction(&mut self, sender: &AccountAddress, sequence_number: u64) {
+        self.transactions
+            .commit_transaction(sender, sequence_number);
+    }
+
+    pub(crate) fn log_commit_transaction(
+        &self,
+        sender: &AccountAddress,
+        sequence_number: u64,
+        block_timestamp: Duration,
+    ) {
         trace!(
             LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
             is_rejected = false
         );
-        self.log_latency(*sender, sequence_number, counters::COMMIT_ACCEPTED_LABEL);
+        self.log_commit_latency(*sender, sequence_number, block_timestamp);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
@@ -61,9 +71,6 @@ impl Mempool {
                 ranking_score,
             );
         }
-
-        self.transactions
-            .commit_transaction(sender, sequence_number);
     }
 
     fn log_reject_transaction(
@@ -111,7 +118,7 @@ impl Mempool {
             .reject_transaction(sender, sequence_number, hash);
     }
 
-    pub(crate) fn log_txn_commit_latency(
+    pub(crate) fn log_txn_latency(
         insertion_info: InsertionInfo,
         bucket: &str,
         stage: &'static str,
@@ -131,7 +138,30 @@ impl Mempool {
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            Self::log_txn_commit_latency(insertion_info, bucket, stage);
+            Self::log_txn_latency(insertion_info, bucket, stage);
+        }
+    }
+
+    fn log_commit_latency(
+        &self,
+        account: AccountAddress,
+        sequence_number: u64,
+        block_timestamp: Duration,
+    ) {
+        if let Some((&insertion_info, bucket)) = self
+            .transactions
+            .get_insertion_info_and_bucket(&account, sequence_number)
+        {
+            Self::log_txn_latency(insertion_info, bucket, counters::COMMIT_ACCEPTED_LABEL);
+
+            let insertion_timestamp =
+                aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
+            counters::core_mempool_txn_commit_latency(
+                counters::COMMIT_ACCEPTED_BLOCK_LABEL,
+                insertion_info.submitted_by_label(),
+                bucket,
+                block_timestamp.saturating_sub(insertion_timestamp),
+            );
         }
     }
 

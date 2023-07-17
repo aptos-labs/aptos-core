@@ -1,0 +1,10 @@
+[package]
+name = 'tic-tac-toe'
+version = '1.0.0'
+
+[addresses]
+tic_tac_toe = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+

@@ -249,6 +249,42 @@ impl SubAccountIdentifier {
         }
     }
 
+    pub fn new_delegated_total_stake(pool: &str) -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: STAKE.to_string(),
+            metadata: Some(SubAccountIdentifierMetadata::new_pool_address(
+                AccountAddress::from_str(pool).unwrap(),
+            )),
+        }
+    }
+
+    pub fn new_delegated_active_stake(pool: &str) -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: ACTIVE_STAKE.to_string(),
+            metadata: Some(SubAccountIdentifierMetadata::new_pool_address(
+                AccountAddress::from_str(pool).unwrap(),
+            )),
+        }
+    }
+
+    pub fn new_delegated_pending_inactive_stake(pool: &str) -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: PENDING_INACTIVE_STAKE.to_string(),
+            metadata: Some(SubAccountIdentifierMetadata::new_pool_address(
+                AccountAddress::from_str(pool).unwrap(),
+            )),
+        }
+    }
+
+    pub fn new_delegated_inactive_stake(pool: &str) -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: INACTIVE_STAKE.to_string(),
+            metadata: Some(SubAccountIdentifierMetadata::new_pool_address(
+                AccountAddress::from_str(pool).unwrap(),
+            )),
+        }
+    }
+
     pub fn new_operator_stake(operator: AccountAddress) -> SubAccountIdentifier {
         SubAccountIdentifier {
             address: format!("{}-{}", STAKE, to_hex_lower(&operator)),
