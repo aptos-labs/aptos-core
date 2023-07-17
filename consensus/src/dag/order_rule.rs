@@ -105,7 +105,7 @@ impl OrderRule {
                 && *metadata.author() == self.anchor_election.get_anchor(metadata.round())
         };
         while let Some(prev_anchor) = dag_reader
-            .reachable(
+            .reachable_from_target_node(
                 &current_anchor,
                 Some(self.lowest_unordered_anchor_round),
                 |node_status| matches!(node_status, NodeStatus::Unordered(_)),

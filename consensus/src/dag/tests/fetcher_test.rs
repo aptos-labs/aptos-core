@@ -40,17 +40,14 @@ fn test_dag_fetcher_receiver() {
     ]);
 
     let request = RemoteFetchRequest::new(
-        target_node.metadata().clone(),
+        target_node.epoch(),
+        target_node
+            .parents()
+            .iter()
+            .map(|parent| parent.metadata().clone())
+            .collect(),
         DagSnapshotBitmask::new(1, vec![vec![false; 4]]),
     );
-    assert_eq!(
-        fetcher.process(request.clone()).unwrap_err().to_string(),
-        "target node is not present"
-    );
-
-    // Add Round 2 - node 0
-    assert!(dag.write().add_node(target_node.clone()).is_ok());
-
     assert_ok_eq!(
         fetcher.process(request),
         FetchResponse::new(1, vec![first_round_nodes[0].clone()])

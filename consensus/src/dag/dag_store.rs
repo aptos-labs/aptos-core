@@ -182,8 +182,8 @@ impl Dag {
             .unwrap_or(false)
     }
 
-    fn reachable_filter(start: HashValue) -> impl FnMut(&Arc<CertifiedNode>) -> bool {
-        let mut reachable = HashSet::from([start]);
+    fn reachable_filter(start: Vec<HashValue>) -> impl FnMut(&Arc<CertifiedNode>) -> bool {
+        let mut reachable: HashSet<HashValue> = HashSet::from_iter(start.into_iter());
         move |node| {
             if reachable.contains(&node.digest()) {
                 for parent in node.parents() {
@@ -202,7 +202,7 @@ impl Dag {
         until: Option<Round>,
     ) -> impl Iterator<Item = &mut NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
-        let mut reachable_filter = Self::reachable_filter(from.digest());
+        let mut reachable_filter = Self::reachable_filter(vec![from.digest()]);
         self.nodes_by_round
             .range_mut(until..=from.round())
             .rev()
@@ -216,20 +216,44 @@ impl Dag {
 
     pub fn reachable(
         &self,
-        from: &Arc<CertifiedNode>,
+        initial: Vec<HashValue>,
+        initial_round: Round,
         until: Option<Round>,
         filter: impl Fn(&NodeStatus) -> bool,
     ) -> impl Iterator<Item = &NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
-        let mut reachable_filter = Self::reachable_filter(from.digest());
+        let mut reachable_filter = Self::reachable_filter(initial);
         self.nodes_by_round
-            .range(until..=from.round())
+            .range(until..=initial_round)
             .rev()
             .flat_map(|(_, round_ref)| round_ref.iter())
             .flatten()
             .filter(move |node_status| {
                 filter(node_status) && reachable_filter(node_status.as_node())
             })
+    }
+
+    pub fn reachable_from_target_node(
+        &self,
+        from: &Arc<CertifiedNode>,
+        until: Option<Round>,
+        filter: impl Fn(&NodeStatus) -> bool,
+    ) -> impl Iterator<Item = &NodeStatus> {
+        self.reachable(vec![from.digest()], from.metadata().round(), until, filter)
+    }
+
+    pub fn reachable_from_parents(
+        &self,
+        parents: &[NodeMetadata],
+        until: Option<Round>,
+        filter: impl Fn(&NodeStatus) -> bool,
+    ) -> impl Iterator<Item = &NodeStatus> {
+        self.reachable(
+            parents.iter().map(|p| *p.digest()).collect(),
+            parents[0].round(),
+            until,
+            filter,
+        )
     }
 
     pub fn get_strong_links_for_round(

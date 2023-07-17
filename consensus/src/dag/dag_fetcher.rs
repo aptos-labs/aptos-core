@@ -91,8 +91,16 @@ impl DagFetcher {
                     local_request.notify();
                     continue;
                 }
+
+                let target = local_request.node();
                 RemoteFetchRequest::new(
-                    local_request.node().metadata().clone(),
+                    target.metadata().epoch(),
+                    local_request
+                        .node()
+                        .parents()
+                        .iter()
+                        .map(|node| node.metadata().clone())
+                        .collect(),
                     dag_reader.bitmask(local_request.node().round()),
                 )
             };
@@ -128,10 +136,8 @@ impl DagFetcher {
 
 #[derive(Debug, ThisError)]
 pub enum FetchHandleError {
-    #[error("target node is not present")]
-    TargetNotPresent,
-    #[error("causal parents not present")]
-    NotPresent,
+    #[error("parents are missing")]
+    ParentsMissing,
 }
 
 pub struct FetchHandler {
@@ -151,24 +157,25 @@ impl RpcHandler for FetchHandler {
     fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
         let dag_reader = self.dag.read();
 
-        let target_node = dag_reader
-            .get_node(message.target())
-            .ok_or(FetchHandleError::TargetNotPresent)?;
+        ensure!(
+            message
+                .parents()
+                .iter()
+                .all(|metadata| dag_reader.get_node(metadata).is_some()),
+            FetchHandleError::ParentsMissing
+        );
 
         let certified_nodes: Vec<_> = dag_reader
-            .reachable(
-                &target_node,
+            .reachable_from_parents(
+                message.parents(),
                 Some(message.exists_bitmask().first_round()),
                 |_| true,
             )
-            .skip(1) // Skip target node
             .map(|node_status| node_status.as_node().clone().deref().clone())
             .collect();
 
-        ensure!(certified_nodes.len() > 0, FetchHandleError::NotPresent);
-
         Ok(FetchResponse::new(
-            message.target().epoch(),
+            message.epoch(),
             certified_nodes,
         ))
     }

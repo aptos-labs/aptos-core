@@ -89,8 +89,25 @@ fn test_certified_node_verify() {
 fn test_remote_fetch_request() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
 
+    let parents: Vec<_> = (0..3)
+        .map(|idx| {
+            NodeMetadata::new_for_test(1, 3, signers[idx].author(), 100, HashValue::random())
+        })
+        .collect();
+
     let request = RemoteFetchRequest::new(
-        NodeMetadata::new_for_test(1, 3, signers[0].author(), 100, HashValue::random()),
+        1,
+        vec![parents[0].clone()],
+        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]]),
+    );
+    assert_eq!(
+        request.verify(&validator_verifier).unwrap_err().to_string(),
+        "invalid voting power for target nodes"
+    );
+
+    let request = RemoteFetchRequest::new(
+        1,
+        parents.clone(),
         DagSnapshotBitmask::new(1, vec![vec![false; 5]]),
     );
     assert_eq!(
@@ -99,16 +116,8 @@ fn test_remote_fetch_request() {
     );
 
     let request = RemoteFetchRequest::new(
-        NodeMetadata::new_for_test(1, 1, signers[0].author(), 100, HashValue::random()),
-        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]]),
-    );
-    assert_eq!(
-        request.verify(&validator_verifier).unwrap_err().to_string(),
-        "target node round should be strictly higher than the last bitmark round"
-    );
-
-    let request = RemoteFetchRequest::new(
-        NodeMetadata::new_for_test(1, 2, signers[0].author(), 100, HashValue::random()),
+        1,
+        parents,
         DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]]),
     );
     assert_ok!(request.verify(&validator_verifier));

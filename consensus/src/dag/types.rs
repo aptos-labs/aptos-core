@@ -480,20 +480,26 @@ impl BroadcastStatus for CertificateAckState {
 /// if a node exist at [start_round + index][validator_index].
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RemoteFetchRequest {
-    target: NodeMetadata,
+    epoch: u64,
+    parents: Vec<NodeMetadata>,
     exists_bitmask: DagSnapshotBitmask,
 }
 
 impl RemoteFetchRequest {
-    pub fn new(target: NodeMetadata, exists_bitmask: DagSnapshotBitmask) -> Self {
+    pub fn new(epoch: u64, parents: Vec<NodeMetadata>, exists_bitmask: DagSnapshotBitmask) -> Self {
         Self {
-            target,
+            epoch,
+            parents,
             exists_bitmask,
         }
     }
 
-    pub fn target(&self) -> &NodeMetadata {
-        &self.target
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn parents(&self) -> &[NodeMetadata] {
+        &self.parents
     }
 
     pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {
@@ -504,8 +510,10 @@ impl RemoteFetchRequest {
 impl TDAGMessage for RemoteFetchRequest {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
-            self.target.round > self.exists_bitmask.last_round(),
-            "target node round should be strictly higher than the last bitmark round"
+            verifier
+                .check_voting_power(self.parents.iter().map(|metadata| metadata.author()))
+                .is_ok(),
+            "invalid voting power for provided parents"
         );
 
         ensure!(
@@ -610,7 +618,7 @@ impl TConsensusMsg for DAGMessage {
             DAGMessage::VoteMsg(vote) => vote.metadata.epoch,
             DAGMessage::CertifiedNodeMsg(node) => node.metadata.epoch,
             DAGMessage::CertifiedAckMsg(ack) => ack.epoch,
-            DAGMessage::FetchRequest(req) => req.target.epoch,
+            DAGMessage::FetchRequest(req) => req.epoch,
             DAGMessage::FetchResponse(res) => res.epoch,
             #[cfg(test)]
             DAGMessage::TestMessage(_) => 1,
