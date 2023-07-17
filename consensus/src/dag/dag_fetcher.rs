@@ -99,7 +99,13 @@ impl DagFetcher {
                         .node()
                         .parents()
                         .iter()
-                        .map(|node| node.metadata().clone())
+                        .filter_map(|node| {
+                            if dag_reader.get_node(node.metadata()).is_some() {
+                                None
+                            } else {
+                                Some(node.metadata().clone())
+                            }
+                        })
                         .collect(),
                     dag_reader.bitmask(local_request.node().round()),
                 )
@@ -176,9 +182,6 @@ impl RpcHandler for FetchRequestHandler {
 
         // TODO: decide if the response is too big and act accordingly.
 
-        Ok(FetchResponse::new(
-            message.epoch(),
-            certified_nodes,
-        ))
+        Ok(FetchResponse::new(message.epoch(), certified_nodes))
     }
 }

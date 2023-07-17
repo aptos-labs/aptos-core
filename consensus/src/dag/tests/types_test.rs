@@ -93,17 +93,7 @@ fn test_remote_fetch_request() {
         .map(|idx| {
             NodeMetadata::new_for_test(1, 3, signers[idx].author(), 100, HashValue::random())
         })
-        .collect();
-
-    let request = RemoteFetchRequest::new(
-        1,
-        vec![parents[0].clone()],
-        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]]),
-    );
-    assert_eq!(
-        request.verify(&validator_verifier).unwrap_err().to_string(),
-        "invalid voting power for provided parents"
-    );
+        .collect(); 
 
     let request = RemoteFetchRequest::new(
         1,
@@ -114,6 +104,13 @@ fn test_remote_fetch_request() {
         request.verify(&validator_verifier).unwrap_err().to_string(),
         "invalid bitmask: each round length is not equal to validator count"
     );
+
+    let request = RemoteFetchRequest::new(
+        1,
+        vec![parents[0].clone()],
+        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]]),
+    );
+    assert_ok!(request.verify(&validator_verifier));
 
     let request = RemoteFetchRequest::new(
         1,

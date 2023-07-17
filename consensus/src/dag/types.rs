@@ -510,13 +510,6 @@ impl RemoteFetchRequest {
 impl TDAGMessage for RemoteFetchRequest {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
-            verifier
-                .check_voting_power(self.parents.iter().map(|metadata| metadata.author()))
-                .is_ok(),
-            "invalid voting power for provided parents"
-        );
-
-        ensure!(
             self.exists_bitmask
                 .bitmask
                 .iter()
