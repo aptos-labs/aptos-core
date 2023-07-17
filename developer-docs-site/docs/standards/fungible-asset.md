@@ -125,8 +125,9 @@ Note, these are framework functions and must be combined with business logic to 
 
 ### Creators
 
-A FA creator can add fungibility to any object at creation by taking `&ConstructorRef` with required information to
-make that object a metadata of the associated FA. Then FA of this metadata can be minted and used.
+A FA creator can add fungibility to any **undeletable** object at creation by taking `&ConstructorRef` with required information to
+make that object a metadata of the associated FA. Then FA of this metadata can be minted and used. It is noted here that
+**undeletable** means the `can_delete` field of `&ConstructorRef` has to be `false`.
 
 ```rust   
 public fun add_fungibility(
@@ -319,7 +320,7 @@ struct FrozenEvent has drop, store {
 }
 ```
 
-# Primary `FungibleStore`
+# Primary and secondary `FungibleStore`s
 
 Each `FungibleStore` object has an owner. However, an owner may possess more than one store. When Alice sends FA to
 Bob, how does she determine the correct destination? Additionally, what happens if Bob doesn't have a store yet?
@@ -416,3 +417,31 @@ An owner can deposit FA from their primary store to that of another account by c
 ```rust
 public entry fun transfer<T: key>(sender: &signer, metadata: Object<T>, recipient: address, amount: u64)
 ```
+
+## Secondary `FungibleStore`
+
+Secondary stores are not commonly used by normal users but prevailing for smart contracts to manage assets owned by
+contracts. For example, an asset pool may have to manage multiple fungible stores for one or more types of FA. Those
+stores do not necessarily have to have deterministic addresses and a user may have multiple stores for a given kind of
+FA. So primary fungible store is not a good fit for the needs where secondary store plays a vital role.
+
+The way to create secondary store is to create an object first and get its `ConstructorRef`. Then call:
+
+```rust
+public fun create_store<T: key>(
+    constructor_ref: &ConstructorRef,
+    metadata: Object<T>,
+): Object<FungibleStore>
+```
+
+It will turn make the newly created object a `FungibleStore`. Sometimes an object can be reused as a store. For example,
+a metadata object can also be a store to hold some FA of its own type or a liquidity pool object can be a store of the
+issued liquidity pool's token/coin.
+
+## Ownership of `FungibleStore`
+
+It is crucial to set correct owner of a `FungibleStore` object for managing the FA stored inside. By default, the owner
+of a newly created object is the creator whose `signer` is passed into the creation function. For `FungibleStore`
+objects managed by smart contract itself, usually they shouldn't have an owner out of the control of this contract. For
+those cases, those objects could make themselves as their owners and keep their object `ExtendRef` at the proper place
+to create `signer` as needed by the contract logic.

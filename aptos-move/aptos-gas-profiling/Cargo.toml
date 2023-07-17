@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 inferno = { workspace = true }
 regex = { workspace = true }
+smallvec = { workspace = true }
 
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true }

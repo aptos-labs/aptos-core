@@ -335,8 +335,6 @@ pub async fn get_delegation_stake_balances(
     pool_address: AccountAddress,
     version: u64,
 ) -> ApiResult<Option<BalanceResult>> {
-    let mut requested_balance: Option<String> = None;
-
     // get requested_balance
     let balances_response = rest_client
         .view(
@@ -352,20 +350,8 @@ pub async fn get_delegation_stake_balances(
         )
         .await?;
 
-    let balances_result = balances_response.into_inner();
-    if account_identifier.is_delegator_active_stake() {
-        requested_balance = balances_result
-            .get(0)
-            .and_then(|v| v.as_str().map(|s| s.to_owned()));
-    } else if account_identifier.is_delegator_inactive_stake() {
-        requested_balance = balances_result
-            .get(1)
-            .and_then(|v| v.as_str().map(|s| s.to_owned()));
-    } else if account_identifier.is_delegator_pending_inactive_stake() {
-        requested_balance = balances_result
-            .get(2)
-            .and_then(|v| v.as_str().map(|s| s.to_owned()));
-    }
+    let requested_balance =
+        parse_requested_balance(account_identifier, balances_response.into_inner());
 
     // get lockup_secs
     let lockup_secs_response = rest_client
@@ -378,11 +364,7 @@ pub async fn get_delegation_stake_balances(
             Some(version),
         )
         .await?;
-    let lockup_secs_result = lockup_secs_response.into_inner();
-    let lockup_expiration = lockup_secs_result
-        .get(0)
-        .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()))
-        .unwrap_or(0);
+    let lockup_expiration = parse_lockup_expiration(lockup_secs_response.into_inner());
 
     if let Some(balance) = requested_balance {
         Ok(Some(BalanceResult {
@@ -396,5 +378,125 @@ pub async fn get_delegation_stake_balances(
         Err(ApiError::InternalError(Some(
             "Unable to construct BalanceResult instance".to_string(),
         )))
+    }
+}
+
+fn parse_requested_balance(
+    account_identifier: &AccountIdentifier,
+    balances_result: Vec<serde_json::Value>,
+) -> Option<String> {
+    if account_identifier.is_delegator_active_stake() {
+        return balances_result
+            .get(0)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
+    } else if account_identifier.is_delegator_inactive_stake() {
+        return balances_result
+            .get(1)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
+    } else if account_identifier.is_delegator_pending_inactive_stake() {
+        return balances_result
+            .get(2)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
+    } else if account_identifier.is_total_stake() {
+        return Some(
+            balances_result
+                .iter()
+                .map(|v| {
+                    v.as_str()
+                        .map(|s| s.to_owned())
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .unwrap_or(0)
+                })
+                .sum::<u64>()
+                .to_string(),
+        );
+    }
+
+    None
+}
+
+fn parse_lockup_expiration(lockup_secs_result: Vec<serde_json::Value>) -> u64 {
+    return lockup_secs_result
+        .get(0)
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+        .unwrap_or(0);
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::types::SubAccountIdentifier;
+
+    #[test]
+    fn test_parse_requested_balance() {
+        let balances_result = vec![
+            serde_json::Value::String("300".to_string()),
+            serde_json::Value::String("200".to_string()),
+            serde_json::Value::String("100".to_string()),
+        ];
+
+        // Total stake balance is sum of all 3
+        assert_eq!(
+            Some("600".to_string()),
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_delegated_total_stake("0xabc")),
+                },
+                balances_result.clone()
+            )
+        );
+
+        assert_eq!(
+            Some("300".to_string()),
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_delegated_active_stake("0xabc")),
+                },
+                balances_result.clone()
+            )
+        );
+
+        assert_eq!(
+            Some("200".to_string()),
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_delegated_inactive_stake("0xabc")),
+                },
+                balances_result.clone()
+            )
+        );
+
+        assert_eq!(
+            Some("100".to_string()),
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_delegated_pending_inactive_stake(
+                        "0xabc"
+                    )),
+                },
+                balances_result.clone()
+            )
+        );
+
+        assert_eq!(
+            None,
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_active_stake()),
+                },
+                balances_result
+            )
+        );
+    }
+
+    #[test]
+    fn test_parse_lockup_expiration() {
+        let lockup_secs_result = vec![serde_json::Value::String("123456".to_string())];
+        assert_eq!(123456, parse_lockup_expiration(lockup_secs_result));
     }
 }

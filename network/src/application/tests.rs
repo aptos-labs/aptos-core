@@ -774,7 +774,7 @@ fn create_network_sender_and_events(
             ConnectionRequestSender::new(connection_outbound_sender),
         );
         let network_events =
-            NetworkEvents::new(inbound_request_receiver, connection_inbound_receiver);
+            NetworkEvents::new(inbound_request_receiver, connection_inbound_receiver, None);
 
         // Save the sender, events and receivers
         network_senders.insert(*network_id, network_sender);

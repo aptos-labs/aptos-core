@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{multi_region_network_test::chunk_validators, LoadDestination, NetworkLoadTest};
+use crate::{multi_region_network_test::chunk_peers, LoadDestination, NetworkLoadTest};
 use aptos_forge::{
     GroupCpuStress, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmCpuStress, SwarmExt, Test,
 };
@@ -237,7 +237,7 @@ fn create_cpu_stress_template(
     all_validators: Vec<PeerId>,
     config: &CpuChaosConfig,
 ) -> SwarmCpuStress {
-    let validator_chunks = chunk_validators(all_validators, config.num_groups);
+    let validator_chunks = chunk_peers(all_validators, config.num_groups);
 
     let group_cpu_stresses = validator_chunks
         .into_iter()

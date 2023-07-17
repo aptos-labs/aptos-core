@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: tuples have different arity (0 != 3) in lvalue
+  ┌─ tests/checking/typing/assign_wrong_arity.move:7:9
+  │
+7 │         x = (0, 1, 2);
+  │         ^
+
+error: expected `()` but found `integer` in lvalue
+  ┌─ tests/checking/typing/assign_wrong_arity.move:8:9
+  │
+8 │         () = 0;
+  │         ^^
+
+error: expected 4 item(s), found 3
+   ┌─ tests/checking/typing/assign_wrong_arity.move:11:9
+   │
+11 │         (x, b, R{f}) = (0, false, R{f: 0}, R{f: 0});
+   │         ^^^^^^^^^^^^
+
+error: expected 2 item(s), found 3
+   ┌─ tests/checking/typing/assign_wrong_arity.move:12:9
+   │
+12 │         (x, b, R{f}) = (0, false);
+   │         ^^^^^^^^^^^^

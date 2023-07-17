@@ -16,13 +16,11 @@ error: expected `num` but found `bool` in expression
 22 │       false
    │       ^^^^^
 
-error: no matching declaration of `>`
+error: invalid call of `>`: expected `num` but found `vector<num>` for argument 1
    ┌─ tests/sources/expressions_err.move:27:7
    │
 27 │       x > y
    │       ^^^^^
-   │
-   = outruled candidate `>(num, num): bool` (expected `num` but found `vector<num>` for argument 1)
 
 error: expected `(num, bool)` but found `bool` in expression
    ┌─ tests/sources/expressions_err.move:32:7
@@ -30,13 +28,11 @@ error: expected `(num, bool)` but found `bool` in expression
 32 │       false
    │       ^^^^^
 
-error: no matching declaration of `M::wrongly_typed_callee`
+error: invalid call of `M::wrongly_typed_callee`: expected `bool` but found `u256` for argument 2
    ┌─ tests/sources/expressions_err.move:37:39
    │
 37 │     fun wrongly_typed_caller(): num { wrongly_typed_callee(1, 1) }
    │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = outruled candidate `M::wrongly_typed_callee(num, bool): num` (expected `bool` but found `u256` for argument 2)
 
 error: expected `num` but found `bool` in expression
    ┌─ tests/sources/expressions_err.move:41:80
@@ -44,10 +40,8 @@ error: expected `num` but found `bool` in expression
 41 │     fun wrongly_typed_fun_arg_caller(): num { wrongly_typed_fun_arg_callee(|x| false) }
    │                                                                                ^^^^^
 
-error: no matching declaration of `M::wrong_instantiation`
+error: invalid call of `M::wrong_instantiation`: generic count mismatch (expected 2 but found 1)
    ┌─ tests/sources/expressions_err.move:46:7
    │
 46 │       wrong_instantiation<u64>(x)
    │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = outruled candidate `M::wrong_instantiation(#0): #0` (generic count mismatch (expected 2 but found 1))

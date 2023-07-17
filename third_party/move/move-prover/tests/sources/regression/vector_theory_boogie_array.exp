@@ -1,0 +1,20 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/vector_theory_boogie_array.move:14:9
+   │
+14 │ ╭         ensures forall a: address where a != addr:
+15 │ │             old(contains(pool, a)) ==> contains(pool, a);
+   │ ╰─────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/regression/vector_theory_boogie_array.move:6: f1
+   =     at tests/sources/regression/vector_theory_boogie_array.move:11: f1 (spec)
+   =     at tests/sources/regression/vector_theory_boogie_array.move:6: f1
+   =         pool = <redacted>
+   =         addr = <redacted>
+   =     at tests/sources/regression/vector_theory_boogie_array.move:7: f1
+   =         idx = <redacted>
+   =     at tests/sources/regression/vector_theory_boogie_array.move:8: f1
+   =         pool = <redacted>
+   =     at tests/sources/regression/vector_theory_boogie_array.move:9: f1
+   =     at tests/sources/regression/vector_theory_boogie_array.move:11: f1 (spec)
+   =     at tests/sources/regression/vector_theory_boogie_array.move:14: f1 (spec)
