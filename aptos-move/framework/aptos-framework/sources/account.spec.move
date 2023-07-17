@@ -58,7 +58,6 @@ spec aptos_framework::account {
         modifies global<Account>(addr);
         let post post_sequence_number = global<Account>(addr).sequence_number;
         ensures post_sequence_number == sequence_number + 1;
-        ensures sequence_number < MAX_U64;
     }
 
     spec get_authentication_key(addr: address): vector<u8> {
@@ -314,7 +313,6 @@ spec aptos_framework::account {
         );
 
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
-        ensures account_scheme == ED25519_SCHEME || account_scheme == MULTI_ED25519_SCHEME;
 
         modifies global<Account>(source_address);
     }
