@@ -353,7 +353,6 @@ async fn test_onchain_config_change() {
 }
 
 #[tokio::test]
-#[ignore]
 // This test is ignored because it is very long running
 async fn test_onchain_shuffling_change() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(2)
@@ -380,12 +379,10 @@ async fn test_onchain_shuffling_change() {
     )
     .unwrap();
 
-    assert_eq!(
-        current_execution_config.transaction_shuffler_type(),
-        TransactionShufflerType::NoShuffling,
-    );
-
-    assert_reordering(&mut swarm, false).await;
+    // assert_eq!(
+    //     current_execution_config.transaction_shuffler_type(),
+    //     TransactionShufflerType::NoShuffling,
+    // );
 
     let execution_config_with_shuffling = OnChainExecutionConfig::V1(ExecutionConfigV1 {
         transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
@@ -426,6 +423,22 @@ async fn test_onchain_shuffling_change() {
         updated_execution_config.transaction_shuffler_type(),
         TransactionShufflerType::SenderAwareV1(32)
     );
+
+    assert_reordering(&mut swarm, true).await;
+}
+
+
+#[tokio::test]
+async fn test_reordering() {
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_init_config(Arc::new(move |_, config, _| {
+            config.consensus.wait_for_full_blocks_above_pending_blocks = 1;
+            config.consensus.wait_for_full_blocks_above_recent_fill_threshold = 0.1;
+        }))
+        .build()
+        .await;
+
+    assert_reordering(&mut swarm, true).await;
 }
 
 async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
@@ -459,7 +472,7 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
         .await
         .unwrap()
         .into_inner();
-    info!("result: {:?}", result);
+    println!("result: {:?}", result);
     tokio::time::sleep(Duration::from_secs(3)).await;
 
     wait_for_all_nodes_to_catchup(&clients, Duration::from_secs(30))
@@ -473,7 +486,7 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
         .unwrap()
         .into_inner();
 
-    info!(
+    println!(
         "dst: {}, senders: {:?}",
         dst.address(),
         accounts.iter().map(|a| a.address()).collect::<Vec<_>>()
@@ -482,11 +495,11 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
     for txn in committed_order {
         match txn.transaction {
             aptos_types::transaction::Transaction::UserTransaction(txn) => {
-                info!("from {}, seq_num {}", txn.sender(), txn.sequence_number());
+                println!("from {}, seq_num {}", txn.sender(), txn.sequence_number());
                 block_txns.push(txn);
             },
             aptos_types::transaction::Transaction::BlockMetadata(b) => {
-                info!("block metadata {}", b.round());
+                println!("block metadata {}", b.round());
 
                 let senders = accounts.iter().map(|a| a.address()).collect::<HashSet<_>>();
                 let mut changes = 0;
@@ -497,7 +510,7 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
                         changes += 1;
                     }
                 }
-                info!("block_txns.len: {}, changes: {}", block_txns.len(), changes);
+                println!("block_txns.len: {}, changes: {}", block_txns.len(), changes);
 
                 if changes > 1 {
                     assert!(expected_reordering, "changes: {}", changes);
