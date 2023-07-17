@@ -1,7 +1,5 @@
-# Continuously run specialized forge tests against the latest main branch.
-# These tests run less frequently than regular forge tests (i.e., stable
-# and unstable).
-name: Continuous Forge Tests - Specialized
+# Continuously run PFN forge tests against the latest main branch
+name: Continuous Forge Tests - Public Fullnodes
 
 permissions:
   issues: write
@@ -23,10 +21,10 @@ on:
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
   schedule:
-    - cron: "0 6 */2 * *" # The main branch cadence. This runs every other day at 6am UTC.
+    - cron: "0 8 */2 * *" # The main branch cadence. This runs every other day at 8am UTC.
   pull_request:
     paths:
-      - ".github/workflows/forge-specialized.yaml"
+      - ".github/workflows/forge-pfn.yaml"
       - "testsuite/find_latest_image.py"
   push:
     branches:
@@ -52,7 +50,7 @@ jobs:
         id: determine-test-branch
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 6 */2 * *" ]]; then
+            if [[ "${{ github.event.schedule }}" == "0 8 */2 * *" ]]; then
               echo "Branch: main"
               echo "BRANCH=main" >> $GITHUB_OUTPUT
             else
@@ -188,58 +186,4 @@ jobs:
       FORGE_NAMESPACE: forge-pfn-performance-with-realistic-env-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
       FORGE_TEST_SUITE: pfn_performance_with_realistic_env
-      POST_TO_SLACK: true
-
-  ### State sync tests
-
-  # Measures state sync performance for validators (output syncing)
-  run-forge-state-sync-perf-validator-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-validator-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: state_sync_perf_validators
-      POST_TO_SLACK: true
-
-  # Measures state sync performance for validator fullnodes (execution syncing)
-  run-forge-state-sync-perf-fullnode-execute-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-execute-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: state_sync_perf_fullnodes_execute_transactions
-      POST_TO_SLACK: true
-
-  # Measures state sync performance for validator fullnodes (fast syncing)
-  run-forge-state-sync-perf-fullnode-fast-sync-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-fast-sync-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: state_sync_perf_fullnodes_fast_sync
-      POST_TO_SLACK: true
-
-  # Measures state sync performance for validator fullnodes (output syncing)
-  run-forge-state-sync-perf-fullnode-apply-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-state-sync-perf-fullnode-apply-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: state_sync_perf_fullnodes_apply_outputs
       POST_TO_SLACK: true

@@ -38,7 +38,7 @@ spec aptos_framework::aptos_account {
 
         aborts_if exists<coin::CoinStore<AptosCoin>>(to) && global<coin::CoinStore<AptosCoin>>(to).frozen;
         ensures exists<aptos_framework::account::Account>(to);
-        ensures exists<AptosCoin>(to);
+        ensures exists<coin::CoinStore<AptosCoin>>(to);
     }
 
     spec assert_account_exists(addr: address) {

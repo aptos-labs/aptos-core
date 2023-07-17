@@ -4,6 +4,7 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
+use super::coin_utils::COIN_ADDR;
 use crate::{
     models::{
         default_models::move_resources::MoveResource,
@@ -83,6 +84,36 @@ pub struct FungibleAssetStore {
     pub frozen: bool,
 }
 
+impl FungibleAssetStore {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = MoveResource::get_outer_type_from_resource(write_resource);
+        if !V2FungibleAssetResource::is_resource_supported(type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let V2FungibleAssetResource::FungibleAssetStore(inner) =
+            V2FungibleAssetResource::from_resource(
+                &type_str,
+                resource.data.as_ref().unwrap(),
+                txn_version,
+            )?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FungibleAssetSupply {
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -133,6 +164,18 @@ impl FungibleAssetSupply {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DepositEvent {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WithdrawEvent {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub amount: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2FungibleAssetResource {
     FungibleAssetMetadata(FungibleAssetMetadata),
     FungibleAssetStore(FungibleAssetStore),
@@ -141,12 +184,12 @@ pub enum V2FungibleAssetResource {
 
 impl V2FungibleAssetResource {
     pub fn is_resource_supported(data_type: &str) -> bool {
-        matches!(
-            data_type,
-            "0x1::fungible_asset::Supply"
-                | "0x1::fungible_asset::Metadata"
-                | "0x1::fungible_asset::FungibleStore"
-        )
+        [
+            format!("{}::fungible_asset::Supply", COIN_ADDR),
+            format!("{}::fungible_asset::Metadata", COIN_ADDR),
+            format!("{}::fungible_asset::FungibleStore", COIN_ADDR),
+        ]
+        .contains(&data_type.to_string())
     }
 
     pub fn from_resource(
@@ -155,12 +198,18 @@ impl V2FungibleAssetResource {
         txn_version: i64,
     ) -> Result<Self> {
         match data_type {
-            "0x1::fungible_asset::Supply" => serde_json::from_value(data.clone())
-                .map(|inner| Some(Self::FungibleAssetSupply(inner))),
-            "0x1::fungible_asset::Metadata" => serde_json::from_value(data.clone())
-                .map(|inner| Some(Self::FungibleAssetMetadata(inner))),
-            "0x1::fungible_asset::FungibleStore" => serde_json::from_value(data.clone())
-                .map(|inner| Some(Self::FungibleAssetStore(inner))),
+            x if x == format!("{}::fungible_asset::Supply", COIN_ADDR) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(Self::FungibleAssetSupply(inner)))
+            },
+            x if x == format!("{}::fungible_asset::Metadata", COIN_ADDR) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(Self::FungibleAssetMetadata(inner)))
+            },
+            x if x == format!("{}::fungible_asset::FungibleStore", COIN_ADDR) => {
+                serde_json::from_value(data.clone())
+                    .map(|inner| Some(Self::FungibleAssetStore(inner)))
+            },
             _ => Ok(None),
         }
         .context(format!(
@@ -170,6 +219,29 @@ impl V2FungibleAssetResource {
         .context(format!(
             "Resource unsupported! Call is_resource_supported first. version {} type {}",
             txn_version, data_type
+        ))
+    }
+}
+
+pub enum FungibleAssetEvent {
+    DepositEvent(DepositEvent),
+    WithdrawEvent(WithdrawEvent),
+}
+
+impl FungibleAssetEvent {
+    pub fn from_event(data_type: &str, data: &str, txn_version: i64) -> Result<Option<Self>> {
+        match data_type {
+            "0x1::fungible_asset::DepositEvent" => {
+                serde_json::from_str(data).map(|inner| Some(Self::DepositEvent(inner)))
+            },
+            "0x1::fungible_asset::WithdrawEvent" => {
+                serde_json::from_str(data).map(|inner| Some(Self::WithdrawEvent(inner)))
+            },
+            _ => Ok(None),
+        }
+        .context(format!(
+            "version {} failed! failed to parse type {}, data {:?}",
+            txn_version, data_type, data
         ))
     }
 }

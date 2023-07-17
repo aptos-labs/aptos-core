@@ -13,7 +13,7 @@ pub struct IndexerGrpcProcessorConfig {
     pub processor_name: String,
     pub postgres_connection_string: String,
     // TODO: add tls support.
-    pub indexer_grpc_data_service_addresss: String,
+    pub indexer_grpc_data_service_address: String,
     // Indexer GRPC http2 ping interval in seconds; default to 30.
     // tonic ref: https://docs.rs/tonic/latest/tonic/transport/channel/struct.Endpoint.html#method.http2_keep_alive_interval
     pub indexer_grpc_http2_ping_interval_in_secs: Option<u64>,
@@ -33,7 +33,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
         let mut worker = Worker::new(
             self.processor_name.clone(),
             self.postgres_connection_string.clone(),
-            self.indexer_grpc_data_service_addresss.clone(),
+            self.indexer_grpc_data_service_address.clone(),
             std::time::Duration::from_secs(
                 self.indexer_grpc_http2_ping_interval_in_secs.unwrap_or(30),
             ),
