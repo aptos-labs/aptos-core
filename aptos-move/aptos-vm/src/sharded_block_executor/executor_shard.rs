@@ -24,7 +24,7 @@ pub trait ExecutorShard<S: StateView + Sync + Send + 'static> {
 
 // Trait that defines the communication interface between the coordinator
 // and the executor shard.
-pub trait CoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
+pub trait CoordinatorClient1<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn send_execute_command(
         &self,
         execute_command: ExecutorShardCommand<S>,
@@ -37,7 +37,7 @@ pub trait CoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);
 }
 
-pub trait CoordinatorToExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
+pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn num_shards(&self) -> usize;
     fn execute_block(&self,
                      state_view: Arc<S>,
@@ -48,7 +48,7 @@ pub trait CoordinatorToExecutorClient<S: StateView + Sync + Send + 'static>: Sen
     fn get_execution_result(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus>;
 }
 
-pub trait ExecutorToCoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
+pub trait CoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn receive_execute_command(&self) -> ExecutorShardCommand<S>;
 
     fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);

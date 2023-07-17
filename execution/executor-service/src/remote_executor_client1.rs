@@ -15,11 +15,11 @@ use aptos_vm::sharded_block_executor::block_executor_client::BlockExecutorClient
 use std::{net::SocketAddr, sync::Mutex};
 
 /// An implementation of [`BlockExecutorClient`] that supports executing blocks remotely.
-pub struct RemoteExecutorClient {
+pub struct RemoteExecutorClient1 {
     network_client: Mutex<NetworkClient>,
 }
 
-impl RemoteExecutorClient {
+impl RemoteExecutorClient1 {
     pub fn new(server_address: SocketAddr, network_timeout_ms: u64) -> Self {
         let network_client = NetworkClient::new(
             "remote-executor-service".to_string(),
@@ -57,7 +57,7 @@ impl RemoteExecutorClient {
     }
 }
 
-impl BlockExecutorClient for RemoteExecutorClient {
+impl BlockExecutorClient for RemoteExecutorClient1 {
     fn execute_block<S: StateView + Sync>(
         &self,
         sub_blocks: SubBlocksForShard<AnalyzedTransaction>,

@@ -78,7 +78,7 @@ use std::{
         Arc,
     },
 };
-use crate::sharded_block_executor::executor_shard::CoordinatorToExecutorClient;
+use crate::sharded_block_executor::executor_shard::ExecutorClient;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1528,15 +1528,9 @@ impl VMExecutor for AptosVM {
         ret
     }
 
-<<<<<<< HEAD
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorShard<S>>(
-        sharded_block_executor: &ShardedBlockExecutor<S, E>,
-        transactions: Vec<SubBlocksForShard<AnalyzedTransaction>>,
-=======
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: CoordinatorToExecutorClient<S>>(
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(
         sharded_block_executor: &ShardedBlockExecutor<S, C>,
-        transactions: Vec<SubBlocksForShard<Transaction>>,
->>>>>>> 5ef53a173b (Local tests okay)
+        transactions: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

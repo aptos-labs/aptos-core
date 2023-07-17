@@ -28,7 +28,7 @@ use aptos_vm::{
     VMExecutor,
 };
 use std::sync::Arc;
-use aptos_vm::sharded_block_executor::executor_shard::CoordinatorToExecutorClient;
+use aptos_vm::sharded_block_executor::executor_shard::ExecutorClient;
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db
@@ -73,7 +73,7 @@ impl TransactionBlockExecutor for FakeVM {
 }
 
 impl VMExecutor for FakeVM {
-    fn execute_block_sharded<S: StateView + Send + Sync, E: CoordinatorToExecutorClient<S>>(
+    fn execute_block_sharded<S: StateView + Send + Sync, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         _state_view: Arc<S>,

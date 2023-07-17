@@ -135,7 +135,7 @@ use aptos_types::{
 };
 use std::{marker::Sync, sync::Arc};
 pub use verifier::view_function::determine_is_view;
-use crate::sharded_block_executor::executor_shard::CoordinatorToExecutorClient;
+use crate::sharded_block_executor::executor_shard::ExecutorClient;
 
 /// This trait describes the VM's validation interfaces.
 pub trait VMValidator {
@@ -162,7 +162,7 @@ pub trait VMExecutor: Send + Sync {
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: CoordinatorToExecutorClient<S>>(
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(
         sharded_block_executor: &ShardedBlockExecutor<S, C>,
         block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         state_view: Arc<S>,

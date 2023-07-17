@@ -11,7 +11,7 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
-use crate::sharded_block_executor::executor_shard::CoordinatorToExecutorClient;
+use crate::sharded_block_executor::executor_shard::ExecutorClient;
 
 pub mod block_executor_client;
 mod counters;
@@ -27,7 +27,7 @@ mod tests;
 mod test_utils;
 
 /// Coordinator for sharded block executors that manages multiple shards and aggregates the results.
-pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: CoordinatorToExecutorClient<S>> {
+pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> {
     executor_client: C,
     phantom: PhantomData<S>,
 }
@@ -42,7 +42,7 @@ pub enum ExecutorShardCommand<S> {
     Stop,
 }
 
-impl<S: StateView + Sync + Send + 'static, C: CoordinatorToExecutorClient<S>> ShardedBlockExecutor<S, C> {
+impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExecutor<S, C> {
     pub fn new(mut executor_client: C) -> Self {
         info!(
             "Creating a new ShardedBlockExecutor with {} shards",

@@ -6,7 +6,7 @@ use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
-use aptos_executor_service::remote_executor_client::RemoteExecutorClient;
+use aptos_executor_service::remote_executor_client1::RemoteExecutorClient1;
 use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
     data_store::FakeDataStore,
@@ -254,8 +254,8 @@ where
                 if let Some(remote_executor_addresses) = remote_executor_addresses {
                     let remote_executor_clients = remote_executor_addresses
                         .into_iter()
-                        .map(|addr| RemoteExecutorClient::new(addr, 10000))
-                        .collect::<Vec<RemoteExecutorClient>>();
+                        .map(|addr| RemoteExecutorClient1::new(addr, 10000))
+                        .collect::<Vec<RemoteExecutorClient1>>();
                     Arc::new(ShardedBlockExecutor::new(remote_executor_clients))
                 } else {
                     let local_executor_client =

@@ -18,7 +18,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 /// A block executor that receives transactions from a channel and executes them in parallel.
 /// It runs in the local machine.
-#[allow(dead_code)]
 pub struct RemoteExecutorShard<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     command_tx: Sender<Message>,
@@ -26,7 +25,6 @@ pub struct RemoteExecutorShard<S: StateView + Sync + Send + 'static> {
     phantom: std::marker::PhantomData<S>,
 }
 
-#[allow(dead_code)]
 impl<S: StateView + Sync + Send + 'static> RemoteExecutorShard<S> {
     pub fn new(
         shard_id: ShardId,

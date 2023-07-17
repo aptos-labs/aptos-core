@@ -6,7 +6,7 @@ use crate::{
         counters::SHARDED_BLOCK_EXECUTION_SECONDS,
         cross_shard_client::{CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
-        executor_shard::{CoordinatorClient, CrossShardClient},
+        executor_shard::{CoordinatorClient1, CrossShardClient},
         messages::CrossShardMsg,
         ExecutorShardCommand,
     },
@@ -20,13 +20,13 @@ use aptos_types::{
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::{collections::HashSet, sync::Arc};
-use crate::sharded_block_executor::executor_shard::ExecutorToCoordinatorClient;
+use crate::sharded_block_executor::executor_shard::CoordinatorClient;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     num_shards: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    coordinator_client: Arc<dyn ExecutorToCoordinatorClient<S>>,
+    coordinator_client: Arc<dyn CoordinatorClient<S>>,
     cross_shard_client: Arc<dyn CrossShardClient>,
 }
 
@@ -35,7 +35,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         shard_id: ShardId,
         num_shards: usize,
         num_threads: usize,
-        coordinator_client: Arc<dyn ExecutorToCoordinatorClient<S>>,
+        coordinator_client: Arc<dyn CoordinatorClient<S>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
     ) -> Self {
         let executor_thread_pool = Arc::new(

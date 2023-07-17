@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::sharded_block_executor::{
-    executor_shard::{CoordinatorClient, CrossShardClient, ExecutorShard},
+    executor_shard::{CoordinatorClient1, CrossShardClient, ExecutorShard},
     messages::CrossShardMsg,
     sharded_executor_service::ShardedExecutorService,
     ExecutorShardCommand,
@@ -22,14 +22,14 @@ use std::{
 use futures::StreamExt;
 use aptos_types::block_executor::partitioner::SubBlocksForShard;
 use aptos_types::transaction::Transaction;
-use crate::sharded_block_executor::executor_shard::{CoordinatorToExecutorClient, ExecutorToCoordinatorClient};
+use crate::sharded_block_executor::executor_shard::{ExecutorClient, CoordinatorClient};
 
 /// A block executor that receives transactions from a channel and executes them in parallel.
 /// It runs in the local machine.
 pub struct LocalExecutorShard<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     executor_service: Arc<ShardedExecutorService<S>>,
-    join_handle: thread::JoinHandle<()>,
+    join_handle: Option<thread::JoinHandle<()>>,
 }
 
 impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
@@ -60,14 +60,14 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
         Self {
             shard_id,
             executor_service,
-            join_handle,
+            join_handle: Some(join_handle),
         }
     }
 
     pub fn setup_local_executor_shards(
         num_shards: usize,
         num_threads: Option<usize>,
-    ) -> (LocalExecutorClient<S>, Vec<Self>) {
+    ) -> LocalExecutorClient<S> {
         let num_threads = num_threads
             .unwrap_or_else(|| (num_cpus::get() as f64 / num_shards as f64).ceil() as usize);
         let mut cross_shard_msg_txs = vec![];
@@ -107,8 +107,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
                 )
             })
             .collect();
-        let coordinator_client = LocalExecutorClient::new(command_txs, result_rxs);
-        (coordinator_client, executor_shards)
+        LocalExecutorClient::new(command_txs, result_rxs, executor_shards)
     }
 }
 
@@ -117,21 +116,25 @@ pub struct LocalExecutorClient<S: StateView + Sync + Send + 'static> {
     command_txs: Vec<Sender<ExecutorShardCommand<S>>>,
     // Channels to receive execution results from the executor shards.
     result_rxs: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
+
+    executor_shards: Vec<LocalExecutorShard<S>>,
 }
 
 impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
     pub fn new(
         command_tx: Vec<Sender<ExecutorShardCommand<S>>>,
         result_rx: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
+        executor_shards: Vec<LocalExecutorShard<S>>,
     ) -> Self {
         Self {
             command_txs: command_tx,
             result_rxs: result_rx,
+            executor_shards,
         }
     }
 }
 
-impl<S: StateView + Sync + Send + 'static> CoordinatorToExecutorClient<S> for LocalExecutorClient<S> {
+impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorClient<S> {
     fn num_shards(&self) -> usize {
         self.command_txs.len()
     }
@@ -167,6 +170,11 @@ impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {
         for command_tx in self.command_txs.iter() {
             let _ =  command_tx.send(ExecutorShardCommand::Stop);
         }
+
+        // wait for join handles to finish
+        for executor_shard in self.executor_shards.iter_mut() {
+            let _ = executor_shard.join_handle.take().unwrap().join();
+        }
     }
 }
 
@@ -189,7 +197,7 @@ impl<S> LocalCoordinatorClient<S> {
     }
 }
 
-impl<S: StateView + Sync + Send + 'static> ExecutorToCoordinatorClient<S> for LocalCoordinatorClient<S> {
+impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordinatorClient<S> {
     fn receive_execute_command(&self) -> ExecutorShardCommand<S> {
         self.command_rx.recv().unwrap()
     }
