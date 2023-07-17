@@ -5,7 +5,7 @@ use crate::{LoadDestination, NetworkLoadTest};
 use aptos_forge::{GroupNetEm, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetEm, Test};
 use aptos_logger::info;
 use aptos_types::PeerId;
-use itertools::{self, Itertools};
+use itertools::{self, EitherOrBoth, Itertools};
 use std::collections::BTreeMap;
 
 /// The link stats are obtained from https://github.com/doitintl/intercloud-throughput/blob/master/results_202202/results.csv
@@ -35,11 +35,14 @@ fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
 }
 
 /// Chunks the given set of peers into the number of specified groups
-pub(crate) fn chunk_peers(peers: Vec<PeerId>, num_groups: usize) -> Vec<Vec<PeerId>> {
+pub(crate) fn chunk_peers(peers: Vec<Vec<PeerId>>, num_groups: usize) -> Vec<Vec<PeerId>> {
     // Chunk the peers into exact groups
     let approx_chunk_size = peers.len() / num_groups;
     let chunks = peers.chunks_exact(approx_chunk_size);
-    let mut peer_chunks: Vec<Vec<PeerId>> = chunks.clone().map(|chunk| chunk.to_vec()).collect();
+    let mut peer_chunks: Vec<Vec<PeerId>> = chunks
+        .clone()
+        .map(|chunk| chunk.iter().flatten().cloned().collect())
+        .collect();
 
     // Get any remaining peers and add them to the first group
     let remaining_peers: Vec<PeerId> = chunks
@@ -48,6 +51,7 @@ pub(crate) fn chunk_peers(peers: Vec<PeerId>, num_groups: usize) -> Vec<Vec<Peer
         // If `approx_peers_per_region` is 1, then it is possible we will have more regions than
         // desired, so the remaining peers will be in the first group.
         .chain(chunks.skip(num_groups).flatten())
+        .flatten()
         .cloned()
         .collect();
     if !remaining_peers.is_empty() {
@@ -61,10 +65,10 @@ pub(crate) fn chunk_peers(peers: Vec<PeerId>, num_groups: usize) -> Vec<Vec<Peer
 /// number of regions provided in the link stats table. Any remaining peers are added to the first
 /// group.
 fn create_link_stats_table_with_peer_groups(
-    peers: Vec<PeerId>,
+    peers: Vec<Vec<PeerId>>,
     link_stats_table: &LinkStatsTable,
 ) -> LinkStatsTableWithPeerGroups {
-    // Verify that we have enough peers to simulate the link stats table
+    // Verify that we have enough grouped peers to simulate the link stats table
     assert!(peers.len() >= link_stats_table.len());
 
     // Verify that we have the correct number of regions to simulate the link stats table
@@ -229,8 +233,21 @@ impl MultiRegionNetworkEmulationTest {
     /// the fullnodes).
     fn create_netem_chaos(&self, swarm: &mut dyn Swarm) -> SwarmNetEm {
         let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+        let all_vfns = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
+        assert!(all_validators.len() >= all_vfns.len());
+
+        let all_pairs: Vec<_> = all_validators
+            .iter()
+            .zip_longest(all_vfns)
+            .map(|either_or_both| match either_or_both {
+                EitherOrBoth::Both(validator, vfn) => vec![*validator, vfn],
+                EitherOrBoth::Left(validator) => vec![*validator],
+                EitherOrBoth::Right(_) => panic!("Unexpected"),
+            })
+            .collect();
+
         let network_emulation_config = self.network_emulation_config.clone();
-        create_multi_region_swarm_network_chaos(all_validators, Some(network_emulation_config))
+        create_multi_region_swarm_network_chaos(all_pairs, Some(network_emulation_config))
     }
 }
 
@@ -240,10 +257,11 @@ impl Test for MultiRegionNetworkEmulationTest {
     }
 }
 
-/// Creates a SwarmNetEm to be injected via chaos. Network emulation
-/// is added to all the given peers using the specified config.
+/// Creates a SwarmNetEm to be injected via chaos. Network emulation is added to all the given
+/// peers using the specified config. Peers that must be colocated should be grouped in the same
+/// inner vector. They are treated as a single group.
 pub fn create_multi_region_swarm_network_chaos(
-    all_peers: Vec<PeerId>,
+    all_peers: Vec<Vec<PeerId>>,
     network_emulation_config: Option<MultiRegionNetworkEmulationConfig>,
 ) -> SwarmNetEm {
     // Determine the network emulation config to use
@@ -300,14 +318,14 @@ mod tests {
         aptos_logger::Logger::new().init();
 
         // Create a config with 8 peers and multiple regions
-        let all_peers = (0..8).map(|_| PeerId::random()).collect();
+        let all_peers: Vec<_> = (0..8).map(|_| vec![PeerId::random()]).collect();
         let netem = create_multi_region_swarm_network_chaos(all_peers, None);
 
         // Verify the number of group netems
         assert_eq!(netem.group_netems.len(), 10);
 
         // Create a config with 10 peers and multiple regions
-        let all_peers: Vec<PeerId> = (0..10).map(|_| PeerId::random()).collect();
+        let all_peers: Vec<_> = (0..10).map(|_| vec![PeerId::random()]).collect();
         let netem = create_multi_region_swarm_network_chaos(all_peers.clone(), None);
 
         // Verify the resulting group netems
@@ -317,8 +335,18 @@ mod tests {
         assert_eq!(netem.group_netems[0], GroupNetEm {
             name: "aws--ap-northeast-1-self-netem".to_owned(),
             rate_in_mbps: 10000,
-            source_nodes: vec![all_peers[0], all_peers[1], all_peers[8], all_peers[9],],
-            target_nodes: vec![all_peers[0], all_peers[1], all_peers[8], all_peers[9],],
+            source_nodes: vec![
+                all_peers[0][0],
+                all_peers[1][0],
+                all_peers[8][0],
+                all_peers[9][0],
+            ],
+            target_nodes: vec![
+                all_peers[0][0],
+                all_peers[1][0],
+                all_peers[8][0],
+                all_peers[9][0],
+            ],
             delay_latency_ms: 50,
             delay_jitter_ms: 5,
             delay_correlation_percentage: 50,
