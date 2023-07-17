@@ -353,6 +353,7 @@ async fn test_onchain_config_change() {
 }
 
 #[tokio::test]
+#[ignore]
 // This test is ignored because it is very long running
 async fn test_onchain_shuffling_change() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(2)
