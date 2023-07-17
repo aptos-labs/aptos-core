@@ -691,10 +691,6 @@ impl DagSnapshotBitmask {
             .unwrap_or(false)
     }
 
-    pub fn last_round(&self) -> Round {
-        self.first_round + self.bitmask.len() as Round - 1
-    }
-
     pub fn first_round(&self) -> Round {
         self.first_round
     }

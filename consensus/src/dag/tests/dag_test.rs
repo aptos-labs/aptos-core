@@ -220,10 +220,10 @@ fn test_dag_bitmask() {
     }
     assert_eq!(
         dag.bitmask(15),
-        DagSnapshotBitmask::new(5, vec![vec![false; signers.len()]])
+        DagSnapshotBitmask::new(5, vec![])
     );
     assert_eq!(
         dag.bitmask(6),
-        DagSnapshotBitmask::new(5, vec![vec![false; signers.len()]])
+        DagSnapshotBitmask::new(5, vec![])
     );
 }

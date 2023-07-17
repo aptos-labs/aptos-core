@@ -291,10 +291,7 @@ impl Dag {
         let lowest_round = match self.lowest_incomplete_round() {
             Some(round) => round,
             None => {
-                return DagSnapshotBitmask::new(self.highest_round() + 1, vec![vec![
-                    false;
-                    self.author_to_index.len()
-                ]]);
+                return DagSnapshotBitmask::new(self.highest_round() + 1, vec![]);
             },
         };
 

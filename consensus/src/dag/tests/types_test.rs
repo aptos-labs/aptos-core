@@ -102,7 +102,7 @@ fn test_remote_fetch_request() {
     );
     assert_eq!(
         request.verify(&validator_verifier).unwrap_err().to_string(),
-        "invalid voting power for target nodes"
+        "invalid voting power for provided parents"
     );
 
     let request = RemoteFetchRequest::new(
@@ -131,7 +131,6 @@ fn test_dag_snapshot_bitmask() {
     assert!(bitmask.has(1, 3));
     assert!(!bitmask.has(2, 0));
     assert_eq!(bitmask.first_round(), 1);
-    assert_eq!(bitmask.last_round(), 1);
 
     let bitmask = DagSnapshotBitmask::new(1, vec![vec![false, true, true, true], vec![
         false, true, false, false,
@@ -143,5 +142,4 @@ fn test_dag_snapshot_bitmask() {
     assert!(bitmask.has(2, 1));
     assert!(!bitmask.has(10, 10));
     assert_eq!(bitmask.first_round(), 1);
-    assert_eq!(bitmask.last_round(), 2);
 }
