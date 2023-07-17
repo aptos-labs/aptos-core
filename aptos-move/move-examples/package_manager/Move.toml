@@ -1,0 +1,11 @@
+[package]
+name = "package_manager"
+version = "1.0.0"
+upgrade_policy = "compatible"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+
+[addresses]
+deployer = "_"
+package = "_"

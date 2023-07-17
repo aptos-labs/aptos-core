@@ -48,3 +48,7 @@ pub const HAPROXY_SERVICE_SUFFIX: &str = "lb";
 pub const VALIDATOR_0_STATEFUL_SET_NAME: &str = "aptos-node-0-validator";
 pub const VALIDATOR_0_GENESIS_SECRET_PREFIX: &str = "aptos-node-0-genesis";
 pub const VALIDATOR_0_DATA_PERSISTENT_VOLUME_CLAIM_PREFIX: &str = "aptos-node-0-validator";
+
+// metadata about the cluster
+pub const DEFAULT_TEST_SUITE_NAME: &str = "unknown-testsuite";
+pub const DEFAULT_USERNAME: &str = "unknown-username";

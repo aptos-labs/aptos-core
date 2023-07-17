@@ -68,10 +68,10 @@ LiquidityPool resource is part of the ObjectGroup resource group. This means tha
 
 LiquidityPool resource can be added during construction of the object:
 ```rust
-use aptos_framework::object::Object;
+use aptos_framework::object::{Self, Object};
 use aptos_framework::fungible_asset::FungibleAsset;
 
-pub fun create_liquidity_pool(
+public fun create_liquidity_pool(
     token_a: Object<FungibleAsset>,
     token_b: Object<FungibleAsset>,
     reserves_a: u128,
@@ -86,6 +86,7 @@ pub fun create_liquidity_pool(
         reserves_a: reserves_a,
         reserves_b: reserves_b
     });
+    object::object_from_constructor_ref(liquidity_pool_constructor_ref)
 }
 ```
 

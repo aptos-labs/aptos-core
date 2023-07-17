@@ -111,7 +111,7 @@ fn test_sharded_block_executor_no_conflict() {
         transactions.push(generate_non_conflicting_p2p(&mut executor).0)
     }
     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+    let partitioned_txns = partitioner.partition(transactions.clone(), 2, 0.9);
     let executor_clients =
         ShardedExecutorClient::create_sharded_executor_clients(num_shards, Some(2));
     let sharded_block_executor = ShardedBlockExecutor::new(executor_clients);
@@ -169,7 +169,7 @@ fn sharded_block_executor_with_conflict(concurrency: usize) {
     }
 
     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
 
     let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
 
@@ -229,7 +229,7 @@ fn sharded_block_executor_with_random_transfers(concurrency: usize) {
     }
 
     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
 
     let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
 

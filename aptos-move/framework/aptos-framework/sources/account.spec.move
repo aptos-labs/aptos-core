@@ -448,6 +448,7 @@ spec aptos_framework::account {
             account: account_signer,
         };
         modifies global<Account>(addr);
+        ensures global<Account>(addr).guid_creation_num == old(global<Account>(addr).guid_creation_num) + 1;
     }
 
     /// The Account existed under the signer.

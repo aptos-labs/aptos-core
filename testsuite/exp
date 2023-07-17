@@ -38,6 +38,9 @@ WORKFLOW_WATCH_TIMEOUT_SECS = 30 * 60  # 30 min build timeout
 
 VALIDATOR_TESTING_IMAGE_NAME = "validator-testing"
 
+FORGE_DEFAULT_TEST_SUITE = "land_blocking"
+FORGE_DEFAULT_CLUSTER_NAME = "aptos-forge-exp-0"
+
 
 def cleanup_and_exit(git: Git, exit_code: int, cleanup_branch: str = None) -> None:
     """Clean up dangling resources like temporary exp branch, and exit with the given code."""
@@ -189,7 +192,8 @@ def workflow_dispatch_forge(
     branch: str,
     git_sha: str,
     duration: int = 480,
-    test_suite: str = "land_blocking",
+    test_suite: str = FORGE_DEFAULT_TEST_SUITE,
+    cluster_name: str = FORGE_DEFAULT_CLUSTER_NAME,
     dry_run: bool = False,
     wait: bool = False,
 ) -> bool:
@@ -209,6 +213,8 @@ def workflow_dispatch_forge(
         f"FORGE_RUNNER_DURATION_SECS={str(duration)}",
         "--field",
         f"FORGE_TEST_SUITE={test_suite}",
+        "--field",
+        f"FORGE_CLUSTER_NAME={cluster_name}",
     ]
     log.info(
         "%s: $ %s",

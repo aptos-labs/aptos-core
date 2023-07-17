@@ -1,0 +1,34 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        f: u64,
+    }
+    private fun bar(s: &mut M::S) {
+        s
+    }
+    private fun baz() {
+        pack M::S(0)
+    }
+    private fun foo(x: &mut u64) {
+        x
+    }
+    private fun t0() {
+        Borrow(Mutable)(0) = 1;
+        Borrow(Mutable)(select M::S.f(pack M::S(0))) = 1;
+        M::foo(Borrow(Mutable)(0)) = 1;
+        select M::S.f(M::bar(Borrow(Mutable)(pack M::S(0)))) = 1;
+        Borrow(Mutable)(select M::S.f(M::bar(Borrow(Mutable)(pack M::S(0))))) = 1;
+        select M::S.f(M::baz()) = 1;
+        Borrow(Mutable)(select M::S.f(M::baz())) = 1;
+        Tuple()
+    }
+    private fun t1() {
+        {
+          let r: &mut M::S = Borrow(Mutable)(pack M::S(0));
+          r = pack M::S(1);
+          select M::S.f(r) = 1;
+          Borrow(Mutable)(select M::S.f(r)) = 1;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M

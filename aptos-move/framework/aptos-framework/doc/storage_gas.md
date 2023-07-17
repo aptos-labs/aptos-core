@@ -1349,6 +1349,11 @@ A non decreasing curve must ensure that next is greater than cur.
 
 <pre><code><b>include</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a>;
 <b>include</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a>;
+<b>ensures</b> result == <a href="storage_gas.md#0x1_storage_gas_GasCurve">GasCurve</a> {
+    min_gas,
+    max_gas,
+    points
+};
 </code></pre>
 
 
@@ -1366,6 +1371,12 @@ A non decreasing curve must ensure that next is greater than cur.
 
 <pre><code><b>aborts_if</b> target_usage == 0;
 <b>aborts_if</b> target_usage &gt; <a href="storage_gas.md#0x1_storage_gas_MAX_U64">MAX_U64</a> / <a href="storage_gas.md#0x1_storage_gas_BASIS_POINT_DENOMINATION">BASIS_POINT_DENOMINATION</a>;
+<b>ensures</b> result == <a href="storage_gas.md#0x1_storage_gas_UsageGasConfig">UsageGasConfig</a> {
+    target_usage,
+    read_curve,
+    create_curve,
+    write_curve,
+};
 </code></pre>
 
 

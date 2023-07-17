@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: no function named `M::fooo` found
+   ┌─ tests/checking/typing/module_call_missing_function.move:13:9
+   │
+13 │         Self::fooo();
+   │         ^^^^^^^^^^^^
+
+error: no function named `foooo` found
+   ┌─ tests/checking/typing/module_call_missing_function.move:14:9
+   │
+14 │         foooo();
+   │         ^^^^^^^
+
+error: no function named `X::foooooo` found
+   ┌─ tests/checking/typing/module_call_missing_function.move:15:9
+   │
+15 │         X::foooooo();
+   │         ^^^^^^^^^^^^

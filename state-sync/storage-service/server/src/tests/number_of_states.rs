@@ -25,7 +25,7 @@ async fn test_get_number_of_states_at_version() {
         .returning(move |_| Ok(number_of_states as usize));
 
     // Create the storage client and server
-    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
     utils::update_storage_server_summary(&mut service, version, 10);
     tokio::spawn(service.start());
 
@@ -48,7 +48,7 @@ async fn test_get_number_of_states_at_version_not_serviceable() {
     let version = 101;
 
     // Create the storage client and server (that cannot service the request)
-    let (mut mock_client, mut service, _, _) = MockClient::new(None, None);
+    let (mut mock_client, mut service, _, _, _) = MockClient::new(None, None);
     utils::update_storage_server_summary(&mut service, version - 1, 10);
     tokio::spawn(service.start());
 
@@ -75,7 +75,7 @@ async fn test_get_number_of_states_at_version_invalid() {
         .returning(move |_| Err(format_err!("Version does not exist!")));
 
     // Create the storage client and server
-    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
     utils::update_storage_server_summary(&mut service, version, 10);
     tokio::spawn(service.start());
 

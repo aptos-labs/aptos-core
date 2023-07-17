@@ -12,7 +12,7 @@ use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{ShardId, SubBlock},
+    block_executor::partitioner::{RoundId, ShardId, SubBlock},
     state_store::state_key::StateKey,
     transaction::Transaction,
     write_set::TransactionWrite,
@@ -50,13 +50,13 @@ impl CrossShardCommitReceiver {
 
 pub struct CrossShardCommitSender {
     shard_id: ShardId,
-    // The senders of cross-shard messages to other shards.
-    message_txs: Vec<Mutex<Sender<CrossShardMsg>>>,
+    // The senders of cross-shard messages to other shards per round.
+    message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
     // The hashmap of source txn index to hashmap of conflicting storage location to the
-    // list of target txn index and shard id. Please note that the transaction indices stored here is
+    // list shard id and round id. Please note that the transaction indices stored here is
     // global indices, so we need to convert the local index received from the parallel execution to
     // the global index.
-    dependent_edges: HashMap<TxnIndex, HashMap<StateKey, HashSet<ShardId>>>,
+    dependent_edges: HashMap<TxnIndex, HashMap<StateKey, HashSet<(ShardId, RoundId)>>>,
     // The offset of the first transaction in the sub-block. This is used to convert the local index
     // in parallel execution to the global index.
     index_offset: TxnIndex,
@@ -65,7 +65,7 @@ pub struct CrossShardCommitSender {
 impl CrossShardCommitSender {
     pub fn new(
         shard_id: ShardId,
-        message_txs: Vec<Sender<CrossShardMsg>>,
+        message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
         sub_block: &SubBlock<Transaction>,
     ) -> Self {
         let mut dependent_edges = HashMap::new();
@@ -81,7 +81,7 @@ impl CrossShardCommitSender {
                     storage_locations_to_target
                         .entry(storage_location.clone().into_state_key())
                         .or_insert_with(HashSet::new)
-                        .insert(txn_id_with_shard.shard_id);
+                        .insert((txn_id_with_shard.shard_id, txn_id_with_shard.round_id));
                     num_dependent_edges += 1;
                 }
             }
@@ -98,7 +98,7 @@ impl CrossShardCommitSender {
 
         Self {
             shard_id,
-            message_txs: message_txs.into_iter().map(Mutex::new).collect(),
+            message_txs,
             dependent_edges,
             index_offset: sub_block.start_index as TxnIndex,
         }
@@ -115,13 +115,13 @@ impl CrossShardCommitSender {
 
         for (state_key, write_op) in write_set.iter() {
             if let Some(dependent_shard_ids) = edges.get(state_key) {
-                for dependent_shard_id in dependent_shard_ids.iter() {
+                for (dependent_shard_id, round_id) in dependent_shard_ids.iter() {
                     trace!("Sending remote update for success for shard id {:?} and txn_idx: {:?}, state_key: {:?}, dependent shard id: {:?}", self.shard_id, txn_idx, state_key, dependent_shard_id);
                     let message = RemoteTxnWriteMsg(RemoteTxnWrite::new(
                         state_key.clone(),
                         Some(write_op.clone()),
                     ));
-                    self.message_txs[*dependent_shard_id]
+                    self.message_txs[*dependent_shard_id][*round_id]
                         .lock()
                         .unwrap()
                         .send(message)

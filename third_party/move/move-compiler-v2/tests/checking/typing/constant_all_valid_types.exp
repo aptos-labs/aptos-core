@@ -1,0 +1,24 @@
+// ---- Model Dump
+module 0x42::M {
+    private fun t1() {
+        0
+    }
+    private fun t2() {
+        0
+    }
+    private fun t3() {
+        0
+    }
+    private fun t4() {
+        false
+    }
+    private fun t5() {
+        0x0
+    }
+    private fun t6() {
+        [1, 35]
+    }
+    private fun t7() {
+        [97, 98, 99, 100]
+    }
+} // end 0x42::M
