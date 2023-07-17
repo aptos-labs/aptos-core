@@ -559,10 +559,10 @@ module veiled_coin::veiled_coin {
             &std::option::none(),
             &std::option::none());
 
-        let amount_ct = elgamal::new_ciphertext_no_randomness(&scalar_amount);
+        let veiled_amount = elgamal::new_ciphertext_no_randomness(&scalar_amount);
 
         // Withdraw `amount` from the veiled balance (leverages the homomorphism of the encryption scheme.)
-        elgamal::ciphertext_sub_assign(&mut veiled_balance, &amount_ct);
+        elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_amount);
 
         // Update the veiled balance to reflect the veiled withdrawal
         veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
