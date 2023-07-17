@@ -14,8 +14,8 @@ fmt:
 	poetry run black aptos_sdk examples
 
 lint:
-	- poetry run mypy aptos_sdk
-	- poetry run flake8 aptos_sdk examples
+	poetry run mypy aptos_sdk
+	poetry run flake8 aptos_sdk examples
 
 examples:
 	poetry run python -m examples.aptos-token

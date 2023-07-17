@@ -745,32 +745,6 @@ class RestClient:
             collection_name,
         )
 
-    #
-    # Package publishing
-    #
-
-    async def publish_package(
-        self, sender: Account, package_metadata: bytes, modules: List[bytes]
-    ) -> str:
-        transaction_arguments = [
-            TransactionArgument(package_metadata, Serializer.to_bytes),
-            TransactionArgument(
-                modules, Serializer.sequence_serializer(Serializer.to_bytes)
-            ),
-        ]
-
-        payload = EntryFunction.natural(
-            "0x1::code",
-            "publish_package_txn",
-            [],
-            transaction_arguments,
-        )
-
-        signed_transaction = await self.create_bcs_signed_transaction(
-            sender, TransactionPayload(payload)
-        )
-        return await self.submit_bcs_transaction(signed_transaction)
-
 
 class FaucetClient:
     """Faucet creates and funds accounts. This is a thin wrapper around that."""
