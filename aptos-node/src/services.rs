@@ -12,7 +12,7 @@ use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdate
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
-use aptos_network_benchmark::{run_benchmark_service, BenchmarkMessage, BenchmarkSharedState};
+use aptos_network_benchmark::{run_benchmark_service, BenchmarkMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
     PeerMonitoringServiceServer,
@@ -191,16 +191,11 @@ pub fn start_benchmark_service(
     runtime: &Handle,
 ) {
     let network_client = network_interfaces.network_client;
-    // let benchmark_service_threads = node_config.benchmark.unwrap().benchmark_service_threads;
-    let shared = Arc::new(tokio::sync::RwLock::new(BenchmarkSharedState::new()));
     runtime.spawn(run_benchmark_service(
-        // benchmark_service_threads,
         node_config.clone(),
-        // runtime,
         network_client,
         network_interfaces.network_service_events,
         TimeService::real(),
-        shared,
     ));
 }
 

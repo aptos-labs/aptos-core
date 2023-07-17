@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::{
     config::NodeConfig,
@@ -41,10 +42,10 @@ pub struct BenchmarkDataSend {
 pub struct BenchmarkDataReply {
     pub request_counter: u64, // A monotonically increasing counter to verify responses
     pub send_micros: i64, // micro seconds since some epoch at a moment just before this message is sent
-    pub your_send_micros: i64, // the send_micros from the previous message
+    pub request_send_micros: i64, // the send_micros from the previous message
 }
 
-/// Counter for pending network events to the monitoring service (server-side)
+/// Counter for pending network events to the benchmark service (server-side)
 pub static PENDING_BENCHMARK_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_benchmark_pending_network_events",
@@ -75,8 +76,8 @@ async fn source_loop(
             },
             Some(x) => match work.send(x).await {
                 Ok(_) => {},
-                Err(se) => {
-                    warn!("benchmark source_loop work send: {}", se);
+                Err(send_error) => {
+                    warn!("benchmark source_loop work send: {}", send_error);
                 },
             },
         };
@@ -96,14 +97,14 @@ async fn handle_direct(
             let reply = BenchmarkDataReply {
                 request_counter: send.request_counter,
                 send_micros: time_service.now_unix_time().as_micros() as i64,
-                your_send_micros: send.send_micros,
+                request_send_micros: send.send_micros,
             };
             let result = network_client.send_to_peer(
                 BenchmarkMessage::DataReply(reply),
                 PeerNetworkId::new(network_id, peer_id),
             );
             if let Err(err) = result {
-                direct_messages("rerr");
+                direct_messages("reply_err");
                 info!(
                     "benchmark ds [{}] could not reply: {}",
                     send.request_counter, err
@@ -124,7 +125,7 @@ async fn handle_direct(
             } else {
                 direct_messages("late");
                 info!(
-                    "benchmark ds [{}] unk bytes in > {} micros",
+                    "benchmark ds [{}] unknown bytes in > {} micros",
                     reply.request_counter,
                     receive_time - rec.send_micros
                 )
@@ -145,7 +146,7 @@ async fn handle_rpc(
             let reply = BenchmarkDataReply {
                 request_counter: send.request_counter,
                 send_micros: time_service.now_unix_time().as_micros() as i64,
-                your_send_micros: send.send_micros,
+                request_send_micros: send.send_micros,
             };
             let reply = BenchmarkMessage::DataReply(reply);
             let reply_bytes = match protocol_id.to_bytes(&reply) {
@@ -249,8 +250,8 @@ pub async fn run_benchmark_service(
     network_client: NetworkClient<BenchmarkMessage>,
     network_requests: NetworkServiceEvents<BenchmarkMessage>,
     time_service: TimeService,
-    shared: Arc<RwLock<BenchmarkSharedState>>,
 ) {
+    let shared = Arc::new(tokio::sync::RwLock::new(BenchmarkSharedState::new()));
     let config = node_config.benchmark.unwrap();
     let benchmark_service_threads = config.benchmark_service_threads;
     let num_threads = match benchmark_service_threads {
@@ -435,7 +436,7 @@ pub async fn rpc_sender(
                     Ok(msg_wrapper) => {
                         let nowu = time_service.now_unix_time().as_micros() as i64;
                         if let BenchmarkMessage::DataReply(msg) = msg_wrapper {
-                            let send_dt = nowu - msg.your_send_micros;
+                            let send_dt = nowu - msg.request_send_micros;
                             info!("benchmark [{}] rpc at {} µs, took {} µs", msg.request_counter, nowu, send_dt);
                             rpc_messages("ok");
                             rpc_bytes("ok").inc_by(data_size as u64);
