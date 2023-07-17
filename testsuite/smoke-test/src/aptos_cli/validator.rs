@@ -27,6 +27,7 @@ use aptos_types::{
     PeerId,
 };
 use std::{collections::HashMap, convert::TryFrom, fmt::Write, sync::Arc, time::Duration};
+use aptos_types::on_chain_config::{ExecutionConfigV1, OnChainExecutionConfig, TransactionShufflerType};
 
 #[tokio::test]
 async fn test_analyze_validators() {
@@ -172,8 +173,8 @@ async fn check_vote_to_elected(swarm: &mut LocalSwarm) -> (Option<u64>, Option<u
     (first_vote, first_elected)
 }
 
-#[ignore]
 #[tokio::test]
+#[ignore]
 async fn test_onchain_config_change() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_init_config(Arc::new(|_, conf, _| {
@@ -338,6 +339,110 @@ async fn test_onchain_config_change() {
     // In updated config, we expect it to be elected pretty fast.
     // There is necessary 20 rounds delay due to exclude_round, and then only a few more rounds.
     assert!(first_elected_new.unwrap() < 40);
+}
+
+#[tokio::test]
+async fn test_execution_config_change() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(2)
+        .with_aptos()
+        .build_with_cli(0)
+        .await;
+
+    let root_cli_index = cli.add_account_with_address_to_cli(
+        swarm.root_key(),
+        swarm.chain_info().root_account().address(),
+    );
+
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    let current_execution_config: OnChainExecutionConfig = bcs::from_bytes(
+        &rest_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::execution_config::ExecutionConfig",
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+        .unwrap();
+
+    assert_eq!(current_execution_config.transaction_shuffler_type(), TransactionShufflerType::SenderAwareV1(32));
+
+    let execution_config_with_no_shuffling = OnChainExecutionConfig::V1(ExecutionConfigV1 {
+        transaction_shuffler_type: TransactionShufflerType::NoShuffling,
+    });
+
+
+    let update_execution_config_script = format!(
+        r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::execution_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            execution_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+        generate_blob(&bcs::to_bytes(&execution_config_with_no_shuffling).unwrap())
+    );
+
+    cli.run_script(root_cli_index, &update_execution_config_script)
+        .await
+        .unwrap();
+
+    let updated_execution_config: OnChainExecutionConfig = bcs::from_bytes(
+        &rest_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::execution_config::ExecutionConfig",
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+        .unwrap();
+
+    assert_eq!(updated_execution_config.transaction_shuffler_type(), TransactionShufflerType::NoShuffling);
+
+    let execution_config_with_shuffling = OnChainExecutionConfig::V1(ExecutionConfigV1 {
+        transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(64),
+    });
+
+    let update_execution_config_script = format!(
+        r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use aptos_framework::execution_config;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            let config_bytes = {};
+            execution_config::set(&framework_signer, config_bytes);
+        }}
+    }}
+    "#,
+        generate_blob(&bcs::to_bytes(&execution_config_with_shuffling).unwrap())
+    );
+
+    cli.run_script(root_cli_index, &update_execution_config_script)
+        .await
+        .unwrap();
+
+    let updated_execution_config: OnChainExecutionConfig = bcs::from_bytes(
+        &rest_client
+            .get_account_resource_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::execution_config::ExecutionConfig",
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+        .unwrap();
+
+    assert_eq!(updated_execution_config.transaction_shuffler_type(), TransactionShufflerType::SenderAwareV1(64));
 }
 
 pub(crate) fn generate_blob(data: &[u8]) -> String {
