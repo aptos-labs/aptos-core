@@ -416,6 +416,7 @@ async fn set_message(client: &Client, account: &mut LocalAccount, message: &str)
     Ok(())
 }
 
+/// Helper function that gets back the result of the interaction.
 async fn get_message(client: &Client, address: AccountAddress) -> Option<String> {
     let resource = match client
         .get_account_resource(
@@ -433,6 +434,8 @@ async fn get_message(client: &Client, address: AccountAddress) -> Option<String>
 
 /// Tests module publishing and interaction. Checks that:
 ///   - module data exists
+///   - can interact with module
+///   - resources reflect interaction
 async fn test_module(
     client: &Client,
     account: &mut LocalAccount,
@@ -488,9 +491,8 @@ async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
 
     // Test new account creation and funding
     // this test is critical to pass for the next tests
-    match handle_result(test_newaccount(&client, &giray, 100_000_000)).await {
-        Err(_) => return Err(anyhow!("returning early because new account test failed")),
-        _ => {},
+    if let Err(_) = handle_result(test_newaccount(&client, &giray, 100_000_000)).await {
+        return Err(anyhow!("returning early because new account test failed"));
     }
 
     // Flow 1: Coin transfer
@@ -512,7 +514,7 @@ async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
     ))
     .await;
 
-    // Flow 3: NFT transfer
+    // Flow 3: Publishing module
     let _ = handle_result(test_module(&client, &mut giray)).await;
 
     Ok(())
