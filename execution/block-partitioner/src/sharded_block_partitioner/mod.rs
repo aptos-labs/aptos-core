@@ -27,6 +27,7 @@ use std::{
     thread,
 };
 use std::env::VarError;
+use std::time::Instant;
 use crate::sharded_block_partitioner::counters::SHARDED_PARTITIONER_MISC_SECONDS;
 use crate::simple_partitioner::SimplePartitioner;
 
@@ -342,7 +343,7 @@ impl ShardedBlockPartitioner {
         }
         let mut current_round = 0;
         for round_id in 0..max_partitioning_rounds - 1 {
-            let _timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
+            let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
             let (
                 updated_frozen_sub_blocks,
                 current_frozen_rw_set_with_index_vec,
@@ -371,6 +372,7 @@ impl ShardedBlockPartitioner {
                 .map(|txns| txns.len())
                 .sum::<usize>();
             // If there are no remaining transactions, we can stop partitioning
+            let time = timer.stop_and_record();
             if num_remaining_txns == 0 {
                 return frozen_sub_blocks;
             }

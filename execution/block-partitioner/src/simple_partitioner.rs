@@ -15,6 +15,7 @@ use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::time::Instant;
 use once_cell::sync::Lazy;
 use aptos_metrics_core::{HistogramVec, register_histogram_vec, exponential_buckets};
+use aptos_types::block_executor::partitioner::ShardedTxnIndex;
 use crate::union_find::UnionFind;
 
 type Sender = Option<AccountAddress>;
@@ -142,19 +143,60 @@ impl BlockPartitioner for SimplePartitioner {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
-        let txns_by_shard_id = self.partition(txns, num_executor_shards, None);
-        let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["convert_to_SBFSs"]).start_timer();
-        let mut ret = Vec::with_capacity(num_executor_shards);
-        let mut txn_counter: usize = 0;
+        let txns_by_shard_id = self.partition(txns, num_executor_shards, Some(2.0));
+        let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_deps"]).start_timer();
+        let mut ret: Vec<SubBlocksForShard<Transaction>> = Vec::with_capacity(num_executor_shards);
+        let mut global_txn_counter: usize = 0;
+        let mut global_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
         for (shard_id, txns) in txns_by_shard_id.into_iter().enumerate() {
-            let twds: Vec<TransactionWithDependencies<Transaction>> = txns
-                .into_iter()
-                .map(|txn| TransactionWithDependencies::new(txn.into(), CrossShardDependencies::default()))
-                .collect();
-            let aggregated_sub_block = SubBlock::new(txn_counter, twds);
-            txn_counter += aggregated_sub_block.num_txns();
-            let sub_block_list = SubBlocksForShard::new(shard_id, vec![aggregated_sub_block]);
-            ret.push(sub_block_list);
+            let start_index_for_cur_sub_block = global_txn_counter;
+            let mut twds_for_cur_sub_block: Vec<TransactionWithDependencies<Transaction>> = Vec::with_capacity(txns.len());
+            let mut local_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
+            for txn in txns {
+                let cur_sharded_txn_idx = ShardedTxnIndex {
+                    txn_index: global_txn_counter,
+                    shard_id,
+                    round_id: 0,
+                };
+                let mut cur_txn_csd = CrossShardDependencies::default();
+                for loc in txn.read_hints() {
+                    let key = loc.clone().into_state_key();
+                    match global_owners_of_key.get(&key) {
+                        Some(owner) => {
+                            ret.get_mut(owner.shard_id).unwrap()
+                                .get_sub_block_mut(owner.round_id).unwrap()
+                                .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc.clone()]);
+                            cur_txn_csd.add_required_edge(*owner, loc.clone());
+                        },
+                        None => {},
+                    }
+                }
+
+                for loc in txn.write_hints() {
+                    let key = loc.clone().into_state_key();
+                    local_owners_of_key.insert(key.clone(), cur_sharded_txn_idx);
+                    match global_owners_of_key.get(&key) {
+                        Some(owner) => {
+                            ret.get_mut(owner.shard_id).unwrap()
+                                .get_sub_block_mut(owner.round_id).unwrap()
+                                .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc.clone()]);
+                            cur_txn_csd.add_required_edge(*owner, loc.clone());
+                        },
+                        None => {},
+                    }
+                }
+
+                let twd = TransactionWithDependencies::new(txn.into(), cur_txn_csd);
+                twds_for_cur_sub_block.push(twd);
+                global_txn_counter += 1;
+            }
+
+            let cur_sub_block = SubBlock::new(start_index_for_cur_sub_block, twds_for_cur_sub_block);
+            ret.push(SubBlocksForShard::new(shard_id, vec![cur_sub_block]));
+
+            for (key, owner) in local_owners_of_key {
+                global_owners_of_key.insert(key, owner);
+            }
         }
         ret
     }

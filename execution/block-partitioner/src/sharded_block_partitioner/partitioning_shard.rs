@@ -17,6 +17,7 @@ use std::sync::{
     mpsc::{Receiver, Sender},
     Arc,
 };
+use std::time::Instant;
 
 pub struct PartitioningShard {
     num_shards: usize,

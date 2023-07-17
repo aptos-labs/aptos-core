@@ -36,8 +36,8 @@ fn main() {
         .collect();
     println!("Created {} accounts", num_accounts);
 
-    // let partitioner = SimplePartitioner{};
-    let partitioner = ShardedBlockPartitioner::new(args.num_shards);
+    let partitioner = SimplePartitioner{};
+    // let partitioner = ShardedBlockPartitioner::new(args.num_shards);
     for _ in 0..args.num_blocks {
         println!("Creating {} transactions", args.block_size);
         let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
