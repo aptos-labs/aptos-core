@@ -69,7 +69,10 @@ impl From<anyhow::Error> for TestFailure {
 }
 
 // Processes a test result.
-async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(fut: Fut) -> Result<TestLog> {
+async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
+    test_name: &str,
+    fut: Fut,
+) -> Result<TestLog> {
     // start timer
     let start = Instant::now();
 
@@ -81,24 +84,20 @@ async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(fut: Fut) 
 
     // process the result
     let output = match result {
-        Ok(_) => {
-            let output = TestLog {
-                result: TestResult::Success,
-                time,
-            };
-            println!("{:?}", output);
-            output
+        Ok(_) => TestLog {
+            result: TestResult::Success,
+            time,
         },
-        Err(failure) => {
-            let output = TestLog {
-                result: TestResult::Fail(failure),
-                time,
-            };
-            println!("{:?}", output);
-            output
+        Err(failure) => TestLog {
+            result: TestResult::Fail(failure),
+            time,
         },
     };
 
+    println!(
+        "{} result:{:?} in time:{:?}",
+        test_name, output.result, output.time
+    );
     Ok(output)
 }
 
@@ -337,7 +336,7 @@ async fn test_mintnft(
     }
 
     // check that token store isn't initialized for the receiver
-    match token_client
+    if let Ok(_) = token_client
         .get_token(
             receiver.address(),
             account.address(),
@@ -346,12 +345,9 @@ async fn test_mintnft(
         )
         .await
     {
-        Ok(_) => {
-            return Err(TestFailure::Fail(
-                "found tokens for receiver when shouldn't",
-            ))
-        },
-        Err(_) => {},
+        return Err(TestFailure::Fail(
+            "found tokens for receiver when shouldn't",
+        ));
     }
 
     // claim token
@@ -398,8 +394,10 @@ async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<H
     named_addresses.insert("hello_blockchain".to_string(), account.address());
 
     // build options
-    let mut options: BuildOptions = BuildOptions::default();
-    options.named_addresses = named_addresses;
+    let options = BuildOptions {
+        named_addresses,
+        ..BuildOptions::default()
+    };
 
     // build module
     let package = BuiltPackage::build(move_dir, options)?;
@@ -485,7 +483,7 @@ async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), 
 
     // interact with module
     let message = "test message";
-    set_message(client, account, message.clone()).await?;
+    set_message(client, account, message).await?;
 
     // check that the message is sent
     let expected_message = message.to_string();
@@ -523,31 +521,29 @@ async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
 
     // Test new account creation and funding
     // this test is critical to pass for the next tests
-    if let Err(_) = handle_result(test_newaccount(&client, &giray, 100_000_000)).await {
+    if handle_result("new account", test_newaccount(&client, &giray, 100_000_000))
+        .await
+        .is_err()
+    {
         return Err(anyhow!("returning early because new account test failed"));
     }
 
     // Flow 1: Coin transfer
-    let _ = handle_result(test_cointransfer(
-        &client,
-        &coin_client,
-        &mut giray,
-        giray2.address(),
-        1_000,
-    ))
+    let _ = handle_result(
+        "coin transfer",
+        test_cointransfer(&client, &coin_client, &mut giray, giray2.address(), 1_000),
+    )
     .await;
 
     // Flow 2: NFT transfer
-    let _ = handle_result(test_mintnft(
-        &client,
-        &token_client,
-        &mut giray,
-        &mut giray2,
-    ))
+    let _ = handle_result(
+        "nft transfer",
+        test_mintnft(&client, &token_client, &mut giray, &mut giray2),
+    )
     .await;
 
     // Flow 3: Publishing module
-    let _ = handle_result(test_module(&client, &mut giray)).await;
+    let _ = handle_result("publish module", test_module(&client, &mut giray)).await;
 
     Ok(())
 }
