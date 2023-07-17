@@ -373,6 +373,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-logging",
  "aptos-vm-validator",
  "bcs 0.1.4",
  "bytes",
@@ -635,6 +636,7 @@ dependencies = [
  "cfg_block",
  "get_if_addrs",
  "mirai-annotations",
+ "num_cpus",
  "poem-openapi",
  "rand 0.7.3",
  "serde 1.0.149",
@@ -658,6 +660,7 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-enum-conversion-derive",
  "aptos-event-notifications",
  "aptos-executor",
  "aptos-executor-test-helpers",
@@ -1006,6 +1009,7 @@ dependencies = [
  "aptos-gas",
  "aptos-gas-profiling",
  "aptos-logger",
+ "aptos-memory-usage-tracker",
  "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-state-view",
@@ -1025,6 +1029,17 @@ dependencies = [
  "move-vm-test-utils",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "aptos-enum-conversion-derive"
+version = "0.0.3"
+dependencies = [
+ "anyhow",
+ "proc-macro2 1.0.59",
+ "quote 1.0.28",
+ "syn 1.0.105",
+ "trybuild",
 ]
 
 [[package]]
@@ -1111,6 +1126,7 @@ name = "aptos-executor-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-config",
  "aptos-crypto",
@@ -1553,6 +1569,7 @@ dependencies = [
  "move-core-types",
  "move-vm-types",
  "regex",
+ "smallvec",
 ]
 
 [[package]]
@@ -1872,6 +1889,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "toml 0.5.9",
+ "tonic",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2002,16 +2020,20 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
+ "aptos-gas-profiling",
  "aptos-keygen",
+ "aptos-memory-usage-tracker",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-logging",
  "bcs 0.1.4",
  "goldenfile",
  "hex",
@@ -2075,6 +2097,17 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "aptos-memory-usage-tracker"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas",
+ "aptos-types",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-types",
 ]
 
 [[package]]
@@ -3250,6 +3283,7 @@ name = "aptos-transaction-benchmarks"
 version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
+ "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-executor-service",
@@ -3467,6 +3501,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-memory-usage-tracker",
  "aptos-metrics-core",
  "aptos-move-stdlib",
  "aptos-mvhashmap",
@@ -3478,6 +3513,7 @@ dependencies = [
  "bcs 0.1.4",
  "dashmap",
  "fail 0.5.0",
+ "futures",
  "move-binary-format",
  "move-bytecode-utils",
  "move-bytecode-verifier",
@@ -4197,6 +4233,15 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "regex",
+]
+
+[[package]]
+name = "basic-toml"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c0de75129aa8d0cceaf750b89013f0e08804d6ec61416da787b35ad0d7cddf1"
+dependencies = [
+ "serde 1.0.149",
 ]
 
 [[package]]
@@ -5673,6 +5718,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
+ "aptos-gas-profiling",
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
@@ -7477,6 +7523,7 @@ dependencies = [
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-memory-usage-tracker",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
@@ -7570,9 +7617,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.147"
+version = "0.2.140"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
+checksum = "99227334921fae1a979cf0bfdfcc6b3e5ce376ef57e16fb6fb3ea2ed6095f80c"
 
 [[package]]
 name = "libfuzzer-sys"
@@ -8533,6 +8580,7 @@ dependencies = [
  "once_cell",
  "regex",
  "serde 1.0.149",
+ "trace",
 ]
 
 [[package]]
@@ -12428,6 +12476,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
+name = "trace"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ad0c048e114d19d1140662762bfdb10682f3bc806d8be18af846600214dd9af"
+dependencies = [
+ "proc-macro2 1.0.59",
+ "quote 1.0.28",
+ "syn 1.0.105",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12540,17 +12599,17 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "trybuild"
-version = "1.0.64"
+version = "1.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7f408301c7480f9e6294eb779cfc907f54bd901a9660ef24d7f233ed5376485"
+checksum = "501dbdbb99861e4ab6b60eb6a7493956a9defb644fd034bc4a5ef27c693c8a3a"
 dependencies = [
+ "basic-toml",
  "glob",
  "once_cell",
  "serde 1.0.149",
  "serde_derive",
  "serde_json",
  "termcolor",
- "toml 0.5.9",
 ]
 
 [[package]]

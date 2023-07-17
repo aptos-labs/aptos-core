@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/checking/naming/double_fun_decl.move:7:9
+  │
+3 │     fun bar(x: u64): u64 {
+  │         --- Alias previously defined here
+  ·
+7 │     fun bar(): u64 {
+  │         ^^^ Duplicate module member or alias 'bar'. Top level names in a namespace must be unique
+
+error: duplicate declaration, item, or annotation
+   ┌─ tests/checking/naming/double_fun_decl.move:15:9
+   │
+11 │     spec fun foo(x: u64): u64 {
+   │              --- Alias previously defined here
+   ·
+15 │     fun foo() {
+   │         ^^^ Duplicate module member or alias 'foo'. Top level names in a namespace must be unique

@@ -38,7 +38,7 @@ class CoinClient(RestClient):
             [TypeTag(StructTag.from_str(f"{coin_address}::moon_coin::MoonCoin"))],
             [],
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -57,7 +57,7 @@ class CoinClient(RestClient):
                 TransactionArgument(amount, Serializer.u64),
             ],
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = self.create_bcs_signed_transaction(
             minter, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
@@ -91,8 +91,8 @@ if __name__ == "__main__":
     rest_client = CoinClient(NODE_URL)
     faucet_client = FaucetClient(FAUCET_URL, rest_client)
 
-    faucet_client.fund_account(alice.address(), 20_000)
-    faucet_client.fund_account(bob.address(), 20_000)
+    faucet_client.fund_account(alice.address(), 20_000_000)
+    faucet_client.fund_account(bob.address(), 20_000_000)
 
     input("\nUpdate the module with Alice's address, compile, and press enter.")
 

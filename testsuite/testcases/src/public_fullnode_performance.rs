@@ -1,17 +1,61 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{LoadDestination, NetworkLoadTest};
+use crate::{
+    multi_region_network_test::create_multi_region_swarm_network_chaos, LoadDestination,
+    NetworkLoadTest,
+};
 use anyhow::Error;
-use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
+use aptos_forge::{NetworkContext, NetworkTest, Result, Swarm, SwarmChaos, SwarmNetEm, Test};
 use aptos_logger::info;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_types::PeerId;
+use rand::{
+    rngs::{OsRng, StdRng},
+    seq::SliceRandom,
+    Rng, SeedableRng,
+};
 use tokio::runtime::Runtime;
 
-/// A simple test that adds multiple public fullnodes (PFNs)
-/// to the swarm and submits transactions through them.
-pub struct PFNPerformance;
+/// A simple test that adds multiple public fullnodes (PFNs) to the swarm
+/// and submits transactions through them. Network emulation chaos can also
+/// be configured for all nodes in the swarm.
+#[derive(Default)]
+pub struct PFNPerformance {
+    add_network_emulation: bool,
+    shuffle_rng_seed: [u8; 32],
+}
+
+impl PFNPerformance {
+    pub fn new(add_network_emulation: bool) -> Self {
+        // Create a random seed for the shuffle RNG
+        let shuffle_rng_seed: [u8; 32] = OsRng.gen();
+
+        Self {
+            add_network_emulation,
+            shuffle_rng_seed,
+        }
+    }
+
+    /// Creates network emulation chaos for the swarm. Note: network chaos
+    /// is added to all validators, VFNs and PFNs in the swarm.
+    fn create_network_emulation_chaos(&self, swarm: &mut dyn Swarm) -> SwarmNetEm {
+        // Identify the validators and fullnodes in the swarm
+        let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+        let fullnode_peer_ids = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
+
+        // Gather and shuffle all peers IDs (so that we get random network emulation)
+        let mut all_peer_ids = validator_peer_ids
+            .iter()
+            .chain(fullnode_peer_ids.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        all_peer_ids.shuffle(&mut StdRng::from_seed(self.shuffle_rng_seed));
+
+        // Create network emulation chaos for the swarm
+        create_multi_region_swarm_network_chaos(all_peer_ids, None)
+    }
+}
 
 impl Test for PFNPerformance {
     fn name(&self) -> &'static str {
@@ -33,8 +77,24 @@ impl NetworkLoadTest for PFNPerformance {
         let num_pfns = 10;
         let pfn_peer_ids = create_and_add_pfns(ctx, num_pfns)?;
 
+        // Add network emulation to the swarm
+        if self.add_network_emulation {
+            let network_chaos = self.create_network_emulation_chaos(ctx.swarm());
+            ctx.swarm().inject_chaos(SwarmChaos::NetEm(network_chaos))?;
+        }
+
         // Use the PFNs as the load destination
         Ok(LoadDestination::Peers(pfn_peer_ids))
+    }
+
+    fn finish(&self, swarm: &mut dyn Swarm) -> Result<()> {
+        // Remove network emulation from the swarm
+        if self.add_network_emulation {
+            let network_chaos = self.create_network_emulation_chaos(swarm);
+            swarm.remove_chaos(SwarmChaos::NetEm(network_chaos))?;
+        }
+
+        Ok(())
     }
 }
 
@@ -49,7 +109,7 @@ fn create_and_add_pfns(ctx: &mut NetworkContext, num_pfns: u64) -> Result<Vec<Pe
     // Create the PFN swarm
     let runtime = Runtime::new().unwrap();
     let pfn_peer_ids: Vec<AccountAddress> = (0..num_pfns)
-        .map(|_| {
+        .map(|i| {
             // Create a config for the PFN. Note: this needs to be done here
             // because the config will generate a unique peer ID for the PFN.
             let pfn_config = swarm.get_default_pfn_node_config();
@@ -62,13 +122,13 @@ fn create_and_add_pfns(ctx: &mut NetworkContext, num_pfns: u64) -> Result<Vec<Pe
             // Verify the PFN was added
             if swarm.full_node(peer_id).is_none() {
                 panic!(
-                    "Failed to locate the PFN in the swarm! Peer ID: {:?}",
-                    peer_id
+                    "Failed to locate PFN {:?} in the swarm! Peer ID: {:?}",
+                    i, peer_id
                 );
             }
 
             // Return the peer ID
-            info!("Created new PFN with peer ID: {:?}", peer_id);
+            info!("Created PFN {:?} with peer ID: {:?}", i, peer_id);
             peer_id
         })
         .collect();

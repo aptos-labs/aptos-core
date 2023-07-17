@@ -249,6 +249,13 @@ export const GetTokenActivitiesCount = `
   }
 }
     `;
+export const GetTokenCurrentOwnerData = `
+    query getTokenCurrentOwnerData($where_condition: current_token_ownerships_v2_bool_exp!) {
+  current_token_ownerships_v2(where: $where_condition) {
+    owner_address
+  }
+}
+    `;
 export const GetTokenData = `
     query getTokenData($where_condition: current_token_datas_v2_bool_exp) {
   current_token_datas_v2(where: $where_condition) {
@@ -285,10 +292,8 @@ export const GetTokenOwnedFromCollection = `
 }
     ${CurrentTokenOwnershipFieldsFragmentDoc}`;
 export const GetTokenOwnersData = `
-    query getTokenOwnersData($token_id: String, $property_version: numeric) {
-  current_token_ownerships(
-    where: {token_data_id_hash: {_eq: $token_id}, property_version: {_eq: $property_version}, amount: {_gt: "0"}}
-  ) {
+    query getTokenOwnersData($where_condition: current_token_ownerships_v2_bool_exp!) {
+  current_token_ownerships_v2(where: $where_condition) {
     owner_address
   }
 }
@@ -359,13 +364,16 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     getTokenActivitiesCount(variables?: Types.GetTokenActivitiesCountQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenActivitiesCountQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenActivitiesCountQuery>(GetTokenActivitiesCount, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenActivitiesCount', 'query');
     },
+    getTokenCurrentOwnerData(variables: Types.GetTokenCurrentOwnerDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenCurrentOwnerDataQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenCurrentOwnerDataQuery>(GetTokenCurrentOwnerData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenCurrentOwnerData', 'query');
+    },
     getTokenData(variables?: Types.GetTokenDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenDataQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenDataQuery>(GetTokenData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenData', 'query');
     },
     getTokenOwnedFromCollection(variables: Types.GetTokenOwnedFromCollectionQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenOwnedFromCollectionQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenOwnedFromCollectionQuery>(GetTokenOwnedFromCollection, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenOwnedFromCollection', 'query');
     },
-    getTokenOwnersData(variables?: Types.GetTokenOwnersDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenOwnersDataQuery> {
+    getTokenOwnersData(variables: Types.GetTokenOwnersDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenOwnersDataQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenOwnersDataQuery>(GetTokenOwnersData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenOwnersData', 'query');
     },
     getTopUserTransactions(variables?: Types.GetTopUserTransactionsQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTopUserTransactionsQuery> {

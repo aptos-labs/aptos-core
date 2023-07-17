@@ -34,6 +34,16 @@ pub enum PeerManagerNotification {
     RecvMessage(PeerId, Message),
 }
 
+impl PeerManagerNotification {
+    /// Returns the peer ID of the notification
+    pub fn get_peer_id(&self) -> PeerId {
+        match self {
+            PeerManagerNotification::RecvRpc(peer_id, _) => *peer_id,
+            PeerManagerNotification::RecvMessage(peer_id, _) => *peer_id,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub enum ConnectionRequest {
     DialPeer(
