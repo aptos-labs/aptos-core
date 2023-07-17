@@ -336,6 +336,22 @@ const sidebars = {
     },
     {
       type: "category",
+      label: "Examples",
+      collapsible: true,
+      collapsed: true,
+      link: {
+        type: "generated-index",
+        title: "Examples",
+        description: "Examples for all the various concepts and tooling used to build on Aptos.",
+        slug: "/category/examples",
+        keywords: ["examples"],
+      },
+      items: [
+        "guides/resource-accounts/key-rotation",
+      ],
+    },
+    {
+      type: "category",
       label: "Build E2E Dapp with Aptos",
       link: { type: "doc", id: "tutorials/build-e2e-dapp/index" },
       collapsible: true,
