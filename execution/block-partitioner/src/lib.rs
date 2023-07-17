@@ -12,9 +12,11 @@ mod union_find;
 pub mod test_utils;
 
 use std::collections::HashMap;
+use std::time::Instant;
 use aptos_metrics_core::{exponential_buckets, Histogram, HistogramVec, IntCounterVec, IntGaugeVec, register_histogram, register_histogram_vec, register_int_counter_vec};
 use aptos_types::{block_executor::partitioner::SubBlocksForShard, transaction::Transaction};
 use once_cell::sync::Lazy;
+use aptos_crypto::hash::CryptoHash;
 use aptos_logger::info;
 use aptos_types::block_executor::partitioner::{RoundId, ShardId};
 use aptos_types::state_store::state_key::StateKey;
@@ -91,9 +93,12 @@ pub fn analyze_block(txns: Vec<Transaction>) -> Vec<AnalyzedTransaction> {
 
 
 pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
+    let timer = Instant::now();
     let mut total_comm_cost = 0;
-    for (shard_id, sub_block_list) in matrix.iter().enumerate() {
-        for (round_id, sub_block) in sub_block_list.sub_blocks.iter().enumerate() {
+    let num_rounds = matrix.first().unwrap().sub_blocks.len();
+    for round_id in 0..num_rounds {
+        for (shard_id, sub_block_list) in matrix.iter().enumerate() {
+            let sub_block = sub_block_list.get_sub_block(round_id).unwrap();
             let mut cur_sub_block_inbound_costs_by_key_src_pair: HashMap<(RoundId, ShardId, StateKey), u64> = HashMap::new();
             let mut cur_sub_block_connectivity_by_key_dst_pair: HashMap<(RoundId, ShardId, StateKey), u64> = HashMap::new();
             for (local_tid, td) in sub_block.transactions.iter().enumerate() {
@@ -101,20 +106,20 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
                 for (src_tid, locs) in td.cross_shard_dependencies.required_edges().iter() {
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
+                        // let key_str = key.hash().to_hex();
                         let value = cur_sub_block_inbound_costs_by_key_src_pair.entry((src_tid.round_id, src_tid.shard_id, key)).or_insert_with(||0);
                         *value += 1;
-                        // let key_str = key.hash().to_hex();
-                        // println!("PAREND - round={}, shard={}, tid={}, wait for key={} from round=???, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.shard_id, src_tid.txn_index);
+                        // println!("PAREND - round={}, shard={}, tid={}, wait for key={} from round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
 
                     }
                 }
                 for (dst_tid, locs) in td.cross_shard_dependencies.dependent_edges().iter() {
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
+                        // let key_str = key.hash().to_hex();
                         let value = cur_sub_block_connectivity_by_key_dst_pair.entry((dst_tid.round_id, dst_tid.shard_id, key)).or_insert_with(||0);
                         *value += 1;
-                        // let key_str = key.hash().to_hex();
-                        // println!("PAREND - round={}, shard={}, tid={}, unblock key={} for round=???, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.shard_id, src_tid.txn_index);
+                        // println!("PAREND - round={}, shard={}, tid={}, unblock key={} for round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
                     }
                 }
             }
@@ -131,4 +136,5 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
         }
     }
     println!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
+    println!("report_time={:?}", timer.elapsed());
 }

@@ -29,50 +29,34 @@ impl SimplePartitioner {
         num_executor_shards: usize,
         maybe_load_imbalance_tolerance: Option<f32>
     ) -> Vec<Vec<AnalyzedTransaction>> {
-        match std::env::var("SIMPLE_PARTITIONER__MERGE_WITH_UNION_FIND") {
-            Ok(v) if v.as_str() == "1" => self.partition_uf(txns, num_executor_shards, maybe_load_imbalance_tolerance),
-            _ => self.partition_bfs(txns, num_executor_shards, maybe_load_imbalance_tolerance),
-        }
-    }
-
-    pub fn partition_uf(
-        &self,
-        txns: Vec<AnalyzedTransaction>,
-        num_executor_shards: usize,
-        maybe_load_imbalance_tolerance: Option<f32>
-    ) -> Vec<Vec<AnalyzedTransaction>> {
+        let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
         let num_txns = txns.len();
-
         let mut senders: Vec<Sender> = Vec::new();
         let mut num_keys: usize = 0;
-        let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
-        let mut key_ids_by_key: HashMap<StateKey, usize> = HashMap::new();
         let mut key_ids_by_sender_id: Vec<HashSet<usize>> = Vec::new();
-        let mut txns_by_sender_id: Vec<Vec<AnalyzedTransaction>> = Vec::new();
-        {
-            let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
-            for (_txn_id, txn) in txns.into_iter().enumerate() {
-                let sender = txn.sender();
-                let sender_id = *sender_ids_by_sender.entry(sender.clone()).or_insert_with(||{
-                    let ret = senders.len();
-                    senders.push(sender);
-                    txns_by_sender_id.push(Vec::new());
-                    key_ids_by_sender_id.push(HashSet::new());
+        let mut txns_by_sender_id: HashMap<usize, Vec<AnalyzedTransaction>> = HashMap::new();
+        let mut key_ids_by_key: HashMap<StateKey, usize> = HashMap::new();
+        let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
+        for (_txn_id, txn) in txns.into_iter().enumerate() {
+            let sender = txn.sender();
+            let sender_id = *sender_ids_by_sender.entry(sender.clone()).or_insert_with(||{
+                let ret = senders.len();
+                senders.push(sender);
+                key_ids_by_sender_id.push(HashSet::new());
+                ret
+            });
+            for storage_location in txn.write_hints().iter().chain(txn.read_hints().iter()) {
+                let key = storage_location.clone().into_state_key();
+                let key_id = *key_ids_by_key.entry(key.clone()).or_insert_with(||{
+                    let ret = num_keys;
+                    num_keys += 1;
                     ret
                 });
-                for storage_location in txn.write_hints().iter().chain(txn.read_hints().iter()) {
-                    let key = storage_location.clone().into_state_key();
-                    let key_id = *key_ids_by_key.entry(key.clone()).or_insert_with(||{
-                        let ret = num_keys;
-                        num_keys += 1;
-                        ret
-                    });
-                    key_ids_by_sender_id[sender_id].insert(key_id);
-                }
-                txns_by_sender_id[sender_id].push(txn);
+                key_ids_by_sender_id[sender_id].insert(key_id);
             }
-            println!("preprocess_time={}", timer.stop_and_record());
+            txns_by_sender_id.entry(sender_id).or_insert_with(Vec::new).push(txn);
         }
+        timer.stop_and_record();
 
         /*
         Now txns_by_sender becomes:
@@ -83,8 +67,6 @@ impl SimplePartitioner {
         }
         */
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["union_find"]).start_timer();
-        let mut num_groups: usize = 0;
-        let mut group_ids_by_sender_id: HashMap<usize, usize> = HashMap::new();
         // The union-find approach.
         let mut uf = UnionFind::new(senders.len() + num_keys);
         for (sender_id, key_ids) in key_ids_by_sender_id.iter().enumerate() {
@@ -94,61 +76,36 @@ impl SimplePartitioner {
             }
         }
 
-        let mut group_ids_by_set_id: HashMap<usize, usize> = HashMap::new();
+        let mut sender_groups_by_set_id: HashMap<usize, Vec<usize>> = HashMap::new();
         for sender_id in 0..senders.len() {
             let set_id = uf.find(sender_id);
-            let group_id = group_ids_by_set_id.entry(set_id).or_insert_with(||{
-                let ret = num_groups;
-                num_groups += 1;
-                ret
-            });
-            group_ids_by_sender_id.insert(sender_id, *group_id);
+            sender_groups_by_set_id.entry(set_id).or_insert_with(Vec::new).push(sender_id);
         }
         timer.stop_and_record();
 
-        /*
-        Now group_ids_by_sender becomes:
-        {
-            A: 0,
-            B: 1,
-            C: 1,
-            ...
-            P: 2,
-            Q: 2,
-            ....
-            X: 0,
-            Y: 0,
-        }
-        */
-
+        let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["cap_group_size"]).start_timer();
         // If a sender group is too large,
         // break it into multiple sub-groups (and accept the fact that we will have cross-group conflicts),
         // each being small enough.
-        let sub_group_size_limit = maybe_load_imbalance_tolerance.map_or(usize::MAX, |k| {
-            let x: usize = ((num_txns as f32) * k / (num_executor_shards as f32)) as usize;
-            x
+        let sub_group_size_limit = maybe_load_imbalance_tolerance.map_or(u64::MAX, |k| {
+            ((num_txns as f32) * k / (num_executor_shards as f32)) as u64
         });
-        let mut cur_sug_group_ids_by_group_id: Vec<usize> = (0..num_groups).collect();
-        let mut sub_groups: Vec<Vec<usize>> = vec![vec![]; num_groups];
-        let mut loads_by_sub_group: Vec<usize> = vec![0; num_groups];
-        {
-            let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["cap_group_size"]).start_timer();
-            for (sender_id, txns) in txns_by_sender_id.iter().enumerate() {
-                let group_id = *group_ids_by_sender_id.get(&sender_id).unwrap();
-                let sub_group_id = cur_sug_group_ids_by_group_id[group_id];
-                if loads_by_sub_group[sub_group_id] == 0 || loads_by_sub_group[sub_group_id] + txns.len() < sub_group_size_limit {
-                    sub_groups.get_mut(sub_group_id).unwrap().push(sender_id);
-                    loads_by_sub_group[sub_group_id] += txns.len();
-                } else {
-                    let new_sub_group_id = sub_groups.len();
-                    cur_sug_group_ids_by_group_id[group_id] = new_sub_group_id;
-                    sub_groups.push(vec![sender_id]);
-                    loads_by_sub_group.push(txns.len());
+
+        let capped_sender_groups: Vec<SenderGroup> = sender_groups_by_set_id.into_iter().flat_map(|(_set_id, sender_ids)|{
+            let mut sub_groups: Vec<SenderGroup> = Vec::new();
+            for sender_id in sender_ids {
+                let num_txns_from_cur_sender = txns_by_sender_id.get(&sender_id).unwrap().len();
+                if sub_groups.len() == 0 || sub_groups.last().unwrap().total_load + num_txns_from_cur_sender as u64 >= sub_group_size_limit {
+                    sub_groups.push(SenderGroup::default());
                 }
+                sub_groups.last_mut().unwrap().add(sender_id, num_txns_from_cur_sender as u64);
             }
-        }
+            sub_groups
+        }).collect();
+        timer.stop_and_record();
+
         /*
-        Now sub_groups becomes:
+        Now capped_sender_groups becomes:
         [
             [A,X,Y],
             [B,C,D,E,F,G,H,I,J,K,L,M,N],
@@ -159,155 +116,21 @@ impl SimplePartitioner {
             [Z],
         ]
         */
-        let (_, shard_ids_by_sub_group_id) = scheduling::assign_tasks_to_workers(loads_by_sub_group, num_executor_shards);
 
-        let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["build_return_object"]).start_timer();
-        let mut txns_by_shard_id: Vec<Vec<AnalyzedTransaction>> = vec![vec![]; num_executor_shards];
-        for (sender_id, txns) in txns_by_sender_id.into_iter().enumerate() {
-            let group_id = *group_ids_by_sender_id.get(&sender_id).unwrap();
-            let sub_group_id = cur_sug_group_ids_by_group_id[group_id];
-            let shard_id = shard_ids_by_sub_group_id[sub_group_id];
-            txns_by_shard_id.get_mut(shard_id).unwrap().extend(txns);
-        }
-        txns_by_shard_id
-    }
-
-    pub fn partition_bfs(
-        &self,
-        txns: Vec<AnalyzedTransaction>,
-        num_executor_shards: usize,
-        maybe_load_imbalance_tolerance: Option<f32>
-    ) -> Vec<Vec<AnalyzedTransaction>> {
-        let num_txns = txns.len();
-
-        let mut senders: Vec<Sender> = Vec::new();
-        let mut keys: Vec<StateKey> = Vec::new();
-        let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
-        let mut key_ids_by_key: HashMap<StateKey, usize> = HashMap::new();
-        let mut key_ids_by_sender_id: Vec<HashSet<usize>> = Vec::new();
-        let mut txns_by_sender_id: Vec<Vec<AnalyzedTransaction>> = Vec::new();
-        let mut sender_ids_by_key_id: Vec<HashSet<usize>> = Vec::new();
-        {
-            let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
-            for (txn_id, txn) in txns.into_iter().enumerate() {
-                let sender = txn.sender();
-                let sender_id = sender_ids_by_sender.entry(sender.clone()).or_insert_with(||{
-                    let ret = senders.len();
-                    senders.push(sender);
-                    key_ids_by_sender_id.push(HashSet::new());
-                    txns_by_sender_id.push(Vec::new());
-                    ret
-                });
-                for storage_location in txn.write_hints().iter().chain(txn.read_hints().iter()) {
-                    let key = storage_location.clone().into_state_key();
-                    let key_id = key_ids_by_key.entry(key.clone()).or_insert_with(||{
-                        let ret = keys.len();
-                        keys.push(key.clone());
-                        sender_ids_by_key_id.push(HashSet::new());
-                        ret
-                    });
-                    sender_ids_by_key_id[*key_id].insert(*sender_id);
-                    key_ids_by_sender_id[*sender_id].insert(*key_id);
-                }
-                txns_by_sender_id[*sender_id].push(txn);
-            }
-        }
-
-        /*
-        Now txns_by_sender becomes:
-        {
-            Alice: [T_A3(K0, K1), T_A4(K0, K1)],
-            Bob: [T_B0(K2), T_B1(K3, K99), T_B2(K2, K99), T_B3(K2, K3)],
-            Carl: [T_C98(K2), T_C99(K3, K4, K5)],
-        }
-        */
-        let mut num_groups: usize = 0;
-        let mut group_ids_by_sender_id: HashMap<usize, usize> = HashMap::new();
-        let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["group_with_bfs"]).start_timer();
-        for sender_id in 0..senders.len() {
-            if !group_ids_by_sender_id.contains_key(&sender_id) {
-                // BFS initialization.
-                let mut sender_ids_to_explore: VecDeque<usize> = VecDeque::new();
-                sender_ids_to_explore.push_back(sender_id);
-                group_ids_by_sender_id.insert(sender_id, num_groups);
-
-                while let Some(cur_sender_id) = sender_ids_to_explore.pop_front() {
-                    for &key_id in key_ids_by_sender_id[cur_sender_id].iter() {
-                        for &nxt_sender_id in sender_ids_by_key_id[key_id].iter() {
-                            if !group_ids_by_sender_id.contains_key(&nxt_sender_id) {
-                                sender_ids_to_explore.push_back(nxt_sender_id);
-                                group_ids_by_sender_id.insert(nxt_sender_id, num_groups);
-                            }
-                        }
-                    }
-                }
-
-                num_groups += 1;
-            }
-        }
+        let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["schedule"]).start_timer();
+        let loads_by_sub_group: Vec<u64> = capped_sender_groups.iter().map(|g| g.total_load).collect();
+        let (_, shard_ids_by_group_id) = scheduling::assign_tasks_to_workers(&loads_by_sub_group, num_executor_shards);
         timer.stop_and_record();
-        /*
-        Now group_ids_by_sender becomes:
-        {
-            A: 0,
-            B: 1,
-            C: 1,
-            ...
-            P: 2,
-            Q: 2,
-            ....
-            X: 0,
-            Y: 0,
-        }
-        */
-
-        // If a sender group is too large,
-        // break it into multiple sub-groups (and accept the fact that we will have cross-group conflicts),
-        // each being small enough.
-        let sub_group_size_limit = maybe_load_imbalance_tolerance.map_or(usize::MAX, |k| {
-            let x: usize = ((num_txns as f32) * k / (num_executor_shards as f32)) as usize;
-            x
-        });
-        let mut cur_sug_group_ids_by_group_id: Vec<usize> = (0..num_groups).collect();
-        let mut sub_groups: Vec<Vec<usize>> = vec![vec![]; num_groups];
-        let mut loads_by_sub_group: Vec<usize> = vec![0; num_groups];
-        {
-            let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["cap_group_size"]).start_timer();
-            for (sender_id, txns) in txns_by_sender_id.iter().enumerate() {
-                let group_id = *group_ids_by_sender_id.get(&sender_id).unwrap();
-                let sub_group_id = cur_sug_group_ids_by_group_id[group_id];
-                if loads_by_sub_group[sub_group_id] == 0 || loads_by_sub_group[sub_group_id] + txns.len() < sub_group_size_limit {
-                    sub_groups.get_mut(sub_group_id).unwrap().push(sender_id);
-                    loads_by_sub_group[sub_group_id] += txns.len();
-                } else {
-                    let new_sub_group_id = sub_groups.len();
-                    cur_sug_group_ids_by_group_id[group_id] = new_sub_group_id;
-                    sub_groups.push(vec![sender_id]);
-                    loads_by_sub_group.push(txns.len());
-                }
-            }
-        }
-        /*
-        Now sub_groups becomes:
-        [
-            [A,X,Y],
-            [B,C,D,E,F,G,H,I,J,K,L,M,N],
-            [P,Q],
-            [U,V],
-            [R,S],
-            [T],
-            [Z],
-        ]
-        */
-        let (_, shard_ids_by_sub_group_id) = scheduling::assign_tasks_to_workers(loads_by_sub_group, num_executor_shards);
 
         let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["build_return_object"]).start_timer();
         let mut txns_by_shard_id: Vec<Vec<AnalyzedTransaction>> = vec![vec![]; num_executor_shards];
-        for (sender_id, txns) in txns_by_sender_id.into_iter().enumerate() {
-            let group_id = *group_ids_by_sender_id.get(&sender_id).unwrap();
-            let sub_group_id = cur_sug_group_ids_by_group_id[group_id];
-            let shard_id = shard_ids_by_sub_group_id[sub_group_id];
-            txns_by_shard_id.get_mut(shard_id).unwrap().extend(txns);
+        for (gid, group) in capped_sender_groups.into_iter().enumerate() {
+            let shard_id = shard_ids_by_group_id[gid];
+            let txns_for_shard = txns_by_shard_id.get_mut(shard_id).unwrap();
+            for sender_id in group.sender_ids {
+                let txns = txns_by_sender_id.remove(&sender_id).unwrap();
+                txns_for_shard.extend(txns);
+            }
         }
         txns_by_shard_id
     }
@@ -348,3 +171,24 @@ pub static SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::ne
     )
         .unwrap()
 });
+
+struct SenderGroup {
+    sender_ids: Vec<usize>,
+    total_load: u64,
+}
+
+impl SenderGroup {
+    fn add(&mut self, sender_id: usize, load: u64) {
+        self.sender_ids.push(sender_id);
+        self.total_load += load;
+    }
+}
+
+impl Default for SenderGroup {
+    fn default() -> Self {
+        Self {
+            sender_ids: vec![],
+            total_load: 0,
+        }
+    }
+}

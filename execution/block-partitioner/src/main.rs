@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::{BlockPartitioner, sharded_block_partitioner::ShardedBlockPartitioner, test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount}};
+use aptos_block_partitioner::{BlockPartitioner, report_sub_block_matrix, sharded_block_partitioner::ShardedBlockPartitioner, test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount}};
 use clap::Parser;
 use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -53,7 +53,8 @@ fn main() {
             .collect();
         println!("Starting to partition");
         let now = Instant::now();
-        BlockPartitioner::partition(&partitioner, transactions, args.num_shards);
+        let result = BlockPartitioner::partition(&partitioner, transactions, args.num_shards);
+        report_sub_block_matrix(&result);
         let elapsed = now.elapsed();
         println!("Time taken to partition: {:?}", elapsed);
     }
