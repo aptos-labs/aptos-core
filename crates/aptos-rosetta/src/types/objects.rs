@@ -12,6 +12,7 @@ use crate::{
         parse_delegation_pool_unlock_operation, parse_delegation_pool_withdraw_operation,
         parse_distribute_staking_rewards_operation, parse_reset_lockup_operation,
         parse_set_operator_operation, parse_set_voter_operation, parse_unlock_stake_operation,
+        parse_update_commission_operation,
     },
     error::ApiResult,
     types::{
@@ -36,6 +37,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use itertools::Itertools;
+use move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -394,6 +396,26 @@ impl Operation {
         )
     }
 
+    pub fn update_commission(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        owner: AccountAddress,
+        operator: Option<AccountIdentifier>,
+        new_commission_percentage: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::UpdateCommission,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(owner),
+            None,
+            Some(OperationMetadata::update_commission(
+                operator,
+                new_commission_percentage,
+            )),
+        )
+    }
+
     pub fn distribute_staking_rewards(
         operation_index: u64,
         status: Option<OperationStatusType>,
@@ -676,6 +698,17 @@ impl OperationMetadata {
         OperationMetadata {
             operator,
             amount: amount.map(U64::from),
+            ..Default::default()
+        }
+    }
+
+    pub fn update_commission(
+        operator: Option<AccountIdentifier>,
+        new_commission_percentage: Option<u64>,
+    ) -> Self {
+        OperationMetadata {
+            operator,
+            commission_percentage: new_commission_percentage.map(U64::from),
             ..Default::default()
         }
     }
@@ -1005,6 +1038,17 @@ fn parse_failed_operations_from_txn_payload(
                     warn!("Failed to parse reset lockup {:?}", inner);
                 }
             },
+            (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_COMMISSION_FUNCTION) => {
+                if let Ok(mut ops) =
+                    parse_update_commission_operation(sender, inner.ty_args(), inner.args())
+                {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse update commission {:?}", inner);
+                }
+            },
             (AccountAddress::ONE, STAKING_CONTRACT_MODULE, CREATE_STAKING_CONTRACT_FUNCTION) => {
                 if let Ok(mut ops) =
                     parse_create_stake_pool_operation(sender, inner.ty_args(), inner.args())
@@ -1178,6 +1222,12 @@ async fn parse_operations_from_write_set(
             parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
                 .await
         },
+        (
+            AccountAddress::ONE,
+            STAKING_CONTRACT_MODULE,
+            STAKING_GROUP_UPDATE_COMMISSION_RESOURCE,
+            0,
+        ) => parse_update_commission(address, data, events, operation_index, changes).await,
         (AccountAddress::ONE, DELEGATION_POOL_MODULE, DELEGATION_POOL_RESOURCE, 0) => {
             parse_delegation_pool_resource_changes(address, data, events, operation_index, changes)
                 .await
@@ -1601,15 +1651,96 @@ async fn parse_staking_contract_resource_changes(
     Ok(operations)
 }
 
-// TODO: implement staking and withdrawals parsing
+async fn parse_update_commission(
+    _owner_address: AccountAddress,
+    data: &[u8],
+    events: &[ContractEvent],
+    mut operation_index: u64,
+    _changes: &WriteSet,
+) -> ApiResult<Vec<Operation>> {
+    let mut operations = Vec::new();
+
+    // This only handles the voter events from the staking contract
+    // If there are direct events on the pool, they will be ignored
+    if let Ok(event_holder) = bcs::from_bytes::<StakingGroupUpdateCommissionEvent>(data) {
+        let update_commission_events = filter_events(
+            events,
+            event_holder.update_commission_events.key(),
+            |event_key, event| {
+                if let Ok(event) = bcs::from_bytes::<UpdateCommissionEvent>(event.event_data()) {
+                    Some(event)
+                } else {
+                    // If we can't parse the withdraw event, then there's nothing
+                    warn!(
+                        "Failed to parse update commission event!  Skipping for {}:{}",
+                        event_key.get_creator_address(),
+                        event_key.get_creation_number()
+                    );
+                    None
+                }
+            },
+        );
+
+        // For every distribute events, add staking reward operation
+        for event in update_commission_events {
+            operations.push(Operation::update_commission(
+                operation_index,
+                Some(OperationStatusType::Success),
+                event.staker,
+                Some(AccountIdentifier::base_account(event.operator)),
+                Some(event.new_commission_percentage),
+            ));
+            operation_index += 1;
+        }
+    }
+    Ok(operations)
+}
+
 async fn parse_delegation_pool_resource_changes(
     _owner_address: AccountAddress,
     _data: &[u8],
-    _events: &[ContractEvent],
-    _operation_index: u64,
+    events: &[ContractEvent],
+    mut operation_index: u64,
     _changes: &WriteSet,
 ) -> ApiResult<Vec<Operation>> {
-    let operations = Vec::new();
+    let mut operations = vec![];
+
+    for e in events {
+        let struct_tag = match e.type_tag() {
+            TypeTag::Struct(struct_tag) => struct_tag,
+            _ => continue,
+        };
+
+        match (
+            struct_tag.address,
+            struct_tag.module.as_str(),
+            struct_tag.name.as_str(),
+        ) {
+            (AccountAddress::ONE, DELEGATION_POOL_MODULE, WITHDRAW_STAKE_EVENT) => {
+                let event: WithdrawUndelegedEvent =
+                    if let Ok(event) = bcs::from_bytes(e.event_data()) {
+                        event
+                    } else {
+                        warn!(
+                            "Failed to parse withdraw undelegated event! Skipping for {}:{}",
+                            e.key().get_creator_address(),
+                            e.key().get_creation_number()
+                        );
+                        continue;
+                    };
+
+                operations.push(Operation::withdraw_undelegated_stake(
+                    operation_index,
+                    Some(OperationStatusType::Success),
+                    event.delegator_address,
+                    AccountIdentifier::base_account(event.pool_address),
+                    Some(event.amount_withdrawn),
+                ));
+                operation_index += 1;
+            },
+            _ => continue,
+        }
+    }
 
     Ok(operations)
 }
@@ -1713,6 +1844,7 @@ pub enum InternalOperation {
     InitializeStakePool(InitializeStakePool),
     ResetLockup(ResetLockup),
     UnlockStake(UnlockStake),
+    UpdateCommission(UpdateCommission),
     WithdrawUndelegated(WithdrawUndelegated),
     DistributeStakingRewards(DistributeStakingRewards),
     AddDelegatedStake(AddDelegatedStake),
@@ -1861,6 +1993,32 @@ impl InternalOperation {
                                 }));
                             }
                         },
+                        Ok(OperationType::UpdateCommission) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    operator,
+                                    commission_percentage,
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                let operator = if let Some(operator) = operator {
+                                    operator.account_address()?
+                                } else {
+                                    return Err(ApiError::InvalidInput(Some(
+                                        "Unlock Stake missing operator field".to_string(),
+                                    )));
+                                };
+                                return Ok(Self::UpdateCommission(UpdateCommission {
+                                    owner: account.account_address()?,
+                                    operator,
+                                    new_commission_percentage: commission_percentage
+                                        .map(u64::from)
+                                        .unwrap_or_default(),
+                                }));
+                            }
+                        },
                         Ok(OperationType::DistributeStakingRewards) => {
                             if let (
                                 Some(OperationMetadata {
@@ -1959,6 +2117,7 @@ impl InternalOperation {
             Self::InitializeStakePool(inner) => inner.owner,
             Self::ResetLockup(inner) => inner.owner,
             Self::UnlockStake(inner) => inner.owner,
+            Self::UpdateCommission(inner) => inner.owner,
             Self::WithdrawUndelegated(inner) => inner.delegator,
             Self::DistributeStakingRewards(inner) => inner.sender,
             Self::AddDelegatedStake(inner) => inner.delegator,
@@ -2029,6 +2188,13 @@ impl InternalOperation {
                     unlock_stake.amount,
                 ),
                 unlock_stake.owner,
+            ),
+            InternalOperation::UpdateCommission(update_commision) => (
+                aptos_stdlib::staking_contract_update_commision(
+                    update_commision.operator,
+                    update_commision.new_commission_percentage,
+                ),
+                update_commision.owner,
             ),
             InternalOperation::DistributeStakingRewards(distribute_staking_rewards) => (
                 aptos_stdlib::staking_contract_distribute(
@@ -2222,6 +2388,13 @@ pub struct UnlockStake {
     pub owner: AccountAddress,
     pub operator: AccountAddress,
     pub amount: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct UpdateCommission {
+    pub owner: AccountAddress,
+    pub operator: AccountAddress,
+    pub new_commission_percentage: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

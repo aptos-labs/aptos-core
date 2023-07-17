@@ -68,8 +68,20 @@ pub fn create_mock_reader_writer(
     reader: Option<MockDatabaseReader>,
     writer: Option<MockDatabaseWriter>,
 ) -> DbReaderWriter {
+    create_mock_reader_writer_with_version(reader, writer, 0)
+}
+
+/// Creates a mock database reader writer with the given
+/// highest synced transaction version.
+pub fn create_mock_reader_writer_with_version(
+    reader: Option<MockDatabaseReader>,
+    writer: Option<MockDatabaseWriter>,
+    highest_synced_version: u64,
+) -> DbReaderWriter {
     let mut reader = reader.unwrap_or_else(create_mock_db_reader);
-    reader.expect_get_latest_version().returning(|| Ok(0));
+    reader
+        .expect_get_latest_version()
+        .returning(move || Ok(highest_synced_version));
     reader
         .expect_get_latest_epoch_state()
         .returning(|| Ok(create_empty_epoch_state()));

@@ -13,6 +13,7 @@ import {
   TransactionAuthenticatorMultiEd25519,
   SigningMessage,
   MultiAgentRawTransaction,
+  FeePayerRawTransaction,
   AccountAddress,
   EntryFunction,
   Identifier,
@@ -42,7 +43,7 @@ export { TypeTagParser } from "../aptos_types";
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
 
-type AnyRawTransaction = RawTransaction | MultiAgentRawTransaction;
+type AnyRawTransaction = RawTransaction | MultiAgentRawTransaction | FeePayerRawTransaction;
 
 /**
  * Function that takes in a Signing Message (serialized raw transaction)
@@ -77,6 +78,8 @@ export class TransactionBuilder<F extends SigningFn> {
     if (rawTxn instanceof RawTransaction) {
       hash.update(RAW_TRANSACTION_SALT);
     } else if (rawTxn instanceof MultiAgentRawTransaction) {
+      hash.update(RAW_TRANSACTION_WITH_DATA_SALT);
+    } else if (rawTxn instanceof FeePayerRawTransaction) {
       hash.update(RAW_TRANSACTION_WITH_DATA_SALT);
     } else {
       throw new Error("Unknown transaction type.");

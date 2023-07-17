@@ -9,14 +9,13 @@ use crate::{
             BroadcastStatus, CertifiedNodeHandleError, CertifiedNodeHandler,
             NodeBroadcastHandleError, NodeBroadcastHandler, ReliableBroadcast,
         },
+        storage::DAGStorage,
         tests::{
             dag_test::MockStorage,
             helpers::{new_certified_node, new_node},
         },
-        types::{
-            CertifiedAck, DAGMessage, NodeCertificate, NodeDigestSignature, TestAck, TestMessage,
-        },
-        RpcHandler,
+        types::{CertifiedAck, DAGMessage, NodeCertificate, TestAck, TestMessage},
+        NodeId, RpcHandler, Vote,
     },
     network::TConsensusMsg,
     network_interface::ConsensusMsg,
@@ -192,22 +191,21 @@ async fn test_node_broadcast_receiver_succeed() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
-        verifier: validator_verifier.clone(),
+        verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state, storage)));
+    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
 
     let wellformed_node = new_node(0, 10, signers[0].author(), vec![]);
     let equivocating_node = new_node(0, 20, signers[0].author(), vec![]);
 
     assert_ne!(wellformed_node.digest(), equivocating_node.digest());
 
-    let mut rb_receiver = NodeBroadcastHandler::new(dag, signers[3].clone(), validator_verifier);
+    let mut rb_receiver = NodeBroadcastHandler::new(dag, signers[3].clone(), epoch_state, storage);
 
-    let expected_result = NodeDigestSignature::new(
-        0,
-        wellformed_node.digest(),
-        wellformed_node.sign(&signers[3]).unwrap(),
+    let expected_result = Vote::new(
+        wellformed_node.metadata().clone(),
+        wellformed_node.sign_vote(&signers[3]).unwrap(),
     );
     // expect an ack for a valid message
     assert_ok_eq!(rb_receiver.process(wellformed_node), expected_result);
@@ -227,20 +225,20 @@ async fn test_node_broadcast_receiver_failure() {
         .iter()
         .map(|signer| {
             let storage = Arc::new(MockStorage::new());
-            let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage)));
+            let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
 
-            NodeBroadcastHandler::new(dag, signer.clone(), validator_verifier.clone())
+            NodeBroadcastHandler::new(dag, signer.clone(), epoch_state.clone(), storage)
         })
         .collect();
 
     // Round 0
     let node = new_node(0, 10, signers[0].author(), vec![]);
-    let node_sig = rb_receivers[1].process(node.clone()).unwrap();
+    let vote = rb_receivers[1].process(node.clone()).unwrap();
 
     // Round 1 with invalid parent
     let partial_sigs = PartialSignatures::new(BTreeMap::from([(
         signers[1].author(),
-        node_sig.signature().clone(),
+        vote.signature().clone(),
     )]));
     let node_cert = NodeCertificate::new(
         node.metadata().clone(),
@@ -282,6 +280,37 @@ async fn test_node_broadcast_receiver_failure() {
         rb_receivers[0].process(node).unwrap_err().to_string(),
         NodeBroadcastHandleError::MissingParents.to_string()
     );
+}
+
+#[test]
+fn test_node_broadcast_receiver_storage() {
+    let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier,
+    });
+    let storage = Arc::new(MockStorage::new());
+    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage.clone())));
+
+    let node = new_node(1, 10, signers[0].author(), vec![]);
+
+    let mut rb_receiver = NodeBroadcastHandler::new(
+        dag.clone(),
+        signers[3].clone(),
+        epoch_state.clone(),
+        storage.clone(),
+    );
+    let sig = rb_receiver.process(node).expect("must succeed");
+
+    assert_ok_eq!(
+        storage.get_votes(),
+        HashMap::from([(NodeId::new(0, 1, signers[0].author()), sig)])
+    );
+
+    let mut rb_receiver =
+        NodeBroadcastHandler::new(dag, signers[3].clone(), epoch_state, storage.clone());
+    assert_ok!(rb_receiver.gc_before_round(2));
+    assert_eq!(storage.get_votes().unwrap().len(), 0);
 }
 
 #[test]

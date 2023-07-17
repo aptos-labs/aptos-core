@@ -44,7 +44,8 @@ async fn test_request_moderator_ignore_pfn() {
     };
 
     // Create the storage client and server
-    let (mut mock_client, mut service, _, _) = MockClient::new(None, Some(storage_service_config));
+    let (mut mock_client, mut service, _, _, _) =
+        MockClient::new(None, Some(storage_service_config));
     utils::update_storage_server_summary(
         &mut service,
         highest_synced_version,
@@ -143,7 +144,7 @@ async fn test_request_moderator_increase_time() {
     };
 
     // Create the storage client and server
-    let (mut mock_client, mut service, time_service, peers_and_metadata) =
+    let (mut mock_client, mut service, _, time_service, peers_and_metadata) =
         MockClient::new(None, Some(storage_service_config));
     utils::update_storage_server_summary(
         &mut service,
@@ -233,7 +234,7 @@ async fn test_request_moderator_peer_garbage_collect() {
     };
 
     // Create the storage client and server
-    let (mut mock_client, mut service, time_service, peers_and_metadata) =
+    let (mut mock_client, mut service, _, time_service, peers_and_metadata) =
         MockClient::new(None, Some(storage_service_config));
     utils::update_storage_server_summary(
         &mut service,

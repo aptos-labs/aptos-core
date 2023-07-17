@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
+    IntCounterVec,
 };
 use once_cell::sync::Lazy;
 
@@ -15,6 +16,13 @@ const SUB_MS_BUCKETS: &[f64] = &[
     0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.125, 0.15, 0.2, 0.25,
     0.5, 1.0, 2.5, 5.0, 10.0,
 ];
+
+static BYTE_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
+    exponential_buckets(
+        /*start=*/ 16.0, /*factor=*/ 2.0, /*count=*/ 20,
+    )
+    .unwrap()
+});
 
 pub static HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -32,6 +40,16 @@ pub static RESPONSE_STATUS: Lazy<HistogramVec> = Lazy::new(|| {
         "API requests latency grouped by status code only",
         &["status"],
         SUB_MS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static POST_BODY_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_api_post_body_bytes",
+        "API POST request body size grouped by operation_id and status",
+        &["operation_id", "status"],
+        BYTE_BUCKETS.clone()
     )
     .unwrap()
 });
