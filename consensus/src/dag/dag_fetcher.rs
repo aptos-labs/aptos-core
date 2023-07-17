@@ -174,6 +174,8 @@ impl RpcHandler for FetchRequestHandler {
             .map(|node_status| node_status.as_node().clone().deref().clone())
             .collect();
 
+        // TODO: decide if the response is too big and act accordingly.
+
         Ok(FetchResponse::new(
             message.epoch(),
             certified_nodes,
