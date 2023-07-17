@@ -591,9 +591,6 @@ The number of new events created does not exceed MAX_U64.
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 2 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
-<b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
-<b>ensures</b> <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr).height == 0;
-<b>ensures</b> <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr).epoch_interval &gt; 0;
 <b>ensures</b> @aptos_framework == addr;
 </code></pre>
 
@@ -611,6 +608,8 @@ The number of new events created does not exceed MAX_U64.
     <b>aborts_if</b> epoch_interval_microsecs &lt;= 0;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+    <b>ensures</b> <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr).height == 0;
+    <b>ensures</b> <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr).epoch_interval &gt; 0;
 }
 </code></pre>
 
@@ -664,7 +663,6 @@ The BlockResource existed under the @aptos_framework.
     <b>let</b> <b>post</b> block_resource = <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>ensures</b> block_resource.epoch_interval == new_epoch_interval;
     <b>ensures</b> addr == @aptos_framework;
-    <b>ensures</b> block_resource.epoch_interval &gt; 0;
 }
 </code></pre>
 
@@ -710,7 +708,6 @@ The BlockResource existed under the @aptos_framework.
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> proposer == @vm_reserved;
 </code></pre>
 
 
