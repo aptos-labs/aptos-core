@@ -8,7 +8,6 @@ use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
     PgConnection,
 };
-use google_cloud_auth::token_source::TokenSource;
 use image::{ImageBuffer, ImageFormat};
 use nft_metadata_crawler_utils::{
     gcs::{write_image_to_gcs, write_json_to_gcs},
@@ -18,36 +17,33 @@ use serde_json::Value;
 use tracing::{error, info};
 
 // Stuct that represents a parser for a single entry from queue
-pub struct Parser<'a> {
+pub struct Parser {
     pub entry: NFTMetadataCrawlerEntry,
     model: NFTMetadataCrawlerURIs,
     bucket: String,
-    ts: &'a dyn TokenSource,
-    force: bool,
+    token: String,
     conn: PooledConnection<ConnectionManager<PgConnection>>,
 }
 
-impl<'a> Parser<'a> {
+impl Parser {
     pub fn new(
         entry: NFTMetadataCrawlerEntry,
         bucket: String,
-        force: bool,
-        ts: &'a dyn TokenSource,
+        token: String,
         conn: PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Self {
         Self {
             model: NFTMetadataCrawlerURIs::new(entry.token_uri.clone()),
             entry,
             bucket,
-            ts,
-            force,
+            token,
             conn,
         }
     }
 
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         // Deduplication
-        if !self.force
+        if !self.entry.force
             && NFTMetadataCrawlerURIsQuery::get_by_token_uri(
                 self.entry.token_uri.clone(),
                 &mut self.conn,
@@ -82,7 +78,7 @@ impl<'a> Parser<'a> {
 
                 // Write JSON to GCS
                 match write_json_to_gcs(
-                    self.ts,
+                    self.token.clone(),
                     self.bucket.clone(),
                     self.entry.token_data_id.clone(),
                     json,
@@ -133,7 +129,7 @@ impl<'a> Parser<'a> {
 
                 // Write image to GCS
                 match write_image_to_gcs(
-                    self.ts,
+                    self.token.clone(),
                     format,
                     self.bucket.clone(),
                     self.entry.token_data_id.clone(),
@@ -179,7 +175,7 @@ impl<'a> Parser<'a> {
 
                     // Write animation to GCS
                     match write_image_to_gcs(
-                        self.ts,
+                        self.token.clone(),
                         format,
                         self.bucket.clone(),
                         self.entry.token_data_id.clone(),

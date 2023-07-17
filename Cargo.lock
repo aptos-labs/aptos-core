@@ -9243,6 +9243,7 @@ dependencies = [
  "base64 0.13.0",
  "chrono",
  "clap 4.3.5",
+ "crossbeam-channel",
  "csv",
  "diesel",
  "field_count",
@@ -9257,6 +9258,7 @@ dependencies = [
  "serde 1.0.149",
  "serde_json",
  "tokio",
+ "tonic 0.9.2",
  "tracing",
  "url",
 ]
@@ -9269,12 +9271,14 @@ dependencies = [
  "base64 0.13.0",
  "chrono",
  "google-cloud-auth",
+ "google-cloud-googleapis",
  "image",
  "reqwest",
  "serde 1.0.149",
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
+ "tonic 0.9.2",
 ]
 
 [[package]]
@@ -12681,6 +12685,7 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost",
+ "rustls-native-certs",
  "rustls-pemfile 1.0.1",
  "tokio",
  "tokio-rustls 0.24.1",

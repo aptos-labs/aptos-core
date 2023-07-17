@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
 use anyhow::anyhow;
-use google_cloud_auth::token_source::TokenSource;
 use image::ImageFormat;
 use reqwest::{
     header::{self, HeaderMap},
@@ -10,7 +9,7 @@ use reqwest::{
 use serde_json::Value;
 
 pub async fn write_json_to_gcs(
-    ts: &dyn TokenSource,
+    token: String,
     bucket: String,
     id: String,
     json: Value,
@@ -25,7 +24,7 @@ pub async fn write_json_to_gcs(
 
     let res = client
         .post(url)
-        .bearer_auth(ts.token().await?.access_token)
+        .bearer_auth(token)
         .header("Content-Type", "application/json")
         .body(json_string)
         .send()
@@ -41,7 +40,7 @@ pub async fn write_json_to_gcs(
 }
 
 pub async fn write_image_to_gcs(
-    ts: &dyn TokenSource,
+    token: String,
     img_format: ImageFormat,
     bucket: String,
     id: String,
@@ -77,7 +76,7 @@ pub async fn write_image_to_gcs(
 
     let res = client
         .post(&url)
-        .bearer_auth(ts.token().await?.access_token)
+        .bearer_auth(token)
         .headers(headers)
         .body(buffer)
         .send()
