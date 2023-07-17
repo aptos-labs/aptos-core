@@ -717,37 +717,50 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
     "table-extension",
 ] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
+### Cargo profiles
+# See here for reference https://doc.rust-lang.org/cargo/reference/profiles.html
 
+# Release build
+# Major difference here is LTO which give a significant performance gain
 [profile.release]
+# Include debuginfo
 debug = true
+# Panic on overflow
 overflow-checks = true
-
-# The performance build is not currently recommended
-# for production deployments. It has not been widely tested.
-[profile.performance]
-inherits = "release"
-opt-level = 3
-debug = true
-overflow-checks = true
+# Perform thin lto, achieving most of the benefit with less compile time
 lto = "thin"
+# Do not split crates into multiple compiled units
 codegen-units = 1
 
+# Correctness build, used for forge / testing
+# This is ostenisbly the same as release minus lto
+[profile.correctness]
+inherits = "release"
+lto = false
+
+# Performance build
+# Previously the LTO build, duplicate until we remove references to this
+[profile.performance]
+inherits = "release"
+
+# Cli build
+# For aptos and various other cli
+# Optimize for binary size / speed
 [profile.cli]
 inherits = "release"
 debug = false
 opt-level = "z"
-lto = "thin"
 strip = true
-codegen-units = 1
 
 [profile.ci]
-inherits = "release"
+inherits = "correctness"
 debug = true
 overflow-checks = true
 debug-assertions = true
 
+# Benchmarking profile
 [profile.bench]
-debug = true
+inherits = "release"
 
 [patch.crates-io]
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
