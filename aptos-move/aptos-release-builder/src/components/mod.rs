@@ -506,7 +506,7 @@ impl Default for ReleaseConfig {
                         }),
                         ReleaseEntry::Consensus(OnChainConsensusConfig::default()),
                         ReleaseEntry::Execution(OnChainExecutionConfig::V1(ExecutionConfigV1 {
-                            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+                            transaction_shuffler_type: TransactionShufflerType::Deprecated(32),
                         })),
                         ReleaseEntry::RawScript(PathBuf::from(
                             "data/proposals/empty_multi_step.move",
