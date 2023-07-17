@@ -64,6 +64,7 @@ impl MockNetwork {
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(peer_mgr_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
+            None,
         );
         let networks = networks
             .unwrap_or_else(|| vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public]);
