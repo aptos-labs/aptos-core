@@ -4,11 +4,12 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- Introduce and use `@aptos-labs/aptos-client` package to manage and handle the client used in the SDK
+
 ## 1.13.3 (2023-07-19)
+
 - Add support for `null` or `undefined` as absense of an Option
 - Fix `Option<LongerType>` for input arguments in entry functions
-
-- Introduce and use `@aptos-labs/aptos-client` package to manage and handle the client used in the SDK
 
 ## 1.13.2 (2023-07-12)
 

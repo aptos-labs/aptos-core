@@ -1,7 +1,11 @@
 {
   "name": "@aptos-labs/aptos-client",
-  "version": "0.0.2",
+  "description": "client package for accessing the Aptos network API",
+  "packageManager": "pnpm@8.3.1",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=15.10.0"
+  },
   "exports": {
     "browser": {
       "import": "./dist/browser/index.browser.mjs",
@@ -34,6 +38,20 @@
     "fmt": "pnpm _fmt --write",
     "_fmt": "prettier 'src/**/*.ts' '.eslintrc.js'"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aptos-labs/aptos-core.git"
+  },
+  "homepage": "https://github.com/aptos-labs/aptos-core",
+  "bugs": {
+    "url": "https://github.com/aptos-labs/aptos-core/issues"
+  },
+  "author": "aptoslabs.com",
+  "keywords": [
+    "Aptos",
+    "Aptos Labs",
+    "Aptos SDK"
+  ],
   "dependencies": {
     "axios": "0.27.2",
     "got": "^11.0.0"
@@ -51,5 +69,6 @@
     "eslint-plugin-import": "2.26.0",
     "@typescript-eslint/eslint-plugin": "5.36.2",
     "@typescript-eslint/parser": "5.36.2"
-  }
+  },
+  "version": "0.0.2"
 }

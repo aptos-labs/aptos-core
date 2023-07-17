@@ -48,7 +48,6 @@ export default async function aptosClient<Res>(requestOptions: AptosClientReques
 
   try {
     const response = await got<Res>(request);
-    parseHeaders<Res>(response);
     return parseResponse<Res>(response);
   } catch (error) {
     const gotError = error as RequestError;
@@ -69,19 +68,6 @@ function parseResponse<Res>(response: Response<Res>): AptosClientResponse<Res> {
     response,
     headers: response.headers,
   };
-}
-
-function parseHeaders<Res>(response: Response<Res>) {
-  // capitalize authorization key to be compatible with axios response
-  if (response.request.options.headers.authorization) {
-    response.request.options.headers.Authorization = response.request.options.headers.authorization;
-    delete response.request.options.headers.authorization;
-  }
-  // capitalize content-type key to be compatible with axios response
-  if (response.request.options.headers["content-type"]) {
-    response.request.options.headers["Content-Type"] = response.request.options.headers["content-type"];
-    delete response.request.options.headers["content-type"];
-  }
 }
 
 /**
