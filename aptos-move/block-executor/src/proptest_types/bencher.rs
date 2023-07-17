@@ -10,7 +10,7 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::executable::ExecutableTestType;
+use aptos_types::{executable::ExecutableTestType, contract_event::ReadWriteEvent};
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
 use proptest::{
@@ -32,7 +32,7 @@ pub struct Bencher<K, V, E> {
 pub(crate) struct BencherState<
     K: Hash + Clone + Debug + Eq + PartialOrd + Ord,
     V: Clone + Eq + Arbitrary,
-    E: Send + Sync + Debug + Clone,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent,
 > where
     Vec<u8>: From<V>,
 {
@@ -44,7 +44,7 @@ impl<K, V, E> Bencher<K, V, E>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + Arbitrary + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Debug + Clone + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
     Vec<u8>: From<V>,
 {
     pub fn new(transaction_size: usize, universe_size: usize) -> Self {
@@ -76,7 +76,7 @@ impl<K, V, E> BencherState<K, V, E>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Debug + Clone + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
     Vec<u8>: From<V>,
 {
     /// Creates a new benchmark state with the given account universe strategy and number of

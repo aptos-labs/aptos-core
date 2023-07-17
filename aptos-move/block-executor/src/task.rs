@@ -8,7 +8,7 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     executable::ModulePath,
     fee_statement::FeeStatement,
-    write_set::{TransactionWrite, WriteOp},
+    write_set::{TransactionWrite, WriteOp}, contract_event::ReadWriteEvent,
 };
 use std::{fmt::Debug, hash::Hash};
 
@@ -30,7 +30,7 @@ pub enum ExecutionStatus<T, E> {
 pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
     type Value: Send + Sync + Clone + TransactionWrite;
-    type Event: Send + Sync + Debug + Clone;
+    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
 
 /// Inference result of a transaction.

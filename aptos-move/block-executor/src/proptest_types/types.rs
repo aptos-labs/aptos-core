@@ -18,7 +18,7 @@ use aptos_types::{
     executable::ModulePath,
     fee_statement::FeeStatement,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
-    write_set::{TransactionWrite, WriteOp},
+    write_set::{TransactionWrite, WriteOp}, contract_event::ReadWriteEvent,
 };
 use claims::{assert_none, assert_ok};
 use once_cell::sync::OnceCell;
@@ -33,7 +33,7 @@ use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
-    },
+    }
 };
 
 // Should not be possible to overflow or underflow, as each delta is at
@@ -164,7 +164,9 @@ impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Transactio
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
-pub struct EventType<E: Send + Sync + Debug + Clone>(pub E, pub bool);
+pub struct EventType<E: Send + Sync + Debug + Clone + ReadWriteEvent>(pub E, pub bool);
+
+
 
 #[derive(Clone, Copy)]
 pub struct TransactionGenParams {
@@ -298,7 +300,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         ret
     }
 
-    pub fn materialize<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug + Clone>(
+    pub fn materialize<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug + Clone + ReadWriteEvent>(
         self,
         universe: &[K],
         // Are writes and reads module access (same access path).
@@ -327,7 +329,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub fn materialize_with_deltas<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone,
+        E: Send + Sync + Debug + Clone + ReadWriteEvent,
     >(
         self,
         universe: &[K],
@@ -369,7 +371,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub fn materialize_disjoint_module_rw<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone,
+        E: Send + Sync + Debug + Clone + ReadWriteEvent,
     >(
         self,
         universe: &[K],
@@ -407,7 +409,7 @@ impl<K, V, E> TransactionType for Transaction<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + Clone + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
 {
     type Event = E;
     type Key = K;
@@ -431,7 +433,7 @@ impl<K, V, E> ExecutorTask for Task<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + Clone + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
 {
     type Argument = ();
     type Error = usize;
@@ -515,7 +517,7 @@ impl<K, V, E> TransactionOutput for Output<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + Clone + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
 {
     type Txn = Transaction<K, V, E>;
 

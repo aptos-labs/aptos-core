@@ -11,7 +11,7 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_types::{contract_event::ContractEvent, executable::ExecutableTestType};
+use aptos_types::{contract_event::{ContractEvent, ReadWriteEvent}, executable::ExecutableTestType};
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -35,7 +35,7 @@ fn run_transactions<K, V, E>(
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Debug + Clone + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
     Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
