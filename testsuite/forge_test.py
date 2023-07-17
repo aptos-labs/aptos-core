@@ -162,6 +162,7 @@ def fake_context(
             name="tomato", kubeconf="kubeconf", is_multiregion=multiregion
         ),
         forge_test_suite="banana",
+        forge_username="banana-eater",
         forge_blocking=True,
         github_actions="false",
         github_job_url="https://banana",

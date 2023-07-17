@@ -703,6 +703,7 @@ impl<'env> SpecTranslator<'env> {
             | ExpData::Sequence(..)
             | ExpData::Loop(..)
             | ExpData::Assign(..)
+            | ExpData::Mutate(..)
             | ExpData::LoopCont(..) => panic!("imperative expressions not supported"),
         }
     }
@@ -916,6 +917,7 @@ impl<'env> SpecTranslator<'env> {
             | Operation::MoveFrom
             | Operation::Freeze
             | Operation::Abort
+            | Operation::Vector
             | Operation::Old => {
                 panic!("operation unexpected: {:?}", oper)
             },

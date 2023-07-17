@@ -1,0 +1,25 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        f: u64,
+        x: M::X,
+    }
+    struct X {
+        dummy_field: bool,
+    }
+    private fun t0(x: &u64,x_mut: &mut u64,s: &M::S,s_mut: &mut M::S) {
+        Deref(x);
+        Deref(x_mut);
+        Deref(s);
+        Deref(Borrow(Immutable)(select M::S.f(s)));
+        select M::S.f(s);
+        Deref(Borrow(Immutable)(select M::S.x(s)));
+        Deref(s_mut);
+        Deref(Borrow(Immutable)(select M::S.f(s_mut)));
+        Deref(Borrow(Mutable)(select M::S.f(s_mut)));
+        select M::S.f(s_mut);
+        Deref(Borrow(Immutable)(select M::S.x(s_mut)));
+        Deref(Borrow(Mutable)(select M::S.x(s_mut)));
+        Tuple()
+    }
+} // end 0x8675309::M

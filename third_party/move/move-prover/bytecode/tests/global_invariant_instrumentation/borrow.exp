@@ -38,7 +38,7 @@ public fun Test::borrow($t0|a: address) {
      var $t6: u64
      var $t7: &mut u64
      # global invariant at tests/global_invariant_instrumentation/borrow.move:7:9+57
-  0: assume forall a: TypeDomain<address>(): Gt(select Test::R.x(global<Test::R>(a)), 0)
+  0: assume forall a: address: TypeDomain<address>(): Gt(select Test::R.x(global<Test::R>(a)), 0)
   1: $t2 := borrow_global<Test::R>($t0) on_abort goto 12 with $t3
   2: $t4 := get_field<Test::R>.x($t2)
   3: $t5 := 1
@@ -49,7 +49,7 @@ public fun Test::borrow($t0|a: address) {
   8: write_back[Test::R@]($t2)
      # global invariant at tests/global_invariant_instrumentation/borrow.move:7:9+57
      # VC: global memory invariant does not hold at tests/global_invariant_instrumentation/borrow.move:7:9+57
-  9: assert forall a: TypeDomain<address>(): Gt(select Test::R.x(global<Test::R>(a)), 0)
+  9: assert forall a: address: TypeDomain<address>(): Gt(select Test::R.x(global<Test::R>(a)), 0)
  10: label L1
  11: return ()
  12: label L2

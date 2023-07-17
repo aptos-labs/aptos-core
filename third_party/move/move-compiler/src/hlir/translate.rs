@@ -478,12 +478,9 @@ fn base_type(context: &Context, sp!(loc, nb_): N::Type) -> H::BaseType {
         NT::UnresolvedError => HB::UnresolvedError,
         NT::Anything => HB::Unreachable,
         NT::Ref(_, _) | NT::Unit => {
-            panic!(
-                "ICE type constraints failed {}:{}-{}",
-                loc.file_hash(),
-                loc.start(),
-                loc.end(),
-            )
+            // This can happen in bad source code; upstream constraint
+            // will fail and generate an appropriate error message.
+            HB::UnresolvedError
         },
     };
     sp(loc, b_)

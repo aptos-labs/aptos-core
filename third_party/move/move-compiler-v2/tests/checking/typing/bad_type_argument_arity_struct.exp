@@ -71,9 +71,3 @@ error: type argument count mismatch (expected 1 but got 2)
   │
 9 │         s3: S<bool, u64>,
   │             ^
-
-error: unable to infer type: `?3`
-   ┌─ tests/checking/typing/bad_type_argument_arity_struct.move:32:19
-   │
-32 │         let s = s(0);
-   │                   ^

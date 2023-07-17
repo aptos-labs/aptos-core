@@ -900,7 +900,7 @@ module aptos_framework::stake {
             coin::merge(&mut stake_pool.inactive, pending_inactive_stake);
         };
 
-        // Cap withdraw amount by total ianctive coins.
+        // Cap withdraw amount by total inactive coins.
         withdraw_amount = min(withdraw_amount, coin::value(&stake_pool.inactive));
         if (withdraw_amount == 0) return coin::zero<AptosCoin>();
 

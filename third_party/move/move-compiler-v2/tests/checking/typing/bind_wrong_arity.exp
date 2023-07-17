@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected `u64` but found `()` in lvalue
+error: expected `u64` but found `()`
   ┌─ tests/checking/typing/bind_wrong_arity.move:6:13
   │
 6 │         let (): u64 = 0;

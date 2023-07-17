@@ -13,7 +13,7 @@ use aptos_types::proof::{
 use bitvec::prelude::*;
 use std::collections::{BTreeMap, HashMap};
 
-type Cache = HashMap<BitVec<Msb0, u8>, NodeInProof>;
+type Cache = HashMap<BitVec<u8, Msb0>, NodeInProof>;
 
 struct NaiveSubTree<'a> {
     leaves: &'a [(HashValue, HashValue)],

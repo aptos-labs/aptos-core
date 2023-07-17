@@ -4,6 +4,9 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.13.2 (2023-07-12)
+- Add support for `Option<T>` and `vector<Object<T>>` in the SDK
+
 ## 1.13.1 (2023-07-06)
 
 - Fixed serialization of arguments like `u16`, `u32` and `u256`
