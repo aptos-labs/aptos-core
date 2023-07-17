@@ -387,7 +387,7 @@ async fn test_mintnft(
 async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<HexEncodedBytes> {
     // get file to compile
     let move_dir =
-        PathBuf::from("/Users/ngk/Documents/aptos-core/aptos-move/move-examples/hello_blockchain");
+        PathBuf::from("./aptos-move/move-examples/hello_blockchain");
 
     // insert address
     let mut named_addresses: BTreeMap<String, AccountAddress> = BTreeMap::new();
