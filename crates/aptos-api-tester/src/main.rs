@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::path::PathBuf;
+use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
@@ -38,8 +39,15 @@ static TESTNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
 
 #[derive(Debug)]
+struct TestLog {
+    result: TestResult,
+    time: f64,
+}
+
+#[derive(Debug)]
 enum TestResult {
     Success,
+    Fail(TestFailure),
 }
 
 #[derive(Debug)]
@@ -60,15 +68,38 @@ impl From<anyhow::Error> for TestFailure {
     }
 }
 
-async fn handle_result<Fut: Future<Output = Result<TestResult, TestFailure>>>(
-    fut: Fut,
-) -> Result<TestResult, TestFailure> {
+// Processes a test result.
+async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(fut: Fut) -> Result<TestLog> {
+    // start timer
+    let start = Instant::now();
+
+    // call the flow
     let result = fut.await;
-    match &result {
-        Ok(success) => println!("{:?}", success),
-        Err(failure) => println!("{:?}", failure),
-    }
-    result
+
+    // end timer
+    let time = (Instant::now() - start).as_secs_f64();
+
+    // process the result
+    let output = match result {
+        Ok(_) => {
+            let output = TestLog {
+                result: TestResult::Success,
+                time,
+            };
+            println!("{:?}", output);
+            output
+        },
+        Err(failure) => {
+            let output = TestLog {
+                result: TestResult::Fail(failure),
+                time,
+            };
+            println!("{:?}", output);
+            output
+        },
+    };
+
+    Ok(output)
 }
 
 /// Tests new account creation. Checks that:
@@ -78,7 +109,7 @@ async fn test_newaccount(
     client: &Client,
     account: &LocalAccount,
     amount_funded: u64,
-) -> Result<TestResult, TestFailure> {
+) -> Result<(), TestFailure> {
     // ask for account data
     let response = client.get_account(account.address()).await?;
 
@@ -106,7 +137,7 @@ async fn test_newaccount(
         return Err(TestFailure::Fail("wrong balance"));
     }
 
-    Ok(TestResult::Success)
+    Ok(())
 }
 
 /// Tests coin transfer. Checks that:
@@ -118,7 +149,7 @@ async fn test_cointransfer(
     account: &mut LocalAccount,
     receiver: AccountAddress,
     amount: u64,
-) -> Result<TestResult, TestFailure> {
+) -> Result<(), TestFailure> {
     // get starting balance
     let starting_receiver_balance = u64::from(
         client
@@ -172,7 +203,7 @@ async fn test_cointransfer(
         ));
     }
 
-    Ok(TestResult::Success)
+    Ok(())
 }
 
 /// Tests nft transfer. Checks that:
@@ -184,7 +215,7 @@ async fn test_mintnft(
     token_client: &TokenClient<'_>,
     account: &mut LocalAccount,
     receiver: &mut LocalAccount,
-) -> Result<TestResult, TestFailure> {
+) -> Result<(), TestFailure> {
     // create collection
     let collection_name = "test collection".to_string();
     let collection_description = "collection description".to_string();
@@ -353,7 +384,7 @@ async fn test_mintnft(
         return Err(TestFailure::Fail("wrong token balance"));
     }
 
-    Ok(TestResult::Success)
+    Ok(())
 }
 
 /// Helper function that publishes module and returns the bytecode.
@@ -436,10 +467,7 @@ async fn get_message(client: &Client, address: AccountAddress) -> Option<String>
 ///   - module data exists
 ///   - can interact with module
 ///   - resources reflect interaction
-async fn test_module(
-    client: &Client,
-    account: &mut LocalAccount,
-) -> Result<TestResult, TestFailure> {
+async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), TestFailure> {
     // publish module
     let blob = publish_module(client, account).await?;
 
@@ -463,7 +491,11 @@ async fn test_module(
     let expected_message = message.to_string();
     let actual_message = match get_message(client, account.address()).await {
         Some(message) => message,
-        None => return Err(TestFailure::Error(anyhow!("module interaction isn't reflected")))
+        None => {
+            return Err(TestFailure::Error(anyhow!(
+                "module interaction isn't reflected"
+            )))
+        },
     };
 
     if expected_message != actual_message {
@@ -472,7 +504,7 @@ async fn test_module(
         ));
     }
 
-    Ok(TestResult::Success)
+    Ok(())
 }
 
 async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
