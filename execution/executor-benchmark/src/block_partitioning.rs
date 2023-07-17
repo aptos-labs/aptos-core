@@ -38,11 +38,12 @@ impl BlockPartitioningStage {
         );
         let block_id = HashValue::random();
         let block: ExecutableBlock<Transaction> = {
-            let _timer = APTOS_BLOCK_PARTITIONER_SECONDS.start_timer();
+            let timer = APTOS_BLOCK_PARTITIONER_SECONDS.start_timer();
             let last_txn = txns.pop().unwrap();
             assert!(matches!(last_txn.transaction(), &Transaction::StateCheckpoint(_)));
             let mut sub_blocks = self.partitioner.partition(txns, self.num_executor_shards);
-            // report_sub_block_matrix(&sub_blocks);
+            timer.stop_and_record();
+            report_sub_block_matrix(&sub_blocks);
             sub_blocks
                 .last_mut()
                 .unwrap()

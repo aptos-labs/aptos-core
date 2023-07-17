@@ -93,7 +93,6 @@ pub fn analyze_block(txns: Vec<Transaction>) -> Vec<AnalyzedTransaction> {
 
 
 pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
-    let timer = Instant::now();
     let mut total_comm_cost = 0;
     let num_rounds = matrix.first().unwrap().sub_blocks.len();
     for round_id in 0..num_rounds {
@@ -107,9 +106,9 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
                         // let key_str = key.hash().to_hex();
+                        // println!("MATRIX_REPORT - round={}, shard={}, tid={}, wait for key={} from round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
                         let value = cur_sub_block_inbound_costs_by_key_src_pair.entry((src_tid.round_id, src_tid.shard_id, key)).or_insert_with(||0);
                         *value += 1;
-                        // println!("PAREND - round={}, shard={}, tid={}, wait for key={} from round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
 
                     }
                 }
@@ -117,9 +116,9 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
                         // let key_str = key.hash().to_hex();
+                        // println!("MATRIX_REPORT - round={}, shard={}, tid={}, unblock key={} for round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
                         let value = cur_sub_block_connectivity_by_key_dst_pair.entry((dst_tid.round_id, dst_tid.shard_id, key)).or_insert_with(||0);
                         *value += 1;
-                        // println!("PAREND - round={}, shard={}, tid={}, unblock key={} for round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
                     }
                 }
             }
@@ -136,5 +135,4 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
         }
     }
     println!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
-    println!("report_time={:?}", timer.elapsed());
 }

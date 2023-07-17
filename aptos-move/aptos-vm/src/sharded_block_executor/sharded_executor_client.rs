@@ -180,15 +180,10 @@ impl ShardedExecutorClient {
         let cross_shard_state_view_clone1 = cross_shard_state_view.clone();
         self.executor_thread_pool.scope(|s| {
             s.spawn(move |_| {
-                if round != 0 {
-                    // If this is not the first round, start the cross-shard commit receiver.
-                    // this is a bit ugly, we can get rid of this when we have round number
-                    // information in the cross shard dependencies.
-                    CrossShardCommitReceiver::start(
-                        cross_shard_state_view_clone1,
-                        &message_rxs[round].lock().unwrap(),
-                    );
-                }
+                CrossShardCommitReceiver::start(
+                    cross_shard_state_view_clone1,
+                    &message_rxs[round].lock().unwrap(),
+                );
             });
             s.spawn(move |_| {
                 disable_speculative_logging();
@@ -201,13 +196,11 @@ impl ShardedExecutorClient {
                     Some(cross_shard_commit_sender),
                 );
                 // Send a stop command to the cross-shard commit receiver.
-                if round != 0 {
-                    self_message_tx
-                        .lock()
-                        .unwrap()
-                        .send(CrossShardMsg::StopMsg)
-                        .unwrap();
-                }
+                self_message_tx
+                    .lock()
+                    .unwrap()
+                    .send(CrossShardMsg::StopMsg)
+                    .unwrap();
                 callback.send(ret).unwrap();
             });
         });
