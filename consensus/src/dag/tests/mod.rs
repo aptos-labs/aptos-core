@@ -6,3 +6,4 @@ mod fetcher_test;
 mod helpers;
 mod reliable_broadcast_tests;
 mod types_test;
+mod dag_network_test;

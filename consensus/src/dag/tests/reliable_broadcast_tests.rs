@@ -3,7 +3,7 @@
 
 use crate::{
     dag::{
-        dag_network::DAGNetworkSender,
+        dag_network::{DAGNetworkSender, RpcWithFallback},
         dag_store::Dag,
         reliable_broadcast::{
             BroadcastStatus, CertifiedNodeHandleError, CertifiedNodeHandler,
@@ -105,7 +105,7 @@ impl DAGNetworkSender for TestDAGSender {
         _responders: Vec<Author>,
         _message: ConsensusMsg,
         _timeout: Duration,
-    ) -> anyhow::Result<ConsensusMsg> {
+    ) -> RpcWithFallback {
         unimplemented!();
     }
 }
