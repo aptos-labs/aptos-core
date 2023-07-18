@@ -1997,6 +1997,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-storage-interface",
  "aptos-types",
+ "arr_macro",
  "bcs 0.1.4",
  "byteorder",
  "itertools",
