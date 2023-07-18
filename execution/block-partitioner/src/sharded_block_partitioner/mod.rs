@@ -30,7 +30,7 @@ use std::env::VarError;
 use std::time::Instant;
 use aptos_types::block_executor::partitioner::{CrossShardDependencies, ShardedTxnIndex, SubBlock, TransactionWithDependencies};
 use aptos_types::state_store::state_key::StateKey;
-use crate::sharded_block_partitioner::counters::SHARDED_PARTITIONER_MISC_SECONDS;
+use crate::sharded_block_partitioner::counters::{ADD_EDGES_MISC_SECONDS, FLATTEN_TO_ROUNDS_MISC_SECONDS, SHARDED_PARTITIONER_MISC_SECONDS};
 use crate::simple_partitioner::SimplePartitioner;
 
 mod conflict_detector;
@@ -282,9 +282,15 @@ impl ShardedBlockPartitioner {
         }
 
         // First round, we filter all transactions with cross-shard dependencies
+        let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["partition_by_senders"]).start_timer();
         let mut txns_to_partition = self.partition_by_senders(transactions);
+        let duration = timer.stop_and_record();
+        let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["flatten_to_rounds"]).start_timer();
         let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_to_partition);
+        let duration = timer.stop_and_record();
+        let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
         let augmented_matrix = self.add_edges(matrix);
+        let duration = timer.stop_and_record();
         augmented_matrix
     }
 
@@ -293,7 +299,7 @@ impl ShardedBlockPartitioner {
         let mut txn_matrix: Vec<Vec<Vec<AnalyzedTransaction>>> = Vec::new();
         let mut current_round = 0;
         for round_id in 0..max_partitioning_rounds - 1 {
-            let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
+            let timer = FLATTEN_TO_ROUNDS_MISC_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
             let (
                 accepted_txns,
                 discarded_txns,
@@ -312,6 +318,7 @@ impl ShardedBlockPartitioner {
             }
         }
 
+        let _timer = FLATTEN_TO_ROUNDS_MISC_SECONDS.with_label_values(&[format!("last_round").as_str()]).start_timer();
         match std::env::var("SHARDED_PARTITIONER__MERGE_LAST_ROUND") {
             Ok(v) if v.as_str() == "1" => {
                 info!("Let the the last shard handle the leftover.");
@@ -326,7 +333,7 @@ impl ShardedBlockPartitioner {
     }
 
     fn add_edges(&self, matrix: Vec<Vec<Vec<AnalyzedTransaction>>>) -> Vec<SubBlocksForShard<Transaction>> {
-        let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
+        let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["main"]).start_timer();
         let mut ret: Vec<SubBlocksForShard<Transaction>> = (0..self.num_shards).map(|shard_id| SubBlocksForShard { shard_id, sub_blocks: vec![] }).collect();
         let mut global_txn_counter: usize = 0;
         let mut global_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
@@ -382,6 +389,10 @@ impl ShardedBlockPartitioner {
                 }
             }
         }
+        let duration = timer.stop_and_record();
+        let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["drop"]).start_timer();
+        drop(global_owners_of_key);
+        let duration = timer.stop_and_record();
         ret
     }
 }
@@ -392,7 +403,7 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         transactions: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
-        let _timer = BLOCK_PARTITIONING_SECONDS.start_timer();
+        let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["env_stuff"]).start_timer();
         assert_eq!(self.num_shards, num_executor_shards);
         let max_partitioning_rounds = std::env::var("SHARDED_PARTITIONER__MAX_ROUNDS").ok()
             .map_or(None, |v|v.parse::<usize>().ok())
@@ -400,12 +411,20 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         let cross_shard_dep_avoid_threshold = std::env::var("SHARDED_PARTITIONER__CROSS_SHARD_DEP_AVOID_THRESHOLD").ok()
             .map_or(None, |v|v.parse::<usize>().ok())
             .unwrap_or(95) as f32 / 100.0;
+        timer.stop_and_record();
         let ret = match std::env::var("SHARDED_PARTITIONER__INIT_WITH_SIMPLE_PARTITIONER") {
             Ok(v) if v.as_str() == "1" => {
+                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["init_with_simple"]).start_timer();
                 let simple_partitioner = SimplePartitioner{};
                 let txns_by_shard_id = simple_partitioner.partition(transactions, self.num_shards);
+                timer.stop_and_record();
+                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["flatten_to_rounds"]).start_timer();
                 let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard_id);
-                self.add_edges(matrix)
+                timer.stop_and_record();
+                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
+                let ret = self.add_edges(matrix);
+                timer.stop_and_record();
+                ret
             }
             _ => {
                 let ret = self.partition(transactions, max_partitioning_rounds, cross_shard_dep_avoid_threshold);

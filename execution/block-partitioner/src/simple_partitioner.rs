@@ -142,6 +142,14 @@ impl SimplePartitioner {
 
         let duration = timer.stop_and_record();
         // println!("build_return_object={}", duration);
+        let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["drop"]).start_timer();
+        drop(capped_sender_groups);
+        drop(loads_by_sub_group);
+        drop(group_ids_by_sender_id);
+        drop(key_ids_by_sender_id);
+        drop(key_ids_by_key);
+        drop(sender_ids_by_sender);
+        let duration = timer.stop_and_record();
         txns_by_shard_id
     }
 }

@@ -33,3 +33,21 @@ pub static SHARDED_PARTITIONER_MISC_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     ).unwrap()
 });
+
+pub static ADD_EDGES_MISC_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "add_edges_misc_seconds",
+        "foo",
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    ).unwrap()
+});
+
+pub static FLATTEN_TO_ROUNDS_MISC_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "flatten_to_rounds_misc_seconds",
+        "foo",
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    ).unwrap()
+});
