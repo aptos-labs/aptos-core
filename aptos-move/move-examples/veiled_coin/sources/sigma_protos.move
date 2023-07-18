@@ -457,7 +457,7 @@ module veiled_coin::sigma_protos {
     // Private functions for Fiat-Shamir challenge derivation
     //
 
-    /// Computes a Fiat-Shamir challenge `rho = H(G, H, Y, C_1, C_2, c, C, x_1, x_2, x_3)` for the `WithdrawalSubproof`
+    /// Computes a Fiat-Shamir challenge `rho = H(G, H, Y, C_1, C_2, c, x_1, x_2, x_3)` for the `WithdrawalSubproof`
     /// $\Sigma$-protocol.
     fun fiat_shamir_withdrawal_subproof_challenge(
         sender_pk: &elgamal::CompressedPubkey,
