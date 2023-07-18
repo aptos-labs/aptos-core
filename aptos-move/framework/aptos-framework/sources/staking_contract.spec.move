@@ -1,4 +1,5 @@
 spec aptos_framework::staking_contract {
+    /// We cannot complete high level properties 6 to 8, because we cannot verify new cycles.
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
