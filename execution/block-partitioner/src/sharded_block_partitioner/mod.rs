@@ -323,7 +323,8 @@ impl ShardedBlockPartitioner {
             Ok(v) if v.as_str() == "1" => {
                 info!("Let the the last shard handle the leftover.");
                 let last_round_txns: Vec<AnalyzedTransaction> = txns_by_shard.into_iter().flatten().collect();
-                txns_by_shard = vec![vec![vec![]; self.num_shards - 1], vec![last_round_txns]].concat();
+                txns_by_shard = vec![vec![]; self.num_shards];
+                *txns_by_shard.get_mut(self.num_shards - 1).unwrap() = last_round_txns;
             }
             _ => {}
         }
