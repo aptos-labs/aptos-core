@@ -231,7 +231,6 @@ impl MultiRegionNetworkEmulationTest {
     fn create_netem_chaos(&self, swarm: &mut dyn Swarm) -> SwarmNetEm {
         let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
         let all_vfns = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
-        assert!(all_validators.len() >= all_vfns.len());
 
         let all_pairs: Vec<_> = all_validators
             .iter()
@@ -239,7 +238,9 @@ impl MultiRegionNetworkEmulationTest {
             .map(|either_or_both| match either_or_both {
                 EitherOrBoth::Both(validator, vfn) => vec![*validator, vfn],
                 EitherOrBoth::Left(validator) => vec![*validator],
-                EitherOrBoth::Right(_) => panic!("Unexpected"),
+                EitherOrBoth::Right(_) => {
+                    panic!("Number of validators must be >= number of VFNs")
+                },
             })
             .collect();
 
@@ -308,6 +309,7 @@ impl NetworkTest for MultiRegionNetworkEmulationTest {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_types::account_address::AccountAddress;
     use std::vec;
 
     #[test]
@@ -350,5 +352,50 @@ mod tests {
             loss_percentage: 1,
             loss_correlation_percentage: 50
         })
+    }
+
+    #[test]
+    fn test_chunk_peers() {
+        let peers: Vec<_> = (0..3).map(|_| vec![AccountAddress::random()]).collect();
+        let chunks = chunk_peers(peers, 4);
+        assert_eq!(chunks[0].len(), 1);
+        assert_eq!(chunks[1].len(), 1);
+        assert_eq!(chunks[2].len(), 1);
+        assert_eq!(chunks[3].len(), 0);
+
+        let peers: Vec<_> = (0..4).map(|_| vec![AccountAddress::random()]).collect();
+        let chunks = chunk_peers(peers, 4);
+        assert_eq!(chunks[0].len(), 1);
+        assert_eq!(chunks[1].len(), 1);
+        assert_eq!(chunks[2].len(), 1);
+        assert_eq!(chunks[3].len(), 1);
+
+        let peers: Vec<_> = (0..5).map(|_| vec![AccountAddress::random()]).collect();
+        let chunks = chunk_peers(peers, 4);
+        assert_eq!(chunks[0].len(), 2);
+        assert_eq!(chunks[1].len(), 1);
+        assert_eq!(chunks[2].len(), 1);
+        assert_eq!(chunks[3].len(), 1);
+
+        let peers: Vec<_> = (0..6).map(|_| vec![AccountAddress::random()]).collect();
+        let chunks = chunk_peers(peers, 4);
+        assert_eq!(chunks[0].len(), 2);
+        assert_eq!(chunks[1].len(), 2);
+        assert_eq!(chunks[2].len(), 1);
+        assert_eq!(chunks[3].len(), 1);
+
+        let peers: Vec<_> = (0..7).map(|_| vec![AccountAddress::random()]).collect();
+        let chunks = chunk_peers(peers, 4);
+        assert_eq!(chunks[0].len(), 2);
+        assert_eq!(chunks[1].len(), 2);
+        assert_eq!(chunks[2].len(), 2);
+        assert_eq!(chunks[3].len(), 1);
+
+        let peers: Vec<_> = (0..8).map(|_| vec![AccountAddress::random()]).collect();
+        let chunks = chunk_peers(peers, 4);
+        assert_eq!(chunks[0].len(), 2);
+        assert_eq!(chunks[1].len(), 2);
+        assert_eq!(chunks[2].len(), 2);
+        assert_eq!(chunks[3].len(), 2);
     }
 }
