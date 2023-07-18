@@ -661,6 +661,60 @@ impl FakeExecutor {
         self.block_time / 1_000_000
     }
 
+    //// exec_module is like exec(), however, we can run a Module published under
+    //// the creator address instead of 0x1, as what is currently done in exec.
+    pub fn exec_module(
+        &mut self,
+        module: &ModuleId,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) {
+        let write_set = {
+            // FIXME: should probably read the timestamp from storage.
+            let timed_features =
+                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+            // TODO(Gas): we probably want to switch to non-zero costs in the future
+            let vm = MoveVmExt::new(
+                NativeGasParameters::zeros(),
+                AbstractValueSizeGasParameters::zeros(),
+                LATEST_GAS_FEATURE_VERSION,
+                self.chain_id,
+                self.features.clone(),
+                timed_features,
+            )
+            .unwrap();
+            let remote_view = StorageAdapter::new(&self.data_store);
+            let mut session =
+                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+            session
+                .execute_function_bypass_visibility(
+                    module,
+                    &Self::name(function_name),
+                    type_params,
+                    args,
+                    &mut UnmeteredGasMeter,
+                )
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Error calling {}.{}: {}",
+                        module.to_string().as_str(),
+                        function_name,
+                        e.into_vm_status()
+                    )
+                });
+            let change_set = session
+                .finish(
+                    &mut (),
+                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
+                )
+                .expect("Failed to generate txn effects");
+            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            write_set
+        };
+        self.data_store.add_write_set(&write_set);
+    }
+
     pub fn exec(
         &mut self,
         module_name: &str,

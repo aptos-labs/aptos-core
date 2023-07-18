@@ -1,0 +1,15 @@
+// ---- Model Dump
+module 0x42::M {
+    struct Cup {
+        f1: #0,
+    }
+    struct R {
+        dummy_field: bool,
+    }
+    struct S {
+        dummy_field: bool,
+    }
+    public fun eat(r: M::R) {
+        M::R{ dummy_field: _ } = r
+    }
+} // end 0x42::M

@@ -1,13 +1,38 @@
-
-Diagnostics:
-error: mutability mismatch (& != &mut) in name expression
-  ┌─ tests/checking/typing/borrow_field_complex_root_expr.move:6:33
-  │
-6 │         (&(if (cond) s_mut else s).f: &u64);  // TODO: relax mutability mismatch?
-  │                                 ^
-
-error: mutability mismatch (&mut != &) in name expression
-  ┌─ tests/checking/typing/borrow_field_complex_root_expr.move:7:29
-  │
-7 │         (&(if (cond) s else s_mut).f: &u64);  // TODO: relax mutability mismatch?
-  │                             ^^^^^
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        f: u64,
+    }
+    private fun t0(cond: bool,s: &M::S,s_mut: &mut M::S) {
+        Borrow(Immutable)(select M::S.f(if cond {
+          s
+        } else {
+          s
+        }));
+        Borrow(Immutable)(select M::S.f(if cond {
+          s_mut
+        } else {
+          s
+        }));
+        Borrow(Immutable)(select M::S.f(if cond {
+          s
+        } else {
+          s_mut
+        }));
+        Borrow(Immutable)(select M::S.f(if cond {
+          s_mut
+        } else {
+          s_mut
+        }));
+        Borrow(Mutable)(select M::S.f(if cond {
+          s_mut
+        } else {
+          s_mut
+        }));
+        Borrow(Immutable)(select M::S.f({
+          let s: M::S = pack M::S(0);
+          Borrow(Immutable)(s)
+        }));
+        Tuple()
+    }
+} // end 0x8675309::M

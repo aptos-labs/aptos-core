@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: expected `bool` but found `integer`
+   ┌─ tests/checking/typing/type_variable_join_threaded_unpack_assign_invalid.move:35:42
+   │
+35 │         Container::put(&mut v, Box { f1: 0, f2: 0});
+   │                                          ^

@@ -233,7 +233,7 @@ impl AptosVMImpl {
                     // maximum. The (unknown) user input should be restricted to the original
                     // maximum transaction size.
                     && (txn_data.script_size + txn_gas_params.max_transaction_size_in_bytes
-                        > txn_data.transaction_size)
+                        >= txn_data.transaction_size)
                     // Since an approved transaction can be sent by anyone, the system is safer by
                     // enforcing an upper limit on governance transactions just so something really
                     // bad doesn't happen.

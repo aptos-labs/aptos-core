@@ -253,11 +253,25 @@ pub fn create_swarm_cpu_stress(
     let group_cpu_stresses = peer_chunks
         .into_iter()
         .enumerate()
-        .map(|(idx, chunk)| GroupCpuStress {
-            name: format!("group-{}-cpu-stress", idx),
-            target_nodes: chunk,
-            num_workers: (cpu_chaos_config.num_groups - idx) as u64,
-            load_per_worker: cpu_chaos_config.load_per_worker,
+        .map(|(idx, chunk)| {
+            // Lower bound the number of workers
+            let num_workers = if cpu_chaos_config.num_groups > idx {
+                (cpu_chaos_config.num_groups - idx) as u64
+            } else {
+                1
+            };
+
+            // Create the cpu stress for the group
+            info!(
+                "Creating CPU stress for group {} with {} workers",
+                idx, num_workers
+            );
+            GroupCpuStress {
+                name: format!("group-{}-cpu-stress", idx),
+                target_nodes: chunk,
+                num_workers,
+                load_per_worker: cpu_chaos_config.load_per_worker,
+            }
         })
         .collect();
 

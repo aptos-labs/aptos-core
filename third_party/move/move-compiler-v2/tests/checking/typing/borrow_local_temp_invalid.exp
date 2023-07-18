@@ -1,11 +1,5 @@
 
 Diagnostics:
-error: unable to infer type: `?4`
-  ┌─ tests/checking/typing/borrow_local_temp_invalid.move:4:11
-  │
-4 │         &(0, 1);
-  │           ^
-
 error: cannot borrow from a reference
   ┌─ tests/checking/typing/borrow_local_temp_invalid.move:9:9
   │
