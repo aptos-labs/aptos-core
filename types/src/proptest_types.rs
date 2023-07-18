@@ -299,7 +299,7 @@ impl RawTransactionGen {
         sender_index: Index,
         universe: &mut AccountInfoUniverse,
     ) -> RawTransaction {
-        let mut sender_info = universe.get_account_info_mut(sender_index);
+        let sender_info = universe.get_account_info_mut(sender_index);
 
         let sequence_number = sender_info.sequence_number;
         sender_info.sequence_number += 1;
