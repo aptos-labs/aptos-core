@@ -108,7 +108,10 @@ fn build_test_peer_manager(
         PeersAndMetadata::new(&[network_id]),
         peer_manager_request_rx,
         connection_reqs_rx,
-        [(ProtocolId::mock(), hello_tx)].iter().cloned().collect(),
+        [(ProtocolId::DiscoveryDirectSend, hello_tx)]
+            .iter()
+            .cloned()
+            .collect(),
         vec![conn_status_tx],
         constants::NETWORK_CHANNEL_SIZE,
         constants::MAX_CONCURRENT_NETWORK_REQS,
