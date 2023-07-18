@@ -110,7 +110,7 @@ export class AccountSequenceNumber {
       nextNumber = this.currentNumber!;
       this.currentNumber! += BigInt(1);
     } catch (e) {
-      console.error("error in updating this account sequence number with the one on chain", e);
+      console.error("error in getting next sequence number for this account", e);
     } finally {
       this.lock = false;
     }
@@ -150,6 +150,8 @@ export class AccountSequenceNumber {
       await sleep(this.sleepTime);
     }
 
+    this.lock = true;
+
     try {
       await this.update();
       const startTime = now();
@@ -164,7 +166,7 @@ export class AccountSequenceNumber {
         }
       }
     } catch (e) {
-      console.error("error in updating this account sequence number with the one on chain", e);
+      console.error("error in synchronizing this account sequence number with the one on chain", e);
     } finally {
       this.lock = false;
     }

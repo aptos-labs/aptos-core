@@ -1,7 +1,9 @@
+/* eslint-disable no-await-in-loop */
+
 /**
- * Provides a simple framework for receiving payloads to be processed.
+ * TransactionWorker provides a simple framework for receiving payloads to be processed.
  *
- * Once one `start()` the process, the worker acquires the current account next sequence number
+ * Once one `start()` the process, the worker acquires the current account's next sequence number
  * (by using the AccountSequenceNumber class), generates a signed transaction and pushes an async
  * submission process into a `outstandingTransactions` queue.
  * At the same time, the worker processes transactions by reading the `outstandingTransactions` queue
@@ -17,6 +19,9 @@ import { PendingTransaction, Transaction } from "../generated";
 import { AptosClient, Provider } from "../providers";
 import { TxnBuilderTypes } from "../transaction_builder";
 import { AccountSequenceNumber } from "./account_sequence_number";
+import { AsyncQueue, AsyncQueueCancelledError } from "./async_queue";
+
+const promiseFulfilledStatus = "fulfilled";
 
 // Events
 const transactionSent = "transactionSent";
@@ -32,18 +37,17 @@ export class TransactionWorker extends EventEmitter {
   // current account sequence number
   readonly accountSequnceNumber: AccountSequenceNumber;
 
+  readonly taskQueue: AsyncQueue<() => Promise<void>> = new AsyncQueue<() => Promise<void>>();
+
   // process has started
   started: boolean;
 
-  // process has stopped
-  stopped: boolean;
-
   // transactions payloads waiting to be generated and signed
   // TODO support entry function payload from ABI builder
-  transactionsQueue: Array<TxnBuilderTypes.TransactionPayload> = [];
+  transactionsQueue = new AsyncQueue<TxnBuilderTypes.TransactionPayload>();
 
   // signed transactions waiting to be submitted
-  outstandingTransactions: Array<[Promise<PendingTransaction>, bigint]> = [];
+  outstandingTransactions = new AsyncQueue<[Promise<PendingTransaction>, bigint]>();
 
   // transactions that have been submitted to chain
   sentTransactions: Array<[string, bigint, any]> = [];
@@ -71,7 +75,6 @@ export class TransactionWorker extends EventEmitter {
     this.provider = provider;
     this.account = account;
     this.started = false;
-    this.stopped = false;
     this.accountSequnceNumber = new AccountSequenceNumber(provider, account, maxWaitTime, maximumInFlight, sleepTime);
   }
 
@@ -82,13 +85,23 @@ export class TransactionWorker extends EventEmitter {
    * to be processed later.
    */
   async submitNextTransaction() {
-    if (this.transactionsQueue.length === 0) return;
-    const sequenceNumber = await this.accountSequnceNumber.nextSequenceNumber();
-    if (sequenceNumber === null) return;
-    const transaction = await this.generateNextTransaction(this.account, sequenceNumber);
-    if (!transaction) return;
-    const pendingTransaction = this.provider.submitSignedBCSTransaction(transaction);
-    this.outstandingTransactions.push([pendingTransaction, sequenceNumber]);
+    try {
+      /* eslint-disable no-constant-condition */
+      while (true) {
+        if (this.transactionsQueue.isEmpty()) return;
+        const sequenceNumber = await this.accountSequnceNumber.nextSequenceNumber();
+        if (sequenceNumber === null) return;
+        const transaction = await this.generateNextTransaction(this.account, sequenceNumber);
+        if (!transaction) return;
+        const pendingTransaction = this.provider.submitSignedBCSTransaction(transaction);
+        await this.outstandingTransactions.enqueue([pendingTransaction, sequenceNumber]);
+      }
+    } catch (error: any) {
+      if (error instanceof AsyncQueueCancelledError) {
+        return;
+      }
+      console.log(error);
+    }
   }
 
   /**
@@ -101,34 +114,46 @@ export class TransactionWorker extends EventEmitter {
    * transactions queue with the failure reason and fires a transactionsFailed event.
    */
   async processTransactions() {
-    const awaitingTransactions = [];
-    const awaitingSequenceNumbers = [];
+    try {
+      /* eslint-disable no-constant-condition */
+      while (true) {
+        const awaitingTransactions = [];
+        const sequenceNumbers = [];
+        let [pendingTransaction, sequenceNumber] = await this.outstandingTransactions.dequeue();
 
-    while (this.outstandingTransactions.length > 0) {
-      const [pendingTransaction, sequenceNumber] = this.outstandingTransactions.shift()!;
+        awaitingTransactions.push(pendingTransaction);
+        sequenceNumbers.push(sequenceNumber);
 
-      awaitingTransactions.push(pendingTransaction);
-      awaitingSequenceNumbers.push(sequenceNumber);
-    }
+        while (!this.outstandingTransactions.isEmpty()) {
+          [pendingTransaction, sequenceNumber] = await this.outstandingTransactions.dequeue();
 
-    // send awaiting transactions to chain
-    const sentTransactions = await Promise.allSettled(awaitingTransactions);
-
-    for (let i = 0; i < sentTransactions.length && i < awaitingSequenceNumbers.length; i += 1) {
-      // check sent transaction status
-      const sentTransaction = sentTransactions[i];
-      const sequenceNumber = awaitingSequenceNumbers[i];
-      if (sentTransaction.status === "fulfilled") {
-        // transaction sent to chain
-        this.sentTransactions.push([sentTransaction.value.hash, sequenceNumber, null]);
-        this.emit(transactionSent, [this.sentTransactions.length, sentTransaction.value.hash]);
-        // check sent transaction execution
-        this.checkTransaction(sentTransaction, sequenceNumber);
-      } else {
-        // send transaction failed
-        this.sentTransactions.push([sentTransaction.status, sequenceNumber, sentTransaction.reason]);
-        this.emit(sentFailed, [this.sentTransactions.length, sentTransaction.reason]);
+          awaitingTransactions.push(pendingTransaction);
+          sequenceNumbers.push(sequenceNumber);
+        }
+        // send awaiting transactions to chain
+        const sentTransactions = await Promise.allSettled(awaitingTransactions);
+        for (let i = 0; i < sentTransactions.length && i < sequenceNumbers.length; i += 1) {
+          // check sent transaction status
+          const sentTransaction = sentTransactions[i];
+          sequenceNumber = sequenceNumbers[i];
+          if (sentTransaction.status === promiseFulfilledStatus) {
+            // transaction sent to chain
+            this.sentTransactions.push([sentTransaction.value.hash, sequenceNumber, null]);
+            this.emit(transactionSent, [this.sentTransactions.length, sentTransaction.value.hash]);
+            // check sent transaction execution
+            await this.checkTransaction(sentTransaction, sequenceNumber);
+          } else {
+            // send transaction failed
+            this.sentTransactions.push([sentTransaction.status, sequenceNumber, sentTransaction.reason]);
+            this.emit(sentFailed, [this.sentTransactions.length, sentTransaction.reason]);
+          }
+        }
       }
+    } catch (error: any) {
+      if (error instanceof AsyncQueueCancelledError) {
+        return;
+      }
+      console.log(error);
     }
   }
 
@@ -144,7 +169,7 @@ export class TransactionWorker extends EventEmitter {
 
     for (let i = 0; i < sentTransactions.length; i += 1) {
       const executedTransaction = sentTransactions[i];
-      if (executedTransaction.status === "fulfilled") {
+      if (executedTransaction.status === promiseFulfilledStatus) {
         // transaction executed to chain
         this.executedTransactions.push([executedTransaction.value.hash, sequenceNumber, null]);
         this.emit(transactionExecuted, [this.executedTransactions.length, executedTransaction.value.hash]);
@@ -161,7 +186,7 @@ export class TransactionWorker extends EventEmitter {
    * @param payload Transaction payload
    */
   async push(payload: TxnBuilderTypes.TransactionPayload): Promise<void> {
-    await this.transactionsQueue.push(payload);
+    await this.transactionsQueue.enqueue(payload);
   }
 
   /**
@@ -171,12 +196,12 @@ export class TransactionWorker extends EventEmitter {
    * @returns
    */
   async generateNextTransaction(account: AptosAccount, sequenceNumber: bigint): Promise<Uint8Array | undefined> {
-    if (this.transactionsQueue.length === 0) return undefined;
-    const payload = await this.transactionsQueue.shift()!;
+    if (this.transactionsQueue.isEmpty()) return undefined;
+    const payload = await this.transactionsQueue.dequeue();
     const rawTransaction = await this.provider.generateRawTransaction(account.address(), payload, {
       providedSequenceNumber: sequenceNumber,
     });
-    const signedTransaction = await AptosClient.generateBCSTransaction(account, rawTransaction);
+    const signedTransaction = AptosClient.generateBCSTransaction(account, rawTransaction);
     return signedTransaction;
   }
 
@@ -185,15 +210,9 @@ export class TransactionWorker extends EventEmitter {
    */
   async run() {
     try {
-      while (!this.stopped) {
-        /* eslint-disable no-await-in-loop, no-promise-executor-return */
-        await Promise.all([this.submitNextTransaction(), this.processTransactions()]);
-        /** 
-         * since run() function runs continuously in a loop, it prevents the execution 
-         * from reaching a callback function (e.g when client wants to gracefuly stop the worker). 
-         * Add a small delay between iterations to allow other code to run
-        /* eslint-disable no-await-in-loop */
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      while (!this.taskQueue.isCancelled()) {
+        const task = await this.taskQueue.dequeue();
+        await task();
       }
     } catch (error: any) {
       throw new Error(error);
@@ -208,7 +227,8 @@ export class TransactionWorker extends EventEmitter {
       throw new Error("worker has already started");
     }
     this.started = true;
-    this.stopped = false;
+    this.taskQueue.enqueue(() => this.submitNextTransaction());
+    this.taskQueue.enqueue(() => this.processTransactions());
     this.run();
   }
 
@@ -216,10 +236,10 @@ export class TransactionWorker extends EventEmitter {
    * Stops the the transaction management process.
    */
   stop() {
-    if (this.stopped) {
+    if (this.taskQueue.isCancelled()) {
       throw new Error("worker has already stopped");
     }
-    this.stopped = true;
     this.started = false;
+    this.taskQueue.cancel();
   }
 }

@@ -54,8 +54,8 @@ async function main() {
 
   await Promise.all(funds);
 
+  console.log(`${funds.length} sender accounts funded in ${Date.now() / 1000 - last} seconds`);
   last = Date.now() / 1000;
-  console.log(`${funds.length} sender accounts funded in ${last - start} seconds`);
 
   // read sender accounts
   const balances: Array<Promise<Types.AccountData>> = [];
@@ -64,8 +64,8 @@ async function main() {
   }
   await Promise.all(balances);
 
+  console.log(`${balances.length} sender account balances checked in ${Date.now() / 1000 - last} seconds`);
   last = Date.now() / 1000;
-  console.log(`${balances.length} sender account balances checked in ${last - start} seconds`);
 
   // create transactions
   const payloads: any[] = [];
@@ -85,13 +85,12 @@ async function main() {
     }
   }
 
-  console.log(`sends ${totalTransactions * senders.length} transactions to chain....`);
+  console.log(`sends ${totalTransactions} transactions to chain....`);
   // emit batch transactions
-  for (let i = 0; i < senders.length; i++) {
-    batchTransactions(payloads, senders[i]);
-  }
+  const promises = senders.map((sender) => batchTransactions(payloads, sender));
+  await Promise.all(promises);
 
-  function batchTransactions(payloads: TxnBuilderTypes.Transaction[], sender: AptosAccount) {
+  async function batchTransactions(payloads: TxnBuilderTypes.Transaction[], sender: AptosAccount) {
     const transactionWorker = new TransactionWorker(provider, sender, 30, 100, 10);
 
     transactionWorker.start();
@@ -100,7 +99,7 @@ async function main() {
 
     // push transactions to worker queue
     for (const payload in payloads) {
-      transactionWorker.push(payloads[payload]);
+      await transactionWorker.push(payloads[payload]);
     }
   }
 
@@ -115,8 +114,7 @@ async function main() {
     transactionWorker.on("transactionSent", async (data) => {
       // all expected transactions have been sent
       if (data[0] === totalTransactions) {
-        last = Date.now() / 1000;
-        console.log(`transactions sent in ${last - start} seconds`);
+        console.log(`transactions sent in ${Date.now() / 1000 - last} seconds`);
       }
     });
 
@@ -133,10 +131,8 @@ async function main() {
 
     transactionWorker.on("transactionExecuted", async (data) => {
       // all expected transactions have been executed
-      console.log(data);
       if (data[0] === totalTransactions) {
-        last = Date.now() / 1000;
-        console.log(`transactions executed in ${last - start} seconds`);
+        console.log(`transactions executed in ${Date.now() / 1000 - last} seconds`);
         await checkAccounts();
       }
     });
@@ -154,25 +150,21 @@ async function main() {
   }
 
   // check for account's sequence numbers
-  const checkAccounts = async () => {
+  async function checkAccounts(): Promise<void> {
     const waitFor: Array<Promise<Types.AccountData>> = [];
     for (let i = 0; i < senders.length; i++) {
       waitFor.push(provider.getAccount(senders[i].address()));
     }
-
     const res = await Promise.all(waitFor);
-    last = Date.now() / 1000;
-    console.log(`transactions verified in  ${last - start}  seconds`);
+    console.log(`transactions verified in  ${Date.now() / 1000 - last}  seconds`);
     for (const account in res) {
       const currentAccount = res[account] as Types.AccountData;
       console.log(
         `sender account ${currentAccount.authentication_key} final sequence number is ${currentAccount.sequence_number}`,
       );
     }
-    // exit for testing porpuses - this would stop the process. most cases we have all transactions
-    // commited, but in some rare cases we might be stopping it before last couple of transactions have commited.
     exit(0);
-  };
+  }
 }
 
 main();
