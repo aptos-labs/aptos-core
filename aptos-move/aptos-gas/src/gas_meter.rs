@@ -37,8 +37,9 @@ use std::collections::BTreeMap;
 //  - << What else? >>
 //
 // Change log:
-// - V10
+// - V11
 //   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
+// - V10
 //   - Added generate_unique_address and get_txn_hash native functions
 //   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
 // - V9
@@ -69,7 +70,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 10;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 11;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 

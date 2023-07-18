@@ -106,14 +106,14 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 440_000 * MUL],
 
     [.ristretto255.point_add, "ristretto255.point_add", 2_135 * MUL],
-    [.ristretto255.point_clone, { 10.. => "ristretto255.point_clone" }, 150 * MUL],
+    [.ristretto255.point_clone, { 11.. => "ristretto255.point_clone" }, 150 * MUL],
     [.ristretto255.point_compress, "ristretto255.point_compress", 40_000 * MUL],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 40_500 * MUL],
     [.ristretto255.point_equals, "ristretto255.point_equals", 2_300 * MUL],
     [.ristretto255.point_from_64_uniform_bytes, "ristretto255.point_from_64_uniform_bytes", 81_500 * MUL],
     [.ristretto255.point_identity, "ristretto255.point_identity", 150 * MUL],
     [.ristretto255.point_mul, "ristretto255.point_mul", 471_000 * MUL],
-    [.ristretto255.point_double_mul, { 10.. => "ristretto255.point_double_mul" }, 508_680 * MUL],
+    [.ristretto255.point_double_mul, { 11.. => "ristretto255.point_double_mul" }, 508_680 * MUL],
     [.ristretto255.point_neg, "ristretto255.point_neg", 360 * MUL],
     [.ristretto255.point_sub, "ristretto255.point_sub", 2_130 * MUL],
     [.ristretto255.point_parse_arg, "ristretto255.point_parse_arg", 150 * MUL],
@@ -143,9 +143,9 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
 
     // Bulletproofs gas parameters begin.
     // Generated at time 1683148919.0628748 by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns=10.0.
-    [.bulletproofs.base, { 10.. => "bulletproofs.base" }, 3_208_556 * MUL],
-    [.bulletproofs.per_bit_rangeproof_verify, { 10.. => "bulletproofs.per_bit_rangeproof_verify" }, 273_192 * MUL],
-    [.bulletproofs.per_byte_rangeproof_deserialize, { 10.. => "bulletproofs.per_byte_rangeproof_deserialize" }, 33 * MUL],
+    [.bulletproofs.base, { 11.. => "bulletproofs.base" }, 3_208_556 * MUL],
+    [.bulletproofs.per_bit_rangeproof_verify, { 11.. => "bulletproofs.per_bit_rangeproof_verify" }, 273_192 * MUL],
+    [.bulletproofs.per_byte_rangeproof_deserialize, { 11.. => "bulletproofs.per_byte_rangeproof_deserialize" }, 33 * MUL],
     // Bulletproofs gas parameters end.
 
     [.type_info.type_of.base, "type_info.type_of.base", 300 * MUL],
