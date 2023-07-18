@@ -61,9 +61,6 @@ impl SafeNativeBuilder {
 
     pub fn set_gas_hook<F>(&mut self, action: F)
     where
-        //// todo: look into FnOnce, Fn, FnMut
-        //// look into Send Sync
-        //// look into closure more indepth
         F: Fn(Expression) + Send + Sync + 'static,
     {
         self.gas_hook = Some(Arc::new(action));

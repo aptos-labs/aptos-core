@@ -1,10 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::gas_meter::GasMeters;
 use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
+use aptos_gas_algebra::Expression;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use aptos_native_interface::reexports::move_vm_types::gas::GasMeter;
 use aptos_types::transaction::TransactionPayload;
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
@@ -13,7 +16,16 @@ use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
 //// CONSTANTS
 const PREFIX: &str = "calibrate_";
 
-//// generate a TransactionPayload for modules
+pub enum GasMeterType {
+    RegularMeter(Vec<u128>),
+    AbstractMeter(Vec<Vec<Expression>>),
+}
+
+/// Generate a TransactionPayload for modules
+///
+/// ### Arguments
+///
+/// * `package` - Built Move package
 pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
     // extract package data
     let code = package.extract_code();
@@ -28,7 +40,14 @@ pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
     )
 }
 
-//// sign transaction to create a Module and return transaction status
+/// Sign transaction to create a Module and return transaction status
+///
+/// ### Arguments
+///
+/// * `executor` - Runs transactions
+/// * `account` - Account to publish module under
+/// * `payload` - Info relating to the module
+/// * `sequence_number` - Nonce
 pub fn sign_module_txn(
     executor: &mut FakeExecutor,
     account: &Account,
@@ -60,7 +79,13 @@ pub fn sign_module_txn(
     println!("txn status: {:?}", txn_status);
 }
 
-//// sign user transaction and only records the body of the transaction
+/// sign user transaction and only records the body of the transaction
+///
+/// ### Arguments
+///
+/// * `executor` - Runs transactions
+/// * `module_name` - Name of module
+/// * `function_name` - Name of function in the module
 pub fn sign_user_txn(
     executor: &mut FakeExecutor,
     module_name: &ModuleId,
@@ -73,20 +98,32 @@ pub fn sign_user_txn(
     elapsed.as_micros()
 }
 
-//// publish module under user and sign user transaction
-pub fn record_with_regular_gas_meter(
+/// Publish module under user, sign and run user transaction.
+/// This runs for both Gas Meters (regular and abstract).
+///
+/// ### Arguments
+///
+/// * `package` - Built Move package
+/// * `executor` - Runs transactions
+/// * `func_identifiers` - All function names
+/// * `address` - Address associated to an account
+/// * `identifier` - Name of module
+pub fn record_gas_meter(
     package: &BuiltPackage,
     executor: &mut FakeExecutor,
     func_identifiers: Vec<String>,
     address: AccountAddress,
     identifier: &String,
-) -> Vec<u128> {
-    //// publish test-package under module address
+) -> GasMeters {
+    // publish test-package under module address
     let creator = executor.new_account_at(address);
 
-    let mut durations: Vec<u128> = Vec::new();
+    let mut gas_meter = GasMeters {
+        regular_meter: Vec::new(),
+        abstract_meter: Vec::new(),
+    };
 
-    //// iterate over all the functions that satisfied the requirements above
+    // iterate over all the functions that satisfied the requirements above
     for (sequence_num_counter, func_identifier) in func_identifiers.into_iter().enumerate() {
         println!(
             "Executing {}::{}::{}",
@@ -96,18 +133,24 @@ pub fn record_with_regular_gas_meter(
         );
 
         // publish package similar to create_publish_package in harness.rs
-        print!("Signing txn for module... ");
+        println!("Signing txn for module... ");
         let module_payload = generate_module_payload(package);
         let counter = sequence_num_counter.try_into().unwrap();
         sign_module_txn(executor, &creator, module_payload, counter);
 
-        //// send a txn that invokes the entry function 0x{address}::{name}::benchmark
-        print!("Signing user txn... ");
+        // send a txn that invokes the entry function 0x{address}::{name}::benchmark
+        println!("Signing and running user txn for Regular Meter... ");
         let module_name = get_module_name(address, identifier, &func_identifier);
         let duration = sign_user_txn(executor, &module_name, &func_identifier);
-        durations.push(duration);
+        gas_meter.regular_meter.push(duration);
+
+        println!("Signing and running user txn for Abstract Meter... ");
+        let gas_formula =
+            executor.exec_abstract_usage(&module_name, &func_identifier, vec![], vec![]);
+        gas_meter.abstract_meter.push(gas_formula);
     }
-    durations
+
+    gas_meter
 }
 
 /*
@@ -115,7 +158,13 @@ pub fn record_with_regular_gas_meter(
  * GETTER FUNCTIONS
  *
  */
-//// get module name
+/// get module name
+///
+/// ### Arguments
+///
+/// * `address` - Address associated to an account
+/// * `identifier` - Name of module
+/// * `func_identifier` - Name of function in module
 pub fn get_module_name(
     address: AccountAddress,
     identifier: &String,
@@ -133,7 +182,11 @@ pub fn get_module_name(
     module_id
 }
 
-//// get all directories of Move projects
+/// get all directories of Move projects
+///
+/// ### Arguments
+///
+/// * `dirs` - directory
 pub fn get_dir_paths(dirs: ReadDir) -> Vec<PathBuf> {
     let mut dir_paths = Vec::new();
     for dir in dirs {
@@ -147,7 +200,14 @@ pub fn get_dir_paths(dirs: ReadDir) -> Vec<PathBuf> {
     dir_paths
 }
 
-//// get functional identifiers
+/// get functional identifiers
+///
+/// ### Arguments
+///
+/// * `cm` - Compiled module
+/// * `identifier` - Name of module
+/// * `address` - Account address for the module
+/// * `pattern` - Certain functions to run based on pattern
 pub fn get_functional_identifiers(
     cm: CompiledModule,
     identifier: &String,
