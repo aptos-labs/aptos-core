@@ -47,10 +47,10 @@ pub enum TransactionAuthenticator {
         signature: Ed25519Signature,
     },
     /// Single signature
-    P256 {
+    /*P256 {
         public_key: P256PublicKey,
         signature: P256PublicKey,
-    },
+    },*/
     /// K-of-N multisignature
     MultiEd25519 {
         public_key: MultiEd25519PublicKey,

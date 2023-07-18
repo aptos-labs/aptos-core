@@ -5835,7 +5835,7 @@ dependencies = [
  "der",
  "elliptic-curve",
  "rfc6979",
- "signature 1.4.0",
+ "signature",
 ]
 
 [[package]]
@@ -5845,7 +5845,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e9c280362032ea4203659fc489832d0204ef09f247a0506f170dafcac08c369"
 dependencies = [
  "serde 1.0.149",
- "signature 2.1.0",
+ "signature",
 ]
 
 [[package]]
@@ -11668,12 +11668,6 @@ dependencies = [
  "digest 0.9.0",
  "rand_core 0.6.4",
 ]
-
-[[package]]
-name = "signature"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e1788eed21689f9cf370582dfc467ef36ed9c707f073528ddafa8d83e3b8500"
 
 [[package]]
 name = "similar"
