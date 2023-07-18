@@ -21,7 +21,7 @@ type NetworkWithCustom = Network | "CUSTOM";
  * const accountNFTs = await provider.getAccountNFTs("0x123");
  * ```
  *
- * @param network enum of type Network - MAINNET | TESTNET | DEVENET or custom endpoints of type CustomEndpoints
+ * @param network enum of type Network - MAINNET | TESTNET | DEVNET | LOCAL or custom endpoints of type CustomEndpoints
  * @param config AptosClient config arg - additional configuration options for the generated Axios client.
  */
 export class Provider {
@@ -45,8 +45,15 @@ export class Provider {
       this.network = network;
     }
 
-    if (!fullNodeUrl || !indexerUrl) {
-      throw new Error("network is not provided");
+    if (!fullNodeUrl) {
+      throw new Error("network is not provided, must provide a Network or a fullNodeUrl");
+    }
+
+    // For local dev purposes and indexer URL may not be given
+    if (!indexerUrl && (this.network === "CUSTOM" || this.network === Network.LOCAL)) {
+      indexerUrl = "No indexer URL given";
+    } else {
+      throw new Error("network does not have an indexer URL");
     }
 
     this.aptosClient = new AptosClient(fullNodeUrl, config, doNotFixNodeUrl);
