@@ -23,7 +23,7 @@ function formatAccountInfo(account: AptosAccount): string {
 const WIDTH = 16;
 
 (async() => {
-    const provider = new Provider(Network.DEVNET);
+    const provider = new Provider({fullnodeUrl: NODE_URL});
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
     // :!:>create_accounts
