@@ -200,9 +200,13 @@ def test_move_view(run_helper: RunHelper, test_name=None):
     response = json.loads(response.stdout)
     if response["Result"] == None or response["Result"][0] != True:
         raise TestError("View function did not return correct result")
-    
+
     # Test view function with with big number arguments
-    expected_number = 18446744073709551615
+    expected_u64 = 18446744073709551615
+    expected_128 = 340282366920938463463374607431768211455
+    expected_256 = (
+        115792089237316195423570985008687907853269984665640564039457584007913129639935
+    )
     response = run_helper.run_command(
         test_name,
         [
@@ -213,12 +217,19 @@ def test_move_view(run_helper: RunHelper, test_name=None):
             "--function-id",
             "default::cli_e2e_tests::test_big_number",
             "--args",
-            f"u64:{expected_number}",
-            "u128:340282366920938463463374607431768211455",
-            "u256:115792089237316195423570985008687907853269984665640564039457584007913129639935", # Important to test this big number
+            f"u64:{expected_u64}",
+            f"u128:{expected_128}",
+            f"u256:{expected_256}",  # Important to test this big number
         ],
     )
-    
+
     response = json.loads(response.stdout)
-    if response["Result"] == None or response["Result"][0] != f"{expected_number}":
-        raise TestError(f"View function [test_big_number] did not return correct result")
+    if (
+        response["Result"] == None
+        or response["Result"][0] != f"{expected_u64}"
+        or response["Result"][1] != f"{expected_128}"
+        or response["Result"][2] != f"{expected_256}"
+    ):
+        raise TestError(
+            f"View function [test_big_number] did not return correct result"
+        )
