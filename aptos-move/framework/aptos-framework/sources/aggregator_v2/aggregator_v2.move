@@ -12,12 +12,6 @@
 /// at the moment.**
 module aptos_framework::aggregator_v2 {
 
-    /// The value of aggregator overflows. Raised by native code.
-    const EAGGREGATOR_OVERFLOW: u64 = 1;
-
-    /// The value of aggregator underflows (goes below zero). Raised by native code.
-    const EAGGREGATOR_UNDERFLOW: u64 = 2;
-
     /// Aggregator feature is not supported. Raised by native code.
     const ENOT_SUPPORTED: u64 = 3;
 
@@ -28,18 +22,16 @@ module aptos_framework::aggregator_v2 {
         limit: u128,
     }
 
-    struct AggregatorSnapshot has store {
-        value: u128,
-    }
-
-    struct AggregatorSnapshotU64 has store {
-        value: u64,
+    struct AggregatorSnapshot<Element> has store {
+        value: Element,
     }
 
     /// Returns `limit` exceeding which aggregator overflows.
     public fun limit(aggregator: &Aggregator): u128 {
         aggregator.limit
     }
+
+    public native fun create_aggregator(limit: u128): Aggregator;
 
     /// Adds `value` to aggregator.
     /// Returns `true` if the addition succeeded and `false` if it exceeded the limit.
@@ -52,16 +44,9 @@ module aptos_framework::aggregator_v2 {
     /// Returns a value stored in this aggregator.
     public native fun read(aggregator: &Aggregator): u128;
 
-    public native fun snapshot(aggregator: &Aggregator): AggregatorSnapshot;
+    public native fun snapshot(aggregator: &Aggregator): AggregatorSnapshot<u128>;
 
-    public native fun snapshot_u64(aggregator: &Aggregator): AggregatorSnapshotU64;
+    public native fun try_snapshot_u64(aggregator: &Aggregator): Option<AggregatorSnapshot<u64>>;
 
-    /// Returns a value stored in this aggregator.
-    public native fun read_snapshot(aggregator: &AggregatorSnapshot): u128;
-
-    /// Returns a value stored in this aggregator.
-    public native fun read_snapshot_u64(aggregator: &AggregatorSnapshotU64): u64;
-
-    /// Destroys an aggregator.
-    public native fun destroy(aggregator: Aggregator);
+    public native fun read_snapshot<Element>(aggregator: &AggregatorSnapshot<Element>): Element;
 }
