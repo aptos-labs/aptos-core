@@ -615,7 +615,7 @@ impl Builder {
             consensus_config: OnChainConsensusConfig::default(),
             // Enable transaction shuffling by default in integration tests and Forge.
             execution_config: OnChainExecutionConfig::V1(ExecutionConfigV1 {
-                transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+                transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
             }),
             gas_schedule: default_gas_schedule(),
         };

@@ -382,13 +382,13 @@ async fn test_onchain_shuffling_change() {
 
     assert_eq!(
         current_execution_config.transaction_shuffler_type(),
-        TransactionShufflerType::NoShuffling,
+        TransactionShufflerType::SenderAwareV2(32),
     );
 
-    assert_reordering(&mut swarm, false).await;
+    assert_reordering(&mut swarm, true).await;
 
     let execution_config_with_shuffling = OnChainExecutionConfig::V1(ExecutionConfigV1 {
-        transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+        transaction_shuffler_type: TransactionShufflerType::NoShuffling,
     });
 
     let update_execution_config_script = format!(
@@ -424,8 +424,10 @@ async fn test_onchain_shuffling_change() {
 
     assert_eq!(
         updated_execution_config.transaction_shuffler_type(),
-        TransactionShufflerType::SenderAwareV1(32)
+        TransactionShufflerType::NoShuffling,
     );
+
+    assert_reordering(&mut swarm, false).await;
 }
 
 async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
@@ -460,7 +462,10 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
         .unwrap()
         .into_inner();
     info!("result: {:?}", result);
-    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    for txn in &txns {
+        clients[0].1.wait_for_signed_transaction(txn).await.unwrap();
+    }
 
     wait_for_all_nodes_to_catchup(&clients, Duration::from_secs(30))
         .await
