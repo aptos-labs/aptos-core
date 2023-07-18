@@ -5,42 +5,25 @@
 //mod algebra_helpers;
 mod benchmark;
 mod benchmark_helpers;
+mod math;
+mod math_interface;
 mod modified_gas_meter;
+mod solve;
 //use aptos_gas_algebra::GasAdd;
 //use aptos_gas_meter::GasAlgebra;
 //use aptos_gas_schedule::gas_params::instr;
 //use aptos_gas_algebra::Expression;
 //use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 //use aptos_native_interface::{Expression, SafeNativeBuilder};
+use aptos_abstract_gas_usage::{collect_terms, normalize};
+use aptos_gas_algebra::Expression;
 use benchmark::benchmark_calibration_function;
+use math_interface::{convert_to_matrix_format, total_num_of_cols, total_num_rows};
 use modified_gas_meter::get_abstract_gas_usage;
+use solve::{build_coefficient_matrix, build_constant_matrix, solve};
+use std::collections::BTreeMap;
 //use move_core_types::{account_address::AccountAddress, ident_str};
 //use std::sync::{Arc, Mutex};
-
-/*fn native_test_simple(gas_core: &mut impl GasAlgebra, v: &[u64]) -> anyhow::Result<u64> {
-    gas_core.charge_execution(
-        instr::LD_CONST_BASE + instr::LD_CONST_PER_BYTE * NumBytes::new(v.len() as u64),
-    )?;
-    Ok(v.iter().sum())
-}
-fn native_test_mul(gas_core: &mut impl GasAlgebra, v: &[u64]) -> anyhow::Result<u64> {
-    gas_core.charge_execution(instr::LD_CONST_PER_BYTE * NumBytes::new(v.len() as u64))?;
-    Ok(v.iter().sum())
-}
-fn native_test_mul_reverse(gas_core: &mut impl GasAlgebra, v: &[u64]) -> anyhow::Result<u64> {
-    gas_core.charge_execution(GasMul {
-        left: NumBytes::new(v.len() as u64),
-        right: instr::LD_CONST_PER_BYTE,
-    })?;
-    Ok(v.iter().sum())
-}
-fn native_test_add(gas_core: &mut impl GasAlgebra, v: &[u64]) -> anyhow::Result<u64> {
-    gas_core.charge_execution(GasAdd {
-        left: instr::LD_CONST_BASE,
-        right: instr::LD_CONST_BASE,
-    })?;
-    Ok(v.iter().sum())
-}*/
 
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
@@ -57,24 +40,50 @@ fn main() {
      * @return: Simplified Map of coefficients and gas parameters
      */
     let abstract_gas_formulae = get_abstract_gas_usage();
-    println!("\n\nabstract gas formulae (LHS): {:?}", abstract_gas_formulae);
-
-    /*let mut gas_core = CalibrationAlgebra {
-        base: StandardGasAlgebra::new(
-            10,
-            VMGasParameters::zeros(),
-            StorageGasParameters::free_and_unlimited(),
-            10000,
-        ),
-        coeff_buffer: BTreeMap::new(),
-    };*/
-    //native_test_simple(&mut gas_core, &[1, 2, 3]).unwrap();
-    //native_test_mul(&mut gas_core, &[1, 2, 3]).unwrap();
-    //native_test_mul_reverse(&mut gas_core, &[1, 2, 3]).unwrap();
-    //native_test_add(&mut gas_core, &[1, 2, 3]).unwrap();
 
     /*
-     * Access shared buffer
+     * @notice: Normalize terms into addition of Vec<Expression>
+     * @return: A vector holding the system of linear equations
      */
-    //// TODO
+    let mut system_of_equations: Vec<Vec<Expression>> = Vec::new();
+    println!("\n\nabstract gas formulae (LHS): ");
+    for formula in abstract_gas_formulae {
+        let mut terms: Vec<Expression> = Vec::new();
+        for term in formula {
+            let normal = normalize(term);
+            terms.extend(normal);
+        }
+        system_of_equations.push(terms);
+    }
+
+    /*
+     * @notice: Collect like terms
+     * @return: Simple mapping to interface with math helpers
+     */
+    let mut mappings: Vec<BTreeMap<String, u64>> = Vec::new();
+    for equation in system_of_equations {
+        let map = collect_terms(equation);
+        mappings.push(map);
+    }
+
+    /*
+     * @notice: Convert simplified map to a math friendly interface
+     * @return vec_format: A format used to easily call the math functions
+     */
+    let vec_format: Vec<Vec<f64>> = convert_to_matrix_format(mappings.clone());
+
+    /*
+     * @notice: Build the system of linear equations using the math library
+     */
+    let nrows = total_num_rows(mappings.clone());
+    let ncols = total_num_of_cols(mappings.clone());
+    let vec_col: usize = 1;
+
+    let mut coeff_matrix = build_coefficient_matrix(vec_format, nrows, ncols);
+    let mut const_matrix = build_constant_matrix(running_times, nrows, vec_col);
+
+    /*
+     * @notice: Solve the system of linear equations
+     */
+    solve(mappings, &mut coeff_matrix, &mut const_matrix);
 }

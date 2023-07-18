@@ -21,7 +21,9 @@ use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::Expression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::{VMGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{
+    MiscGasParameters, NativeGasParameters, VMGasParameters, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_native_interface::SafeNativeBuilder;
@@ -54,7 +56,7 @@ use aptos_vm::{
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::{StorageGasParameters, ChangeSetConfigs};
+use aptos_vm_types::storage::{ChangeSetConfigs, StorageGasParameters};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -726,8 +728,8 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Vec<Expression> {
         /*
-            * @notice: Define the shared buffers
-            */
+         * @notice: Define the shared buffers
+         */
         let a1 = Arc::new(Mutex::new(Vec::<Expression>::new()));
         let a2 = Arc::clone(&a1);
 
@@ -745,9 +747,9 @@ impl FakeExecutor {
             );
 
             builder.set_gas_hook(move |expression| {
-                println!("TEST PRINT expression {:?}", expression);
+                println!("TEST PRINT expression {:?}\n", expression);
                 a2.lock().unwrap().push(expression);
-                println!("A2 VEC: {:?}", a2.lock().unwrap());
+                println!("A2 VEC: {:?}\n", a2.lock().unwrap());
             });
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
@@ -769,19 +771,17 @@ impl FakeExecutor {
                     &Self::name(function_name),
                     type_params,
                     args,
-                    &mut StandardGasMeter::new(
-                        CalibrationAlgebra {
-                            base: StandardGasAlgebra::new(
-                                //// TODO: fill in these with proper values
-                                LATEST_GAS_FEATURE_VERSION,
-                                VMGasParameters::zeros(),
-                                StorageGasParameters::free_and_unlimited(),
-                                100000,
-                            ),
-                            //coeff_buffer: BTreeMap::new(),
-                            shared_buffer: Arc::clone(&a1),
-                        }
-                    ), // StandardGasMeter with CalibrationAlgebra
+                    &mut StandardGasMeter::new(CalibrationAlgebra {
+                        base: StandardGasAlgebra::new(
+                            //// TODO: fill in these with proper values
+                            LATEST_GAS_FEATURE_VERSION,
+                            VMGasParameters::zeros(),
+                            StorageGasParameters::free_and_unlimited(),
+                            100000,
+                        ),
+                        //coeff_buffer: BTreeMap::new(),
+                        shared_buffer: Arc::clone(&a1),
+                    }), // StandardGasMeter with CalibrationAlgebra
                 )
                 .unwrap_or_else(|e| {
                     panic!(
@@ -792,7 +792,7 @@ impl FakeExecutor {
                     )
                 });
 
-            println!("A3 ARC: {:?}", a1.lock().unwrap());
+            println!("A3 ARC: {:?}\n", a1.lock().unwrap());
 
             let change_set = session
                 .finish(

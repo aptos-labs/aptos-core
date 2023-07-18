@@ -3,8 +3,11 @@
 
 //use crate::algebra_helpers::{collect_terms, normalize};
 //use crate::types::Expression;
+//use crate::algebra_helpers::normalize;
 use crate::visitor::CalibrationVisitor;
-use aptos_gas_algebra::{Fee, FeePerGasUnit,  Expression,GasExpression, InternalGas, InternalGasUnit, Octa};
+use aptos_gas_algebra::{
+    Expression, Fee, FeePerGasUnit, GasExpression, InternalGas, InternalGasUnit, Octa,
+};
 use aptos_gas_meter::GasAlgebra;
 use aptos_gas_schedule::VMGasParameters;
 //use aptos_native_interface::SafeNativeBuilder;
@@ -57,6 +60,7 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         //// Normalize (collect like terms, accept different formats)
         //let node = visitor.node.pop().unwrap();
         let node = abstract_amount.to_dynamic();
+        //println!("ALGEBRA node: {:?}\n", node);
         self.shared_buffer.lock().unwrap().push(node);
         //let terms = normalize(node);
         //println!("terms {:?}\n", terms);
