@@ -336,7 +336,7 @@ async fn test_mintnft(
     }
 
     // check that token store isn't initialized for the receiver
-    if let Ok(_) = token_client
+    if token_client
         .get_token(
             receiver.address(),
             account.address(),
@@ -344,6 +344,7 @@ async fn test_mintnft(
             &token_name,
         )
         .await
+        .is_ok()
     {
         return Err(TestFailure::Fail(
             "found tokens for receiver when shouldn't",
@@ -386,8 +387,7 @@ async fn test_mintnft(
 /// Helper function that publishes module and returns the bytecode.
 async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<HexEncodedBytes> {
     // get file to compile
-    let move_dir =
-        PathBuf::from("./aptos-move/move-examples/hello_blockchain");
+    let move_dir = PathBuf::from("./aptos-move/move-examples/hello_blockchain");
 
     // insert address
     let mut named_addresses: BTreeMap<String, AccountAddress> = BTreeMap::new();
