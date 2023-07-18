@@ -195,7 +195,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
                 .into_iter()
                 .filter_map(|(k, _)| k.module_path())
                 .collect(),
-            ExecutionStatus::Abort(_) => Vec::new(),
+            ExecutionStatus::Abort(_) | ExecutionStatus::AggregatorError => Vec::new(),
         };
 
         if !self.module_read_write_intersection.load(Ordering::Relaxed) {
@@ -263,7 +263,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
                     .map(|(k, _)| k)
                     .chain(t.get_deltas().into_iter().map(|(k, _)| k))
                     .collect(),
-                ExecutionStatus::Abort(_) => HashSet::new(),
+                ExecutionStatus::Abort(_) | ExecutionStatus::AggregatorError => HashSet::new(),
             },
         }
     }
@@ -288,7 +288,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
                     let deltas = t.get_deltas();
                     (deltas.len(), Box::new(deltas.into_iter().map(|(k, _)| k)))
                 },
-                ExecutionStatus::Abort(_) => (
+                ExecutionStatus::Abort(_) | ExecutionStatus::AggregatorError => (
                     0,
                     Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
                 ),
@@ -312,7 +312,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 t.incorporate_delta_writes(delta_writes);
             },
-            ExecutionStatus::Abort(_) => {},
+            ExecutionStatus::Abort(_) | ExecutionStatus::AggregatorError => {},
         };
     }
 

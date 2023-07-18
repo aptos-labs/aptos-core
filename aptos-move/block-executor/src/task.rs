@@ -4,7 +4,7 @@
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::{TStateView, StateView};
+use aptos_state_view::TStateView;
 use aptos_types::{
     executable::ModulePath,
     fee_statement::FeeStatement,
@@ -119,5 +119,6 @@ pub trait TransactionOutput: Send + Sync + Debug + Sized {
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
 
-    fn try_materialize(&self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus>;    
+    fn try_materialize(&self, 
+        state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>) -> anyhow::Result<Self, VMStatus>;    
 }

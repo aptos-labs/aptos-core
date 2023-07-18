@@ -11,14 +11,14 @@ use aptos_aggregator::{
     transaction::AggregatorValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::{StateViewId, TStateView};
+use aptos_state_view::{StateViewId, TStateView, StateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     executable::ModulePath,
     fee_statement::FeeStatement,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
-    write_set::{TransactionWrite, WriteOp},
+    write_set::{TransactionWrite, WriteOp}, vm_status::VMStatus,
 };
 use claims::{assert_none, assert_ok};
 use once_cell::sync::OnceCell;
@@ -531,6 +531,10 @@ where
 
     fn fee_statement(&self) -> FeeStatement {
         FeeStatement::new(1, 1, 0, 0, 0)
+    }
+
+    fn try_materialize(&self, state_view: &impl StateView) -> Result<Self, VMStatus> {
+        unreachable!("try_materialize function invoked in test cases");
     }
 }
 

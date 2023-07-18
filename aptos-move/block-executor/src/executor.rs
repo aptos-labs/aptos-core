@@ -744,7 +744,7 @@ where
 
             // match statement for `res`
             let mut reexecute = false;
-            match res {
+            match &res {
                 ExecutionStatus::Success(output) => {
                     let result = output.try_materialize(state_view);
                     match result {
