@@ -533,7 +533,7 @@ where
         FeeStatement::new(1, 1, 0, 0, 0)
     }
 
-    fn try_materialize(&self, state_view: &impl StateView) -> Result<Self, VMStatus> {
+    fn try_materialize(&self, state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>) -> anyhow::Result<Output<K, V>, VMStatus> {
         unreachable!("try_materialize function invoked in test cases");
     }
 }
