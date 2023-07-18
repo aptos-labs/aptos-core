@@ -13,7 +13,6 @@ use aptos_types::{
     on_chain_config::{Features, TimedFeatures},
 };
 use move_vm_runtime::native_functions::NativeFunctionTable;
-//use std::sync::{Arc, Mutex};
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{

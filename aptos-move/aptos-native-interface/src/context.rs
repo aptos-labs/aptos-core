@@ -34,7 +34,6 @@ pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
 
     pub(crate) enable_incremental_gas_charging: bool,
 
-    //// @param gas_param: Expression similar to aptos-gas-calibration/types
     pub(crate) gas_hook: Option<&'c (dyn Fn(Expression) + Send + Sync)>,
 }
 
