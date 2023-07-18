@@ -1,6 +1,6 @@
 /// Package for creating, verifying, serializing & deserializing the $\Sigma$-protocol proofs used in veiled coins.
 ///
-/// # Preliminaries
+/// ## Preliminaries
 ///
 /// Recall that a $\Sigma$-protocol proof argues knowledge of a *secret* witness $w$ such that an arithmetic relation
 /// $R(x; w) = 1$ is satisfied over group and field elements stored in $x$ and $w$.
@@ -8,7 +8,7 @@
 /// Here, $x$ is a public statement known to the verifier (i.e., known to the validators). Importantly, the
 /// $\Sigma$-protocol's zero-knowledge property ensures the witness $w$ remains secret.
 ///
-/// # WithdrawalSubproof: ElGamal-Pedersen equality
+/// ## WithdrawalSubproof: ElGamal-Pedersen equality
 ///
 /// This proof is used to provably convert an ElGamal ciphertext to a Pedersen commitment over which a ZK range proof
 /// can be securely computed. Otherwise, knowledge of the ElGamal SK breaks the binding of the 2nd component of the
@@ -44,7 +44,7 @@
 /// }
 /// ```
 ///
-/// # TransferSubproof: ElGamal-Pedersen equality and ElGamal-ElGamal equality
+/// ## TransferSubproof: ElGamal-Pedersen equality and ElGamal-ElGamal equality
 ///
 /// This protocol argues two things. First, that the same amount is ElGamal-encrypted for both the sender and recipient.
 /// This is needed to correctly withdraw & deposit the same amount during a transfer. Second, that this same amount is
@@ -244,9 +244,9 @@ module veiled_coin::sigma_protos {
         // \rho * Y + X_7 =? \alpha_5 * G
         let y_acc = ristretto255::point_mul(&sender_pk_point, &rho);
         ristretto255::point_add_assign(&mut y_acc, &proof.x7);
-        
+
         let g_alpha5 = ristretto255::basepoint_mul(&proof.alpha5);
-        assert!(ristretto255::point_equals(&y_acc, &g_alpha5), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
+        assert!(ristretto255::point_equals(&y_acc, &g_alpha5), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
     }
 
     /// Verifies the $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
@@ -470,7 +470,7 @@ module veiled_coin::sigma_protos {
     {
         let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
-        let y = elgamal::pubkey_to_compressed_point(sender_pk); 
+        let y = elgamal::pubkey_to_compressed_point(sender_pk);
 
         let bytes = vector::empty<u8>();
 
