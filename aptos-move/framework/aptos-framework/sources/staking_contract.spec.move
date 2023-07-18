@@ -79,6 +79,8 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>,
     ) {
+        pragma verify_duration_estimate = 200; // TODO: set because of timeout (property proved).
+
         // preconditions
         include PreconditionsInCreateContract;
 
@@ -98,6 +100,8 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>,
     ): address {
+        pragma verify_duration_estimate = 200; // TODO: set because of timeout (property proved).
+
         // preconditions
         include PreconditionsInCreateContract;
         
