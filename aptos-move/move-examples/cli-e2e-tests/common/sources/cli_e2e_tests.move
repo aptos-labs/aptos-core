@@ -259,8 +259,13 @@ module addr::cli_e2e_tests {
 
     // The following functions are used to test input args
     #[view]
-    public fun test_u64(n: u64): u64 {
-        n
+    public fun test_big_number(
+        u64: u64,
+        _u128: u128,
+        _u256: u256,
+    ): u64 {
+        // Just return u64 number, we mainly use this to display the number in the test
+        u64
     }
 
     inline fun get_hero(creator: &address, collection: &String, name: &String): (Object<Hero>, &Hero) {

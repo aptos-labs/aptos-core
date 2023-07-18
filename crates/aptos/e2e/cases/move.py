@@ -202,7 +202,7 @@ def test_move_view(run_helper: RunHelper, test_name=None):
         raise TestError("View function did not return correct result")
     
     # Test view function with with u64 argument
-    expected_u64 = 123
+    expected_number = 123
     response = run_helper.run_command(
         test_name,
         [
@@ -211,12 +211,14 @@ def test_move_view(run_helper: RunHelper, test_name=None):
             "view",
             "--assume-yes",
             "--function-id",
-            "default::cli_e2e_tests::test_u64",
+            "default::cli_e2e_tests::test_big_number",
             "--args",
-            f"u64:{expected_u64}",
+            f"u64:{expected_number}",
+            "u128:123456",
+            "u256:340282366920938463463374607431768211455", # Important to test this big number
         ],
     )
     
     response = json.loads(response.stdout)
-    if response["Result"] == None or response["Result"][0] != "123":
-        raise TestError(f"View function [test_u64] did not return correct result")
+    if response["Result"] == None or response["Result"][0] != f"{expected_number}":
+        raise TestError(f"View function [test_big_number] did not return correct result")
