@@ -2,7 +2,8 @@ import { AptosAccount, FaucetClient, Network, Provider, HexString } from 'aptos'
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
 const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
-export const FAUCET_URL = "https://faucet.devnet.aptoslabs.com";
+const WIDTH = 16;
+const APTOS_COIN_DECIMALS = 8;
 
 function truncate(address: HexString): string {
     return `${address.toString().substring(0, 6)}...${address.toString().substring(address.toString().length - 4, address.toString().length)}`
@@ -20,7 +21,6 @@ function formatAccountInfo(account: AptosAccount): string {
     }).join(' ');
 }
 
-const WIDTH = 16;
 
 (async() => {
     const provider = new Provider({fullnodeUrl: NODE_URL});
@@ -30,8 +30,8 @@ const WIDTH = 16;
     const alice = new AptosAccount();
     const bob = new AptosAccount(); // <:!:create_accounts
     
-    await faucetClient.fundAccount(alice.address(), 1 * Math.pow(10, 8));
-    await faucetClient.fundAccount(bob.address(), 1 * Math.pow(10, 8));
+    await faucetClient.fundAccount(alice.address(), 1 * Math.pow(10, APTOS_COIN_DECIMALS));
+    await faucetClient.fundAccount(bob.address(), 1 * Math.pow(10, APTOS_COIN_DECIMALS));
 
     console.log(`\n${'Account'.padEnd(WIDTH)} ${'Address'.padEnd(WIDTH)} ${'Auth Key'.padEnd(WIDTH)} ${'Private Key'.padEnd(WIDTH)}`)
     console.log(`-------------------------------------------------------------------`)
