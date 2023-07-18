@@ -299,10 +299,11 @@ pub async fn direct_sender(
     let interval = Duration::from_nanos(1_000_000_000 / config.direct_send_per_second);
     let ticker = time_service.interval(interval);
     futures::pin_mut!(ticker);
-    // random payload filler
     let data_size = config.direct_send_data_size;
-    let mut blob = Vec::<u8>::with_capacity(data_size);
     let mut rng = OsRng;
+    let mut blob = Vec::<u8>::with_capacity(data_size);
+
+    // random payload filler
     for _ in 0..data_size {
         blob.push(rng.gen());
     }
