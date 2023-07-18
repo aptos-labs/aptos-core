@@ -201,8 +201,8 @@ def test_move_view(run_helper: RunHelper, test_name=None):
     if response["Result"] == None or response["Result"][0] != True:
         raise TestError("View function did not return correct result")
     
-    # Test view function with with u64 argument
-    expected_number = 123
+    # Test view function with with big number arguments
+    expected_number = 18446744073709551615
     response = run_helper.run_command(
         test_name,
         [
@@ -214,8 +214,8 @@ def test_move_view(run_helper: RunHelper, test_name=None):
             "default::cli_e2e_tests::test_big_number",
             "--args",
             f"u64:{expected_number}",
-            "u128:123456",
-            "u256:340282366920938463463374607431768211455", # Important to test this big number
+            "u128:340282366920938463463374607431768211455",
+            "u256:115792089237316195423570985008687907853269984665640564039457584007913129639935", # Important to test this big number
         ],
     )
     
