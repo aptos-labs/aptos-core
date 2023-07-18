@@ -1,0 +1,39 @@
+[package]
+name = "nft-metadata-crawler-uri-retriever"
+description = "NFT Metadata Crawler URI Retriever."
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-indexer-grpc-server-framework = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+clap = { workspace = true }
+csv = { workspace = true }
+google-cloud-auth = { workspace = true }
+google-cloud-googleapis = { workspace = true }
+hyper = { workspace = true }
+nft-metadata-crawler-utils = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+tonic = { version = "0.9", features = [
+    "tls",
+    "tls-roots",
+    "transport",
+    "prost",
+    "gzip",
+    "codegen",
+] }
+tracing = { workspace = true }
