@@ -41,7 +41,7 @@ module whitelist_example::mint {
     const PUBLIC_PER_USER_LIMIT: u64 = 2;
 
     fun init_module(owner: &signer) {
-        
+
         aptos_token::create_collection(
             owner,
             string::utf8(COLLECTION_DESCRIPTION),
@@ -61,7 +61,7 @@ module whitelist_example::mint {
             ROYALTY_DENOMINATOR,
         );
 
-        whitelist::init_tiers(owner);
+        whitelist::init_whitelist(owner);
 
         whitelist::upsert_tier_config(
             owner,
@@ -85,9 +85,9 @@ module whitelist_example::mint {
     }
 
     /// simple mint function to demonstrate how to call the whitelist functions
-    public entry fun mint(owner: &signer, receiver: &signer, tier_name: String) {
+    public entry fun mint(owner: &signer, receiver: &signer) {
         let owner_addr = signer::address_of(owner);
-        whitelist::deduct_one_from_tier(owner, receiver, tier_name);
+        whitelist::increment(owner, receiver);
 
         // store next GUID to derive object address later
         let token_creation_num = account::get_guid_next_creation_num(@whitelist_example);
@@ -190,7 +190,7 @@ module whitelist_example::mint {
 
     // The whitelist.move unit tests are more important for this Move example, but we display a happy path test here to convey the intended flow.
     #[test(owner = @whitelist_example, nft_receiver = @0xFB, nft_receiver2 = @0xFC, aptos_framework = @0x1)]
-    public fun test_happy_path(
+    public fun mint_happy_path(
         owner: &signer,
         nft_receiver: &signer,
         nft_receiver2: &signer,
@@ -214,20 +214,20 @@ module whitelist_example::mint {
 
         // mint one token to nft_receiver through the whitelist
         let token_creation_num = account::get_guid_next_creation_num(@whitelist_example);
-        mint(owner, nft_receiver, string::utf8(b"whitelist"));
+        mint(owner, nft_receiver); // whitelist
         let token_object_addr = object::create_guid_object_address(@whitelist_example, token_creation_num);
         let token_object = object::address_to_object<AptosToken>(token_object_addr);
 
         // mint one token to nft_receiver2 through the public list
         let token_creation_num2 = account::get_guid_next_creation_num(@whitelist_example);
-        mint(owner, nft_receiver2, string::utf8(b"public"));
+        mint(owner, nft_receiver2); // public
         let token_object_addr2 = object::create_guid_object_address(@whitelist_example, token_creation_num2);
         let token_object2 = object::address_to_object<AptosToken>(token_object_addr2);
 
-        mint(owner, nft_receiver, string::utf8(b"public"));
-        mint(owner, nft_receiver, string::utf8(b"public"));
+        mint(owner, nft_receiver); // public
+        mint(owner, nft_receiver); // public
 
-        mint(owner, nft_receiver2, string::utf8(b"public"));
+        mint(owner, nft_receiver2); // public
 
         assert!(object::owner(token_object) == nft_receiver_addr, 5);
         assert!(object::owner(token_object2) == nft_receiver2_addr, 6);
