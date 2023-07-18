@@ -7,6 +7,7 @@ resource "google_container_cluster" "aptos" {
   lifecycle {
     ignore_changes = [
       private_cluster_config,
+      cluster_autoscaling[0].auto_provisioning_defaults[0].shielded_instance_config
     ]
     prevent_destroy = true
   }

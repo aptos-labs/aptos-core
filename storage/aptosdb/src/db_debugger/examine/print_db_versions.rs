@@ -29,7 +29,7 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[clap(about = "Print the version of each types of data.")]
 pub struct Cmd {
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     db_dir: PathBuf,
 
     #[clap(long)]

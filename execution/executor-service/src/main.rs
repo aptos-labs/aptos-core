@@ -7,10 +7,10 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 #[derive(Debug, Parser)]
 struct Args {
-    #[clap(long, default_value = "8080")]
+    #[clap(long, default_value_t = 8080)]
     pub server_port: u16,
 
-    #[clap(long, default_value = "8")]
+    #[clap(long, default_value_t = 8)]
     pub num_executor_threads: usize,
 }
 
@@ -22,4 +22,10 @@ fn main() {
     let executor_service =
         ProcessExecutorService::new(server_addr, 1000, args.num_executor_threads);
     executor_service.run();
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
 }

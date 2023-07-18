@@ -256,7 +256,7 @@ Specified rewards rate decrease rate is invalid, which must be not greater than 
 
 <a name="0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD"></a>
 
-Specified rewards rate period is invalid, which must be 1 year at the moment.
+Specified rewards rate period is invalid. It must be larger than 0 and cannot be changed if configured.
 
 
 <pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD">EINVALID_REWARDS_RATE_PERIOD</a>: u64 = 9;
@@ -558,7 +558,7 @@ Return the reward rate of this epoch.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get_reward_rate">get_reward_rate</a>(config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>): (u64, u64) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> {
-    <b>let</b> (rewards_rate, rewards_rate_denominator) = <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_periodical_reward_rate_decrease_enabled">features::periodical_reward_rate_decrease_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_periodical_reward_rate_decrease_enabled">features::periodical_reward_rate_decrease_enabled</a>()) {
         <b>let</b> epoch_rewards_rate = <b>borrow_global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
         <b>if</b> (<a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_is_zero">fixed_point64::is_zero</a>(epoch_rewards_rate)) {
             (0u64, 1u64)
@@ -574,8 +574,7 @@ Return the reward rate of this epoch.
         }
     } <b>else</b> {
         (config.rewards_rate, config.rewards_rate_denominator)
-    };
-    (rewards_rate, rewards_rate_denominator)
+    }
 }
 </code></pre>
 
@@ -835,6 +834,12 @@ Can only be called as part of the Aptos governance proposal process established 
     );
 
     <b>let</b> staking_rewards_config = <b>borrow_global_mut</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
+    // Currently rewards_rate_period_in_secs is not allowed <b>to</b> be changed because this could bring complicated
+    // logics. At the moment the argument is just a placeholder for future <b>use</b>.
+    <b>assert</b>!(
+        rewards_rate_period_in_secs == staking_rewards_config.rewards_rate_period_in_secs,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD">EINVALID_REWARDS_RATE_PERIOD</a>),
+    );
     staking_rewards_config.rewards_rate = rewards_rate;
     staking_rewards_config.min_rewards_rate = min_rewards_rate;
     staking_rewards_config.rewards_rate_period_in_secs = rewards_rate_period_in_secs;
@@ -941,11 +946,10 @@ Can only be called as part of the Aptos governance proposal process established 
         <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_ceil">fixed_point64::ceil</a>(rewards_rate_decrease_rate) &lt;= 1,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_DECREASE_RATE">EINVALID_REWARDS_RATE_DECREASE_RATE</a>)
     );
-    // This field, rewards_rate_period_in_secs is added <b>as</b> a placeholder. In case we want <b>to</b> change
-    // the reward period, we don't have <b>to</b> add a new <b>struct</b>.
-    // To avoid complex logic, now rewards rate decrease interval must be 1 year.
+    // This field, rewards_rate_period_in_secs must be greater than 0.
+    // TODO: rewards_rate_period_in_secs should be longer than the epoch duration but reading epoch duration causes a circular dependency.
     <b>assert</b>!(
-        rewards_rate_period_in_secs == <a href="staking_config.md#0x1_staking_config_ONE_YEAR_IN_SECS">ONE_YEAR_IN_SECS</a>,
+        rewards_rate_period_in_secs &gt; 0,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD">EINVALID_REWARDS_RATE_PERIOD</a>),
     );
 }
@@ -1081,7 +1085,7 @@ Can only be called as part of the Aptos governance proposal process established 
     rewards_rate,
     <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_create_from_u128">fixed_point64::spec_create_from_u128</a>((1u128)));
 <b>invariant</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_less_or_equal">fixed_point64::spec_less_or_equal</a>(min_rewards_rate, rewards_rate);
-<b>invariant</b> rewards_rate_period_in_secs == <a href="staking_config.md#0x1_staking_config_ONE_YEAR_IN_SECS">ONE_YEAR_IN_SECS</a>;
+<b>invariant</b> rewards_rate_period_in_secs &gt; 0;
 <b>invariant</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_ceil">fixed_point64::spec_ceil</a>(rewards_rate_decrease_rate) &lt;= 1;
 </code></pre>
 
@@ -1186,7 +1190,8 @@ StakingRewardsConfig does not exist under the aptos_framework before creating it
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
 </code></pre>
@@ -1297,7 +1302,9 @@ StakingRewardsConfig is under the @aptos_framework.
 
 <pre><code><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>let</b> staking_reward_config = <b>borrow_global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> staking_reward_config.rewards_rate_period_in_secs != rewards_rate_period_in_secs;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(addr);
 </code></pre>

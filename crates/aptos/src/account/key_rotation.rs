@@ -43,11 +43,11 @@ pub struct RotateKey {
     pub(crate) txn_options: TransactionOptions,
 
     /// File name that contains the new private key encoded in the type from `--encoding`
-    #[clap(long, group = "new_private_key", parse(from_os_str))]
+    #[clap(long, group = "new_private_key_inputs", value_parser)]
     pub(crate) new_private_key_file: Option<PathBuf>,
 
     /// New private key encoded in the type from `--encoding`
-    #[clap(long, group = "new_private_key")]
+    #[clap(long, group = "new_private_key_inputs")]
     pub(crate) new_private_key: Option<String>,
 
     /// Name of the profile to save the new private key

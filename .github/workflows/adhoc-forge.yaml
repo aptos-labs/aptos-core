@@ -1,5 +1,5 @@
 name: "Ad-hoc Forge Run"
-on: 
+on:
   workflow_dispatch:
     inputs:
       IMAGE_TAG:
@@ -7,7 +7,7 @@ on:
         type: string
         description: The docker image tag to test. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
       FORGE_IMAGE_TAG:
-        required: true 
+        required: true
         type: string
         description: The docker image tag to use for forge runner. If not specified, falls back on GIT_SHA, and then to the latest commits on the current branch
       FORGE_RUNNER_DURATION_SECS:
@@ -20,7 +20,11 @@ on:
         type: string
         default: land_blocking
         description: Test suite to run
-      
+      FORGE_CLUSTER_NAME:
+        required: false
+        type: string
+        description: The Forge k8s cluster to be used for test
+
 env:
   GIT_SHA: ${{ github.sha }}
 
@@ -41,20 +45,23 @@ jobs:
           echo "FORGE_IMAGE_TAG: ${{ inputs.FORGE_IMAGE_TAG }}"
           echo "FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}"
           echo "FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}"
+          echo "FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}"
     outputs:
       gitSha: ${{ env.GIT_SHA }}
       imageTag: ${{ inputs.IMAGE_TAG }}
       forgeImageTag: ${{ inputs.FORGE_IMAGE_TAG }}
       forgeRunnerDurationSecs: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
       forgeTestSuite: ${{ inputs.FORGE_TEST_SUITE }}
+      forgeClusterName: ${{ inputs.FORGE_CLUSTER_NAME }}
 
   adhoc-forge-test:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    needs: [ determine-forge-run-metadata ] 
+    needs: [determine-forge-run-metadata]
     secrets: inherit
     with:
-      GIT_SHA: ${{ needs.determine-forge-run-metadata.outputs.gitSha }}      
-      IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.imageTag }} 
+      GIT_SHA: ${{ needs.determine-forge-run-metadata.outputs.gitSha }}
+      IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.imageTag }}
       FORGE_IMAGE_TAG: ${{ needs.determine-forge-run-metadata.outputs.forgeImageTag }}
-      FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forgeTestSuite }} 
-      FORGE_RUNNER_DURATION_SECS: ${{ needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs }}
+      FORGE_TEST_SUITE: ${{ needs.determine-forge-run-metadata.outputs.forgeTestSuite }}
+      FORGE_RUNNER_DURATION_SECS: ${{ fromJSON(needs.determine-forge-run-metadata.outputs.forgeRunnerDurationSecs) }} # fromJSON converts to integer
+      FORGE_CLUSTER_NAME: ${{ needs.determine-forge-run-metadata.outputs.forgeClusterName }}

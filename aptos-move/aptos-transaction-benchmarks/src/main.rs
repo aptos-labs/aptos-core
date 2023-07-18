@@ -7,6 +7,7 @@ use aptos_language_e2e_tests::account_universe::P2PTransferGen;
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_benchmarks::transactions::TransactionBencher;
+use aptos_vm_logging::disable_speculative_logging;
 use clap::{Parser, Subcommand};
 use proptest::prelude::*;
 use std::{
@@ -45,10 +46,10 @@ struct ParamSweepOpt {
     #[clap(long)]
     pub skip_sequential: bool,
 
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value_t = 2)]
     pub num_warmups: usize,
 
-    #[clap(long, default_value = "10")]
+    #[clap(long, default_value_t = 10)]
     pub num_runs: usize,
 
     #[clap(long)]
@@ -57,28 +58,28 @@ struct ParamSweepOpt {
 
 #[derive(Debug, Parser)]
 struct ExecuteOpt {
-    #[clap(long, default_value = "200000")]
+    #[clap(long, default_value_t = 200000)]
     pub num_accounts: usize,
 
-    #[clap(long, default_value = "5")]
+    #[clap(long, default_value_t = 5)]
     pub num_warmups: usize,
 
-    #[clap(long, default_value = "100000")]
+    #[clap(long, default_value_t = 100000)]
     pub block_size: usize,
 
-    #[clap(long, default_value = "15")]
+    #[clap(long, default_value_t = 15)]
     pub num_blocks: usize,
 
-    #[clap(long, default_value = "8")]
+    #[clap(long, default_value_t = 8)]
     pub concurrency_level_per_shard: usize,
 
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value_t = 1)]
     pub num_executor_shards: usize,
 
-    #[clap(long, min_values = 1, conflicts_with = "num_executor_shards")]
+    #[clap(long, num_args = 1.., conflicts_with = "num_executor_shards")]
     pub remote_executor_addresses: Option<Vec<SocketAddr>>,
 
-    #[clap(long, default_value = "true")]
+    #[clap(long, default_value_t = true)]
     pub no_conflict_txns: bool,
 
     #[clap(long)]
@@ -86,6 +87,8 @@ struct ExecuteOpt {
 }
 
 fn param_sweep(opt: ParamSweepOpt) {
+    disable_speculative_logging();
+
     let block_sizes = opt.block_sizes.unwrap_or_else(|| vec![1000, 10000, 50000]);
     let concurrency_level = num_cpus::get();
 
@@ -202,4 +205,10 @@ fn main() {
         BenchmarkCommand::ParamSweep(opt) => param_sweep(opt),
         BenchmarkCommand::Execute(opt) => execute(opt),
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
 }

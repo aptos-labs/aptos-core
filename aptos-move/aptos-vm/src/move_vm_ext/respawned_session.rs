@@ -71,7 +71,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         change_set
             .squash(new_change_set, change_set_configs)
             .map_err(|_err| {
-                VMStatus::Error(
+                VMStatus::error(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                     err_msg("Failed to squash VMChangeSet"),
                 )

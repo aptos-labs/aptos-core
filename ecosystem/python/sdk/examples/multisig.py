@@ -1,11 +1,15 @@
+# Copyright © Aptos Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+import asyncio
 import subprocess
 import time
 
 from aptos_sdk.account import Account, RotationProofChallenge
 from aptos_sdk.account_address import AccountAddress
+from aptos_sdk.async_client import FaucetClient, RestClient
 from aptos_sdk.authenticator import Authenticator, MultiEd25519Authenticator
 from aptos_sdk.bcs import Serializer
-from aptos_sdk.client import FaucetClient, RestClient
 from aptos_sdk.ed25519 import MultiPublicKey, MultiSignature
 from aptos_sdk.transactions import (
     EntryFunction,
@@ -26,7 +30,7 @@ def wait():
     input("\nPress Enter to continue...")
 
 
-if __name__ == "__main__":
+async def main():
     rest_client = RestClient(NODE_URL)
     faucet_client = FaucetClient(FAUCET_URL, rest_client)
 
@@ -59,9 +63,7 @@ if __name__ == "__main__":
         [alice.public_key(), bob.public_key(), chad.public_key()], threshold
     )
 
-    multisig_address = AccountAddress.from_multisig_schema(
-        [alice.public_key(), bob.public_key(), chad.public_key()], threshold
-    )
+    multisig_address = AccountAddress.from_multi_ed25519(multisig_public_key)
 
     print("\n=== 2-of-3 Multisig account ===")
     print(f"Account public key: {multisig_public_key}")
@@ -76,20 +78,23 @@ if __name__ == "__main__":
     chad_start = 30_000_000
     multisig_start = 40_000_000
 
-    faucet_client.fund_account(alice.address(), alice_start)
+    alice_fund = faucet_client.fund_account(alice.address(), alice_start)
+    bob_fund = faucet_client.fund_account(bob.address(), bob_start)
+    chad_fund = faucet_client.fund_account(chad.address(), chad_start)
+    multisig_fund = faucet_client.fund_account(multisig_address, multisig_start)
+    await asyncio.gather(*[alice_fund, bob_fund, chad_fund, multisig_fund])
+
     alice_balance = rest_client.account_balance(alice.address())
-    print(f"Alice's balance:  {alice_balance}")
-
-    faucet_client.fund_account(bob.address(), bob_start)
     bob_balance = rest_client.account_balance(bob.address())
-    print(f"Bob's balance:    {bob_balance}")
-
-    faucet_client.fund_account(chad.address(), chad_start)
     chad_balance = rest_client.account_balance(chad.address())
-    print(f"Chad's balance:   {chad_balance}")
-
-    faucet_client.fund_account(multisig_address, multisig_start)
     multisig_balance = rest_client.account_balance(multisig_address)
+    [alice_balance, bob_balance, chad_balance, multisig_balance] = await asyncio.gather(
+        *[alice_balance, bob_balance, chad_balance, multisig_balance]
+    )
+
+    print(f"Alice's balance:  {alice_balance}")
+    print(f"Bob's balance:    {bob_balance}")
+    print(f"Chad's balance:   {chad_balance}")
     print(f"Multisig balance: {multisig_balance}")  # <:!:section_3
 
     wait()
@@ -105,6 +110,7 @@ if __name__ == "__main__":
         ],
     )
 
+    chain_id = await rest_client.chain_id()
     raw_transaction = RawTransaction(
         sender=multisig_address,
         sequence_number=0,
@@ -114,7 +120,7 @@ if __name__ == "__main__":
         expiration_timestamps_secs=(
             int(time.time()) + rest_client.client_config.expiration_ttl
         ),
-        chain_id=rest_client.chain_id,
+        chain_id=chain_id,
     )
 
     alice_signature = alice.sign(raw_transaction.keyed())
@@ -145,8 +151,8 @@ if __name__ == "__main__":
 
     print("\n=== Submitting transfer transaction ===")
 
-    tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
-    rest_client.wait_for_transaction(tx_hash)
+    tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
+    await rest_client.wait_for_transaction(tx_hash)
     print(f"Transaction hash: {tx_hash}")  # <:!:section_5
 
     wait()
@@ -155,15 +161,16 @@ if __name__ == "__main__":
     print("\n=== New account balances===")
 
     alice_balance = rest_client.account_balance(alice.address())
-    print(f"Alice's balance:  {alice_balance}")
-
     bob_balance = rest_client.account_balance(bob.address())
-    print(f"Bob's balance:    {bob_balance}")
-
     chad_balance = rest_client.account_balance(chad.address())
-    print(f"Chad's balance:   {chad_balance}")
-
     multisig_balance = rest_client.account_balance(multisig_address)
+    [alice_balance, bob_balance, chad_balance, multisig_balance] = await asyncio.gather(
+        *[alice_balance, bob_balance, chad_balance, multisig_balance]
+    )
+
+    print(f"Alice's balance:  {alice_balance}")
+    print(f"Bob's balance:    {bob_balance}")
+    print(f"Chad's balance:   {chad_balance}")
     print(f"Multisig balance: {multisig_balance}")  # <:!:section_6
 
     wait()
@@ -181,8 +188,8 @@ if __name__ == "__main__":
 
     deedee_start = 50_000_000
 
-    faucet_client.fund_account(deedee.address(), deedee_start)
-    deedee_balance = rest_client.account_balance(deedee.address())
+    await faucet_client.fund_account(deedee.address(), deedee_start)
+    deedee_balance = await rest_client.account_balance(deedee.address())
     print(f"Deedee's balance:    {deedee_balance}")  # <:!:section_7
 
     wait()
@@ -241,21 +248,19 @@ if __name__ == "__main__":
         ],
     )
 
-    signed_transaction = rest_client.create_bcs_signed_transaction(
+    signed_transaction = await rest_client.create_bcs_signed_transaction(
         deedee, TransactionPayload(entry_function)
     )
 
-    auth_key = rest_client.account(deedee.address())["authentication_key"]
+    account_data = await rest_client.account(deedee.address())
+    print(f"Auth key pre-rotation: {account_data['authentication_key']}")
 
-    print(f"Auth key pre-rotation: {auth_key}")
-
-    tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
+    tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
     rest_client.wait_for_transaction(tx_hash)
     print(f"Transaction hash:      {tx_hash}")
 
-    auth_key = rest_client.account(deedee.address())["authentication_key"]
-
-    print(f"New auth key:          {auth_key}")
+    account_data = await rest_client.account(deedee.address())
+    print(f"New auth key:          {account_data['authentication_key']}")
     print(f"1st multisig address:  {multisig_address}")  # <:!:section_9
 
     wait()
@@ -263,7 +268,7 @@ if __name__ == "__main__":
     # :!:>section_10
     print("\n=== Genesis publication ===")
 
-    packages_dir = "../../../../aptos-move/move-examples/upgrade_and_govern/"
+    packages_dir = "../../../aptos-move/move-examples/upgrade_and_govern/"
 
     command = (
         f"aptos move compile "
@@ -304,7 +309,7 @@ if __name__ == "__main__":
         expiration_timestamps_secs=(
             int(time.time()) + rest_client.client_config.expiration_ttl
         ),
-        chain_id=rest_client.chain_id,
+        chain_id=chain_id,
     )
 
     alice_signature = alice.sign(raw_transaction.keyed())
@@ -323,11 +328,11 @@ if __name__ == "__main__":
 
     signed_transaction = SignedTransaction(raw_transaction, authenticator)
 
-    tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
-    rest_client.wait_for_transaction(tx_hash)
+    tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
+    await rest_client.wait_for_transaction(tx_hash)
     print(f"\nTransaction hash: {tx_hash}")
 
-    registry = rest_client.account_resource(
+    registry = await rest_client.account_resource(
         deedee.address(), "0x1::code::PackageRegistry"
     )
 
@@ -385,7 +390,7 @@ if __name__ == "__main__":
         expiration_timestamps_secs=(
             int(time.time()) + rest_client.client_config.expiration_ttl
         ),
-        chain_id=rest_client.chain_id,
+        chain_id=chain_id,
     )
 
     alice_signature = alice.sign(raw_transaction.keyed())
@@ -406,11 +411,11 @@ if __name__ == "__main__":
 
     signed_transaction = SignedTransaction(raw_transaction, authenticator)
 
-    tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
-    rest_client.wait_for_transaction(tx_hash)
+    tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
+    await rest_client.wait_for_transaction(tx_hash)
     print(f"\nTransaction hash: {tx_hash}")
 
-    registry = rest_client.account_resource(
+    registry = await rest_client.account_resource(
         deedee.address(), "0x1::code::PackageRegistry"
     )
 
@@ -444,7 +449,7 @@ if __name__ == "__main__":
         expiration_timestamps_secs=(
             int(time.time()) + rest_client.client_config.expiration_ttl
         ),
-        chain_id=rest_client.chain_id,
+        chain_id=chain_id,
     )
 
     alice_signature = alice.sign(raw_transaction.keyed())
@@ -463,13 +468,23 @@ if __name__ == "__main__":
 
     signed_transaction = SignedTransaction(raw_transaction, authenticator)
 
-    tx_hash = rest_client.submit_bcs_transaction(signed_transaction)
-    rest_client.wait_for_transaction(tx_hash)
+    tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
+    await rest_client.wait_for_transaction(tx_hash)
     print(f"Transaction hash: {tx_hash}")
 
     alice_balance = rest_client.account_balance(alice.address())
-    print(f"Alice's balance:  {alice_balance}")
     bob_balance = rest_client.account_balance(bob.address())
-    print(f"Bob's balance:    {bob_balance}")
     chad_balance = rest_client.account_balance(chad.address())
-    print(f"Chad's balance:   {chad_balance}")  # <:!:section_12
+    multisig_balance = rest_client.account_balance(multisig_address)
+    [alice_balance, bob_balance, chad_balance, multisig_balance] = await asyncio.gather(
+        *[alice_balance, bob_balance, chad_balance, multisig_balance]
+    )
+
+    print(f"Alice's balance:  {alice_balance}")
+    print(f"Bob's balance:    {bob_balance}")
+    print(f"Chad's balance:   {chad_balance}")
+    print(f"Multisig balance: {multisig_balance}")  # <:!:section_12
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -8,6 +8,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 edition = "2021"
+default-run = "aptos-debugger"
 
 [dependencies]
 anyhow = { workspace = true }
@@ -15,6 +16,7 @@ aptos-crypto = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-memory-usage-tracker = { workspace = true }
 aptos-resource-viewer = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-state-view = { workspace = true }
@@ -23,6 +25,7 @@ aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
+bcs = { workspace = true }
 clap = { workspace = true }
 move-binary-format = { workspace = true }
 move-cli = { workspace = true }
@@ -32,5 +35,9 @@ move-resource-viewer = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
+regex = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+
+[[bin]]
+name = "bcs-txn-decoder"

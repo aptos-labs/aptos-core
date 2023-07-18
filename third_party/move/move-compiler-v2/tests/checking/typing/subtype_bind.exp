@@ -1,0 +1,31 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        dummy_field: bool,
+    }
+    private fun t0() {
+        {
+          let x: &u64 = Borrow(Mutable)(0);
+          x;
+          Tuple()
+        }
+    }
+    private fun t1() {
+        {
+          let (x: &mut u64, y: &u64) = Tuple(Borrow(Mutable)(0), Borrow(Mutable)(0));
+          x;
+          y;
+          {
+            let (x: &u64, y: &mut u64) = Tuple(Borrow(Mutable)(0), Borrow(Mutable)(0));
+            x;
+            y;
+            {
+              let (x: &u64, y: &u64) = Tuple(Borrow(Mutable)(0), Borrow(Mutable)(0));
+              x;
+              y;
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x8675309::M

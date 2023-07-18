@@ -4,12 +4,20 @@
 import asyncio
 import logging
 import typing
+import unittest
+import unittest.mock
 
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.account_sequence_number import AccountSequenceNumber
 from aptos_sdk.async_client import RestClient
-from aptos_sdk.transactions import SignedTransaction, TransactionPayload
+from aptos_sdk.bcs import Serializer
+from aptos_sdk.transactions import (
+    EntryFunction,
+    SignedTransaction,
+    TransactionArgument,
+    TransactionPayload,
+)
 
 
 class TransactionWorker:
@@ -49,6 +57,9 @@ class TransactionWorker:
         self._account_sequence_number = AccountSequenceNumber(
             rest_client, account.address()
         )
+        self._account_sequence_number._maximum_wait_time = (
+            rest_client.client_config.transaction_wait_in_seconds
+        )
         self._rest_client = rest_client
         self._transaction_generator = transaction_generator
 
@@ -60,7 +71,7 @@ class TransactionWorker:
     def address(self) -> AccountAddress:
         return self._account.address()
 
-    async def _submit_transactions_task(self):
+    async def _submit_transactions(self):
         try:
             while True:
                 sequence_number = (
@@ -81,7 +92,7 @@ class TransactionWorker:
             # This is insufficient, if we hit this we either need to bail or resolve the potential errors
             logging.error(e, exc_info=True)
 
-    async def _process_transactions_task(self):
+    async def _process_transactions(self):
         try:
             while True:
                 # Always start waiting for one, that way we can acquire a batch in the loop below.
@@ -103,7 +114,7 @@ class TransactionWorker:
 
                 outputs = await asyncio.gather(*awaitables, return_exceptions=True)
 
-                for (output, sequence_number) in zip(outputs, sequence_numbers):
+                for output, sequence_number in zip(outputs, sequence_numbers):
                     if isinstance(output, BaseException):
                         await self._processed_transactions.put(
                             (sequence_number, None, output)
@@ -120,7 +131,7 @@ class TransactionWorker:
 
     async def next_processed_transaction(
         self,
-    ) -> (int, typing.Optional[str], typing.Optional[Exception]):
+    ) -> typing.Tuple[int, typing.Optional[str], typing.Optional[Exception]]:
         return await self._processed_transactions.get()
 
     def stop(self):
@@ -141,10 +152,10 @@ class TransactionWorker:
         self._started = True
 
         self._submit_transactions_task = asyncio.create_task(
-            self._submit_transactions_task()
+            self._submit_transactions()
         )
         self._process_transactions_task = asyncio.create_task(
-            self._process_transactions_task()
+            self._process_transactions()
         )
 
 
@@ -166,13 +177,6 @@ class TransactionQueue:
         return await self._client.create_bcs_signed_transaction(
             sender, payload, sequence_number=sequence_number
         )
-
-
-import unittest
-import unittest.mock
-
-from aptos_sdk.bcs import Serializer
-from aptos_sdk.transactions import EntryFunction, TransactionArgument
 
 
 class Test(unittest.IsolatedAsyncioTestCase):

@@ -3,7 +3,7 @@ import json
 import os
 import unittest
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import (
     Any,
@@ -80,18 +80,28 @@ class AssertFixtureMixin:
     def assertFixture(
         self: HasAssertMultiLineEqual, test_str: str, fixture_name: str
     ) -> None:
+        fixture = None
         fixture_path = get_fixture_path(fixture_name)
         if os.getenv("FORGE_WRITE_FIXTURES") == "true":
             print(f"Writing fixture to {str(fixture_path)}")
             fixture_path.write_text(test_str)
             fixture = test_str
         else:
-            fixture = fixture_path.read_text()
+            try:
+                fixture = fixture_path.read_text()
+            except FileNotFoundError as e:
+                raise Exception(
+                    f"Fixture {fixture_path} is missing.\nRun with FORGE_WRITE_FIXTURES=true to update the fixtures"
+                ) from e
+            except Exception as e:
+                raise Exception(
+                    f"Failed while reading fixture:\n{e}\nRun with FORGE_WRITE_FIXTURES=true to update the fixtures"
+                ) from e
         temp = Path(tempfile.mkstemp()[1])
         temp.write_text(test_str)
         self.assertMultiLineEqual(
             test_str,
-            fixture,
+            fixture or "",
             f"Fixture {fixture_name} does not match"
             "\n"
             f"Wrote to {str(temp)} for comparison"
@@ -152,6 +162,7 @@ def fake_context(
             name="tomato", kubeconf="kubeconf", is_multiregion=multiregion
         ),
         forge_test_suite="banana",
+        forge_username="banana-eater",
         forge_blocking=True,
         github_actions="false",
         github_job_url="https://banana",
@@ -613,10 +624,21 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
             "testFormatReport.fixture",
         )
 
+    def testSanitizeForgeNamespaceLastCharacter(self) -> None:
+        namespace_with_invalid_last_char = "forge-$$$"
+        namespace = sanitize_forge_resource_name(namespace_with_invalid_last_char)
+        self.assertEqual(namespace, "forge---0")
+
     def testSanitizeForgeNamespaceSlashes(self) -> None:
         namespace_with_slash = "forge-banana/apple"
         namespace = sanitize_forge_resource_name(namespace_with_slash)
         self.assertEqual(namespace, "forge-banana-apple")
+
+    def testSanitizeForgeNamespaceStartsWith(self) -> None:
+        namespace_with_invalid_start = "frog-"
+        self.assertRaises(
+            Exception, sanitize_forge_resource_name, namespace_with_invalid_start
+        )
 
     def testSanitizeForgeNamespaceTooLong(self) -> None:
         namespace_too_long = "forge-" + "a" * 10000
@@ -625,6 +647,16 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
             namespace,
             "forge-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         )
+
+    def testPossibleAuthFailureMessage(self) -> None:
+        result = ForgeResult.empty()
+        context = fake_context()
+        now = context.time.now()
+        result._start_time = now - timedelta(seconds=4800)
+        result._end_time = now
+        result.state = ForgeState.FAIL
+        output = result.format(context)
+        self.assertFixture(output, "testPossibleAuthFailureMessage.fixture")
 
 
 class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):

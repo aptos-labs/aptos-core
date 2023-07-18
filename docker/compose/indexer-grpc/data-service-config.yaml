@@ -1,7 +1,8 @@
 health_check_port: 8084
 
 server_config:
-  data_service_grpc_listen_address: 0.0.0.0:50052
+  data_service_grpc_non_tls_config:
+      data_service_grpc_listen_address: 0.0.0.0:50052
   whitelisted_auth_tokens: ["dummy_token"]
   file_store_config:
     file_store_type: LocalFileStore

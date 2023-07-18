@@ -251,7 +251,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                     if matches!(mv_value, ReadResult::Unresolved) {
                         let from_storage =
                             self.base_view.get_state_value_bytes(state_key)?.map_or(
-                                Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+                                Err(VMStatus::error(StatusCode::STORAGE_ERROR, None)),
                                 |bytes| Ok(deserialize(&bytes)),
                             )?;
 
@@ -270,7 +270,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                         // For now we use STORAGE_ERROR as the VM will not log the speculative eror,
                         // so no actual error will be logged once the execution is halted and
                         // the speculative logging is flushed.
-                        ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::Error(
+                        ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::error(
                             StatusCode::STORAGE_ERROR,
                             Some("Speculative error to halt BlockSTM early.".to_string()),
                         ))),

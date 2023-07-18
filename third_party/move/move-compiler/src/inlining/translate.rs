@@ -65,17 +65,23 @@ pub fn run_inlining(env: &mut CompilationEnv, prog: &mut Program) {
 impl<'l> Inliner<'l> {
     fn run(&mut self, prog: &mut Program) {
         // First collect all definitions of inlined functions so we can expand them later in the AST.
-        self.visit_functions(prog, VisitingMode::All, &mut |ctx, _, fdef| {
+        self.visit_functions(prog, VisitingMode::All, &mut |ctx, fname, fdef| {
             if let Some(mid) = ctx.current_module {
                 let global_name = (mid, ctx.current_function);
                 ctx.visibilities
                     .insert(global_name, fdef.visibility.clone());
                 if fdef.inline {
-                    assert!(
-                        matches!(fdef.body.value, FunctionBody_::Defined(_)),
-                        "ICE inline function without body"
-                    );
-                    ctx.inline_defs.insert(global_name, fdef.clone());
+                    if !matches!(fdef.body.value, FunctionBody_::Defined(_)) {
+                        ctx.env.add_diag(diag!(
+                            Inlining::Unsupported,
+                            (
+                                fdef.body.loc,
+                                format!("inline function {} must not be native", fname)
+                            )
+                        ));
+                    } else {
+                        ctx.inline_defs.insert(global_name, fdef.clone());
+                    }
                 }
             }
         });
@@ -134,7 +140,11 @@ impl<'l> Inliner<'l> {
     {
         for (_, mid_, mdef) in prog.modules.iter_mut() {
             self.current_module = Some(*mid_);
-            if mode == VisitingMode::All || mdef.is_source_module {
+            let visit_module = match mode {
+                VisitingMode::All => true,
+                VisitingMode::SourceOnly => mdef.is_source_module,
+            };
+            if visit_module {
                 for (loc, fname, fdef) in mdef.functions.iter_mut() {
                     self.current_function = *fname;
                     self.current_function_loc = Some(loc);
@@ -345,7 +355,14 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                         items.push_back(sp(loc, SequenceItem_::Seq(body)));
                         Some(UnannotatedExp_::Block(items))
                     },
-                    _ => panic!("ICE expected function parameter to be a lambda"),
+                    _ => {
+                        self.inliner.env.add_diag(diag!(
+			    Inlining::Unsupported,
+			    (repl.exp.loc,
+			     "Inlined function-typed parameter currently must be a literal lambda expression")
+			));
+                        None
+                    },
                 }
             },
             _ => None,
@@ -624,14 +641,16 @@ impl<'l> Inliner<'l> {
                 .zip(mcall.type_arguments.iter())
                 .map(|(p, t)| (p.id, t.clone()))
                 .collect();
-            let (decls_for_let, bindings) = self.process_parameters(
-                call_loc,
-                fdef.signature
-                    .parameters
-                    .iter()
-                    .cloned()
-                    .zip(get_args_from_exp(&mcall.arguments)),
-            );
+            let mut inliner_visitor = OuterVisitor { inliner: self };
+            let mut inlined_args = mcall.arguments.clone();
+            Dispatcher::new(&mut inliner_visitor).exp(&mut inlined_args);
+            let mapped_params = fdef
+                .signature
+                .parameters
+                .iter()
+                .cloned()
+                .zip(get_args_from_exp(&inlined_args));
+            let (decls_for_let, bindings) = self.process_parameters(call_loc, mapped_params);
 
             // Expand the body in its own independent visitor
             self.inline_stack.push_front(global_name); // for cycle detection

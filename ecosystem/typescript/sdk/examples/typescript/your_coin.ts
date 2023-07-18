@@ -40,7 +40,7 @@ class CoinClient extends AptosClient {
     return pendingTxn.hash;
   }
 
-  /** Mints the newly created coin to a specified receiver address */
+  /** Transfer the newly created coin to a specified receiver address */
   async transferCoin(sender: AptosAccount, receiverAddress: HexString, amount: number | bigint): Promise<string> {
     const rawTxn = await this.generateTransaction(sender.address(), {
       function: "0x1::aptos_account::transfer_coins",

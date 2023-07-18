@@ -305,9 +305,9 @@ pub trait DbReader: Send + Sync {
             .and_then(|opt| opt.ok_or_else(|| format_err!("Latest LedgerInfo not found.")))
     }
 
-    /// Returns the latest version, error on on non-bootstrapped DB.
+    /// Returns the latest committed version, error on on non-bootstrapped/empty DB.
     fn get_latest_version(&self) -> Result<Version> {
-        Ok(self.get_latest_ledger_info()?.ledger_info().version())
+        unimplemented!()
     }
 
     /// Returns the latest state checkpoint version if any.
@@ -444,13 +444,6 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// Gets the latest transaction info.
-    /// N.B. Unlike get_startup_info(), even if the db is not bootstrapped, this can return `Some`
-    /// -- those from a aptos db-tool restore run.
-    fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>> {
-        unimplemented!()
-    }
-
     /// Gets the transaction accumulator root hash at specified version.
     /// Caller must guarantee the version is not greater than the latest version.
     fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue> {
@@ -569,16 +562,7 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_synced_version(&self) -> Result<u64> {
-        let (synced_version, _) = self
-            .get_latest_transaction_info_option()
-            .map_err(|e| {
-                format_err!(
-                    "[MoveStorage] Failed fetching latest transaction info: {}",
-                    e
-                )
-            })?
-            .ok_or_else(|| format_err!("[MoveStorage] Latest transaction info not found."))?;
-        Ok(synced_version)
+        self.get_latest_version()
     }
 
     fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {

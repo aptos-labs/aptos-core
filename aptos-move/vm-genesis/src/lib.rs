@@ -410,6 +410,8 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
         FeatureFlag::BLS12_381_STRUCTURES,
         FeatureFlag::CHARGE_INVARIANT_VIOLATION,
+        FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
+        FeatureFlag::GAS_PAYER_ENABLED,
     ]
 }
 

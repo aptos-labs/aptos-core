@@ -1,7 +1,5 @@
-import axios from "axios";
-
 import { AnyNumber } from "../bcs/types";
-import { HexString, MaybeHexString, CUSTOM_REQUEST_HEADER } from "../utils";
+import { HexString, MaybeHexString } from "../utils";
 import {
   GetAccountTokensCountQuery,
   GetAccountCoinsDataQuery,
@@ -21,6 +19,7 @@ import {
   GetTokenOwnedFromCollectionQuery,
   GetCollectionDataQuery,
   GetCollectionsWithOwnedTokensQuery,
+  GetTokenCurrentOwnerDataQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -41,7 +40,10 @@ import {
   GetTokenOwnedFromCollection,
   GetCollectionData,
   GetCollectionsWithOwnedTokens,
+  GetTokenCurrentOwnerData,
 } from "../indexer/generated/queries";
+import { ClientConfig, post } from "../client";
+import { ApiError } from "./aptos_client";
 
 /**
  * Controls the number of results that are returned and the starting position of those results.
@@ -68,13 +70,16 @@ type GraphqlQuery = {
  * {@link https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql}
  */
 export class IndexerClient {
-  endpoint: string;
+  readonly endpoint: string;
+
+  readonly config: ClientConfig | undefined;
 
   /**
    * @param endpoint URL of the Aptos Indexer API endpoint.
    */
-  constructor(endpoint: string) {
+  constructor(endpoint: string, config?: ClientConfig) {
     this.endpoint = endpoint;
+    this.config = config;
   }
 
   /**
@@ -89,18 +94,26 @@ export class IndexerClient {
   }
 
   /**
-   * Builds a axios client call to fetch data from Aptos Indexer.
+   * Makes axios client call to fetch data from Aptos Indexer.
    *
    * @param graphqlQuery A GraphQL query to pass in the `data` axios call.
    */
   async queryIndexer<T>(graphqlQuery: GraphqlQuery): Promise<T> {
-    const { data } = await axios.post(this.endpoint, graphqlQuery, {
-      headers: CUSTOM_REQUEST_HEADER,
+    const response = await post<GraphqlQuery, any>({
+      url: this.endpoint,
+      body: graphqlQuery,
+      overrides: { WITH_CREDENTIALS: false, ...this.config },
     });
-    if (data.errors) {
-      throw new Error(`Indexer data error ${JSON.stringify(data.errors, null, " ")}`);
+    if (response.data.errors) {
+      throw new ApiError(
+        response.data.errors[0].extensions.code,
+        JSON.stringify({
+          message: response.data.errors[0].message,
+          error_code: response.data.errors[0].extensions.code,
+        }),
+      );
     }
-    return data.data;
+    return response.data.data;
   }
 
   /**
@@ -255,28 +268,105 @@ export class IndexerClient {
   /**
    * Queries token data
    *
-   * @param tokenId Token ID
+   * @param tokenId Token ID address
    * @returns GetTokenDataQuery response type
    */
-  async getTokenData(tokenId: string): Promise<GetTokenDataQuery> {
+  async getTokenData(
+    tokenId: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<GetTokenDataQuery> {
+    const tokenAddress = HexString.ensure(tokenId).hex();
+    IndexerClient.validateAddress(tokenAddress);
+
+    const whereCondition: any = {
+      token_data_id: { _eq: tokenAddress },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
     const graphqlQuery = {
       query: GetTokenData,
-      variables: { token_id: tokenId },
+      variables: { where_condition: whereCondition },
     };
     return this.queryIndexer(graphqlQuery);
   }
 
   /**
-   * Queries token owners data
+   * Queries token owners data. This query returns historical owners data
+   * To fetch token v2 standard, pass in the optional `tokenStandard` parameter and
+   * dont pass `propertyVersion` parameter (as propertyVersion only compatible with v1 standard)
    *
    * @param tokenId Token ID
-   * @param propertyVersion Property version
+   * @param propertyVersion Property version (optional) - only compatible with token v1 standard
    * @returns GetTokenOwnersDataQuery response type
    */
-  async getTokenOwnersData(tokenId: string, propertyVersion: number): Promise<GetTokenOwnersDataQuery> {
+  async getTokenOwnersData(
+    tokenId: string,
+    propertyVersion?: number,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<GetTokenOwnersDataQuery> {
+    const tokenAddress = HexString.ensure(tokenId).hex();
+    IndexerClient.validateAddress(tokenAddress);
+
+    const whereCondition: any = {
+      token_data_id: { _eq: tokenAddress },
+    };
+
+    if (propertyVersion) {
+      whereCondition.property_version_v1 = { _eq: propertyVersion };
+    }
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
     const graphqlQuery = {
       query: GetTokenOwnersData,
-      variables: { token_id: tokenId, property_version: propertyVersion },
+      variables: { where_condition: whereCondition },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries token current owner data. This query returns the current token owner data.
+   * To fetch token v2 standard, pass in the optional `tokenStandard` parameter and
+   * dont pass `propertyVersion` parameter (as propertyVersion only compatible with v1 standard)
+   *
+   * @param tokenId Token ID
+   * @param propertyVersion Property version (optional) - only compatible with token v1 standard
+   * @returns GetTokenCurrentOwnerDataQuery response type
+   */
+  async getTokenCurrentOwnerData(
+    tokenId: string,
+    propertyVersion?: number,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<GetTokenCurrentOwnerDataQuery> {
+    const tokenAddress = HexString.ensure(tokenId).hex();
+    IndexerClient.validateAddress(tokenAddress);
+
+    const whereCondition: any = {
+      token_data_id: { _eq: tokenAddress },
+      amount: { _gt: "0" },
+    };
+
+    if (propertyVersion) {
+      whereCondition.property_version_v1 = { _eq: propertyVersion };
+    }
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
+    const graphqlQuery = {
+      query: GetTokenCurrentOwnerData,
+      variables: { where_condition: whereCondition },
     };
     return this.queryIndexer(graphqlQuery);
   }

@@ -217,7 +217,9 @@ fn init_store(
 
     let batch = SchemaBatch::new();
     for (ver, txn) in txns.iter().enumerate() {
-        store.put_transaction(ver as Version, txn, &batch).unwrap();
+        store
+            .put_transaction(ver as Version, txn, /*skip_index=*/ false, &batch)
+            .unwrap();
     }
     store
         .ledger_db

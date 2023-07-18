@@ -189,7 +189,7 @@ impl DeltaOp {
         // In case storage fails to fetch the value, return immediately.
         let maybe_value = state_view
             .get_state_value_bytes(state_key)
-            .map_err(|e| VMStatus::Error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
+            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
 
         // Otherwise we have to apply delta to the storage value.
         match maybe_value {
@@ -207,7 +207,7 @@ impl DeltaOp {
             },
             // Something is wrong, the value to which we apply delta should
             // always exist. Guard anyway.
-            None => Err(VMStatus::Error(
+            None => Err(VMStatus::error(
                 StatusCode::STORAGE_ERROR,
                 Some("Aggregator value does not exist in storage.".to_string()),
             )),
@@ -371,7 +371,7 @@ impl DeltaChangeSet {
         WriteSetMut::new(materialized_write_set)
             .freeze()
             .map_err(|_err| {
-                VMStatus::Error(
+                VMStatus::error(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                     Some("Error when freezing materialized deltas.".to_string()),
                 )
@@ -657,7 +657,11 @@ mod test {
         let delta_op = delta_add(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &KEY),
-            Err(VMStatus::Error(StatusCode::STORAGE_ERROR, Some(_)))
+            Err(VMStatus::Error {
+                status_code: StatusCode::STORAGE_ERROR,
+                message: Some(_),
+                sub_status: None
+            })
         );
     }
 
@@ -675,7 +679,7 @@ mod test {
         type Key = StateKey;
 
         fn get_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-            Err(anyhow::Error::new(VMStatus::Error(
+            Err(anyhow::Error::new(VMStatus::error(
                 StatusCode::STORAGE_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
@@ -696,7 +700,11 @@ mod test {
         let delta_op = delta_add(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &KEY),
-            Err(VMStatus::Error(StatusCode::STORAGE_ERROR, Some(_)))
+            Err(VMStatus::Error {
+                status_code: StatusCode::STORAGE_ERROR,
+                message: Some(_),
+                sub_status: None
+            })
         );
     }
 
@@ -707,7 +715,11 @@ mod test {
         let delta_change_set = DeltaChangeSet::new(deltas);
         assert_matches!(
             delta_change_set.try_into_write_set(&state_view),
-            Err(VMStatus::Error(StatusCode::STORAGE_ERROR, Some(_)))
+            Err(VMStatus::Error {
+                status_code: StatusCode::STORAGE_ERROR,
+                message: Some(_),
+                sub_status: None
+            })
         );
     }
 

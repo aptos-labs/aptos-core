@@ -6,15 +6,19 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
+    collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     token_utils::TokenWriteSet,
     v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping},
 };
 use crate::{
+    database::PgPoolConnection,
     schema::{current_token_datas_v2, token_datas_v2},
     util::standardize_address,
 };
+use anyhow::Context;
 use aptos_api_types::{WriteResource as APIWriteResource, WriteTableItem as APIWriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
+use diesel::{prelude::*, sql_query, sql_types::Text};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -60,6 +64,12 @@ pub struct CurrentTokenDataV2 {
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
     pub decimals: i64,
+}
+
+#[derive(Debug, QueryableByName)]
+pub struct TokenDataIdFromTable {
+    #[diesel(sql_type = Text)]
+    pub token_data_id: String,
 }
 
 impl TokenDataV2 {
@@ -221,5 +231,35 @@ impl TokenDataV2 {
             }
         }
         Ok(None)
+    }
+
+    /// Try to see if an address is a token. We'll try a few times in case there is a race condition,
+    /// and if we can't find after 3 times, we'll assume that it's not a token.
+    /// TODO: An improvement is that we'll make another query to see if address is a coin.
+    pub fn is_address_token(conn: &mut PgPoolConnection, address: &str) -> anyhow::Result<bool> {
+        let mut retried = 0;
+        while retried < QUERY_RETRIES {
+            retried += 1;
+            match Self::get_by_token_data_id(conn, address) {
+                Ok(_) => return Ok(true),
+                Err(_) => {
+                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                },
+            }
+        }
+        Ok(false)
+    }
+
+    /// TODO: Change this to a KV store
+    fn get_by_token_data_id(conn: &mut PgPoolConnection, address: &str) -> anyhow::Result<String> {
+        let mut res: Vec<Option<TokenDataIdFromTable>> =
+            sql_query("SELECT token_data_id FROM current_token_datas_v2 WHERE token_data_id = $1")
+                .bind::<Text, _>(address)
+                .get_results(conn)?;
+        Ok(res
+            .pop()
+            .context("token data result empty")?
+            .context("token data result null")?
+            .token_data_id)
     }
 }

@@ -9,6 +9,7 @@ use crate::{
     metrics,
     notification_handlers::{
         CommitNotification, CommittedTransactions, MempoolNotificationHandler,
+        StorageServiceNotificationHandler,
     },
     storage_synchronizer::StorageSynchronizerInterface,
 };
@@ -22,6 +23,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReader;
+use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::Verifier,
@@ -269,18 +271,9 @@ pub fn fetch_latest_synced_ledger_info(
 
 /// Fetches the latest synced version from the specified storage
 pub fn fetch_latest_synced_version(storage: Arc<dyn DbReader>) -> Result<Version, Error> {
-    let latest_transaction_info =
-        storage
-            .get_latest_transaction_info_option()
-            .map_err(|error| {
-                Error::StorageError(format!(
-                    "Failed to get the latest transaction info from storage: {:?}",
-                    error
-                ))
-            })?;
-    latest_transaction_info
-        .ok_or_else(|| Error::StorageError("Latest transaction info is missing!".into()))
-        .map(|(latest_synced_version, _)| latest_synced_version)
+    storage.get_latest_version().map_err(|e| {
+        Error::StorageError(format!("Failed to get latest version from storage: {e:?}"))
+    })
 }
 
 /// Initializes all relevant metric gauges (e.g., after a reboot
@@ -313,12 +306,17 @@ pub fn initialize_sync_gauges(storage: Arc<dyn DbReader>) -> Result<(), Error> {
 }
 
 /// Handles a notification for committed transactions by
-/// notifying mempool and the event subscription service.
-pub async fn handle_committed_transactions<M: MempoolNotificationSender>(
+/// notifying mempool, the event subscription service and
+/// the storage service.
+pub async fn handle_committed_transactions<
+    M: MempoolNotificationSender,
+    S: StorageServiceNotificationSender,
+>(
     committed_transactions: CommittedTransactions,
     storage: Arc<dyn DbReader>,
     mempool_notification_handler: MempoolNotificationHandler<M>,
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
+    storage_service_notification_handler: StorageServiceNotificationHandler<S>,
 ) {
     // Fetch the latest synced version and ledger info from storage
     let (latest_synced_version, latest_synced_ledger_info) =
@@ -348,6 +346,7 @@ pub async fn handle_committed_transactions<M: MempoolNotificationSender>(
         latest_synced_ledger_info,
         mempool_notification_handler,
         event_subscription_service,
+        storage_service_notification_handler,
     )
     .await
     {

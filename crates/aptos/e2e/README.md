@@ -30,8 +30,9 @@ poetry run python main.py -d --base-network mainnet --test-cli-path ~/aptos-core
 ```
 
 ## Debugging
-
 If you are get an error message similar to this:
+
+### CPU architecture
 ```
 docker: no matching manifest for linux/arm64/v8 in the manifest list entries.
 ```
@@ -42,10 +43,50 @@ DOCKER_DEFAULT_PLATFORM=linux/amd64 poetry run python main.py --base-network tes
 ```
 This makes the docker commands use the x86_64 images since we don't publish images for ARM.
 
-When running the e2e test using poetry locally, make sure you set your aptos config type to `workspace`, otherwise it won't be able to find the test account after `aptos init`. You can change it back to `global` afterward:
+### CLI config type
+If you see an error like this:
+```
+Traceback (most recent call last):
+  File "/Users/dport/a/core/crates/aptos/e2e/main.py", line 194, in <module>
+    if main():
+  File "/Users/dport/a/core/crates/aptos/e2e/main.py", line 156, in main
+    run_helper.prepare()
+  File "/Users/dport/a/core/crates/aptos/e2e/test_helpers.py", line 155, in prepare
+    self.prepare_cli()
+  File "/Users/dport/a/core/crates/aptos/e2e/test_helpers.py", line 189, in prepare_cli
+    raise RuntimeError(
+RuntimeError: When using --test-cli-path you must use workspace configuration, try running `aptos config set-global-config --config-type workspace`
+```
+
+It is because you are using the `--test-cli-path` flag but have configured the CLI to use the `global` config type. This is not currently compatible, you must switch the config type to workspace prior to running the E2E tests:
 ```
 aptos config set-global-config --config-type workspace
 ```
+
+### My test doesn't work
+You might be getting output like this:
+```
+2023-06-22 20:27:07,533 - ERROR - These tests failed:
+2023-06-22 20:27:07,533 - ERROR - test_move_compile_script ...
+```
+
+The best place to look is the test framework working directory, by default `/tmp/aptos-cli-tests`.
+
+In this directory you will find lots of useful output. For example, you can see the stdout of one of the commands in a test case like this:
+```
+$ cat /tmp/aptos-cli-tests/out/007_test_move_compile_script.stdout
+{
+  "Error": "Move compilation failed: Unable to resolve packages for package 'TwoByTwoTransfer': While resolving dependency 'AptosFramework' in package 'TwoByTwoTransfer': While processing dependency 'AptosFramework': Unable to find package manifest for 'AptosFramework' at \"Move.toml/move/scripts/two_by_two_transfer/../../../framework/aptos-framework\""
+}
+```
+
+For each test there are the following files:
+- test_name.command
+- test_name.stdout
+- test_name.stderr
+
+This file might also be present if the test threw an exception:
+- test_name.exception
 
 ## Writing new test cases
 To write a new test case, follow these steps:

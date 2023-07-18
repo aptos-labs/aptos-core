@@ -49,7 +49,7 @@ module marketplace::test_utils {
     }
 
     public fun fee_schedule(seller: &signer): Object<FeeSchedule> {
-        fee_schedule::init_internal(
+        fee_schedule::init(
             seller,
             signer::address_of(seller),
             2,
@@ -71,7 +71,7 @@ module marketplace::test_utils {
         aptos_token::create_collection(
             seller,
             string::utf8(b"collection description"),
-            1,
+            2,
             collection_name,
             string::utf8(b"collection uri"),
             true,
@@ -102,6 +102,26 @@ module marketplace::test_utils {
         object::address_to_object(obj_addr)
     }
 
+    public fun mint_tokenv2_additional(seller: &signer): Object<Token> {
+        let seller_addr = signer::address_of(seller);
+        let collection_name = string::utf8(b"collection_name");
+        let token_creation_num = account::get_guid_next_creation_num(seller_addr);
+
+        aptos_token::mint(
+            seller,
+            collection_name,
+            string::utf8(b"description"),
+            string::utf8(b"token_name_2"),
+            string::utf8(b"uri"),
+            vector::empty(),
+            vector::empty(),
+            vector::empty(),
+        );
+
+        let obj_addr = object::create_guid_object_address(seller_addr, token_creation_num);
+        object::address_to_object(obj_addr)
+    }
+
     public fun mint_tokenv1(seller: &signer): tokenv1::TokenId {
         let collection_name = string::utf8(b"collection_name");
         let token_name = string::utf8(b"token_name");
@@ -111,10 +131,38 @@ module marketplace::test_utils {
             collection_name,
             string::utf8(b"Collection: Hello, World"),
             string::utf8(b"https://aptos.dev"),
-            1,
+            2,
             vector[true, true, true],
         );
 
+        tokenv1::create_token_script(
+            seller,
+            collection_name,
+            token_name,
+            string::utf8(b"Hello, Token"),
+            1,
+            1,
+            string::utf8(b"https://aptos.dev"),
+            signer::address_of(seller),
+            100,
+            1,
+            vector[true, true, true, true, true],
+            vector::empty(),
+            vector::empty(),
+            vector::empty(),
+        );
+
+        tokenv1::create_token_id_raw(
+            signer::address_of(seller),
+            collection_name,
+            token_name,
+            0,
+        )
+    }
+
+    public fun mint_tokenv1_additional(seller: &signer): tokenv1::TokenId {
+        let collection_name = string::utf8(b"collection_name");
+        let token_name = string::utf8(b"token_name_2");
         tokenv1::create_token_script(
             seller,
             collection_name,

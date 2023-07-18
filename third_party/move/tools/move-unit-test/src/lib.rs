@@ -48,7 +48,7 @@ pub struct UnitTestingConfig {
     /// Number of threads to use for running tests.
     #[clap(
         name = "num_threads",
-        default_value = "8",
+        default_value_t = 8,
         short = 't',
         long = "threads"
     )]
@@ -59,9 +59,7 @@ pub struct UnitTestingConfig {
         name = "dependencies",
         long = "dependencies",
         short = 'd',
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub dep_files: Vec<String>,
 
@@ -89,16 +87,14 @@ pub struct UnitTestingConfig {
         name = "NAMED_ADDRESSES",
         short = 'a',
         long = "addresses",
-        parse(try_from_str = shared::parse_named_address)
+        value_parser = shared::parse_named_address
     )]
     pub named_address_values: Vec<(String, NumericalAddress)>,
 
     /// Source files
     #[clap(
         name = "sources",
-        takes_value(true),
-        multiple_values(true),
-        multiple_occurrences(true)
+        num_args = 0..
     )]
     pub source_files: Vec<String>,
 
@@ -110,10 +106,6 @@ pub struct UnitTestingConfig {
     /// Verbose mode
     #[clap(short = 'v', long = "verbose")]
     pub verbose: bool,
-
-    /// Whether the test output need to be printed out.
-    #[clap(short = 'v', long = "verbose")]
-    pub report_writeset: bool,
 
     /// Use the EVM-based execution backend.
     /// Does not work with --stackless.
@@ -147,7 +139,6 @@ impl UnitTestingConfig {
             verbose: false,
             list: false,
             named_address_values: vec![],
-            report_writeset: false,
 
             #[cfg(feature = "evm-backend")]
             evm: false,
@@ -248,7 +239,7 @@ impl UnitTestingConfig {
             test_plan,
             native_function_table,
             cost_table,
-            self.report_writeset,
+            self.verbose,
             #[cfg(feature = "evm-backend")]
             self.evm,
         )
@@ -263,7 +254,7 @@ impl UnitTestingConfig {
             test_results.report_statistics(&shared_writer)?;
         }
 
-        if self.report_writeset {
+        if self.verbose {
             test_results.report_goldens(&shared_writer)?;
         }
 
@@ -272,4 +263,10 @@ impl UnitTestingConfig {
         let writer = shared_writer.into_inner().unwrap();
         Ok((writer, ok))
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    UnitTestingConfig::command().debug_assert()
 }

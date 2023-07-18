@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: duplicate declaration of type parameter `T`, previously found in type parameters
+  ┌─ tests/checking/naming/duplicate_type_parameter_function.move:2:16
+  │
+2 │     fun foo<T, T>() {}
+  │                ^
+
+error: duplicate declaration of type parameter `T`, previously found in type parameters
+  ┌─ tests/checking/naming/duplicate_type_parameter_function.move:3:23
+  │
+3 │     fun foo2<T: drop, T: key, T>() {}
+  │                       ^
+
+error: duplicate declaration of type parameter `T`, previously found in type parameters
+  ┌─ tests/checking/naming/duplicate_type_parameter_function.move:3:31
+  │
+3 │     fun foo2<T: drop, T: key, T>() {}
+  │                               ^
