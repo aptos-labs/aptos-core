@@ -55,8 +55,6 @@ return true.
 -  [Function `cryptography_algebra_enabled`](#0x1_features_cryptography_algebra_enabled)
 -  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
 -  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
--  [Function `get_bulletproofs_feature`](#0x1_features_get_bulletproofs_feature)
--  [Function `bulletproofs_enabled`](#0x1_features_bulletproofs_enabled)
 -  [Function `get_periodical_reward_rate_decrease_feature`](#0x1_features_get_periodical_reward_rate_decrease_feature)
 -  [Function `periodical_reward_rate_decrease_enabled`](#0x1_features_periodical_reward_rate_decrease_enabled)
 -  [Function `get_partial_governance_voting`](#0x1_features_get_partial_governance_voting)
@@ -66,6 +64,8 @@ return true.
 -  [Function `fee_payer_enabled`](#0x1_features_fee_payer_enabled)
 -  [Function `get_auids`](#0x1_features_get_auids)
 -  [Function `auids_enabled`](#0x1_features_auids_enabled)
+-  [Function `get_bulletproofs_feature`](#0x1_features_get_bulletproofs_feature)
+-  [Function `bulletproofs_enabled`](#0x1_features_bulletproofs_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -173,7 +173,7 @@ available. This is needed because of the introduction of a new native function.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a>: u64 = 16;
+<pre><code><b>const</b> <a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a>: u64 = 24;
 </code></pre>
 
 
@@ -934,52 +934,6 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_bulletproofs_feature"></a>
-
-## Function `get_bulletproofs_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bulletproofs_feature">get_bulletproofs_feature</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bulletproofs_feature">get_bulletproofs_feature</a>(): u64 { <a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a> }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_features_bulletproofs_enabled"></a>
-
-## Function `bulletproofs_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_enabled">bulletproofs_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_enabled">bulletproofs_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a>)
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_features_get_periodical_reward_rate_decrease_feature"></a>
 
 ## Function `get_periodical_reward_rate_decrease_feature`
@@ -1181,6 +1135,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_auids_enabled">auids_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_bulletproofs_feature"></a>
+
+## Function `get_bulletproofs_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bulletproofs_feature">get_bulletproofs_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bulletproofs_feature">get_bulletproofs_feature</a>(): u64 { <a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_bulletproofs_enabled"></a>
+
+## Function `bulletproofs_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_enabled">bulletproofs_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_enabled">bulletproofs_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a>)
 }
 </code></pre>
 
