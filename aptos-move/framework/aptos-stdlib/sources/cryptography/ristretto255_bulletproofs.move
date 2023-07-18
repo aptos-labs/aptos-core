@@ -3,10 +3,10 @@
 /// A Bulletproof-based zero-knowledge range proof is a proof that a Pedersen commitment
 /// $c = v G + r H$ commits to an $n$-bit value $v$ (i.e., $v \in [0, 2^n)$). Currently, this module only supports
 /// $n \in \{8, 16, 32, 64\}$ for the number of bits.
-module aptos_std::bulletproofs {
+module aptos_std::ristretto255_bulletproofs {
     use std::error;
     use std::features;
-    use aptos_std::pedersen;
+    use aptos_std::ristretto255_pedersen as pedersen;
     use aptos_std::ristretto255::{Self, RistrettoPoint};
 
     //

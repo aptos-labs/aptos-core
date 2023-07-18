@@ -393,7 +393,7 @@ pub fn all_natives(
         util::make_all(gas_params.util, timed_features.clone(), features.clone())
     );
     add_natives_from_module!(
-        "bulletproofs",
+        "ristretto255_bulletproofs",
         cryptography::bulletproofs::make_all(
             gas_params.bulletproofs,
             timed_features.clone(),

@@ -8,7 +8,7 @@
 /// that `Enc_Y(v, r) + Enc_Y(v', r') = Enc_Y(v + v', r + r')` where `v, v'` are plaintext messages, `Y` is a public key and `r, r'`
 /// are the randomness of the ciphertexts.
 
-module aptos_std::elgamal {
+module aptos_std::ristretto255_elgamal {
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
     use std::option::Option;
     use std::vector;

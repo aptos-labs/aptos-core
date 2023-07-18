@@ -10,15 +10,15 @@ module veiled_coin::veiled_coin_tests {
     use std::string::utf8;
 
     #[test_only]
-    use aptos_std::bulletproofs;
+    use aptos_std::ristretto255_bulletproofs as bulletproofs;
     #[test_only]
     use aptos_std::debug::print;
     #[test_only]
-    use aptos_std::elgamal;
+    use aptos_std::ristretto255_elgamal as elgamal;
     #[test_only]
     use aptos_std::ristretto255;
     #[test_only]
-    use aptos_std::pedersen;
+    use aptos_std::ristretto255_pedersen as pedersen;
 
     #[test_only]
     use aptos_framework::account;
@@ -169,12 +169,12 @@ module veiled_coin::veiled_coin_tests {
         // Compute a sigma proof which shows that the recipient's new balance ciphertext and commitment both encode
         // the same value. The commitment is necessary to ensure the value is binding
         let sigma_proof = prove_withdrawal(
-            &recipient_sk, 
-            &recipient_pk, 
-            &curr_balance_ct, 
-            &new_balance_comm, 
-            &recipient_new_balance, 
-            &recipient_amount_unveiled, 
+            &recipient_sk,
+            &recipient_pk,
+            &curr_balance_ct,
+            &new_balance_comm,
+            &recipient_new_balance,
+            &recipient_amount_unveiled,
             &ristretto255::scalar_zero());
         let sigma_proof_bytes = serialize_withdrawal_subproof(&sigma_proof);
 
@@ -294,14 +294,14 @@ module veiled_coin::veiled_coin_tests {
         let amount_val = ristretto255::new_scalar_from_u32(50);
         let amount_rand = ristretto255::random_scalar();
 
-        // The commitment to the sender's new balance can use fresh randomness as we don't use the 
+        // The commitment to the sender's new balance can use fresh randomness as we don't use the
         // new balance amount in a ciphertext
         let new_balance_rand = ristretto255::random_scalar();
         let curr_balance_val = ristretto255::new_scalar_from_u32(150);
 
         // The sender's new balance is 150 - 50 = 100
         let new_balance_val = ristretto255::new_scalar_from_u32(100);
-   
+
         // No veiled transfers have been done yet so the sender's balance randomness is zero
         let curr_balance_ct = elgamal::new_ciphertext_with_basepoint(&curr_balance_val, &ristretto255::scalar_zero(), &sender_pk);
         let (new_balance_range_proof, _) = bulletproofs::prove_range_pedersen(
@@ -366,7 +366,7 @@ module veiled_coin::veiled_coin_tests {
         println(b"Transferred veiled coins");
 
         // Compute the randomness of the sender's current balance
-        let balance_rand = ristretto255::scalar_neg(&amount_rand); 
+        let balance_rand = ristretto255::scalar_neg(&amount_rand);
         // Sanity check veiled balances
         assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&sender), 100, &balance_rand, &sender_pk), 1);
         assert!(veiled_coin::verify_opened_balance<coin::FakeMoney>(signer::address_of(&recipient), 50, &amount_rand, &recipient_pk), 1);
@@ -390,12 +390,12 @@ module veiled_coin::veiled_coin_tests {
         let new_new_balance_comm = pedersen::new_commitment_for_bulletproof(&new_new_balance_val, &fresh_new_balance_rand);
         let new_new_balance_comm_bytes = pedersen::commitment_to_bytes(&new_new_balance_comm);
         let sigma_proof = sigma_protos::prove_withdrawal(
-            &sender_sk, 
+            &sender_sk,
             &sender_pk,
-            &new_curr_balance_ct, 
-            &new_new_balance_comm, 
-            &new_new_balance_val, 
-            &new_amount_val, 
+            &new_curr_balance_ct,
+            &new_new_balance_comm,
+            &new_new_balance_val,
+            &new_amount_val,
             &fresh_new_balance_rand);
         let sigma_proof_bytes = serialize_withdrawal_subproof(&sigma_proof);
 

@@ -8,7 +8,7 @@ Package for creating, verifying, serializing & deserializing the $\Sigma$-protoc
 
 <a name="@Preliminaries_0"></a>
 
-## Preliminaries
+### Preliminaries
 
 
 Recall that a $\Sigma$-protocol proof argues knowledge of a *secret* witness $w$ such that an arithmetic relation
@@ -18,21 +18,62 @@ Here, $x$ is a public statement known to the verifier (i.e., known to the valida
 $\Sigma$-protocol's zero-knowledge property ensures the witness $w$ remains secret.
 
 
-<a name="@The_"full"_sigma_protocol_for_a_veiled_transfer_1"></a>
+<a name="@WithdrawalSubproof:_ElGamal-Pedersen_equality_1"></a>
 
-## The "full" sigma protocol for a veiled transfer
+### WithdrawalSubproof: ElGamal-Pedersen equality
+
+
+This proof is used to provably convert an ElGamal ciphertext to a Pedersen commitment over which a ZK range proof
+can be securely computed. Otherwise, knowledge of the ElGamal SK breaks the binding of the 2nd component of the
+ElGamal ciphertext, making any ZK range proof over it useless.
+Because the sender cannot, after receiving a fully veiled transaction, compute their balance randomness, their
+updated balance ciphertext is computed in the relation, which is then linked to the Pedersen commitment of $b$.
+
+The secret witness $w$ in this relation, known only to the sender of the TXN, consists of:
+- $b$, sender's new balance, after the withdrawal from their veiled balance
+- $r$, randomness used to commit to $b$
+- $sk$, the sender's secret ElGamal encryption key
+
+(Note that the $\Sigma$-protocol's zero-knowledge property ensures the witness is not revealed.)
+
+The public statement $x$ in this relation consists of:
+- $G$, basepoint of a given elliptic curve
+- $H$, basepoint used for randomness in the Pedersen commitments
+- $(C_1, C_2)$, ElGamal encryption of the sender's current balance
+- $c$, Pedersen commitment to $b$ with randomness $r$
+- $v$, the amount the sender is withdrawing
+- $Y$, the sender's ElGamal encryption public key
+
+The relation being proved is as follows:
+
+```
+R(
+x = [ (C_1, C_2), c, G, H, Y, v]
+w = [ b, r, sk ]
+) = {
+C_1 - v G = b G + sk C_2
+c = b G + r H
+Y = sk G
+}
+```
+
+
+<a name="@TransferSubproof:_ElGamal-Pedersen_equality_and_ElGamal-ElGamal_equality_2"></a>
+
+### TransferSubproof: ElGamal-Pedersen equality and ElGamal-ElGamal equality
 
 
 This protocol argues two things. First, that the same amount is ElGamal-encrypted for both the sender and recipient.
 This is needed to correctly withdraw & deposit the same amount during a transfer. Second, that this same amount is
-committed via Pedersen. Third, that a Pedersen-committed balance is correctly ElGamal encrypted. These last two
-Pedersen commitments are needed to prevent overflowing attacks on the balance.
+committed via Pedersen. Third, that a Pedersen-committed balance is correctly ElGamal encrypted. ZK range proofs
+are computed over these last two Pedersen commitments, to prevent overflowing attacks on the balance.
 
 The secret witness $w$ in this relation, known only to the sender of the TXN, consists of:
 - $v$, amount being transferred
 - $r$, randomness used to ElGamal-encrypt $v$
 - $b$, sender's new balance after the transfer occurs
-- $r_b$, randomness used to ElGamal-encrypt $b$
+- $r_b$, randomness used to Pedersen commit $b$
+- $sk$, the sender's secret ElGamal encryption key
 
 The public statement $x$ in this relation consists of:
 - Public parameters
@@ -46,22 +87,23 @@ The public statement $x$ in this relation consists of:
 + $(C', D)$, ElGamal encryption of $v$, under the recipient's PK, using randomness $r$
 + $c$, Pedersen commitment to $v$ using randomness $r$
 - New balance encryption & commitment
-+ $(c_1, c_2)$, ElGamal encryption of $b$, under the sender's PK, using randomness $r_b$
++ $(C_1, C_2)$, ElGamal encryption of the sender's *current* balance, under the sender's PK. This is used to
+compute the sender's updated balance in the relation, as the sender cannot know their balance randomness.
 + $c'$, Pedersen commitment to $b$ using randomness $r_b$
 
 The relation being proved is:
 ```
 R(
-x = [ Y, Y', (C, C', D), c, (c_1, c_2), c', G, H]
-w = [ v, r, b, r_b ]
+x = [ Y, Y', (C, C', D), c, (C_1, C_2), c', G, H ]
+w = [ v, r, b, r_b, sk ]
 ) = {
 C  = v G + r Y
 C' = v G + r Y'
-D = r G
-c_1 =   b G + r_b Y
-c_2 = r_b G
-c  = b G + r_b H
-c' = v G +   r H
+D  = r G
+C_1 - C  = b G + sk (C_2 - D)
+c  = v G + r H
+c' = b G + r_b H
+Y  = sk G
 }
 ```
 
@@ -70,63 +112,52 @@ $C'$ -> $\bar{C}$, $Y$ -> $y$, $Y'$ -> $\bar{y}$, $v$ -> $b^*$). Note that their
 ElGamal-to-Pedersen conversion parts, as they can do ZK range proofs directly over ElGamal ciphertexts using their
 $\Sigma$-bullets modification of Bulletproofs.
 
-Note also that the equations $C_L - C = b' G + sk (C_R - D)$ and $Y = sk G$ in the Zether paper are enforced
-programmatically by this smart contract and so are not needed in our $\Sigma$-protocol.
 
-
-<a name="@_2"></a>
-
-##
-
-
-
--  [Preliminaries](#@Preliminaries_0)
--  [The "full" sigma protocol for a veiled transfer](#@The_"full"_sigma_protocol_for_a_veiled_transfer_1)
--  [](#@_2)
--  [Struct `ElGamalPedEqProof`](#0x1337_sigma_protos_ElGamalPedEqProof)
--  [Struct `FullSigmaProof`](#0x1337_sigma_protos_FullSigmaProof)
+    -  [Preliminaries](#@Preliminaries_0)
+    -  [WithdrawalSubproof: ElGamal-Pedersen equality](#@WithdrawalSubproof:_ElGamal-Pedersen_equality_1)
+    -  [TransferSubproof: ElGamal-Pedersen equality and ElGamal-ElGamal equality](#@TransferSubproof:_ElGamal-Pedersen_equality_and_ElGamal-ElGamal_equality_2)
+-  [Struct `WithdrawalSubproof`](#0x1337_sigma_protos_WithdrawalSubproof)
+-  [Struct `TransferSubproof`](#0x1337_sigma_protos_TransferSubproof)
 -  [Constants](#@Constants_3)
--  [Function `verify_full_sigma_proof`](#0x1337_sigma_protos_verify_full_sigma_proof)
--  [Function `verify_elgamalpedeq_proof`](#0x1337_sigma_protos_verify_elgamalpedeq_proof)
-    -  [Cryptographic details](#@Cryptographic_details_4)
--  [Function `deserialize_elgamalpedeq_proof`](#0x1337_sigma_protos_deserialize_elgamalpedeq_proof)
--  [Function `deserialize_full_sigma_proof`](#0x1337_sigma_protos_deserialize_full_sigma_proof)
+-  [Function `verify_transfer_subproof`](#0x1337_sigma_protos_verify_transfer_subproof)
+-  [Function `verify_withdrawal_subproof`](#0x1337_sigma_protos_verify_withdrawal_subproof)
+-  [Function `deserialize_withdrawal_subproof`](#0x1337_sigma_protos_deserialize_withdrawal_subproof)
+-  [Function `deserialize_transfer_subproof`](#0x1337_sigma_protos_deserialize_transfer_subproof)
 
 
 <pre><code><b>use</b> <a href="helpers.md#0x1337_helpers">0x1337::helpers</a>;
-<b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal">0x1::elgamal</a>;
 <b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/doc/pedersen.md#0x1_pedersen">0x1::pedersen</a>;
 <b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
+<b>use</b> <a href="">0x1::ristretto255_elgamal</a>;
+<b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/doc/ristretto255_pedersen.md#0x1_ristretto255_pedersen">0x1::ristretto255_pedersen</a>;
 <b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 
 
-<a name="0x1337_sigma_protos_ElGamalPedEqProof"></a>
+<a name="0x1337_sigma_protos_WithdrawalSubproof"></a>
 
-## Struct `ElGamalPedEqProof`
+## Struct `WithdrawalSubproof`
 
-A $\Sigma$-protocol for proving the correct ElGamal encryption of a Pedersen-committed balance.
+A $\Sigma$-protocol used during an unveiled withdrawal (for proving the correct ElGamal encryption of a
+Pedersen-committed balance).
 
 
-<pre><code><b>struct</b> <a href="sigma_protos.md#0x1337_sigma_protos_ElGamalPedEqProof">ElGamalPedEqProof</a>&lt;CoinType&gt; <b>has</b> drop
+<pre><code><b>struct</b> <a href="sigma_protos.md#0x1337_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a> <b>has</b> drop
 </code></pre>
 
 
 
-<a name="0x1337_sigma_protos_FullSigmaProof"></a>
+<a name="0x1337_sigma_protos_TransferSubproof"></a>
 
-## Struct `FullSigmaProof`
+## Struct `TransferSubproof`
 
-A $\Sigma$-protocol proof used as part of a <code>VeiledTransferProof</code>.
-This proof encompasses the $\Sigma$-protocol from <code><a href="sigma_protos.md#0x1337_sigma_protos_ElGamalPedEqProof">ElGamalPedEqProof</a></code>.
-(A more detailed description can be found in <code>verify_withdrawal_sigma_protocol</code>.)
-TODO: rename more clearly
+A $\Sigma$-protocol proof used during a veiled transfer. This proof encompasses the $\Sigma$-protocol from
+<code><a href="sigma_protos.md#0x1337_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a></code>.
 
 
-<pre><code><b>struct</b> <a href="sigma_protos.md#0x1337_sigma_protos_FullSigmaProof">FullSigmaProof</a>&lt;CoinType&gt; <b>has</b> drop
+<pre><code><b>struct</b> <a href="sigma_protos.md#0x1337_sigma_protos_TransferSubproof">TransferSubproof</a> <b>has</b> drop
 </code></pre>
 
 
@@ -151,113 +182,63 @@ The $\Sigma$-protocol proof for withdrawals did not verify.
 The domain separation tag (DST) used in the Fiat-Shamir transform of our $\Sigma$-protocol.
 
 
-<pre><code><b>const</b> <a href="sigma_protos.md#0x1337_sigma_protos_FIAT_SHAMIR_SIGMA_DST">FIAT_SHAMIR_SIGMA_DST</a>: <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [65, 112, 116, 111, 115, 86, 101, 105, 108, 101, 100, 67, 111, 105, 110, 47, 87, 105, 116, 104, 100, 114, 97, 119, 97, 108, 80, 114, 111, 111, 102, 70, 105, 97, 116, 83, 104, 97, 109, 105, 114];
+<pre><code><b>const</b> <a href="sigma_protos.md#0x1337_sigma_protos_FIAT_SHAMIR_SIGMA_DST">FIAT_SHAMIR_SIGMA_DST</a>: <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [65, 112, 116, 111, 115, 86, 101, 105, 108, 101, 100, 67, 111, 105, 110, 47, 87, 105, 116, 104, 100, 114, 97, 119, 97, 108, 83, 117, 98, 112, 114, 111, 111, 102, 70, 105, 97, 116, 83, 104, 97, 109, 105, 114];
 </code></pre>
 
 
 
-<a name="0x1337_sigma_protos_verify_full_sigma_proof"></a>
+<a name="0x1337_sigma_protos_verify_transfer_subproof"></a>
 
-## Function `verify_full_sigma_proof`
+## Function `verify_transfer_subproof`
 
 Verifies a $\Sigma$-protocol proof necessary to ensure correctness of a veiled transfer.
 
-Specifically, the proof argues that the same amount $v$ is Pedersen-committed in <code>transfer_value</code> and ElGamal-
+Specifically, the proof argues that the same amount $v$ is Pedersen-committed in <code>comm_amount</code> and ElGamal-
 encrypted in <code>withdraw_ct</code> (under <code>sender_pk</code>) and in <code>deposit_ct</code> (under <code>recipient_pk</code>), all three using the
 same randomness $r$.
 
-In addition, it argues that the same balance $b$ is ElGamal-encrypted in <code>sender_updated_balance_ct</code> under
-<code>sender_pk</code> and Pedersen-committed in <code>sender_updated_balance_comm</code>, both with the same randomness $r_b$.
-
-The Pedersen commitments are used as a simple mechanism to convert ElGamal ciphertexts to a
-computationally-binding commitment, over which a ZK range proof can be securely argued. Otherwise, knowledge of
-the ElGamal SK breaks the binding of the ElGamal commitment making any ZK range proof over it useless.
+In addition, it argues that the sender's new balance $b$ committed to by sender_new_balance_comm is the same
+as the value encrypted by the ciphertext obtained by subtracting withdraw_ct from sender_curr_balance_ct
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x1337_sigma_protos_verify_full_sigma_proof">verify_full_sigma_proof</a>&lt;CoinType&gt;(sender_pk: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal_CompressedPubkey">elgamal::CompressedPubkey</a>, recipient_pk: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal_CompressedPubkey">elgamal::CompressedPubkey</a>, withdraw_ct: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>, deposit_ct: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>, sender_updated_balance_ct: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>, sender_updated_balance_comm: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, transfer_value: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, proof: &<a href="sigma_protos.md#0x1337_sigma_protos_FullSigmaProof">sigma_protos::FullSigmaProof</a>&lt;CoinType&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x1337_sigma_protos_verify_transfer_subproof">verify_transfer_subproof</a>(sender_pk: &<a href="_CompressedPubkey">ristretto255_elgamal::CompressedPubkey</a>, recipient_pk: &<a href="_CompressedPubkey">ristretto255_elgamal::CompressedPubkey</a>, withdraw_ct: &<a href="_Ciphertext">ristretto255_elgamal::Ciphertext</a>, deposit_ct: &<a href="_Ciphertext">ristretto255_elgamal::Ciphertext</a>, comm_amount: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">ristretto255_pedersen::Commitment</a>, sender_new_balance_comm: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">ristretto255_pedersen::Commitment</a>, sender_curr_balance_ct: &<a href="_Ciphertext">ristretto255_elgamal::Ciphertext</a>, proof: &<a href="sigma_protos.md#0x1337_sigma_protos_TransferSubproof">sigma_protos::TransferSubproof</a>)
 </code></pre>
 
 
 
-<a name="0x1337_sigma_protos_verify_elgamalpedeq_proof"></a>
+<a name="0x1337_sigma_protos_verify_withdrawal_subproof"></a>
 
-## Function `verify_elgamalpedeq_proof`
+## Function `verify_withdrawal_subproof`
 
-Verifies a $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
-Specifically, this proof proves that <code>sender_updated_balance_ct</code> and <code>sender_updated_balance_comm</code> encode the
-same amount $v$ using the same randomness $r$, with <code>sender_pk</code> being used in <code>sender_updated_balance_ct</code>.
+Verifies the $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
 
-This is necessary to prevent the forgery of range proofs, as computing a range proof over the left half of an
-ElGamal ciphertext allows a user with their secret key to create range proofs over false values.
+Specifically, the proof argues that the same amount $v$ is Pedersen-committed in <code>sender_new_balance_comm</code> and
+ElGamal-encrypted in the ciphertext obtained by subtracting the ciphertext (vG, 0G) from sender_curr_balance_ct
 
 
-<a name="@Cryptographic_details_4"></a>
-
-### Cryptographic details
-
-
-The proof argues knowledge of a witness $w$ such that a specific relation $R(x; w)$ is satisfied, for a public
-statement $x$ known to the verifier (i.e., known to the validators). We describe this relation below.
-
-The secret witness $w$ in this relation, known only to the sender of the TXN, consists of:
-- $b$, the new veiled balance of the sender after their transaction goes through
-- $r$, ElGamal encryption randomness of the sender's new balance
-
-(Note that the $\Sigma$-protocol's zero-knowledge property ensures the witness is not revealed.)
-
-The public statement $x$ in this relation consists of:
-- $G$, the basepoint of a given elliptic curve
-- $Y$, the sender's PK
-- $(c1, c2)$, the ElGamal ecnryption of the sender's updated balance $b$ with updated randomness $r$ after
-their transaction is sent
-- $c$, the Pedersen commitment to $b$ with randomness $r$, using fixed randomness base $H$
-
-The relation being proved is as follows:
-
-```
-R(
-x = [ Y, (c1, c2), c, G, H]
-w = [ b, r ]
-) = {
-c1 = r * G
-c2 = b * G + r * Y
-c = b * G + r * H
-}
-```
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x1337_sigma_protos_verify_elgamalpedeq_proof">verify_elgamalpedeq_proof</a>&lt;CoinType&gt;(sender_pk: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal_CompressedPubkey">elgamal::CompressedPubkey</a>, sender_updated_balance_ct: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>, sender_updated_balance_comm: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, proof: &<a href="sigma_protos.md#0x1337_sigma_protos_ElGamalPedEqProof">sigma_protos::ElGamalPedEqProof</a>&lt;CoinType&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x1337_sigma_protos_verify_withdrawal_subproof">verify_withdrawal_subproof</a>(sender_pk: &<a href="_CompressedPubkey">ristretto255_elgamal::CompressedPubkey</a>, sender_curr_balance_ct: &<a href="_Ciphertext">ristretto255_elgamal::Ciphertext</a>, sender_new_balance_comm: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">ristretto255_pedersen::Commitment</a>, amount: &<a href="../../../framework/aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, proof: &<a href="sigma_protos.md#0x1337_sigma_protos_WithdrawalSubproof">sigma_protos::WithdrawalSubproof</a>)
 </code></pre>
 
 
 
-<a name="0x1337_sigma_protos_deserialize_elgamalpedeq_proof"></a>
+<a name="0x1337_sigma_protos_deserialize_withdrawal_subproof"></a>
 
-## Function `deserialize_elgamalpedeq_proof`
+## Function `deserialize_withdrawal_subproof`
 
-Deserializes and returns an <code><a href="sigma_protos.md#0x1337_sigma_protos_ElGamalPedEqProof">ElGamalPedEqProof</a></code> given its byte representation (see protocol description in
-<code>verify_elgamalpedeq_proof</code>)
-
-Elements at the end of the <code><a href="sigma_protos.md#0x1337_sigma_protos_ElGamalPedEqProof">ElGamalPedEqProof</a></code> struct are expected to be at the start of the byte vector, and
-serialized using the serialization formats in the <code><a href="../../../framework/aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">ristretto255</a></code> module.
+Deserializes and returns an <code><a href="sigma_protos.md#0x1337_sigma_protos_WithdrawalSubproof">WithdrawalSubproof</a></code> given its byte representation.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x1337_sigma_protos_deserialize_elgamalpedeq_proof">deserialize_elgamalpedeq_proof</a>&lt;CoinType&gt;(proof_bytes: <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="sigma_protos.md#0x1337_sigma_protos_ElGamalPedEqProof">sigma_protos::ElGamalPedEqProof</a>&lt;CoinType&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x1337_sigma_protos_deserialize_withdrawal_subproof">deserialize_withdrawal_subproof</a>(proof_bytes: <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="sigma_protos.md#0x1337_sigma_protos_WithdrawalSubproof">sigma_protos::WithdrawalSubproof</a>&gt;
 </code></pre>
 
 
 
-<a name="0x1337_sigma_protos_deserialize_full_sigma_proof"></a>
+<a name="0x1337_sigma_protos_deserialize_transfer_subproof"></a>
 
-## Function `deserialize_full_sigma_proof`
+## Function `deserialize_transfer_subproof`
 
-Deserializes and returns a <code><a href="sigma_protos.md#0x1337_sigma_protos_FullSigmaProof">FullSigmaProof</a></code> given its byte representation (see protocol description in
-<code>verify_full_sigma_protocol</code>)
-TODO: update all other occurences
-
-Elements at the end of the <code><a href="sigma_protos.md#0x1337_sigma_protos_FullSigmaProof">FullSigmaProof</a></code> struct are expected to be at the start  of the byte vector, and
-serialized using the serialization formats in the <code><a href="../../../framework/aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">ristretto255</a></code> module.
+Deserializes and returns a <code><a href="sigma_protos.md#0x1337_sigma_protos_TransferSubproof">TransferSubproof</a></code> given its byte representation.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x1337_sigma_protos_deserialize_full_sigma_proof">deserialize_full_sigma_proof</a>&lt;CoinType&gt;(proof_bytes: <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="sigma_protos.md#0x1337_sigma_protos_FullSigmaProof">sigma_protos::FullSigmaProof</a>&lt;CoinType&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protos.md#0x1337_sigma_protos_deserialize_transfer_subproof">deserialize_transfer_subproof</a>(proof_bytes: <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="sigma_protos.md#0x1337_sigma_protos_TransferSubproof">sigma_protos::TransferSubproof</a>&gt;
 </code></pre>

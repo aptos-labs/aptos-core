@@ -11,9 +11,9 @@
 -  [Function `public_amount_to_veiled_balance`](#0x1337_helpers_public_amount_to_veiled_balance)
 
 
-<pre><code><b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal">0x1::elgamal</a>;
-<b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
+<b>use</b> <a href="">0x1::ristretto255_elgamal</a>;
 <b>use</b> <a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
@@ -54,7 +54,7 @@ exists because we did not like the interface of <code>std::vector::trim</code>.)
 Returns an encryption of zero, without any randomness (i.e., $r=0$), under any ElGamal PK.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="helpers.md#0x1337_helpers_get_veiled_balance_zero_ciphertext">get_veiled_balance_zero_ciphertext</a>(): <a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal_CompressedCiphertext">elgamal::CompressedCiphertext</a>
+<pre><code><b>public</b> <b>fun</b> <a href="helpers.md#0x1337_helpers_get_veiled_balance_zero_ciphertext">get_veiled_balance_zero_ciphertext</a>(): <a href="_CompressedCiphertext">ristretto255_elgamal::CompressedCiphertext</a>
 </code></pre>
 
 
@@ -67,5 +67,5 @@ Returns an encryption of <code>amount</code>, without any randomness (i.e., $r=0
 WARNING: This is not a proper ciphertext: the value <code>amount</code> can be easily bruteforced.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="helpers.md#0x1337_helpers_public_amount_to_veiled_balance">public_amount_to_veiled_balance</a>(amount: u32): <a href="../../../framework/aptos-framework/../aptos-stdlib/doc/elgamal.md#0x1_elgamal_Ciphertext">elgamal::Ciphertext</a>
+<pre><code><b>public</b> <b>fun</b> <a href="helpers.md#0x1337_helpers_public_amount_to_veiled_balance">public_amount_to_veiled_balance</a>(amount: u32): <a href="_Ciphertext">ristretto255_elgamal::Ciphertext</a>
 </code></pre>

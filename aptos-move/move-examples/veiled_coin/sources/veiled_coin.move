@@ -110,11 +110,13 @@ module veiled_coin::veiled_coin {
     use std::signer;
     use std::vector;
 
-    use aptos_std::bulletproofs::{Self, RangeProof};
-    use aptos_std::elgamal::Self;
-    use aptos_std::pedersen;
+    use aptos_std::ristretto255;
+    use aptos_std::ristretto255_bulletproofs as bulletproofs;
+    use aptos_std::ristretto255_bulletproofs::RangeProof;
+    use aptos_std::ristretto255_elgamal as elgamal;
+    use aptos_std::ristretto255_pedersen as pedersen;
     #[test_only]
-    use aptos_std::ristretto255::{Self, Scalar};
+    use aptos_std::ristretto255::Scalar;
 
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};

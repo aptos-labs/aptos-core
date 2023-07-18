@@ -3,13 +3,13 @@
 ///
 /// A Pedersen commitment to a value `v` under _commitment key_ `(g, h)` is `v * g + r * h`, for a random scalar `r`.
 
-module aptos_std::pedersen {
+module aptos_std::ristretto255_pedersen {
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
     use std::option::Option;
     use std::vector;
 
     ///
-    /// Error Codes 
+    /// Error Codes
     ///
 
     /// The wrong number of bytes was passed in for deserialization

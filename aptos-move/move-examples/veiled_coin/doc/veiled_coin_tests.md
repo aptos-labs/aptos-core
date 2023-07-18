@@ -3,6 +3,9 @@
 
 # Module `0x1337::veiled_coin_tests`
 
+Tests for veiled coins.
+
+TODO: test that payments to self return successfully (ideally, they should do nothing)
 
 
 
