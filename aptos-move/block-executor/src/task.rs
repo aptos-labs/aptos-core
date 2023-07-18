@@ -10,7 +10,6 @@ use aptos_types::{
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp}, vm_status::VMStatus,
 };
-use std::marker::Sized;
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -24,6 +23,8 @@ pub enum ExecutionStatus<T, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(T),
+    /// Transaction execution resulted in an aggregator error
+    AggregatorError
 }
 
 /// Trait that defines a transaction type that can be executed by the block executor. A transaction
@@ -86,7 +87,7 @@ pub trait ExecutorTask: Sync {
 }
 
 /// Trait for execution result of a single transaction.
-pub trait TransactionOutput: Send + Sync + Debug {
+pub trait TransactionOutput: Send + Sync + Debug + Sized {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
@@ -118,5 +119,5 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
 
-    fn try_materialize(&self, state_view: &impl StateView) -> Result<Self, VMStatus>;    
+    fn try_materialize(&self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus>;    
 }

@@ -13,6 +13,7 @@ use crate::{
     },
     AptosVM,
 };
+use anyhow::Result;
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_block_executor::{
     errors::Error,
@@ -148,13 +149,13 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    fn try_materialize(&self, state_view: &impl StateView) -> Result<AptosTransactionOutput, VMStatus> {
+    fn try_materialize(&self, state_view: &impl StateView) -> anyhow::Result<AptosTransactionOutput, VMStatus> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to materialize")
             .try_materialize(state_view)
-            .map(|vm_output| AptosTransactionOutput { vm_output, committed_output: self.committed_output })
+            .map(|vm_output| Self::new(vm_output))
     }
 }
 

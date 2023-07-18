@@ -13,6 +13,8 @@ pub enum Error<E> {
     /// Execution of a thread yields a non-recoverable error, such error will be propagated back to
     /// the caller.
     UserError(E),
+    ///  Execution of a thread yields an aggregator error
+    AggregatorError
 }
 
 pub type Result<T, E> = ::std::result::Result<T, Error<E>>;

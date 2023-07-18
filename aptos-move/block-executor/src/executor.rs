@@ -300,6 +300,7 @@ where
                 // Record the status indicating abort.
                 ExecutionStatus::Abort(Error::UserError(err))
             },
+            ExecutionStatus::AggregatorError => ExecutionStatus::AggregatorError
         };
 
         // Remove entries from previous write/delta set that were not overwritten.
@@ -511,7 +512,7 @@ where
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     txn_commit_listener.on_transaction_committed(txn_idx, output);
                 },
-                ExecutionStatus::Abort(_) => {
+                ExecutionStatus::Abort(_) | ExecutionStatus::AggregatorError => {
                     txn_commit_listener.on_execution_aborted(txn_idx);
                 },
             }
@@ -692,6 +693,9 @@ where
                         ret = Some(err);
                         break;
                     },
+                    ExecutionStatus::AggregatorError => {
+                        ret = Some(Error::AggregatorError)
+                    }
                 };
             }
             ret
@@ -739,7 +743,7 @@ where
             );
 
             // match statement for `res`
-            let reexecute = false;
+            let mut reexecute = false;
             match res {
                 ExecutionStatus::Success(output) => {
                     let result = output.try_materialize(state_view);
@@ -759,9 +763,10 @@ where
                         }
                     }
                 },
-                ExecutionStatus::Abort(vm_status) => if is_aggregator_error(&vm_status) {
+                ExecutionStatus::AggregatorError => {
                     reexecute = true;
-                }
+                },
+                _ => {}
             }
             
             if reexecute {
@@ -804,6 +809,12 @@ where
                     // Record the status indicating abort.
                     return Err(Error::UserError(err));
                 },
+                ExecutionStatus::AggregatorError => {
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
+                    }
+                    return Err(Error::AggregatorError);
+                }
             }
 
             // When the txn is a SkipRest txn, halt sequential execution.

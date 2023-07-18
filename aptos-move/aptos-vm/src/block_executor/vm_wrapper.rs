@@ -71,7 +71,13 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             Ok((vm_status, vm_output, sender)) => {
                 process_vm_output(vm_status, vm_output, sender, log_context)
             },
-            Err(err) => ExecutionStatus::Abort(err),
+            Err(err) => {
+                if is_aggregator_error(err) {
+                    ExecutionStatus::AggregatorError
+                } else {
+                    ExecutionStatus::Abort(err)
+                }
+            }
         }
     }
 
