@@ -55,8 +55,8 @@ class Account:
 
     def store(self, path: str):
         data = {
-            "account_address": self.account_address.hex(),
-            "private_key": self.private_key.hex(),
+            "account_address": str(self.account_address),
+            "private_key": str(self.private_key),
         }
         with open(path, "w") as file:
             json.dump(data, file)
@@ -68,8 +68,7 @@ class Account:
 
     def auth_key(self) -> str:
         """Returns the auth_key for the associated account"""
-
-        return AccountAddress.from_key(self.private_key.public_key()).hex()
+        return str(AccountAddress.from_key(self.private_key.public_key()))
 
     def sign(self, data: bytes) -> ed25519.Signature:
         return self.private_key.sign(data)
@@ -120,7 +119,7 @@ class Test(unittest.TestCase):
 
         self.assertEqual(start, load)
         # Auth key and Account address should be the same at start
-        self.assertEqual(start.address().hex(), start.auth_key())
+        self.assertEqual(str(start.address()), start.auth_key())
 
     def test_key(self):
         message = b"test message"

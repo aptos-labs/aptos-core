@@ -25,8 +25,6 @@ class AccountAddress:
     def __init__(self, address: bytes):
         self.address = address
 
-        # Note: The correctness of is_special relies on this check. Be careful when
-        # changing anything about this function.
         if len(address) != AccountAddress.LENGTH:
             raise Exception("Expected address of length 32")
 
@@ -36,9 +34,6 @@ class AccountAddress:
         return self.address == other.address
 
     def __str__(self):
-        return self.hex()
-
-    def to_standard_string(self):
         """
         Represent an account address in a way that is compliant with the v1 address
         standard. The standard is defined as part of AIP-40, read more here:
@@ -66,7 +61,7 @@ class AccountAddress:
         Returns whether the address is a "special" address. Addresses are considered
         special if the first 63 characters of the hex string are zero. In other words,
         an address is special if the first 31 bytes are zero and the last byte is
-        smaller than than `0b10000` (16). In other words, special is defined as an address
+        smaller than `0b10000` (16). In other words, special is defined as an address
         that matches the following regex: `^0x0{63}[0-9a-f]$`. In short form this means
         the addresses in the range from `0x0` to `0xf` (inclusive) are special.
 
@@ -74,13 +69,6 @@ class AccountAddress:
         https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md
         """
         return all(b == 0 for b in self.address[:-1]) and self.address[-1] < 0b10000
-
-    def hex(self) -> str:
-        """
-        NOTE: Prefer to_standard_string for representing instances of AccountAddress
-        as strings.
-        """
-        return f"0x{self.address.hex()}"
 
     @staticmethod
     def from_hex(address: str) -> AccountAddress:
@@ -214,93 +202,95 @@ class Test(unittest.TestCase):
     def test_to_standard_string(self):
         # Test special address: 0x0
         self.assertEqual(
-            AccountAddress.from_hex(
-                "0x0000000000000000000000000000000000000000000000000000000000000000"
-            ).to_standard_string(),
+            str(
+                AccountAddress.from_hex(
+                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                )
+            ),
             "0x0",
         )
 
         # Test special address: 0x1
         self.assertEqual(
-            AccountAddress.from_hex(
-                "0x0000000000000000000000000000000000000000000000000000000000000001"
-            ).to_standard_string(),
+            str(
+                AccountAddress.from_hex(
+                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                )
+            ),
             "0x1",
         )
 
         # Test special address: 0x4
         self.assertEqual(
-            AccountAddress.from_hex(
-                "0x0000000000000000000000000000000000000000000000000000000000000004"
-            ).to_standard_string(),
+            str(
+                AccountAddress.from_hex(
+                    "0x0000000000000000000000000000000000000000000000000000000000000004"
+                )
+            ),
             "0x4",
         )
 
         # Test special address: 0xf
         self.assertEqual(
-            AccountAddress.from_hex(
-                "0x000000000000000000000000000000000000000000000000000000000000000f"
-            ).to_standard_string(),
+            str(
+                AccountAddress.from_hex(
+                    "0x000000000000000000000000000000000000000000000000000000000000000f"
+                )
+            ),
             "0xf",
         )
 
         # Test special address from short no 0x: d
         self.assertEqual(
-            AccountAddress.from_hex("d").to_standard_string(),
+            str(AccountAddress.from_hex("d")),
             "0xd",
         )
 
         # Test non-special address from long:
         # 0x0000000000000000000000000000000000000000000000000000000000000010
+        value = "0x0000000000000000000000000000000000000000000000000000000000000010"
         self.assertEqual(
-            AccountAddress.from_hex(
-                "0x0000000000000000000000000000000000000000000000000000000000000010"
-            ).to_standard_string(),
-            "0x0000000000000000000000000000000000000000000000000000000000000010",
+            str(AccountAddress.from_hex(value)),
+            value,
         )
 
         # Test non-special address from long:
         # 0x000000000000000000000000000000000000000000000000000000000000001f
+        value = "0x000000000000000000000000000000000000000000000000000000000000001f"
         self.assertEqual(
-            AccountAddress.from_hex(
-                "0x000000000000000000000000000000000000000000000000000000000000001f"
-            ).to_standard_string(),
-            "0x000000000000000000000000000000000000000000000000000000000000001f",
+            str(AccountAddress.from_hex(value)),
+            value,
         )
 
         # Test non-special address from long:
         # 0x00000000000000000000000000000000000000000000000000000000000000a0
+        value = "0x00000000000000000000000000000000000000000000000000000000000000a0"
         self.assertEqual(
-            AccountAddress.from_hex(
-                "0x00000000000000000000000000000000000000000000000000000000000000a0"
-            ).to_standard_string(),
-            "0x00000000000000000000000000000000000000000000000000000000000000a0",
+            str(AccountAddress.from_hex(value)),
+            value,
         )
 
         # Test non-special address from long no 0x:
         # ca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0
+        value = "ca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0"
         self.assertEqual(
-            AccountAddress.from_hex(
-                "ca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0"
-            ).to_standard_string(),
-            "0xca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0",
+            str(AccountAddress.from_hex(value)),
+            f"0x{value}",
         )
 
         # Test non-special address from long no 0x:
         # 1000000000000000000000000000000000000000000000000000000000000000
+        value = "1000000000000000000000000000000000000000000000000000000000000000"
         self.assertEqual(
-            AccountAddress.from_hex(
-                "1000000000000000000000000000000000000000000000000000000000000000"
-            ).to_standard_string(),
-            "0x1000000000000000000000000000000000000000000000000000000000000000",
+            str(AccountAddress.from_hex(value)),
+            f"0x{value}",
         )
 
         # Demonstrate that neither leading nor trailing zeroes get trimmed for
         # non-special addresses:
         # 0f00000000000000000000000000000000000000000000000000000000000000
+        value = "0f00000000000000000000000000000000000000000000000000000000000000"
         self.assertEqual(
-            AccountAddress.from_hex(
-                "0f00000000000000000000000000000000000000000000000000000000000000"
-            ).to_standard_string(),
-            "0x0f00000000000000000000000000000000000000000000000000000000000000",
+            str(AccountAddress.from_hex(value)),
+            f"0x{value}",
         )
