@@ -3,17 +3,13 @@
 
 use aptos_gas_algebra::{Expression, GasExpressionVisitor};
 
-/*
- * @notice: Visitor to traverse the Reverse Polish Notation
- */
+/// Visitor to traverse the Reverse Polish Notation
 pub struct CalibrationVisitor {
     //// Holds the AST
     pub node: Vec<Expression>,
 }
 
-/*
- * @notice: CalibrationVisitor implementation
- */
+/// CalibrationVisitor implementation
 impl GasExpressionVisitor for CalibrationVisitor {
     fn add(&mut self) {
         let expr = Expression::Add {

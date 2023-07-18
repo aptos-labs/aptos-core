@@ -1,80 +1,61 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//mod algebra;
-//mod algebra_helpers;
-mod benchmark;
-mod benchmark_helpers;
-mod modified_gas_meter;
-//use aptos_gas_algebra::GasAdd;
-//use aptos_gas_meter::GasAlgebra;
-//use aptos_gas_schedule::gas_params::instr;
-//use aptos_gas_algebra::Expression;
-//use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-//use aptos_native_interface::{Expression, SafeNativeBuilder};
-use benchmark::benchmark_calibration_function;
-use modified_gas_meter::get_abstract_gas_usage;
-//use move_core_types::{account_address::AccountAddress, ident_str};
-//use std::sync::{Arc, Mutex};
+mod gas_meter;
+mod gas_meter_helpers;
+mod math;
+mod math_interface;
+mod solve;
+use aptos_abstract_gas_usage::{collect_terms, normalize};
+use aptos_gas_algebra::Expression;
+use gas_meter::compile_and_run_samples_ir;
+use math_interface::{convert_to_matrix_format, total_num_of_cols, total_num_rows};
+use solve::{build_coefficient_matrix, build_constant_matrix, solve};
+use std::collections::BTreeMap;
 
-/*fn native_test_simple(gas_core: &mut impl GasAlgebra, v: &[u64]) -> anyhow::Result<u64> {
-    gas_core.charge_execution(
-        instr::LD_CONST_BASE + instr::LD_CONST_PER_BYTE * NumBytes::new(v.len() as u64),
-    )?;
-    Ok(v.iter().sum())
-}
-fn native_test_mul(gas_core: &mut impl GasAlgebra, v: &[u64]) -> anyhow::Result<u64> {
-    gas_core.charge_execution(instr::LD_CONST_PER_BYTE * NumBytes::new(v.len() as u64))?;
-    Ok(v.iter().sum())
-}
-fn native_test_mul_reverse(gas_core: &mut impl GasAlgebra, v: &[u64]) -> anyhow::Result<u64> {
-    gas_core.charge_execution(GasMul {
-        left: NumBytes::new(v.len() as u64),
-        right: instr::LD_CONST_PER_BYTE,
-    })?;
-    Ok(v.iter().sum())
-}
-fn native_test_add(gas_core: &mut impl GasAlgebra, v: &[u64]) -> anyhow::Result<u64> {
-    gas_core.charge_execution(GasAdd {
-        left: instr::LD_CONST_BASE,
-        right: instr::LD_CONST_BASE,
-    })?;
-    Ok(v.iter().sum())
-}*/
+/*
+ * Error types:
+ *
+ * - Impercise gas models (i.e., inject a dummy term into abstract usage)
+ * - Measurement errors (i.e., loading of module, loading of vm, etc.)
+ * - Samples not running long enough (i.e., run the simple ones in loops)
+ */
 
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
 
-    /*
-     * @notice: Run with Regular Gas Meter to get running time
-     * @return: f64 representing the running time
-     */
-    let running_times = benchmark_calibration_function();
-    println!("running times (RHS): {:?}", running_times);
+    let samples_ir = compile_and_run_samples_ir();
+    //let samples_ir = compile_and_run_samples();
 
-    /*
-     * @notice: Run with Modified Gas Meter to get Gas Formula
-     * @return: Simplified Map of coefficients and gas parameters
-     */
-    let abstract_gas_formulae = get_abstract_gas_usage();
-    println!("\n\nabstract gas formulae (LHS): {:?}", abstract_gas_formulae);
+    println!("\n\nabstract gas formulae (LHS): ");
+    let mut system_of_equations: Vec<Vec<Expression>> = Vec::new();
+    for formula in samples_ir.abstract_meter {
+        let mut terms: Vec<Expression> = Vec::new();
+        for term in formula {
+            let normal = normalize(term);
+            terms.extend(normal);
+        }
+        system_of_equations.push(terms);
+    }
 
-    /*let mut gas_core = CalibrationAlgebra {
-        base: StandardGasAlgebra::new(
-            10,
-            VMGasParameters::zeros(),
-            StorageGasParameters::free_and_unlimited(),
-            10000,
-        ),
-        coeff_buffer: BTreeMap::new(),
-    };*/
-    //native_test_simple(&mut gas_core, &[1, 2, 3]).unwrap();
-    //native_test_mul(&mut gas_core, &[1, 2, 3]).unwrap();
-    //native_test_mul_reverse(&mut gas_core, &[1, 2, 3]).unwrap();
-    //native_test_add(&mut gas_core, &[1, 2, 3]).unwrap();
+    // Collect like terms
+    let mut mappings: Vec<BTreeMap<String, u64>> = Vec::new();
+    for equation in system_of_equations {
+        let map = collect_terms(equation);
+        mappings.push(map);
+    }
 
-    /*
-     * Access shared buffer
-     */
-    //// TODO
+    // Convert simplified map to a math friendly interface
+    let vec_format: Vec<Vec<f64>> = convert_to_matrix_format(mappings.clone());
+
+    // Build the system of linear equations using the math library
+    let nrows = total_num_rows(mappings.clone());
+    let ncols = total_num_of_cols(mappings.clone());
+    let vec_col: usize = 1;
+
+    let mut coeff_matrix = build_coefficient_matrix(vec_format, nrows, ncols);
+    let mut const_matrix = build_constant_matrix(samples_ir.regular_meter, nrows, vec_col);
+
+    // Solve the system of linear equations
+    solve(mappings, &mut coeff_matrix, &mut const_matrix);
 }

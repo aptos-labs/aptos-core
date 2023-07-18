@@ -21,7 +21,9 @@ use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::Expression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::{VMGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{
+    MiscGasParameters, NativeGasParameters, VMGasParameters, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_native_interface::SafeNativeBuilder;
@@ -53,7 +55,7 @@ use aptos_vm::{
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::{StorageGasParameters, ChangeSetConfigs};
+use aptos_vm_types::storage::{ChangeSetConfigs, StorageGasParameters};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -656,8 +658,8 @@ impl FakeExecutor {
         self.block_time / 1_000_000
     }
 
-    //// exec_module is like exec(), however, we can run a Module published under
-    //// the creator address instead of 0x1, as what is currently done in exec.
+    /// exec_module is like exec(), however, we can run a Module published under
+    /// the creator address instead of 0x1, as what is currently done in exec.
     pub fn exec_module(
         &mut self,
         module: &ModuleId,
@@ -681,22 +683,20 @@ impl FakeExecutor {
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
-            session
-                .execute_function_bypass_visibility(
-                    module,
-                    &Self::name(function_name),
-                    type_params,
-                    args,
-                    &mut UnmeteredGasMeter,
-                )
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "Error calling {}.{}: {}",
-                        module.to_string().as_str(),
-                        function_name,
-                        e.into_vm_status()
-                    )
-                });
+            // TODO: preload module
+
+            // TODO: timing here
+            let result = session.execute_function_bypass_visibility(
+                module,
+                &Self::name(function_name),
+                type_params,
+                args,
+                &mut UnmeteredGasMeter,
+            );
+            if let Err(err) = result {
+                println!("should error, but ignoring for now");
+            }
+
             let change_set = session
                 .finish(
                     &mut (),
@@ -712,6 +712,7 @@ impl FakeExecutor {
         self.data_store.add_write_set(&write_set);
     }
 
+    /// record abstract usage using a modified gas meter
     pub fn exec_abstract_usage(
         &mut self,
         module: &ModuleId,
@@ -719,9 +720,7 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Vec<Expression> {
-        /*
-            * @notice: Define the shared buffers
-            */
+        // Define the shared buffers
         let a1 = Arc::new(Mutex::new(Vec::<Expression>::new()));
         let a2 = Arc::clone(&a1);
 
@@ -739,9 +738,9 @@ impl FakeExecutor {
             );
 
             builder.set_gas_hook(move |expression| {
-                println!("TEST PRINT expression {:?}", expression);
+                println!("TEST PRINT expression {:?}\n", expression);
                 a2.lock().unwrap().push(expression);
-                println!("A2 VEC: {:?}", a2.lock().unwrap());
+                println!("A2 VEC: {:?}\n", a2.lock().unwrap());
             });
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
@@ -754,39 +753,33 @@ impl FakeExecutor {
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session =
-                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+            let mut session = vm.new_session(&remote_view, SessionId::void());
 
-            session
-                .execute_function_bypass_visibility(
-                    module,
-                    &Self::name(function_name),
-                    type_params,
-                    args,
-                    &mut StandardGasMeter::new(
-                        CalibrationAlgebra {
-                            base: StandardGasAlgebra::new(
-                                //// TODO: fill in these with proper values
-                                LATEST_GAS_FEATURE_VERSION,
-                                VMGasParameters::zeros(),
-                                StorageGasParameters::free_and_unlimited(),
-                                100000,
-                            ),
-                            //coeff_buffer: BTreeMap::new(),
-                            shared_buffer: Arc::clone(&a1),
-                        }
-                    ), // StandardGasMeter with CalibrationAlgebra
-                )
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "Error calling {}.{}: {}",
-                        module.to_string().as_str(),
-                        function_name,
-                        e.into_vm_status()
-                    )
-                });
+            // TODO: preload module
+            // session.load_module(module_id)
 
-            println!("A3 ARC: {:?}", a1.lock().unwrap());
+            let result = session.execute_function_bypass_visibility(
+                module,
+                &Self::name(function_name),
+                type_params,
+                args,
+                &mut StandardGasMeter::new(CalibrationAlgebra {
+                    base: StandardGasAlgebra::new(
+                        //// TODO: fill in these with proper values
+                        LATEST_GAS_FEATURE_VERSION,
+                        VMGasParameters::zeros(),
+                        StorageGasParameters::free_and_unlimited(),
+                        100000,
+                    ),
+                    //coeff_buffer: BTreeMap::new(),
+                    shared_buffer: Arc::clone(&a1),
+                }), // StandardGasMeter with CalibrationAlgebra
+            );
+            if let Err(err) = result {
+                println!("should error, but ignoring for now");
+            }
+
+            println!("A3 ARC: {:?}\n", a1.lock().unwrap());
 
             let change_set = session
                 .finish(
