@@ -236,18 +236,18 @@ impl TokenDataV2 {
     /// Try to see if an address is a token. We'll try a few times in case there is a race condition,
     /// and if we can't find after 3 times, we'll assume that it's not a token.
     /// TODO: An improvement is that we'll make another query to see if address is a coin.
-    pub fn is_address_token(conn: &mut PgPoolConnection, address: &str) -> anyhow::Result<bool> {
+    pub fn is_address_token(conn: &mut PgPoolConnection, address: &str) -> bool {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
             match Self::get_by_token_data_id(conn, address) {
-                Ok(_) => return Ok(true),
+                Ok(_) => return true,
                 Err(_) => {
                     std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
                 },
             }
         }
-        Ok(false)
+        false
     }
 
     /// TODO: Change this to a KV store
