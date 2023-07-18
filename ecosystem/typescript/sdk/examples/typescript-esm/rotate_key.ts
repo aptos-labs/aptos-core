@@ -1,6 +1,7 @@
 import { AptosAccount, FaucetClient, Network, Provider, HexString } from 'aptos';
 
-export const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
+const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
+const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
 export const FAUCET_URL = "https://faucet.devnet.aptoslabs.com";
 
 function truncate(address: HexString): string {
