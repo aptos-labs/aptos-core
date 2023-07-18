@@ -218,6 +218,10 @@ impl Node {
         &self.parents
     }
 
+    pub fn parents_metadata_iter(&self) -> impl Iterator<Item = &NodeMetadata> {
+        self.parents().iter().map(|cert| &cert.metadata)
+    }
+
     pub fn author(&self) -> &Author {
         self.metadata.author()
     }
@@ -481,7 +485,7 @@ impl BroadcastStatus for CertificateAckState {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RemoteFetchRequest {
     epoch: u64,
-    parents: Vec<NodeMetadata>,
+    targets: Vec<NodeMetadata>,
     exists_bitmask: DagSnapshotBitmask,
 }
 
@@ -489,7 +493,7 @@ impl RemoteFetchRequest {
     pub fn new(epoch: u64, parents: Vec<NodeMetadata>, exists_bitmask: DagSnapshotBitmask) -> Self {
         Self {
             epoch,
-            parents,
+            targets: parents,
             exists_bitmask,
         }
     }
@@ -498,8 +502,8 @@ impl RemoteFetchRequest {
         self.epoch
     }
 
-    pub fn parents(&self) -> &[NodeMetadata] {
-        &self.parents
+    pub fn targets(&self) -> &[NodeMetadata] {
+        &self.targets
     }
 
     pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {

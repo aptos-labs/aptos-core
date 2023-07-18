@@ -124,10 +124,23 @@ impl Dag {
         self.get_node_ref_by_metadata(metadata).is_some()
     }
 
-    pub fn all_exists(&self, nodes: &[NodeCertificate]) -> bool {
+    pub fn all_exists<'a>(&self, mut nodes: impl Iterator<Item = &'a NodeMetadata>) -> bool {
+        nodes.all(|metadata| self.exists(metadata))
+    }
+
+    pub fn filter_missing<'a>(
+        &self,
+        nodes: impl Iterator<Item = &'a NodeMetadata>,
+    ) -> Vec<NodeMetadata> {
         nodes
-            .iter()
-            .all(|certificate| self.exists(certificate.metadata()))
+            .filter_map(|node_metadata| {
+                if self.exists(node_metadata) {
+                    None
+                } else {
+                    Some(node_metadata.clone())
+                }
+            })
+            .collect()
     }
 
     fn get_node_ref_by_metadata(&self, metadata: &NodeMetadata) -> Option<&NodeStatus> {
@@ -216,12 +229,14 @@ impl Dag {
 
     pub fn reachable(
         &self,
-        initial: Vec<HashValue>,
-        initial_round: Round,
+        targets: &[NodeMetadata],
         until: Option<Round>,
         filter: impl Fn(&NodeStatus) -> bool,
     ) -> impl Iterator<Item = &NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
+        let initial = targets.iter().map(|t| *t.digest()).collect();
+        let initial_round = targets[0].round();
+
         let mut reachable_filter = Self::reachable_filter(initial);
         self.nodes_by_round
             .range(until..=initial_round)
@@ -231,29 +246,6 @@ impl Dag {
             .filter(move |node_status| {
                 filter(node_status) && reachable_filter(node_status.as_node())
             })
-    }
-
-    pub fn reachable_from_target_node(
-        &self,
-        from: &Arc<CertifiedNode>,
-        until: Option<Round>,
-        filter: impl Fn(&NodeStatus) -> bool,
-    ) -> impl Iterator<Item = &NodeStatus> {
-        self.reachable(vec![from.digest()], from.metadata().round(), until, filter)
-    }
-
-    pub fn reachable_from_parents(
-        &self,
-        parents: &[NodeMetadata],
-        until: Option<Round>,
-        filter: impl Fn(&NodeStatus) -> bool,
-    ) -> impl Iterator<Item = &NodeStatus> {
-        self.reachable(
-            parents.iter().map(|p| *p.digest()).collect(),
-            parents[0].round(),
-            until,
-            filter,
-        )
     }
 
     pub fn get_strong_links_for_round(

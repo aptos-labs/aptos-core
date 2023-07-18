@@ -47,8 +47,8 @@ impl NetworkHandler {
                 storage,
             ),
             certified_node_receiver: CertifiedNodeHandler::new(dag.clone()),
-            epoch_state,
-            fetch_receiver: FetchRequestHandler::new(dag),
+            epoch_state: epoch_state.clone(),
+            fetch_receiver: FetchRequestHandler::new(dag, epoch_state),
         }
     }
 

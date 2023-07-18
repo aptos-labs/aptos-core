@@ -21,9 +21,9 @@ fn test_dag_fetcher_receiver() {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state, storage)));
+    let dag = Arc::new(RwLock::new(Dag::new(epoch_state.clone(), storage)));
 
-    let mut fetcher = FetchRequestHandler::new(dag.clone());
+    let mut fetcher = FetchRequestHandler::new(dag.clone(), epoch_state);
 
     let mut first_round_nodes = vec![];
 
@@ -36,7 +36,8 @@ fn test_dag_fetcher_receiver() {
 
     // Round 2 - node 0
     let target_node = new_certified_node(2, signers[0].author(), vec![
-        first_round_nodes[0].certificate()
+        first_round_nodes[0].certificate(),
+        first_round_nodes[1].certificate()
     ]);
 
     let request = RemoteFetchRequest::new(
@@ -46,11 +47,11 @@ fn test_dag_fetcher_receiver() {
             .iter()
             .map(|parent| parent.metadata().clone())
             .collect(),
-        DagSnapshotBitmask::new(1, vec![vec![false; 4]]),
+        DagSnapshotBitmask::new(1, vec![vec![true, false]]),
     );
     assert_ok_eq!(
         fetcher.process(request),
-        FetchResponse::new(1, vec![first_round_nodes[0].clone()])
+        FetchResponse::new(1, vec![first_round_nodes[1].clone()])
     );
 }
 

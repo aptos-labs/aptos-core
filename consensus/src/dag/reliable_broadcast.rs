@@ -260,7 +260,7 @@ impl RpcHandler for CertifiedNodeHandler {
                 return Ok(CertifiedAck::new(node.metadata().epoch()));
             }
 
-            if !dag_reader.all_exists(node.parents()) {
+            if !dag_reader.all_exists(node.parents_metadata_iter()) {
                 // TODO(ibalajiarun): implement fetching logic.
                 bail!(CertifiedNodeHandleError::MissingParents);
             }
