@@ -1,5 +1,6 @@
 /// Tests for veiled coins.
 ///
+/// TODO: improve testing framework; currently very cumbersome to set up a veiled payment test
 /// TODO: test that payments to self return successfully (ideally, they should do nothing)
 module veiled_coin::veiled_coin_tests {
     #[test_only]
