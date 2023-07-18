@@ -81,19 +81,6 @@ This is obtained by hashing the compressed Ristretto255 basepoint using SHA3-512
 
 
 
-<a name="0x1_ristretto255_pedersen_EWRONG_BYTE_LENGTH"></a>
-
-
-Error Codes
-
-The wrong number of bytes was passed in for deserialization
-
-
-<pre><code><b>const</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_EWRONG_BYTE_LENGTH">EWRONG_BYTE_LENGTH</a>: u64 = 1;
-</code></pre>
-
-
-
 <a name="0x1_ristretto255_pedersen_new_commitment_from_bytes"></a>
 
 ## Function `new_commitment_from_bytes`
@@ -111,7 +98,6 @@ Creates a new public key from a serialized Ristretto255 point.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_new_commitment_from_bytes">new_commitment_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">Commitment</a>&gt; {
-    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&bytes) == 32, <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_EWRONG_BYTE_LENGTH">EWRONG_BYTE_LENGTH</a>);
     <b>let</b> point = <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(bytes);
     <b>if</b> (std::option::is_some(&<b>mut</b> point)) {
         <b>let</b> comm = <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">Commitment</a> {

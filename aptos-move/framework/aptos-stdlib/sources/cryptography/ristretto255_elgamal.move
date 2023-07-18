@@ -14,13 +14,6 @@ module aptos_std::ristretto255_elgamal {
     use std::vector;
 
     //
-    // Error codes
-    //
-
-    /// The wrong number of bytes was passed in for deserialization
-    const EWRONG_BYTE_LENGTH: u64 = 1;
-
-    //
     // Structs
     //
 
@@ -47,7 +40,6 @@ module aptos_std::ristretto255_elgamal {
 
     /// Creates a new public key from a serialized Ristretto255 point.
     public fun new_pubkey_from_bytes(bytes: vector<u8>): Option<CompressedPubkey> {
-        assert!(vector::length(&bytes) == 32, EWRONG_BYTE_LENGTH);
         let point = ristretto255::new_compressed_point_from_bytes(bytes);
         if (std::option::is_some(&mut point)) {
             let pk = CompressedPubkey {
@@ -77,7 +69,9 @@ module aptos_std::ristretto255_elgamal {
     /// Creates a new ciphertext from two serialized Ristretto255 points: the first 32 bytes store `r * G` while the
     /// next 32 bytes store `v * G + r * Y`, where `Y` is the public key.
     public fun new_ciphertext_from_bytes(bytes: vector<u8>): Option<Ciphertext> {
-        assert!(vector::length(&bytes) == 64, EWRONG_BYTE_LENGTH);
+        if(vector::length(&bytes) != 64) {
+            return std::option::none<Ciphertext>()
+        };
 
         let bytes_right = vector::trim(&mut bytes, 32);
 

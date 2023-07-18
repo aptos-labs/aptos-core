@@ -17,7 +17,6 @@ are the randomness of the ciphertexts.
 -  [Struct `Ciphertext`](#0x1_ristretto255_elgamal_Ciphertext)
 -  [Struct `CompressedCiphertext`](#0x1_ristretto255_elgamal_CompressedCiphertext)
 -  [Struct `CompressedPubkey`](#0x1_ristretto255_elgamal_CompressedPubkey)
--  [Constants](#@Constants_0)
 -  [Function `new_pubkey_from_bytes`](#0x1_ristretto255_elgamal_new_pubkey_from_bytes)
 -  [Function `pubkey_to_bytes`](#0x1_ristretto255_elgamal_pubkey_to_bytes)
 -  [Function `pubkey_to_point`](#0x1_ristretto255_elgamal_pubkey_to_point)
@@ -143,21 +142,6 @@ An ElGamal public key.
 
 </details>
 
-<a name="@Constants_0"></a>
-
-## Constants
-
-
-<a name="0x1_ristretto255_elgamal_EWRONG_BYTE_LENGTH"></a>
-
-The wrong number of bytes was passed in for deserialization
-
-
-<pre><code><b>const</b> <a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_EWRONG_BYTE_LENGTH">EWRONG_BYTE_LENGTH</a>: u64 = 1;
-</code></pre>
-
-
-
 <a name="0x1_ristretto255_elgamal_new_pubkey_from_bytes"></a>
 
 ## Function `new_pubkey_from_bytes`
@@ -175,7 +159,6 @@ Creates a new public key from a serialized Ristretto255 point.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_new_pubkey_from_bytes">new_pubkey_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_CompressedPubkey">CompressedPubkey</a>&gt; {
-    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&bytes) == 32, <a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_EWRONG_BYTE_LENGTH">EWRONG_BYTE_LENGTH</a>);
     <b>let</b> point = <a href="ristretto255.md#0x1_ristretto255_new_compressed_point_from_bytes">ristretto255::new_compressed_point_from_bytes</a>(bytes);
     <b>if</b> (std::option::is_some(&<b>mut</b> point)) {
         <b>let</b> pk = <a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_CompressedPubkey">CompressedPubkey</a> {
@@ -285,7 +268,9 @@ next 32 bytes store <code>v * G + r * Y</code>, where <code>Y</code> is the publ
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_new_ciphertext_from_bytes">new_ciphertext_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a>&gt; {
-    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&bytes) == 64, <a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_EWRONG_BYTE_LENGTH">EWRONG_BYTE_LENGTH</a>);
+    <b>if</b>(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&bytes) != 64) {
+        <b>return</b> std::option::none&lt;<a href="ristretto255_elgamal.md#0x1_ristretto255_elgamal_Ciphertext">Ciphertext</a>&gt;()
+    };
 
     <b>let</b> bytes_right = <a href="../../move-stdlib/doc/vector.md#0x1_vector_trim">vector::trim</a>(&<b>mut</b> bytes, 32);
 

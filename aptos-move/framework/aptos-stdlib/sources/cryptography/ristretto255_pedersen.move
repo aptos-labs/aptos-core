@@ -6,14 +6,6 @@
 module aptos_std::ristretto255_pedersen {
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
     use std::option::Option;
-    use std::vector;
-
-    ///
-    /// Error Codes
-    ///
-
-    /// The wrong number of bytes was passed in for deserialization
-    const EWRONG_BYTE_LENGTH: u64 = 1;
 
     //
     // Constants
@@ -38,7 +30,6 @@ module aptos_std::ristretto255_pedersen {
 
     /// Creates a new public key from a serialized Ristretto255 point.
     public fun new_commitment_from_bytes(bytes: vector<u8>): Option<Commitment> {
-        assert!(vector::length(&bytes) == 32, EWRONG_BYTE_LENGTH);
         let point = ristretto255::new_point_from_bytes(bytes);
         if (std::option::is_some(&mut point)) {
             let comm = Commitment {
