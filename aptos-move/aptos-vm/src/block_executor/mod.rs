@@ -148,10 +148,13 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    fn try_materialize(&self) -> Result<AptosTransactionOutput, VMStatus> {
+    fn try_materialize(&self, state_view: &impl StateView) -> Result<AptosTransactionOutput, VMStatus> {
         self.vm_output
             .lock()
-            .try_materialize()
+            .as_ref()
+            .expect("Output to be set to materialize")
+            .try_materialize(state_view)
+            .map(|vm_output| AptosTransactionOutput { vm_output, committed_output: self.committed_output })
     }
 }
 

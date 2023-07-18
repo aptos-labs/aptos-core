@@ -4,12 +4,13 @@
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::TStateView;
+use aptos_state_view::{TStateView, StateView};
 use aptos_types::{
     executable::ModulePath,
     fee_statement::FeeStatement,
-    write_set::{TransactionWrite, WriteOp},
+    write_set::{TransactionWrite, WriteOp}, vm_status::VMStatus,
 };
+use std::marker::Sized;
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -63,7 +64,7 @@ pub trait ExecutorTask: Sync {
     /// If the execution returns an aggregator error (overflow/underflow),
     /// then BlockSTM will re-run this function later (in commit hook of the
     /// transaction) with aggregators disabled.
-    fn execute_transaction_in_parallel_execution(
+    fn execute_transaction(
         &self,
         view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
@@ -71,17 +72,17 @@ pub trait ExecutorTask: Sync {
         aggregator_enabled: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 
-    /// Execute a single transaction given the view of the current state.
-    /// This function is only run during sequential execution.
-    /// This function will first run the transaction with aggregators enabled.
-    /// If the execution gives an aggregator error (overflow/underflow), then
-    /// it will re-run the transaction with aggregators disabled.
-    fn execute_transaction_in_sequential_execution(
-        &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
-        txn: &Self::Txn,
-        txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error>;
+    // Execute a single transaction given the view of the current state.
+    // This function is only run during sequential execution.
+    // This function will first run the transaction with aggregators enabled.
+    // If the execution gives an aggregator error (overflow/underflow), then
+    // it will re-run the transaction with aggregators disabled.
+    // fn execute_transaction_in_sequential_execution(
+    //     &self,
+    //     view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+    //     txn: &Self::Txn,
+    //     txn_idx: TxnIndex,
+    // ) -> ExecutionStatus<Self::Output, Self::Error>;
 }
 
 /// Trait for execution result of a single transaction.
@@ -116,4 +117,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
+
+    fn try_materialize(&self, state_view: &impl StateView) -> Result<Self, VMStatus>;    
 }

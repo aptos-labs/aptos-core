@@ -56,7 +56,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // This function is called by the BlockExecutor for each transaction it intends
     // to execute (via the ExecutorTask trait). This function is run speculatively
     // as a part of a parallel execution.
-    fn execute_transaction_in_parallel_execution(
+    fn execute_transaction(
         &self,
         view: &impl StateView,
         txn: &PreprocessedTransaction,
@@ -78,38 +78,38 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // This function is called by the BlockExecutor for each transaction it intends
     // to execute (via the ExecutorTask trait). This function is run during
     // sequential execution of a block.
-    fn execute_transaction_in_sequential_execution(
-        &self,
-        view: &impl StateView,
-        txn: &PreprocessedTransaction,
-        txn_idx: TxnIndex,
-    ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
+    // fn execute_transaction_in_sequential_execution(
+    //     &self,
+    //     view: &impl StateView,
+    //     txn: &PreprocessedTransaction,
+    //     txn_idx: TxnIndex,
+    // ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
+    //     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
 
-        let result = match self
-            .vm
-            .execute_single_transaction(txn, &view, &log_context, true)
-            .and_then(|(vm_status, vm_output, sender)| {
-                vm_output
-                    .try_materialize(view)
-                    .map(|vm_output| (vm_status, vm_output, sender))
-            }) {
-            res @ Ok(_) => res,
-            Err(e) if !is_aggregator_error(&e) => Err(e),
-            _ => self
-                .vm
-                .execute_single_transaction(txn, &view, &log_context, false),
-        };
+    //     let result = match self
+    //         .vm
+    //         .execute_single_transaction(txn, &view, &log_context, true)
+    //         .and_then(|(vm_status, vm_output, sender)| {
+    //             vm_output
+    //                 .try_materialize(view)
+    //                 .map(|vm_output| (vm_status, vm_output, sender))
+    //         }) {
+    //         res @ Ok(_) => res,
+    //         Err(e) if !is_aggregator_error(&e) => Err(e),
+    //         _ => self
+    //             .vm
+    //             .execute_single_transaction(txn, &view, &log_context, false),
+    //     };
 
-        match result {
-            Ok((vm_status, vm_output, sender)) => {
-                // Aggregators are already materialized by this point, so delta change set should be empty
-                assert!(vm_output.delta_change_set().is_empty());
-                process_vm_output(vm_status, vm_output, sender, log_context)
-            },
-            Err(err) => ExecutionStatus::Abort(err),
-        }
-    }
+    //     match result {
+    //         Ok((vm_status, vm_output, sender)) => {
+    //             // Aggregators are already materialized by this point, so delta change set should be empty
+    //             assert!(vm_output.delta_change_set().is_empty());
+    //             process_vm_output(vm_status, vm_output, sender, log_context)
+    //         },
+    //         Err(err) => ExecutionStatus::Abort(err),
+    //     }
+    // }
 }
 
 fn process_vm_output(

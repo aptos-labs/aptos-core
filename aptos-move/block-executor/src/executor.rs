@@ -15,7 +15,7 @@ use crate::{
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
-use aptos_aggregator::delta_change_set::{deserialize, serialize};
+use aptos_aggregator::delta_change_set::{deserialize, serialize, is_aggregator_error};
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
@@ -252,7 +252,7 @@ where
         let speculative_view = MVHashMapView::new(versioned_cache, scheduler);
 
         // VM execution.
-        let execute_result = executor.execute_transaction_in_parallel_execution(
+        let execute_result = executor.execute_transaction(
             &LatestView::<T, S, X>::new_mv_view(base_view, &speculative_view, idx_to_execute),
             txn,
             idx_to_execute,
@@ -714,10 +714,6 @@ where
         }
     }
 
-    fn reexecute_transaction_if_aggregator_error(status: ExecutionStatus<Self::Output, Self::Error>) -> ExecutionStatus<Self::Output, Self::Error> {
-
-    }
-
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
@@ -731,19 +727,50 @@ where
         let mut ret = Vec::with_capacity(num_txns);
 
         let mut accumulated_fee_statement = FeeStatement::zero();
-
+        
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let res = executor.execute_transaction_in_sequential_execution(
-                &LatestView::<T, S, X>::new_btree_view(base_view, &data_map, idx as TxnIndex),
+            let state_view = &LatestView::<T, S, X>::new_btree_view(base_view, &data_map, idx as TxnIndex);
+
+            let mut res = executor.execute_transaction(
+                state_view,
                 txn,
                 idx as TxnIndex,
+                true
             );
 
-            let res = reexecute_transaction_if_aggregator_error(res);
-
-            // Reexecute the transaction if there is an aggregator error
-            if let ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) = res {
-                output.try_materialize(view);
+            // match statement for `res`
+            let reexecute = false;
+            match res {
+                ExecutionStatus::Success(output) => {
+                    let result = output.try_materialize(state_view);
+                    match result {
+                        Ok(materialized_output) => res = ExecutionStatus::Success(materialized_output),
+                        Err(vm_status) => if is_aggregator_error(&vm_status) {
+                            reexecute = true;
+                        }
+                    }
+                },
+                ExecutionStatus::SkipRest(output) => {
+                    let result = output.try_materialize(state_view);
+                    match result {
+                        Ok(materialized_output) => res = ExecutionStatus::SkipRest(materialized_output),
+                        Err(vm_status) => if is_aggregator_error(&vm_status) {
+                            reexecute = true;
+                        }
+                    }
+                },
+                ExecutionStatus::Abort(vm_status) => if is_aggregator_error(&vm_status) {
+                    reexecute = true;
+                }
+            }
+            
+            if reexecute {
+                res = executor.execute_transaction(
+                    state_view,
+                    txn,
+                    idx as TxnIndex,
+                    false
+                );
             }
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));

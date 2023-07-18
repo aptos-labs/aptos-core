@@ -426,7 +426,7 @@ where
         Self::new()
     }
 
-    fn execute_transaction_in_parallel_execution(
+    fn execute_transaction(
         &self,
         view: &impl TStateView<Key = K>,
         txn: &Self::Txn,
@@ -468,16 +468,16 @@ where
         }
     }
 
-    fn execute_transaction_in_sequential_execution(
-        &self,
-        _view: &impl TStateView<Key = K>,
-        _txn: &Self::Txn,
-        _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error> {
-        unreachable!(
-            "execute_transaction_in_sequential_execution is currently not being used in tests"
-        );
-    }
+    // fn execute_transaction_in_sequential_execution(
+    //     &self,
+    //     _view: &impl TStateView<Key = K>,
+    //     _txn: &Self::Txn,
+    //     _txn_idx: TxnIndex,
+    // ) -> ExecutionStatus<Self::Output, Self::Error> {
+    //     unreachable!(
+    //         "execute_transaction_in_sequential_execution is currently not being used in tests"
+    //     );
+    // }
 }
 
 #[derive(Debug)]
