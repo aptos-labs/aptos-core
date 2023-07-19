@@ -19,7 +19,6 @@ kubernetes-stubs = "^22.6.0.post1"
 [tool.poetry.group.dev.dependencies]
 black = "^23.3.0"
 pyright = "^1.1.309"
-poethepoet = "^0.20.0"
 
 [build-system]
 requires = ["poetry-core"]
