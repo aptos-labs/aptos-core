@@ -85,6 +85,7 @@ pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     Version::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,
     ChainId::CONFIG_ID,
+    OnChainExecutionConfig::CONFIG_ID,
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
