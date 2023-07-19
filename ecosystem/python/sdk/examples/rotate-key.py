@@ -37,7 +37,7 @@ async def rotate_auth_key_ed_25519_payload(
     rotation_proof_challenge = RotationProofChallenge(
         sequence_number=await rest_client.account_sequence_number(from_account.address()),
         originator=from_account.address(),
-        current_auth_key=from_account.address(),
+        current_auth_key=from_account.auth_key(),
         new_public_key=to_account.public_key().key.encode(),
     )
 

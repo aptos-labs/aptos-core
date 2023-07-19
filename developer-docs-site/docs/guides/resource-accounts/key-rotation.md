@@ -10,14 +10,13 @@ Aptos Move accounts have authentication keys that are separate from their public
 
 After rotating the key, the controlling account can sign transactions for the initial account.
 
-In this guide, we show examples for how to rotate an account's authentication key using the various Aptos SDKs.
+In this guide, we show examples for how to rotate an account's authentication key using a few of the various Aptos SDKs.
 
-If you haven't installed the SDKs, you can do so at the following links:
+Here are the installation links for the SDKs we will cover in this example:
 
 * [Aptos CLI](../../tools/install-cli/)
 * [Typescript SDK](../../sdks/ts-sdk/index)
 * [Python SDK](../../sdks/python-sdk/index)
-* [Rust SDK](../../sdks/rust-sdk/index)
 
 :::warning
 Some of the following examples use private keys. Do not share your private keys with anyone.
@@ -34,8 +33,10 @@ echo "devnet" | aptos init --profile rotate-2
 ```shell title="Rotate the authentication key for rotate-1 to rotate-2's authentication key"
 aptos account rotate-key --profile rotate-1 --new-private-key <ROTATE_2_PRIVATE_KEY>
 ```
-:::tip Where do I get the private key for a profile?
-Public, private, and authentication keys for Aptos CLI profiles are stored in `~/.aptos/config.yaml`.
+:::info Where do I get the private key for a profile?
+Public, private, and authentication keys for Aptos CLI profiles are stored in `~/.aptos/config.yaml` if your config is set to `Global` and `<local_directory>/.aptos/config.yaml` if it's set to `Workspace`.
+
+To see your config settings, run `aptos config show-global-config`.
 :::
 
 ```shell title="Confirm yes and create a new profile so that you can continue to sign for the resource account"
@@ -122,12 +123,6 @@ Bob                0xe39d...adf91f     0xe39d...adf91f      0xb2cd...a5c415
 Alice              0x3e58...2b6243    '0xe39d...adf91f'    '0xb2cd...a5c415'    
 Bob                0xe39d...adf91f     0xe39d...adf91f      0xb2cd...a5c415  
 ```
-
-  </TabItem>
-
-  <TabItem value="rust" label="Rust">
-
-    Coming soon.
 
   </TabItem>
 </Tabs>
