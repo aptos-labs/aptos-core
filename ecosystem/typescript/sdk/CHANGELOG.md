@@ -3,6 +3,8 @@
 All notable changes to the Aptos Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+## 1.13.3 (2023-07-19)
 - Add support for `null` or `undefined` as absense of an Option
 - Fix `Option<LongerType>` for input arguments in entry functions
 
