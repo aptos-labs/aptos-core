@@ -267,6 +267,21 @@ module addr::cli_e2e_tests {
         (num64, num128, num256)
     }
 
+    #[view]
+    public fun test_vector(
+        input_u8: vector<u8>,
+        input_u16: vector<u16>,
+        input_u32: vector<u32>,
+        input_u64: vector<u64>,
+        input_u128: vector<u128>,
+        input_u256: vector<u256>,
+        input_addr: vector<address>,
+        input_bool: vector<bool>,
+        input_string: vector<String>,
+    ): (vector<u8>, vector<u16>, vector<u32>, vector<u64>, vector<u128>, vector<u256>, vector<address>, vector<bool>, vector<String>) {
+        (input_u8, input_u16, input_u32, input_u64, input_u128, input_u256, input_addr, input_bool, input_string)
+    }
+
     inline fun get_hero(creator: &address, collection: &String, name: &String): (Object<Hero>, &Hero) {
         let token_address = token::create_token_address(
             creator,
