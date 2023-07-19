@@ -486,9 +486,7 @@ class RestClient:
         signed_transaction = await self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload), sequence_number=sequence_number
         )
-        return await self.submit_bcs_transaction(signed_transaction)
-
-    # <:!:bcs_transfer
+        return await self.submit_bcs_transaction(signed_transaction)  # <:!:bcs_transfer
 
     #
     # Token transaction wrappers
