@@ -178,7 +178,7 @@ class Test(unittest.IsolatedAsyncioTestCase):
 
         rest_client = RestClient("https://fullnode.devnet.aptoslabs.com/v1")
         account_sequence_number = AccountSequenceNumber(
-            rest_client, AccountAddress.from_hex("b0b")
+            rest_client, AccountAddress.from_str("b0b")
         )
         last_seq_num = 0
         for seq_num in range(5):
