@@ -25,8 +25,8 @@ spec aptos_framework::staking_proxy {
     }
 
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
+        use aptos_std::simple_map;
         use aptos_framework::staking_contract::{Store};
-        use aptos_framework::simple_map;
         // TODO: Verify timeout and can't verify `staking_contract::switch_operator`.
         pragma aborts_if_is_partial;
 

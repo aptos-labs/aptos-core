@@ -45,7 +45,7 @@ fn benchmark_groups(c: &mut Criterion) {
 
     //for n in 1..=128 {
     //for n in [256, 512, 1024, 2048, 4096] {
-    for n in [8192, 16384, 32768] {
+    for n in [2, 8192, 16384, 32768] {
         multi_scalar_mul(&mut group, n);
     }
 

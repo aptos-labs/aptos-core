@@ -1,0 +1,27 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        f: u64,
+    }
+    private fun bar() {
+        pack M::S(0)
+    }
+    private fun foo() {
+        Abort(0)
+    }
+    private fun t0(cond: bool,_s: M::S) {
+        select M::S.f(M::foo());
+        select M::S.f(M::bar());
+        select M::S.f(if cond {
+          M::foo()
+        } else {
+          Borrow(Immutable)(M::bar())
+        });
+        select M::S.f(if cond {
+          Deref(M::foo())
+        } else {
+          M::bar()
+        });
+        Tuple()
+    }
+} // end 0x8675309::M

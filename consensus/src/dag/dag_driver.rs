@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::storage::DAGStorage;
 use crate::{
     dag::{
         dag_store::Dag,
@@ -28,6 +29,7 @@ pub(crate) struct DagDriver {
     current_round: Round,
     time_service: Arc<dyn TimeService>,
     rb_abort_handle: Option<AbortHandle>,
+    storage: Arc<dyn DAGStorage>,
 }
 
 impl DagDriver {
@@ -39,7 +41,9 @@ impl DagDriver {
         reliable_broadcast: Arc<ReliableBroadcast>,
         current_round: Round,
         time_service: Arc<dyn TimeService>,
+        storage: Arc<dyn DAGStorage>,
     ) -> Self {
+        // TODO: rebroadcast nodes after recovery
         Self {
             author,
             epoch_state,
@@ -49,13 +53,14 @@ impl DagDriver {
             current_round,
             time_service,
             rb_abort_handle: None,
+            storage,
         }
     }
 
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let mut dag_writer = self.dag.write();
         let round = node.metadata().round();
-        if dag_writer.all_exists(node.parents()) {
+        if dag_writer.all_exists(node.parents_metadata()) {
             dag_writer.add_node(node)?;
             if self.current_round == round {
                 let maybe_strong_links = dag_writer
@@ -84,6 +89,9 @@ impl DagDriver {
             payload,
             strong_links,
         );
+        self.storage
+            .save_node(&new_node)
+            .expect("node must be saved");
         self.broadcast_node(new_node);
     }
 

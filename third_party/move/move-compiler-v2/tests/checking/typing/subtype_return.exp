@@ -1,0 +1,21 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        dummy_field: bool,
+    }
+    private fun t0(u: &mut u64) {
+        u
+    }
+    private fun t1(s: &mut M::S) {
+        s
+    }
+    private fun t2(u1: &mut u64,u2: &mut u64) {
+        Tuple(u1, u2)
+    }
+    private fun t3(u1: &mut u64,u2: &mut u64) {
+        Tuple(u1, u2)
+    }
+    private fun t4(u1: &mut u64,u2: &mut u64) {
+        Tuple(u1, u2)
+    }
+} // end 0x8675309::M

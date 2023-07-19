@@ -15,6 +15,7 @@ use aptos_event_notifications::{EventNotificationSender, EventSubscriptionServic
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
+use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -68,24 +69,35 @@ impl CommitNotification {
         CommitNotification::CommittedStateSnapshot(committed_states)
     }
 
-    /// Handles the commit notification by notifying mempool and the event
-    /// subscription service.
-    pub async fn handle_transaction_notification<M: MempoolNotificationSender>(
+    /// Handles the commit notification by notifying mempool, the event
+    /// subscription service and the storage service.
+    pub async fn handle_transaction_notification<
+        M: MempoolNotificationSender,
+        S: StorageServiceNotificationSender,
+    >(
         events: Vec<ContractEvent>,
         transactions: Vec<Transaction>,
         latest_synced_version: Version,
         latest_synced_ledger_info: LedgerInfoWithSignatures,
         mut mempool_notification_handler: MempoolNotificationHandler<M>,
         event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
+        mut storage_service_notification_handler: StorageServiceNotificationHandler<S>,
     ) -> Result<(), Error> {
-        // Notify mempool of the committed transactions
+        // Log the highest synced version and timestamp
+        let blockchain_timestamp_usecs = latest_synced_ledger_info.ledger_info().timestamp_usecs();
         debug!(
             LogSchema::new(LogEntry::NotificationHandler).message(&format!(
-                "Notifying mempool of transactions at version: {:?}",
-                latest_synced_version
+                "Notifying the storage service, mempool and the event subscription service of version: {:?} and timestamp: {:?}.",
+                latest_synced_version, blockchain_timestamp_usecs
             ))
         );
-        let blockchain_timestamp_usecs = latest_synced_ledger_info.ledger_info().timestamp_usecs();
+
+        // Notify the storage service of the committed transactions
+        storage_service_notification_handler
+            .notify_storage_service_of_committed_transactions(latest_synced_version)
+            .await?;
+
+        // Notify mempool of the committed transactions
         mempool_notification_handler
             .notify_mempool_of_committed_transactions(
                 transactions.clone(),
@@ -94,16 +106,11 @@ impl CommitNotification {
             .await?;
 
         // Notify the event subscription service of the events
-        debug!(
-            LogSchema::new(LogEntry::NotificationHandler).message(&format!(
-                "Notifying the event subscription service of events at version: {:?}",
-                latest_synced_version
-            ))
-        );
         event_subscription_service
             .lock()
-            .notify_events(latest_synced_version, events.clone())
-            .map_err(|error| error.into())
+            .notify_events(latest_synced_version, events.clone())?;
+
+        Ok(())
     }
 }
 
@@ -421,6 +428,43 @@ impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
             error!(LogSchema::new(LogEntry::NotificationHandler)
                 .error(&error)
                 .message("Failed to notify mempool of committed transactions!"));
+            Err(error)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// A simple handler for sending notifications to the storage service
+#[derive(Clone)]
+pub struct StorageServiceNotificationHandler<M> {
+    storage_service_notification_sender: M,
+}
+
+impl<M: StorageServiceNotificationSender> StorageServiceNotificationHandler<M> {
+    pub fn new(storage_service_notification_sender: M) -> Self {
+        Self {
+            storage_service_notification_sender,
+        }
+    }
+
+    /// Notifies the storage service that transactions have been committed
+    pub async fn notify_storage_service_of_committed_transactions(
+        &mut self,
+        highest_synced_version: u64,
+    ) -> Result<(), Error> {
+        // Notify the storage service
+        let result = self
+            .storage_service_notification_sender
+            .notify_new_commit(highest_synced_version)
+            .await;
+
+        // Log any errors
+        if let Err(error) = result {
+            let error = Error::NotifyStorageServiceError(format!("{:?}", error));
+            error!(LogSchema::new(LogEntry::NotificationHandler)
+                .error(&error)
+                .message("Failed to notify the storage service of committed transactions!"));
             Err(error)
         } else {
             Ok(())

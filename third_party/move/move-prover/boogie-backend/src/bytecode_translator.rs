@@ -957,7 +957,10 @@ impl<'env> FunctionTranslator<'env> {
         emitln!(
             writer,
             "// {} {}",
-            bytecode.display(fun_target, &BTreeMap::default()),
+            bytecode
+                .display(fun_target, &BTreeMap::default())
+                .to_string()
+                .replace('\n', "\n// "),
             loc.display(env)
         );
 
@@ -2235,6 +2238,7 @@ impl<'env> FunctionTranslator<'env> {
                         let node_id = env.new_node(env.unknown_loc(), mem.to_type());
                         self.track_global_mem(mem, node_id);
                     },
+                    Vector => unimplemented!("vector"),
                 }
                 if let Some(AbortAction(target, code)) = aa {
                     emitln!(writer, "if ($abort_flag) {");
