@@ -673,7 +673,7 @@ class RestClient:
 
         token_id = {
             "token_data_id": {
-                "creator": creator.hex(),
+                "creator": str(creator),
                 "collection": collection_name,
                 "name": token_name,
             },
@@ -720,7 +720,7 @@ class RestClient:
         token_data_handle = resource["data"]["token_data"]["handle"]
 
         token_data_id = {
-            "creator": creator.hex(),
+            "creator": str(creator),
             "collection": collection_name,
             "name": token_name,
         }
@@ -759,7 +759,7 @@ class FaucetClient:
     async def close(self):
         await self.rest_client.close()
 
-    async def fund_account(self, address: str, amount: int):
+    async def fund_account(self, address: AccountAddress, amount: int):
         """This creates an account if it does not exist and mints the specified amount of
         coins into that account."""
         response = await self.rest_client.client.post(

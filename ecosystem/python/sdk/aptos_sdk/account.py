@@ -40,7 +40,7 @@ class Account:
 
     @staticmethod
     def load_key(key: str) -> Account:
-        private_key = ed25519.PrivateKey.from_hex(key)
+        private_key = ed25519.PrivateKey.from_str(key)
         account_address = AccountAddress.from_key(private_key.public_key())
         return Account(account_address, private_key)
 
@@ -49,8 +49,8 @@ class Account:
         with open(path) as file:
             data = json.load(file)
         return Account(
-            AccountAddress.from_hex(data["account_address"]),
-            ed25519.PrivateKey.from_hex(data["private_key"]),
+            AccountAddress.from_str(data["account_address"]),
+            ed25519.PrivateKey.from_str(data["private_key"]),
         )
 
     def store(self, path: str):
@@ -80,7 +80,7 @@ class Account:
 
 
 class RotationProofChallenge:
-    type_info_account_address: AccountAddress = AccountAddress.from_hex("0x1")
+    type_info_account_address: AccountAddress = AccountAddress.from_str("0x1")
     type_info_module_name: str = "account"
     type_info_struct_name: str = "RotationProofChallenge"
     sequence_number: int
