@@ -3,9 +3,11 @@
 
 #![forbid(unsafe_code)]
 
+mod counters;
 mod utils;
 
-use crate::utils::{TestFailure, TestLog, TestResult};
+use crate::counters::{test_error, test_fail, test_success};
+use crate::utils::{NetworkName, TestFailure, TestLog, TestName, TestResult};
 use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
@@ -57,7 +59,8 @@ static ERROR_MODULE_INTERACTION: &str = "module interaction isn't reflected";
 
 // Processes a test result.
 async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
-    test_name: &str,
+    test_name: TestName,
+    network_type: NetworkName,
     fut: Fut,
 ) -> Result<TestLog> {
     // start timer
@@ -71,19 +74,36 @@ async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
 
     // process the result
     let output = match result {
-        Ok(_) => TestLog {
-            result: TestResult::Success,
-            time,
+        Ok(_) => {
+            test_success(&test_name.to_string(), &network_type.to_string()).inc();
+
+            TestLog {
+                result: TestResult::Success,
+                time,
+            }
         },
-        Err(failure) => TestLog {
-            result: TestResult::Fail(failure),
-            time,
+        Err(failure) => {
+            match &failure {
+                TestFailure::Error(_) => {
+                    test_error(&test_name.to_string(), &network_type.to_string()).inc()
+                },
+                TestFailure::Fail(_) => {
+                    test_fail(&test_name.to_string(), &network_type.to_string()).inc()
+                },
+            };
+
+            TestLog {
+                result: TestResult::from(failure),
+                time,
+            }
         },
     };
 
     println!(
         "{} result:{:?} in time:{:?}",
-        test_name, output.result, output.time
+        test_name.to_string(),
+        output.result,
+        output.time
     );
     Ok(output)
 }
@@ -478,7 +498,11 @@ async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), 
     Ok(())
 }
 
-async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
+async fn test_flows(
+    network_type: NetworkName,
+    client: Client,
+    faucet_client: FaucetClient,
+) -> Result<()> {
     // create clients
     let coin_client = CoinClient::new(&client);
     let token_client = TokenClient::new(&client);
@@ -494,29 +518,40 @@ async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
 
     // Test new account creation and funding
     // this test is critical to pass for the next tests
-    if handle_result("new account", test_newaccount(&client, &giray, 100_000_000))
-        .await
-        .is_err()
+    if handle_result(
+        TestName::NewAccount,
+        network_type,
+        test_newaccount(&client, &giray, 100_000_000),
+    )
+    .await
+    .is_err()
     {
         return Err(anyhow!("returning early because new account test failed"));
     }
 
     // Flow 1: Coin transfer
     let _ = handle_result(
-        "coin transfer",
+        TestName::CoinTransfer,
+        network_type,
         test_cointransfer(&client, &coin_client, &mut giray, giray2.address(), 1_000),
     )
     .await;
 
     // Flow 2: NFT transfer
     let _ = handle_result(
-        "nft transfer",
+        TestName::NftTransfer,
+        network_type,
         test_mintnft(&client, &token_client, &mut giray, &mut giray2),
     )
     .await;
 
     // Flow 3: Publishing module
-    let _ = handle_result("publish module", test_module(&client, &mut giray)).await;
+    let _ = handle_result(
+        TestName::PublishModule,
+        network_type,
+        test_module(&client, &mut giray),
+    )
+    .await;
 
     Ok(())
 }
@@ -526,6 +561,7 @@ async fn main() -> Result<()> {
     // test flows on testnet
     println!("testing testnet...");
     let _ = test_flows(
+        NetworkName::Testnet,
         Client::new(TESTNET_NODE_URL.clone()),
         FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone()),
     )
@@ -534,6 +570,7 @@ async fn main() -> Result<()> {
     // test flows on devnet
     println!("testing devnet...");
     let _ = test_flows(
+        NetworkName::Devnet,
         Client::new(DEVNET_NODE_URL.clone()),
         FaucetClient::new(DEVNET_FAUCET_URL.clone(), DEVNET_NODE_URL.clone()),
     )
