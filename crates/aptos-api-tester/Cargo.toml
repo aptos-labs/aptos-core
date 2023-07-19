@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-framework = { workspace = true }
+aptos-logger = { workspace = true }
 aptos-network = { workspace = true }
 aptos-push-metrics = { workspace = true }
 aptos-rest-client = { workspace = true }
@@ -28,4 +29,3 @@ prometheus = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
-

@@ -36,6 +36,7 @@ use url::Url;
 =======
 use crate::counters::{test_error, test_fail, test_success, test_latency};
 use crate::utils::{NetworkName, TestFailure, TestLog, TestName, TestResult};
+use aptos_logger::{Level, Logger, info};
 
 >>>>>>> b4694b4160 (add histogram)
 // network urls
@@ -111,8 +112,9 @@ async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
     };
 
 
-    println!(
-        "{} result:{:?} in time:{:?}",
+    info!(
+        "{} {} result:{:?} in time:{:?}",
+        network_type.to_string(),
         test_name.to_string(),
         output.result,
         output.time
@@ -515,6 +517,8 @@ async fn test_flows(
     client: Client,
     faucet_client: FaucetClient,
 ) -> Result<()> {
+    info!("testing {}", network_type.to_string());
+
     // create clients
     let coin_client = CoinClient::new(&client);
     let token_client = TokenClient::new(&client);
@@ -522,11 +526,11 @@ async fn test_flows(
     // create and fund account for tests
     let mut giray = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(giray.address(), 100_000_000).await?;
-    println!("{:?}", giray.address());
+    info!("{:?}", giray.address());
 
     let mut giray2 = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(giray2.address(), 100_000_000).await?;
-    println!("{:?}", giray2.address());
+    info!("{:?}", giray2.address());
 
     // Test new account creation and funding
     // this test is critical to pass for the next tests
@@ -570,11 +574,11 @@ async fn test_flows(
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // start logging agents
+    // log metrics
+    Logger::builder().level(Level::Info).build();
     let _mp = MetricsPusher::start_for_local_run("api-tester");
 
     // test flows on testnet
-    println!("testing testnet...");
     let _ = test_flows(
         NetworkName::Testnet,
         Client::new(TESTNET_NODE_URL.clone()),
@@ -583,7 +587,6 @@ async fn main() -> Result<()> {
     .await;
 
     // test flows on devnet
-    println!("testing devnet...");
     let _ = test_flows(
         NetworkName::Devnet,
         Client::new(DEVNET_NODE_URL.clone()),
