@@ -694,7 +694,11 @@ where
                         ret = Some(err);
                         break;
                     },
-                    ExecutionStatus::AggregatorError => ret = Some(Error::AggregatorError),
+                    ExecutionStatus::AggregatorError => {
+                        unreachable!(
+                            "The execution status in last_input_output is an aggregator error"
+                        );
+                    },
                 };
             }
             ret
@@ -732,13 +736,22 @@ where
         let mut accumulated_fee_statement = FeeStatement::zero();
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let res = executor.execute_transaction(
+            let mut res = executor.execute_transaction(
                 &LatestView::<T, S, X>::new_btree_view(base_view, &data_map, idx as TxnIndex),
                 txn,
                 idx as TxnIndex,
                 false,
                 true,
             );
+            if matches!(res, ExecutionStatus::AggregatorError) {
+                res = executor.execute_transaction(
+                    &LatestView::<T, S, X>::new_btree_view(base_view, &data_map, idx as TxnIndex),
+                    txn,
+                    idx as TxnIndex,
+                    false,
+                    false,
+                );
+            }
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
@@ -772,7 +785,7 @@ where
                     return Err(Error::UserError(err));
                 },
                 ExecutionStatus::AggregatorError => {
-                    // TODO: Rexecute the transaction here.
+                    unreachable!("Transaction execution resulted in Aggregator Error even after executing the second time");
                 },
             }
 

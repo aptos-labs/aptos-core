@@ -273,10 +273,6 @@ impl BlockAptosVM {
                 unreachable!("[Execution]: Must be handled by sequential fallback")
             },
             Err(Error::UserError(err)) => Err(err),
-            Err(Error::AggregatorError) => {
-                // TODO: What to do here?
-                unreachable!("")
-            },
         }
     }
 }

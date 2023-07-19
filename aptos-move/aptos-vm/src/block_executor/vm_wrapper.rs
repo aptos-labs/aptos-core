@@ -75,7 +75,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                             process_vm_output(vm_status, materialized_output, sender, log_context)
                         },
                         Err(vm_status) => {
-                            if !is_aggregator_error(&vm_status) {
+                            if is_aggregator_error(&vm_status) {
                                 ExecutionStatus::AggregatorError
                             } else {
                                 ExecutionStatus::Abort(vm_status)
@@ -87,7 +87,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                 }
             },
             Err(vm_status) => {
-                if !is_aggregator_error(&vm_status) {
+                if is_aggregator_error(&vm_status) {
                     ExecutionStatus::AggregatorError
                 } else {
                     ExecutionStatus::Abort(vm_status)
