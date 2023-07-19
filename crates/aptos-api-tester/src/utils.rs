@@ -3,12 +3,6 @@
 use aptos_rest_client::error::RestError;
 
 #[derive(Debug)]
-pub struct TestLog {
-    pub result: TestResult,
-    pub time: f64,
-}
-
-#[derive(Debug)]
 pub enum TestResult {
     Success,
     Fail(&'static str),

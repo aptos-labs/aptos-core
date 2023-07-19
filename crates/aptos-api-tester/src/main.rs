@@ -6,12 +6,13 @@
 mod counters;
 mod utils;
 
-use crate::counters::{test_error, test_fail, test_success};
-use crate::utils::{NetworkName, TestFailure, TestLog, TestName, TestResult};
+use crate::counters::{test_error, test_fail, test_latency, test_success};
+use crate::utils::{NetworkName, TestFailure, TestName, TestResult};
 use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
 use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_logger::{info, Level, Logger};
 use aptos_push_metrics::MetricsPusher;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::{
@@ -32,13 +33,6 @@ use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, future::Future, path::PathBuf, time::Instant};
 use url::Url;
 
-<<<<<<< HEAD
-=======
-use crate::counters::{test_error, test_fail, test_success, test_latency};
-use crate::utils::{NetworkName, TestFailure, TestLog, TestName, TestResult};
-use aptos_logger::{Level, Logger, info};
-
->>>>>>> b4694b4160 (add histogram)
 // network urls
 static DEVNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
@@ -71,7 +65,7 @@ async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
     test_name: TestName,
     network_type: NetworkName,
     fut: Fut,
-) -> Result<TestLog> {
+) -> Result<TestResult> {
     // start timer
     let start = Instant::now();
 
@@ -85,39 +79,35 @@ async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
     let output = match result {
         Ok(_) => {
             test_success(&test_name.to_string(), &network_type.to_string()).inc();
-            test_latency(&test_name.to_string(), &network_type.to_string(), "success").observe(time);
+            test_latency(&test_name.to_string(), &network_type.to_string(), "success")
+                .observe(time);
 
-            TestLog {
-                result: TestResult::Success,
-                time,
-            }
+            TestResult::Success
         },
         Err(failure) => {
             match &failure {
                 TestFailure::Error(_) => {
                     test_error(&test_name.to_string(), &network_type.to_string()).inc();
-                    test_latency(&test_name.to_string(), &network_type.to_string(), "error").observe(time);
+                    test_latency(&test_name.to_string(), &network_type.to_string(), "error")
+                        .observe(time);
                 },
                 TestFailure::Fail(_) => {
                     test_fail(&test_name.to_string(), &network_type.to_string()).inc();
-                    test_latency(&test_name.to_string(), &network_type.to_string(), "fail").observe(time);
+                    test_latency(&test_name.to_string(), &network_type.to_string(), "fail")
+                        .observe(time);
                 },
             };
 
-            TestLog {
-                result: TestResult::from(failure),
-                time,
-            }
+            TestResult::from(failure)
         },
     };
-
 
     info!(
         "{} {} result:{:?} in time:{:?}",
         network_type.to_string(),
         test_name.to_string(),
-        output.result,
-        output.time
+        output,
+        time,
     );
     Ok(output)
 }
@@ -534,15 +524,15 @@ async fn test_flows(
 
     // Test new account creation and funding
     // this test is critical to pass for the next tests
-    if handle_result(
+    match handle_result(
         TestName::NewAccount,
         network_type,
         test_newaccount(&client, &giray, 100_000_000),
     )
-    .await
-    .is_err()
+    .await?
     {
-        return Err(anyhow!("returning early because new account test failed"));
+        TestResult::Success => {},
+        _ => return Err(anyhow!("returning early because new account test failed")),
     }
 
     // Flow 1: Coin transfer
