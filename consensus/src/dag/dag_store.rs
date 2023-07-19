@@ -132,13 +132,7 @@ impl Dag {
         &'b self,
         nodes: impl Iterator<Item = &'a NodeMetadata> + 'b,
     ) -> impl Iterator<Item = &'a NodeMetadata> + 'b {
-        nodes.filter_map(|node_metadata| {
-            if self.exists(node_metadata) {
-                None
-            } else {
-                Some(node_metadata)
-            }
-        })
+        nodes.filter(|node_metadata| !self.exists(node_metadata))
     }
 
     fn get_node_ref_by_metadata(&self, metadata: &NodeMetadata) -> Option<&NodeStatus> {
@@ -229,6 +223,7 @@ impl Dag {
         &self,
         targets: &[NodeMetadata],
         until: Option<Round>,
+        // TODO: replace filter with bool to filter unordered
         filter: impl Fn(&NodeStatus) -> bool,
     ) -> impl Iterator<Item = &NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());

@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
 use super::{
-    dag_fetcher::FetchRequestHandler, reliable_broadcast::CertifiedNodeHandler, storage::DAGStorage,
-    types::TDAGMessage,
+    dag_fetcher::FetchRequestHandler, reliable_broadcast::CertifiedNodeHandler,
+    storage::DAGStorage, types::TDAGMessage,
 };
 use crate::{
     dag::{

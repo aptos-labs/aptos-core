@@ -83,7 +83,7 @@ fn setup() -> (Vec<ValidatorSigner>, Arc<EpochState>, Dag, Arc<MockStorage>) {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
-        verifier: validator_verifier.clone(),
+        verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
     let dag = Dag::new(epoch_state.clone(), storage.clone());
@@ -218,12 +218,6 @@ fn test_dag_bitmask() {
         metadatas.push(node.metadata().clone());
         assert!(dag.add_node(node).is_ok());
     }
-    assert_eq!(
-        dag.bitmask(15),
-        DagSnapshotBitmask::new(5, vec![])
-    );
-    assert_eq!(
-        dag.bitmask(6),
-        DagSnapshotBitmask::new(5, vec![])
-    );
+    assert_eq!(dag.bitmask(15), DagSnapshotBitmask::new(5, vec![]));
+    assert_eq!(dag.bitmask(6), DagSnapshotBitmask::new(5, vec![]));
 }

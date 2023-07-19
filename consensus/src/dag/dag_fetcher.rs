@@ -88,8 +88,10 @@ impl DagFetcher {
             let remote_request = {
                 let dag_reader = self.dag.read();
 
-                let missing_parents: Vec<NodeMetadata> =
-                    dag_reader.filter_missing(local_request.node().parents_metadata_iter()).cloned().collect();
+                let missing_parents: Vec<NodeMetadata> = dag_reader
+                    .filter_missing(local_request.node().parents_metadata())
+                    .cloned()
+                    .collect();
 
                 if missing_parents.is_empty() {
                     local_request.notify();
@@ -126,7 +128,7 @@ impl DagFetcher {
                 if self
                     .dag
                     .read()
-                    .all_exists(local_request.node().parents_metadata_iter())
+                    .all_exists(local_request.node().parents_metadata())
                 {
                     local_request.notify();
                 } else {

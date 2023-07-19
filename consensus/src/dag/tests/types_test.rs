@@ -93,7 +93,7 @@ fn test_remote_fetch_request() {
         .map(|idx| {
             NodeMetadata::new_for_test(1, 3, signers[idx].author(), 100, HashValue::random())
         })
-        .collect(); 
+        .collect();
 
     let request = RemoteFetchRequest::new(
         1,

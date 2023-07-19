@@ -218,7 +218,7 @@ impl Node {
         &self.parents
     }
 
-    pub fn parents_metadata_iter(&self) -> impl Iterator<Item = &NodeMetadata> {
+    pub fn parents_metadata(&self) -> impl Iterator<Item = &NodeMetadata> {
         self.parents().iter().map(|cert| &cert.metadata)
     }
 
