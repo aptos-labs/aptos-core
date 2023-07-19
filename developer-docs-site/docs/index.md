@@ -51,7 +51,7 @@ See the newest Aptos releases in the [Latest Releases](./releases/index.md) list
   <div class="col">
     <div class="card card-body h-100 d-flex flex-column">
     <a href="move/move-on-aptos" class="card-title card-link stretched-link"> <h2>Move on Aptos</h2></a>
-    <p class="card-text">Learn how Move works on the Aptos blockchain.</p>
+    <p class="card-text">Learn how the Move programming language helps make the Aptos blockchain safe and reliable.</p>
     </div>
   </div>
   <div class="col">

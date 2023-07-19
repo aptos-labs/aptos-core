@@ -2752,7 +2752,7 @@ Withdraw from <code>pool_address</code>'s inactive stake with the corresponding 
         <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> stake_pool.inactive, pending_inactive_stake);
     };
 
-    // Cap withdraw amount by total ianctive coins.
+    // Cap withdraw amount by total inactive coins.
     withdraw_amount = <b>min</b>(withdraw_amount, <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.inactive));
     <b>if</b> (withdraw_amount == 0) <b>return</b> <a href="coin.md#0x1_coin_zero">coin::zero</a>&lt;AptosCoin&gt;();
 
@@ -4251,4 +4251,4 @@ Returns validator's next epoch voting power, including pending_active, active, a
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

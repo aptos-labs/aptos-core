@@ -255,7 +255,7 @@ Publish the package with your account address set for `HelloBlockchain`.
 
 Here, you need to change 8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71 to your account address.
 ```bash
-$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
+$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
 ```
 
 :::tip
@@ -268,7 +268,7 @@ aptos move publish --included-artifacts none
 
 You can additionally use named profiles for the addresses.  The first placeholder is `default`
 ```bash
-$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=default
+$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=default
 ```
 
 :::tip

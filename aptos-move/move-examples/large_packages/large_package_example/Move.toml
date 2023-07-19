@@ -1,0 +1,7 @@
+[package]
+name = "LargePackageExample"
+version = "1.0.0"
+upgrade_policy = "compatible"
+
+[addresses]
+large_package_example = "_"

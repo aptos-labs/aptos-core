@@ -120,11 +120,11 @@ aptos move compile
     aptos move init --name <pkg_name>
     ```
 * Move code can also live in a number of other places. See the [Move
-  book](../../../developer-docs-site/docs/guides/move-guides/book/packages.md) for more information on the
+  book](../../../developer-docs-site/docs/move/book/packages.md) for more information on the
   Move package system.
 * More information on the `Move.toml` file can also be found in the [Package](../../../developer-docs-site/docs/move/book/packages.md#movetoml) section of the Move book.
 * Move also supports the idea of [named
-  addresses](../../../developer-docs-site/docs/guides/move-guides/book/address.md#named-addresses); Named
+  addresses](../../../developer-docs-site/docs/move/book/address.md#named-addresses); Named
   addresses are a way to parameterize Move source code so that you can compile
   the module using different values for `named_addr` to get different bytecode
   that you can deploy, depending on what address(es) you control. They are used quite frequently, and can be defined in the `Move.toml` file in the `[addresses]` section, like so:
@@ -150,7 +150,7 @@ aptos move compile
     [`public(friend)`](../../../developer-docs-site/docs/move/book/friends.md).
     A function marked as `entry` can be called as a transaction.
 * `move_to` is one of the [five different global storage
-  operators](../../../developer-docs-site/docs/guides/move-guides/book/global-storage-operators.md).
+  operators](../../../developer-docs-site/docs/move/book/global-storage-operators.md).
 </details>
 
 ## Step 2: Adding unit tests to my first Move module<span id="Step2"><span>

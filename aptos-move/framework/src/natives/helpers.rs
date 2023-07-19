@@ -270,6 +270,51 @@ where
     Arc::new(closure)
 }
 
+#[allow(unused)]
+/// Makes a test-only native function using the "safe" native framework, for consistency with normal
+/// natives.
+pub fn make_test_only_safe_native(
+    timed_features: TimedFeatures,
+    features: Arc<Features>,
+    func: impl Fn(
+            &mut SafeNativeContext,
+            Vec<Type>,
+            VecDeque<Value>,
+        ) -> SafeNativeResult<SmallVec<[Value; 1]>>
+        + Sync
+        + Send
+        + 'static,
+) -> NativeFunction {
+    let closure = move |context: &mut NativeContext, ty_args, args| {
+        use SafeNativeError::*;
+
+        // Test-only natives do not need gas. They are only ran locally during testing.
+        let gas_budget = InternalGas::zero();
+
+        let mut context = SafeNativeContext {
+            timed_features: &timed_features,
+            features: features.clone(),
+            inner: context,
+            gas_budget,
+            gas_used: 0.into(),
+        };
+
+        let res = func(&mut context, ty_args, args);
+
+        match res {
+            Ok(ret_vals) => Ok(NativeResult::ok(InternalGas::zero(), ret_vals)),
+            Err(err) => match err {
+                Abort { abort_code } => Ok(NativeResult::err(InternalGas::zero(), abort_code)),
+                // We leave this here in case a developer does try and charge gas.
+                OutOfGas => Ok(NativeResult::out_of_gas(context.gas_used)),
+                InvariantViolation(err) => Err(err),
+            },
+        }
+    };
+
+    Arc::new(closure)
+}
+
 /// For all $n > 0$, returns $\floor{\log_2{n}}$, contained within a `Some`.
 /// For $n = 0$, returns `None`.
 pub fn log2_floor(n: usize) -> Option<usize> {
