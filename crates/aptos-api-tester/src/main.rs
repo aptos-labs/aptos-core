@@ -3,6 +3,8 @@
 
 #![forbid(unsafe_code)]
 
+mod utils;
+
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::path::PathBuf;
@@ -12,7 +14,6 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
 use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_rest_client::error::RestError;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::bcs;
 use aptos_sdk::coin_client::CoinClient;
@@ -28,6 +29,10 @@ use move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use url::Url;
 
+use utils::TestFailure;
+use utils::TestLog;
+use utils::TestResult;
+
 // network urls
 static DEVNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
@@ -37,36 +42,6 @@ static TESTNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
 static TESTNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
-
-#[derive(Debug)]
-struct TestLog {
-    result: TestResult,
-    time: f64,
-}
-
-#[derive(Debug)]
-enum TestResult {
-    Success,
-    Fail(TestFailure),
-}
-
-#[derive(Debug)]
-enum TestFailure {
-    Fail(&'static str),
-    Error(anyhow::Error),
-}
-
-impl From<RestError> for TestFailure {
-    fn from(e: RestError) -> TestFailure {
-        TestFailure::Error(e.into())
-    }
-}
-
-impl From<anyhow::Error> for TestFailure {
-    fn from(e: anyhow::Error) -> TestFailure {
-        TestFailure::Error(e)
-    }
-}
 
 // Processes a test result.
 async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
