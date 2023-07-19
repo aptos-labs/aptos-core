@@ -1,4 +1,4 @@
-/// This module provides a solution for sorted maps, that is it has the properties that
+/// This module provides a solution for unsorted maps, that is it has the properties that
 /// 1) Keys point to Values
 /// 2) Each Key must be unique
 /// 3) A Key can be found within O(N) time
@@ -13,6 +13,8 @@ module aptos_std::simple_map {
     const EKEY_ALREADY_EXISTS: u64 = 1;
     /// Map key is not found
     const EKEY_NOT_FOUND: u64 = 2;
+    /// Lengths of keys and values do not match
+    const EMISMATCHED_LENGTHS: u64 = 3;
 
     struct SimpleMap<Key, Value> has copy, drop, store {
         data: vector<Element<Key, Value>>,
@@ -27,10 +29,28 @@ module aptos_std::simple_map {
         vector::length(&map.data)
     }
 
-    public fun create<Key: store, Value: store>(): SimpleMap<Key, Value> {
+    /// Create an empty SimpleMap.
+    public fun new<Key: store, Value: store>(): SimpleMap<Key, Value> {
         SimpleMap {
             data: vector::empty(),
         }
+    }
+
+    /// Create a SimpleMap from a vector of keys and values. The keys must be unique.
+    public fun new_from<Key: store, Value: store>(
+        keys: vector<Key>,
+        values: vector<Value>,
+    ): SimpleMap<Key, Value> {
+        let map = new();
+        add_all(&mut map, keys, values);
+        map
+    }
+
+    #[deprecated]
+    /// Create an empty SimpleMap.
+    /// This function is deprecated, use `new` instead.
+    public fun create<Key: store, Value: store>(): SimpleMap<Key, Value> {
+        new()
     }
 
     public fun borrow<Key: store, Value: store>(
@@ -66,6 +86,7 @@ module aptos_std::simple_map {
         vector::destroy_empty(data);
     }
 
+    /// Add a key/value pair to the map. The key must not already exist.
     public fun add<Key: store, Value: store>(
         map: &mut SimpleMap<Key, Value>,
         key: Key,
@@ -75,6 +96,18 @@ module aptos_std::simple_map {
         assert!(option::is_none(&maybe_idx), error::invalid_argument(EKEY_ALREADY_EXISTS));
 
         vector::push_back(&mut map.data, Element { key, value });
+    }
+
+    /// Add multiple key/value pairs to the map. The keys must not already exist.
+    public fun add_all<Key: store, Value: store>(
+        map: &mut SimpleMap<Key, Value>,
+        keys: vector<Key>,
+        values: vector<Value>,
+    ) {
+        assert!(vector::length(&keys) == vector::length(&values), error::invalid_argument(EMISMATCHED_LENGTHS));
+        vector::zip(keys, values, |key, value| {
+            add(map, key, value);
+        });
     }
 
     /// Insert key/value pair or update an existing key to a new value
@@ -139,6 +172,7 @@ module aptos_std::simple_map {
         vector::destroy(values, |_v| dv(_v));
     }
 
+    /// Remove a key/value pair from the map. The key must exist.
     public fun remove<Key: store, Value: store>(
         map: &mut SimpleMap<Key, Value>,
         key: &Key,
@@ -167,7 +201,7 @@ module aptos_std::simple_map {
     }
 
     #[test]
-    public fun add_remove_many() {
+    public fun test_add_remove_many() {
         let map = create<u64, u64>();
 
         assert!(length(&map) == 0, 0);
@@ -200,6 +234,23 @@ module aptos_std::simple_map {
     }
 
     #[test]
+    public fun test_add_all() {
+        let map = create<u64, u64>();
+
+        assert!(length(&map) == 0, 0);
+        add_all(&mut map, vector[1, 2, 3], vector[10, 20, 30]);
+        assert!(length(&map) ==3, 1);
+        assert!(borrow(&map, &1) == &10, 2);
+        assert!(borrow(&map, &2) == &20, 3);
+        assert!(borrow(&map, &3) == &30, 4);
+
+        remove(&mut map, &1);
+        remove(&mut map, &2);
+        remove(&mut map, &3);
+        destroy_empty(map);
+    }
+
+    #[test]
     public fun test_keys() {
         let map = create<u64, u64>();
         assert!(keys(&map) == vector[], 0);
@@ -221,7 +272,7 @@ module aptos_std::simple_map {
 
     #[test]
     #[expected_failure]
-    public fun add_twice() {
+    public fun test_add_twice() {
         let map = create<u64, u64>();
         add(&mut map, 3, 1);
         add(&mut map, 3, 1);
@@ -232,7 +283,7 @@ module aptos_std::simple_map {
 
     #[test]
     #[expected_failure]
-    public fun remove_twice() {
+    public fun test_remove_twice() {
         let map = create<u64, u64>();
         add(&mut map, 3, 1);
         remove(&mut map, &3);
@@ -242,7 +293,7 @@ module aptos_std::simple_map {
     }
 
     #[test]
-    public fun upsert_test() {
+    public fun test_upsert_test() {
         let map = create<u64, u64>();
         // test adding 3 elements using upsert
         upsert<u64, u64>(&mut map, 1, 1 );

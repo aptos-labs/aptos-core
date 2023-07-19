@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: undeclared `0x2::X::S`
+  ┌─ tests/checking/naming/unbound_struct_in_module.move:6:16
+  │
+6 │     fun foo(s: X::S): X::S {
+  │                ^^^^
+
+error: undeclared `0x2::X::S`
+  ┌─ tests/checking/naming/unbound_struct_in_module.move:6:23
+  │
+6 │     fun foo(s: X::S): X::S {
+  │                       ^^^^

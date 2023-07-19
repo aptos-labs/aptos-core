@@ -185,7 +185,7 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
 }
 
 impl NetworkTest for ValidatorJoinLeaveTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

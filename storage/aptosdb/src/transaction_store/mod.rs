@@ -146,13 +146,16 @@ impl TransactionStore {
         &self,
         version: Version,
         transaction: &Transaction,
+        skip_index: bool,
         batch: &SchemaBatch,
     ) -> Result<()> {
-        if let Some(txn) = transaction.try_as_signed_user_txn() {
-            batch.put::<TransactionByAccountSchema>(
-                &(txn.sender(), txn.sequence_number()),
-                &version,
-            )?;
+        if !skip_index {
+            if let Some(txn) = transaction.try_as_signed_user_txn() {
+                batch.put::<TransactionByAccountSchema>(
+                    &(txn.sender(), txn.sequence_number()),
+                    &version,
+                )?;
+            }
         }
         batch.put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
         batch.put::<TransactionSchema>(&version, transaction)?;

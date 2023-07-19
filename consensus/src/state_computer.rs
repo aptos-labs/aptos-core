@@ -331,9 +331,9 @@ async fn test_commit_sync_race() {
         transaction_shuffler::create_transaction_shuffler,
     };
     use aptos_consensus_notifications::Error;
-    use aptos_executor_types::ExecutableBlock;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
+        block_executor::partitioner::ExecutableBlock,
         block_info::BlockInfo,
         ledger_info::LedgerInfo,
         on_chain_config::{TransactionDeduperType, TransactionShufflerType},
@@ -355,7 +355,7 @@ async fn test_commit_sync_race() {
 
         fn execute_block(
             &self,
-            _block: ExecutableBlock,
+            _block: ExecutableBlock<Transaction>,
             _parent_block_id: HashValue,
             _maybe_block_gas_limit: Option<u64>,
         ) -> Result<StateComputeResult, ExecutionError> {

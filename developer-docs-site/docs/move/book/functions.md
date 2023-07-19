@@ -327,6 +327,10 @@ fun zero(): u64 { 0 }
 
 Here `: u64` indicates that the function's return type is `u64`.
 
+:::tip
+A function can return an immutable `&` or mutable `&mut` [reference](./references.md) if derived from an input reference. Keep in mind, this means that a function [cannot return a reference to global storage](./references.md#references-cannot-be-stored) unless it is an [inline function](#inline-functions).
+:::
+
 Using tuples, a function can return multiple values:
 
 ```move
@@ -518,7 +522,7 @@ fun foo() { return () }
 ## Inline Functions
 
 Inline functions are functions which are expanded at caller side instead
-of compiled into Move bytecode. This allows to safe gas and may lead
+of compiled into Move bytecode. This allows to save gas and may lead
 to faster execution. For example, one can define an inline function
 
 ```move=

@@ -4,7 +4,7 @@ import subprocess, re
 
 # Set the tps threshold for block size 1k, 10k and 50k
 BLOCK_SIZES = ["1k", "10k", "50k"]
-THRESHOLDS = {"1k": 3200, "10k": 4300, "50k": 7400}
+THRESHOLDS = {"1k": 3500, "10k": 5200, "50k": 12600}
 THRESHOLD_NOISE = 0.1
 
 # Run the VM sequential execution with performance optimizations enabled

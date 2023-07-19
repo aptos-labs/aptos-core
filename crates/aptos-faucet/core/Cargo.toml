@@ -33,7 +33,7 @@ once_cell = { workspace = true }
 poem = { workspace = true }
 poem-openapi = { workspace = true }
 rand = { workspace = true }
-redis = { workspace = true, features = ["aio", "tokio-comp", "connection-manager"], default-features = false }
+redis = { workspace = true, features = ["aio", "tokio-comp", "connection-manager"] }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

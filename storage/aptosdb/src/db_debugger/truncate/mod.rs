@@ -28,26 +28,26 @@ use std::{fs, path::PathBuf, sync::Arc};
 #[clap(about = "Delete all data after the provided version.")]
 #[clap(group(clap::ArgGroup::new("backup")
         .required(true)
-        .args(&["backup-checkpoint-dir", "opt-out-backup-checkpoint"]),
+        .args(&["backup_checkpoint_dir", "opt_out_backup_checkpoint"]),
 ))]
 pub struct Cmd {
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     db_dir: PathBuf,
 
     #[clap(long)]
     target_version: u64,
 
-    #[clap(long, default_value = "1000")]
+    #[clap(long, default_value_t = 1000)]
     ledger_db_batch_size: usize,
 
-    #[clap(long, parse(from_os_str), group = "backup")]
+    #[clap(long, value_parser, group = "backup")]
     backup_checkpoint_dir: Option<PathBuf>,
 
     #[clap(long, group = "backup")]
     opt_out_backup_checkpoint: bool,
 
     #[clap(long)]
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
 }
 
 impl Cmd {
@@ -61,14 +61,19 @@ impl Cmd {
             println!("Creating backup at: {:?}", &backup_checkpoint_dir);
             fs::create_dir_all(&backup_checkpoint_dir)?;
             // TODO(grao): Support sharded state merkle db here.
-            AptosDB::create_checkpoint(&self.db_dir, backup_checkpoint_dir, false)?;
+            AptosDB::create_checkpoint(
+                &self.db_dir,
+                backup_checkpoint_dir,
+                self.split_ledger_db,
+                false,
+            )?;
             println!("Done!");
         } else {
             println!("Opted out backup creation!.");
         }
 
         let rocksdb_config = RocksdbConfigs {
-            use_state_kv_db: self.use_state_kv_db,
+            split_ledger_db: self.split_ledger_db,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
@@ -229,7 +234,7 @@ mod test {
                 version += txns_to_commit.len() as u64;
             }
 
-            let db_version = db.get_latest_transaction_info_option().unwrap().unwrap().0;
+            let db_version = db.get_latest_version().unwrap();
             prop_assert_eq!(db_version, version - 1);
 
             drop(db);
@@ -242,13 +247,13 @@ mod test {
                 ledger_db_batch_size: 15,
                 opt_out_backup_checkpoint: true,
                 backup_checkpoint_dir: None,
-                use_state_kv_db: false,
+                split_ledger_db: false,
             };
 
             cmd.run().unwrap();
 
             let db = AptosDB::new_for_test(&tmp_dir);
-            let db_version = db.get_latest_transaction_info_option().unwrap().unwrap().0;
+            let db_version = db.get_latest_version().unwrap();
             prop_assert_eq!(db_version, target_version);
 
             let txn_list_with_proof = db.get_transactions(0, db_version + 1, db_version, true).unwrap();

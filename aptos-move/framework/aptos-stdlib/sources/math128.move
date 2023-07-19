@@ -3,8 +3,8 @@ module aptos_std::math128 {
 
     use std::fixed_point32::FixedPoint32;
     use std::fixed_point32;
-    use std::fixed_point64::FixedPoint64;
-    use std::fixed_point64;
+    use aptos_std::fixed_point64::FixedPoint64;
+    use aptos_std::fixed_point64;
 
     /// Abort value when an invalid argument is provided.
     const EINVALID_ARG_FLOOR_LOG2: u64 = 1;

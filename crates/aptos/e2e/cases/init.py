@@ -51,3 +51,12 @@ def test_metrics_accessible(run_helper: RunHelper, test_name=None):
     # JSON this will throw an exception which will be caught as a test failure.
     metrics_url = run_helper.get_metrics_url(json=True)
     requests.get(metrics_url).json()
+
+
+@test_case
+def test_aptos_header_included(run_helper: RunHelper, test_name=None):
+    # Make sure the aptos-cli header is included on the original request
+    response = requests.get(run_helper.get_metrics_url())
+
+    if 'request_source_client="aptos-cli' not in response.text:
+        raise TestError("Request should contain the correct aptos header: aptos-cli")

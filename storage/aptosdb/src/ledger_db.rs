@@ -133,14 +133,78 @@ impl LedgerDb {
     }
 
     pub(crate) fn create_checkpoint(
-        _db_root_path: impl AsRef<Path>,
-        _cp_root_path: impl AsRef<Path>,
+        db_root_path: impl AsRef<Path>,
+        cp_root_path: impl AsRef<Path>,
+        split_ledger_db: bool,
     ) -> Result<()> {
-        // TODO(grao): Implement this function.
-        todo!()
+        let rocksdb_configs = RocksdbConfigs {
+            split_ledger_db,
+            ..Default::default()
+        };
+        let ledger_db = Self::new(db_root_path, rocksdb_configs, /*readonly=*/ false)?;
+        let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
+
+        info!(
+            split_ledger_db = split_ledger_db,
+            "Creating ledger_db checkpoint at: {cp_ledger_db_folder:?}"
+        );
+
+        std::fs::remove_dir_all(&cp_ledger_db_folder).unwrap_or(());
+        if split_ledger_db {
+            std::fs::create_dir_all(&cp_ledger_db_folder).unwrap_or(());
+        }
+
+        ledger_db
+            .metadata_db()
+            .create_checkpoint(Self::metadata_db_path(
+                cp_root_path.as_ref(),
+                split_ledger_db,
+            ))?;
+
+        if split_ledger_db {
+            ledger_db
+                .event_db()
+                .create_checkpoint(cp_ledger_db_folder.join(EVENT_DB_NAME))?;
+            ledger_db
+                .transaction_accumulator_db()
+                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME))?;
+            ledger_db
+                .transaction_db()
+                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_DB_NAME))?;
+            ledger_db
+                .transaction_info_db()
+                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_INFO_DB_NAME))?;
+            ledger_db
+                .write_set_db()
+                .create_checkpoint(cp_ledger_db_folder.join(WRITE_SET_DB_NAME))?;
+        }
+
+        Ok(())
     }
 
+    // Only expect to be used by fast sync when it is finished.
     pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        info!("Fast sync is done, writing pruner progress {version} for all ledger sub pruners.");
+        self.event_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::EventPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
+        self.transaction_accumulator_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::TransactionAccumulatorPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
+        self.transaction_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::TransactionPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
+        self.transaction_info_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::TransactionInfoPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
+        self.write_set_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::WriteSetPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )?;
         self.ledger_metadata_db.put::<DbMetadataSchema>(
             &DbMetadataKey::LedgerPrunerProgress,
             &DbMetadataValue::Version(version),
@@ -167,16 +231,32 @@ impl LedgerDb {
         &self.transaction_accumulator_db
     }
 
+    pub(crate) fn transaction_accumulator_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.transaction_accumulator_db)
+    }
+
     pub(crate) fn transaction_db(&self) -> &DB {
         &self.transaction_db
+    }
+
+    pub(crate) fn transaction_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.transaction_db)
     }
 
     pub(crate) fn transaction_info_db(&self) -> &DB {
         &self.transaction_info_db
     }
 
+    pub(crate) fn transaction_info_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.transaction_info_db)
+    }
+
     pub(crate) fn write_set_db(&self) -> &DB {
         &self.write_set_db
+    }
+
+    pub(crate) fn write_set_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.write_set_db)
     }
 
     fn open_rocksdb(

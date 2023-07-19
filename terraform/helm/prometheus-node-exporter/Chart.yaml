@@ -1,0 +1,8 @@
+apiVersion: v2
+name: aptos-prometheus-node-exporter
+version: 4.17.5
+
+dependencies:
+  - name: prometheus-node-exporter
+    version: 4.17.5
+    repository: "https://prometheus-community.github.io/helm-charts"

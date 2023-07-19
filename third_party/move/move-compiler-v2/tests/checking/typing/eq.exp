@@ -1,0 +1,36 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct G {
+        f: #0,
+    }
+    struct R {
+        f: u64,
+    }
+    struct S {
+        u: u64,
+    }
+    private fun t0(r: &M::R,r_mut: &mut M::R,s: M::S,s_ref: &M::S,s_mut: &mut M::S) {
+        Eq<u64>(0, 1);
+        Eq<u8>(0, 1);
+        Eq<u8>(0, 1);
+        Eq<u128>(0, 1);
+        Eq<u128>(0, 1);
+        Eq<u64>(Borrow(Immutable)(0), Borrow(Immutable)(1));
+        Eq<bool>(true, false);
+        Eq<u64>(0, 1);
+        Eq<M::S>(Borrow(Immutable)(s), s_ref);
+        Eq<M::S>(Borrow(Mutable)(s), s_ref);
+        Eq<M::S>(Borrow(Mutable)(s), s_mut);
+        Eq<M::S>(Borrow(Immutable)(s), s_mut);
+        Eq<M::S>(s_ref, s_mut);
+        Eq<M::S>(s_mut, s_mut);
+        Eq<M::S>(pack M::S(0), s);
+        Eq<M::R>(r, r);
+        Eq<M::R>(r_mut, r_mut);
+        Eq<M::R>(r, r_mut);
+        Eq<M::R>(r_mut, r);
+        Eq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(1));
+        Eq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(1));
+        Tuple()
+    }
+} // end 0x8675309::M

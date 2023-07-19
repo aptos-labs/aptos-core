@@ -68,15 +68,35 @@ You can configure the port settings on your node using the configuration YAML fi
 
 ### Port settings
 
-For the validator:
+:::tip Default port settings
+The recommendations described below assume the default port settings used by validators, validator fullnodes and public fullnodes. **We recommend that you do not expose any other ports while operating a node.** If you have changed the default port settings, then you should adjust the recommendations accordingly.
+:::
 
-- Open the TCP port 6180, to enable the validators to talk to each other.
-- Open the TCP port 6181, to enable validator fullnode to connect.
-- Open the TCP port 9101, to send the validator metrics to validate the health stats.
+#### For the validator:
 
-For the public fullnode:
+- Open the following TCP ports:
+  - `6180` – Open publicly to enable the validator to connect to other validators in the network.
+  - `6181` – Open privately to only be accessible by your validator fullnode.
+- Close the following TCP ports:
+  - `6182` – To prevent public fullnode connections
+  - `9101` – To prevent unauthorized metric inspection
+  - `80/8080` – To prevent unauthorized REST API access
 
-- Open the TCP port 6182, to enable the fullnodes to talk to each other.
-- Open the TCP port 9101, to send the fullnode metrics to validate the health stats (only needed during registration stage).
-- Open the TCP port 80/8080, for the REST API access.
+#### For the validator fullnode:
 
+- Open the following TCP ports:
+  - `6182` – Open publicly to enable public fullnodes to connect to your validator fullnode.
+  - `6181` – Open privately to only be accessible by your validator.
+- Close the following TCP ports:
+  - `9101` – To prevent unauthorized metric inspection
+  - `80/8080` – To prevent unauthorized REST API access
+
+#### For a public fullnode:
+- Open the TCP port `6182` publicly to enable other public fullnodes to connect to your node. 
+- Close the following TCP ports:
+  - `9101` – To prevent unauthorized metric inspection
+  - `80/8080` – To prevent unauthorized REST API access
+
+:::caution Exposing services
+We note that the inspection port (`9101`) and the REST API port (`80` or `8080`) are likely useful for your internal network, e.g., application development and debugging. However, the inspection port should never be exposed publicly as it can be easily abused. Similarly, if you choose to expose the REST API endpoint publicly, you should deploy an additional authentication or rate-limiting mechanism to prevent abuse.
+:::

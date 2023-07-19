@@ -1,0 +1,21 @@
+// ---- Model Dump
+module 0x8675309::M {
+    private fun any<T>() {
+        Abort(0)
+    }
+    private fun foo(x: &mut u64) {
+        Freeze<u64>(x);
+        Freeze<vector<bool>>(Borrow(Mutable)(M::any<vector<bool>>()));
+        if And(true, false) {
+          Abort(Deref(x))
+        } else {
+          Tuple()
+        };
+        if Or(true, false) {
+          Abort(Cast(0))
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x8675309::M

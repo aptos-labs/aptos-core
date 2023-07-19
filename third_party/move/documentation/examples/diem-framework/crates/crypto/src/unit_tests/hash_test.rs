@@ -193,7 +193,7 @@ fn test_common_prefix_bits_len() {
 proptest! {
     #[test]
     fn test_hashvalue_to_bits_roundtrip(hash in any::<HashValue>()) {
-        let bitvec: BitVec<Msb0, u8>  = hash.iter_bits().collect();
+        let bitvec: BitVec<u8, Msb0>  = hash.iter_bits().collect();
         let bytes: Vec<u8> = bitvec.into();
         let hash2 = HashValue::from_slice(bytes).unwrap();
         prop_assert_eq!(hash, hash2);
@@ -201,7 +201,7 @@ proptest! {
 
     #[test]
     fn test_hashvalue_to_bits_inverse_roundtrip(bits in vec(any::<bool>(), HashValue::LENGTH_IN_BITS)) {
-        let bitvec: BitVec<Msb0, u8> = bits.iter().cloned().collect();
+        let bitvec: BitVec<u8, Msb0> = bits.iter().cloned().collect();
         let bytes: Vec<u8> = bitvec.into();
         let hash = HashValue::from_slice(bytes).unwrap();
         let bits2: Vec<bool> = hash.iter_bits().collect();
@@ -218,7 +218,7 @@ proptest! {
 
     #[test]
     fn test_hashvalue_to_rev_bits_roundtrip(hash in any::<HashValue>()) {
-        let bitvec: BitVec<Lsb0, u8> = hash.iter_bits().rev().collect();
+        let bitvec: BitVec<u8, Lsb0> = hash.iter_bits().rev().collect();
         let mut bytes: Vec<u8> = bitvec.into();
         bytes.reverse();
         let hash2 = HashValue::from_slice(&bytes).unwrap();

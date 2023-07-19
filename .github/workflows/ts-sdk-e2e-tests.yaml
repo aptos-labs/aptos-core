@@ -1,0 +1,82 @@
+# Each of these jobs runs the TS SDK E2E tests from this commit against a local testnet
+# built from one of the production release branches. In other words, we run the TS SDK
+# tests against a local devnet, testnet, and mainnet. We also run the TS SDK tests for
+# the indexer, though those run against the production indexer for now.
+
+env:
+  GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+name: "TS SDK E2E Tests"
+on:
+  pull_request_target:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+
+jobs:
+  # Note on the job-level `if` conditions:
+  # This workflow is designed such that we run subsequent jobs only when a 'push'
+  # triggered the workflow or on 'pull_request's which have set auto_merge=true
+  # or have the label "CICD:run-e2e-tests".
+  permission-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check repository permission for user which triggered workflow
+        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+        with:
+          required-permission: write
+          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+
+  run-tests-main-branch:
+    needs: [permission-check]
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - uses: ./.github/actions/run-ts-sdk-e2e-tests
+        with:
+          BRANCH: main
+          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+
+  # Run the TS SDK indexer tests. Note: Unlike the above tests where everything is self
+  # contained because we run a local testnet, these tests operate against the
+  # production indexer service. This service can be flaky so we don't want those tests
+  # to be land blocking for any PR on the aptos repo. This is why we run those tests
+  # separate from test-sdk-confirm-client-generated-publish.
+  run-indexer-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+      - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
+        with:
+          node-version-file: .node-version
+          registry-url: "https://registry.npmjs.org"
+      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+
+      # Run package install. If install fails, it probably means the lockfile
+      # was not included in the commit.
+      - run: cd ./ecosystem/typescript/sdk && pnpm install --frozen-lockfile
+
+      # Run indexer tests.
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        name: ts-sdk-indexer-test
+        with:
+          max_attempts: 3
+          timeout_minutes: 20
+          command: cd ./ecosystem/typescript/sdk && pnpm run test:indexer

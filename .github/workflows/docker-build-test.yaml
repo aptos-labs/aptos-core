@@ -61,6 +61,10 @@ env:
   # We use `pr-<pr_number>` as cache-id for PRs and simply <branch_name> otherwise.
   TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
 
+  # On PRs, only build and push to GCP
+  # On push, build and push to all remote registries
+  TARGET_REGISTRY: ${{ github.event_name == 'pull_request_target' && 'remote' || 'remote-all' }}
+
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
@@ -99,9 +103,11 @@ jobs:
         run: |
           echo "GIT_SHA: ${GIT_SHA}"
           echo "TARGET_CACHE_ID: ${TARGET_CACHE_ID}"
+          echo "TARGET_REGISTRY: ${TARGET_REGISTRY}"
     outputs:
       gitSha: ${{ env.GIT_SHA }}
       targetCacheId: ${{ env.TARGET_CACHE_ID }}
+      targetRegistry: ${{ env.TARGET_REGISTRY }}
 
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
@@ -112,6 +118,7 @@ jobs:
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-indexer:
     needs: [permission-check, determine-docker-build-metadata]
@@ -127,6 +134,7 @@ jobs:
       PROFILE: release
       FEATURES: indexer
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
@@ -142,6 +150,7 @@ jobs:
       PROFILE: release
       FEATURES: failpoints
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
@@ -156,6 +165,7 @@ jobs:
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: performance
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-consensus-only-perf-test:
     needs: [permission-check, determine-docker-build-metadata]
@@ -170,16 +180,19 @@ jobs:
       PROFILE: release
       FEATURES: consensus-only-perf-test
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
-  sdk-release:
+  node-api-compatibility-tests:
     needs: [permission-check, rust-images, determine-docker-build-metadata] # runs with the default release docker build variant "rust-images"
     if: |
-      (github.event_name == 'push' && github.ref_name != 'main') ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      github.event.pull_request.auto_merge != null ||
-      contains(github.event.pull_request.body, '#e2e')
-    uses: aptos-labs/aptos-core/.github/workflows/sdk-release.yaml@main
+      (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null) ||
+        contains(github.event.pull_request.body, '#e2e'
+      )
+    uses: ./.github/workflows/node-api-compatibility-tests.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -187,14 +200,14 @@ jobs:
   cli-e2e-tests:
     needs: [permission-check, rust-images, determine-docker-build-metadata] # runs with the default release docker build variant "rust-images"
     if: |
-      !contains(github.event.pull_request.labels.*.name, 'CICD:skip-sdk-integration-test') && (
+      (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
       )
-    uses: ./.github/workflows/cli-e2e-tests.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/cli-e2e-tests.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -207,7 +220,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
       github.event.pull_request.auto_merge != null ||
       contains(github.event.pull_request.body, '#e2e')
-    uses: ./.github/workflows/docker-indexer-grpc-test.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/docker-indexer-grpc-test.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -233,7 +246,7 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_TEST_SUITE: land_blocking
+      FORGE_TEST_SUITE: realistic_env_max_load
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 480
       COMMENT_HEADER: forge-e2e
@@ -265,7 +278,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: testnet_2d8b1b57553d869190f61df1aaf7f31a8fc19a7b # test against a previous testnet release
+      IMAGE_TAG: aptos-node-v1.5.1 # test against a previous testnet release
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
@@ -293,7 +306,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: aptos-node-v1.3.0_3fc3d42b6cfe27460004f9a0326451bcda840a60 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
+      IMAGE_TAG: aptos-node-v1.5.1 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
@@ -319,3 +332,27 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-consensus-only-perf-test
       FORGE_NAMESPACE: forge-consensus-only-perf-test-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+
+  # Run forge multiregion test. This test uses the multiregion forge cluster that deploys pods in three GCP regions.
+  forge-multiregion-test:
+    needs:
+      - permission-check
+      - determine-docker-build-metadata
+      - rust-images
+      - rust-images-indexer
+      - rust-images-failpoints
+      - rust-images-performance
+      - rust-images-consensus-only-perf-test
+    if: |
+      !failure() && !cancelled() && needs.permission-check.result == 'success' &&
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-multiregion-test')
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      FORGE_TEST_SUITE: multiregion_benchmark_test
+      IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      FORGE_RUNNER_DURATION_SECS: 300
+      COMMENT_HEADER: forge-multiregion-test
+      FORGE_NAMESPACE: forge-multiregion-test-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      FORGE_CLUSTER_NAME: forge-multiregion

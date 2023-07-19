@@ -197,10 +197,11 @@ fn test_unsuccessful_squash_1() {
     let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
-        Err(VMStatus::Error(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            Some(_),
-        ))
+        Err(VMStatus::Error {
+            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            sub_status: None,
+            message: Some(_),
+        })
     );
 }
 
@@ -218,10 +219,11 @@ fn test_unsuccessful_squash_modify_create() {
     let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
-        Err(VMStatus::Error(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            Some(_),
-        ))
+        Err(VMStatus::Error {
+            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            sub_status: None,
+            message: Some(_),
+        })
     );
 }
 
@@ -239,10 +241,11 @@ fn test_unsuccessful_squash_delete_modify() {
     let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
-        Err(VMStatus::Error(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            Some(_),
-        ))
+        Err(VMStatus::Error {
+            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            sub_status: None,
+            message: Some(_),
+        })
     );
 }
 
@@ -260,10 +263,11 @@ fn test_unsuccessful_squash_delete_delete() {
     let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
-        Err(VMStatus::Error(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            Some(_),
-        ))
+        Err(VMStatus::Error {
+            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            sub_status: None,
+            message: Some(_),
+        })
     );
 }
 
@@ -281,10 +285,11 @@ fn test_unsuccessful_squash_delete_delta() {
     let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
-        Err(VMStatus::Error(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            Some(_),
-        ))
+        Err(VMStatus::Error {
+            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            sub_status: None,
+            message: Some(_),
+        })
     );
 }
 
@@ -302,9 +307,10 @@ fn test_unsuccessful_squash_delta_create() {
     let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
-        Err(VMStatus::Error(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            Some(_),
-        ))
+        Err(VMStatus::Error {
+            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            sub_status: None,
+            message: Some(_),
+        })
     );
 }

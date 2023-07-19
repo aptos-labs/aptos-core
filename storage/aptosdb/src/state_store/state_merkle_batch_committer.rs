@@ -8,7 +8,7 @@ use crate::{
     metrics::LATEST_SNAPSHOT_VERSION,
     state_store::{buffered_state::CommitMessage, StateDb},
     version_data::VersionDataSchema,
-    PrunerManager, ShardedStateMerkleSchemaBatch, OTHER_TIMERS_SECONDS,
+    PrunerManager, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
@@ -21,7 +21,7 @@ use std::sync::{mpsc::Receiver, Arc};
 
 pub struct StateMerkleBatch {
     pub top_levels_batch: SchemaBatch,
-    pub sharded_batch: ShardedStateMerkleSchemaBatch,
+    pub batches_for_shards: Vec<SchemaBatch>,
     pub root_hash: HashValue,
     pub state_delta: Arc<StateDelta>,
 }
@@ -48,7 +48,7 @@ impl StateMerkleBatchCommitter {
                 CommitMessage::Data(state_merkle_batch) => {
                     let StateMerkleBatch {
                         top_levels_batch,
-                        sharded_batch,
+                        batches_for_shards,
                         root_hash,
                         state_delta,
                     } = state_merkle_batch;
@@ -63,13 +63,16 @@ impl StateMerkleBatchCommitter {
                         .start_timer();
                     self.state_db
                         .state_merkle_db
-                        .commit(current_version, top_levels_batch, sharded_batch)
+                        .commit(current_version, top_levels_batch, batches_for_shards)
                         .expect("State merkle nodes commit failed.");
                     if self.state_db.state_merkle_db.cache_enabled() {
                         self.state_db
                             .state_merkle_db
-                            .version_cache()
-                            .maybe_evict_version(self.state_db.state_merkle_db.lru_cache());
+                            .version_caches()
+                            .iter()
+                            .for_each(|(_, cache)| {
+                                cache.maybe_evict_version(self.state_db.state_merkle_db.lru_cache())
+                            });
                     }
                     info!(
                         version = current_version,
@@ -85,7 +88,9 @@ impl StateMerkleBatchCommitter {
                         .epoch_snapshot_pruner
                         .maybe_set_pruner_target_db_version(current_version);
 
-                    self.check_usage_consistency(&state_delta).unwrap();
+                    if !self.state_db.skip_usage {
+                        self.check_usage_consistency(&state_delta).unwrap();
+                    }
                 },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {

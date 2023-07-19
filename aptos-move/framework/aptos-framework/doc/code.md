@@ -34,6 +34,7 @@ This module supports functionality related to code management.
     -  [Function `check_upgradability`](#@Specification_1_check_upgradability)
     -  [Function `check_coexistence`](#@Specification_1_check_coexistence)
     -  [Function `check_dependencies`](#@Specification_1_check_dependencies)
+    -  [Function `get_module_names`](#@Specification_1_get_module_names)
     -  [Function `request_publish`](#@Specification_1_request_publish)
     -  [Function `request_publish_with_allowed_deps`](#@Specification_1_request_publish_with_allowed_deps)
 
@@ -982,6 +983,25 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_get_module_names"></a>
+
+### Function `get_module_names`
+
+
+<pre><code><b>fun</b> <a href="code.md#0x1_code_get_module_names">get_module_names</a>(pack: &<a href="code.md#0x1_code_PackageMetadata">code::PackageMetadata</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] len(result) == len(pack.modules);
+<b>ensures</b> [abstract] <b>forall</b> i in 0..len(result): result[i] == pack.modules[i].name;
 </code></pre>
 
 

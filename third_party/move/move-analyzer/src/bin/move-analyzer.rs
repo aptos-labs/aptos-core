@@ -267,3 +267,9 @@ fn on_notification(
         _ => eprintln!("handle notification '{}' from client", notification.method),
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Options::command().debug_assert()
+}

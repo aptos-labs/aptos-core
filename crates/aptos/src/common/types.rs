@@ -40,7 +40,7 @@ use aptos_types::{
     },
 };
 use async_trait::async_trait;
-use clap::{ArgEnum, Parser};
+use clap::{Parser, ValueEnum};
 use hex::FromHexError;
 use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
 use serde::{Deserialize, Serialize};
@@ -359,7 +359,7 @@ impl CliConfig {
 }
 
 /// Types of Keys used by the blockchain
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum KeyType {
     /// Ed25519 key used for signing
     Ed25519,
@@ -452,11 +452,12 @@ impl ProfileOptions {
 }
 
 /// Types of encodings used by the blockchain
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug, Default)]
 pub enum EncodingType {
     /// Binary Canonical Serialization
     BCS,
     /// Hex encoded e.g. 0xABCDE12345
+    #[default]
     Hex,
     /// Base 64 encoded
     Base64,
@@ -556,12 +557,6 @@ impl RngArgs {
     }
 }
 
-impl Default for EncodingType {
-    fn default() -> Self {
-        EncodingType::Hex
-    }
-}
-
 impl Display for EncodingType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {
@@ -624,7 +619,7 @@ pub struct EncodingOptions {
 #[derive(Debug, Parser)]
 pub struct AuthenticationKeyInputOptions {
     /// Authentication Key file input
-    #[clap(long, group = "authentication_key_input", parse(from_os_str))]
+    #[clap(long, group = "authentication_key_input", value_parser)]
     auth_key_file: Option<PathBuf>,
 
     /// Authentication key input
@@ -661,7 +656,7 @@ pub struct PublicKeyInputOptions {
     /// Ed25519 Public key input file name
     ///
     /// Mutually exclusive with `--public-key`
-    #[clap(long, group = "public_key_input", parse(from_os_str))]
+    #[clap(long, group = "public_key_input", value_parser)]
     public_key_file: Option<PathBuf>,
     /// Ed25519 Public key encoded in a type as shown in `encoding`
     ///
@@ -732,7 +727,7 @@ pub struct PrivateKeyInputOptions {
     ///
     /// Encoded with type from `--encoding`
     /// Mutually exclusive with `--private-key`
-    #[clap(long, group = "private_key_input", parse(from_os_str))]
+    #[clap(long, group = "private_key_input", value_parser)]
     private_key_file: Option<PathBuf>,
     /// Signing Ed25519 private key
     ///
@@ -880,7 +875,7 @@ pub fn account_address_from_auth_key(auth_key: &AuthenticationKey) -> AccountAdd
 #[derive(Debug, Parser)]
 pub struct SaveFile {
     /// Output file path
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub output_file: PathBuf,
 
     #[clap(flatten)]
@@ -957,20 +952,28 @@ impl RestOptions {
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
 pub struct MovePackageDir {
+    /// Enables dev mode, which uses all dev-addresses and dev-dependencies
+    ///
+    /// Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and
+    /// [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+    ///
+    /// Currently, it also additionally pulls in all test compilation artifacts
+    #[clap(long)]
+    pub dev: bool,
     /// Path to a move package (the folder with a Move.toml file)
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub package_dir: Option<PathBuf>,
     /// Path to save the compiled move package
     ///
     /// Defaults to `<package_dir>/build`
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     pub output_dir: Option<PathBuf>,
     /// Named addresses for the move binary
     ///
     /// Example: alice=0x1234, bob=0x5678
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
-    #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
+    #[clap(long, value_parser = crate::common::utils::parse_map::<String, AccountAddressWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 
     /// Skip pulling the latest git dependencies
@@ -989,6 +992,7 @@ pub struct MovePackageDir {
 impl MovePackageDir {
     pub fn new(package_dir: PathBuf) -> Self {
         Self {
+            dev: false,
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
@@ -1334,7 +1338,7 @@ pub struct TransactionOptions {
     ///
     /// This allows you to override the account address from the derived account address
     /// in the event that the authentication key was rotated or for a resource account
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) sender_account: Option<AccountAddress>,
 
     #[clap(flatten)]
@@ -1602,7 +1606,10 @@ impl TransactionOptions {
 
         // Generate the execution & IO flamegraph.
         println!();
-        match gas_log.to_flamegraph(format!("Transaction {} -- Execution & IO", hash))? {
+        match gas_log
+            .exec_io
+            .to_flamegraph(format!("Transaction {} -- Execution & IO", hash))?
+        {
             Some(graph_bytes) => {
                 create_dir!();
                 let graph_file_path = Path::join(dir, format!("{}.exec_io.svg", raw_file_name));
@@ -1692,14 +1699,14 @@ pub struct OptionalPoolAddressArgs {
     /// Address of the Staking pool
     ///
     /// Defaults to the profile's `AccountAddress`
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) pool_address: Option<AccountAddress>,
 }
 
 #[derive(Parser)]
 pub struct PoolAddressArgs {
     /// Address of the Staking pool
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) pool_address: AccountAddress,
 }
 
@@ -1726,7 +1733,7 @@ pub struct RotationProofChallenge {
 #[derive(Clone, Debug, Parser, Serialize)]
 pub struct MultisigAccount {
     /// The address of the multisig account to interact with
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) multisig_address: AccountAddress,
 }
 
@@ -1744,7 +1751,7 @@ pub struct TypeArgVec {
     /// TypeTag arguments separated by spaces.
     ///
     /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
-    #[clap(long, multiple_values = true)]
+    #[clap(long, num_args = 0..)]
     pub(crate) type_args: Vec<MoveType>,
 }
 
@@ -1778,7 +1785,7 @@ impl TryInto<Vec<TypeTag>> for TypeArgVec {
     }
 }
 
-#[derive(Debug, Parser)]
+#[derive(Clone, Debug, Parser)]
 pub struct ArgWithTypeVec {
     /// Arguments combined with their type separated by spaces.
     ///
@@ -1788,7 +1795,7 @@ pub struct ArgWithTypeVec {
     /// quotes based on your shell interpreter)
     ///
     /// Example: `address:0x1 bool:true u8:0 u256:1234 "bool:[true, false]" 'address:[["0xace", "0xbee"], []]'`
-    #[clap(long, multiple_values = true)]
+    #[clap(long, num_args = 0..)]
     pub(crate) args: Vec<ArgWithType>,
 }
 
@@ -1852,7 +1859,7 @@ pub struct EntryFunctionArguments {
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long, required_unless_present = "json-file")]
+    #[clap(long, required_unless_present = "json_file")]
     pub function_id: Option<MemberId>,
 
     #[clap(flatten)]
@@ -1861,7 +1868,7 @@ pub struct EntryFunctionArguments {
     pub(crate) arg_vec: ArgWithTypeVec,
 
     /// JSON file specifying public entry function ID, type arguments, and arguments.
-    #[clap(long, parse(from_os_str), conflicts_with_all = &["function-id", "args", "type-args"])]
+    #[clap(long, value_parser, conflicts_with_all = &["function_id", "args", "type_args"])]
     pub(crate) json_file: Option<PathBuf>,
 }
 
@@ -1937,7 +1944,7 @@ pub struct ScriptFunctionArguments {
     pub(crate) arg_vec: ArgWithTypeVec,
 
     /// JSON file specifying type arguments and arguments.
-    #[clap(long, parse(from_os_str), conflicts_with_all = &["args", "type-args"])]
+    #[clap(long, value_parser, conflicts_with_all = &["args", "type_args"])]
     pub(crate) json_file: Option<PathBuf>,
 }
 

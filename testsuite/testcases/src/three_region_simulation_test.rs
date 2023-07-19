@@ -101,7 +101,7 @@ impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
 }
 
 impl NetworkTest for ThreeRegionSameCloudSimulationTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

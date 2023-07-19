@@ -30,6 +30,12 @@ inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
+  GCP_AUTH_DURATION:
+    description: "Duration of GCP auth token in seconds"
+    type: int
+    # setting this to 1.5h since sometimes docker builds (special performance
+    # builds etc.) take that long. Default is 1h.
+    default: 5400
 outputs:
   CLOUDSDK_AUTH_ACCESS_TOKEN:
     description: "GCP access token"
@@ -47,7 +53,7 @@ runs:
       uses: aptos-labs/setup-buildx-action@7952e9cf0debaf1f3f3e5dc7d9c5ea6ececb127e # pin v2.4.0
       with:
         endpoint: builders
-        version: v0.10.1
+        version: v0.11.0
         custom-name: "core-builder"
         keep-state: true
         config-inline: |
@@ -62,7 +68,9 @@ runs:
               all = true
               keepBytes = 900000000000
 
-    - uses: imjasonh/setup-crane@5146f708a817ea23476677995bf2133943b9be0b # pin@v0.1
+    - uses: imjasonh/setup-crane@00c9e93efa4e1138c9a7a5c594acd6c75a2fbf0c # pin@v0.3
+      with:
+        version: v0.15.2
 
     - id: auth
       name: "Authenticate to Google Cloud"
@@ -70,7 +78,7 @@ runs:
       with:
         create_credentials_file: false
         token_format: "access_token"
-        access_token_lifetime: 5400 # setting this to 1.5h since sometimes docker builds (special performance builds etc.) take that long. Default is 1h.
+        access_token_lifetime: ${{ inputs.GCP_AUTH_DURATION }}
         workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
         export_environment_variables: ${{ inputs.EXPORT_GCP_PROJECT_VARIABLES }}

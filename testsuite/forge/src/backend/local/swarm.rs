@@ -512,15 +512,23 @@ impl Swarm for LocalSwarm {
     }
 
     fn full_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
-        Box::new(self.fullnodes.values().map(|v| v as &'a dyn FullNode))
+        let mut full_nodes: Vec<_> = self
+            .fullnodes
+            .values()
+            .map(|v| v as &'a dyn FullNode)
+            .collect();
+        full_nodes.sort_by_key(|n| n.index());
+        Box::new(full_nodes.into_iter())
     }
 
     fn full_nodes_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn FullNode> + 'a> {
-        Box::new(
-            self.fullnodes
-                .values_mut()
-                .map(|v| v as &'a mut dyn FullNode),
-        )
+        let mut full_nodes: Vec<_> = self
+            .fullnodes
+            .values_mut()
+            .map(|v| v as &'a mut dyn FullNode)
+            .collect();
+        full_nodes.sort_by_key(|n| n.index());
+        Box::new(full_nodes.into_iter())
     }
 
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode> {
@@ -548,7 +556,7 @@ impl Swarm for LocalSwarm {
         self.add_validator_fullnode(version, template, id)
     }
 
-    fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
+    async fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
         self.add_fullnode(version, template)
     }
 
@@ -648,6 +656,10 @@ impl Swarm for LocalSwarm {
             inspection_service_url,
             self.chain_id,
         )
+    }
+
+    fn get_default_pfn_node_config(&self) -> NodeConfig {
+        todo!()
     }
 }
 

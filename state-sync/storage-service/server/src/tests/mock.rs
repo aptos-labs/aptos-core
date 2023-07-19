@@ -19,6 +19,7 @@ use aptos_network::{
     },
 };
 use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
+use aptos_storage_service_notifications::StorageServiceNotifier;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
     StorageServiceMessage,
@@ -37,8 +38,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionWithProof, Version,
+        AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
+        TransactionWithProof, Version,
     },
     PeerId,
 };
@@ -65,6 +66,7 @@ impl MockClient {
     ) -> (
         Self,
         StorageServiceServer<StorageReader>,
+        StorageServiceNotifier,
         MockTimeService,
         Arc<PeersAndMetadata>,
     ) {
@@ -92,12 +94,17 @@ impl MockClient {
             let network_events = NetworkEvents::new(
                 peer_manager_notification_receiver,
                 connection_notification_receiver,
+                None,
             );
             network_and_events.insert(network_id, network_events);
             peer_manager_notifiers.insert(network_id, peer_manager_notifier);
         }
         let storage_service_network_events =
             StorageServiceNetworkEvents::new(NetworkServiceEvents::new(network_and_events));
+
+        // Create the storage service notifier and listener
+        let (storage_service_notifier, storage_service_listener) =
+            aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
 
         // Create the storage service
         let peers_and_metadata = create_peers_and_metadata(network_ids);
@@ -110,6 +117,7 @@ impl MockClient {
             mock_time_service.clone(),
             peers_and_metadata.clone(),
             storage_service_network_events,
+            storage_service_listener,
         );
 
         // Return the client and service
@@ -119,6 +127,7 @@ impl MockClient {
         (
             mock_client,
             storage_server,
+            storage_service_notifier,
             mock_time_service.into_mock(),
             peers_and_metadata,
         )
@@ -316,8 +325,6 @@ mock! {
         fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
 
         fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
-
-        fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>>;
 
         fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue>;
 

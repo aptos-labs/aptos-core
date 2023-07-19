@@ -224,7 +224,7 @@ impl CliTestFramework {
     pub async fn fund_account(&self, index: usize, amount: Option<u64>) -> CliTypedResult<String> {
         FundWithFaucet {
             profile_options: Default::default(),
-            account: self.account_id(index),
+            account: Some(self.account_id(index)),
             faucet_options: self.faucet_options(),
             amount: amount.unwrap_or(DEFAULT_FUNDED_COINS),
             rest_options: self.rest_options(),
@@ -1036,6 +1036,7 @@ impl CliTestFramework {
 
     pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
         MovePackageDir {
+            dev: true,
             package_dir: Some(self.move_dir()),
             output_dir: None,
             named_addresses: Self::named_addresses(account_strs),

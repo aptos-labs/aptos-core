@@ -43,7 +43,7 @@ impl VMChangeSet {
             .iter()
             .all(|(k, _)| write_set.get(k).is_none());
         if !disjoint {
-            return Err(VMStatus::Error(
+            return Err(VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg("DeltaChangeSet and WriteSet are not disjoint."),
             ));
@@ -90,7 +90,7 @@ impl VMChangeSet {
             .for_each(|item| write_set_mut.insert(item));
 
         let write_set = write_set_mut.freeze().map_err(|_| {
-            VMStatus::Error(
+            VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg("Failed to freeze write when materializing VMChangeSet"),
             )
@@ -142,7 +142,7 @@ impl VMChangeSet {
                         // This case (applying a delta to deleted item) should
                         // never happen. Let's still return an error instead of
                         // panicking.
-                        return Err(VMStatus::Error(
+                        return Err(VMStatus::error(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                             err_msg("Cannot squash delta which was already deleted."),
                         ));
@@ -176,7 +176,7 @@ impl VMChangeSet {
                     // Squashing creation and deletion is a no-op. In that case, we
                     // have to remove the old write op from the write set.
                     let noop = !WriteOp::squash(entry.get_mut(), next_write_op).map_err(|e| {
-                        VMStatus::Error(
+                        VMStatus::error(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                             err_msg(format!("Error while squashing two write ops: {}.", e)),
                         )
@@ -193,7 +193,7 @@ impl VMChangeSet {
 
                     // We cannot create after modification with a delta!
                     if removed_delta.is_some() && next_write_op.is_creation() {
-                        return Err(VMStatus::Error(
+                        return Err(VMStatus::error(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                             err_msg("Cannot create a resource after modification with a delta."),
                         ));
@@ -205,7 +205,7 @@ impl VMChangeSet {
         }
 
         let write_set = write_set_mut.freeze().map_err(|_| {
-            VMStatus::Error(
+            VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 err_msg("Error when freezing squashed write sets."),
             )

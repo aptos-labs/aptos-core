@@ -11,13 +11,15 @@ One method to do so is to use the CLI:
     * Return to the first terminal and press enter.
 """
 
+import asyncio
 import os
 import sys
 
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
+from aptos_sdk.async_client import FaucetClient, RestClient
 from aptos_sdk.bcs import Serializer
-from aptos_sdk.client import FaucetClient, RestClient
+from aptos_sdk.package_publisher import PackagePublisher
 from aptos_sdk.transactions import (
     EntryFunction,
     TransactionArgument,
@@ -29,7 +31,7 @@ from .common import FAUCET_URL, NODE_URL
 
 
 class CoinClient(RestClient):
-    def register_coin(self, coin_address: AccountAddress, sender: Account) -> str:
+    async def register_coin(self, coin_address: AccountAddress, sender: Account) -> str:
         """Register the receiver account to receive transfers for the new coin."""
 
         payload = EntryFunction.natural(
@@ -38,12 +40,12 @@ class CoinClient(RestClient):
             [TypeTag(StructTag.from_str(f"{coin_address}::moon_coin::MoonCoin"))],
             [],
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = await self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
-    def mint_coin(
+    async def mint_coin(
         self, minter: Account, receiver_address: AccountAddress, amount: int
     ) -> str:
         """Mints the newly created coin to a specified receiver address."""
@@ -57,26 +59,26 @@ class CoinClient(RestClient):
                 TransactionArgument(amount, Serializer.u64),
             ],
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = await self.create_bcs_signed_transaction(
             minter, TransactionPayload(payload)
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
-    def get_balance(
+    async def get_balance(
         self,
         coin_address: AccountAddress,
         account_address: AccountAddress,
     ) -> str:
         """Returns the coin balance of the given account"""
 
-        balance = self.account_resource(
+        balance = await self.account_resource(
             account_address,
             f"0x1::coin::CoinStore<{coin_address}::moon_coin::MoonCoin>",
         )
         return balance["data"]["coin"]["value"]
 
 
-if __name__ == "__main__":
+async def main():
     assert (
         len(sys.argv) == 2
     ), "Expecting an argument that points to the moon_coin directory."
@@ -91,8 +93,9 @@ if __name__ == "__main__":
     rest_client = CoinClient(NODE_URL)
     faucet_client = FaucetClient(FAUCET_URL, rest_client)
 
-    faucet_client.fund_account(alice.address(), 20_000)
-    faucet_client.fund_account(bob.address(), 20_000)
+    alice_fund = faucet_client.fund_account(alice.address(), 20_000_000)
+    bob_fund = faucet_client.fund_account(bob.address(), 20_000_000)
+    await asyncio.gather(*[alice_fund, bob_fund])
 
     input("\nUpdate the module with Alice's address, compile, and press enter.")
 
@@ -111,20 +114,23 @@ if __name__ == "__main__":
         metadata = f.read()
 
     print("\nPublishing MoonCoin package.")
-    txn_hash = rest_client.publish_package(alice, metadata, [module])
-    rest_client.wait_for_transaction(txn_hash)
+    package_publisher = PackagePublisher(rest_client)
+    txn_hash = await package_publisher.publish_package(alice, metadata, [module])
+    await rest_client.wait_for_transaction(txn_hash)
     # <:!:publish
 
     print("\nBob registers the newly created coin so he can receive it from Alice.")
-    txn_hash = rest_client.register_coin(alice.address(), bob)
-    rest_client.wait_for_transaction(txn_hash)
-    print(
-        f"Bob's initial MoonCoin balance: {rest_client.get_balance(alice.address(), bob.address())}."
-    )
+    txn_hash = await rest_client.register_coin(alice.address(), bob)
+    await rest_client.wait_for_transaction(txn_hash)
+    balance = await rest_client.get_balance(alice.address(), bob.address())
+    print(f"Bob's initial MoonCoin balance: {balance}")
 
     print("Alice mints Bob some of the new coin.")
-    txn_hash = rest_client.mint_coin(alice, bob.address(), 100)
-    rest_client.wait_for_transaction(txn_hash)
-    print(
-        f"Bob's updated MoonCoin balance: {rest_client.get_balance(alice.address(), bob.address())}."
-    )
+    txn_hash = await rest_client.mint_coin(alice, bob.address(), 100)
+    await rest_client.wait_for_transaction(txn_hash)
+    balance = await rest_client.get_balance(alice.address(), bob.address())
+    print(f"Bob's updated MoonCoin balance: {balance}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

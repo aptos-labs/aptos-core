@@ -9,3 +9,13 @@ use once_cell::sync::Lazy;
 pub static CRITICAL_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_vm_critical_errors", "Number of critical errors").unwrap()
 });
+
+/// Count the number of errors within the speculative logging logic / implementation.
+/// Intended to trigger lower priority / urgency alerts.
+pub static SPECULATIVE_LOGGING_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_vm_speculative_logging_errors",
+        "Number of errors in speculative logging implementation"
+    )
+    .unwrap()
+});

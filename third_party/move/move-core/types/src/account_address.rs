@@ -436,6 +436,7 @@ mod tests {
         }
 
         #[test]
+        #[allow(clippy::redundant_clone)] // Required to work around prop_assert_eq! limitations
         fn test_address_protobuf_roundtrip(addr in any::<AccountAddress>()) {
             let bytes = addr.to_vec();
             prop_assert_eq!(bytes.clone(), addr.as_ref());

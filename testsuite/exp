@@ -1,0 +1,416 @@
+#!/usr/bin/env python3
+
+"""
+This script is used to trigger Github Actions Workflows, which are used to:
+* build docker images
+* run Forge
+
+The script will sync your local changes to a new branch, push it to the remote, and trigger the workflow on that branch.
+
+Usage:
+    ./exp --with-forge --forge-test-suite <test-suite>
+
+NOTE:
+* The script will not clean up the local branch after the workflow is done. You can delete the branch manually. The branch is deleted on the remote
+* If the script is interrupted, the workflow may still be running remotely. You can check the status of the workflow on Github Actions page.
+* The script must be run from the "testsuite" directory, or at least in a context where "testrun" and "forge.py" are available in the same directory.
+* This script supports building different profiles and features into the docker images, but does not yet support using non-release images in Forge.
+"""
+
+from email.policy import default
+import json
+from typing import List, Tuple
+import click
+import sys
+import time
+
+from test_framework.shell import LocalShell, Shell
+from test_framework.git import Git
+from test_framework.logging import log, init_logging
+from forge import image_exists
+
+APTOS_CORE_REPO = "https://github.com/aptos-labs/aptos-core.git"
+DOCKER_RUST_BUILD_WORKFLOW_NAME = "workflow-run-docker-rust-build.yaml"
+FORGE_WORKFLOW_NAME = "adhoc-forge.yaml"
+EXP_GIT_BRANCH_PREFIX = "exp/"
+WORKFLOW_WATCH_INTERVAL_SECS = 10  # refresh every 10s
+WORKFLOW_WATCH_TIMEOUT_SECS = 30 * 60  # 30 min build timeout
+
+VALIDATOR_TESTING_IMAGE_NAME = "validator-testing"
+
+FORGE_DEFAULT_TEST_SUITE = "land_blocking"
+FORGE_DEFAULT_CLUSTER_NAME = "aptos-forge-exp-0"
+
+
+def cleanup_and_exit(git: Git, exit_code: int, cleanup_branch: str = None) -> None:
+    """Clean up dangling resources like temporary exp branch, and exit with the given code."""
+    if cleanup_branch:
+        log.info("Deleting remote branch %s", cleanup_branch)
+        git.run(["push", "origin", "--delete", cleanup_branch]).unwrap()
+
+    sys.exit(exit_code)
+
+
+def try_push_new_branch(git: Git, current_branch: str, new_branch: str) -> None:
+    if git.branch_exists(new_branch):
+        log.info("Branch %s already exists. Overriding its local state.", new_branch)
+        git.run(["branch", "-D", new_branch]).unwrap()  # delete local branch
+
+    # create a new branch and push it to the remote
+    log.info("Creating branch %s", new_branch)
+    git.run(["checkout", "-b", new_branch]).unwrap()
+    log.info("Pushing branch %s", new_branch)
+    git.run(["push", "-f", "origin", new_branch]).unwrap()
+
+    log.info("Successfully created new branch %s", new_branch)
+
+    git.run(["checkout", current_branch]).unwrap()  # switch back to the original branch
+
+
+def get_gh_username(shell: Shell) -> str:
+    ret = shell.run(["gh", "api", "user", "-q", ".login"])
+    if ret.succeeded():
+        return ret.unwrap().decode().strip()
+    else:
+        return ""
+
+
+def wait_for_workflow(shell: Shell, branch: str, workflow_name: str) -> bool:
+    """Get the latest workflow run ID and wait for it to complete."""
+    # get the workflow run ID
+    gh_run_list_cmd = [
+        "gh",
+        "run",
+        "list",
+        "--workflow",
+        workflow_name,
+        "--branch",
+        branch,
+        "--limit",
+        "1",
+        "--json",
+        "databaseId",
+        "--jq",
+        ".[0].databaseId",
+    ]
+    gh_run_list_cmd_ret = shell.run(gh_run_list_cmd)
+    # get the URL
+    if not gh_run_list_cmd_ret.succeeded():
+        log.info("Failed to get workflow run ID")
+        return False
+    workflow_run_id = gh_run_list_cmd_ret.unwrap().decode().strip()
+    log.info(
+        f"Workflow URL: https://github.com/aptos-labs/aptos-core/actions/runs/{workflow_run_id}"
+    )
+
+    workflow_success = False
+    iterations = WORKFLOW_WATCH_TIMEOUT_SECS // WORKFLOW_WATCH_INTERVAL_SECS
+    for i in range(iterations):
+        secs_remaining = (iterations - i) * WORKFLOW_WATCH_INTERVAL_SECS
+        log.info(
+            f"Checking workflow status: https://github.com/aptos-labs/aptos-core/actions/runs/{workflow_run_id} ({secs_remaining}s remaining)"
+        )
+        gh_run_view_cmd = [
+            "gh",
+            "run",
+            "view",
+            workflow_run_id,
+            "--log",  # Exit with non-zero status if run fails
+        ]
+        gh_run_view_cmd_ret = shell.run(gh_run_view_cmd)
+        if gh_run_view_cmd_ret.succeeded():
+            workflow_success = True
+            log.info("Successfully ran workflow")
+            log.info(f"To view the logs, run:\n\t$ {' '.join(gh_run_view_cmd)}")
+            break
+        else:
+            log.info(f"Waiting for workflow {workflow_name} to complete...")
+            time.sleep(WORKFLOW_WATCH_INTERVAL_SECS)
+
+    return workflow_success
+
+
+def workflow_dispatch_docker_build(
+    shell: Shell,
+    branch: str,
+    git_sha: str,
+    features: str,
+    profile: str,
+    dry_run: bool = False,
+    wait: bool = False,
+) -> bool:
+    build_addl_testing_images = "true"  # always build additional testing images
+
+    log.info("GIT_SHA: %s", git_sha)
+    log.info("FEATURES: %s", features)
+    log.info("PROFILE: %s", profile)
+    log.info(f"BUILD_ADDL_TESTING_IMAGES: {build_addl_testing_images}")
+
+    gh_workflow_run_cmd = [
+        "gh",
+        "workflow",
+        "run",
+        DOCKER_RUST_BUILD_WORKFLOW_NAME,
+        "--ref",
+        branch,
+        "--field",
+        f"GIT_SHA={git_sha}",
+        "--field",
+        f"FEATURES={features}",
+        "--field",
+        f"PROFILE={profile}",
+        "--field",
+        f"BUILD_ADDL_TESTING_IMAGES={build_addl_testing_images}",
+    ]
+    log.info(
+        "%s: $ %s",
+        "Running command" if not dry_run else "Will run command",
+        " ".join(gh_workflow_run_cmd),
+    )
+    if dry_run:
+        log.info("Dry run. Exiting before running gh commands to trigger workflow")
+        return True
+    gh_workflow_run_cmd_ret = shell.run(gh_workflow_run_cmd, stream_output=True)
+    log.info(
+        f"All workflow runs: https://github.com/aptos-labs/aptos-core/actions/workflows/{DOCKER_RUST_BUILD_WORKFLOW_NAME}"
+    )
+    # XXX: wait a while for GH API to update
+    time.sleep(10)
+    dispatch_status = gh_workflow_run_cmd_ret.succeeded()
+    if dispatch_status:
+        log.info("Successfully triggered docker build workflow")
+    else:
+        log.error("Failed to trigger docker build workflow")
+        return False
+    if wait:
+        return wait_for_workflow(shell, branch, DOCKER_RUST_BUILD_WORKFLOW_NAME)
+    return True
+
+
+def workflow_dispatch_forge(
+    shell: Shell,
+    branch: str,
+    git_sha: str,
+    duration: int = 480,
+    test_suite: str = FORGE_DEFAULT_TEST_SUITE,
+    cluster_name: str = FORGE_DEFAULT_CLUSTER_NAME,
+    dry_run: bool = False,
+    wait: bool = False,
+) -> bool:
+    """Run Forge via workflow_dispatch and return the success status."""
+    gh_workflow_run_cmd = [
+        "gh",
+        "workflow",
+        "run",
+        FORGE_WORKFLOW_NAME,
+        "--ref",
+        branch,
+        "--field",
+        f"IMAGE_TAG={git_sha}",
+        "--field",
+        f"FORGE_IMAGE_TAG={git_sha}",
+        "--field",
+        f"FORGE_RUNNER_DURATION_SECS={str(duration)}",
+        "--field",
+        f"FORGE_TEST_SUITE={test_suite}",
+        "--field",
+        f"FORGE_CLUSTER_NAME={cluster_name}",
+    ]
+    log.info(
+        "%s: $ %s",
+        "Running command" if not dry_run else "Will run command",
+        " ".join(gh_workflow_run_cmd),
+    )
+    if dry_run:
+        log.info("Dry run. Exiting before running gh commands to trigger workflow")
+        return True
+    gh_workflow_run_cmd_ret = shell.run(gh_workflow_run_cmd, stream_output=True)
+    log.info(
+        f"All workflow runs: https://github.com/aptos-labs/aptos-core/actions/workflows/{FORGE_WORKFLOW_NAME}"
+    )
+    # XXX: wait a while for GH API to update
+    time.sleep(10)
+    dispatch_status = gh_workflow_run_cmd_ret.succeeded()
+    if dispatch_status:
+        log.info("Successfully triggered Forge test workflow")
+    else:
+        log.error("Failed to trigger Forge test workflow")
+        return False
+    if wait:
+        return wait_for_workflow(shell, branch, FORGE_WORKFLOW_NAME)
+    return True
+
+
+def ensure_git_status(git: Git, ignore_uncommitted_changes: bool) -> Tuple[str, str]:
+    """Ensure that the git status is clean and return the git SHA and branch name of the experimental branch"""
+    current_git_branch = git.branch()
+    new_exp_git_branch = (
+        EXP_GIT_BRANCH_PREFIX + current_git_branch
+    )  # the temporary branch to push to
+
+    # ensure that the current git workspace is clean
+    if not git.status():
+        log.info("ERROR: uncommitted changes in git workspace")
+        uncommitted_files = git.run(["status", "--porcelain"]).unwrap().decode().strip()
+        log.info("Uncommitted files:\n%s", uncommitted_files)
+        if ignore_uncommitted_changes:
+            log.info("WARNING: ignoring uncommitted changes in the git workspace")
+        else:
+            cleanup_and_exit(git, 1)
+
+    # create a new branch and push it to the remote
+    try:
+        try_push_new_branch(git, current_git_branch, new_exp_git_branch)
+    except Exception as e:
+        log.info("ERROR: Failed to create exp branch %s: %s", new_exp_git_branch, e)
+        cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
+
+    if not git.branch_matches_remote(APTOS_CORE_REPO, current_git_branch):
+        log.info("ERROR: Not synced with remote. Please push to a remote branch")
+        log.info(
+            "%s (local) != %s (remote)",
+            git.get_commit_hash(current_git_branch),
+            git.resolve_remote_ref(APTOS_CORE_REPO, current_git_branch),
+        )
+        cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
+
+    git_sha = git.get_commit_hash("HEAD")
+    return git_sha, new_exp_git_branch
+
+
+@click.group()
+@click.option(
+    "--log-metadata/--no-log-metadata",
+    default=True,
+)
+def main(log_metadata: bool) -> None:
+    init_logging(logger=log, print_metadata=log_metadata)
+
+
+@main.command(help="Run a workflow on the aptos-core repo")
+@click.option(
+    "--features",
+    multiple=True,
+    default=[],
+    help="Cargo features to enable",
+)
+@click.option(
+    "--profile",
+    default="release",
+    help="Cargo profile to build",
+)
+@click.option(
+    "--ignore-uncommitted-changes",
+    is_flag=True,
+    help="Ignores uncommitted changes in the git workspace",
+)
+@click.option(
+    "--wait",
+    is_flag=True,
+    help="Wait for all scheduled workflows to finish",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Dry run",
+)
+@click.option(
+    "--with-forge",
+    is_flag=True,
+    help="Run Forge as well",
+)
+@click.option(
+    "--forge-runner-duration-secs",
+    default=480,
+    help="Duration of the Forge test in seconds",
+)
+@click.option(
+    "--forge-test-suite",
+    default="land_blocking",
+    help="Test suite to run in Forge",
+)
+def run(
+    features: List[str],
+    profile: str,
+    ignore_uncommitted_changes: bool,
+    wait: bool,
+    dry_run: bool,
+    with_forge: bool,
+    forge_runner_duration_secs: int,
+    forge_test_suite: str,
+) -> None:
+    # If --with-forge is specified, --wait should be True, otherwise the job will fail.
+    if with_forge:
+        wait = True
+
+    shell = LocalShell()
+    git = Git(shell)
+
+    git_sha, new_exp_git_branch = ensure_git_status(git, ignore_uncommitted_changes)
+    features = ",".join(features)
+    profile = profile
+
+    prev_built_image_exists = image_exists(shell, VALIDATOR_TESTING_IMAGE_NAME, git_sha)
+    if prev_built_image_exists:
+        log.info(f"!!!Image validator-testing:{git_sha} already exists, using it...")
+    else:
+        log.info(
+            f"!!!Image validator-testing:{git_sha} does not exist, will build it first..."
+        )
+        docker_build_workflow_dispatch_status = workflow_dispatch_docker_build(
+            shell,
+            new_exp_git_branch,
+            git_sha,
+            features,
+            profile,
+            dry_run=dry_run,
+            wait=wait,
+        )
+        if not docker_build_workflow_dispatch_status:
+            log.error("Docker build workflow failed")
+            cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
+        log.info(f"!!!Image validator-testing:{git_sha} built successfully")
+        log.info(
+            f"!!!To trigger Forge tests with the same image, run: $ poetry run ./forge.py --image-tag {git_sha} --forge-image-tag {git_sha}"
+        )
+
+    if with_forge:
+        log.info("Running forge!!!")
+        forge_workflow_dispatch_status = workflow_dispatch_forge(
+            shell,
+            new_exp_git_branch,
+            git_sha,
+            forge_runner_duration_secs,
+            forge_test_suite,
+            dry_run,
+        )
+        if not forge_workflow_dispatch_status:
+            log.error("Forge test workflow failed")
+            cleanup_and_exit(git, 1, cleanup_branch=new_exp_git_branch)
+
+
+@main.command("list", help="List all authored workflows")
+def list_exp():
+    shell = LocalShell()
+    username = get_gh_username(shell)
+    gh_workflow_list_cmd = [
+        "gh",
+        "run",
+        "list",
+        "--json",
+        "conclusion,createdAt,name,url",  # specific fields we care about
+        "--workflow",
+        DOCKER_RUST_BUILD_WORKFLOW_NAME,
+        "--user",
+        username,
+    ]
+    gh_workflow_list_cmd_ret = shell.run(gh_workflow_list_cmd)
+    list_out = json.dumps(
+        json.loads(gh_workflow_list_cmd_ret.unwrap().decode()), indent=2
+    )
+    log.info("Output:\n%s", list_out)
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

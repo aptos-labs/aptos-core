@@ -45,4 +45,6 @@ pub use move_core_types::gas_algebra::{
     Arg, Byte, GasQuantity, InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit,
     NumArgs, NumBytes, UnitDiv,
 };
-pub use transaction::{ChangeSetConfigs, StorageGasParameters, TransactionGasParameters};
+pub use transaction::{
+    ChangeSetConfigs, StorageGasParameters, StoragePricing, TransactionGasParameters,
+};

@@ -5,7 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use super::token_models::v2_token_utils::ObjectCore;
+use super::token_models::v2_token_utils::ObjectWithMetadata;
 use crate::{
     models::move_resources::MoveResource,
     schema::{current_objects, objects},
@@ -83,30 +83,31 @@ impl Object {
         txn_version: i64,
         write_set_change_index: i64,
     ) -> anyhow::Result<Option<(Self, CurrentObject)>> {
-        if let Some(inner) = ObjectCore::from_write_resource(write_resource, txn_version)? {
+        if let Some(inner) = ObjectWithMetadata::from_write_resource(write_resource, txn_version)? {
             let resource = MoveResource::from_write_resource(
                 write_resource,
                 0, // Placeholder, this isn't used anyway
                 txn_version,
                 0, // Placeholder, this isn't used anyway
             );
+            let object_core = &inner.object_core;
             Ok(Some((
                 Self {
                     transaction_version: txn_version,
                     write_set_change_index,
                     object_address: resource.address.clone(),
-                    owner_address: Some(inner.get_owner_address()),
+                    owner_address: Some(object_core.get_owner_address()),
                     state_key_hash: resource.state_key_hash.clone(),
-                    guid_creation_num: Some(inner.guid_creation_num.clone()),
-                    allow_ungated_transfer: Some(inner.allow_ungated_transfer),
+                    guid_creation_num: Some(object_core.guid_creation_num.clone()),
+                    allow_ungated_transfer: Some(object_core.allow_ungated_transfer),
                     is_deleted: false,
                 },
                 CurrentObject {
                     object_address: resource.address,
-                    owner_address: Some(inner.get_owner_address()),
+                    owner_address: Some(object_core.get_owner_address()),
                     state_key_hash: resource.state_key_hash,
-                    allow_ungated_transfer: Some(inner.allow_ungated_transfer),
-                    last_guid_creation_num: Some(inner.guid_creation_num),
+                    allow_ungated_transfer: Some(object_core.allow_ungated_transfer),
+                    last_guid_creation_num: Some(object_core.guid_creation_num.clone()),
                     last_transaction_version: txn_version,
                     is_deleted: false,
                 },

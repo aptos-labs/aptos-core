@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: field `g` not declared in struct `M::S`
+  ┌─ tests/checking/typing/borrow_field_missing.move:5:10
+  │
+5 │         &s.g;
+  │          ^^^
+
+error: field `h` not declared in struct `M::S`
+  ┌─ tests/checking/typing/borrow_field_missing.move:6:10
+  │
+6 │         &s_mut.h;
+  │          ^^^^^^^

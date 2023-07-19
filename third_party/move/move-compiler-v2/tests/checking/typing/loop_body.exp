@@ -1,0 +1,64 @@
+// ---- Model Dump
+module 0x8675309::M {
+    private fun t0() {
+        loop {
+          Tuple()
+        }
+    }
+    private fun t1() {
+        loop {
+          Tuple()
+        }
+    }
+    private fun t2() {
+        loop {
+          Tuple()
+        }
+    }
+    private fun t3() {
+        loop {
+          {
+            let x: () = 0;
+            x;
+            Tuple()
+          }
+        }
+    }
+    private fun t4() {
+        loop {
+          if true {
+            Tuple()
+          } else {
+            Tuple()
+          }
+        }
+    }
+    private fun t5() {
+        loop {
+          break
+        };
+        loop {
+          break
+        };
+        loop {
+          return Tuple()
+        }
+    }
+    private fun t6() {
+        loop {
+          continue
+        }
+    }
+    private fun t7() {
+        loop {
+          continue
+        }
+    }
+    private fun t8() {
+        loop {
+          loop {
+            break
+          }
+        }
+    }
+} // end 0x8675309::M

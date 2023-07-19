@@ -13,7 +13,7 @@ use crate::{
         },
         utils::{
             create_data_stream_listener, create_epoch_ending_ledger_info, create_epoch_state,
-            create_full_node_driver_configuration, create_transaction_info,
+            create_full_node_driver_configuration,
         },
     },
     utils::OutputFallbackHandler,
@@ -502,8 +502,8 @@ fn create_continuous_syncer(
     // Create the mock db reader with the given synced version
     let mut mock_database_reader = create_mock_db_reader();
     mock_database_reader
-        .expect_get_latest_transaction_info_option()
-        .returning(move || Ok(Some((synced_version, create_transaction_info()))));
+        .expect_get_latest_version()
+        .returning(move || Ok(synced_version));
     mock_database_reader
         .expect_get_latest_epoch_state()
         .returning(move || Ok(create_epoch_state(current_epoch)));

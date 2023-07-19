@@ -4,12 +4,13 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, wait_stateful_set, Create, ForgeRunnerMode, GenesisConfigFn, K8sApi,
-    K8sNode, NodeConfigFn, Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME,
-    DEFAULT_ROOT_KEY, FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
-    GENESIS_HELM_CHART_PATH, GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN,
-    MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS,
-    VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
+    nodes_healthcheck, wait_stateful_set, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode,
+    NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME,
+    DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
+    FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_CHART_PATH,
+    GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
+    NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
+    VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
@@ -23,7 +24,7 @@ use k8s_openapi::api::{
 use kube::{
     api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, PostParams},
     client::Client as K8sClient,
-    config::Kubeconfig,
+    config::{KubeConfigOptions, Kubeconfig},
     Config, Error as KubeError, ResourceExt,
 };
 use rand::Rng;
@@ -145,10 +146,8 @@ async fn wait_nodes_stateful_set(
 ) -> Result<()> {
     // wait for all nodes healthy
     for node in nodes.values() {
-        // retry exponentially until 1 min, then every 1 min until ~22 min
-        let retry_policy = RetryPolicy::exponential(Duration::from_secs(5))
-            .with_max_retries(25)
-            .with_max_delay(Duration::from_secs(60));
+        // retry every 10 seconds for 20 minutes
+        let retry_policy = RetryPolicy::fixed(Duration::from_secs(10)).with_max_retries(120);
         wait_stateful_set(
             kube_client,
             kube_namespace,
@@ -197,6 +196,9 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
     let testnet_addons_helm_selector = "app.kubernetes.io/part-of=testnet-addons";
     let genesis_helm_selector = "app.kubernetes.io/part-of=aptos-genesis";
 
+    // selector for manually created resources from Forge
+    let forge_pfn_selector = "app.kubernetes.io/part-of=forge-pfn";
+
     // delete all deployments and statefulsets
     // cross this with all the compute resources created by aptos-node helm chart
     let deployments: Api<Deployment> = Api::namespaced(client.clone(), kube_namespace);
@@ -210,6 +212,7 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
         aptos_node_helm_selector,
         testnet_addons_helm_selector,
         genesis_helm_selector,
+        forge_pfn_selector,
     ] {
         info!("Deleting k8s resources with selector: {}", selector);
         delete_k8s_collection(deployments.clone(), "Deployments", selector).await?;
@@ -497,6 +500,8 @@ pub async fn check_persistent_volumes(
     Ok(())
 }
 
+/// Installs a testnet in a k8s namespace by first running genesis, and the installing the aptos-nodes via helm
+/// Returns the current era, as well as a mapping of validators and fullnodes
 pub async fn install_testnet_resources(
     kube_namespace: String,
     num_validators: usize,
@@ -508,7 +513,7 @@ pub async fn install_testnet_resources(
     enable_haproxy: bool,
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
-) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
+) -> Result<(String, HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await?;
 
     // get deployment-specific helm values and cache it
@@ -597,7 +602,7 @@ pub async fn install_testnet_resources(
     )
     .await?;
 
-    Ok((validators, fullnodes))
+    Ok((new_era.clone(), validators, fullnodes))
 }
 
 pub fn construct_node_helm_values(
@@ -618,6 +623,13 @@ pub fn construct_node_helm_values(
     value["haproxy"]["enabled"] = enable_haproxy.into();
     value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
     value["labels"]["forge-image-tag"] = make_k8s_label(image_tag).into();
+
+    // if present, tag the node with the test suite name and username
+    let suite_name = env::var("FORGE_TEST_SUITE").unwrap_or(DEFAULT_TEST_SUITE_NAME.to_string());
+    value["labels"]["forge-test-suite"] = make_k8s_label(suite_name).into();
+    let username = env::var("FORGE_USERNAME").unwrap_or(DEFAULT_USERNAME.to_string());
+    value["labels"]["forge-username"] = make_k8s_label(username).into();
+
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
     }
@@ -652,6 +664,12 @@ pub fn construct_genesis_helm_values(
     value["genesis"]["fullnode"]["internal_host_suffix"] = fullnode_internal_host_suffix.into();
     value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
     value["labels"]["forge-image-tag"] = make_k8s_label(genesis_image_tag).into();
+
+    // if present, tag the node with the test suite name and username
+    let suite_name = env::var("FORGE_TEST_SUITE").unwrap_or(DEFAULT_TEST_SUITE_NAME.to_string());
+    value["labels"]["forge-test-suite"] = make_k8s_label(suite_name).into();
+    let username = env::var("FORGE_USERNAME").unwrap_or(DEFAULT_USERNAME.to_string());
+    value["labels"]["forge-username"] = make_k8s_label(username).into();
 
     if let Some(config_fn) = genesis_helm_config_fn {
         (config_fn)(&mut value);
@@ -713,10 +731,27 @@ pub async fn collect_running_nodes(
     Ok((validators, fullnodes))
 }
 
+/// Returns a [Config] object reading the KUBECONFIG environment variable or infering from the
+/// environment. Differently from [`Config::infer()`], this will look at the
+/// `KUBECONFIG` env var first, and only then infer from the environment.
+async fn make_kube_client_config() -> Result<Config> {
+    match Config::from_kubeconfig(&KubeConfigOptions::default()).await {
+        Ok(config) => Ok(config),
+        Err(kubeconfig_err) => {
+            Config::infer()
+                .await
+                .map_err(|infer_err|
+                    anyhow::anyhow!("Unable to construct Config. Failed to infer config {:?}. Failed to read KUBECONFIG {:?}", infer_err, kubeconfig_err)
+                )
+        }
+    }
+}
+
 pub async fn create_k8s_client() -> Result<K8sClient> {
-    let mut config = Config::infer().await?;
+    let mut config = make_kube_client_config().await?;
+
     let cluster_name = Kubeconfig::read()
-        .map(|k| k.current_context.unwrap())
+        .map(|k| k.current_context.unwrap_or_default())
         .unwrap_or_else(|_| config.cluster_url.to_string());
 
     config.accept_invalid_certs = true;
@@ -797,7 +832,7 @@ enum ApiError {
 }
 
 async fn create_namespace(
-    namespace_api: Arc<dyn Create<Namespace>>,
+    namespace_api: Arc<dyn ReadWrite<Namespace>>,
     kube_namespace: String,
 ) -> Result<(), ApiError> {
     let kube_namespace_name = kube_namespace.clone();
@@ -1032,36 +1067,7 @@ pub fn make_k8s_label(value: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
-    use hyper::http::StatusCode;
-    use kube::error::ErrorResponse;
-
-    struct FailedNamespacesApi {
-        status_code: u16,
-    }
-
-    impl FailedNamespacesApi {
-        fn from_status_code(status_code: u16) -> Self {
-            FailedNamespacesApi { status_code }
-        }
-    }
-
-    #[async_trait]
-    impl Create<Namespace> for FailedNamespacesApi {
-        async fn create(
-            &self,
-            _pp: &PostParams,
-            _namespace: &Namespace,
-        ) -> Result<Namespace, KubeError> {
-            let status = StatusCode::from_u16(self.status_code).unwrap();
-            Err(KubeError::Api(ErrorResponse {
-                status: status.to_string(),
-                code: status.as_u16(),
-                message: "Failed to create namespace".to_string(),
-                reason: "Failed to parse error data".into(),
-            }))
-        }
-    }
+    use crate::FailedNamespacesApi;
 
     #[tokio::test]
     async fn test_create_namespace_final_error() {
@@ -1098,6 +1104,8 @@ haproxy:
 labels:
   forge-namespace: forge-123
   forge-image-tag: image
+  forge-test-suite: unknown-testsuite
+  forge-username: unknown-username
 ";
         assert_eq!(node_helm_values, expected_helm_values);
     }
@@ -1131,6 +1139,8 @@ genesis:
 labels:
   forge-namespace: forge-123
   forge-image-tag: genesis_image
+  forge-test-suite: unknown-testsuite
+  forge-username: unknown-username
 ";
         assert_eq!(genesis_helm_values, expected_helm_values);
         println!("{}", genesis_helm_values);

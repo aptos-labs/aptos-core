@@ -102,8 +102,8 @@ impl Default for ConsensusConfig {
             max_sending_block_bytes: 600 * 1024, // 600 KB
             max_sending_block_bytes_quorum_store_override: 5 * 1024 * 1024, // 5MB
             max_receiving_block_txns: 10000,
-            max_receiving_block_txns_quorum_store_override: 2
-                * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
+            max_receiving_block_txns_quorum_store_override: 10000
+                .max(2 * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE),
             max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
             max_receiving_block_bytes_quorum_store_override: 6 * 1024 * 1024, // 6MB
             max_pruned_blocks_in_mem: 100,

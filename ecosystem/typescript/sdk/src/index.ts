@@ -9,6 +9,7 @@ export * from "./plugins";
 export * from "./transaction_builder";
 export * as TokenTypes from "./aptos_types/token_types";
 export * as Types from "./generated/index";
+export * from "./client";
 export { derivePath } from "./utils/hd-key";
 export {
   deserializePropertyMap,

@@ -30,7 +30,7 @@
     "fmt": "pnpm _fmt --write",
     "fmt:check": "pnpm _fmt --check",
     "cov:clean": "rm -rf coverage",
-    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
+    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated --exportCore=false --exportServices=false",
     "checked-publish": "scripts/checked_publish.sh",
     "generate-ts-docs": "scripts/generate_ts_docs.sh",
     "indexer-codegen": "graphql-codegen --config ./src/indexer/codegen.yml",
@@ -85,5 +85,5 @@
     "typedoc": "^0.23.20",
     "typescript": "4.8.2"
   },
-  "version": "1.10.0"
+  "version": "1.13.2"
 }
