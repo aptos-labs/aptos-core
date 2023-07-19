@@ -14,10 +14,14 @@ use crate::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_channels::{
+    aptos_channel,
+    aptos_channel::{Receiver, Sender},
+    message_queues::QueueStyle,
+};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
@@ -181,6 +185,33 @@ impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMes
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> Self {
+        // Spawn a task to deserialize inbound messages
+        let deserialized_message_receiver = Self::spawn_deserialization_handler(
+            peer_mgr_notifs_rx,
+            max_parallel_deserialization_tasks,
+        );
+
+        // Process the control messages
+        let control_event_stream = connection_notifs_rx
+            .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
+
+        Self {
+            event_stream: ::futures::stream::select(
+                deserialized_message_receiver,
+                control_event_stream,
+            ),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<TMessage: Message + Send + 'static> NetworkEvents<TMessage> {
+    /// Spawns a message deserialization handler that deserializes
+    /// messages in parallel and sends them to the receiver.
+    fn spawn_deserialization_handler(
+        peer_mgr_notifs_rx: Receiver<(AccountAddress, ProtocolId), PeerManagerNotification>,
+        max_parallel_deserialization_tasks: Option<usize>,
+    ) -> Receiver<(), Event<TMessage>> {
         // Create a channel for deserialized messages
         let (deserialized_message_sender, deserialized_message_receiver) = aptos_channel::new(
             QueueStyle::FIFO,
@@ -220,17 +251,7 @@ impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMes
                 .await
         });
 
-        // Process the control messages
-        let control_event_stream = connection_notifs_rx
-            .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
-
-        Self {
-            event_stream: ::futures::stream::select(
-                deserialized_message_receiver,
-                control_event_stream,
-            ),
-            _marker: PhantomData,
-        }
+        deserialized_message_receiver
     }
 }
 
@@ -338,6 +359,25 @@ impl<TMessage: Message + Send + 'static> NewNetworkSender for NetworkSender<TMes
         connection_reqs_tx: ConnectionRequestSender,
         max_parallel_serialization_tasks: Option<usize>,
     ) -> Self {
+        // Spawn a task to serialize outbound messages
+        let serializing_message_sender =
+            Self::spawn_serialization_handler(&peer_mgr_reqs_tx, max_parallel_serialization_tasks);
+
+        Self {
+            peer_mgr_reqs_tx,
+            connection_reqs_tx,
+            serializing_message_sender,
+        }
+    }
+}
+
+impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
+    /// Spawns a message serialization handler that serializes
+    /// messages in parallel and sends them to the receiver.
+    fn spawn_serialization_handler(
+        peer_mgr_reqs_tx: &PeerManagerRequestSender,
+        max_parallel_serialization_tasks: Option<usize>,
+    ) -> Sender<(), MessageSerializationRequest<TMessage>> {
         // Create a channel for serializing messages
         let (serializing_message_sender, serializing_message_receiver) = aptos_channel::new(
             QueueStyle::FIFO,
@@ -404,12 +444,7 @@ impl<TMessage: Message + Send + 'static> NewNetworkSender for NetworkSender<TMes
                 )
                 .await
         });
-
-        Self {
-            peer_mgr_reqs_tx,
-            connection_reqs_tx,
-            serializing_message_sender,
-        }
+        serializing_message_sender
     }
 }
 
