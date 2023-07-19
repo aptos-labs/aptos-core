@@ -37,7 +37,8 @@ cargo +nightly fmt $CHECK_ARG
 cargo sort --grouped --workspace $CHECK_ARG
 
 # Ensure that aptos-cached-packages have been built correctly.
-UPDATE_FRAMEWORK_BUILD=1 cargo build -p aptos-cached-packages
+unset SKIP_FRAMEWORK_BUILD
+cargo build -p aptos-cached-packages
 if [ -n "$CHECK_ARG" ]; then
     if [ -n "$(git status --porcelain -uno aptos-move)" ]; then
       git diff

@@ -7,7 +7,7 @@ use std::{env::current_dir, path::PathBuf};
 fn main() {
     // Set the below variable to skip the building step. This might be useful if the build
     // is broken so it can be debugged with the old outdated artifacts.
-    if std::env::var("UPDATE_FRAMEWORK_BUILD").is_ok() {
+    if std::env::var("SKIP_FRAMEWORK_BUILD").is_err() {
         let current_dir = current_dir().expect("Should be able to get current dir");
         // Get the previous directory
         let mut prev_dir = current_dir;
