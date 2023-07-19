@@ -2,6 +2,7 @@ import asyncio
 import subprocess
 import time
 
+from aptos_sdk.ed25519 import PrivateKey
 from aptos_sdk.account import Account, RotationProofChallenge
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.authenticator import Authenticator, MultiEd25519Authenticator
@@ -26,18 +27,19 @@ def truncate(address: str) -> str:
     return address[0:6] + '...' + address[-6:]
 
 def format_account_info(account: Account) -> str:
-    vals = [str(account.address()), account.auth_key(), account.private_key.hex()]
+    vals = [str(account.address()), account.auth_key(), account.private_key.hex(), str(account.public_key())]
     return ''.join([truncate(v).ljust(WIDTH, ' ') for v in vals])
 
 async def rotate_auth_key_ed_25519_payload(
     rest_client: RestClient,
     from_account: Account,
-    to_account: Account
+    private_key: PrivateKey
 ) -> TransactionPayload:
+    to_account = Account.load_key(private_key.hex())
     rotation_proof_challenge = RotationProofChallenge(
         sequence_number=await rest_client.account_sequence_number(from_account.address()),
         originator=from_account.address(),
-        current_auth_key=from_account.auth_key(),
+        current_auth_key=AccountAddress.from_hex(from_account.auth_key()),
         new_public_key=to_account.public_key().key.encode(),
     )
 
@@ -78,15 +80,15 @@ async def main():
 
     await faucet_client.fund_account(alice.address(), 10_000_000)
     await faucet_client.fund_account(bob.address(), 10_000_000)
-    print('\n' + 'Account'.ljust(WIDTH, " ") + 'Address'.ljust(WIDTH, " ") + 'Auth Key'.ljust(WIDTH, " ") + 'Private Key'.ljust(WIDTH, " "))
-    print('------------------------------------------------------------------------')
+    print('\n' + 'Account'.ljust(WIDTH, " ") + 'Address'.ljust(WIDTH, " ") + 'Auth Key'.ljust(WIDTH, " ") + 'Private Key'.ljust(WIDTH, " ") + 'Public Key'.ljust(WIDTH, " "))
+    print('-------------------------------------------------------------------------------------------')
     print('Alice'.ljust(WIDTH, " ") + format_account_info(alice))
     print('Bob'.ljust(WIDTH, " ") + format_account_info(bob))
 
     print("\n...rotating...\n")
 
     # :!:>rotate_key
-    payload = await rotate_auth_key_ed_25519_payload(rest_client, alice, bob)
+    payload = await rotate_auth_key_ed_25519_payload(rest_client, alice, bob.private_key)
 
     signed_transaction = await rest_client.create_bcs_signed_transaction(
         alice, payload
@@ -95,6 +97,8 @@ async def main():
     tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
     await rest_client.wait_for_transaction(tx_hash)
 
+    new_account_info = await rest_client.account(alice.address())
+    assert AccountAddress.from_hex(new_account_info['authentication_key']) == bob.address(), "Authentication key doesn't match Bob's address"
     alice = Account(alice.address(), bob.private_key)
 
     print('Alice'.ljust(WIDTH, " ") + format_account_info(alice))

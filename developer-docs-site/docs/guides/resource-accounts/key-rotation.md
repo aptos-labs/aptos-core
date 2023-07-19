@@ -14,9 +14,9 @@ In this guide, we show examples for how to rotate an account's authentication ke
 
 Here are the installation links for the SDKs we will cover in this example:
 
-* [Aptos CLI](../../tools/install-cli/)
+* [Aptos CLI](../../tools/install-cli)
 * [Typescript SDK](../../sdks/ts-sdk/index)
-* [Python SDK](../../sdks/python-sdk/index)
+* [Python SDK](../../sdks/python-sdk)
 
 :::warning
 Some of the following examples use private keys. Do not share your private keys with anyone.
@@ -92,15 +92,15 @@ cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript-esm
 pnpm install && pnpm rotate_key
 ```
 ```shell title="rotate_key.ts output"
-Account          Address           Auth Key           Private Key     
--------------------------------------------------------------------
-Alice            0x8dcc...7dbe    '0x8dcc...7dbe'    '0x1cec...cc88'
-Bob              0x36eb...9b6c     0x36eb...9b6c      0x9d7c...0610   
- 
+Account            Address             Auth Key             Private Key          Public Key         
+------------------------------------------------------------------------------------------------
+Alice              0x213d...031013    '0x213d...031013'    '0x00a4...b2887b'    '0x859e...08d2a9'
+Bob                0x1c06...ac3bb3     0x1c06...ac3bb3      0xf2be...9486aa      0xbbc1...abb808    
+
 ...rotating...
 
-Alice            0x8dcc...7dbe    '0x36eb...9b6c'    '0x9d7c...0610'
-Bob              0x36eb...9b6c     0x36eb...9b6c      0x9d7c...0610   
+Alice              0x213d...031013    '0x1c06...ac3bb3'    '0xf2be...9486aa'    '0xbbc1...abb808'
+Bob                0x1c06...ac3bb3     0x1c06...ac3bb3      0xf2be...9486aa      0xbbc1...abb808 
 ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -112,16 +112,16 @@ Bob              0x36eb...9b6c     0x36eb...9b6c      0x9d7c...0610
 cd ~/aptos-core/ecosystem/python/sdk
 poetry install && poetry run python -m examples.rotate-key
 ```
-```shell title="rotate_key.ts output"
-Account            Address             Auth Key             Private Key        
-------------------------------------------------------------------------
-Alice              0x3e58...2b6243    '0x3e58...2b6243'    '0xb927...f4264d'    
-Bob                0xe39d...adf91f     0xe39d...adf91f      0xb2cd...a5c415    
+```shell title="rotate_key.py output"
+Account            Address             Auth Key             Private Key          Public Key         
+------------------------------------------------------------------------------------------------
+Alice              0x213d...031013    '0x213d...031013'    '0x00a4...b2887b'    '0x859e...08d2a9'
+Bob                0x1c06...ac3bb3     0x1c06...ac3bb3      0xf2be...9486aa      0xbbc1...abb808    
 
 ...rotating...
 
-Alice              0x3e58...2b6243    '0xe39d...adf91f'    '0xb2cd...a5c415'    
-Bob                0xe39d...adf91f     0xe39d...adf91f      0xb2cd...a5c415  
+Alice              0x213d...031013    '0x1c06...ac3bb3'    '0xf2be...9486aa'    '0xbbc1...abb808'
+Bob                0x1c06...ac3bb3     0x1c06...ac3bb3      0xf2be...9486aa      0xbbc1...abb808 
 ```
 
   </TabItem>
