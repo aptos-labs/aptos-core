@@ -148,8 +148,8 @@ describe("TypeTagParser", () => {
       expect(result.value.type_args[0] instanceof TypeTagAddress).toBeTruthy();
     });
 
-    test("TypeTagParser successfully parses a strcut with a nested Object and Struct types", () => {
-      const typeTag = "0x1::some_module::SomeResource<0x4::object::Object<T>, 0x1::some_module::SomeResource>";
+    test("TypeTagParser successfully parses a struct with a nested Object and Struct types", () => {
+      const typeTag = "0x1::some_module::SomeResource<0x1::object::Object<T>, 0x1::some_module::SomeResource>";
       const parser = new TypeTagParser(typeTag);
       const result = parser.parseTypeTag() as TypeTagStruct;
       expect(result.value.address.toHexString()).toEqual(expectedTypeTag.address);
