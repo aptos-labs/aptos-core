@@ -26,6 +26,7 @@ concurrency:
 jobs:
   scripts-lint:
     runs-on: ubuntu-latest
+    environment: foo
     steps:
       - uses: actions/checkout@v3
       - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
