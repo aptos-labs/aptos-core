@@ -7,10 +7,14 @@ use crate::{
     txn_emitter::generate_traffic,
 };
 use aptos_cached_packages::aptos_stdlib;
+use aptos_config::config::GasEstimationConfig;
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, TransactionType};
 use aptos_global_constants::{DEFAULT_BUCKETS, GAS_UNIT_PRICE};
-use aptos_rest_client::aptos_api_types::{MoveModuleId, TransactionData};
+use aptos_rest_client::{
+    aptos_api_types::{MoveModuleId, TransactionData},
+    Client,
+};
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::{
     account_address::AccountAddress,
@@ -80,6 +84,15 @@ fn next_bucket(gas_unit_price: u64) -> u64 {
         .unwrap()
 }
 
+async fn block_height(client: &Client) -> u64 {
+    client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .block_height
+}
+
 async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
     let client = swarm.validators().next().unwrap().rest_client();
     let estimation = match client.estimate_gas_price().await {
@@ -126,8 +139,21 @@ async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
         estimation.prioritized_gas_estimate
     );
 
-    // Empty blocks will reset the prices
-    std::thread::sleep(Duration::from_secs(40));
+    // Wait for enough empty blocks to reset the prices
+    let num_blocks_to_reset = GasEstimationConfig::default().aggressive_block_history as u64;
+    let base_height = block_height(&client).await;
+    loop {
+        let num_blocks_passed = block_height(&client).await - base_height;
+        if num_blocks_passed > num_blocks_to_reset {
+            println!("{} blocks passed, done sleeping", num_blocks_passed);
+            break;
+        }
+        println!("{} blocks passed, sleeping 10 secs...", num_blocks_passed);
+        // Exercise cache
+        client.estimate_gas_price().await.unwrap();
+        std::thread::sleep(Duration::from_secs(10));
+    }
+
     // Multiple times, to exercise cache
     for _i in 0..2 {
         let estimation = match client.estimate_gas_price().await {

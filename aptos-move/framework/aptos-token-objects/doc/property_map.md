@@ -1212,4 +1212,4 @@ Removes a property from the map, ensuring that it does in fact exist
 </details>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

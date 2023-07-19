@@ -27,7 +27,7 @@ spec aptos_framework::storage_gas {
     // -----------------
 
     spec module {
-        use aptos_std::chain_status;
+        use aptos_framework::chain_status;
         pragma verify = true;
         pragma aborts_if_is_strict;
         // After genesis, `StateStorageUsage` and `GasParameter` exist.
@@ -125,7 +125,7 @@ spec aptos_framework::storage_gas {
 
     /// Address @aptos_framework must exist StorageGasConfig and StorageGas and StateStorageUsage.
     spec on_reconfig {
-        use aptos_std::chain_status;
+        use aptos_framework::chain_status;
         requires chain_status::is_operating();
         aborts_if !exists<StorageGasConfig>(@aptos_framework);
         aborts_if !exists<StorageGas>(@aptos_framework);

@@ -1513,8 +1513,24 @@ impl ArgWithType {
         &'a self,
     ) -> CliTypedResult<serde_json::Value> {
         match self._vector_depth {
-            0 => serde_json::to_value(bcs::from_bytes::<T>(&self.arg)?)
-                .map_err(|err| CliError::UnexpectedError(err.to_string())),
+            0 => match self._ty.clone() {
+                FunctionArgType::U64 => {
+                    serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::U128 => {
+                    serde_json::to_value(bcs::from_bytes::<u128>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::U256 => {
+                    serde_json::to_value(bcs::from_bytes::<U256>(&self.arg)?.to_string())
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::Raw => serde_json::to_value(&self.arg)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string())),
+                _ => serde_json::to_value(bcs::from_bytes::<T>(&self.arg)?)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string())),
+            },
             1 => serde_json::to_value(bcs::from_bytes::<Vec<T>>(&self.arg)?)
                 .map_err(|err| CliError::UnexpectedError(err.to_string())),
 
