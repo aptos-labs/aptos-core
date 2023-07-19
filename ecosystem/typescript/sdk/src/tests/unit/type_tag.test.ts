@@ -108,6 +108,24 @@ describe("TypeTagParser", () => {
       expect(result instanceof TypeTagAddress).toBeTruthy();
     });
 
+    test("TypeTagParser successfully parses complex Object types", () => {
+      const typeTag = "0x1::object::Object<T>";
+      const parser = new TypeTagParser(typeTag);
+      const result = parser.parseTypeTag();
+      expect(result instanceof TypeTagAddress).toBeTruthy();
+
+      const typeTag2 = "0x1::object::Object<0x1::coin::Fun<A, B<C>>>";
+      const parser2 = new TypeTagParser(typeTag);
+      const result2 = parser2.parseTypeTag();
+      expect(result2 instanceof TypeTagAddress).toBeTruthy();
+    });
+
+    test("TypeTagParser does not parse unofficial objects", () => {
+      const typeTag = "0x12345::object::Object<T>";
+      const parser = new TypeTagParser(typeTag);
+      expect(() => parser.parseTypeTag()).toThrowError("Invalid type tag.");
+    });
+
     test("TypeTagParser successfully parses an Option type", () => {
       const typeTag = "0x1::option::Option<u8>";
       const parser = new TypeTagParser(typeTag);

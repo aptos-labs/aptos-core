@@ -1,14 +1,21 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
-from aptos_sdk.client import RestClient
+import asyncio
+
+from aptos_sdk.async_client import RestClient
 
 from .common import NODE_URL
 
-if __name__ == "__main__":
+
+async def main():
     rest_client = RestClient(NODE_URL)
-    total_apt = rest_client.aggregator_value(
+    total_apt = await rest_client.aggregator_value(
         "0x1", "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>", ["supply"]
     )
     print(f"Total circulating APT: {total_apt}")
-    rest_client.close()
+    await rest_client.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

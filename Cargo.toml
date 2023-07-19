@@ -556,7 +556,7 @@ sha3 = "0.9.1"
 siphasher = "0.3.10"
 serde = { version = "1.0.137", features = ["derive", "rc"] }
 serde_bytes = "0.11.6"
-serde_json = { version = "1.0.81", features = ["preserve_order"] }
+serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_precision"] } # Note: arbitrary_precision is required to parse u256 in JSON
 serde_repr = "0.1"
 serde_merge = "0.1.3"
 serde-name = "0.1.1"
