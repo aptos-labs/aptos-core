@@ -134,7 +134,7 @@ async fn test_cointransfer(
             .value,
     );
 
-    // transfer coins to static account
+    // transfer coins to second account
     let pending_txn = coin_client
         .transfer(account, receiver, amount, None)
         .await?;
