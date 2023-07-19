@@ -54,13 +54,13 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     }
 
     // This function is called by the BlockExecutor for each transaction it intends
-    // to execute (via the ExecutorTask trait). This function is run speculatively
-    // as a part of a parallel execution.
-    fn execute_transaction_in_parallel_execution(
+    // to execute (via the ExecutorTask trait).
+    fn execute_transaction(
         &self,
         view: &impl StateView,
         txn: &PreprocessedTransaction,
         txn_idx: TxnIndex,
+        parallel_execution: bool,
         aggregator_enabled: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
@@ -69,45 +69,30 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .execute_single_transaction(txn, &view, &log_context, aggregator_enabled)
         {
             Ok((vm_status, vm_output, sender)) => {
-                process_vm_output(vm_status, vm_output, sender, log_context)
+                if !parallel_execution {
+                    match vm_output.try_materialize(view) {
+                        Ok(materialized_output) => {
+                            process_vm_output(vm_status, materialized_output, sender, log_context)
+                        },
+                        Err(vm_status) => {
+                            if !is_aggregator_error(&vm_status) {
+                                ExecutionStatus::AggregatorError
+                            } else {
+                                ExecutionStatus::Abort(vm_status)
+                            }
+                        },
+                    }
+                } else {
+                    process_vm_output(vm_status, vm_output, sender, log_context)
+                }
             },
-            Err(err) => ExecutionStatus::Abort(err),
-        }
-    }
-
-    // This function is called by the BlockExecutor for each transaction it intends
-    // to execute (via the ExecutorTask trait). This function is run during
-    // sequential execution of a block.
-    fn execute_transaction_in_sequential_execution(
-        &self,
-        view: &impl StateView,
-        txn: &PreprocessedTransaction,
-        txn_idx: TxnIndex,
-    ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-
-        let result = match self
-            .vm
-            .execute_single_transaction(txn, &view, &log_context, true)
-            .and_then(|(vm_status, vm_output, sender)| {
-                vm_output
-                    .try_materialize(view)
-                    .map(|vm_output| (vm_status, vm_output, sender))
-            }) {
-            res @ Ok(_) => res,
-            Err(e) if !is_aggregator_error(&e) => Err(e),
-            _ => self
-                .vm
-                .execute_single_transaction(txn, &view, &log_context, false),
-        };
-
-        match result {
-            Ok((vm_status, vm_output, sender)) => {
-                // Aggregators are already materialized by this point, so delta change set should be empty
-                assert!(vm_output.delta_change_set().is_empty());
-                process_vm_output(vm_status, vm_output, sender, log_context)
+            Err(vm_status) => {
+                if !is_aggregator_error(&vm_status) {
+                    ExecutionStatus::AggregatorError
+                } else {
+                    ExecutionStatus::Abort(vm_status)
+                }
             },
-            Err(err) => ExecutionStatus::Abort(err),
         }
     }
 }

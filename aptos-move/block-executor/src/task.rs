@@ -23,6 +23,8 @@ pub enum ExecutionStatus<T, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(T),
+    /// Transaction execution result in Aggregator error
+    AggregatorError,
 }
 
 /// Trait that defines a transaction type that can be executed by the block executor. A transaction
@@ -58,29 +60,19 @@ pub trait ExecutorTask: Sync {
     fn init(args: Self::Argument) -> Self;
 
     /// Execute a single transaction given the view of the current state.
-    /// This function is only run during parallel execution.
     /// BlockSTM will first call this function with aggregators enabled.
     /// If the execution returns an aggregator error (overflow/underflow),
     /// then BlockSTM will re-run this function later (in commit hook of the
     /// transaction) with aggregators disabled.
-    fn execute_transaction_in_parallel_execution(
+    /// Parallel_exectuion flag is set to true for parallel exectuion, and
+    /// set to false for sequential execution.
+    fn execute_transaction(
         &self,
         view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
+        parallel_execution: bool,
         aggregator_enabled: bool,
-    ) -> ExecutionStatus<Self::Output, Self::Error>;
-
-    /// Execute a single transaction given the view of the current state.
-    /// This function is only run during sequential execution.
-    /// This function will first run the transaction with aggregators enabled.
-    /// If the execution gives an aggregator error (overflow/underflow), then
-    /// it will re-run the transaction with aggregators disabled.
-    fn execute_transaction_in_sequential_execution(
-        &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
-        txn: &Self::Txn,
-        txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }
 

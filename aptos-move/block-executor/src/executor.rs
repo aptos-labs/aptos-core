@@ -252,10 +252,11 @@ where
         let speculative_view = MVHashMapView::new(versioned_cache, scheduler);
 
         // VM execution.
-        let execute_result = executor.execute_transaction_in_parallel_execution(
+        let execute_result = executor.execute_transaction(
             &LatestView::<T, S, X>::new_mv_view(base_view, &speculative_view, idx_to_execute),
             txn,
             idx_to_execute,
+            true,
             true,
         );
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
@@ -300,6 +301,7 @@ where
                 // Record the status indicating abort.
                 ExecutionStatus::Abort(Error::UserError(err))
             },
+            ExecutionStatus::AggregatorError => ExecutionStatus::AggregatorError,
         };
 
         // Remove entries from previous write/delta set that were not overwritten.
@@ -511,7 +513,7 @@ where
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     txn_commit_listener.on_transaction_committed(txn_idx, output);
                 },
-                ExecutionStatus::Abort(_) => {
+                ExecutionStatus::Abort(_) | ExecutionStatus::AggregatorError => {
                     txn_commit_listener.on_execution_aborted(txn_idx);
                 },
             }
@@ -692,6 +694,7 @@ where
                         ret = Some(err);
                         break;
                     },
+                    ExecutionStatus::AggregatorError => ret = Some(Error::AggregatorError),
                 };
             }
             ret
@@ -729,10 +732,12 @@ where
         let mut accumulated_fee_statement = FeeStatement::zero();
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let res = executor.execute_transaction_in_sequential_execution(
+            let res = executor.execute_transaction(
                 &LatestView::<T, S, X>::new_btree_view(base_view, &data_map, idx as TxnIndex),
                 txn,
                 idx as TxnIndex,
+                false,
+                true,
             );
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
@@ -765,6 +770,9 @@ where
                     }
                     // Record the status indicating abort.
                     return Err(Error::UserError(err));
+                },
+                ExecutionStatus::AggregatorError => {
+                    // TODO: Rexecute the transaction here.
                 },
             }
 
