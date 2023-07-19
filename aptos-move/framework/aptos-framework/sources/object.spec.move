@@ -16,6 +16,24 @@ spec aptos_framework::object {
         aborts_if !spec_exists_at<T>(object);
     }
 
+    spec create_object(owner_address: address): ConstructorRef{
+        use std::features;
+        pragma aborts_if_is_partial;
+
+        // TODO: native function generate_unique_address() cause an abort
+        aborts_if !features::spec_is_enabled(features::APTOS_UNIQUE_IDENTIFIERS);
+        aborts_if exists<ObjectCore>(transaction_context::spec_generate_unique_address());
+    }
+
+    spec create_sticky_object(owner_address: address): ConstructorRef{
+        use std::features;
+        pragma aborts_if_is_partial;
+
+        // TODO: native function generate_unique_address() cause an abort
+        aborts_if !features::spec_is_enabled(features::APTOS_UNIQUE_IDENTIFIERS);
+        aborts_if exists<ObjectCore>(transaction_context::spec_generate_unique_address());
+    }
+
     spec create_object_address(source: &address, seed: vector<u8>): address {
         pragma opaque;
         pragma aborts_if_is_strict = false;
