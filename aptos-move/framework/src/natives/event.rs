@@ -68,6 +68,23 @@ pub fn make_native_write_to_event_store(
     }
 }
 
+#[cfg(feature = "testing")]
+fn native_emitted_events_internal(
+    _: &(),
+    context: &mut SafeNativeContext,
+    mut ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.len() == 1);
+
+    let ty = ty_args.pop().unwrap();
+    let guid = safely_pop_arg!(arguments, Vec<u8>);
+
+    let events = context.emitted_events(guid, ty)?;
+    Ok(smallvec![Value::vector_for_testing_only(events)])
+}
+
 /***************************************************************************************************
  * module
  *
@@ -77,13 +94,28 @@ pub struct GasParameters {
     pub write_to_event_store: WriteToEventStoreGasParameters,
 }
 
+#[allow(clippy::vec_init_then_push)]
 pub fn make_all(
     gas_params: GasParameters,
     calc_abstract_val_size: impl Fn(&Value) -> AbstractValueSize + Send + Sync + 'static,
     timed_features: TimedFeatures,
     features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [(
+    let mut natives = vec![];
+
+    // Test-only natives
+    #[cfg(feature = "testing")]
+    natives.push((
+        "emitted_events_internal",
+        make_safe_native(
+            (),
+            timed_features.clone(),
+            features.clone(),
+            native_emitted_events_internal,
+        ),
+    ));
+
+    natives.push((
         "write_to_event_store",
         make_safe_native(
             gas_params.write_to_event_store,
@@ -91,7 +123,7 @@ pub fn make_all(
             features,
             make_native_write_to_event_store(calc_abstract_val_size),
         ),
-    )];
+    ));
 
     make_module_natives(natives)
 }
