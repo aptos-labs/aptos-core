@@ -13,7 +13,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 This tutorial describes how to create and transfer NFTs on the Aptos blockchain. The Aptos implementation for core NFTs can be found in the [token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) Move module.
 
 For reference, also see:
-* [mint_nft](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) Move example on how to airdrop an NFT 
+* [mint_nft](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/mint_nft) Move example on how to airdrop an NFT
 * [mint_nft.rs](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/e2e-move-tests/src/tests/mint_nft.rs) Rust end-to-end test
 
 ## Step 1: Pick an SDK
@@ -286,7 +286,7 @@ In Aptos, each account must have an on-chain representation in order to receive 
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
-  
+
   Since the Rust example here uses the same `transfer-coin.rs` function as in the [Your First Transaction](first-transaction.md) tutorial, it creates but does not fund Bob's account.
 
 ```rust
@@ -323,7 +323,7 @@ Your application will call `create_collection`:
 
 The is the function signature of `create_collection`. It returns a transaction hash:
 ```python
-:!: static/sdks/python/aptos_sdk/client.py create_collection
+:!: static/sdks/python/aptos_sdk/async_client.py create_collection
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -360,7 +360,7 @@ Your application will call `create_token`:
 
 The is the function signature of `create_token`. It returns a transaction hash:
 ```python
-:!: static/sdks/python/aptos_sdk/client.py create_token
+:!: static/sdks/python/aptos_sdk/async_client.py create_token
 ```
   </TabItem>
   <TabItem value="rust" label="Rust">
@@ -408,7 +408,7 @@ To read a token's metadata:
 
 Here's how `get_token_data` queries the token metadata:
 ```python
-:!: static/sdks/python/aptos_sdk/client.py read_token_data_table
+:!: static/sdks/python/aptos_sdk/async_client.py read_token_data_table
 ```
 
   </TabItem>
