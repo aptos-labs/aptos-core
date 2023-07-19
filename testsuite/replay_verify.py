@@ -7,7 +7,6 @@ import os
 import subprocess
 import shutil
 import sys
-import math
 from multiprocessing import Pool, freeze_support
 from typing import Tuple
 
@@ -18,22 +17,22 @@ from verify_core.common import clear_artifacts, query_backup_latest_version
 
 
 def replay_verify_partition(
-    n: int,
-    N: int,
-    history_start: int,
-    per_partition: int,
-    latest_version: int,
-    txns_to_skip: Tuple[int],
-    backup_config_template_path: str,
+        n: int,
+        N: int,
+        history_start: int,
+        per_partition: int,
+        latest_version: int,
+        txns_to_skip: Tuple[int],
+        backup_config_template_path: str,
 ) -> Tuple[int, int]:
     """
     Run replay-verify for a partition of the backup, returning a tuple of the (partition number, return code)
 
     n: partition number
     N: total number of partitions
-    history_start: start version of the history to verify
+    history_start: start version of the history
     per_partition: number of versions per partition
-    latest_version: last version to verify
+    latest_version: latest version in the backup
     txns_to_skip: list of transactions to skip
     backup_config_template_path: path to the backup config template
     """
@@ -94,20 +93,8 @@ def main():
         "TXNS_TO_SKIP",
         "BACKUP_CONFIG_TEMPLATE_PATH",
     ]
-
     if not all(env in os.environ for env in REQUIRED_ENVS):
         raise Exception("Missing required ENV variables")
-    (runner_no, runner_cnt) = (
-        (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (None, None)
-    )
-    # by default we only run one job
-    if runner_no is None or runner_cnt is None:
-        runner_no = 0
-        runner_cnt = 1
-
-    assert (
-        runner_no >= 0 and runner_no < runner_cnt
-    ), "runner_no must be between 0 and runner_cnt"
 
     HISTORY_START = int(os.environ["HISTORY_START"])
     TXNS_TO_SKIP = [int(txn) for txn in os.environ["TXNS_TO_SKIP"].split(" ")]
@@ -128,14 +115,9 @@ def main():
 
     LATEST_VERSION = query_backup_latest_version(BACKUP_CONFIG_TEMPLATE_PATH)
 
-    # the runner may have small overlap at the boundary to prevent missing any transactions
-    runner_load = math.ceil((LATEST_VERSION - HISTORY_START) / runner_cnt)
-    runner_start = HISTORY_START + runner_no * runner_load
-    runner_end = runner_start + runner_load
-    print("runner start %d end %d" % (runner_start, runner_end))
     # run replay-verify in parallel
     N = 32
-    PER_PARTITION = (runner_end - runner_start) // N
+    PER_PARTITION = (LATEST_VERSION - HISTORY_START) // N
 
     with Pool(N) as p:
         all_partitions = p.starmap(
@@ -144,9 +126,9 @@ def main():
                 (
                     n,
                     N,
-                    runner_start,
+                    HISTORY_START,
                     PER_PARTITION,
-                    runner_end,
+                    LATEST_VERSION,
                     TXNS_TO_SKIP,
                     BACKUP_CONFIG_TEMPLATE_PATH,
                 )
