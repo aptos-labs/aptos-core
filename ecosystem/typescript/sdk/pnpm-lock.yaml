@@ -2,8 +2,8 @@ lockfileVersion: '6.0'
 
 dependencies:
   '@aptos-labs/aptos-client':
-    specifier: ^0.0.1
-    version: 0.0.1
+    specifier: ^0.0.2
+    version: 0.0.2
   '@noble/hashes':
     specifier: 1.1.3
     version: 1.1.3
@@ -116,8 +116,9 @@ packages:
       js-yaml: 4.1.0
     dev: true
 
-  /@aptos-labs/aptos-client@0.0.1:
-    resolution: {integrity: sha512-ORzpWE5nbdMvwf7/fbfn2FAExifisGlk2831GS3UZiy/3Qs4a6VSLFYdK+HJEE0B/uXIcKytv94Xhwnxc5XxDQ==}
+  /@aptos-labs/aptos-client@0.0.2:
+    resolution: {integrity: sha512-FgKZb5zDPz8MmAcVxXzYhxP6OkzuIPoDRJp48YJ8+vrZ9EOZ35HaWGN2M3u+GPdnFE9mODFqkxw3azh3kHGZjQ==}
+    engines: {node: '>=15.10.0'}
     dependencies:
       axios: 0.27.2
       got: 11.8.6
