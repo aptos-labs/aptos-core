@@ -420,6 +420,7 @@ bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.7"
+bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
 bytes = "1.1.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
@@ -438,6 +439,7 @@ crossbeam = "0.8.1"
 crossbeam-channel = "0.5.4"
 csv = "1.2.1"
 curve25519-dalek = "3"
+curve25519-dalek-ng = "4"
 dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
@@ -498,6 +500,7 @@ log = "0.4.17"
 lru = "0.7.5"
 lz4 = "1.24.0"
 maplit = "1.0.2"
+merlin = "3"
 mime = "0.3.16"
 mirai-annotations = "1.12.0"
 mockall = "0.11.4"
@@ -676,3 +679,4 @@ debug = true
 # https://github.com/rust-rocksdb/rust-rocksdb/issues/666
 [patch.crates-io]
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
+merlin = { git = "https://github.com/aptos-labs/merlin" }

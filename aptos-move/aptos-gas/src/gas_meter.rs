@@ -30,8 +30,15 @@ use move_vm_types::{
     views::{TypeView, ValueView},
 };
 use std::collections::BTreeMap;
-
+// This gas feature version must be bumped up when one of the following conditions arises
+//  - A new gas parameter is added, removed or renamed in `aptos_framework.rs` or `move_stdlib.rs`
+//  - Changing how gas is calculated in any way (needs to be gated by a new feature version in the
+//    first place)
+//  - << What else? >>
+//
 // Change log:
+// - V11
+//   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
 // - V10
 //   - Added generate_unique_address and get_txn_hash native functions
 //   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
@@ -63,7 +70,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 10;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 11;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 

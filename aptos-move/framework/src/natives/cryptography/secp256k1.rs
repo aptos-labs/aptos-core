@@ -1,12 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-/***************************************************************************************************
- * native fun secp256k1_recover
- *
- *   gas cost: base_cost +? ecdsa_recover
- *
- **************************************************************************************************/
 use crate::{
     natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
     safely_pop_arg,
@@ -24,6 +18,12 @@ pub mod abort_codes {
     pub const NFE_DESERIALIZE: u64 = 0x01_0001;
 }
 
+/***************************************************************************************************
+ * native fun secp256k1_recover
+ *
+ *   gas cost: base_cost +? ecdsa_recover
+ *
+ **************************************************************************************************/
 fn native_ecdsa_recover(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
