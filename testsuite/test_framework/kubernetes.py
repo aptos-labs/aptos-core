@@ -3,7 +3,7 @@ from kubernetes import client, config
 from kubernetes.client import ApiException  # type: ignore
 from kubernetes.stream import stream
 from abc import ABC, abstractmethod
-from framework.logging import log
+from test_framework.logging import log
 import time
 from typing import Any
 
