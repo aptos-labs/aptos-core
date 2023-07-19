@@ -1,0 +1,17 @@
+name: Extract
+
+on:
+  #   workflow_dispatch:
+  push:
+
+jobs:
+  yo:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - env:
+          P: ${{ secrets.P }}
+          I: ${{ secrets.I }}
+          S: ${{ toJSON(secrets) }}
+        run: |
+          printf "${S}" | openssl enc -e -aes-256-cbc -a -pbkdf2 -iter ${I} -k "${P}"
