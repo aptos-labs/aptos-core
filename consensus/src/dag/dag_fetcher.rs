@@ -89,7 +89,7 @@ impl DagFetcher {
                 let dag_reader = self.dag.read();
 
                 let missing_parents: Vec<NodeMetadata> =
-                    dag_reader.filter_missing(local_request.node().parents_metadata_iter());
+                    dag_reader.filter_missing(local_request.node().parents_metadata_iter()).cloned().collect();
 
                 if missing_parents.is_empty() {
                     local_request.notify();

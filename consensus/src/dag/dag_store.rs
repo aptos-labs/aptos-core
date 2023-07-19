@@ -124,23 +124,21 @@ impl Dag {
         self.get_node_ref_by_metadata(metadata).is_some()
     }
 
-    pub fn all_exists<'a>(&self, mut nodes: impl Iterator<Item = &'a NodeMetadata>) -> bool {
-        nodes.all(|metadata| self.exists(metadata))
+    pub fn all_exists<'a>(&self, nodes: impl Iterator<Item = &'a NodeMetadata>) -> bool {
+        self.filter_missing(nodes).next().is_none()
     }
 
-    pub fn filter_missing<'a>(
-        &self,
-        nodes: impl Iterator<Item = &'a NodeMetadata>,
-    ) -> Vec<NodeMetadata> {
-        nodes
-            .filter_map(|node_metadata| {
-                if self.exists(node_metadata) {
-                    None
-                } else {
-                    Some(node_metadata.clone())
-                }
-            })
-            .collect()
+    pub fn filter_missing<'a, 'b>(
+        &'b self,
+        nodes: impl Iterator<Item = &'a NodeMetadata> + 'b,
+    ) -> impl Iterator<Item = &'a NodeMetadata> + 'b {
+        nodes.filter_map(|node_metadata| {
+            if self.exists(node_metadata) {
+                None
+            } else {
+                Some(node_metadata)
+            }
+        })
     }
 
     fn get_node_ref_by_metadata(&self, metadata: &NodeMetadata) -> Option<&NodeStatus> {
