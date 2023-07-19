@@ -12,6 +12,7 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
 use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_push_metrics::MetricsPusher;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::{
     bcs,
@@ -569,6 +570,9 @@ async fn test_flows(
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // start logging agents
+    let _mp = MetricsPusher::start_for_local_run("api-tester");
+
     // test flows on testnet
     println!("testing testnet...");
     let _ = test_flows(

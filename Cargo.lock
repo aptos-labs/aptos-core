@@ -403,6 +403,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-framework",
  "aptos-network",
+ "aptos-push-metrics",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-types",
