@@ -249,6 +249,7 @@ pub fn create_swarm_cpu_stress(
     let cpu_chaos_config = cpu_chaos_config.unwrap_or_default();
 
     // Chunk the peers into groups and create a GroupCpuStress for each group
+    let all_peers = all_peers.iter().map(|id| vec![*id]).collect();
     let peer_chunks = chunk_peers(all_peers, cpu_chaos_config.num_groups);
     let group_cpu_stresses = peer_chunks
         .into_iter()
