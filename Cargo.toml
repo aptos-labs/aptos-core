@@ -101,6 +101,8 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
+    "ecosystem/nft-metadata-crawler/nft-metadata-crawler-parser",
+    "ecosystem/nft-metadata-crawler/nft-metadata-crawler-utils",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
@@ -474,6 +476,8 @@ get_if_addrs = "0.5.3"
 git2 = "0.16.1"
 glob = "0.3.0"
 goldenfile = "1.1.0"
+google-cloud-auth = "0.11.0"
+google-cloud-googleapis = { version = "0.10.0", features = ["pubsub"] }
 handlebars = "4.2.2"
 heck = "0.3.2"
 hex = "0.4.3"
@@ -482,6 +486,7 @@ hostname = "0.3.1"
 httpmock = "0.6"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
+image = "0.24.5"
 include_dir = { version = "0.7.2", features = ["glob"] }
 indicatif = "0.15.0"
 indoc = "1.0.6"
@@ -506,6 +511,7 @@ mirai-annotations = "1.12.0"
 mockall = "0.11.4"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
+nft-metadata-crawler-utils = { path = "ecosystem/nft-metadata-crawler/nft-metadata-crawler-utils" }
 ntest = "0.9.0"
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
@@ -530,6 +536,7 @@ prometheus-parse = "0.2.4"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 prost = "0.11.3"
+prost-types = "0.11.3"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
