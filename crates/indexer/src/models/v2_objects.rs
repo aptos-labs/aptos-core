@@ -105,9 +105,9 @@ impl Object {
         }
     }
 
-    /// This should never really happen since it's very difficult to delete the entire resource group
-    /// currently. We actually need a better way of detecting whether an object is deleted since there
-    /// is likely no delete resource write set change.
+    /// This handles the case where the entire object is deleted
+    /// TODO: We need to detect if an object is only partially deleted
+    /// using KV store
     pub fn from_delete_resource(
         delete_resource: &DeleteResource,
         txn_version: i64,

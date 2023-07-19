@@ -114,7 +114,7 @@ impl UserTransaction {
                 )
                 .unwrap()
             })
-            .unwrap_or_default() // empty vec if signature is None
+            .unwrap_or_default()
     }
 }
 

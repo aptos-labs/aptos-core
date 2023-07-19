@@ -526,6 +526,8 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         }
 
         // TODO, merge this loop with above
+        // Moving object handling here because we need a single object
+        // map through transactions for lookups
         let mut all_objects = vec![];
         let mut all_current_objects = HashMap::new();
         for txn in &transactions {
