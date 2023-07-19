@@ -120,5 +120,7 @@ pub fn collect_terms(terms: Vec<Expression>) -> BTreeMap<String, u64> {
             _ => {},
         }
     }
+    map.insert(String::from("STARTUP_COST"), 1);
+    //let _ = map.remove("RET").unwrap();
     map
 }

@@ -16,8 +16,6 @@ use std::collections::BTreeMap;
 /*
  * Error types:
  *
- * - Impercise gas models (i.e., inject a dummy term into abstract usage)
- * - Measurement errors (i.e., loading of module, loading of vm, etc.)
  * - Samples not running long enough (i.e., run the simple ones in loops)
  */
 
@@ -25,6 +23,7 @@ fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
 
     let samples_ir = compile_and_run_samples_ir();
+    println!("\nrunning times (RHS): {:?}", samples_ir.regular_meter);
     //let samples_ir = compile_and_run_samples();
 
     println!("\n\nabstract gas formulae (LHS): ");
