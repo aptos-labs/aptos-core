@@ -180,7 +180,7 @@ async def main():
 
     deedee = Account.generate()
 
-    while deedee.address().hex()[2:4] != "dd":
+    while str(deedee.address())[2:4] != "dd":
         deedee = Account.generate()
 
     print(f"Deedee's address:    {deedee.address()}")
@@ -256,7 +256,7 @@ async def main():
     print(f"Auth key pre-rotation: {account_data['authentication_key']}")
 
     tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
-    rest_client.wait_for_transaction(tx_hash)
+    await rest_client.wait_for_transaction(tx_hash)
     print(f"Transaction hash:      {tx_hash}")
 
     account_data = await rest_client.account(deedee.address())
@@ -274,7 +274,7 @@ async def main():
         f"aptos move compile "
         f"--save-metadata "
         f"--package-dir {packages_dir}genesis "
-        f"--named-addresses upgrade_and_govern={deedee.address().hex()}"
+        f"--named-addresses upgrade_and_govern={str(deedee.address())}"
     )
 
     print(f"Running aptos CLI command: {command}\n")
@@ -351,7 +351,7 @@ async def main():
         f"aptos move compile "
         f"--save-metadata "
         f"--package-dir {packages_dir}upgrade "
-        f"--named-addresses upgrade_and_govern={deedee.address().hex()}"
+        f"--named-addresses upgrade_and_govern={str(deedee.address())}"
     )
 
     print(f"Running aptos CLI command: {command}\n")
