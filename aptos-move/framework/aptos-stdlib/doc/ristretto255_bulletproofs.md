@@ -318,4 +318,4 @@ Aborts with <code><a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argu
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

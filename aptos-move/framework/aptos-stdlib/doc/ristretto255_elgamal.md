@@ -704,4 +704,4 @@ Returns the <code>RistrettoPoint</code> in the ciphertext which contains the enc
 </details>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY
