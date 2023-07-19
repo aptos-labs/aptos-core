@@ -33,7 +33,7 @@ proposals:
     - Execution:
         V2:
           transaction_shuffler_type:
-            sender_aware_v1: 32
+            deprecated_sender_aware_v1: 32
           block_gas_limit : 35000
   - name: enable_aptos_unique_identifiers
     metadata:
