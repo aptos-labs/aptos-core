@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::dag_store::NodeStatus;
 use crate::{
     dag::{anchor_election::AnchorElection, dag_store::Dag, types::NodeMetadata, CertifiedNode},
     experimental::buffer_manager::OrderedBlocks,
@@ -104,7 +105,11 @@ impl OrderRule {
                 && *metadata.author() == self.anchor_election.get_anchor(metadata.round())
         };
         while let Some(prev_anchor) = dag_reader
-            .reachable(&current_anchor, Some(self.lowest_unordered_anchor_round))
+            .reachable(
+                &[current_anchor.metadata().clone()],
+                Some(self.lowest_unordered_anchor_round),
+                |node_status| matches!(node_status, NodeStatus::Unordered(_)),
+            )
             .map(|node_status| node_status.as_node())
             .find(|node| is_anchor(node.metadata()))
         {
