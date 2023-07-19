@@ -22,7 +22,8 @@ use aptos_gas_algebra::Expression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_gas_schedule::{
-    MiscGasParameters, NativeGasParameters, VMGasParameters, LATEST_GAS_FEATURE_VERSION,
+    InitialGasSchedule, MiscGasParameters, NativeGasParameters, VMGasParameters,
+    LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
@@ -71,6 +72,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
+    time::Instant,
 };
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -102,6 +104,11 @@ pub struct FakeExecutor {
     features: Features,
     chain_id: u8,
     aggregator_enabled: bool,
+}
+
+pub enum GasMeterType {
+    RegularMeter(Vec<u128>),
+    AbstractMeter(Vec<Expression>),
 }
 
 impl FakeExecutor {
@@ -674,7 +681,8 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-    ) {
+    ) -> u128 {
+        let running_time: u128;
         let write_set = {
             // FIXME: should probably read the timestamp from storage.
             let timed_features =
@@ -692,19 +700,33 @@ impl FakeExecutor {
             let remote_view = StorageAdapter::new(&self.data_store);
             let mut session =
                 vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
-            // TODO: preload module
 
-            // TODO: timing here
-            let result = session.execute_function_bypass_visibility(
-                module,
-                &Self::name(function_name),
-                type_params,
-                args,
-                &mut UnmeteredGasMeter,
-            );
-            if let Err(err) = result {
-                println!("should error, but ignoring for now");
+            // preload module to ensure cache is hot
+            let _ = session.load_module(module);
+
+            // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
+            let mut i = 0;
+            let iterations = 10; // TODO: change this to support CLI flag
+            let mut times = Vec::new();
+            while i < iterations {
+                let start = Instant::now();
+                let result = session.execute_function_bypass_visibility(
+                    module,
+                    &Self::name(function_name),
+                    type_params.clone(),
+                    args.clone(),
+                    &mut UnmeteredGasMeter,
+                );
+                let elapsed = start.elapsed();
+                if let Err(err) = result {
+                    println!("Should error, but ignoring for now... {}", err);
+                }
+                times.push(elapsed.as_micros());
+                i += 1;
             }
+            // TODO: use median
+            let sum: u128 = times.iter().sum();
+            running_time = sum / iterations;
 
             let change_set = session
                 .finish(
@@ -716,6 +738,7 @@ impl FakeExecutor {
             write_set
         };
         self.data_store.add_write_set(&write_set);
+        running_time
     }
 
     /// record abstract usage using a modified gas meter
@@ -744,9 +767,9 @@ impl FakeExecutor {
             );
 
             builder.set_gas_hook(move |expression| {
-                println!("TEST PRINT expression {:?}\n", expression);
+                //println!("TEST PRINT expression {:?}\n", expression);
                 a2.lock().unwrap().push(expression);
-                println!("A2 VEC: {:?}\n", a2.lock().unwrap());
+                //println!("A2 VEC: {:?}\n", a2.lock().unwrap());
             });
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
@@ -762,8 +785,8 @@ impl FakeExecutor {
             let mut session =
                 vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
 
-            // TODO: preload module
-            // session.load_module(module_id)
+            // preload module to ensure cache is hot
+            let _ = session.load_module(module);
 
             let result = session.execute_function_bypass_visibility(
                 module,
@@ -774,19 +797,19 @@ impl FakeExecutor {
                     base: StandardGasAlgebra::new(
                         //// TODO: fill in these with proper values
                         LATEST_GAS_FEATURE_VERSION,
-                        VMGasParameters::zeros(),
+                        InitialGasSchedule::initial(),
                         StorageGasParameters::free_and_unlimited(),
-                        100000,
+                        10000000000000,
                     ),
-                    //coeff_buffer: BTreeMap::new(),
+                    // coeff_buffer: BTreeMap::new(),
                     shared_buffer: Arc::clone(&a1),
-                }), // StandardGasMeter with CalibrationAlgebra
+                }),
             );
             if let Err(err) = result {
-                println!("should error, but ignoring for now");
+                println!("Should error, but ignoring for now... {}", err);
             }
 
-            println!("A3 ARC: {:?}\n", a1.lock().unwrap());
+            //println!("A3 ARC: {:?}\n", a1.lock().unwrap());
 
             let change_set = session
                 .finish(
@@ -800,7 +823,11 @@ impl FakeExecutor {
         self.data_store.add_write_set(&write_set);
 
         let a1_result = Arc::into_inner(a1);
-        a1_result.expect("should unwrap").lock().unwrap().to_vec()
+        a1_result
+            .expect("Failed to get a1 arc result")
+            .lock()
+            .unwrap()
+            .to_vec()
     }
 
     pub fn exec(

@@ -7,7 +7,6 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
 use aptos_gas_algebra::Expression;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_native_interface::reexports::move_vm_types::gas::GasMeter;
 use aptos_types::transaction::TransactionPayload;
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
@@ -15,11 +14,6 @@ use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
 
 //// CONSTANTS
 const PREFIX: &str = "calibrate_";
-
-pub enum GasMeterType {
-    RegularMeter(Vec<u128>),
-    AbstractMeter(Vec<Vec<Expression>>),
-}
 
 /// Generate a TransactionPayload for modules
 ///
@@ -91,11 +85,9 @@ pub fn sign_user_txn(
     module_name: &ModuleId,
     function_name: &str,
 ) -> u128 {
-    let start = Instant::now();
-    executor.exec_module(module_name, function_name, vec![], vec![]);
-    let elapsed = start.elapsed();
-    println!("running time (microseconds): {}", elapsed.as_micros());
-    elapsed.as_micros()
+    let elapsed = executor.exec_module(module_name, function_name, vec![], vec![]);
+    println!("running time (microseconds): {}", elapsed);
+    elapsed
 }
 
 /// Publish module under user, sign and run user transaction.

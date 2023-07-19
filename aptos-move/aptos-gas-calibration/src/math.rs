@@ -91,13 +91,18 @@ pub fn compute_least_square_solutions(
 ) -> Result<DMatrix<f64>, String> {
     let A_T = A.transpose();
     let A_TA = A_T.clone().mul(A.clone());
+
+    println!("A_TA {}\n", A_TA);
+
     let A_Tb = A_T.clone().mul(b.clone());
+    println!("A_Tb {}\n", A_Tb);
 
     if !A_TA.is_invertible() {
         return Err("cannot invert A_TA matrix".to_string());
     }
 
     let inverse = A_TA.try_inverse().expect("inverse should work");
+    println!("INVERSE MATRIX {}\n", inverse);
     let x_hat = inverse.mul(&A_Tb);
     Ok(x_hat)
 }
@@ -168,8 +173,7 @@ pub fn find_outliers(
 
         let numerator = (a_ij - computed_running_time[i]).abs();
         let denominator = computed_running_time[i];
-        // TODO: change to approx_eq?
-        if denominator == 0.0 {
+        if approx_eq!(f64, denominator, 0.0, ulps = 2) {
             return Err(String::from("Division by zero"));
         } else {
             let diff = numerator.div(denominator);

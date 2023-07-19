@@ -1,0 +1,725 @@
+module 0xcafe.BasicInstr {
+    // ret
+    public entry calibrate_1() {
+    label b0:
+        return;
+    }
+
+    // ldu64, pop, ret
+    public entry calibrate_2() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+        _ = 5;
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // ldu64, pop, ret
+    public entry calibrate_3() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();                
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();                
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();
+        (6,7,8);
+        _,_,_ = ();        
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // sub, ldu64, pop, ret
+    public entry calibrate_4() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (6,7,8);
+        _ = (2 - 1);
+        _,_,_ = ();
+        (6,7,8);
+        _ = (2 - 1);
+        _,_,_ = ();
+        (6,7,8);
+        _ = (2 - 1);
+        _,_,_ = ();
+        (6,7,8);
+        _ = (2 - 1);
+        _,_,_ = ();
+        (6,7,8);
+        _ = (2 - 1);
+        _,_,_ = ();
+        (6,7,8);
+        _ = (2 - 1);
+        _,_,_ = ();
+        (6,7,8);
+        _ = (2 - 1);
+        _,_,_ = ();
+        (6,7,8);
+        _ = (2 - 1);
+        _,_,_ = ();                        
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }  
+
+    // sub 
+    public entry calibrate_5() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (1 - 1);
+        _ = (5 - 1);
+        _ = (1 - 1);
+        _ = (5 - 1);
+        _ = (1 - 1);
+        _ = (5 - 1);
+        _ = (1 - 1);
+        _ = (5 - 1);  
+        _ = (1 - 1);
+        _ = (5 - 1);
+        _ = (1 - 1);
+        _ = (5 - 1);
+        _ = (1 - 1);
+        _ = (5 - 1);
+        _ = (1 - 1);
+        _ = (5 - 1);                        
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    } 
+
+    // stloc, ldu64, ret
+    public entry calibrate_6() {
+        let a: u64;
+        let b: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 5;
+        b = 10;
+        a = 5;
+        b = 10;
+        a = 5;
+        b = 10;
+        a = 5;
+        b = 10;                
+        a = 5;
+        b = 10;
+        a = 5;
+        b = 10;
+        a = 5;
+        b = 10;
+        a = 5;
+        b = 10;
+
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    } 
+
+    // stloc, ldu64, sub, pop, ret
+    public entry calibrate_7() {
+        let a: u64;
+        let b: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 10;
+        (6);
+        _ = (2 - 1);
+        _ = ();
+        b = 5;
+        a = 10;
+        (6);
+        _ = (2 - 1);
+        _ = ();
+        b = 5;
+
+        a = 10;
+        (6);
+        _ = (2 - 1);
+        _ = ();
+        b = 5;
+        a = 10;
+        (6);
+        _ = (2 - 1);
+        _ = ();
+        b = 5;
+
+        a = 10;
+        (6);
+        _ = (2 - 1);
+        _ = ();
+        b = 5;
+        a = 10;
+        (6);
+        _ = (2 - 1);
+        _ = ();
+        b = 5;
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }  
+
+    // stloc, ldu64, pop, ret
+    public entry calibrate_8() {
+        let a: u64;
+        let b: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 10;
+        _ = 5;
+        b = 5;
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // moveloc, stloc, ldu64, pop, ret
+    public entry calibrate_9() {
+        let a: u64;
+        let b: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 5;
+        a = move(a);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }    
+
+    // moveloc, stloc, ldu64, sub, pop, ret
+    public entry calibrate_10() {
+        let a: u64;
+        let b: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 5;
+        a = move(a);
+        _ = (5 - 1);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // add, ldu64, pop, ret
+    public entry calibrate_11() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (1 + 1);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // add, moveloc, stloc ...
+    public entry calibrate_12() {
+        let a: u64;
+        let b: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 5;
+        b = move(a) + 1;
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // lt, ldu64, pop, ret
+    public entry calibrate_13() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (5 < 1);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // lt, stloc, moveloc ...
+    public entry calibrate_14() {
+        let a: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 5;
+        _ = (move(a) < 1);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // lt, stloc ...
+    public entry calibrate_15() {
+        let a: u64;
+        let b: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 1;
+        b = 2;
+        _ = (move(b) < move(a));
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // branch, ret
+    public entry calibrate_16() {
+        let i: u64;
+    label entry:
+        i = 0;
+        jump b0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+        jump b0;
+    label b0:
+        jump loop_start;       
+    label loop_end:
+        return;          
+    }
+
+    // branch, moveloc, pop, lt, ldu64
+    public entry calibrate_17() {
+        let a: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+        jump b0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (1,2,3);
+        _,_,_ = ();
+
+        jump b0;
+    label b0:
+        a = 5;
+        _ = (move(a) < 1);
+        jump loop_start;       
+    label loop_end:
+        return;          
+    }
+
+    // branch, ... , sub
+    public entry calibrate_18() {
+        let a: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+        jump b0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 5;
+        _ = (2 - 1);
+        _ = (move(a) < 1);
+
+        jump b0;
+    label b0:
+        (1,2,3);
+        _,_,_ = ();
+        _ = (2 + 1);
+        jump loop_start;       
+    label loop_end:
+        return;          
+    }    
+
+    // brfalse, ldu64, stloc, moveloc, lt, ret
+    public entry calibrate_19() {
+        let a: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+        jump b0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 5;
+        jump_if_false (move(a) < 1) b0;
+
+        jump b0;
+    label b0:
+        jump loop_start;     
+    label loop_end:
+        return;          
+    }
+    
+    // brfalse, ... , add, sub 
+    public entry calibrate_20() {
+        let a: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+        jump b0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 5;
+        _ = (2 + 1);
+        jump_if_false (move(a) < 1) b0;
+
+        jump b0;
+    label b0:
+        _ = (2 - 1);
+        jump loop_start;     
+    label loop_end:
+        return;         
+    }
+
+    // ldconst, stloc, ...
+    public entry calibrate_21() {
+        let b: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        b = h"0001020304050607";
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // ldconst, stloc, ...
+    public entry calibrate_22() {
+        let b: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        b = h"000102030405060712346536356345";
+
+        jump loop_start;
+    label loop_end:
+        return;  
+
+    }
+
+    // copyloc
+    public entry calibrate_23() {
+        let a: u64;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = 5;
+        _ = copy(a);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    // copyloc, ldconst, ...
+    public entry calibrate_24() {
+        let a: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = h"001178097586";
+        _ = copy(a);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    public entry calibrate_25() {
+        let b: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+
+        jump loop_start;
+    label loop_end:
+        return;  
+
+    }  
+
+    public entry calibrate_26() {
+        let b: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        _ = copy(b);
+
+        jump loop_start;
+    label loop_end:
+        return;  
+
+    } 
+
+    public entry calibrate_27() {
+        let b: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+
+        jump loop_start;
+    label loop_end:
+        return;  
+
+    }             
+
+    public entry calibrate_28() {
+        let b: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        _ = copy(b);
+
+        jump loop_start;
+    label loop_end:
+        return;  
+
+    } 
+
+    public entry calibrate_29() {
+        let b: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678";        
+
+        jump loop_start;
+    label loop_end:
+        return;  
+
+    }
+
+    public entry calibrate_30() {
+        let b: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";        
+
+        _ = copy(b);
+
+        jump loop_start;
+    label loop_end:
+        return;  
+
+    }
+
+    public entry calibrate_31() {
+        let a: u64;
+        let b: vector<u8>;
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        a = (2 + 1);
+        a = (2 + 1);
+        a = (2 + 1);
+        a = (2 + 1);
+        a = (2 + 1);
+        a = (2 + 1);
+        a = (2 + 1);
+        a = (2 + 1);
+        _ = copy(a);        
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";
+        b = h"000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678000102030405060712346536356345012392385678567856785678567856785678";        
+        _ = copy(b);
+
+        jump loop_start;
+    label loop_end:
+        return; 
+    }    
+}

@@ -45,7 +45,7 @@ pub fn compile_and_run_samples() -> GasMeters {
             ..BuildOptions::default()
         };
         let package =
-            BuiltPackage::build(dir_path, build_options).expect("build package must succeed");
+            BuiltPackage::build(dir_path, build_options).expect("Failed to build package");
 
         // iterate over all Move package code
         let codes = package.extract_code();
@@ -103,7 +103,7 @@ pub fn compile_and_run_samples_ir() -> GasMeters {
 
             if file_path.is_file() {
                 // compile module
-                let code = read_to_string(&file_path).expect("should have file contents");
+                let code = read_to_string(&file_path).expect("Failed to read file contents");
                 let module = Compiler::new(vec![])
                     .into_compiled_module(&code)
                     .expect("should compile mvir");
@@ -119,7 +119,7 @@ pub fn compile_and_run_samples_ir() -> GasMeters {
                 let mut module_blob: Vec<u8> = vec![];
                 module
                     .serialize(&mut module_blob)
-                    .expect("should serialize");
+                    .expect("Failed to serialize module");
 
                 println!("BLOB {:#?}\n", module);
 
@@ -127,10 +127,9 @@ pub fn compile_and_run_samples_ir() -> GasMeters {
                 executor.add_module(&module_id, module_blob);
 
                 for func_identifier in func_identifiers {
-                    let start = Instant::now();
-                    executor.exec_module(&module_id, &func_identifier, vec![], vec![]);
-                    let elapsed = start.elapsed();
-                    gas_meter.regular_meter.push(elapsed.as_micros());
+                    let elapsed =
+                        executor.exec_module(&module_id, &func_identifier, vec![], vec![]);
+                    gas_meter.regular_meter.push(elapsed);
 
                     // record with abstract gas meter
                     let gas_formula =

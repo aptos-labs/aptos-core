@@ -109,7 +109,7 @@ pub trait GasExpression<E> {
         visitor
             .node
             .pop()
-            .expect("there should be a root node in AST")
+            .expect("Failed: there should be a root node in AST")
     }
 }
 
