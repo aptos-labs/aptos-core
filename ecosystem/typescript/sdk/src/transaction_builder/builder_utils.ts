@@ -161,7 +161,7 @@ function serializeStruct(argVal: any, argType: TypeTag, serializer: Serializer, 
 function serializeOption(argVal: any, argType: TypeTag, serializer: Serializer, depth: number) {
   // For option, we determine if it's empty or not empty first
   // empty option is nothing, we specifically check for undefined to prevent fuzzy matching
-  if (argVal === undefined) {
+  if (argVal === undefined || argVal === null) {
     serializer.serializeU32AsUleb128(0);
   } else {
     // Something means we need an array of 1
