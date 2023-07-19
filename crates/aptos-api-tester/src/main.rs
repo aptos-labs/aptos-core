@@ -60,7 +60,6 @@ static ERROR_NO_BYTECODE: &str = "error while getting bytecode from blobs";
 static ERROR_MODULE_INTERACTION: &str = "module interaction isn't reflected";
 
 // Processes a test result.
-// TODO: needs redesign
 async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
     test_name: TestName,
     network_type: NetworkName,
