@@ -41,6 +41,7 @@ spec aptos_framework::reconfiguration {
     spec disable_reconfiguration(aptos_framework: &signer) {
         include AbortsIfNotAptosFramework;
         aborts_if exists<DisableReconfiguration>(@aptos_framework);
+        ensures exists<DisableReconfiguration>(@aptos_framework);
     }
 
     /// Make sure the caller is admin and check the resource DisableReconfiguration.
@@ -48,6 +49,7 @@ spec aptos_framework::reconfiguration {
         use aptos_framework::reconfiguration::{DisableReconfiguration};
         include AbortsIfNotAptosFramework;
         aborts_if !exists<DisableReconfiguration>(@aptos_framework);
+        ensures !exists<DisableReconfiguration>(@aptos_framework);
     }
 
     /// When genesis_event emit the epoch and the `last_reconfiguration_time` .
@@ -58,6 +60,7 @@ spec aptos_framework::reconfiguration {
         aborts_if !exists<Configuration>(@aptos_framework);
         let config_ref = global<Configuration>(@aptos_framework);
         aborts_if !(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0);
+        ensures config_ref.epoch == 1;
     }
 
     spec last_reconfiguration_time {
