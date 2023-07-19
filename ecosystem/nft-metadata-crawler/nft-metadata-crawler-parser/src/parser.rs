@@ -47,7 +47,9 @@ impl Parser {
         }
     }
 
-    // Main parsing flow
+    /**
+     * Main parsing flow
+     */
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         // Deduplicate token_uri
         // Skip if token_uri already exists and not force
