@@ -289,7 +289,7 @@ impl ShardedBlockPartitioner {
         let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_to_partition);
         let duration = timer.stop_and_record();
         let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
-        let augmented_matrix = self.add_edges(matrix);
+        let augmented_matrix = self.add_edges(matrix, None);
         let duration = timer.stop_and_record();
         augmented_matrix
     }
@@ -333,16 +333,16 @@ impl ShardedBlockPartitioner {
         txn_matrix
     }
 
-    fn add_edges(&self, matrix: Vec<Vec<Vec<AnalyzedTransaction>>>) -> Vec<SubBlocksForShard<Transaction>> {
+    fn add_edges(&self, matrix: Vec<Vec<Vec<AnalyzedTransaction>>>, maybe_num_keys: Option<usize>) -> Vec<SubBlocksForShard<Transaction>> {
         let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["main"]).start_timer();
         let mut ret: Vec<SubBlocksForShard<Transaction>> = (0..self.num_shards).map(|shard_id| SubBlocksForShard { shard_id, sub_blocks: vec![] }).collect();
         let mut global_txn_counter: usize = 0;
-        let mut global_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
+        let mut global_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::with_capacity(maybe_num_keys.unwrap_or(0));
         for (round_id, row) in matrix.into_iter().enumerate() {
             for (shard_id, txns) in row.into_iter().enumerate() {
                 let start_index_for_cur_sub_block = global_txn_counter;
                 let mut twds_for_cur_sub_block: Vec<TransactionWithDependencies<Transaction>> = Vec::with_capacity(txns.len());
-                let mut local_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
+                let mut local_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::with_capacity(maybe_num_keys.unwrap_or(0));
                 for txn in txns {
                     let cur_sharded_txn_idx = ShardedTxnIndex {
                         txn_index: global_txn_counter,
@@ -417,13 +417,13 @@ impl BlockPartitioner for ShardedBlockPartitioner {
             Ok(v) if v.as_str() == "1" => {
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["init_with_simple"]).start_timer();
                 let simple_partitioner = SimplePartitioner{};
-                let txns_by_shard_id = simple_partitioner.partition(transactions, self.num_shards);
+                let (txns_by_shard_id, num_keys) = simple_partitioner.partition(transactions, self.num_shards);
                 timer.stop_and_record();
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["flatten_to_rounds"]).start_timer();
                 let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard_id);
                 timer.stop_and_record();
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
-                let ret = self.add_edges(matrix);
+                let ret = self.add_edges(matrix, Some(num_keys));
                 timer.stop_and_record();
                 ret
             }

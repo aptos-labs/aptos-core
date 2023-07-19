@@ -24,11 +24,13 @@ pub struct SimplePartitioner {}
 impl SimplePartitioner {
     /// If `maybe_load_imbalance_tolerance` is none,
     /// it is guaranteed that the returned txn groups do not have cross-group conflicts.
+    ///
+    /// Also return `num_keys` to help optimize later stages.
     pub fn partition(
         &self,
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
-    ) -> Vec<Vec<AnalyzedTransaction>> {
+    ) -> (Vec<Vec<AnalyzedTransaction>>, usize) {
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
         let num_txns = txns.len();
         let mut num_senders: usize = 0;
@@ -150,7 +152,7 @@ impl SimplePartitioner {
         drop(key_ids_by_key);
         drop(sender_ids_by_sender);
         let duration = timer.stop_and_record();
-        txns_by_shard_id
+        (txns_by_shard_id, num_keys)
     }
 }
 
@@ -160,7 +162,7 @@ impl BlockPartitioner for SimplePartitioner {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> Vec<SubBlocksForShard<Transaction>> {
-        let txns_by_shard_id = self.partition(txns, num_executor_shards);
+        let (txns_by_shard_id, num_keys) = self.partition(txns, num_executor_shards);
         let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_deps"]).start_timer();
         let mut ret: Vec<SubBlocksForShard<Transaction>> = Vec::with_capacity(num_executor_shards);
         let mut global_txn_counter: usize = 0;
