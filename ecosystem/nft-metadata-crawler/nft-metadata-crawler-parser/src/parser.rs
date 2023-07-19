@@ -54,7 +54,7 @@ impl Parser {
         // Deduplicate token_uri
         // Skip if token_uri already exists and not force
         if self.entry.force
-            && NFTMetadataCrawlerURIsQuery::get_by_token_uri(
+            || NFTMetadataCrawlerURIsQuery::get_by_token_uri(
                 self.entry.token_uri.clone(),
                 &mut self.conn,
             )?
@@ -89,7 +89,7 @@ impl Parser {
         // Deduplicate raw_image_uri
         // Skip if raw_image_uri has already been parsed and not force
         if self.entry.force
-            && NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
+            || NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
                 self.model.get_raw_image_uri(),
                 &mut self.conn,
             )?
@@ -124,7 +124,7 @@ impl Parser {
         // Deduplicate raw_animation_uri
         // Skip if raw_animation_uri has already been parsed and not force
         if self.entry.force
-            && NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
+            || NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
                 self.model.get_raw_animation_uri(),
                 &mut self.conn,
             )?
