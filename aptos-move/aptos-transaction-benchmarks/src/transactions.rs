@@ -14,7 +14,6 @@ use aptos_language_e2e_tests::{
     gas_costs::TXN_RESERVED,
 };
 use aptos_types::{
-    block_executor::partitioner::BlockExecutorTransactions,
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
@@ -349,7 +348,7 @@ where
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            BlockExecutorTransactions::Unsharded(transactions),
+            transactions,
             self.state_view.as_ref(),
             1,
             maybe_block_gas_limit,
@@ -394,7 +393,7 @@ where
                 NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
             >(
                 Arc::clone(&RAYON_EXEC_POOL),
-                BlockExecutorTransactions::Unsharded(transactions),
+                transactions,
                 self.state_view.as_ref(),
                 concurrency_level_per_shard,
                 maybe_block_gas_limit,
