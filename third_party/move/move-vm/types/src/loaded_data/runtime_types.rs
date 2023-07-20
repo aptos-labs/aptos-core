@@ -139,8 +139,13 @@ pub enum Type {
     Address,
     Signer,
     Vector(Box<Type>),
-    Struct(CachedStructIndex),
-    StructInstantiation(CachedStructIndex, Vec<Type>),
+    Struct {
+        index: CachedStructIndex,
+    },
+    StructInstantiation {
+        index: CachedStructIndex,
+        ty_args: Vec<Type>,
+    },
     Reference(Box<Type>),
     MutableReference(Box<Type>),
     TyParam(u16),
@@ -180,13 +185,19 @@ impl Type {
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
             },
-            Type::Struct(def_idx) => Type::Struct(*def_idx),
-            Type::StructInstantiation(def_idx, instantiation) => {
+            Type::Struct { index: def_idx } => Type::Struct { index: *def_idx },
+            Type::StructInstantiation {
+                index: def_idx,
+                ty_args: instantiation,
+            } => {
                 let mut inst = vec![];
                 for ty in instantiation {
                     inst.push(ty.apply_subst(subst, depth + 1)?)
                 }
-                Type::StructInstantiation(*def_idx, inst)
+                Type::StructInstantiation {
+                    index: *def_idx,
+                    ty_args: inst,
+                }
             },
         };
         Ok(res)
@@ -223,8 +234,11 @@ impl Type {
             Vector(ty) | Reference(ty) | MutableReference(ty) => {
                 Self::LEGACY_BASE_MEMORY_SIZE + ty.size()
             },
-            Struct(_) => Self::LEGACY_BASE_MEMORY_SIZE,
-            StructInstantiation(_, tys) => tys
+            Struct { index: _ } => Self::LEGACY_BASE_MEMORY_SIZE,
+            StructInstantiation {
+                index: _,
+                ty_args: tys,
+            } => tys
                 .iter()
                 .fold(Self::LEGACY_BASE_MEMORY_SIZE, |acc, ty| acc + ty.size()),
         }
