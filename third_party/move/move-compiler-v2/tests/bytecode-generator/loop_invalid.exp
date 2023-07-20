@@ -1,0 +1,39 @@
+// ---- Model Dump
+module 0x42::loop_invalid {
+    private fun misplaced_break(x: u64) {
+        loop {
+          if Gt(x, 0) {
+            break
+          } else {
+            break
+          }
+        };
+        break;
+        x
+    }
+    private fun misplaced_continue(x: u64) {
+        continue;
+        loop {
+          if Gt(x, 0) {
+            continue
+          } else {
+            break
+          }
+        };
+        x
+    }
+} // end 0x42::loop_invalid
+
+
+Diagnostics:
+error: missing enclosing loop statement
+  ┌─ tests/bytecode-generator/loop_invalid.move:7:9
+  │
+7 │         break;
+  │         ^^^^^
+
+error: missing enclosing loop statement
+   ┌─ tests/bytecode-generator/loop_invalid.move:12:9
+   │
+12 │         continue;
+   │         ^^^^^^^^

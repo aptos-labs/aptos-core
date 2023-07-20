@@ -33,6 +33,9 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::pool_u64`](pool_u64.md#0x1_pool_u64)
 -  [`0x1::pool_u64_unbound`](pool_u64_unbound.md#0x1_pool_u64_unbound)
 -  [`0x1::ristretto255`](ristretto255.md#0x1_ristretto255)
+-  [`0x1::ristretto255_bulletproofs`](ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs)
+-  [`0x1::ristretto255_elgamal`](ristretto255_elgamal.md#0x1_ristretto255_elgamal)
+-  [`0x1::ristretto255_pedersen`](ristretto255_pedersen.md#0x1_ristretto255_pedersen)
 -  [`0x1::secp256k1`](secp256k1.md#0x1_secp256k1)
 -  [`0x1::simple_map`](simple_map.md#0x1_simple_map)
 -  [`0x1::smart_table`](smart_table.md#0x1_smart_table)
@@ -43,4 +46,4 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::type_info`](type_info.md#0x1_type_info)
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY
