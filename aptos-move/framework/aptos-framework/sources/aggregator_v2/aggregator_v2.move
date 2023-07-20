@@ -29,9 +29,12 @@ module aptos_framework::aggregator_v2 {
     /// Returns a value stored in this aggregator.
     public native fun read(aggregator: &Aggregator): u128;
 
-    public native fun snapshot(aggregator: &Aggregator): AggregatorSnapshot<u128>;
+    public native fun deferred_read(aggregator: &Aggregator): AggregatorSnapshot<u128>;
 
-    public native fun try_snapshot_u64(aggregator: &Aggregator): Option<AggregatorSnapshot<u64>>;
+    // Do automatic conversion to u64, if all possible values of aggregator fit it (i.e. limit is <= u64::MAX)
+    // If limit of the aggregator exceeds u64::MAX, this will return None)
+    // This doesn't check if actual value can be converted.
+    public native fun deferred_read_convert_u64(aggregator: &Aggregator): Option<AggregatorSnapshot<u64>>;
 
     public native fun read_snapshot<Element>(snapshot: &AggregatorSnapshot<Element>): Element;
 }
