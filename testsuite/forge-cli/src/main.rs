@@ -1496,15 +1496,7 @@ fn realistic_env_max_load_test(
                     mempool_backlog: 40000,
                 })
                 .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(
-                if ha_proxy {
-                    4600
-                } else if long_running {
-                    5500
-                } else {
-                    5000
-                },
-            ),
+            inner_success_criteria: SuccessCriteria::new(if ha_proxy { 4600 } else { 5500 }),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
