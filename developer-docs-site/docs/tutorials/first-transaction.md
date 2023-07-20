@@ -346,7 +346,7 @@ Breaking the above down into pieces:
 
 Behind the scenes the Python SDK generates, signs, and submits a transaction:
 ```python
-:!: static/sdks/python/aptos_sdk/client.py bcs_transfer
+:!: static/sdks/python/aptos_sdk/async_client.py bcs_transfer
 ```
 
 Breaking the above down into pieces:

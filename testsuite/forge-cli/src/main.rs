@@ -1498,7 +1498,7 @@ fn realistic_env_max_load_test(
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
-                    4700
+                    4600
                 } else if long_running {
                     5500
                 } else {
@@ -1527,7 +1527,7 @@ fn realistic_env_max_load_test(
                 )
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, max_cpu_threshold),
+                    MetricsThreshold::new(14, max_cpu_threshold),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
                 ))

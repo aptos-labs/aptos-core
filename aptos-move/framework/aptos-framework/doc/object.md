@@ -2572,4 +2572,4 @@ Return true if the provided address has indirect or direct ownership of the prov
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

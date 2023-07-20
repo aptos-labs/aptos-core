@@ -43,12 +43,12 @@ async def main():
         alice, TransactionPayload(payload)
     )
 
-    print("\n=== Simulate before creatng Bob's Account ===")
+    print("\n=== Simulate before creating Bob's Account ===")
     output = await rest_client.simulate_transaction(transaction, alice)
     assert output[0]["vm_status"] != "Executed successfully", "This shouldn't succeed"
     print(json.dumps(output, indent=4, sort_keys=True))
 
-    print("\n=== Simulate after creatng Bob's Account ===")
+    print("\n=== Simulate after creating Bob's Account ===")
     await faucet_client.fund_account(bob.address(), 0)
     output = await rest_client.simulate_transaction(transaction, alice)
     assert output[0]["vm_status"] == "Executed successfully", "This should succeed"
