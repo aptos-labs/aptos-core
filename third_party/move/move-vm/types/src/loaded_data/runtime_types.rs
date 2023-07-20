@@ -113,6 +113,7 @@ impl DepthFormula {
 pub struct StructType {
     pub fields: Vec<Type>,
     pub field_names: Vec<Identifier>,
+    pub type_phantom_constraint: Vec<bool>,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
     pub name: Identifier,
@@ -141,10 +142,13 @@ pub enum Type {
     Vector(Box<Type>),
     Struct {
         index: CachedStructIndex,
+        ability: AbilitySet,
     },
     StructInstantiation {
         index: CachedStructIndex,
         ty_args: Vec<Type>,
+        base_ability: AbilitySet,
+        is_phantom_params: Vec<bool>,
     },
     Reference(Box<Type>),
     MutableReference(Box<Type>),
@@ -185,10 +189,18 @@ impl Type {
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
             },
-            Type::Struct { index: def_idx } => Type::Struct { index: *def_idx },
+            Type::Struct {
+                index: def_idx,
+                ability,
+            } => Type::Struct {
+                index: *def_idx,
+                ability: *ability,
+            },
             Type::StructInstantiation {
                 index: def_idx,
                 ty_args: instantiation,
+                base_ability,
+                is_phantom_params,
             } => {
                 let mut inst = vec![];
                 for ty in instantiation {
@@ -197,6 +209,8 @@ impl Type {
                 Type::StructInstantiation {
                     index: *def_idx,
                     ty_args: inst,
+                    base_ability: *base_ability,
+                    is_phantom_params: is_phantom_params.clone(),
                 }
             },
         };
@@ -234,11 +248,8 @@ impl Type {
             Vector(ty) | Reference(ty) | MutableReference(ty) => {
                 Self::LEGACY_BASE_MEMORY_SIZE + ty.size()
             },
-            Struct { index: _ } => Self::LEGACY_BASE_MEMORY_SIZE,
-            StructInstantiation {
-                index: _,
-                ty_args: tys,
-            } => tys
+            Struct { .. } => Self::LEGACY_BASE_MEMORY_SIZE,
+            StructInstantiation { ty_args: tys, .. } => tys
                 .iter()
                 .fold(Self::LEGACY_BASE_MEMORY_SIZE, |acc, ty| acc + ty.size()),
         }

@@ -279,6 +279,11 @@ impl ModuleCache {
         let module = module.self_id();
         StructType {
             fields: vec![],
+            type_phantom_constraint: struct_handle
+                .type_parameters
+                .iter()
+                .map(|ty| ty.is_phantom)
+                .collect(),
             field_names,
             abilities,
             type_parameters,
@@ -418,7 +423,10 @@ impl ModuleCache {
                     module.identifier_at(module_handle.name).to_owned(),
                 );
                 let def_idx = resolver(struct_name, &module_id)?;
-                Type::Struct { index: def_idx }
+                Type::Struct {
+                    index: def_idx,
+                    ability: struct_handle.abilities,
+                }
             },
             SignatureToken::StructInstantiation(sh_idx, tys) => {
                 let type_parameters: Vec<_> = tys
@@ -435,7 +443,13 @@ impl ModuleCache {
                 let def_idx = resolver(struct_name, &module_id)?;
                 Type::StructInstantiation {
                     index: def_idx,
+                    base_ability: struct_handle.abilities,
                     ty_args: type_parameters,
+                    is_phantom_params: struct_handle
+                        .type_parameters
+                        .iter()
+                        .map(|ty| ty.is_phantom)
+                        .collect(),
                 }
             },
         };
@@ -543,7 +557,9 @@ impl ModuleCache {
                 inner
             },
             Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
-            Type::Struct { index: cache_idx } => {
+            Type::Struct {
+                index: cache_idx, ..
+            } => {
                 let mut struct_formula = self.calculate_depth_of_struct(*cache_idx, depth_cache)?;
                 debug_assert!(struct_formula.terms.is_empty());
                 struct_formula.scale(1);
@@ -552,6 +568,7 @@ impl ModuleCache {
             Type::StructInstantiation {
                 index: cache_idx,
                 ty_args,
+                ..
             } => {
                 let ty_arg_map = ty_args
                     .iter()
@@ -887,11 +904,13 @@ impl Loader {
             | (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
                 Self::match_return_type(ret_inner, expected_inner, map)
             },
+            // Abilities will not contribute to the equality check as they ought to cache the same value.
             // For structs the both need to be the same struct.
             (
-                Type::Struct { index: ret_idx },
+                Type::Struct { index: ret_idx, .. },
                 Type::Struct {
                     index: expected_idx,
+                    ..
                 },
             ) => *ret_idx == *expected_idx,
             // For struct instantiations we need to additionally match all type arguments
@@ -899,10 +918,12 @@ impl Loader {
                 Type::StructInstantiation {
                     index: ret_idx,
                     ty_args: ret_fields,
+                    ..
                 },
                 Type::StructInstantiation {
                     index: expected_idx,
                     ty_args: expected_fields,
+                    ..
                 },
             ) => {
                 *ret_idx == *expected_idx
@@ -934,14 +955,8 @@ impl Loader {
             | (Type::Bool, _)
             | (Type::Address, _)
             | (Type::Signer, _)
-            | (Type::Struct { index: _ }, _)
-            | (
-                Type::StructInstantiation {
-                    index: _,
-                    ty_args: _,
-                },
-                _,
-            )
+            | (Type::Struct { .. }, _)
+            | (Type::StructInstantiation { .. }, _)
             | (Type::Vector(_), _)
             | (Type::MutableReference(_), _)
             | (Type::Reference(_), _) => false,
@@ -1218,7 +1233,10 @@ impl Loader {
                     .resolve_struct_by_name(&struct_tag.name, &module_id)
                     .map_err(|e| e.finish(Location::Undefined))?;
                 if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
-                    Type::Struct { index: idx }
+                    Type::Struct {
+                        index: idx,
+                        ability: struct_type.abilities,
+                    }
                 } else {
                     let mut type_params = vec![];
                     for ty_param in &struct_tag.type_params {
@@ -1229,6 +1247,8 @@ impl Loader {
                     Type::StructInstantiation {
                         index: idx,
                         ty_args: type_params,
+                        base_ability: struct_type.abilities,
+                        is_phantom_params: struct_type.type_phantom_constraint.clone(),
                     }
                 }
             },
@@ -1549,8 +1569,8 @@ impl Loader {
                 }
             },
             Type::StructInstantiation {
-                index: _,
                 ty_args: struct_inst,
+                ..
             } => {
                 let mut sum_nodes = 1u64;
                 for ty in ty_args.iter().chain(struct_inst.iter()) {
@@ -1563,7 +1583,7 @@ impl Loader {
             Type::Address
             | Type::Bool
             | Type::Signer
-            | Type::Struct { index: _ }
+            | Type::Struct { .. }
             | Type::TyParam(_)
             | Type::U8
             | Type::U16
@@ -1619,8 +1639,19 @@ impl Loader {
         )
     }
 
-    pub(crate) fn get_struct_type(&self, idx: CachedStructIndex) -> Option<Arc<StructType>> {
-        self.module_cache.read().structs.get(idx.0).map(Arc::clone)
+    pub(crate) fn get_struct_type(
+        &self,
+        idx: CachedStructIndex,
+    ) -> PartialVMResult<Arc<StructType>> {
+        self.module_cache
+            .read()
+            .structs
+            .get(idx.0)
+            .map(Arc::clone)
+            .ok_or_else(|| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Struct Definition not resolved".to_string())
+            })
     }
 
     pub(crate) fn abilities(&self, ty: &Type) -> PartialVMResult<AbilitySet> {
@@ -1647,23 +1678,20 @@ impl Loader {
                 vec![false],
                 vec![self.abilities(ty)?],
             ),
-            Type::Struct { index: idx } => Ok(self.module_cache.read().struct_at(*idx).abilities),
+            Type::Struct { ability, .. } => Ok(*ability),
             Type::StructInstantiation {
-                index: idx,
-                ty_args: type_args,
+                ty_args,
+                base_ability,
+                is_phantom_params,
+                ..
             } => {
-                let struct_type = self.module_cache.read().struct_at(*idx);
-                let declared_phantom_parameters = struct_type
-                    .type_parameters
-                    .iter()
-                    .map(|param| param.is_phantom);
-                let type_argument_abilities = type_args
+                let type_argument_abilities = ty_args
                     .iter()
                     .map(|arg| self.abilities(arg))
                     .collect::<PartialVMResult<Vec<_>>>()?;
                 AbilitySet::polymorphic_abilities(
-                    struct_type.abilities,
-                    declared_phantom_parameters,
+                    *base_ability,
+                    is_phantom_params.iter().map(|b| *b),
                     type_argument_abilities,
                 )
             },
@@ -1772,12 +1800,15 @@ impl<'a> Resolver<'a> {
     // Type resolution
     //
 
-    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> Type {
+    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> PartialVMResult<Type> {
         let struct_def = match &self.binary {
             BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        Type::Struct { index: struct_def }
+        Ok(Type::Struct {
+            index: struct_def,
+            ability: self.loader.get_struct_type(struct_def)?.abilities,
+        })
     }
 
     pub(crate) fn instantiate_generic_type(
@@ -1802,6 +1833,8 @@ impl<'a> Resolver<'a> {
             }
         }
 
+        let index = struct_inst.def;
+        let struct_ = self.loader.get_struct_type(index)?;
         Ok(Type::StructInstantiation {
             index: struct_inst.def,
             ty_args: struct_inst
@@ -1809,6 +1842,8 @@ impl<'a> Resolver<'a> {
                 .iter()
                 .map(|ty| self.subst(ty, ty_args))
                 .collect::<PartialVMResult<_>>()?,
+            base_ability: struct_.abilities,
+            is_phantom_params: struct_.type_phantom_constraint.clone(),
         })
     }
 
@@ -1817,15 +1852,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => &module.field_handles[idx.0 as usize],
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        Ok(self
-            .loader
-            .get_struct_type(handle.owner)
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Struct Definition not resolved".to_string())
-            })?
-            .fields[handle.offset]
-            .clone())
+        Ok(self.loader.get_struct_type(handle.owner)?.fields[handle.offset].clone())
     }
 
     pub(crate) fn instantiate_generic_field(
@@ -1837,13 +1864,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => &module.field_instantiations[idx.0 as usize],
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        let struct_type = self
-            .loader
-            .get_struct_type(field_instantiation.owner)
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Struct Definition not resolved".to_string())
-            })?;
+        let struct_type = self.loader.get_struct_type(field_instantiation.owner)?;
 
         let instantiation_types = field_instantiation
             .instantiation
@@ -1861,10 +1882,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        self.loader.get_struct_type(idx).ok_or_else(|| {
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Struct Definition not resolved".to_string())
-        })
+        self.loader.get_struct_type(idx)
     }
 
     pub(crate) fn instantiate_generic_struct_fields(
@@ -1876,13 +1894,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => module.struct_instantiation_at(idx.0),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        let struct_type = self
-            .loader
-            .get_struct_type(struct_inst.def)
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Struct Definition not resolved".to_string())
-            })?;
+        let struct_type = self.loader.get_struct_type(struct_inst.def)?;
 
         let instantiation_types = struct_inst
             .instantiation
@@ -1952,10 +1964,15 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
+    pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
         match &self.binary {
-            BinaryType::Module(module) => Type::Struct {
-                index: module.field_handles[idx.0 as usize].owner,
+            BinaryType::Module(module) => {
+                let index = module.field_handles[idx.0 as usize].owner;
+                let struct_ = self.loader.get_struct_type(index)?;
+                Ok(Type::Struct {
+                    index,
+                    ability: struct_.abilities,
+                })
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
@@ -1967,14 +1984,20 @@ impl<'a> Resolver<'a> {
         args: &[Type],
     ) -> PartialVMResult<Type> {
         match &self.binary {
-            BinaryType::Module(module) => Ok(Type::StructInstantiation {
-                index: module.field_instantiations[idx.0 as usize].owner,
-                ty_args: module.field_instantiations[idx.0 as usize]
-                    .instantiation
-                    .iter()
-                    .map(|ty| ty.subst(args))
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            }),
+            BinaryType::Module(module) => {
+                let index = module.field_instantiations[idx.0 as usize].owner;
+                let struct_ = self.loader.get_struct_type(index)?;
+                Ok(Type::StructInstantiation {
+                    index,
+                    ty_args: module.field_instantiations[idx.0 as usize]
+                        .instantiation
+                        .iter()
+                        .map(|ty| ty.subst(args))
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                    base_ability: struct_.abilities,
+                    is_phantom_params: struct_.type_phantom_constraint.clone(),
+                })
+            },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
     }
@@ -2871,12 +2894,13 @@ impl Loader {
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
             Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
-            Type::Struct { index: gidx } => {
+            Type::Struct { index: gidx, .. } => {
                 TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(*gidx, &[], gas_context)?))
             },
             Type::StructInstantiation {
                 index: gidx,
                 ty_args,
+                ..
             } => TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(*gidx, ty_args, gas_context)?)),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -2896,7 +2920,7 @@ impl Loader {
                     result += 1;
                     todo.push(ty);
                 },
-                Type::StructInstantiation { index: _, ty_args } => {
+                Type::StructInstantiation { ty_args, .. } => {
                     result += 1;
                     todo.extend(ty_args.iter())
                 },
@@ -3011,13 +3035,14 @@ impl Loader {
                     depth + 1,
                 )?))
             },
-            Type::Struct { index: gidx } => {
+            Type::Struct { index: gidx, .. } => {
                 *count += 1;
                 MoveTypeLayout::Struct(self.struct_gidx_to_type_layout(*gidx, &[], count, depth)?)
             },
             Type::StructInstantiation {
                 index: gidx,
                 ty_args,
+                ..
             } => {
                 *count += 1;
                 MoveTypeLayout::Struct(
@@ -3120,12 +3145,13 @@ impl Loader {
             Type::Vector(ty) => MoveTypeLayout::Vector(Box::new(
                 self.type_to_fully_annotated_layout_impl(ty, count, depth + 1)?,
             )),
-            Type::Struct { index: gidx } => MoveTypeLayout::Struct(
+            Type::Struct { index: gidx, .. } => MoveTypeLayout::Struct(
                 self.struct_gidx_to_fully_annotated_layout(*gidx, &[], count, depth)?,
             ),
             Type::StructInstantiation {
                 index: gidx,
                 ty_args,
+                ..
             } => MoveTypeLayout::Struct(
                 self.struct_gidx_to_fully_annotated_layout(*gidx, ty_args, count, depth)?,
             ),

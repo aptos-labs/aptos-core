@@ -403,7 +403,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// Fetch a struct type from cache, if the index is in bounds
     /// Helpful when paired with load_type, or any other API that returns 'Type'
     pub fn get_struct_type(&self, index: CachedStructIndex) -> Option<Arc<StructType>> {
-        self.move_vm.runtime.loader().get_struct_type(index)
+        self.move_vm.runtime.loader().get_struct_type(index).ok()
     }
 
     /// Gets the abilities for this type, at it's particular instantiation

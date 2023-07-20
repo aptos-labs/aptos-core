@@ -1939,15 +1939,9 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 
         (Type::Vector(_), Container::Vec(_)) => Ok(()),
 
-        (Type::Struct { index: _ }, Container::Vec(_))
+        (Type::Struct { .. }, Container::Vec(_))
         | (Type::Signer, Container::Vec(_))
-        | (
-            Type::StructInstantiation {
-                index: _,
-                ty_args: _,
-            },
-            Container::Vec(_),
-        ) => Ok(()),
+        | (Type::StructInstantiation { .. }, Container::Vec(_)) => Ok(()),
 
         (Type::Reference(_), _) | (Type::MutableReference(_), _) | (Type::TyParam(_), _) => Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1964,21 +1958,14 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
         | (Type::Address, _)
         | (Type::Signer, _)
         | (Type::Vector(_), _)
-        | (Type::Struct { index: _ }, _)
-        | (
-            Type::StructInstantiation {
-                index: _,
-                ty_args: _,
-            },
-            _,
-        ) => Err(
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                format!(
-                    "vector elem layout mismatch, expected {:?}, got {:?}",
-                    ty, v
-                ),
-            ),
-        ),
+        | (Type::Struct { .. }, _)
+        | (Type::StructInstantiation { .. }, _) => Err(PartialVMError::new(
+            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+        )
+        .with_message(format!(
+            "vector elem layout mismatch, expected {:?}, got {:?}",
+            ty, v
+        ))),
     }
 }
 
@@ -2184,10 +2171,11 @@ impl Vector {
 
             Type::Signer
             | Type::Vector(_)
-            | Type::Struct { index: _ }
+            | Type::Struct { .. }
             | Type::StructInstantiation {
                 index: _,
                 ty_args: _,
+                ..
             } => Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
                 elements.into_iter().map(|v| v.0).collect(),
             ))))),
