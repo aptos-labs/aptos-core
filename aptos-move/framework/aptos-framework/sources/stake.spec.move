@@ -40,25 +40,32 @@ spec aptos_framework::stake {
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<ValidatorSet>(aptos_addr);
         aborts_if exists<ValidatorPerformance>(aptos_addr);
+        ensures exists<ValidatorSet>(aptos_addr);
+        ensures exists<ValidatorPerformance>(aptos_addr);
     }
 
     spec extract_owner_cap(owner: &signer): OwnerCapability {
         let owner_address = signer::address_of(owner);
         aborts_if !exists<OwnerCapability>(owner_address);
+        ensures !exists<OwnerCapability>(owner_address);
     }
 
     spec deposit_owner_cap(owner: &signer, owner_cap: OwnerCapability) {
         let owner_address = signer::address_of(owner);
         aborts_if exists<OwnerCapability>(owner_address);
+        ensures exists<OwnerCapability>(owner_address);
+        ensures global<OwnerCapability>(owner_address) == owner_cap;
     }
 
     spec unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) {
         let pool_address = owner_cap.pool_address;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post stake_pool = global<StakePool>(pool_address);
+        aborts_if amount != 0 && !exists<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
         let min_amount = aptos_std::math64::min(amount,pre_stake_pool.active.value);
 
+        ensures stake_pool.active.value == pre_stake_pool.active.value - min_amount;
         ensures stake_pool.pending_inactive.value == pre_stake_pool.pending_inactive.value + min_amount;
     }
 
@@ -103,6 +110,7 @@ spec aptos_framework::stake {
     spec set_operator_with_cap(owner_cap: &OwnerCapability, new_operator: address) {
         let pool_address = owner_cap.pool_address;
         let post stake_pool = global<StakePool>(pool_address);
+        aborts_if !exists<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
         ensures stake_pool.operator_address == new_operator;
     }
@@ -114,8 +122,9 @@ spec aptos_framework::stake {
         let pre_stake_pool = global<StakePool>(pool_address);
         let post stake_pool = global<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
-        let min_amount = aptos_std::math64::min(amount,pre_stake_pool.pending_inactive.value);
+        let min_amount = aptos_std::math64::min(amount, pre_stake_pool.pending_inactive.value);
 
+        ensures stake_pool.pending_inactive.value == pre_stake_pool.pending_inactive.value - min_amount;
         ensures stake_pool.active.value == pre_stake_pool.active.value + min_amount;
     }
 
@@ -125,8 +134,13 @@ spec aptos_framework::stake {
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
     ) {
+        pragma aborts_if_is_partial;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
+        aborts_if !exists<StakePool>(pool_address);
+        aborts_if signer::address_of(operator) != pre_stake_pool.operator_address;
+        aborts_if !exists<ValidatorConfig>(pool_address);
+        // aborts_if !bls12381::verify_proof_of_possession_internal(new_consensus_pubkey, proof_of_possession); // Prover error.
         modifies global<ValidatorConfig>(pool_address);
 
         ensures validator_info.consensus_pubkey == new_consensus_pubkey;
@@ -135,6 +149,7 @@ spec aptos_framework::stake {
     spec set_delegated_voter_with_cap(owner_cap: &OwnerCapability, new_voter: address) {
         let pool_address = owner_cap.pool_address;
         let post stake_pool = global<StakePool>(pool_address);
+        aborts_if !exists<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
         ensures stake_pool.delegated_voter == new_voter;
     }
@@ -154,9 +169,19 @@ spec aptos_framework::stake {
         requires chain_status::is_operating();
         // This function should never abort.
         aborts_if false;
+
+        let validator_perf = global<ValidatorPerformance>(@aptos_framework);
+        let post post_validator_perf = global<ValidatorPerformance>(@aptos_framework);
+        let validator_len = len(validator_perf.validators);
+        let cur_proposer_index = option::spec_borrow(proposer_index);
+        ensures option::spec_is_some(proposer_index) && cur_proposer_index < validator_len ==> 
+            post_validator_perf.validators[cur_proposer_index].successful_proposals == validator_perf.validators[cur_proposer_index].successful_proposals + 1;
+        // ensures forall i in 0..len(failed_proposer_indices): failed_proposer_indices[i] < validator_len ==> 
+        //     post_validator_perf.validators[failed_proposer_indices[i]].failed_proposals == validator_perf.validators[failed_proposer_indices[i]].failed_proposals + 1;
     }
 
     spec update_stake_pool {
+        // pragma aborts_if_is_strict;
         include ResourceRequirement;
         include staking_config::StakingRewardsConfigRequirement;
         aborts_if !exists<StakePool>(pool_address);
