@@ -339,7 +339,7 @@ spec aptos_framework::staking_contract {
     }
 
     spec schema IncreaseLockupWithCapAbortsIf{
-        use std::timestamp;
+        use aptos_framework::timestamp;
         staker: address;
         operator: address;
 

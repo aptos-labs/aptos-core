@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "testing")]
+use crate::natives::helpers::make_test_only_safe_native;
 use crate::{
     natives::{
         cryptography::{ristretto255_point, ristretto255_scalar},
@@ -14,7 +16,9 @@ use aptos_types::{
 };
 use curve25519_dalek::scalar::Scalar;
 use move_binary_format::errors::PartialVMError;
-use move_core_types::gas_algebra::{InternalGasPerArg, InternalGasPerByte};
+use move_core_types::gas_algebra::{
+    GasQuantity, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumArgs,
+};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::values::{Reference, StructRef, Value};
 use std::{collections::VecDeque, sync::Arc};
@@ -31,17 +35,21 @@ pub struct GasParameters {
     pub basepoint_double_mul: InternalGasPerArg,
 
     pub point_add: InternalGasPerArg,
+    pub point_clone: InternalGasPerArg,
     pub point_compress: InternalGasPerArg,
     pub point_decompress: InternalGasPerArg,
     pub point_equals: InternalGasPerArg,
     pub point_from_64_uniform_bytes: InternalGasPerArg,
     pub point_identity: InternalGasPerArg,
     pub point_mul: InternalGasPerArg,
+    pub point_double_mul: InternalGasPerArg,
     pub point_neg: InternalGasPerArg,
     pub point_sub: InternalGasPerArg,
     pub point_parse_arg: InternalGasPerArg,
 
+    // Should have been named `sha2_512_per_byte`
     pub sha512_per_byte: InternalGasPerByte,
+    // Should have been named `sha2_512_per_hash`
     pub sha512_per_hash: InternalGasPerArg,
 
     pub scalar_add: InternalGasPerArg,
@@ -57,12 +65,35 @@ pub struct GasParameters {
     pub scalar_parse_arg: InternalGasPerArg,
 }
 
+impl GasParameters {
+    /// Returns gas costs for a variable-time multiscalar multiplication (MSM) of size-n. The MSM
+    /// employed in curve25519 is:
+    ///  1. Strauss, when n <= 190, see https://www.jstor.org/stable/2310929
+    ///  2. Pippinger, when n > 190, which roughly requires O(n / log_2 n) scalar multiplications
+    /// For simplicity, we estimate the complexity as O(n / log_2 n)
+    pub fn multi_scalar_mul_gas(&self, size: usize) -> GasQuantity<InternalGasUnit> {
+        self.point_mul * NumArgs::new((size as f64 / f64::log2(size as f64)).ceil() as u64)
+    }
+}
+
 pub fn make_all(
     gas_params: GasParameters,
     timed_features: TimedFeatures,
     features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [
+    let mut natives = vec![];
+
+    #[cfg(feature = "testing")]
+    natives.append(&mut vec![(
+        "random_scalar_internal",
+        make_test_only_safe_native(
+            timed_features.clone(),
+            features.clone(),
+            ristretto255_scalar::native_scalar_random,
+        ),
+    )]);
+
+    natives.append(&mut vec![
         (
             "point_is_canonical_internal",
             make_safe_native(
@@ -91,6 +122,15 @@ pub fn make_all(
             ),
         ),
         (
+            "point_clone_internal",
+            make_safe_native(
+                gas_params.clone(),
+                timed_features.clone(),
+                features.clone(),
+                ristretto255_point::native_point_clone,
+            ),
+        ),
+        (
             "point_compress_internal",
             make_safe_native(
                 gas_params.clone(),
@@ -106,6 +146,15 @@ pub fn make_all(
                 timed_features.clone(),
                 features.clone(),
                 ristretto255_point::native_point_mul,
+            ),
+        ),
+        (
+            "point_double_mul_internal",
+            make_safe_native(
+                gas_params.clone(),
+                timed_features.clone(),
+                features.clone(),
+                ristretto255_point::native_double_scalar_mul,
             ),
         ),
         (
@@ -163,6 +212,7 @@ pub fn make_all(
             ),
         ),
         (
+            // NOTE: This was supposed to be more clearly named with *_sha2_512_*.
             "new_point_from_sha512_internal",
             make_safe_native(
                 gas_params.clone(),
@@ -178,6 +228,15 @@ pub fn make_all(
                 timed_features.clone(),
                 features.clone(),
                 ristretto255_point::native_new_point_from_64_uniform_bytes,
+            ),
+        ),
+        (
+            "double_scalar_mul_internal",
+            make_safe_native(
+                gas_params.clone(),
+                timed_features.clone(),
+                features.clone(),
+                ristretto255_point::native_double_scalar_mul,
             ),
         ),
         (
@@ -207,6 +266,7 @@ pub fn make_all(
                 ristretto255_scalar::native_scalar_invert,
             ),
         ),
+        // NOTE: This was supposed to be more clearly named with *_sha2_512_*.
         (
             "scalar_from_sha512_internal",
             make_safe_native(
@@ -288,7 +348,7 @@ pub fn make_all(
                 ristretto255_scalar::native_scalar_uniform_from_64_bytes,
             ),
         ),
-    ];
+    ]);
 
     crate::natives::helpers::make_module_natives(natives)
 }

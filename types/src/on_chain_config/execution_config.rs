@@ -76,7 +76,7 @@ pub struct ExecutionConfigV1 {
 impl Default for ExecutionConfigV1 {
     fn default() -> Self {
         Self {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
         }
     }
 }
@@ -117,7 +117,8 @@ impl Default for ExecutionConfigV3 {
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionShufflerType {
     NoShuffling,
-    SenderAwareV1(u32),
+    DeprecatedSenderAwareV1(u32),
+    SenderAwareV2(u32),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -153,20 +154,20 @@ mod test {
     #[test]
     fn test_config_serialization() {
         let config = OnChainExecutionConfig::V1(ExecutionConfigV1 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
         });
 
         let s = serde_yaml::to_string(&config).unwrap();
         let result = serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV1(32)
+            TransactionShufflerType::SenderAwareV2(32)
         ));
 
         // V2 test with random per-block gas limit
         let rand_gas_limit = rand::thread_rng().gen_range(0, 1000000) as u64;
         let config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
             block_gas_limit: Some(rand_gas_limit),
         });
 
@@ -174,13 +175,13 @@ mod test {
         let result = serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV1(32)
+            TransactionShufflerType::SenderAwareV2(32)
         ));
         assert!(result.block_gas_limit() == Some(rand_gas_limit));
 
         // V2 test with no per-block gas limit
         let config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
             block_gas_limit: None,
         });
 
@@ -188,7 +189,7 @@ mod test {
         let result = serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV1(32)
+            TransactionShufflerType::SenderAwareV2(32)
         ));
         assert!(matches!(result.block_gas_limit(), None));
     }
@@ -196,7 +197,7 @@ mod test {
     #[test]
     fn test_config_onchain_payload() {
         let execution_config = OnChainExecutionConfig::V1(ExecutionConfigV1 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
         });
 
         let mut configs = HashMap::new();
@@ -211,13 +212,13 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV1(32)
+            TransactionShufflerType::SenderAwareV2(32)
         ));
 
         // V2 test with random per-block gas limit
         let rand_gas_limit = rand::thread_rng().gen_range(0, 1000000) as u64;
         let execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
             block_gas_limit: Some(rand_gas_limit),
         });
 
@@ -233,13 +234,13 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV1(32)
+            TransactionShufflerType::SenderAwareV2(32)
         ));
         assert!(result.block_gas_limit() == Some(rand_gas_limit));
 
         // V2 test with no per-block gas limit
         let execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
             block_gas_limit: None,
         });
 
@@ -255,7 +256,7 @@ mod test {
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
             result.transaction_shuffler_type(),
-            TransactionShufflerType::SenderAwareV1(32)
+            TransactionShufflerType::SenderAwareV2(32)
         ));
         assert!(matches!(result.block_gas_limit(), None));
     }

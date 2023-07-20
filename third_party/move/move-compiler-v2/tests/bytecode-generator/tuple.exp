@@ -1,0 +1,43 @@
+// ---- Model Dump
+module 0x42::tuple {
+    struct S {
+        f: u64,
+    }
+    private fun tuple(x: u64) {
+        Tuple(x, pack tuple::S(Add(x, 1)))
+    }
+    private fun use_tuple(x: u64) {
+        {
+          let (x: u64, tuple::S{ f: y: u64 }) = tuple::tuple(x);
+          Add(x, y)
+        }
+    }
+} // end 0x42::tuple
+
+============ initial bytecode ================
+
+[variant baseline]
+fun tuple::tuple($t0: u64): (u64, tuple::S) {
+     var $t1: u64
+     var $t2: tuple::S
+     var $t3: u64
+     var $t4: u64
+  0: $t1 := move($t0)
+  1: $t4 := 1
+  2: $t3 := +($t0, $t4)
+  3: $t2 := pack tuple::S($t3)
+  4: return ($t1, $t2)
+}
+
+
+[variant baseline]
+fun tuple::use_tuple($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: tuple::S
+  0: ($t2, $t4) := tuple::tuple($t0)
+  1: $t3 := unpack tuple::S($t4)
+  2: $t1 := +($t0, $t3)
+  3: return $t1
+}
