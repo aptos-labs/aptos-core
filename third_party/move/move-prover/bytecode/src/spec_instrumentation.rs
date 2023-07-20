@@ -618,21 +618,12 @@ impl<'a> Instrumenter<'a> {
 
             // Havoc all &mut parameters, their post-value are to be determined by the post
             // conditions.
-            //
-            // There is some special case here about EventHandle types. Even though
-            // they are `&mut`, they are never modified, and this is not expressed in the
-            // specifications. We treat this by skipping the Havoc for them. TODO: find a better
-            // solution
             let mut_srcs = srcs
                 .iter()
                 .cloned()
                 .filter(|src| {
                     let ty = &self.builder.data.local_types[*src];
                     ty.is_mutable_reference()
-                        && !self
-                            .builder
-                            .global_env()
-                            .is_wellknown_event_handle_type(ty.skip_reference())
                 })
                 .collect_vec();
             for src in &mut_srcs {
@@ -1157,16 +1148,11 @@ fn check_opaque_modifies_completeness(
     }
     // All memory directly or indirectly modified by this opaque function must be captured by
     // a modifies clause. Otherwise we could introduce unsoundness.
-    // TODO: we currently except Event::EventHandle from this, because this is treated as
-    //   an immutable reference. We should find a better way how to deal with event handles.
     for mem in usage_analysis::get_memory_usage(&target)
         .modified
         .all
         .iter()
     {
-        if env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![])) {
-            continue;
-        }
         if env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory() {
             continue;
         }

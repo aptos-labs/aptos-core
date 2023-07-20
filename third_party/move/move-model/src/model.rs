@@ -1059,20 +1059,6 @@ impl GlobalEnv {
         }
     }
 
-    /// Returns true if the type represents the well-known event handle type.
-    pub fn is_wellknown_event_handle_type(&self, ty: &Type) -> bool {
-        if let Type::Struct(mid, sid, _) = ty {
-            let module_env = self.get_module(*mid);
-            let struct_env = module_env.get_struct(*sid);
-            let module_name = module_env.get_name();
-            module_name.addr() == &Address::Numerical(AccountAddress::ONE)
-                && &*self.symbol_pool.string(module_name.name()) == "event"
-                && &*self.symbol_pool.string(struct_env.get_name()) == "EventHandle"
-        } else {
-            false
-        }
-    }
-
     /// Returns associated intrinsics.
     pub fn get_intrinsics(&self) -> &IntrinsicsAnnotation {
         &self.intrinsics
