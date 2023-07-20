@@ -243,7 +243,7 @@ impl Parser {
     async fn commit_to_postgres(&mut self) {
         match upsert_uris(&mut self.conn, self.model.clone()) {
             Ok(_) => self.log_info("Successfully committed to Postgres"),
-            Err(e) => self.log_error(&format!("Failed to commit to Postgres: {}", e.to_string())),
+            Err(e) => self.log_error(&format!("Failed to commit to Postgres: {}", e)),
         };
     }
 
