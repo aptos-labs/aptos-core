@@ -144,10 +144,7 @@ impl Parser {
 
             // Parse raw_animation_uri, use None if parsing fails
             self.log_info("Parsing raw_animation_uri for IPFS");
-            let animation_uri = match self.model.get_raw_animation_uri() {
-                Some(uri) => Some(URIParser::parse(uri)),
-                None => None,
-            };
+            let animation_uri = self.model.get_raw_animation_uri().map(URIParser::parse);
 
             // Resize and optimize animation
             self.log_info("Optimizing animation");
