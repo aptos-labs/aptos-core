@@ -226,18 +226,31 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     }
 
     /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
-    pub fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
+    pub(crate) fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
         {
-            ExecutionStatus::Success(output) => Some(output.fee_statement()),
+            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                Some(output.fee_statement())
+            },
             _ => None,
         }
     }
 
-    pub fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
+    /// Does a transaction at txn_idx have SkipRest or Abort status.
+    pub(crate) fn block_truncated_at_idx(&self, txn_idx: TxnIndex) -> bool {
+        matches!(
+            &self.outputs[txn_idx as usize]
+                .load_full()
+                .expect("[BlockSTM]: Execution output must be recorded after execution")
+                .output_status,
+            ExecutionStatus::SkipRest(_) | ExecutionStatus::Abort(_)
+        )
+    }
+
+    pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
