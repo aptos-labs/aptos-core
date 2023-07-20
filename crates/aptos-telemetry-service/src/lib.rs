@@ -11,6 +11,7 @@ use crate::{
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_types::{chain_id::ChainId, PeerId};
 use clap::Parser;
+use clients::loki::LokiClient;
 use context::GroupedMetricsClients;
 use gcp_bigquery_client::Client as BigQueryClient;
 use reqwest::Url;
@@ -259,6 +260,44 @@ impl LogIngestEndpoint {
     }
 }
 
+/// A single Loki log ingest endpoint config
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LokiIngestEndpoint {
+    pub endpoint_url: Url,
+    pub basic_user_env_var: String,
+    pub basic_pass_env_var: String,
+}
+
+impl LokiIngestEndpoint {
+    #[cfg(test)]
+    fn default_for_test() -> Self {
+        Self {
+            endpoint_url: Url::parse("test://test").unwrap(),
+            basic_user_env_var: "".into(),
+            basic_pass_env_var: "".into(),
+        }
+    }
+
+    fn make_client(&self) -> LokiClient {
+        let basic_user = env::var(&self.basic_user_env_var).unwrap_or_else(|_| {
+            panic!(
+                "environment variable {} must be set.",
+                self.basic_user_env_var
+            )
+        });
+
+        let basic_pass = env::var(&self.basic_pass_env_var).unwrap_or_else(|_| {
+            panic!(
+                "environment variable {} must be set.",
+                self.basic_pass_env_var
+            )
+        });
+
+        LokiClient::new(self.endpoint_url.clone(), basic_user, basic_pass)
+    }
+}
+
 /// Log ingest configuration for different sources
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -269,6 +308,8 @@ pub struct LogIngestConfig {
     pub unknown_logs_endpoint: LogIngestEndpoint,
     // Blacklisted peers from log ingestion
     pub blacklist_peers: Option<HashSet<PeerId>>,
+    // Loki endpoint
+    pub loki_endpoint: LokiIngestEndpoint,
 }
 impl LogIngestConfig {
     #[cfg(test)]
@@ -277,6 +318,7 @@ impl LogIngestConfig {
             known_logs_endpoint: LogIngestEndpoint::default_for_test(),
             unknown_logs_endpoint: LogIngestEndpoint::default_for_test(),
             blacklist_peers: None,
+            loki_endpoint: LokiIngestEndpoint::default_for_test(),
         }
     }
 }

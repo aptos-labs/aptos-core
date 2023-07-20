@@ -39,6 +39,15 @@ pub(crate) static LOG_INGEST_BACKEND_REQUEST_DURATION: Lazy<HistogramVec> = Lazy
     .unwrap()
 });
 
+pub(crate) static LOKI_INGEST_REQUEST_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "telemetry_web_service_loki_ingest_request_duration",
+        "Number of loki log ingest requests by response code",
+        &["response_code"]
+    )
+    .unwrap()
+});
+
 pub(crate) static METRICS_INGEST_BACKEND_REQUEST_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "telemetry_web_service_metrics_ingest_backend_request_duration",

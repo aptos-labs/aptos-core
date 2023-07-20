@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
+    clients::{
+        big_query::TableWriteClient, humio, loki::LokiClient,
+        victoria_metrics_api::Client as MetricsClient,
+    },
     types::common::EpochedPeerStore,
     LogIngestConfig, MetricsEndpointsConfig,
 };
@@ -56,6 +59,7 @@ pub struct LogIngestClients {
     pub known_logs_ingest_client: humio::IngestClient,
     pub unknown_logs_ingest_client: humio::IngestClient,
     pub blacklist: Option<HashSet<PeerId>>,
+    pub loki_ingest_client: LokiClient,
 }
 
 impl From<LogIngestConfig> for LogIngestClients {
@@ -64,6 +68,7 @@ impl From<LogIngestConfig> for LogIngestClients {
             known_logs_ingest_client: config.known_logs_endpoint.make_client(),
             unknown_logs_ingest_client: config.unknown_logs_endpoint.make_client(),
             blacklist: config.blacklist_peers,
+            loki_ingest_client: config.loki_endpoint.make_client(),
         }
     }
 }

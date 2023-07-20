@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod humio;
+pub mod loki;
 
 pub mod victoria_metrics_api {
 

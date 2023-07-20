@@ -119,3 +119,47 @@ pub mod humio {
         pub messages: Vec<String>,
     }
 }
+
+pub mod loki {
+    use serde::Serialize;
+    use std::{
+        collections::HashMap,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    #[derive(Serialize, Clone, Debug)]
+    pub struct LokiLogStream {
+        pub stream: HashMap<String, String>,
+        pub values: Vec<[String; 2]>,
+    }
+
+    impl LokiLogStream {
+        pub fn new(labels: HashMap<String, String>, messages: Vec<String>) -> Self {
+            let unix_timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("should work")
+                .as_nanos();
+            let values = messages
+                .into_iter()
+                .map(|message| [format!("{}", unix_timestamp), message])
+                .collect();
+            Self {
+                stream: labels,
+                values,
+            }
+        }
+    }
+
+    #[derive(Serialize, Clone, Debug)]
+    pub struct LokiLog {
+        pub streams: Vec<LokiLogStream>,
+    }
+
+    impl From<LokiLogStream> for LokiLog {
+        fn from(value: LokiLogStream) -> Self {
+            Self {
+                streams: vec![value],
+            }
+        }
+    }
+}

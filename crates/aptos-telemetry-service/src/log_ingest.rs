@@ -11,8 +11,8 @@ use crate::{
     context::Context,
     debug, error,
     errors::{LogIngestError, ServiceError},
-    metrics::LOG_INGEST_BACKEND_REQUEST_DURATION,
-    types::{auth::Claims, common::NodeType, humio::UnstructuredLog},
+    metrics::{LOG_INGEST_BACKEND_REQUEST_DURATION, LOKI_INGEST_REQUEST_DURATION},
+    types::{auth::Claims, common::NodeType, humio::UnstructuredLog, loki::LokiLogStream},
 };
 use flate2::bufread::GzDecoder;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
@@ -54,13 +54,6 @@ pub async fn handle_log_ingest(
         }
     }
 
-    let client = match claims.node_type {
-        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode => {
-            &context.log_ingest_clients().unknown_logs_ingest_client
-        },
-        _ => &context.log_ingest_clients().known_logs_ingest_client,
-    };
-
     let log_messages: Vec<String> = if let Some(encoding) = encoding {
         if encoding.eq_ignore_ascii_case("gzip") {
             let decoder = GzDecoder::new(body.reader());
@@ -80,6 +73,26 @@ pub async fn handle_log_ingest(
         })?
     };
 
+    let result = humio_log_ingest(&context, &claims, log_messages.clone()).await?;
+    if let Err(err) = loki_log_ingest(&context, &claims, log_messages).await {
+        error!("error injecting into loki: {:?}", err);
+    }
+
+    Ok(result)
+}
+
+async fn humio_log_ingest(
+    context: &Context,
+    claims: &Claims,
+    messages: Vec<String>,
+) -> anyhow::Result<impl Reply, Rejection> {
+    let client = match claims.node_type {
+        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode => {
+            &context.log_ingest_clients().unknown_logs_ingest_client
+        },
+        _ => &context.log_ingest_clients().known_logs_ingest_client,
+    };
+
     let mut fields = HashMap::new();
     fields.insert(PEER_ID_FIELD_NAME.into(), claims.peer_id.to_string());
     fields.insert(EPOCH_FIELD_NAME.into(), claims.epoch.to_string());
@@ -97,7 +110,7 @@ pub async fn handle_log_ingest(
     let unstructured_log = UnstructuredLog {
         fields,
         tags,
-        messages: log_messages,
+        messages,
     };
 
     debug!("ingesting to humio: {:?}", unstructured_log);
@@ -128,6 +141,72 @@ pub async fn handle_log_ingest(
                 .with_label_values(&["Unknown"])
                 .observe(start_timer.elapsed().as_secs_f64());
             error!("error sending log ingest request: {}", err);
+            return Err(reject::custom(ServiceError::bad_request(
+                LogIngestError::IngestionError.into(),
+            )));
+        },
+    }
+
+    Ok(reply::with_status(reply::reply(), StatusCode::CREATED))
+}
+
+async fn loki_log_ingest(
+    context: &Context,
+    claims: &Claims,
+    messages: Vec<String>,
+) -> anyhow::Result<impl Reply, Rejection> {
+    let client = match claims.node_type {
+        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode => {
+            return Ok(reply::with_status(reply::reply(), StatusCode::CREATED));
+        },
+        _ => &context.log_ingest_clients().loki_ingest_client,
+    };
+
+    let mut fields = HashMap::new();
+    fields.insert(PEER_ID_FIELD_NAME.into(), claims.peer_id.to_string());
+    fields.insert(EPOCH_FIELD_NAME.into(), claims.epoch.to_string());
+
+    let chain_name = if claims.chain_id.id() == 3 {
+        format!("{}", claims.chain_id.id())
+    } else {
+        format!("{}", claims.chain_id)
+    };
+    fields.insert(CHAIN_ID_TAG_NAME.into(), chain_name);
+    fields.insert(PEER_ROLE_TAG_NAME.into(), claims.node_type.to_string());
+    fields.insert(RUN_UUID_TAG_NAME.into(), claims.run_uuid.to_string());
+    fields.insert("source".into(), "telemetry".into());
+
+    let loki_log = LokiLogStream::new(fields, messages).into();
+
+    debug!("ingesting to loki: {:?}", loki_log);
+
+    let start_timer = Instant::now();
+
+    let res = client.ingest_log(loki_log).await;
+
+    match res {
+        Ok(res) => {
+            LOKI_INGEST_REQUEST_DURATION
+                .with_label_values(&[res.status().as_str()])
+                .observe(start_timer.elapsed().as_secs_f64());
+            if res.status().is_success() {
+                debug!("log ingested into loki succeessfully");
+            } else {
+                error!(
+                    "loki log ingestion failed: {}: {}",
+                    res.error_for_status_ref().err().unwrap(),
+                    res.text().await.unwrap(),
+                );
+                return Err(reject::custom(ServiceError::bad_request(
+                    LogIngestError::IngestionError.into(),
+                )));
+            }
+        },
+        Err(err) => {
+            LOKI_INGEST_REQUEST_DURATION
+                .with_label_values(&["Unknown"])
+                .observe(start_timer.elapsed().as_secs_f64());
+            error!("error sending loki ingest request: {}", err);
             return Err(reject::custom(ServiceError::bad_request(
                 LogIngestError::IngestionError.into(),
             )));
