@@ -26,9 +26,6 @@ use aptos_block_executor::{
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
-    block_executor::partitioner::{
-        BlockExecutorTransactions, SubBlock, SubBlocksForShard, TransactionWithDependencies,
-    },
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
@@ -145,51 +142,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    fn verify_transactions(
-        transactions: BlockExecutorTransactions<Transaction>,
-    ) -> BlockExecutorTransactions<PreprocessedTransaction> {
-        match transactions {
-            BlockExecutorTransactions::Unsharded(transactions) => {
-                let signature_verified_txns = transactions
-                    .into_par_iter()
-                    .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
-                    .collect();
-                BlockExecutorTransactions::Unsharded(signature_verified_txns)
-            },
-            BlockExecutorTransactions::Sharded(sub_blocks) => {
-                let shard_id = sub_blocks.shard_id;
-                let signature_verified_sub_blocks = sub_blocks
-                    .into_sub_blocks()
-                    .into_par_iter()
-                    .map(|sub_block| {
-                        let start_index = sub_block.start_index;
-                        let verified_txns = sub_block
-                            .into_transactions_with_deps()
-                            .into_par_iter()
-                            .with_min_len(25)
-                            .map(|txn_with_deps| {
-                                let TransactionWithDependencies {
-                                    txn,
-                                    cross_shard_dependencies,
-                                } = txn_with_deps;
-                                let preprocessed_txn = preprocess_transaction::<AptosVM>(txn);
-                                TransactionWithDependencies::new(
-                                    preprocessed_txn,
-                                    cross_shard_dependencies,
-                                )
-                            })
-                            .collect();
-                        SubBlock::new(start_index, verified_txns)
-                    })
-                    .collect();
-
-                BlockExecutorTransactions::Sharded(SubBlocksForShard::new(
-                    shard_id,
-                    signature_verified_sub_blocks,
-                ))
-            },
-        }
+    fn verify_transactions(transactions: Vec<Transaction>) -> Vec<PreprocessedTransaction> {
+        transactions
+            .into_par_iter()
+            .with_min_len(25)
+            .map(preprocess_transaction::<AptosVM>)
+            .collect()
     }
 
     pub fn execute_block<
@@ -197,7 +155,7 @@ impl BlockAptosVM {
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
         executor_thread_pool: Arc<ThreadPool>,
-        transactions: BlockExecutorTransactions<Transaction>,
+        transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
@@ -214,19 +172,11 @@ impl BlockAptosVM {
             executor_thread_pool.install(|| Self::verify_transactions(transactions));
         drop(signature_verification_timer);
 
-        let is_sharded_execution = matches!(
-            signature_verified_block,
-            BlockExecutorTransactions::Sharded(_)
-        );
-        let num_txns = signature_verified_block.num_txns();
-        if !is_sharded_execution && state_view.id() != StateViewId::Miscellaneous {
+        let num_txns = signature_verified_block.len();
+        if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
             init_speculative_logs(num_txns);
-        }
-
-        if is_sharded_execution {
-            aptos_vm_logging::disable_speculative_logging();
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
@@ -254,7 +204,7 @@ impl BlockAptosVM {
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());
 
-                if !is_sharded_execution && state_view.id() != StateViewId::Miscellaneous {
+                if state_view.id() != StateViewId::Miscellaneous {
                     // Speculation is disabled in Miscellaneous context, which is used by testing and
                     // can even lead to concurrent execute_block invocations, leading to errors on flush.
                     flush_speculative_logs(pos);
