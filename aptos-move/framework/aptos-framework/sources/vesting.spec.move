@@ -53,6 +53,9 @@ spec aptos_framework::vesting {
     spec schema TotalAccumulatedRewardsAbortsIf {
         vesting_contract_address: address;
 
+        // Note: commission percentage should not be under 0 or higher than 100, cause it's a percentage number
+        // This requirement will solve the timeout issue of total_accumulated_rewards
+        // However, accumulated_rewards is still timeout
         requires staking_contract.commission_percentage >= 0 && staking_contract.commission_percentage <= 100;
 
         include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
@@ -83,9 +86,11 @@ spec aptos_framework::vesting {
 
     spec accumulated_rewards(vesting_contract_address: address, shareholder_or_beneficiary: address): u64 {
         // TODO: A severe timeout can not be resolved.
-        pragma verify = false;
+        pragma verify_duration_estimate = 1000;
 
+        // This schema lead to timeout
         include TotalAccumulatedRewardsAbortsIf;
+
         let vesting_contract = global<VestingContract>(vesting_contract_address);
         let operator = vesting_contract.staking.operator;
         let staking_contracts = global<staking_contract::Store>(vesting_contract_address).staking_contracts;
@@ -135,8 +140,6 @@ spec aptos_framework::vesting {
     spec create_vesting_contract {
         // TODO: Data invariant does not hold.
         pragma verify = false;
-        pragma aborts_if_is_partial;
-
         aborts_if withdrawal_address == @aptos_framework || withdrawal_address == @vm_reserved;
         aborts_if !exists<account::Account>(withdrawal_address);
         aborts_if !exists<coin::CoinStore<AptosCoin>>(withdrawal_address);
