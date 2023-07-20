@@ -5,7 +5,10 @@ use crate::{
         nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
-    utils::{image_optimizer::ImageOptimizer, json_parser::JSONParser, uri_parser::URIParser},
+    utils::{
+        db::upsert_uris, image_optimizer::ImageOptimizer, json_parser::JSONParser,
+        uri_parser::URIParser,
+    },
 };
 use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
@@ -192,7 +195,10 @@ impl Parser {
      * Calls and handles error for upserting to Postgres
      */
     async fn commit_to_postgres(&mut self) {
-        todo!();
+        match upsert_uris(&mut self.conn, self.model.clone()) {
+            Ok(_) => self.log_info("Successfully committed to Postgres"),
+            Err(e) => self.log_error(&format!("Failed to commit to Postgres: {}", e.to_string())),
+        };
     }
 
     /**
