@@ -420,7 +420,7 @@ fn native_format_list(
                 match_list_ty(context, list_ty, "Cons")?;
 
                 // We know that the type is a list, so we can safely unwrap
-                let ty_args = if let Type::StructInstantiation(_, ty_args) = list_ty {
+                let ty_args = if let Type::StructInstantiation { index: _, ty_args } = list_ty {
                     ty_args
                 } else {
                     unreachable!()

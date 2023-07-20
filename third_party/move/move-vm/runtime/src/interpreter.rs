@@ -1052,7 +1052,7 @@ fn check_depth_of_type_impl(
         Type::Reference(ty) | Type::MutableReference(ty) | Type::Vector(ty) => {
             check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?
         },
-        Type::Struct(si) => {
+        Type::Struct { index: si } => {
             let struct_type = resolver.loader().get_struct_type(*si).ok_or_else(|| {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("Struct Definition not resolved".to_string())
@@ -1064,7 +1064,7 @@ fn check_depth_of_type_impl(
                 .solve(&[]))
         },
         // NB: substitution must be performed before calling this function
-        Type::StructInstantiation(si, ty_args) => {
+        Type::StructInstantiation { index: si, ty_args } => {
             // Calculate depth of all type arguments, and make sure they themselves are not too deep.
             let ty_arg_depths = ty_args
                 .iter()

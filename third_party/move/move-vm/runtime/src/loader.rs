@@ -418,7 +418,7 @@ impl ModuleCache {
                     module.identifier_at(module_handle.name).to_owned(),
                 );
                 let def_idx = resolver(struct_name, &module_id)?;
-                Type::Struct(def_idx)
+                Type::Struct { index: def_idx }
             },
             SignatureToken::StructInstantiation(sh_idx, tys) => {
                 let type_parameters: Vec<_> = tys
@@ -433,7 +433,10 @@ impl ModuleCache {
                     module.identifier_at(module_handle.name).to_owned(),
                 );
                 let def_idx = resolver(struct_name, &module_id)?;
-                Type::StructInstantiation(def_idx, type_parameters)
+                Type::StructInstantiation {
+                    index: def_idx,
+                    ty_args: type_parameters,
+                }
             },
         };
         Ok(res)
@@ -540,13 +543,16 @@ impl ModuleCache {
                 inner
             },
             Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
-            Type::Struct(cache_idx) => {
+            Type::Struct { index: cache_idx } => {
                 let mut struct_formula = self.calculate_depth_of_struct(*cache_idx, depth_cache)?;
                 debug_assert!(struct_formula.terms.is_empty());
                 struct_formula.scale(1);
                 struct_formula
             },
-            Type::StructInstantiation(cache_idx, ty_args) => {
+            Type::StructInstantiation {
+                index: cache_idx,
+                ty_args,
+            } => {
                 let ty_arg_map = ty_args
                     .iter()
                     .enumerate()
@@ -882,11 +888,22 @@ impl Loader {
                 Self::match_return_type(ret_inner, expected_inner, map)
             },
             // For structs the both need to be the same struct.
-            (Type::Struct(ret_idx), Type::Struct(expected_idx)) => *ret_idx == *expected_idx,
+            (
+                Type::Struct { index: ret_idx },
+                Type::Struct {
+                    index: expected_idx,
+                },
+            ) => *ret_idx == *expected_idx,
             // For struct instantiations we need to additionally match all type arguments
             (
-                Type::StructInstantiation(ret_idx, ret_fields),
-                Type::StructInstantiation(expected_idx, expected_fields),
+                Type::StructInstantiation {
+                    index: ret_idx,
+                    ty_args: ret_fields,
+                },
+                Type::StructInstantiation {
+                    index: expected_idx,
+                    ty_args: expected_fields,
+                },
             ) => {
                 *ret_idx == *expected_idx
                     && ret_fields.len() == expected_fields.len()
@@ -917,8 +934,14 @@ impl Loader {
             | (Type::Bool, _)
             | (Type::Address, _)
             | (Type::Signer, _)
-            | (Type::Struct(_), _)
-            | (Type::StructInstantiation(_, _), _)
+            | (Type::Struct { index: _ }, _)
+            | (
+                Type::StructInstantiation {
+                    index: _,
+                    ty_args: _,
+                },
+                _,
+            )
             | (Type::Vector(_), _)
             | (Type::MutableReference(_), _)
             | (Type::Reference(_), _) => false,
@@ -1195,7 +1218,7 @@ impl Loader {
                     .resolve_struct_by_name(&struct_tag.name, &module_id)
                     .map_err(|e| e.finish(Location::Undefined))?;
                 if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
-                    Type::Struct(idx)
+                    Type::Struct { index: idx }
                 } else {
                     let mut type_params = vec![];
                     for ty_param in &struct_tag.type_params {
@@ -1203,7 +1226,10 @@ impl Loader {
                     }
                     self.verify_ty_args(struct_type.type_param_constraints(), &type_params)
                         .map_err(|e| e.finish(Location::Undefined))?;
-                    Type::StructInstantiation(idx, type_params)
+                    Type::StructInstantiation {
+                        index: idx,
+                        ty_args: type_params,
+                    }
                 }
             },
         })
@@ -1522,7 +1548,10 @@ impl Loader {
                     return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
                 }
             },
-            Type::StructInstantiation(_, struct_inst) => {
+            Type::StructInstantiation {
+                index: _,
+                ty_args: struct_inst,
+            } => {
                 let mut sum_nodes = 1u64;
                 for ty in ty_args.iter().chain(struct_inst.iter()) {
                     sum_nodes = sum_nodes.saturating_add(self.count_type_nodes(ty));
@@ -1534,7 +1563,7 @@ impl Loader {
             Type::Address
             | Type::Bool
             | Type::Signer
-            | Type::Struct(_)
+            | Type::Struct { index: _ }
             | Type::TyParam(_)
             | Type::U8
             | Type::U16
@@ -1613,13 +1642,16 @@ impl Loader {
                 "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
             )),
 
-            Type::Vector(ty) => {
-                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                    self.abilities(ty)?
-                ])
-            },
-            Type::Struct(idx) => Ok(self.module_cache.read().struct_at(*idx).abilities),
-            Type::StructInstantiation(idx, type_args) => {
+            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
+                AbilitySet::VECTOR,
+                vec![false],
+                vec![self.abilities(ty)?],
+            ),
+            Type::Struct { index: idx } => Ok(self.module_cache.read().struct_at(*idx).abilities),
+            Type::StructInstantiation {
+                index: idx,
+                ty_args: type_args,
+            } => {
                 let struct_type = self.module_cache.read().struct_at(*idx);
                 let declared_phantom_parameters = struct_type
                     .type_parameters
@@ -1745,7 +1777,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        Type::Struct(struct_def)
+        Type::Struct { index: struct_def }
     }
 
     pub(crate) fn instantiate_generic_type(
@@ -1770,14 +1802,14 @@ impl<'a> Resolver<'a> {
             }
         }
 
-        Ok(Type::StructInstantiation(
-            struct_inst.def,
-            struct_inst
+        Ok(Type::StructInstantiation {
+            index: struct_inst.def,
+            ty_args: struct_inst
                 .instantiation
                 .iter()
                 .map(|ty| self.subst(ty, ty_args))
                 .collect::<PartialVMResult<_>>()?,
-        ))
+        })
     }
 
     pub(crate) fn get_field_type(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
@@ -1922,7 +1954,9 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
         match &self.binary {
-            BinaryType::Module(module) => Type::Struct(module.field_handles[idx.0 as usize].owner),
+            BinaryType::Module(module) => Type::Struct {
+                index: module.field_handles[idx.0 as usize].owner,
+            },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
     }
@@ -1933,14 +1967,14 @@ impl<'a> Resolver<'a> {
         args: &[Type],
     ) -> PartialVMResult<Type> {
         match &self.binary {
-            BinaryType::Module(module) => Ok(Type::StructInstantiation(
-                module.field_instantiations[idx.0 as usize].owner,
-                module.field_instantiations[idx.0 as usize]
+            BinaryType::Module(module) => Ok(Type::StructInstantiation {
+                index: module.field_instantiations[idx.0 as usize].owner,
+                ty_args: module.field_instantiations[idx.0 as usize]
                     .instantiation
                     .iter()
                     .map(|ty| ty.subst(args))
                     .collect::<PartialVMResult<Vec<_>>>()?,
-            )),
+            }),
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
     }
@@ -2836,17 +2870,14 @@ impl Loader {
             Type::U256 => TypeTag::U256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
-            Type::Vector(ty) => {
-                TypeTag::Vector(Box::new(self.type_to_type_tag_impl(ty, gas_context)?))
+            Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
+            Type::Struct { index: gidx } => {
+                TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(*gidx, &[], gas_context)?))
             },
-            Type::Struct(gidx) => TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(
-                *gidx,
-                &[],
-                gas_context,
-            )?)),
-            Type::StructInstantiation(gidx, ty_args) => TypeTag::Struct(Box::new(
-                self.struct_gidx_to_type_tag(*gidx, ty_args, gas_context)?,
-            )),
+            Type::StructInstantiation {
+                index: gidx,
+                ty_args,
+            } => TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(*gidx, ty_args, gas_context)?)),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -2865,7 +2896,7 @@ impl Loader {
                     result += 1;
                     todo.push(ty);
                 },
-                Type::StructInstantiation(_, ty_args) => {
+                Type::StructInstantiation { index: _, ty_args } => {
                     result += 1;
                     todo.extend(ty_args.iter())
                 },
@@ -2980,11 +3011,14 @@ impl Loader {
                     depth + 1,
                 )?))
             },
-            Type::Struct(gidx) => {
+            Type::Struct { index: gidx } => {
                 *count += 1;
                 MoveTypeLayout::Struct(self.struct_gidx_to_type_layout(*gidx, &[], count, depth)?)
             },
-            Type::StructInstantiation(gidx, ty_args) => {
+            Type::StructInstantiation {
+                index: gidx,
+                ty_args,
+            } => {
                 *count += 1;
                 MoveTypeLayout::Struct(
                     self.struct_gidx_to_type_layout(*gidx, ty_args, count, depth)?,
@@ -3086,10 +3120,13 @@ impl Loader {
             Type::Vector(ty) => MoveTypeLayout::Vector(Box::new(
                 self.type_to_fully_annotated_layout_impl(ty, count, depth + 1)?,
             )),
-            Type::Struct(gidx) => MoveTypeLayout::Struct(
+            Type::Struct { index: gidx } => MoveTypeLayout::Struct(
                 self.struct_gidx_to_fully_annotated_layout(*gidx, &[], count, depth)?,
             ),
-            Type::StructInstantiation(gidx, ty_args) => MoveTypeLayout::Struct(
+            Type::StructInstantiation {
+                index: gidx,
+                ty_args,
+            } => MoveTypeLayout::Struct(
                 self.struct_gidx_to_fully_annotated_layout(*gidx, ty_args, count, depth)?,
             ),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {

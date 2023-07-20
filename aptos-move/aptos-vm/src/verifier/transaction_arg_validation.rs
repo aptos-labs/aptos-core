@@ -196,7 +196,7 @@ pub(crate) fn is_valid_txn_arg(
     match typ {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
-        Struct(idx) | StructInstantiation(idx, _) => {
+        Struct { index: idx } | StructInstantiation { index: idx, ty_args: _ } => {
             if let Some(st) = session.get_struct_type(*idx) {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
                 allowed_structs.contains_key(&full_name)
@@ -254,7 +254,7 @@ fn construct_arg(
     use move_vm_types::loaded_data::runtime_types::Type::*;
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => Ok(arg),
-        Vector(_) | Struct(_) | StructInstantiation(_, _) => {
+        Vector(_) | Struct { index: _ } | StructInstantiation { index: _, ty_args: _ } => {
             let mut cursor = Cursor::new(&arg[..]);
             let mut new_arg = vec![];
             let mut max_invocations = 10; // Read from config in the future
@@ -322,7 +322,7 @@ pub(crate) fn recursively_construct_arg(
                 len -= 1;
             }
         },
-        Struct(idx) | StructInstantiation(idx, _) => {
+        Struct { index: idx } | StructInstantiation { index: idx, ty_args: _ } => {
             // validate the struct value, we use `expect()` because that check was already
             // performed in `is_valid_txn_arg`
             let st = session
