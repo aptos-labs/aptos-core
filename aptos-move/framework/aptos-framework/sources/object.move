@@ -21,11 +21,12 @@ module aptos_framework::object {
     use std::signer;
     use std::vector;
 
+    use aptos_std::from_bcs;
+
     use aptos_framework::account;
     use aptos_framework::transaction_context;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event;
-    use aptos_framework::from_bcs;
     use aptos_framework::guid;
 
     friend aptos_framework::primary_fungible_store;

@@ -60,7 +60,6 @@ pub(crate) fn update_store(
         root_hash = store
             .merklize_value_set(
                 jmt_update_refs(&jmt_updates),
-                None,
                 version,
                 version.checked_sub(1),
             )

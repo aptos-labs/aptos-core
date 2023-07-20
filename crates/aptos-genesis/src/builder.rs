@@ -27,7 +27,10 @@ use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig},
+    on_chain_config::{
+        ExecutionConfigV1, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
+        TransactionShufflerType,
+    },
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -610,7 +613,10 @@ impl Builder {
             employee_vesting_start: None,
             employee_vesting_period_duration: None,
             consensus_config: OnChainConsensusConfig::default(),
-            execution_config: OnChainExecutionConfig::default(),
+            // Enable transaction shuffling by default in integration tests and Forge.
+            execution_config: OnChainExecutionConfig::V1(ExecutionConfigV1 {
+                transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            }),
             gas_schedule: default_gas_schedule(),
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
