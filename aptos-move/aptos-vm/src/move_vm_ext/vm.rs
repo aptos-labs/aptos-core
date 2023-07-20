@@ -57,6 +57,16 @@ impl MoveVmExt {
 
         let verifier_config = verifier_config(&features, &timed_features);
 
+        let mut type_max_cost = 0;
+        let mut type_base_cost = 0;
+        let mut type_byte_cost = 0;
+        if timed_features.is_enabled(TimedFeatureFlag::LimitTypeTagSize) {
+            // 5000 limits type tag total size < 5000 bytes and < 50 nodes
+            type_max_cost = 5000;
+            type_base_cost = 100;
+            type_byte_cost = 1;
+        }
+
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives(
@@ -73,6 +83,9 @@ impl MoveVmExt {
                     enable_invariant_violation_check_in_swap_loc,
                     type_size_limit,
                     max_value_nest_depth: Some(128),
+                    type_max_cost,
+                    type_base_cost,
+                    type_byte_cost,
                 },
             )?,
             chain_id,
