@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::sharded_block_partitioner::{
     conflict_detector::CrossShardConflictDetector,
+    counters::NUM_PARTITIONED_TXNS,
     cross_shard_messages::{CrossShardClient, CrossShardClientInterface, CrossShardMsg},
     dependency_analysis::{RWSet, WriteSetWithTxnIndex},
     dependent_edges::DependentEdgeCreator,
@@ -102,6 +103,9 @@ impl PartitioningShard {
             .collect::<Vec<TransactionWithDependencies<Transaction>>>();
 
         let mut frozen_sub_blocks = dependent_edge_creator.into_frozen_sub_blocks();
+        NUM_PARTITIONED_TXNS
+            .with_label_values(&[&self.shard_id.to_string(), &round_id.to_string()])
+            .set(accepted_txns_with_dependencies.len() as i64);
         let current_frozen_sub_block = SubBlock::new(index_offset, accepted_txns_with_dependencies);
         frozen_sub_blocks.add_sub_block(current_frozen_sub_block);
         // send the result back to the controller
@@ -128,6 +132,9 @@ impl PartitioningShard {
 
         // Since txn filtering is not allowed, we can create the RW set with maximum txn
         // index with the index offset passed.
+        NUM_PARTITIONED_TXNS
+            .with_label_values(&[&self.shard_id.to_string(), &round_id.to_string()])
+            .set(transactions.len() as i64);
         let write_set_with_index_for_shard = WriteSetWithTxnIndex::new(&transactions, index_offset);
 
         let current_round_rw_set_with_index = self

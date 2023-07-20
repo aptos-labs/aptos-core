@@ -314,7 +314,7 @@ class ReadObject:
 
     def __str__(self) -> str:
         response = "ReadObject"
-        for (resource_obj, value) in self.resources.items():
+        for resource_obj, value in self.resources.items():
             response += f"\n\t{resource_obj.struct_tag}: {value}"
 
         return response
@@ -338,6 +338,7 @@ class AptosTokenClient:
                 resources[resource_obj] = resource_obj.parse(resource["data"])
         return ReadObject(resources)
 
+    @staticmethod
     def create_collection_payload(
         description: str,
         max_supply: int,
@@ -401,7 +402,7 @@ class AptosTokenClient:
         royalty_numerator: int,
         royalty_denominator: int,
     ) -> str:
-        payload = create_collection_payload(
+        payload = AptosTokenClient.create_collection_payload(
             description,
             max_supply,
             name,
@@ -423,6 +424,7 @@ class AptosTokenClient:
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
 
+    @staticmethod
     def mint_token_payload(
         collection: str,
         description: str,
@@ -465,7 +467,9 @@ class AptosTokenClient:
         uri: str,
         properties: PropertyMap,
     ) -> str:
-        payload = mint_token_payload(collection, description, name, uri, properties)
+        payload = AptosTokenClient.mint_token_payload(
+            collection, description, name, uri, properties
+        )
         signed_transaction = await self.client.create_bcs_signed_transaction(
             creator, payload
         )
@@ -605,3 +609,14 @@ class AptosTokenClient:
             creator, TransactionPayload(payload)
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
+
+    async def tokens_minted_from_transaction(
+        self, txn_hash: str
+    ) -> List[AccountAddress]:
+        output = await self.client.transaction_by_hash(txn_hash)
+        mints = []
+        for event in output["events"]:
+            if event["type"] != "0x4::collection::MintEvent":
+                continue
+            mints.append(AccountAddress.from_hex(event["data"]["token"]))
+        return mints

@@ -1,0 +1,18 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        f: bool,
+    }
+    private fun t0(x: bool,r: M::R) {
+        Not(true);
+        Not(false);
+        Not(x);
+        Not(x);
+        Not(x);
+        Not(select M::R.f(r));
+        {
+          let M::R{ f: _ } = r;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M

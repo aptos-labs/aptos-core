@@ -4,12 +4,14 @@ use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
         block_executor_client::BlockExecutorClient,
+        counters::SHARDED_BLOCK_EXECUTION_SECONDS,
         cross_shard_client::{CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
         messages::CrossShardMsg,
     },
 };
-use aptos_logger::trace;
+use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING_ROUNDS;
+use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
@@ -30,17 +32,18 @@ use std::{
 pub struct ShardedExecutorClient {
     shard_id: ShardId,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    message_rx: Arc<Mutex<Receiver<CrossShardMsg>>>,
-    // The senders of cross-shard messages to other shards.
-    message_txs: Arc<Vec<Mutex<Sender<CrossShardMsg>>>>,
+    // The receivers of cross shard messages from other shards per round.
+    message_rxs: Arc<Vec<Mutex<Receiver<CrossShardMsg>>>>,
+    // The senders of cross-shard messages to other shards per round.
+    message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
 }
 
 impl ShardedExecutorClient {
     pub fn new(
         shard_id: ShardId,
         num_threads: usize,
-        message_txs: Vec<Sender<CrossShardMsg>>,
-        message_rx: Receiver<CrossShardMsg>,
+        message_rxs: Vec<Receiver<CrossShardMsg>>,
+        message_txs: Vec<Vec<Sender<CrossShardMsg>>>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -53,8 +56,13 @@ impl ShardedExecutorClient {
         Self {
             shard_id,
             executor_thread_pool,
-            message_rx: Arc::new(Mutex::new(message_rx)),
-            message_txs: Arc::new(message_txs.into_iter().map(Mutex::new).collect()),
+            message_rxs: Arc::new(message_rxs.into_iter().map(Mutex::new).collect()),
+            message_txs: Arc::new(
+                message_txs
+                    .into_iter()
+                    .map(|inner_vec| inner_vec.into_iter().map(Mutex::new).collect())
+                    .collect(),
+            ),
         }
     }
 
@@ -67,19 +75,25 @@ impl ShardedExecutorClient {
         let mut cross_shard_msg_txs = vec![];
         let mut cross_shard_msg_rxs = vec![];
         for _ in 0..num_shards {
-            let (messages_tx, messages_rx) = std::sync::mpsc::channel();
-            cross_shard_msg_txs.push(messages_tx);
-            cross_shard_msg_rxs.push(messages_rx);
+            let mut current_shard_msg_txs = vec![];
+            let mut current_shard_msg_rxs = vec![];
+            for _ in 0..MAX_ALLOWED_PARTITIONING_ROUNDS {
+                let (messages_tx, messages_rx) = std::sync::mpsc::channel();
+                current_shard_msg_txs.push(messages_tx);
+                current_shard_msg_rxs.push(messages_rx);
+            }
+            cross_shard_msg_txs.push(current_shard_msg_txs);
+            cross_shard_msg_rxs.push(current_shard_msg_rxs);
         }
         cross_shard_msg_rxs
             .into_iter()
             .enumerate()
-            .map(|(shard_id, rx)| {
+            .map(|(shard_id, rxs)| {
                 Self::new(
                     shard_id as ShardId,
                     num_threads,
+                    rxs,
                     cross_shard_msg_txs.clone(),
-                    rx,
                 )
             })
             .collect()
@@ -114,20 +128,17 @@ impl ShardedExecutorClient {
             self.shard_id,
             round
         );
-        let cross_shard_commit_sender = CrossShardCommitSender::new(
-            self.shard_id,
-            self.message_txs
-                .iter()
-                .map(|t| t.lock().unwrap().clone())
-                .collect(),
-            &sub_block,
-        );
+        let cross_shard_commit_sender =
+            CrossShardCommitSender::new(self.shard_id, self.message_txs.clone(), &sub_block);
 
         let (callback, callback_receiver) = oneshot::channel();
 
-        let message_rxs = self.message_rx.clone();
+        let message_rxs = self.message_rxs.clone();
         let self_message_tx = Arc::new(Mutex::new(
-            self.message_txs[self.shard_id].lock().unwrap().clone(),
+            self.message_txs[self.shard_id][round]
+                .lock()
+                .unwrap()
+                .clone(),
         ));
         let cross_shard_state_view =
             Arc::new(self.create_cross_shard_state_view(state_view, &sub_block));
@@ -140,7 +151,7 @@ impl ShardedExecutorClient {
                     // information in the cross shard dependencies.
                     CrossShardCommitReceiver::start(
                         cross_shard_state_view_clone1,
-                        &message_rxs.lock().unwrap(),
+                        &message_rxs[round].lock().unwrap(),
                     );
                 }
             });
@@ -184,6 +195,15 @@ impl BlockExecutorClient for ShardedExecutorClient {
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
+            let _timer = SHARDED_BLOCK_EXECUTION_SECONDS
+                .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
+                .start_timer();
+            info!(
+                "executing sub block for shard {} and round {}, number of txns {}",
+                self.shard_id,
+                round,
+                sub_block.transactions.len()
+            );
             result.push(self.execute_sub_block(
                 sub_block,
                 round,

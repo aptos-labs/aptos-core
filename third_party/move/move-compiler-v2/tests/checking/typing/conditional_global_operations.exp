@@ -1,0 +1,32 @@
+// ---- Model Dump
+module 0x42::M {
+    struct Box {
+        f: #0,
+    }
+    struct K {
+        dummy_field: bool,
+    }
+    struct Pair {
+        f1: #0,
+        f2: #1,
+    }
+    struct R {
+        dummy_field: bool,
+    }
+    struct S {
+        dummy_field: bool,
+    }
+    private fun ex<T>(s: &signer,a1: address) {
+        MoveTo<M::Box<M::R>>(s, pack M::Box<M::R>(pack M::R(false)));
+        BorrowGlobal(Immutable)<M::Box<T>>(a1);
+        BorrowGlobal(Mutable)<M::Box<M::Box<T>>>(a1);
+        M::Pair<?11, ?12>{ f1: _, f2: _ } = MoveFrom<M::Pair<M::S, M::R>>(a1);
+        exists<M::Pair<M::Box<T>, M::S>>(a1);
+        BorrowGlobal(Immutable)<M::Box<M::K>>(a1);
+        BorrowGlobal(Mutable)<M::Pair<M::S, M::K>>(a1);
+        Tuple()
+    }
+    private fun ignore<T>(_x: T) {
+        Abort(0)
+    }
+} // end 0x42::M

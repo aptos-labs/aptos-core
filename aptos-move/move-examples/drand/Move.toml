@@ -1,0 +1,13 @@
+[package]
+name = "Drand lottery"
+version = "0.0.1"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+#AptosStdlib = { local = "../../framework/aptos-stdlib" }
+
+[addresses]
+std = "0x1"
+aptos_std = "0x1"
+aptos_framework = "0x1"
+drand = "_"

@@ -324,7 +324,7 @@ async def distribute(
     txns = []
     txn_hashes = []
 
-    for (account, fund) in all_accounts:
+    for account, fund in all_accounts:
         sequence_number = await account_sequence_number.next_sequence_number(
             block=False
         )
@@ -388,7 +388,7 @@ async def main():
     last = time.time()
 
     workers = []
-    for (account, recipient) in zip(accounts, receivers):
+    for account, recipient in zip(accounts, receivers):
         workers.append(WorkerContainer(NODE_URL, account, recipient.address()))
         workers[-1].start()
 

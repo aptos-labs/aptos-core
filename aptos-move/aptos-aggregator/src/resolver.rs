@@ -42,9 +42,7 @@ pub mod test_utils {
 
     impl AggregatorStore {
         pub fn set_from_id(&mut self, id: AggregatorID, value: u128) {
-            let state_key = id
-                .into_state_key()
-                .expect("Only table-based IDs are tested.");
+            let state_key = id.as_state_key().expect("Only table-based IDs are tested.");
             self.set_from_state_key(state_key, value);
         }
 
@@ -57,7 +55,7 @@ pub mod test_utils {
     impl AggregatorResolver for AggregatorStore {
         fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<u128, anyhow::Error> {
             let state_key = id
-                .into_state_key()
+                .as_state_key()
                 .expect("Only table-based IDs can be accessed in tests.");
             match self.get_state_value_bytes(&state_key)? {
                 Some(bytes) => Ok(deserialize(&bytes)),
