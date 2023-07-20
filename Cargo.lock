@@ -3073,6 +3073,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "bcs 0.1.4",
+ "dashmap",
  "serde 1.0.149",
  "serde_bytes",
  "serde_json",

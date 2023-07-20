@@ -17,6 +17,7 @@ use crossbeam_channel::{Receiver, Sender};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use aptos_logger::trace;
+use aptos_state_view::in_memory_state_view::InMemoryStateView;
 use aptos_types::block_executor::partitioner::SubBlocksForShard;
 use aptos_types::transaction::Transaction;
 use aptos_vm::sharded_block_executor::executor_shard::ExecutorClient;
@@ -181,6 +182,25 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             phantom: std::marker::PhantomData,
         }
     }
+
+    // fn prepare_in_memory_state_view(
+    //     &self,
+    //     state_view: Arc<S>,
+    //     block: &Vec<SubBlocksForShard<Transaction>>,
+    // ) -> InMemoryStateView {
+    //     let in_memory_state_view = Arc::new(InMemoryStateView::new(DashMap::new()));
+    //     self.thread_pool.scope(|s| {
+    //         for sub_block in block {
+    //             let state_view = state_view.clone();
+    //             let in_memory_state_view = in_memory_state_view.clone();
+    //             s.spawn(move |_| {
+    //                 for txn in sub_block.iter() {
+    //                     for storage_
+    //                 }
+    //             });
+    //         }
+    //     });
+    // }
 }
 
 impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorClient<S> {
