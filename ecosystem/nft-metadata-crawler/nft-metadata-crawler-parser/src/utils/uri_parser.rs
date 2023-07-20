@@ -25,7 +25,7 @@ impl URIParser {
         let modified_uri = if uri.starts_with("ipfs://") {
             uri.replace("ipfs://", "https://ipfs.com/ipfs/")
         } else {
-            uri.to_string()
+            uri
         };
 
         let re = Regex::new(r"^(ipfs/)(?P<cid>[a-zA-Z0-9]+)(?P<path>/.*)?$")?;
