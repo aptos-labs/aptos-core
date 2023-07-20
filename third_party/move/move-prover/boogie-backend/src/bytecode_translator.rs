@@ -957,7 +957,10 @@ impl<'env> FunctionTranslator<'env> {
         emitln!(
             writer,
             "// {} {}",
-            bytecode.display(fun_target, &BTreeMap::default()),
+            bytecode
+                .display(fun_target, &BTreeMap::default())
+                .to_string()
+                .replace('\n', "\n// "),
             loc.display(env)
         );
 

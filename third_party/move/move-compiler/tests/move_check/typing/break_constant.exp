@@ -1,0 +1,6 @@
+error[E04014]: invalid loop control
+  ┌─ tests/move_check/typing/break_constant.move:3:21
+  │
+3 │     const C : u64 = break;
+  │                     ^^^^^ Invalid usage of 'break'. 'break' can only be used inside a loop body
+

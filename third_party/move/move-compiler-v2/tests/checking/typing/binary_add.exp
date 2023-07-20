@@ -1,0 +1,23 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    private fun t0(x: u64,r: M::R) {
+        Add(0, 0);
+        Add(1, 0);
+        Add(0, 1);
+        Add(0, 1);
+        Add(0, 1);
+        Add(0, 1);
+        Add(0, 1);
+        Add(0, 1);
+        Add(x, x);
+        Add(select M::R.f(r), select M::R.f(r));
+        Add(Add(Add(1, select M::R.f(r)), select M::R.f(r)), 0);
+        {
+          let M::R{ f: _ } = r;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M

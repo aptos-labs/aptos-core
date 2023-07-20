@@ -1,60 +1,60 @@
 ---
 remote_endpoint: ~
-name: "v1.5"
+name: "v1.6"
 proposals:
   - name: upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.4.0"
-      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.4.0. Struct constructor, generic cryptography algebra, ed25519 returns false if wrong length, quorum store, and transaction shuffling will be enabled in separate proposals."
+      title: "Multi-step proposal to upgrade mainnet framework to v1.6"
+      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.6"
     execution_mode: MultiStep
     update_sequence:
       - DefaultGas
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: enable_bls12381
+  - name: enable_fee_payer
     metadata:
-      title: "Enable bls12381"
-      description: "AIP-20: Support of generic cryptography algebra operations in Aptos standard library."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/94"
+      title: "Enable fee payer"
+      description: "AIP-39: Support secondary fee payer to pay gas cost on behalf of the sender."
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8904"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-39.md"
     execution_mode: MultiStep
     update_sequence:
     - FeatureFlag:
         enabled:
-          - cryptography_algebra_natives
-          - bls12381_structures
-  - name: enable_quorum_store
+          - gas_payer_enabled
+  - name: enable_block_gas_limit
     metadata:
-      title: "Enable Quorum Store"
-      description: "AIP-26: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/108"
+      title: "Enable Block Gas Limit"
+      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132"
     execution_mode: MultiStep
     update_sequence:
-    - Consensus:
+    - Execution:
         V2:
-          decoupled_execution: true
-          back_pressure_limit: 10
-          exclude_round: 40
-          proposer_election_type:
-            leader_reputation:
-              proposer_and_voter_v2:
-                active_weight: 1000
-                inactive_weight: 10
-                failed_weight: 1
-                failure_threshold_percent: 10
-                proposer_window_num_validators_multiplier: 10
-                voter_window_num_validators_multiplier: 1
-                weight_by_voting_power: true
-                use_history_from_previous_epoch_max_count: 5
-          max_failed_authors_to_store: 10
-  - name: enable_charge_invariant_violation
+          transaction_shuffler_type:
+            sender_aware_v1: 32
+          block_gas_limit : 35000
+  - name: enable_aptos_unique_identifiers
     metadata:
-      title: "Enable charge_invariant_violation"
-      description: "AIP-20: Support of generic cryptography algebra operations in Aptos standard library."
-      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8213"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-35.md"
+      title: "Enable Aptos Unique Identifiers"
+      description: "AIP-36: Support for aptos unique identifiers (generated using native function generate_unique_address)"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/154"
     execution_mode: MultiStep
     update_sequence:
     - FeatureFlag:
         enabled:
-          - charge_invariant_violation
+          - aptos_unique_identifiers
+  - name: enable_partial_voting
+    metadata:
+      title: "Enable partial voting"
+      description: "AIP-28:  Partial voting for on chain governance."
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8090"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-28.md"
+    execution_mode: MultiStep
+    update_sequence:
+    - RawScript: /aptos/aptos-move/aptos-release-builder/data/proposals/aip_28_initialization.move
+    - FeatureFlag:
+        enabled:
+          - partial_governance_voting
+          - delegation_pool_partial_governance_voting

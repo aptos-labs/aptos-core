@@ -1,0 +1,55 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        dummy_field: bool,
+    }
+    private fun t0(cond: bool) {
+        if cond {
+          Tuple()
+        } else {
+          Tuple()
+        };
+        Tuple()
+    }
+    private fun t1(cond: bool) {
+        if cond {
+          0
+        } else {
+          0
+        };
+        if cond {
+          false
+        } else {
+          false
+        };
+        M::R{ dummy_field: _ } = if cond {
+          pack M::R(false)
+        } else {
+          pack M::R(false)
+        };
+        if cond {
+          Borrow(Immutable)(0)
+        } else {
+          Borrow(Immutable)(1)
+        };
+        if cond {
+          Borrow(Mutable)(0)
+        } else {
+          Borrow(Mutable)(1)
+        };
+        Tuple()
+    }
+    private fun t2(cond: bool) {
+        if cond {
+          Tuple(0, false)
+        } else {
+          Tuple(1, true)
+        };
+        (_, _, _, M::R{ dummy_field: _ }) = if cond {
+          Tuple(0, 0, Borrow(Immutable)(0), pack M::R(false))
+        } else {
+          Tuple(1, 1, Borrow(Immutable)(1), pack M::R(false))
+        };
+        Tuple()
+    }
+} // end 0x8675309::M

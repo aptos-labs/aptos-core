@@ -188,7 +188,7 @@ module aptos_framework::staking_config {
 
     /// Return the reward rate of this epoch.
     public fun get_reward_rate(config: &StakingConfig): (u64, u64) acquires StakingRewardsConfig {
-        let (rewards_rate, rewards_rate_denominator) = if (features::periodical_reward_rate_decrease_enabled()) {
+        if (features::periodical_reward_rate_decrease_enabled()) {
             let epoch_rewards_rate = borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate;
             if (fixed_point64::is_zero(epoch_rewards_rate)) {
                 (0u64, 1u64)
@@ -204,8 +204,7 @@ module aptos_framework::staking_config {
             }
         } else {
             (config.rewards_rate, config.rewards_rate_denominator)
-        };
-        (rewards_rate, rewards_rate_denominator)
+        }
     }
 
     /// Return the joining limit %.

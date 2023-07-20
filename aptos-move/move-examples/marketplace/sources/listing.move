@@ -130,6 +130,7 @@ module marketplace::listing {
 
     /// This should be called at the end of a listing.
     public(friend) fun extract_or_transfer_tokenv1(
+        closer: &signer,
         recipient: address,
         object: Object<TokenV1Container>,
     ) acquires TokenV1Container {
@@ -142,6 +143,14 @@ module marketplace::listing {
                 transfer_ref: _,
             } = move_from(object_addr);
             tokenv1::direct_deposit_with_opt_in(recipient, token);
+            object::delete(delete_ref);
+        } else if (signer::address_of(closer) == recipient) {
+            let TokenV1Container {
+                token,
+                delete_ref,
+                transfer_ref: _,
+            } = move_from(object_addr);
+            tokenv1::deposit_token(closer, token);
             object::delete(delete_ref);
         } else {
             let tokenv1_container = borrow_global<TokenV1Container>(object_addr);
@@ -174,6 +183,7 @@ module marketplace::listing {
     /// The listing has concluded, transfer the asset and delete the listing. Returns the seller
     /// for depositing any profit and the fee schedule for the marketplaces commission.
     public(friend) fun close(
+        closer: &signer,
         object: Object<Listing>,
         recipient: address,
     ): (address, Object<FeeSchedule>) acquires Listing, TokenV1Container {
@@ -189,7 +199,7 @@ module marketplace::listing {
 
         let obj_signer = object::generate_signer_for_extending(&extend_ref);
         if (exists<TokenV1Container>(object::object_address(&object))) {
-            extract_or_transfer_tokenv1(recipient, object::convert(object));
+            extract_or_transfer_tokenv1(closer, recipient, object::convert(object));
         } else {
             object::transfer(&obj_signer, object, recipient);
         };

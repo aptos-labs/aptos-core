@@ -2,8 +2,8 @@ name: "Run SDK E2E tests"
 description: |
   Run the SDK E2E tests against a local testnet built from a particular release branch
 inputs:
-  NETWORK:
-    description: "The network to use for running the local testnet, one of devnet / testnet / mainnet"
+  BRANCH:
+    description: "The branch to use for running the local testnet"
     required: true
   GCP_DOCKER_ARTIFACT_REPO:
     description: "The GCP Docker artifact repository"
@@ -19,7 +19,16 @@ runs:
         registry-url: "https://registry.npmjs.org"
     - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
 
+    # Find a docker image to use for the testnet.
+    - uses: ./.github/actions/get-latest-docker-image-tag
+      id: get-docker-image-tag
+      with:
+        branch: ${{ inputs.BRANCH }}
+
     # Set up the necessary env vars for the test suite.
+    - run: echo "DOCKER_IMAGE=${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}" >>.env
+      shell: bash
+      working-directory: ./ecosystem/typescript/sdk
     - run: echo "APTOS_NODE_URL=http://127.0.0.1:8080/v1" >> .env
       shell: bash
       working-directory: ./ecosystem/typescript/sdk
@@ -32,12 +41,6 @@ runs:
     - run: echo "ANS_TEST_ACCOUNT_ADDRESS=585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82" >> .env
       shell: bash
       working-directory: ./ecosystem/typescript/sdk
-    - run: echo "DOCKER_IMAGE=${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.NETWORK }}" >>.env
-      shell: bash
-      working-directory: ./ecosystem/typescript/sdk
-    - run: echo "NETWORK=${{ inputs.NETWORK }}" >> .env
-      shell: bash
-      working-directory: ./ecosystem/typescript/sdk
 
     # Run package install. If install fails, it probably means the updated lockfile was
     # not included in the commit.
@@ -48,7 +51,7 @@ runs:
     # Run a local testnet.
     - uses: ./.github/actions/run-local-testnet
       with:
-        IMAGE_TAG: ${{ inputs.NETWORK }}
+        IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
         GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
 
     # Run the TS SDK tests.

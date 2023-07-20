@@ -1,0 +1,10 @@
+// ---- Model Dump
+module 0x2::X {
+} // end 0x2::X
+module 0x2::M {
+    private fun foo() {
+        0;
+        0;
+        Tuple()
+    }
+} // end 0x2::M

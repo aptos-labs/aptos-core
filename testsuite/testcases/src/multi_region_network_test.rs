@@ -214,13 +214,13 @@ impl Default for MultiRegionNetworkEmulationConfig {
 /// A test to emulate network conditions for a multi-region setup.
 #[derive(Default)]
 pub struct MultiRegionNetworkEmulationTest {
-    network_emulation_config: Option<MultiRegionNetworkEmulationConfig>,
+    network_emulation_config: MultiRegionNetworkEmulationConfig,
 }
 
 impl MultiRegionNetworkEmulationTest {
     pub fn new_with_config(network_emulation_config: MultiRegionNetworkEmulationConfig) -> Self {
         Self {
-            network_emulation_config: Some(network_emulation_config),
+            network_emulation_config,
         }
     }
 
@@ -230,7 +230,7 @@ impl MultiRegionNetworkEmulationTest {
     fn create_netem_chaos(&self, swarm: &mut dyn Swarm) -> SwarmNetEm {
         let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
         let network_emulation_config = self.network_emulation_config.clone();
-        create_multi_region_swarm_network_chaos(all_validators, network_emulation_config)
+        create_multi_region_swarm_network_chaos(all_validators, Some(network_emulation_config))
     }
 }
 
