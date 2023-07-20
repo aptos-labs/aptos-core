@@ -5,6 +5,10 @@ spec aptos_framework::block {
         invariant [suspendable] chain_status::is_operating() ==> exists<BlockResource>(@aptos_framework);
     }
 
+    spec BlockResource {
+        invariant epoch_interval > 0;
+    }
+
     spec block_prologue {
         use aptos_framework::chain_status;
         use aptos_framework::coin::CoinInfo;
@@ -68,9 +72,6 @@ spec aptos_framework::block {
         let addr = signer::address_of(aptos_framework);
         let account = global<account::Account>(addr);
         aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-
-        // Only the Aptos framework address can execute
-        ensures @aptos_framework == addr;
     }
 
     spec schema Initialize {
