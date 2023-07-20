@@ -4,7 +4,6 @@ use crate::{
     network_controller::{error::Error, Message, MessageType, NetworkMessage},
     NetworkServer,
 };
-use aptos_logger::error;
 use crossbeam_channel::Sender;
 use std::{
     collections::HashMap,

@@ -11,8 +11,7 @@ use std::collections::HashMap;
 use aptos_crypto::hash::CryptoHash;
 use rand::Rng;
 use crate::{AptosVM, VMExecutor};
-use crate::sharded_block_executor::executor_shard::{ExecutorClient, ExecutorShard};
-use crate::sharded_block_executor::local_executor_shard::LocalExecutorShard;
+use crate::sharded_block_executor::executor_shard::{ExecutorClient};
 use crate::sharded_block_executor::ShardedBlockExecutor;
 use aptos_types::{
     state_store::state_key::StateKeyInner,
@@ -158,7 +157,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>> (s
     let partitioner = ShardedBlockPartitioner::new(num_shards);
     let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
 
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
+    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone()).into_iter().map(|t| t.into_txn()).collect();
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
@@ -203,7 +202,7 @@ pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataSt
     let partitioner = ShardedBlockPartitioner::new(num_shards);
     let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
 
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
+    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone()).into_iter().map(|t| t.into_txn()).collect();
 
     let sharded_txn_output = sharded_block_executor
         .execute_block(

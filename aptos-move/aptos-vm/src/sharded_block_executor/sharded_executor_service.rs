@@ -6,12 +6,12 @@ use crate::{
         counters::SHARDED_BLOCK_EXECUTION_SECONDS,
         cross_shard_client::{CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
-        executor_shard::{CoordinatorClient1, CrossShardClient},
+        executor_shard::{CrossShardClient},
         messages::CrossShardMsg,
         ExecutorShardCommand,
     },
 };
-use aptos_logger::{error, info, trace};
+use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{ShardId, SubBlock, SubBlocksForShard},
@@ -94,7 +94,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
         let cross_shard_client = self.cross_shard_client.clone();
         let cross_shard_client_clone = cross_shard_client.clone();
-        let executor_thread_pool = self.executor_thread_pool.clone();
         self.executor_thread_pool.scope(|s| {
             s.spawn(move |_| {
                 CrossShardCommitReceiver::start(
@@ -128,8 +127,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             });
         });
         println!("waiting for sub block for shard {} and round {}", self.shard_id, round);
-        let ret = block_on(callback_receiver).unwrap();
-        ret
+        block_on(callback_receiver).unwrap()
     }
 
     fn execute_block(

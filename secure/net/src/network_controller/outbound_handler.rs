@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    network_controller::{error::Error, Message, MessageType, NetworkMessage},
+    network_controller::{Message, MessageType, NetworkMessage},
     NetworkClient,
 };
-use aptos_logger::error;
 use crossbeam_channel::{Receiver, Select};
 use std::{
     collections::HashMap,

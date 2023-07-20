@@ -7,41 +7,15 @@ use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId},
     transaction::TransactionOutput,
 };
-use crossbeam_channel::SendError;
 use aptos_types::block_executor::partitioner::SubBlocksForShard;
-use aptos_types::transaction::Transaction;
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use move_core_types::vm_status::VMStatus;
-
-pub trait ExecutorShard<S: StateView + Sync + Send + 'static> {
-    fn start(&mut self);
-
-    fn stop(&mut self);
-
-    fn send_execute_command(&self, execute_command: ExecutorShardCommand<S>);
-
-    fn get_execution_result(&self) -> Result<Vec<Vec<TransactionOutput>>, VMStatus>;
-}
-
-// Trait that defines the communication interface between the coordinator
-// and the executor shard.
-pub trait CoordinatorClient1<S: StateView + Sync + Send + 'static>: Send + Sync {
-    fn send_execute_command(
-        &self,
-        execute_command: ExecutorShardCommand<S>,
-    ) -> Result<(), SendError<ExecutorShardCommand<S>>>;
-
-    fn get_execution_result(&self) -> Result<Vec<Vec<TransactionOutput>>, VMStatus>;
-
-    fn receive_execute_command(&self) -> ExecutorShardCommand<S>;
-
-    fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);
-}
 
 pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn num_shards(&self) -> usize;
     fn execute_block(&self,
                      state_view: Arc<S>,
-                     block: Vec<SubBlocksForShard<Transaction>>,
+                     block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
                      concurrency_level_per_shard: usize,
                      maybe_block_gas_limit: Option<u64>);
 

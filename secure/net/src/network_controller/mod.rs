@@ -71,7 +71,7 @@ pub struct NetworkController {
 impl NetworkController {
     pub fn new(service: String, listen_addr: SocketAddr, timeout_ms: u64) -> Self {
         let inbound_handler = Arc::new(Mutex::new(InboundHandler::new(service.clone(), listen_addr, timeout_ms)));
-        let outbound_handler = OutboundHandler::new(service.clone(), listen_addr, inbound_handler.clone());
+        let outbound_handler = OutboundHandler::new(service, listen_addr, inbound_handler.clone());
         Self {
             inbound_handler,
             outbound_handler,

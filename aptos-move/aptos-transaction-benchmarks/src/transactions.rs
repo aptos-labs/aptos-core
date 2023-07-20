@@ -23,7 +23,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     sharded_block_executor::{
-        block_executor_client::VMExecutorClient, local_executor_shard::LocalExecutorShard,
+        block_executor_client::VMExecutorClient, local_executor_shard::LocalExecutorService,
         ShardedBlockExecutor,
     },
 };
@@ -196,7 +196,7 @@ struct TransactionBenchState<S> {
     strategy: S,
     account_universe: AccountUniverse,
     parallel_block_executor:
-        Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorShard<FakeDataStore>>>>,
+        Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorService<FakeDataStore>>>>,
     block_partitioner: Option<ShardedBlockPartitioner>,
     validator_set: ValidatorSet,
     state_view: Arc<FakeDataStore>,

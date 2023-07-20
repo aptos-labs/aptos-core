@@ -12,9 +12,8 @@ mod error;
 pub mod process_executor_service;
 mod remote_cordinator_client;
 mod remote_cross_shard_client;
-pub mod remote_executor_client1;
 pub mod remote_executor_service;
-mod remote_executor_shard;
+mod remote_executor_client;
 mod thread_executor_service;
 #[cfg(test)]
 mod tests;
@@ -54,7 +53,7 @@ impl ExecuteBlockCommand {
     pub fn into(
         self,
     ) -> (
-        SubBlocksForShard<Transaction>,
+        SubBlocksForShard<AnalyzedTransaction>,
         InMemoryStateView,
         usize,
         Option<u64>,

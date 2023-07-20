@@ -2,13 +2,9 @@
 
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use aptos_types::transaction::{Transaction, TransactionOutput};
-use rand::rngs::OsRng;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
-use aptos_types::block_executor::partitioner::SubBlocksForShard;
-use std::collections::HashMap;
 use aptos_crypto::hash::CryptoHash;
-use rand::Rng;
 use aptos_types::{
     state_store::state_key::StateKeyInner,
 };
@@ -19,7 +15,7 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::account_address::AccountAddress;
 use aptos_vm::{AptosVM, VMExecutor};
-use aptos_vm::sharded_block_executor::executor_shard::ExecutorShard;
+use aptos_vm::sharded_block_executor::executor_shard::ExecutorClient;
 use aptos_vm::sharded_block_executor::ShardedBlockExecutor;
 
 pub fn generate_account_at(executor: &mut FakeExecutor, address: AccountAddress) -> AccountData {
@@ -102,9 +98,9 @@ pub fn compare_txn_outputs(
     }
 }
 
-pub fn test_sharded_block_executor_no_conflict<E: ExecutorShard<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>) {
+pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>) {
     let num_txns = 400;
-    let num_shards = 8;
+    let num_shards = sharded_block_executor.num_shards();
     let mut executor = FakeExecutor::from_head_genesis();
     let mut transactions = Vec::new();
     for _ in 0..num_txns {
@@ -127,93 +123,5 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorShard<FakeDataStore>> 
         None,
     )
         .unwrap();
-    compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
-}
-
-pub fn test_sharded_block_executor_with_conflict<E: ExecutorShard<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
-    let num_txns = 800;
-    let num_shards = sharded_block_executor.num_shards();
-    let num_accounts = 80;
-    let mut executor = FakeExecutor::from_head_genesis();
-    let mut transactions = Vec::new();
-    let mut accounts = Vec::new();
-    let mut txn_hash_to_account = HashMap::new();
-    for _ in 0..num_accounts {
-        let account = generate_account_at(&mut executor, AccountAddress::random());
-        accounts.push(Mutex::new(account));
-    }
-    for i in 1..num_txns / num_accounts {
-        for j in 0..num_accounts {
-            let sender = &mut accounts[j].lock().unwrap();
-            let sender_addr = *sender.address();
-            let receiver = &accounts[(j + i) % num_accounts].lock().unwrap();
-            let transfer_amount = 1_000;
-            let txn = generate_p2p_txn(sender, receiver, transfer_amount);
-            txn_hash_to_account.insert(txn.transaction().hash(), sender_addr);
-            transactions.push(txn)
-        }
-    }
-
-    let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 4, 0.9);
-
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
-    let sharded_txn_output = sharded_block_executor
-        .execute_block(
-            Arc::new(executor.data_store().clone()),
-            partitioned_txns,
-            concurrency,
-            None,
-        )
-        .unwrap();
-
-    let unsharded_txn_output =
-        AptosVM::execute_block(execution_ordered_txns, &executor.data_store(), None).unwrap();
-    compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
-}
-
-pub fn sharded_block_executor_with_random_transfers<E: ExecutorShard<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
-    let mut rng = OsRng;
-    let max_accounts = 200;
-    let max_txns = 1000;
-    let num_accounts = rng.gen_range(1, max_accounts);
-    let mut accounts = Vec::new();
-    let mut executor = FakeExecutor::from_head_genesis();
-
-    for _ in 0..num_accounts {
-        let account = generate_account_at(&mut executor, AccountAddress::random());
-        accounts.push(Mutex::new(account));
-    }
-
-    let num_txns = rng.gen_range(1, max_txns);
-    let num_shards = sharded_block_executor.num_shards();
-
-    let mut transactions = Vec::new();
-
-    for _ in 0..num_txns {
-        let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
-        let sender = &mut accounts[indices.index(0)].lock().unwrap();
-        let receiver = &accounts[indices.index(1)].lock().unwrap();
-        let transfer_amount = rng.gen_range(1, 1000);
-        let txn = generate_p2p_txn(sender, receiver, transfer_amount);
-        transactions.push(txn)
-    }
-
-    let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
-
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone());
-
-    let sharded_txn_output = sharded_block_executor
-        .execute_block(
-            Arc::new(executor.data_store().clone()),
-            partitioned_txns,
-            concurrency,
-            None,
-        )
-        .unwrap();
-
-    let unsharded_txn_output =
-        AptosVM::execute_block(execution_ordered_txns, &executor.data_store(), None).unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }

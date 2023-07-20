@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{counters::NUM_EXECUTOR_SHARDS, executor_shard::ExecutorShard};
+use crate::sharded_block_executor::{counters::NUM_EXECUTOR_SHARDS};
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -43,7 +43,7 @@ pub enum ExecutorShardCommand<S> {
 }
 
 impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExecutor<S, C> {
-    pub fn new(mut executor_client: C) -> Self {
+    pub fn new(executor_client: C) -> Self {
         info!(
             "Creating a new ShardedBlockExecutor with {} shards",
             executor_client.num_shards()

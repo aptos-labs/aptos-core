@@ -12,7 +12,7 @@ use crate::{
     data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
     move_vm_ext::{MoveResolverExt, RespawnedSession, SessionExt, SessionId},
-    sharded_block_executor::{executor_shard::ExecutorShard, ShardedBlockExecutor},
+    sharded_block_executor::{ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,

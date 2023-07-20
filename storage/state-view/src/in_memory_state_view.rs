@@ -9,16 +9,15 @@ use aptos_types::state_store::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use dashmap::DashMap;
 
 // A State view backed by in-memory hashmap.
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct InMemoryStateView {
-    state_data: DashMap<StateKey, StateValue>,
+    state_data: HashMap<StateKey, StateValue>,
 }
 
 impl InMemoryStateView {
-    pub fn new(state_data: DashMap<StateKey, StateValue>) -> Self {
+    pub fn new(state_data: HashMap<StateKey, StateValue>) -> Self {
         Self { state_data }
     }
 }
@@ -27,8 +26,7 @@ impl TStateView for InMemoryStateView {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        let state_value = self.state_data.get(state_key).map(|v| v.value().clone());
-        Ok(state_value)
+        Ok(self.state_data.get(state_key).cloned())
     }
 
     fn is_genesis(&self) -> bool {

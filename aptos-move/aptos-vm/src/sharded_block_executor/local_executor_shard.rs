@@ -1,38 +1,36 @@
 // Copyright © Aptos Foundation
 
 use crate::sharded_block_executor::{
-    executor_shard::{CoordinatorClient1, CrossShardClient, ExecutorShard},
+    executor_shard::{CrossShardClient},
     messages::CrossShardMsg,
     sharded_executor_service::ShardedExecutorService,
     ExecutorShardCommand,
 };
 use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING_ROUNDS;
-use aptos_logger::{error, trace};
+use aptos_logger::{trace};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId},
     transaction::TransactionOutput,
 };
-use crossbeam_channel::{unbounded, Receiver, SendError, Sender};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use futures::StreamExt;
 use aptos_types::block_executor::partitioner::SubBlocksForShard;
-use aptos_types::transaction::Transaction;
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use crate::sharded_block_executor::executor_shard::{ExecutorClient, CoordinatorClient};
 
 /// A block executor that receives transactions from a channel and executes them in parallel.
 /// It runs in the local machine.
-pub struct LocalExecutorShard<S: StateView + Sync + Send + 'static> {
-    shard_id: ShardId,
-    executor_service: Arc<ShardedExecutorService<S>>,
+pub struct LocalExecutorService<S: StateView + Sync + Send + 'static> {
+    _executor_service: Arc<ShardedExecutorService<S>>,
     join_handle: Option<thread::JoinHandle<()>>,
 }
 
-impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
+impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
     pub fn new(
         shard_id: ShardId,
         num_shards: usize,
@@ -43,7 +41,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
         cross_shard_rxs: Vec<Receiver<CrossShardMsg>>,
     ) -> Self {
         let cross_shard_client =
-            Arc::new(LocalCrossShardClient::new(shard_id, cross_shard_txs, cross_shard_rxs));
+            Arc::new(LocalCrossShardClient::new(cross_shard_txs, cross_shard_rxs));
         let coordinator_client = Arc::new(LocalCoordinatorClient::new(command_rx, result_tx));
         let executor_service = Arc::new(ShardedExecutorService::new(
             shard_id,
@@ -58,8 +56,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorShard<S> {
             .spawn(move || executor_service_clone.start())
             .unwrap();
         Self {
-            shard_id,
-            executor_service,
+            _executor_service: executor_service,
             join_handle: Some(join_handle),
         }
     }
@@ -117,14 +114,14 @@ pub struct LocalExecutorClient<S: StateView + Sync + Send + 'static> {
     // Channels to receive execution results from the executor shards.
     result_rxs: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
 
-    executor_shards: Vec<LocalExecutorShard<S>>,
+    executor_shards: Vec<LocalExecutorService<S>>,
 }
 
 impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
     pub fn new(
         command_tx: Vec<Sender<ExecutorShardCommand<S>>>,
         result_rx: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
-        executor_shards: Vec<LocalExecutorShard<S>>,
+        executor_shards: Vec<LocalExecutorService<S>>,
     ) -> Self {
         Self {
             command_txs: command_tx,
@@ -142,7 +139,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
     fn execute_block(
         &self,
         state_view: Arc<S>,
-        block: Vec<SubBlocksForShard<Transaction>>,
+        block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>) {
         for (i, sub_blocks_for_shard) in block.into_iter().enumerate() {
@@ -208,7 +205,6 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
 }
 
 pub struct LocalCrossShardClient {
-    shard_id: ShardId,
     // The senders of cross-shard messages to other shards per round.
     message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
     // The receivers of cross shard messages from other shards per round.
@@ -217,12 +213,10 @@ pub struct LocalCrossShardClient {
 
 impl LocalCrossShardClient {
     pub fn new(
-        shard_id: ShardId,
         cross_shard_txs: Vec<Vec<Sender<CrossShardMsg>>>,
         cross_shard_rxs: Vec<Receiver<CrossShardMsg>>,
     ) -> Self {
         Self {
-            shard_id,
             message_rxs: Arc::new(cross_shard_rxs.into_iter().map(Mutex::new).collect()),
             message_txs: Arc::new(
                 cross_shard_txs
