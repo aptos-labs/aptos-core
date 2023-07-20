@@ -23,7 +23,7 @@ use crate::{
     },
     schema,
 };
-use aptos_api_types::Transaction;
+use aptos_api_types::{Transaction, WriteSetChange};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -481,6 +481,8 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
+        let mut conn = self.get_conn();
+
         let (txns, txn_details, events, write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
@@ -524,12 +526,54 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         }
 
         // TODO, merge this loop with above
+        // Moving object handling here because we need a single object
+        // map through transactions for lookups
         let mut all_objects = vec![];
         let mut all_current_objects = HashMap::new();
         for txn in &transactions {
-            let (mut objects, current_objects) = Object::from_transaction(txn);
-            all_objects.append(&mut objects);
-            all_current_objects.extend(current_objects);
+            let (changes, txn_version) = match txn {
+                Transaction::UserTransaction(user_txn) => (
+                    user_txn.info.changes.clone(),
+                    user_txn.info.version.0 as i64,
+                ),
+                Transaction::BlockMetadataTransaction(bmt_txn) => {
+                    (bmt_txn.info.changes.clone(), bmt_txn.info.version.0 as i64)
+                },
+                _ => continue,
+            };
+
+            for (index, wsc) in changes.iter().enumerate() {
+                let index = index as i64;
+                match wsc {
+                    WriteSetChange::WriteResource(inner) => {
+                        if let Some((object, current_object)) =
+                            &Object::from_write_resource(inner, txn_version, index).unwrap()
+                        {
+                            all_objects.push(object.clone());
+                            all_current_objects
+                                .insert(object.object_address.clone(), current_object.clone());
+                        }
+                    },
+                    WriteSetChange::DeleteResource(inner) => {
+                        // Passing all_current_objects into the function so that we can get the owner of the deleted
+                        // resource if it was handled in the same batch
+                        if let Some((object, current_object)) = Object::from_delete_resource(
+                            inner,
+                            txn_version,
+                            index,
+                            &all_current_objects,
+                            &mut conn,
+                        )
+                        .unwrap()
+                        {
+                            all_objects.push(object.clone());
+                            all_current_objects
+                                .insert(object.object_address.clone(), current_object.clone());
+                        }
+                    },
+                    _ => {},
+                }
+            }
         }
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
         let mut current_table_items = current_table_items
@@ -546,7 +590,6 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
         all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
 
-        let mut conn = self.get_conn();
         let tx_result = insert_to_db(
             &mut conn,
             self.name(),

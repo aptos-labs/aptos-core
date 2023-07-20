@@ -10,7 +10,7 @@ use anyhow::Ok;
 use aptos_crypto::HashValue;
 use std::collections::HashMap;
 
-pub trait DAGStorage {
+pub trait DAGStorage: Send + Sync {
     fn save_node(&self, node: &Node) -> anyhow::Result<()>;
 
     fn delete_node(&self, digest: HashValue) -> anyhow::Result<()>;

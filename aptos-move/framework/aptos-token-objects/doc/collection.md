@@ -1106,4 +1106,4 @@ Provides the count of the current selection if supply tracking is used
 </details>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY
