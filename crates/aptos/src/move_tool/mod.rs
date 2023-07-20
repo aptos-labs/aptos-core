@@ -1531,8 +1531,33 @@ impl ArgWithType {
                 _ => serde_json::to_value(bcs::from_bytes::<T>(&self.arg)?)
                     .map_err(|err| CliError::UnexpectedError(err.to_string())),
             },
-            1 => serde_json::to_value(bcs::from_bytes::<Vec<T>>(&self.arg)?)
-                .map_err(|err| CliError::UnexpectedError(err.to_string())),
+            1 => match self._ty.clone() {
+                FunctionArgType::U64 => {
+                    let u64_vector: Vec<u64> = bcs::from_bytes::<Vec<u64>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        u64_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::U128 => {
+                    let u128_vector: Vec<u128> = bcs::from_bytes::<Vec<u128>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        u128_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::U256 => {
+                    let u256_vector: Vec<U256> = bcs::from_bytes::<Vec<U256>>(&self.arg)?;
+                    let string_vector: Vec<String> =
+                        u256_vector.iter().map(ToString::to_string).collect();
+                    serde_json::to_value(string_vector)
+                        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+                },
+                FunctionArgType::Raw => serde_json::to_value(&self.arg)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string())),
+                _ => serde_json::to_value(bcs::from_bytes::<Vec<T>>(&self.arg)?)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string())),
+            },
 
             2 => serde_json::to_value(bcs::from_bytes::<Vec<Vec<T>>>(&self.arg)?)
                 .map_err(|err| CliError::UnexpectedError(err.to_string())),
