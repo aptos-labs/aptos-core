@@ -42,7 +42,7 @@ FORGE_DEFAULT_TEST_SUITE = "land_blocking"
 FORGE_DEFAULT_CLUSTER_NAME = "aptos-forge-exp-0"
 
 
-def cleanup_and_exit(git: Git, exit_code: int, cleanup_branch: str = None) -> None:
+def cleanup_and_exit(git: Git, exit_code: int, cleanup_branch: str = "") -> None:
     """Clean up dangling resources like temporary exp branch, and exit with the given code."""
     if cleanup_branch:
         log.info("Deleting remote branch %s", cleanup_branch)
@@ -175,7 +175,8 @@ def workflow_dispatch_docker_build(
         f"All workflow runs: https://github.com/aptos-labs/aptos-core/actions/workflows/{DOCKER_RUST_BUILD_WORKFLOW_NAME}"
     )
     # XXX: wait a while for GH API to update
-    time.sleep(10)
+    if wait:
+        time.sleep(10)
     dispatch_status = gh_workflow_run_cmd_ret.succeeded()
     if dispatch_status:
         log.info("Successfully triggered docker build workflow")
@@ -193,7 +194,7 @@ def workflow_dispatch_forge(
     git_sha: str,
     duration: int = 480,
     test_suite: str = FORGE_DEFAULT_TEST_SUITE,
-    cluster_name: str = FORGE_DEFAULT_CLUSTER_NAME,
+    forge_cluster: str = FORGE_DEFAULT_CLUSTER_NAME,
     dry_run: bool = False,
     wait: bool = False,
 ) -> bool:
@@ -214,7 +215,7 @@ def workflow_dispatch_forge(
         "--field",
         f"FORGE_TEST_SUITE={test_suite}",
         "--field",
-        f"FORGE_CLUSTER_NAME={cluster_name}",
+        f"FORGE_CLUSTER_NAME={forge_cluster}",
     ]
     log.info(
         "%s: $ %s",
@@ -329,6 +330,11 @@ def main(log_metadata: bool) -> None:
     default="land_blocking",
     help="Test suite to run in Forge",
 )
+@click.option(
+    "--forge-cluster",
+    default=FORGE_DEFAULT_CLUSTER_NAME,
+    help="Name of the cluster to run Forge on",
+)
 def run(
     features: List[str],
     profile: str,
@@ -338,6 +344,7 @@ def run(
     with_forge: bool,
     forge_runner_duration_secs: int,
     forge_test_suite: str,
+    forge_cluster: str,
 ) -> None:
     # If --with-forge is specified, --wait should be True, otherwise the job will fail.
     if with_forge:
@@ -347,7 +354,7 @@ def run(
     git = Git(shell)
 
     git_sha, new_exp_git_branch = ensure_git_status(git, ignore_uncommitted_changes)
-    features = ",".join(features)
+    features_str = ",".join(features)
     profile = profile
 
     prev_built_image_exists = image_exists(shell, VALIDATOR_TESTING_IMAGE_NAME, git_sha)
@@ -361,7 +368,7 @@ def run(
             shell,
             new_exp_git_branch,
             git_sha,
-            features,
+            features_str,
             profile,
             dry_run=dry_run,
             wait=wait,
@@ -380,9 +387,11 @@ def run(
             shell,
             new_exp_git_branch,
             git_sha,
-            forge_runner_duration_secs,
-            forge_test_suite,
-            dry_run,
+            duration=forge_runner_duration_secs,
+            test_suite=forge_test_suite,
+            forge_cluster=forge_cluster,
+            dry_run=dry_run,
+            wait=wait,
         )
         if not forge_workflow_dispatch_status:
             log.error("Forge test workflow failed")

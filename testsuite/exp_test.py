@@ -63,3 +63,21 @@ class TestExp(unittest.TestCase):
         git = Git(spy_shell)
         exp.try_push_new_branch(git, "banana", "exp/banana")
         spy_shell.assert_commands(self)
+
+    def test_workflow_dispatch_docker_build(self):
+        branch = "banana_branch"
+        git_sha = "banana_sha"
+        features = "banana_feature1,banana_feature2"
+        profile = "banana_performance"
+        dry_run = False
+        wait = False
+        shell = SpyShell([
+                FakeCommand(
+                    f"gh workflow run {exp.DOCKER_RUST_BUILD_WORKFLOW_NAME} --ref {branch} --field GIT_SHA={git_sha} --field FEATURES={features} --field PROFILE={profile} --field BUILD_ADDL_TESTING_IMAGES=true",  # the branch exists already
+                    RunResult(0, b""),
+                ),
+        ])
+        exp.workflow_dispatch_docker_build(
+            shell, branch, git_sha, features, profile, dry_run, wait
+        )
+        shell.assert_commands(self)
