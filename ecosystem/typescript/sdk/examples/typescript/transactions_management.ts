@@ -17,7 +17,16 @@
  * Read more about it here {@link https://aptos.dev/guides/transaction-management}
  */
 
-import { AptosAccount, BCS, TxnBuilderTypes, TransactionWorker, FaucetClient, Provider, Types } from "aptos";
+import {
+  AptosAccount,
+  BCS,
+  TxnBuilderTypes,
+  TransactionWorker,
+  TransactionWorkerEvents,
+  FaucetClient,
+  Provider,
+  Types,
+} from "aptos";
 import { exit } from "process";
 import { NODE_URL, FAUCET_URL } from "./common";
 
@@ -111,14 +120,14 @@ async function main() {
      * on a success event, is the hash value of the processed transaction
      * on a failure event, is the reason for the failure
      */
-    transactionWorker.on("transactionSent", async (data) => {
+    transactionWorker.on(TransactionWorkerEvents.TransactionSent, async (data) => {
       // all expected transactions have been sent
       if (data[0] === totalTransactions) {
         console.log(`transactions sent in ${Date.now() / 1000 - last} seconds`);
       }
     });
 
-    transactionWorker.on("sentFailed", async (data) => {
+    transactionWorker.on(TransactionWorkerEvents.SentFailed, async (data) => {
       /**
        * transaction sent failed, up to the user to decide next steps.
        * whether to stop the worker by transactionWorker.stop() and handle
@@ -129,7 +138,7 @@ async function main() {
       console.log("sentFailed", data);
     });
 
-    transactionWorker.on("transactionExecuted", async (data) => {
+    transactionWorker.on(TransactionWorkerEvents.TransactionExecuted, async (data) => {
       // all expected transactions have been executed
       if (data[0] === totalTransactions) {
         console.log(`transactions executed in ${Date.now() / 1000 - last} seconds`);
@@ -137,7 +146,7 @@ async function main() {
       }
     });
 
-    transactionWorker.on("executionFailed", async (data) => {
+    transactionWorker.on(TransactionWorkerEvents.ExecutionFailed, async (data) => {
       /**
        * transaction execution failed, up to the user to decide next steps.
        * whether to stop the worker by transactionWorker.stop() and handle

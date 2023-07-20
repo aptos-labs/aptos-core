@@ -23,13 +23,14 @@ import { AsyncQueue, AsyncQueueCancelledError } from "./async_queue";
 
 const promiseFulfilledStatus = "fulfilled";
 
-// Events
-const transactionSent = "transactionSent";
-const sentFailed = "sentFailed";
+export enum TransactionWorkerEvents {
+  TransactionSent = "transactionSent",
+  SentFailed = "sentFailed",
+  TransactionExecuted = "transactionExecuted",
+  ExecutionFailed = "executionFailed",
+}
 
-const transactionExecuted = "transactionExecuted";
-const executionFailed = "executionFailed";
-export class TransactionWorker extends EventEmitter {
+export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
   readonly provider: Provider;
 
   readonly account: AptosAccount;
@@ -139,13 +140,16 @@ export class TransactionWorker extends EventEmitter {
           if (sentTransaction.status === promiseFulfilledStatus) {
             // transaction sent to chain
             this.sentTransactions.push([sentTransaction.value.hash, sequenceNumber, null]);
-            this.emit(transactionSent, [this.sentTransactions.length, sentTransaction.value.hash]);
+            this.emit(TransactionWorkerEvents.TransactionSent, [
+              this.sentTransactions.length,
+              sentTransaction.value.hash,
+            ]);
             // check sent transaction execution
             await this.checkTransaction(sentTransaction, sequenceNumber);
           } else {
             // send transaction failed
             this.sentTransactions.push([sentTransaction.status, sequenceNumber, sentTransaction.reason]);
-            this.emit(sentFailed, [this.sentTransactions.length, sentTransaction.reason]);
+            this.emit(TransactionWorkerEvents.SentFailed, [this.sentTransactions.length, sentTransaction.reason]);
           }
         }
       }
@@ -172,11 +176,17 @@ export class TransactionWorker extends EventEmitter {
       if (executedTransaction.status === promiseFulfilledStatus) {
         // transaction executed to chain
         this.executedTransactions.push([executedTransaction.value.hash, sequenceNumber, null]);
-        this.emit(transactionExecuted, [this.executedTransactions.length, executedTransaction.value.hash]);
+        this.emit(TransactionWorkerEvents.TransactionExecuted, [
+          this.executedTransactions.length,
+          executedTransaction.value.hash,
+        ]);
       } else {
         // transaction execution failed
         this.executedTransactions.push([executedTransaction.status, sequenceNumber, executedTransaction.reason]);
-        this.emit(executionFailed, [this.executedTransactions.length, executedTransaction.reason]);
+        this.emit(TransactionWorkerEvents.ExecutionFailed, [
+          this.executedTransactions.length,
+          executedTransaction.reason,
+        ]);
       }
     }
   }
