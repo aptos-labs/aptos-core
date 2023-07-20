@@ -93,7 +93,7 @@ impl TokenActivityV2 {
                     true
                 } else {
                     // Look up in the db
-                    TokenDataV2::is_address_token(conn, &maybe_token_data_id)?
+                    TokenDataV2::is_address_token(conn, &maybe_token_data_id)
                 };
                 if !is_token {
                     return Ok(None);
