@@ -531,6 +531,7 @@ spec aptos_framework::account {
         });
 
         include account_scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: signed_message_bytes };
+        // TODO: compiler error with message T
         // aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
         //     ed25519::Signature { bytes: signed_message_bytes },
         //     ed25519::UnvalidatedPublicKey { bytes: account_public_key },
