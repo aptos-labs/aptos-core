@@ -5,14 +5,20 @@ use crate::{
         nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
-    utils::{image_optimizer::ImageOptimizer, json_parser::JSONParser, uri_parser::URIParser},
+    utils::{
+        db::upsert_uris, image_optimizer::ImageOptimizer, json_parser::JSONParser,
+        uri_parser::URIParser,
+    },
 };
 use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
     PgConnection,
 };
 use image::ImageFormat;
-use nft_metadata_crawler_utils::NFTMetadataCrawlerEntry;
+use nft_metadata_crawler_utils::{
+    gcs::{write_image_to_gcs, write_json_to_gcs},
+    NFTMetadataCrawlerEntry,
+};
 use serde_json::Value;
 use tracing::{error, info};
 
@@ -174,8 +180,29 @@ impl Parser {
     /**
      * Calls and handles error for writing JSON to GCS
      */
-    async fn handle_write_json_to_gcs(&mut self, _json: Option<Value>) -> Option<String> {
-        todo!();
+    async fn handle_write_json_to_gcs(&self, json: Option<Value>) -> Option<String> {
+        if let Some(json) = json {
+            match write_json_to_gcs(
+                self.token.clone(),
+                self.bucket.clone(),
+                self.entry.token_data_id.clone(),
+                json,
+            )
+            .await
+            {
+                Ok(filename) => {
+                    self.log_info("Successfully wrote JSON to GCS");
+                    Some(filename)
+                },
+                Err(e) => {
+                    self.log_error(&e.to_string());
+                    None
+                },
+            }
+        } else {
+            self.log_error("No JSON to write to GCS");
+            None
+        }
     }
 
     /**
@@ -183,16 +210,41 @@ impl Parser {
      */
     async fn handle_write_image_to_gcs(
         &mut self,
-        _image: Option<(Vec<u8>, ImageFormat)>,
+        image: Option<(Vec<u8>, ImageFormat)>,
     ) -> Option<String> {
-        todo!();
+        if let Some((image, format)) = image {
+            match write_image_to_gcs(
+                self.token.clone(),
+                format,
+                self.bucket.clone(),
+                self.entry.token_data_id.clone(),
+                image,
+            )
+            .await
+            {
+                Ok(filename) => {
+                    self.log_info("Successfully wrote image to GCS");
+                    Some(filename)
+                },
+                Err(e) => {
+                    self.log_error(&e.to_string());
+                    None
+                },
+            }
+        } else {
+            self.log_error("No image to write to GCS");
+            None
+        }
     }
 
     /**
      * Calls and handles error for upserting to Postgres
      */
     async fn commit_to_postgres(&mut self) {
-        todo!();
+        match upsert_uris(&mut self.conn, self.model.clone()) {
+            Ok(_) => self.log_info("Successfully committed to Postgres"),
+            Err(e) => self.log_error(&format!("Failed to commit to Postgres: {}", e.to_string())),
+        };
     }
 
     /**
