@@ -10,6 +10,8 @@ use crate::{
     hash::CryptoHash,
     traits::*,
 };
+use p256::{ecdsa::signature::Signer, elliptic_curve::sec1};
+use p256;
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -20,6 +22,8 @@ use std::fmt;
 /// A P256 private key
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
 pub struct P256PrivateKey(pub(crate) p256::ecdsa::SigningKey);
+
+impl private::Sealed for P256PrivateKey {}
 
 #[cfg(feature = "assert-private-keys-not-cloneable")]
 static_assertions::assert_not_impl_any!(P256PrivateKey: Clone);
@@ -36,13 +40,15 @@ impl Clone for P256PrivateKey {
 #[derive(DeserializeKey, Clone, SerializeKey)]
 pub struct P256PublicKey(pub(crate) p256::ecdsa::VerifyingKey);
 
+impl private::Sealed for P256PublicKey {}
+
 impl P256PrivateKey {
     /// The length of the P256PrivateKey
     pub const LENGTH: usize = P256_PRIVATE_KEY_LENGTH;
 
     /// Serialize a P256PrivateKey.
     pub fn to_bytes(&self) -> [u8; P256_PRIVATE_KEY_LENGTH] {
-        self.0.to_bytes()
+        self.0.to_bytes().into()
     }
 
     /// Deserialize an P256PrivateKey without any validation checks apart from expected key size.
@@ -58,7 +64,7 @@ impl P256PrivateKey {
     /// Private function aimed at minimizing code duplication between sign
     /// methods of the SigningKey implementation. This should remain private.
     fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
-        let secret_key: &p256::SecretKey = &self.0;
+        let secret_key: &p256::ecdsa::SigningKey = &self.0;
         let public_key: P256PublicKey = self.into();
         let sig = secret_key.sign(message.as_ref());
         P256Signature(sig)
@@ -67,8 +73,10 @@ impl P256PrivateKey {
 
 impl P256PublicKey {
     /// Serialize a P256PublicKey.
+    // TODO: Better error handling here. Also should we compress?
     pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
-        self.0.to_bytes()
+        let bytes = &*self.0.to_encoded_point(false).to_bytes();
+        bytes.try_into().unwrap()
     }
 
     /// Deserialize a P256PublicKey without any validation checks apart from expected key size
@@ -78,7 +86,8 @@ impl P256PublicKey {
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
-        match ed25519_dalek::PublicKey::from_bytes(bytes) {
+        let enc_point = sec1::EncodedPoint::from_bytes(bytes);
+        match p256::ecdsa::VerifyingKey::from_bytes(bytes) {
             Ok(p256_public_key) => Ok(P256PublicKey(p256_public_key)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
