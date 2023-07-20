@@ -340,6 +340,10 @@ describe("BuilderUtils", () => {
     let serializer = new Serializer();
     serializeArg(undefined, new TypeTagStruct(optionStructTag(new TypeTagU8())), serializer);
     expect(serializer.getBytes()).toEqual(new Uint8Array([0x0]));
+
+    let serializer2 = new Serializer();
+    serializeArg(null, new TypeTagStruct(optionStructTag(new TypeTagU8())), serializer2);
+    expect(serializer2.getBytes()).toEqual(new Uint8Array([0x0]));
   });
 
   it("serializes an option num arg", async () => {

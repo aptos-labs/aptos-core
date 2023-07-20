@@ -7,6 +7,7 @@ use aptos_language_e2e_tests::account_universe::P2PTransferGen;
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_benchmarks::transactions::TransactionBencher;
+use aptos_vm_logging::disable_speculative_logging;
 use clap::{Parser, Subcommand};
 use proptest::prelude::*;
 use std::{
@@ -86,6 +87,8 @@ struct ExecuteOpt {
 }
 
 fn param_sweep(opt: ParamSweepOpt) {
+    disable_speculative_logging();
+
     let block_sizes = opt.block_sizes.unwrap_or_else(|| vec![1000, 10000, 50000]);
     let concurrency_level = num_cpus::get();
 

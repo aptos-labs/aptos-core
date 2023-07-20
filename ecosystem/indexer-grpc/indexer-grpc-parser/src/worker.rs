@@ -40,7 +40,7 @@ pub struct Worker {
     pub db_pool: PgDbPool,
     pub processor_name: String,
     pub postgres_connection_string: String,
-    pub indexer_grpc_data_service_addresss: String,
+    pub indexer_grpc_data_service_address: String,
     pub indexer_grpc_http2_ping_interval: std::time::Duration,
     pub indexer_grpc_http2_ping_timeout: std::time::Duration,
     pub auth_token: String,
@@ -55,7 +55,7 @@ impl Worker {
     pub async fn new(
         processor_name: String,
         postgres_connection_string: String,
-        indexer_grpc_data_service_addresss: String,
+        indexer_grpc_data_service_address: String,
         indexer_grpc_http2_ping_interval: std::time::Duration,
         indexer_grpc_http2_ping_timeout: std::time::Duration,
         auth_token: String,
@@ -82,7 +82,7 @@ impl Worker {
             db_pool: conn_pool,
             processor_name,
             postgres_connection_string,
-            indexer_grpc_data_service_addresss,
+            indexer_grpc_data_service_address,
             indexer_grpc_http2_ping_interval,
             indexer_grpc_http2_ping_timeout,
             starting_version,
@@ -99,13 +99,13 @@ impl Worker {
 
         info!(
             processor_name = processor_name,
-            stream_address = self.indexer_grpc_data_service_addresss.clone(),
+            stream_address = self.indexer_grpc_data_service_address.clone(),
             "[Parser] Connecting to GRPC endpoint",
         );
 
         let channel = tonic::transport::Channel::from_shared(format!(
             "http://{}",
-            self.indexer_grpc_data_service_addresss.clone()
+            self.indexer_grpc_data_service_address.clone()
         ))
         .expect("[Parser] Endpoint is not a valid URI")
         .http2_keep_alive_interval(self.indexer_grpc_http2_ping_interval)
@@ -116,7 +116,7 @@ impl Worker {
             Err(e) => {
                 error!(
                     processor_name = processor_name,
-                    stream_address = self.indexer_grpc_data_service_addresss.clone(),
+                    stream_address = self.indexer_grpc_data_service_address.clone(),
                     error = ?e,
                     "[Parser] Error connecting to grpc_stream"
                 );
@@ -125,7 +125,7 @@ impl Worker {
         };
         info!(
             processor_name = processor_name,
-            stream_address = self.indexer_grpc_data_service_addresss.clone(),
+            stream_address = self.indexer_grpc_data_service_address.clone(),
             "[Parser] Connected to GRPC endpoint",
         );
 
@@ -157,7 +157,7 @@ impl Worker {
 
         info!(
             processor_name = processor_name,
-            stream_address = self.indexer_grpc_data_service_addresss.clone(),
+            stream_address = self.indexer_grpc_data_service_address.clone(),
             final_start_version = starting_version,
             start_version_from_config = self.starting_version,
             start_version_from_db = starting_version_from_db,
@@ -181,7 +181,7 @@ impl Worker {
         let concurrent_tasks = self.number_concurrent_processing_tasks;
         info!(
             processor_name = processor_name,
-            stream_address = self.indexer_grpc_data_service_addresss.clone(),
+            stream_address = self.indexer_grpc_data_service_address.clone(),
             starting_version = starting_version,
             concurrent_tasks = concurrent_tasks,
             "[Parser] Successfully connected to GRPC endpoint. Now instantiating processor",
@@ -324,7 +324,7 @@ impl Worker {
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
-                            stream_address = self.indexer_grpc_data_service_addresss.clone(),
+                            stream_address = self.indexer_grpc_data_service_address.clone(),
                             error = ?e,
                             "[Parser] Error processing transactions"
                         );
@@ -350,7 +350,7 @@ impl Worker {
                     if prev_end.unwrap() + 1 != start {
                         error!(
                             processor_name = processor_name,
-                            stream_address = self.indexer_grpc_data_service_addresss.clone(),
+                            stream_address = self.indexer_grpc_data_service_address.clone(),
                             processed_versions = processed_versions_sorted
                                 .iter()
                                 .map(|(s, e)| format!("{}-{}", s, e))

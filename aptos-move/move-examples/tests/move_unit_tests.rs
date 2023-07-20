@@ -76,6 +76,15 @@ fn test_resource_account_common(pkg: &str) {
 }
 
 #[test]
+fn test_veiled_coin() {
+    let named_address = BTreeMap::from([(
+        String::from("veiled_coin"),
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+    )]);
+    run_tests_for_pkg("veiled_coin", named_address);
+}
+
+#[test]
 fn test_common_account() {
     test_common("common_account");
 }
@@ -98,6 +107,11 @@ fn test_groth16() {
 #[test]
 fn test_hello_blockchain() {
     test_common("hello_blockchain");
+}
+
+#[test]
+fn test_drand_lottery() {
+    test_common("drand");
 }
 
 #[test]
@@ -223,4 +237,19 @@ fn test_swap() {
         ),
     ]);
     run_tests_for_pkg("swap", named_address);
+}
+
+#[test]
+fn test_package_manager() {
+    let named_address = BTreeMap::from([
+        (
+            String::from("deployer"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("package"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("package_manager", named_address);
 }
