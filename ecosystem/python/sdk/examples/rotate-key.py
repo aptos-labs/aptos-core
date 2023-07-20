@@ -2,12 +2,12 @@ import asyncio
 import subprocess
 import time
 
-from aptos_sdk.ed25519 import PrivateKey
 from aptos_sdk.account import Account, RotationProofChallenge
 from aptos_sdk.account_address import AccountAddress
+from aptos_sdk.async_client import FaucetClient, RestClient
 from aptos_sdk.authenticator import Authenticator, MultiEd25519Authenticator
 from aptos_sdk.bcs import Serializer
-from aptos_sdk.async_client import FaucetClient, RestClient
+from aptos_sdk.ed25519 import PrivateKey
 from aptos_sdk.transactions import (
     EntryFunction,
     RawTransaction,
@@ -23,21 +23,29 @@ from .common import FAUCET_URL, NODE_URL
 
 WIDTH = 19
 
+
 def truncate(address: str) -> str:
-    return address[0:6] + '...' + address[-6:]
+    return address[0:6] + "..." + address[-6:]
+
 
 def format_account_info(account: Account) -> str:
-    vals = [str(account.address()), account.auth_key(), account.private_key.hex(), str(account.public_key())]
-    return ''.join([truncate(v).ljust(WIDTH, ' ') for v in vals])
+    vals = [
+        str(account.address()),
+        account.auth_key(),
+        account.private_key.hex(),
+        str(account.public_key()),
+    ]
+    return "".join([truncate(v).ljust(WIDTH, " ") for v in vals])
+
 
 async def rotate_auth_key_ed_25519_payload(
-    rest_client: RestClient,
-    from_account: Account,
-    private_key: PrivateKey
+    rest_client: RestClient, from_account: Account, private_key: PrivateKey
 ) -> TransactionPayload:
     to_account = Account.load_key(private_key.hex())
     rotation_proof_challenge = RotationProofChallenge(
-        sequence_number=await rest_client.account_sequence_number(from_account.address()),
+        sequence_number=await rest_client.account_sequence_number(
+            from_account.address()
+        ),
         originator=from_account.address(),
         current_auth_key=AccountAddress.from_str(from_account.auth_key()),
         new_public_key=to_account.public_key().key.encode(),
@@ -86,34 +94,48 @@ async def main():
     await faucet_client.fund_account(bob.address(), 10_000_000)
 
     # display formatted account info
-    print('\n' + 'Account'.ljust(WIDTH, " ") + 'Address'.ljust(WIDTH, " ") + 'Auth Key'.ljust(WIDTH, " ") + 'Private Key'.ljust(WIDTH, " ") + 'Public Key'.ljust(WIDTH, " "))
-    print('-------------------------------------------------------------------------------------------')
-    print('Alice'.ljust(WIDTH, " ") + format_account_info(alice))
-    print('Bob'.ljust(WIDTH, " ") + format_account_info(bob))
+    print(
+        "\n"
+        + "Account".ljust(WIDTH, " ")
+        + "Address".ljust(WIDTH, " ")
+        + "Auth Key".ljust(WIDTH, " ")
+        + "Private Key".ljust(WIDTH, " ")
+        + "Public Key".ljust(WIDTH, " ")
+    )
+    print(
+        "-------------------------------------------------------------------------------------------"
+    )
+    print("Alice".ljust(WIDTH, " ") + format_account_info(alice))
+    print("Bob".ljust(WIDTH, " ") + format_account_info(bob))
 
     print("\n...rotating...\n")
 
     # :!:>rotate_key
     # create the payload for rotating Alice's private key to Bob's private key
-    payload = await rotate_auth_key_ed_25519_payload(rest_client, alice, bob.private_key)
+    payload = await rotate_auth_key_ed_25519_payload(
+        rest_client, alice, bob.private_key
+    )
     # have Alice sign the transaction with the payload
     signed_transaction = await rest_client.create_bcs_signed_transaction(alice, payload)
     # submit the transaction and wait for confirmation
     tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
-    await rest_client.wait_for_transaction(tx_hash) # <:!:rotate_key
+    await rest_client.wait_for_transaction(tx_hash)  # <:!:rotate_key
 
     # check the authentication key for Alice's address on-chain
     alice_new_account_info = await rest_client.account(alice.address())
     # ensure that Alice's authentication key matches bob's
-    assert alice_new_account_info['authentication_key'] == bob.auth_key(), "Authentication key doesn't match Bob's"
+    assert (
+        alice_new_account_info["authentication_key"] == bob.auth_key()
+    ), "Authentication key doesn't match Bob's"
 
     # construct a new Account object that reflects alice's original address with the new private key
     alice = Account(alice.address(), bob.private_key)
 
     # display formatted account info
-    print('Alice'.ljust(WIDTH, " ") + format_account_info(alice))
-    print('Bob'.ljust(WIDTH, " ") +  format_account_info(bob))
+    print("Alice".ljust(WIDTH, " ") + format_account_info(alice))
+    print("Bob".ljust(WIDTH, " ") + format_account_info(bob))
     print()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
