@@ -1,12 +1,13 @@
 # This workflow runs a public fullnode using the `main` branch,
-# connects the public fullnode to `mainnet` and synchronizes the
-# node using fast syncing to verify that nothing has been broken.
+# connects the public fullnode to `testnet` and synchronizes the
+# node using execution or output syncing to verify that nothing
+# has been broken.
 
-name: "fullnode-fast-mainnet-main"
+name: "fullnode-intelligent-testnet-main"
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 2 * * *" # Once a day, at 02:00 (UTC)
+    - cron: "30 5 * * *" # Once a day, at 05:30 (UTC)
 
 permissions:
   contents: read
@@ -22,13 +23,13 @@ jobs:
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
-  fullnode-fast-mainnet-main:
+  fullnode-intelligent-testnet-main:
     needs: check-repo
     uses: ./.github/workflows/run-fullnode-sync.yaml
     secrets: inherit
     with:
-      TEST_NAME: fullnode-fast-mainnet-main
+      TEST_NAME: fullnode-intelligent-testnet-main
       GIT_REF: main
-      NETWORK: mainnet
+      NETWORK: testnet
       BOOTSTRAPPING_MODE: DownloadLatestStates
-      CONTINUOUS_SYNCING_MODE: ExecuteTransactions
+      CONTINUOUS_SYNCING_MODE: ExecuteTransactionsOrApplyOutputs
