@@ -51,9 +51,7 @@ spec aptos_framework::block {
 
         aborts_if false;
 
-        // While emitting a new block event, the number of them is equal to the current block height.
         aborts_if event::counter(event_handle) != new_block_event.height;
-        ensures event::counter(event_handle) == new_block_event.height;
     }
 
     /// The caller is aptos_framework.

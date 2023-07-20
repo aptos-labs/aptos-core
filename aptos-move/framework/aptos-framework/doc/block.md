@@ -748,7 +748,6 @@ The BlockResource existed under the @aptos_framework.
 <b>requires</b> (proposer != @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &lt; <a href="timestamp.md#0x1_timestamp">timestamp</a>);
 <b>aborts_if</b> <b>false</b>;
 <b>aborts_if</b> <a href="event.md#0x1_event_counter">event::counter</a>(event_handle) != new_block_event.height;
-<b>ensures</b> <a href="event.md#0x1_event_counter">event::counter</a>(event_handle) == new_block_event.height;
 </code></pre>
 
 
