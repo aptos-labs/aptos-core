@@ -15,6 +15,11 @@ use aptos_types::{
 use aptos_vm::sharded_block_executor::{executor_shard::ExecutorShard, ExecutorShardCommand};
 use crossbeam_channel::{Receiver, Sender};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
+use aptos_logger::trace;
+use aptos_types::block_executor::partitioner::SubBlocksForShard;
+use aptos_types::transaction::Transaction;
+use aptos_vm::sharded_block_executor::executor_shard::ExecutorClient;
 
 /// A block executor that receives transactions from a channel and executes them in parallel.
 /// It runs in the local machine.
@@ -137,5 +142,63 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> for RemoteExecutorSh
         println!("Received result for shard {}", self.shard_id);
         let result: RemoteExecutionResult = bcs::from_bytes(&received_bytes).unwrap();
         result.inner
+    }
+}
+
+pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
+    // Channels to send execute block commands to the executor shards.
+    command_txs: Vec<Sender<Message>>,
+    // Channels to receive execution results from the executor shards.
+    result_rxs: Vec<Receiver<Message>>,
+    // Thread pool used to pre-fetch the state values for the block in parallel and create an in-memory state view.
+    thread_pool: Arc<rayon::ThreadPool>,
+    phantom: std::marker::PhantomData<S>,
+}
+
+impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
+    pub fn new(
+        remote_shard_addresses: Vec<SocketAddr>,
+        controller: &mut NetworkController,
+        num_threads: Option<usize>,
+    ) -> Self {
+        let num_threads = num_threads.unwrap_or_else(|| num_cpus::get());
+        let thread_pool = Arc::new(rayon::ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap());
+        let (command_txs, result_rxs) = remote_shard_addresses
+            .iter().enumerate()
+            .map(|(shard_id, address)| {
+                let execute_command_type = format!("execute_command_{}", shard_id);
+                let execute_result_type = format!("execute_result_{}", shard_id);
+                let command_tx = controller
+                    .create_outbound_channel(*address, execute_command_type.to_string());
+                let result_rx = controller.create_inbound_channel(execute_result_type.to_string());
+                (command_tx, result_rx)
+            })
+            .unzip();
+        Self {
+            command_txs,
+            result_rxs,
+            thread_pool,
+            phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorClient<S> {
+    fn num_shards(&self) -> usize {
+        self.command_txs.len()
+    }
+
+    fn execute_block(&self, state_view: Arc<S>, block: Vec<SubBlocksForShard<Transaction>>, concurrency_level_per_shard: usize, maybe_block_gas_limit: Option<u64>) {
+    }
+
+    fn get_execution_result(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
+        trace!("RemoteExecutorClient Waiting for results");
+        let mut results = vec![];
+        for rx in self.result_rxs.iter() {
+            let received_bytes = rx.recv().unwrap().to_bytes();
+            let result: RemoteExecutionResult = bcs::from_bytes(&received_bytes).unwrap();
+            results.push(result.inner?);
+        }
+        Ok(results)
     }
 }

@@ -156,7 +156,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
     }
 
     fn get_execution_result(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
-        trace!("ShardedBlockExecutor Waiting for results");
+        trace!("LocalExecutorClient Waiting for results");
         let mut results = vec![];
         for rx in self.result_rxs.iter() {
             results.push(rx.recv().unwrap()?);
