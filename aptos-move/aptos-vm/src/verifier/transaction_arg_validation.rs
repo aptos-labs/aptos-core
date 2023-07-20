@@ -254,7 +254,7 @@ fn construct_arg(
     use move_vm_types::loaded_data::runtime_types::Type::*;
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => Ok(arg),
-        Vector(_) | Struct { index: _ } | StructInstantiation { index: _, ty_args: _ } => {
+        Vector(_) | Struct { .. } | StructInstantiation { .. } => {
             let mut cursor = Cursor::new(&arg[..]);
             let mut new_arg = vec![];
             let mut max_invocations = 10; // Read from config in the future
