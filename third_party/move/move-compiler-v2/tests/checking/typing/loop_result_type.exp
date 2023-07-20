@@ -1,0 +1,56 @@
+// ---- Model Dump
+module 0x2::X {
+    struct R {
+        dummy_field: bool,
+    }
+} // end 0x2::X
+module 0x2::M {
+    private fun foo(_x: u64) {
+        Tuple()
+    }
+    private fun t0() {
+        loop {
+          Tuple()
+        }
+    }
+    private fun t1() {
+        loop {
+          {
+            let x: () = 0;
+            x;
+            Tuple()
+          }
+        }
+    }
+    private fun t2() {
+        M::foo(loop {
+          Tuple()
+        })
+    }
+    private fun t3() {
+        {
+          let x: X::R = loop {
+            0;
+            Tuple()
+          };
+          x
+        }
+    }
+    private fun t4() {
+        {
+          let () = loop {
+            break
+          };
+          {
+            let () = loop {
+              if false {
+                break
+              } else {
+                Tuple()
+              }
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0x2::M

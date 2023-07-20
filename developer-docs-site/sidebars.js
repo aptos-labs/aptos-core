@@ -101,6 +101,7 @@ const sidebars = {
         "tutorials/first-transaction",
         "tutorials/your-first-nft",
         "tutorials/first-coin",
+        "tutorials/first-fungible-asset",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
         "tutorials/first-multisig",

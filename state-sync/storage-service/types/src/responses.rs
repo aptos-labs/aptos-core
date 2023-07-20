@@ -537,6 +537,13 @@ impl DataSummary {
             .map(|li| (li.ledger_info().version() + OPTIMISTIC_FETCH_VERSION_DELTA) > known_version)
             .unwrap_or(false)
     }
+
+    /// Returns the version of the synced ledger info (if one exists)
+    pub fn get_synced_ledger_info_version(&self) -> Option<u64> {
+        self.synced_ledger_info
+            .as_ref()
+            .map(|ledger_info| ledger_info.ledger_info().version())
+    }
 }
 
 /// A struct representing a contiguous, non-empty data range (lowest to highest,

@@ -7,7 +7,7 @@ mod consensusdb_test;
 mod schema;
 
 use crate::{
-    dag::{CertifiedNode, Node},
+    dag::{CertifiedNode, Node, NodeId, Vote},
     error::DbError,
 };
 use anyhow::Result;
@@ -17,7 +17,7 @@ use aptos_logger::prelude::*;
 use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
 use schema::{
     block::BlockSchema,
-    dag::{CertifiedNodeSchema, NodeSchema},
+    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema},
     quorum_certificate::QCSchema,
     single_entry::{SingleEntryKey, SingleEntrySchema},
     BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, NODE_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME,
@@ -197,6 +197,32 @@ impl ConsensusDB {
         batch.put::<NodeSchema>(&node.digest(), node)?;
         self.commit(batch)?;
         Ok(())
+    }
+
+    pub fn delete_node(&self, digest: HashValue) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.delete::<NodeSchema>(&digest)?;
+        self.commit(batch)
+    }
+
+    pub fn save_dag_vote(&self, node_id: &NodeId, vote: &Vote) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        batch.put::<DagVoteSchema>(node_id, vote)?;
+        self.commit(batch)
+    }
+
+    pub fn get_dag_votes(&self) -> Result<HashMap<NodeId, Vote>, DbError> {
+        let mut iter = self.db.iter::<DagVoteSchema>(ReadOptions::default())?;
+        iter.seek_to_first();
+        Ok(iter.collect::<Result<HashMap<NodeId, Vote>>>()?)
+    }
+
+    pub fn delete_dag_votes(&self, node_ids: Vec<NodeId>) -> Result<(), DbError> {
+        let batch = SchemaBatch::new();
+        node_ids
+            .iter()
+            .try_for_each(|node_id| batch.delete::<DagVoteSchema>(node_id))?;
+        self.commit(batch)
     }
 
     pub fn save_certified_node(&self, node: &CertifiedNode) -> Result<(), DbError> {

@@ -1,0 +1,14 @@
+
+Diagnostics:
+error: constant expression must be a literal
+   ┌─ tests/checking/typing/constant_supported_exps.move:3:20
+   │
+ 3 │       const C: u64 = {
+   │ ╭────────────────────^
+ 4 │ │         ();
+ 5 │ │         0;
+ 6 │ │         { (); () };
+   · │
+28 │ │         0
+29 │ │     };
+   │ ╰─────^

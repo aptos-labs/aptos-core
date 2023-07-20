@@ -126,8 +126,7 @@ impl DelegatorPool {
         if let Some(StakeResource::DelegationPool(inner)) =
             StakeResource::from_write_resource(write_resource, txn_version)?
         {
-            let staking_pool_address: String =
-                standardize_address(&write_resource.address.to_string());
+            let staking_pool_address = standardize_address(&write_resource.address.to_string());
             let total_coins = inner.active_shares.total_coins;
             let total_shares =
                 &inner.active_shares.total_shares / &inner.active_shares.scaling_factor;

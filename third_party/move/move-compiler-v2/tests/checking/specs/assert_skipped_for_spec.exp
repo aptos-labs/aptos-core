@@ -1,0 +1,11 @@
+// ---- Model Dump
+module 0x42::M {
+    private fun bar(x: u64) {
+        if Gt(x, 0) {
+          Abort(1)
+        } else {
+          Tuple()
+        };
+        Sub(x, 1)
+    }
+} // end 0x42::M

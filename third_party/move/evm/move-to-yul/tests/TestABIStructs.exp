@@ -2446,7 +2446,7 @@ object "test_A2_M_test_abi_String" {
                 case 2 {
                     // label L5
                     // assert Le($t1, $t4)
-                    // assert forall j: Range(0, $t1): ascii::$is_valid_char(Index($t0, j))
+                    // assert forall j: num: Range(0, $t1): ascii::$is_valid_char(Index($t0, j))
                     // $t6 := <($t1, $t4)
                     $t6 := $Lt(i, $t4)
                     // if ($t6) goto L1 else goto L0
@@ -2474,7 +2474,7 @@ object "test_A2_M_test_abi_String" {
                 case 5 {
                     // label L0
                     // assert Eq<u64>($t1, $t4)
-                    // assert forall j: Range(0, $t4): ascii::$is_valid_char(Index($t0, j))
+                    // assert forall j: num: Range(0, $t4): ascii::$is_valid_char(Index($t0, j))
                     // $t14 := move($t0)
                     $t14 := mload($locals)
                     // $t15 := pack ascii::String($t14)

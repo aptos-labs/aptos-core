@@ -4,7 +4,7 @@
 import time
 from typing import Any, Dict, List
 
-import httpx
+import requests
 
 from . import ed25519
 from .account import Account
@@ -38,14 +38,16 @@ class RestClient:
     """A wrapper around the Aptos-core Rest API"""
 
     chain_id: int
-    client: httpx.Client
+    client: requests.Session
     client_config: ClientConfig
     base_url: str
 
     def __init__(self, base_url: str, client_config: ClientConfig = ClientConfig()):
         self.base_url = base_url
-        self.client = httpx.Client()
-        self.client.headers[Metadata.APTOS_HEADER] = Metadata.get_aptos_header_val()
+        self.client = requests.Session()
+        self.client.headers.update(
+            {Metadata.APTOS_HEADER: Metadata.get_aptos_header_val()}
+        )
         self.client_config = client_config
         self.chain_id = int(self.info()["chain_id"])
 
@@ -205,8 +207,8 @@ class RestClient:
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
         response = self.client.post(
             f"{self.base_url}/transactions/simulate",
+            data=signed_transaction.bytes(),
             headers=headers,
-            content=signed_transaction.bytes(),
         )
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
@@ -217,8 +219,8 @@ class RestClient:
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
         response = self.client.post(
             f"{self.base_url}/transactions",
+            data=signed_transaction.bytes(),
             headers=headers,
-            content=signed_transaction.bytes(),
         )
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)

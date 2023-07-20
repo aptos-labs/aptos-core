@@ -377,7 +377,8 @@ where
                     .into_iter()
                     .map(|txn| txn.into())
                     .collect::<Vec<AnalyzedTransaction>>(),
-                1,
+                4,
+                0.9,
             );
             parallel_block_executor
                 .execute_block(

@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use super::{reliable_broadcast::CertifiedNodeHandler, types::TDAGMessage};
+use super::{reliable_broadcast::CertifiedNodeHandler, storage::DAGStorage, types::TDAGMessage};
 use crate::{
     dag::{
         dag_network::RpcHandler, dag_store::Dag, reliable_broadcast::NodeBroadcastHandler,
@@ -32,13 +32,15 @@ impl NetworkHandler {
         dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
         signer: ValidatorSigner,
         epoch_state: Arc<EpochState>,
+        storage: Arc<dyn DAGStorage>,
     ) -> Self {
         Self {
             dag_rpc_rx,
             node_receiver: NodeBroadcastHandler::new(
                 dag.clone(),
                 signer,
-                epoch_state.verifier.clone(),
+                epoch_state.clone(),
+                storage,
             ),
             certified_node_receiver: CertifiedNodeHandler::new(dag),
             epoch_state,
@@ -46,6 +48,7 @@ impl NetworkHandler {
     }
 
     async fn start(mut self) {
+        // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         while let Some(msg) = self.dag_rpc_rx.next().await {
             if let Err(e) = self.process_rpc(msg).await {
                 warn!(error = ?e, "error processing rpc");
