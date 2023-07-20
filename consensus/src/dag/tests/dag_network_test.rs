@@ -1,10 +1,6 @@
-use crate::{
-    dag::{
-        dag_network::{DAGNetworkSender, RpcWithFallback},
-        types::{DAGMessage, TestAck, TestMessage},
-    },
-    network::TConsensusMsg,
-    network_interface::ConsensusMsg,
+use crate::dag::{
+    dag_network::{DAGNetworkSender, RpcWithFallback},
+    types::{DAGMessage, TestAck, TestMessage},
 };
 use anyhow::{anyhow, bail};
 use aptos_consensus_types::common::Author;
@@ -12,7 +8,7 @@ use aptos_infallible::Mutex;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
-use claims::{assert_ok, assert_err};
+use claims::{assert_err, assert_ok};
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
@@ -34,12 +30,10 @@ impl DAGNetworkSender for MockDAGNetworkSender {
     async fn send_rpc(
         &self,
         receiver: Author,
-        message: ConsensusMsg,
+        message: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<ConsensusMsg> {
-        let message: TestMessage = (TConsensusMsg::from_network_message(message)
-            as anyhow::Result<DAGMessage>)?
-            .try_into()?;
+    ) -> anyhow::Result<DAGMessage> {
+        let message: TestMessage = message.try_into()?;
         let state = {
             self.test_peer_state
                 .lock()
@@ -48,10 +42,10 @@ impl DAGNetworkSender for MockDAGNetworkSender {
                 .clone()
         };
         match state {
-            TestPeerState::Fast => Ok(DAGMessage::from(TestAck(message.0)).into_network_message()),
+            TestPeerState::Fast => Ok(TestAck(message.0).into()),
             TestPeerState::Slow(duration) => {
                 self.time_service.sleep(duration.clone()).await;
-                Ok(DAGMessage::from(TestAck(message.0)).into_network_message())
+                Ok(TestAck(message.0).into())
             },
             TestPeerState::FailSlow(duration) => {
                 self.time_service.sleep(duration.clone()).await;
@@ -63,7 +57,7 @@ impl DAGNetworkSender for MockDAGNetworkSender {
     async fn send_rpc_with_fallbacks(
         &self,
         responders: Vec<Author>,
-        message: ConsensusMsg,
+        message: DAGMessage,
         timeout: Duration,
     ) -> RpcWithFallback {
         RpcWithFallback::new(
@@ -98,14 +92,10 @@ async fn test_send_rpc_with_fallback() {
             (validators[4], TestPeerState::Slow(Duration::from_secs(2))),
         ]))),
     };
-    
+
     let message = TestMessage(vec![42; validators.len() - 1]);
     let mut rpc = sender
-        .send_rpc_with_fallbacks(
-            validators,
-            DAGMessage::from(message).into_network_message(),
-            Duration::from_millis(100),
-        )
+        .send_rpc_with_fallbacks(validators, message.into(), Duration::from_millis(100))
         .await;
 
     assert_ok!(rpc.next().await.unwrap());

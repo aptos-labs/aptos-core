@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_network::RpcWithFallback, RpcHandler, types::NodeMetadata};
-use crate::{
-    dag::{
-        dag_network::DAGNetworkSender,
-        dag_store::Dag,
-        types::{CertifiedNode, DAGMessage, FetchResponse, Node, RemoteFetchRequest},
-    },
-    network::TConsensusMsg,
+use super::{dag_network::RpcWithFallback, types::NodeMetadata, RpcHandler};
+use crate::dag::{
+    dag_network::DAGNetworkSender,
+    dag_store::Dag,
+    types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
@@ -17,7 +14,7 @@ use aptos_logger::error;
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
 use futures::StreamExt;
-use std::{sync::Arc, time::Duration, collections::HashMap};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use thiserror::Error as ThisError;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
@@ -111,21 +108,20 @@ impl DagFetcher {
                 )
             };
 
-            let network_request = DAGMessage::from(remote_request.clone()).into_network_message();
             let mut rpc = RpcWithFallback::new(
                 responders,
-                network_request,
+                remote_request.clone().into(),
                 Duration::from_secs(1),
                 self.network.clone(),
                 self.time_service.clone(),
             );
             while let Some(response) = rpc.next().await {
-                if let Ok(response) = response
-                    .and_then(DAGMessage::try_from)
-                    .and_then(FetchResponse::try_from)
-                    .and_then(|response| {
-                        response.verify(&remote_request, &self.epoch_state.verifier)
-                    })
+                if let Ok(response) =
+                    response
+                        .and_then(FetchResponse::try_from)
+                        .and_then(|response| {
+                            response.verify(&remote_request, &self.epoch_state.verifier)
+                        })
                 {
                     let certified_nodes = response.certified_nodes();
                     // TODO: support chunk response or fallback to state sync
@@ -137,8 +133,12 @@ impl DagFetcher {
                             }
                         }
                     }
-                    
-                    if self.dag.read().all_exists(local_request.node().parents_metadata()) {
+
+                    if self
+                        .dag
+                        .read()
+                        .all_exists(local_request.node().parents_metadata())
+                    {
                         local_request.notify();
                         break;
                     }

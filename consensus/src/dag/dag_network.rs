@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::network_interface::ConsensusMsg;
+use super::types::DAGMessage;
 use aptos_consensus_types::common::Author;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
 use async_trait::async_trait;
@@ -28,16 +28,16 @@ pub trait DAGNetworkSender: Send + Sync {
     async fn send_rpc(
         &self,
         receiver: Author,
-        message: ConsensusMsg,
+        message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<ConsensusMsg>;
+    ) -> anyhow::Result<DAGMessage>;
 
     /// Given a list of potential responders, sending rpc to get response from any of them and could
     /// fallback to more in case of failures.
     async fn send_rpc_with_fallbacks(
         &self,
         responders: Vec<Author>,
-        message: ConsensusMsg,
+        message: DAGMessage,
         timeout: Duration,
     ) -> RpcWithFallback;
 }
@@ -63,24 +63,20 @@ impl Responders {
             return None;
         }
         Some(
-            self.peers.split_off(
-                self.peers
-                    .len()
-                    .checked_sub(count as usize)
-                    .unwrap_or(0),
-            ),
+            self.peers
+                .split_off(self.peers.len().checked_sub(count as usize).unwrap_or(0)),
         )
     }
 }
 
 pub struct RpcWithFallback {
     responders: Responders,
-    message: ConsensusMsg,
+    message: DAGMessage,
     timeout: Duration,
 
     terminated: bool,
     futures: Pin<
-        Box<FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<ConsensusMsg>> + Send>>>>,
+        Box<FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<DAGMessage>> + Send>>>>,
     >,
     sender: Arc<dyn DAGNetworkSender>,
     interval: Pin<Box<Interval>>,
@@ -89,7 +85,7 @@ pub struct RpcWithFallback {
 impl RpcWithFallback {
     pub fn new(
         responders: Vec<Author>,
-        message: ConsensusMsg,
+        message: DAGMessage,
         timeout: Duration,
         sender: Arc<dyn DAGNetworkSender>,
         time_service: TimeService,
@@ -107,17 +103,31 @@ impl RpcWithFallback {
     }
 }
 
+async fn send_rpc(
+    sender: Arc<dyn DAGNetworkSender>,
+    peer: Author,
+    message: DAGMessage,
+    timeout: Duration,
+) -> anyhow::Result<DAGMessage> {
+    sender.send_rpc(peer, message, timeout).await
+}
+
 impl Stream for RpcWithFallback {
-    type Item = anyhow::Result<ConsensusMsg>;
+    type Item = anyhow::Result<DAGMessage>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let send_rpc = move |sender: Arc<dyn DAGNetworkSender>, peer, message, timeout| async move {
-            sender.send_rpc(peer, message, timeout).await
-        };
+        if !self.futures.is_empty() {
+            // Check if any of the futures is ready
+            if let Poll::Ready(result) = self.futures.as_mut().poll_next(cx) {
+                return Poll::Ready(result);
+            }
+        }
 
+        // Check if the timeout has happened
         let timeout = matches!(self.interval.as_mut().poll_next(cx), Poll::Ready(_));
 
         if self.futures.is_empty() || timeout {
+            // try to find more responders and queue futures
             if let Some(peers) = Pin::new(&mut self.responders).next_to_request() {
                 for peer in peers {
                     let future = Box::pin(send_rpc(
@@ -129,18 +139,18 @@ impl Stream for RpcWithFallback {
                     self.futures.push(future);
                 }
             } else if self.futures.is_empty() {
+                self.terminated = true;
                 return Poll::Ready(None);
             }
         }
 
-        let result = futures::ready!(self.futures.as_mut().poll_next(cx));
-        Poll::Ready(result)
+        self.futures.as_mut().poll_next(cx)
     }
 }
 
 impl FusedStream for RpcWithFallback {
     fn is_terminated(&self) -> bool {
-        self.futures.is_empty()
+        self.terminated
     }
 }
 
@@ -152,7 +162,7 @@ struct ExponentialNumberGenerator {
 
 impl ExponentialNumberGenerator {
     fn new(starting_value: u32, factor: u32, max_limit: u32) -> Self {
-        ExponentialNumberGenerator {
+        Self {
             current: starting_value,
             factor,
             max_limit,
@@ -166,7 +176,11 @@ impl Iterator for ExponentialNumberGenerator {
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.current;
         if self.current < self.max_limit {
-            self.current = (self.current * self.factor).min(self.max_limit)
+            self.current = self
+                .current
+                .checked_mul(self.factor)
+                .unwrap_or(self.max_limit)
+                .min(self.max_limit)
         }
 
         Some(result)

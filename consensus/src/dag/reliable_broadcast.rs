@@ -6,13 +6,10 @@ use super::{
     types::{CertifiedAck, CertifiedNode},
     NodeId,
 };
-use crate::{
-    dag::{
-        dag_network::{DAGNetworkSender, RpcHandler},
-        dag_store::Dag,
-        types::{Node, NodeCertificate, TDAGMessage, Vote},
-    },
-    network::TConsensusMsg,
+use crate::dag::{
+    dag_network::{DAGNetworkSender, RpcHandler},
+    dag_store::Dag,
+    types::{Node, NodeCertificate, TDAGMessage, Vote},
 };
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
@@ -64,9 +61,9 @@ impl ReliableBroadcast {
                     )
                 }
             };
-            let network_message = message.into().into_network_message();
+            let dag_message = message.into();
             for receiver in receivers {
-                fut.push(send_message(receiver, network_message.clone()));
+                fut.push(send_message(receiver, dag_message.clone()));
             }
             while let Some((receiver, result)) = fut.next().await {
                 match result {
@@ -79,7 +76,7 @@ impl ReliableBroadcast {
                             }
                         }
                     },
-                    Err(_) => fut.push(send_message(receiver, network_message.clone())),
+                    Err(_) => fut.push(send_message(receiver, dag_message.clone())),
                 }
             }
             unreachable!("Should aggregate with all responses");
