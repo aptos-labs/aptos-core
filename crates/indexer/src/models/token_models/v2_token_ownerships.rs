@@ -164,6 +164,10 @@ impl TokenOwnershipV2 {
 
         // check if token was transferred
         if let Some((event_index, transfer_event)) = &metadata.transfer_event {
+            // If it's a self transfer then skip
+            if transfer_event.get_to_address() == transfer_event.get_from_address() {
+                return Ok(Some((ownership, current_ownership, None, None)));
+            }
             Ok(Some((
                 ownership,
                 current_ownership,
