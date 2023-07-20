@@ -1,5 +1,3 @@
-import axios from "axios";
-
 interface Cookie {
   name: string;
   value: string;
@@ -9,7 +7,7 @@ interface Cookie {
   secure?: boolean;
 }
 
-class CookieJar {
+export class CookieJar {
   constructor(private jar = new Map<string, Cookie[]>()) {}
 
   setCookie(url: URL, cookieStr: string) {
@@ -84,23 +82,3 @@ class CookieJar {
     return cookie;
   }
 }
-const jar = new CookieJar();
-
-axios.interceptors.response.use((response) => {
-  if (Array.isArray(response.headers["set-cookie"])) {
-    response.headers["set-cookie"].forEach((c) => {
-      jar.setCookie(new URL(response.config.url!), c);
-    });
-  }
-  return response;
-});
-/* eslint-disable prefer-arrow-callback,func-names */
-axios.interceptors.request.use(function (config) {
-  const cookies = jar.getCookies(new URL(config.url!));
-
-  if (cookies?.length > 0 && config.headers) {
-    /* eslint-disable no-param-reassign */
-    config.headers.cookie = cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
-  }
-  return config;
-});
