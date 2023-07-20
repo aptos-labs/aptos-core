@@ -2950,7 +2950,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify_duration_estimate = 1000;
 <b>include</b> <a href="vesting.md#0x1_vesting_TotalAccumulatedRewardsAbortsIf">TotalAccumulatedRewardsAbortsIf</a>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
 <b>let</b> operator = vesting_contract.staking.operator;
@@ -3051,7 +3051,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>pragma</b> aborts_if_is_partial;
 <b>aborts_if</b> withdrawal_address == @aptos_framework || withdrawal_address == @vm_reserved;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(withdrawal_address);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(withdrawal_address);
