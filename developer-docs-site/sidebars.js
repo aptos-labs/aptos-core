@@ -46,7 +46,6 @@ const sidebars = {
         },
         "concepts/accounts",
         "concepts/resources",
-        "concepts/resource-accounts",
         "concepts/events",
         "concepts/txns-states",
         "concepts/gas-txn-fee",
@@ -337,6 +336,11 @@ const sidebars = {
     },
     {
       type: "category",
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> 2cc005c6a5 (Updated inaccurate wording, explained the difference between account.move and resource_account.move, and moved the structure around. Also added auth key rotation examples from #9130 to refer to.)
       label: "Examples",
       collapsible: true,
       collapsed: true,
@@ -347,10 +351,30 @@ const sidebars = {
         slug: "/category/examples",
         keywords: ["examples"],
       },
+<<<<<<< HEAD
       items: ["guides/account-management/key-rotation"],
     },
     {
       type: "category",
+=======
+      items: [
+        "guides/account-management/key-rotation",
+        {
+          type: "category",
+          label: "Resource accounts",
+          link: { type: "doc", id: "guides/resource-accounts/index" },
+          collapsible: true,
+          collapsed: true,
+          items: [
+            "guides/resource-accounts/using-resource-accounts",
+          ],
+        },
+      ],
+    },
+    {
+      type: "category",
+>>>>>>> 55c0f3ab0c (Updated inaccurate wording, explained the difference between account.move and resource_account.move, and moved the structure around. Also added auth key rotation examples from #9130 to refer to.)
+>>>>>>> 2cc005c6a5 (Updated inaccurate wording, explained the difference between account.move and resource_account.move, and moved the structure around. Also added auth key rotation examples from #9130 to refer to.)
       label: "Build E2E Dapp with Aptos",
       link: { type: "doc", id: "tutorials/build-e2e-dapp/index" },
       collapsible: true,

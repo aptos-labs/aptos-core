@@ -1,24 +1,36 @@
 ---
-title: "Resource Accounts"
-id: "resource-accounts"
+title: "Move subsections to individual pages"
+id: "using-resource-accounts"
 ---
 
-## What is a resource account?
+# Utilizing Resource Accounts
 
-A resource account is an [Account](https://aptos.dev/concepts/accounts/) that's used to store and manage resources. It can be a simple storage account that's used merely to separate different resources for an account or a module, or it can be utilized to programmatically control resource management in a contract.
+### What is a resource account?
+
+A resource account is an [Account](https://aptos.dev/concepts/accounts/) that's used to store and manage resources. It can be used as a simple storage account for various resources or it can be utilized to programmatically manage resources from within a smart contract.
 
 There are two distinct ways to manage a resource account:
 
-1. The auth key is rotated to a separate account that can control it manually
-2. The Move VM rotates the auth key to 0x0 and controls the account through a SignerCapability
+1. The authentication key is rotated to a separate account that can control it manually by signing for it
+2. The authentication key is rotated to 0x0 and is controlled programmatically with a `SignerCapability`
 
 In this guide we'll discuss how to implement each technique, variations on the implementations, and any configuration details relevant to the creation process.
 
-## Rotating the auth key to another account
+You can view the smart contracts that define and use resource accounts in more detail at [account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/account.move) and [resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move).
+
+:::tip
+The `create_resource_account(...)` functions in `account.move` and `resource_account.move` are similar but serve two different purposes, each one reflecting one of the two aforementioned ways to manage resource accounts.
+
+The `create_resource_account(...)` function in `account.move` creates a resource account and rotates its authentication key to `0x0`. The resource account doesn't have an associated private key and can only be controlled through the usage of a [SignerCapability](#whats-a-signercapability).
+
+The `create_resource_account(...)` function in `resource_account.move` creates a resource account and rotates its authentication key to a specified authentication key. The account is still controlled by the specified authentication key's corresponding private key as long as the SignerCapability hasn't yet been retrieved.
+:::
+
+## Rotating the authentication key to another account
 
 The first technique we're going to discuss is through the `create_resource_account` function in the `resource_account.move` contract. View the code [here](https://github.com/aptos-labs/aptos-core/blob/4beb914a168bd358ec375bfd9854cffaa271199a/aptos-move/framework/aptos-framework/sources/account.move#L602).
 
-You can specify a `seed` byte vector and an optional auth key to rotate the resulting resource account's auth key to.
+You can specify a `seed` byte vector and an optional authentication key to rotate the resulting resource account's authentication key to.
 ```rust
 public entry fun create_resource_account(
     origin: &signer,
@@ -34,15 +46,15 @@ public entry fun create_resource_account(
     );
 }
 ```
-When you create a resource account like this, the account with the matching auth key can sign for it. Transactions signed in this way will show the signer/sender account as the resource account, but it was actually signed by the owning account with the matching auth key. This is mostly for separating resources into a different account- it's merely a way to organize and manage resources.
+When you create a resource account like this, the account with the matching authentication key can sign for it. Transactions signed in this way will show the signer/sender account as the resource account, but it was actually signed by the owning account with the matching authentication key. This is mostly for separating resources into a different account- it's merely a way to organize and manage resources.
 
-Notice that there is nothing returned here- we are not given anything to store or manage. We simply created a resource account and rotated its auth key to the optional auth key.
+Notice that there is nothing returned here- we are not given anything to store or manage. We simply created a resource account and rotated its authentication key to the optional authentication key.
 
 :::tip
-If you don't specify an auth key, that is, if you pass in `vector::empty<u8>()` or `vector<u8> []` to the `optional_auth_key` field, it will automatically rotate the auth key to the `origin` account's auth key.
+If you don't specify an authentication key, that is, if you pass in `vector::empty<u8>()` or `vector<u8> []` to the `optional_auth_key` field, it will automatically rotate the authentication key to the `origin` account's authentication key.
 :::
 
-## Rotating the auth key to 0x0 to create a SignerCapability
+## Rotating the authentication key to 0x0 to create a SignerCapability
 
 The second technique is the `create_resource_account` function in the `account.move` contract. View the code [here](https://github.com/aptos-labs/aptos-core/blob/4beb914a168bd358ec375bfd9854cffaa271199a/aptos-move/framework/aptos-framework/sources/account.move#L602).
 
@@ -55,25 +67,11 @@ public fun create_resource_account(
 }
 ```
 
-When this function is called, the auth key of the resource account is rotated to `0x0`, which gives the Move VM the capability to generate the resource account's signer from a `SignerCapability`. You can store this `SignerCapability` and retrieve it later to sign for the resource account.
+When this function is called, the authentication key of the resource account is rotated to `0x0`, which gives the Move VM the capability to generate the resource account's signer from a `SignerCapability`. You can store this `SignerCapability` and retrieve it later to sign for the resource account.
 
 This is often integral to automating a smart contract in Move. It gives the developer the ability to generate a signer for an account programmatically.
 
-Notice that the creation function returns the resource account's `signer` and a `SignerCapability` resource. Let's discuss what a `SignerCapability` is and then how to store it.
-
-#### What's a SignerCapability?
-
-A SignerCapability is a very simple resource, mostly meant to abstractly represent the ability to sign for an account. It doesn't actually *do* anything special, but its existence somewhere implies that if you have access to it, you either created it or received access to it very intentionally.
-
-It contains a single field called `account` the matches the address it's intended to generate a signature for:
-
-```rust
-struct SignerCapability has drop, store {
-    account: address
-}
-```
-
-Since it only has the abilities `drop` and `store`, it can't be copied, meaning only `account.move` itself can manage the new creation of a `SignerCapability`. The inner `account` field cannot be altered post creation, so it can only sign for the resource account it was initially created for.
+Notice that the creation function returns the resource account's `signer` and a `SignerCapability` resource. Read more about what a `SignerCapability` is [here](#whats-a-signercapability).
 
 Here is a very basic example that demonstrates how you'd use a `SignerCapability` in a Move contract:
 
@@ -137,7 +135,7 @@ public entry fun create_resource_account_and_publish_package(
 ```
 
 :::warning Immutable Contracts
-By default, publishing a module to a resource account means it will be immutable *unless* you store the SignerCapability somewhere in the `init_module` function. This is because the auth key is rotated to `ZERO_AUTH_KEY`, meaning the only way to control it is through a `SignerCapability`.
+By default, publishing a module to a resource account means it will be immutable *unless* you store the SignerCapability somewhere in the `init_module` function. This is because the authentication key is rotated to `ZERO_AUTH_KEY`, meaning the only way to control it is through a `SignerCapability`.
 
 If you don't store the `SignerCapability` there is no way to retrieve the resource account's signer, rendering it immutable.
 
@@ -355,7 +353,7 @@ public entry fun create_resource_account_and_fund(
 
 ## Acquiring a SignerCapability later
 
-Say you create a resource account and rotate its auth key to your account's auth key. You'd just need to sign for the account and call `retrieve_resource_account_cap` in order to get the `SignerCapability` and store it somewhere:
+Say you create a resource account and rotate its authentication key to your account's authentication key. You'd just need to sign for the account and call `retrieve_resource_account_cap` in order to get the `SignerCapability` and store it somewhere:
 
 ```rust
 struct MySignerCapability has key {
@@ -378,10 +376,28 @@ aptos move run --function-id MODULE_ADDRESS::MODULE_NAME::retrieve_cap --args ad
 
 ## How is the address for a resource account derived?
 
-When a resource account is created, the address is derived from a SHA3-256 hash of the requesting account's address plus an optional byte vector `seed`. If you want to know the resource address generated by an account + a given arbitrary seed, you can call the `create_resource_address` function in `account.move`:
-
+When a resource account is created, the address is derived from a SHA3-256 hash of the requesting account's address plus an optional byte vector `seed`. If you want to know the resource address generated by an account and a given seed, you can call the `create_resource_address` function in `account.move`:
 ```rust
-account::create_resource_address(your_account_address, seed);
+/// This is a helper function to compute resource addresses. Computation of the address
+/// involves the use of a cryptographic hash operation and should be use thoughtfully.
+public fun create_resource_address(source: &address, seed: vector<u8>): address {
+    let bytes = bcs::to_bytes(source);
+    vector::append(&mut bytes, seed);
+    vector::push_back(&mut bytes, DERIVE_RESOURCE_ACCOUNT_SCHEME);
+    from_bcs::to_address(hash::sha3_256(bytes))
+}
 ```
 
-You can view the resource account functionality in more detail at [account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/account.move) and [resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move).
+## What's a SignerCapability?
+
+A SignerCapability is a very simple resource, intended to be an abstract representation of the ability to sign for an account. It doesn't actually *do* anything special, but its existence somewhere implies that if you have access to it, you either created it or received access to it very intentionally.
+
+It contains a single field called `account` the matches the address it's intended to generate a signature for:
+
+```rust
+struct SignerCapability has drop, store {
+    account: address
+}
+```
+
+Since it only has the abilities `drop` and `store`, it can't be copied, meaning only `account.move` itself can manage the new creation of a `SignerCapability`. The inner `account` field cannot be altered post creation, so it can only sign for the resource account it was initially created for.
