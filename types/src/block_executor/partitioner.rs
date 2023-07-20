@@ -418,34 +418,3 @@ impl From<Vec<Transaction>> for ExecutableTransactions {
         Self::Unsharded(txns)
     }
 }
-
-// Represents the transactions that are executed on a particular block executor shard. Unsharded
-// transactions represents the entire block. Sharded transactions represents the transactions
-// that are assigned to this shard.
-pub enum BlockExecutorTransactions<T> {
-    Unsharded(Vec<T>),
-    Sharded(SubBlocksForShard<T>),
-}
-
-impl<T: Clone> BlockExecutorTransactions<T> {
-    pub fn num_txns(&self) -> usize {
-        match self {
-            BlockExecutorTransactions::Unsharded(transactions) => transactions.len(),
-            BlockExecutorTransactions::Sharded(sub_blocks) => sub_blocks.num_txns(),
-        }
-    }
-
-    pub fn get_unsharded_transactions(&self) -> Option<&Vec<T>> {
-        match self {
-            BlockExecutorTransactions::Unsharded(transactions) => Some(transactions),
-            BlockExecutorTransactions::Sharded(_) => None,
-        }
-    }
-
-    pub fn into_txns(self) -> Vec<T> {
-        match self {
-            BlockExecutorTransactions::Unsharded(transactions) => transactions,
-            BlockExecutorTransactions::Sharded(sub_blocks) => sub_blocks.into_txns(),
-        }
-    }
-}
