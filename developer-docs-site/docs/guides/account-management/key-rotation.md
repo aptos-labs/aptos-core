@@ -1,14 +1,14 @@
 ---
-title: "Key Rotation"
+title: "Rotating an authentication key"
 id: "key-rotation"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Aptos Move accounts have authentication keys that are separate from their public address. This means you can rotate an account's private key to give control of it to another account without changing the initial account's public address.
+Aptos Move accounts have a public address, an authentication key, a public key, and a private key. The public address is permanent, always matching the account's initial authentication key.
 
-After rotating the key, the controlling account can sign transactions for the initial account.
+The Aptos account model facilitates the unique ability to rotate an account's private key. Since an account's address is the *initial* authentication key, the ability to sign for an account can be transferred to another private key without changing its public address.
 
 In this guide, we show examples for how to rotate an account's authentication key using a few of the various Aptos SDKs.
 
@@ -26,14 +26,16 @@ Some of the following examples use private keys. Do not share your private keys 
 <Tabs groupId="examples">
   <TabItem value="CLI" label="CLI">
 
+Run the following to initialize two test profiles. Leave the inputs blank both times you're prompted for a private key.
+
 ```shell title="Initialize two test profiles on devnet"
-echo "devnet" | aptos init --profile rotate-1
-echo "devnet" | aptos init --profile rotate-2
+aptos init --profile test_profile_1 --network devnet --assume-yes
+aptos init --profile test_profile_2 --network devnet --assume-yes
 ```
-```shell title="Rotate the authentication key for rotate-1 to rotate-2's authentication key"
-aptos account rotate-key --profile rotate-1 --new-private-key <ROTATE_2_PRIVATE_KEY>
+```shell title="Rotate the authentication key for test_profile_1 to test_profile_2's authentication key"
+aptos account rotate-key --profile test_profile_1 --new-private-key <TEST_PROFILE_2_PRIVATE_KEY>
 ```
-:::info Where do I get the private key for a profile?
+:::info Where do I view the private key for a profile?
 Public, private, and authentication keys for Aptos CLI profiles are stored in `~/.aptos/config.yaml` if your config is set to `Global` and `<local_directory>/.aptos/config.yaml` if it's set to `Workspace`.
 
 To see your config settings, run `aptos config show-global-config`.
@@ -49,18 +51,22 @@ yes
 ...
 
 Enter the name for the profile
-rotate-1-new
+test_profile_1_rotated
 
-Profile rotate-1-new is saved.
+Profile test_profile_1_rotated is saved.
 ```
-You can now use the profile like any other account. The private key for `rotate-1-new` will match `rotate-2` in the `~/.aptos/config.yaml` file and the `Authentication Key` on the account will match the `Authentication Key` of `rotate-2` on-chain.
+You can now use the profile like any other account.
+
+In your `config.yaml` file, `test_profile_1_rotated` will retain its original public address but have a new public and private key that matches `test_profile_2`.
+
+The authentication keys aren't shown in the `config.yaml` file, but we can verify the change with the following commands:
 
 ```shell title="Verify the authentication keys are now equal with view functions"
-# View the authentication key of `rotate-1-new`
-aptos move view --function-id 0x1::account::get_authentication_key --args address:rotate-1-new
+# View the authentication key of `test_profile_1_rotated`
+aptos move view --function-id 0x1::account::get_authentication_key --args address:test_profile_1_rotated
 
-# View the authentication key of `rotate-2`, it should equal the above.
-aptos move view --function-id 0x1::account::get_authentication_key --args address:rotate-2
+# View the authentication key of `test_profile_2`, it should equal the above.
+aptos move view --function-id 0x1::account::get_authentication_key --args address:test_profile_2
 ```
 
 ```json title="Example output from the previous two commands"
@@ -79,14 +85,15 @@ aptos move view --function-id 0x1::account::get_authentication_key --args addres
 
   <TabItem value="typescript" label="Typescript">
 
-View the full example for this code [here](https://github.com/aptos-labs/aptos-core/ecosystem/typescript/sdk/examples/typescript/rotate_key.ts).
-
 This program creates two accounts on devnet, Alice and Bob, funds them, then rotates the Alice's authentication key to that of Bob's.
+
+View the full example for this code [here](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk/examples/typescript/rotate_key.ts).
 
 The function to rotate is very simple:
 ```typescript title="Typescript SDK rotate authentication key function"
 :!: static/sdks/typescript/examples/typescript-esm/rotate_key.ts rotate_key
 ```
+Commands to run the example script:
 ```shell title="Navigate to the typescript SDK directory, install dependencies and run rotate_key.ts"
 cd ~/aptos-core/ecosystem/typescript/sdk/examples/typescript-esm
 pnpm install && pnpm rotate_key
@@ -105,9 +112,15 @@ Bob                0x1c06...ac3bb3     0x1c06...ac3bb3      0xf2be...9486aa     
   </TabItem>
   <TabItem value="python" label="Python">
 
+This program creates two accounts on devnet, Alice and Bob, funds them, then rotates the Alice's authentication key to that of Bob's.
+
+View the full example for this code [here](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples/rotate-key.py).
+
+Here's the relevant code that rotates Alice's keys to Bob's:
 ```python title="Python SDK rotate authentication key function"
 :!: static/sdks/python/examples/rotate-key.py rotate_key
 ```
+Commands to run the example script:
 ```shell title="Navigate to the python SDK directory, install dependencies and run rotate_key.ts"
 cd ~/aptos-core/ecosystem/python/sdk
 poetry install && poetry run python -m examples.rotate-key

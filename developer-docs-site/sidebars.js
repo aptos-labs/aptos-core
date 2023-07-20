@@ -347,7 +347,7 @@ const sidebars = {
         keywords: ["examples"],
       },
       items: [
-        "guides/resource-accounts/key-rotation",
+        "guides/account-management/key-rotation",
       ],
     },
     {

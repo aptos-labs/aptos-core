@@ -39,7 +39,7 @@ async def rotate_auth_key_ed_25519_payload(
     rotation_proof_challenge = RotationProofChallenge(
         sequence_number=await rest_client.account_sequence_number(from_account.address()),
         originator=from_account.address(),
-        current_auth_key=AccountAddress.from_hex(from_account.auth_key()),
+        current_auth_key=AccountAddress.from_str(from_account.auth_key()),
         new_public_key=to_account.public_key().key.encode(),
     )
 
@@ -73,13 +73,19 @@ async def rotate_auth_key_ed_25519_payload(
 
 
 async def main():
+    # initialize the clients used to interact with the blockchain
     rest_client = RestClient(NODE_URL)
     faucet_client = FaucetClient(FAUCET_URL, rest_client)
+
+    # generate random accounts Alice and Bob
     alice = Account.generate()
     bob = Account.generate()
 
+    # fund both accounts
     await faucet_client.fund_account(alice.address(), 10_000_000)
     await faucet_client.fund_account(bob.address(), 10_000_000)
+
+    # display formatted account info
     print('\n' + 'Account'.ljust(WIDTH, " ") + 'Address'.ljust(WIDTH, " ") + 'Auth Key'.ljust(WIDTH, " ") + 'Private Key'.ljust(WIDTH, " ") + 'Public Key'.ljust(WIDTH, " "))
     print('-------------------------------------------------------------------------------------------')
     print('Alice'.ljust(WIDTH, " ") + format_account_info(alice))
@@ -88,19 +94,23 @@ async def main():
     print("\n...rotating...\n")
 
     # :!:>rotate_key
+    # create the payload for rotating Alice's private key to Bob's private key
     payload = await rotate_auth_key_ed_25519_payload(rest_client, alice, bob.private_key)
-
-    signed_transaction = await rest_client.create_bcs_signed_transaction(
-        alice, payload
-    ) # <:!:rotate_key
-
+    # have Alice sign the transaction with the payload
+    signed_transaction = await rest_client.create_bcs_signed_transaction(alice, payload)
+    # submit the transaction and wait for confirmation
     tx_hash = await rest_client.submit_bcs_transaction(signed_transaction)
-    await rest_client.wait_for_transaction(tx_hash)
+    await rest_client.wait_for_transaction(tx_hash) # <:!:rotate_key
 
-    new_account_info = await rest_client.account(alice.address())
-    assert AccountAddress.from_hex(new_account_info['authentication_key']) == bob.address(), "Authentication key doesn't match Bob's address"
+    # check the authentication key for Alice's address on-chain
+    alice_new_account_info = await rest_client.account(alice.address())
+    # ensure that Alice's authentication key matches bob's
+    assert alice_new_account_info['authentication_key'] == bob.auth_key(), "Authentication key doesn't match Bob's"
+
+    # construct a new Account object that reflects alice's original address with the new private key
     alice = Account(alice.address(), bob.private_key)
 
+    # display formatted account info
     print('Alice'.ljust(WIDTH, " ") + format_account_info(alice))
     print('Bob'.ljust(WIDTH, " ") +  format_account_info(bob))
     print()
