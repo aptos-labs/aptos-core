@@ -23,10 +23,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_state_view::TStateView;
-use aptos_types::{
-    block_executor::partitioner::BlockExecutorTransactions, executable::Executable,
-    fee_statement::FeeStatement, write_set::WriteOp,
-};
+use aptos_types::{executable::Executable, fee_statement::FeeStatement, write_set::WriteOp};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
@@ -697,20 +694,19 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: BlockExecutorTransactions<T>,
+        signature_verified_block: Vec<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
-        let signature_verified_txns = signature_verified_block.into_txns();
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
-                &signature_verified_txns,
+                &signature_verified_block,
                 base_view,
             )
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_txns,
+                &signature_verified_block,
                 base_view,
             )
         };
@@ -720,17 +716,17 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_txns.len());
+            init_speculative_logs(signature_verified_block.len());
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_txns,
+                &signature_verified_block,
                 base_view,
             )
         }
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
-            drop(signature_verified_txns);
+            drop(signature_verified_block);
         });
         ret
     }

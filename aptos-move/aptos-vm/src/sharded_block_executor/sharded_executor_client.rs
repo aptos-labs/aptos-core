@@ -14,10 +14,8 @@ use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{
-        BlockExecutorTransactions, ShardId, SubBlock, SubBlocksForShard,
-    },
-    transaction::{Transaction, TransactionOutput},
+    block_executor::partitioner::{ShardId, SubBlock, SubBlocksForShard},
+    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
@@ -102,7 +100,7 @@ impl ShardedExecutorClient {
     fn create_cross_shard_state_view<'a, S: StateView + Sync + Send>(
         &self,
         base_view: &'a S,
-        sub_block: &SubBlock<Transaction>,
+        sub_block: &SubBlock<AnalyzedTransaction>,
     ) -> CrossShardStateView<'a, S> {
         let mut cross_shard_state_key = HashSet::new();
         for txn in &sub_block.transactions {
@@ -117,7 +115,7 @@ impl ShardedExecutorClient {
 
     fn execute_sub_block<S: StateView + Sync + Send>(
         &self,
-        sub_block: SubBlock<Transaction>,
+        sub_block: SubBlock<AnalyzedTransaction>,
         round: usize,
         state_view: &S,
         concurrency_level: usize,
@@ -158,7 +156,11 @@ impl ShardedExecutorClient {
             s.spawn(move |_| {
                 let ret = BlockAptosVM::execute_block(
                     self.executor_thread_pool.clone(),
-                    BlockExecutorTransactions::Unsharded(sub_block.into_txns()),
+                    sub_block
+                        .into_txns()
+                        .into_iter()
+                        .map(|txn| txn.into_txn())
+                        .collect(),
                     cross_shard_state_view.as_ref(),
                     concurrency_level,
                     maybe_block_gas_limit,
@@ -188,7 +190,7 @@ impl ShardedExecutorClient {
 impl BlockExecutorClient for ShardedExecutorClient {
     fn execute_block<S: StateView + Sync + Send>(
         &self,
-        transactions: SubBlocksForShard<Transaction>,
+        transactions: SubBlocksForShard<AnalyzedTransaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
