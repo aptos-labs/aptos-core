@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use chrono::{NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use google_cloud_auth::{
     project::{create_token_source, Config},
     token_source::TokenSource,
@@ -9,22 +9,20 @@ use google_cloud_auth::{
 pub mod gcs;
 pub mod pubsub;
 
-/**
- * Struct to help with parsing of CSV
- */
+/// Struct to help with parsing of CSV
 #[derive(Clone, Debug)]
 pub struct NFTMetadataCrawlerEntry {
     pub token_data_id: String,
     pub token_uri: String,
     pub last_transaction_version: i32,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
-    pub last_updated: chrono::NaiveDateTime,
     pub force: bool,
 }
 
 impl NFTMetadataCrawlerEntry {
-    pub fn new(s: String) -> anyhow::Result<Self> {
-        let parts: Vec<&str> = s.split(',').collect();
+    /// Parses CSV string from PubSub entry into struct
+    pub fn new(csv_string: String) -> anyhow::Result<Self> {
+        let parts: Vec<&str> = csv_string.split(',').collect();
         Ok(Self {
             token_data_id: parts[0].to_string(),
             token_uri: parts[1].to_string(),
@@ -37,12 +35,12 @@ impl NFTMetadataCrawlerEntry {
                 parts[3],
                 "%Y-%m-%d %H:%M:%S%.f %Z",
             )?),
-            last_updated: Utc::now().naive_utc(),
             force: parts[4].parse::<bool>().unwrap_or(false),
         })
     }
 }
 
+/// Retrieves token source from GOOGLE_APPLICATION_CREDENTIALS
 pub async fn get_token_source() -> Box<dyn TokenSource> {
     create_token_source(Config {
         audience: None,

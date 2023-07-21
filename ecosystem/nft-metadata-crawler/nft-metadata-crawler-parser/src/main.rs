@@ -3,9 +3,7 @@
 use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
 use serde::{Deserialize, Serialize};
 
-/**
- * Structs to hold config from YAML
- */
+/// Structs to hold config from YAML
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParserConfig {
@@ -17,11 +15,9 @@ pub struct ParserConfig {
     pub ipfs_prefix: String,
 }
 
-/**
- * Main driver function
- */
 #[async_trait::async_trait]
 impl RunnableConfig for ParserConfig {
+    /// Main driver function
     async fn run(&self) -> anyhow::Result<()> {
         todo!();
     }

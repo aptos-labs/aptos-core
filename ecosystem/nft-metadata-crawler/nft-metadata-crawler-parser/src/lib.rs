@@ -11,9 +11,7 @@ use diesel::{
 use hyper::header;
 use reqwest::Client;
 
-/**
- * Establishes a connection pool to Postgres
- */
+/// Establishes a connection pool to Postgres
 pub fn establish_connection_pool(database_url: String) -> Pool<ConnectionManager<PgConnection>> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     Pool::builder()
@@ -21,9 +19,7 @@ pub fn establish_connection_pool(database_url: String) -> Pool<ConnectionManager
         .expect("Failed to create pool.")
 }
 
-/**
- * HEAD request to get MIME type and size of content
- */
+/// HEAD request to get MIME type and size of content
 pub async fn get_uri_metadata(url: String) -> anyhow::Result<(String, u32)> {
     let client = Client::new();
     let request = client.head(&url);

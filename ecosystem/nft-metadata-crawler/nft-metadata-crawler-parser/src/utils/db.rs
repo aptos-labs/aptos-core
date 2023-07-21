@@ -8,9 +8,7 @@ use diesel::{
 };
 use tracing::{error, info};
 
-/**
- * Upserts URIs into database
- */
+/// Upserts URIs into database
 pub fn upsert_uris(
     conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     entry: NFTMetadataCrawlerURIs,

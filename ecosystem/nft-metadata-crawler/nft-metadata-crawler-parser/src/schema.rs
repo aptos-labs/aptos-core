@@ -13,6 +13,6 @@ diesel::table! {
         json_parser_retry_count -> Int4,
         image_optimizer_retry_count -> Int4,
         animation_optimizer_retry_count -> Int4,
-        last_updated -> Timestamp,
+        inserted_at -> Timestamp,
     }
 }

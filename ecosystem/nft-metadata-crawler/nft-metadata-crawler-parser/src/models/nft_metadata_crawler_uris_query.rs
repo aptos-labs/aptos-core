@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
 
+use std::{thread, time::Duration};
+
 use crate::schema::nft_metadata_crawler_uris;
 use diesel::{
     prelude::*,
@@ -20,7 +22,7 @@ pub struct NFTMetadataCrawlerURIsQuery {
     pub json_parser_retry_count: i32,
     pub image_optimizer_retry_count: i32,
     pub animation_optimizer_retry_count: i32,
-    pub last_updated: chrono::NaiveDateTime,
+    pub inserted_at: chrono::NaiveDateTime,
 }
 
 impl NFTMetadataCrawlerURIsQuery {
@@ -28,6 +30,18 @@ impl NFTMetadataCrawlerURIsQuery {
         token_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> diesel::QueryResult<Option<Self>> {
+        for _ in 0..3 {
+            match nft_metadata_crawler_uris::table
+                .find(token_uri.clone())
+                .first::<NFTMetadataCrawlerURIsQuery>(conn)
+                .optional()
+            {
+                Ok(result) => return Ok(result),
+                Err(_) => thread::sleep(Duration::from_secs(5)),
+            }
+        }
+
+        // Retry one last time but now propagate the error if it fails
         nft_metadata_crawler_uris::table
             .find(token_uri)
             .first::<NFTMetadataCrawlerURIsQuery>(conn)
@@ -42,6 +56,18 @@ impl NFTMetadataCrawlerURIsQuery {
             return Ok(None);
         }
 
+        for _ in 0..3 {
+            match nft_metadata_crawler_uris::table
+                .filter(nft_metadata_crawler_uris::raw_image_uri.eq(raw_image_uri.clone()))
+                .first::<NFTMetadataCrawlerURIsQuery>(conn)
+                .optional()
+            {
+                Ok(result) => return Ok(result),
+                Err(_) => thread::sleep(Duration::from_secs(5)),
+            }
+        }
+
+        // Retry one last time but now propagate the error if it fails
         nft_metadata_crawler_uris::table
             .filter(nft_metadata_crawler_uris::raw_image_uri.eq(raw_image_uri))
             .first::<NFTMetadataCrawlerURIsQuery>(conn)
@@ -56,6 +82,18 @@ impl NFTMetadataCrawlerURIsQuery {
             return Ok(None);
         }
 
+        for _ in 0..3 {
+            match nft_metadata_crawler_uris::table
+                .filter(nft_metadata_crawler_uris::raw_animation_uri.eq(raw_animation_uri.clone()))
+                .first::<NFTMetadataCrawlerURIsQuery>(conn)
+                .optional()
+            {
+                Ok(result) => return Ok(result),
+                Err(_) => thread::sleep(Duration::from_secs(5)),
+            }
+        }
+
+        // Retry one last time but now propagate the error if it fails
         nft_metadata_crawler_uris::table
             .filter(nft_metadata_crawler_uris::raw_animation_uri.eq(raw_animation_uri))
             .first::<NFTMetadataCrawlerURIsQuery>(conn)
