@@ -297,10 +297,10 @@ fn test_node_broadcast_receiver_storage() {
     );
     let sig = rb_receiver.process(node).expect("must succeed");
 
-    assert_ok_eq!(
-        storage.get_votes(),
-        HashMap::from([(NodeId::new(0, 1, signers[0].author()), sig)])
-    );
+    assert_ok_eq!(storage.get_votes(), vec![(
+        NodeId::new(0, 1, signers[0].author()),
+        sig
+    )],);
 
     let mut rb_receiver =
         NodeBroadcastHandler::new(dag, signers[3].clone(), epoch_state, storage.clone());
