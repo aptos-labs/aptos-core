@@ -9,9 +9,7 @@ use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
     GasScalingFactor, GasUnit, NumSlots,
 };
-use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
-};
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
 };
@@ -211,8 +209,8 @@ impl TransactionGasParameters {
     }
 
     /// New formula to charge storage fee for an event, measured in APT.
-    pub fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {
-        NumBytes::new(event.size() as u64) * self.storage_fee_per_event_byte
+    pub fn storage_fee_per_event(&self, event_size: usize) -> Fee {
+        NumBytes::new(event_size as u64) * self.storage_fee_per_event_byte
     }
 
     pub fn storage_discount_for_events(&self, total_cost: Fee) -> Fee {

@@ -6,7 +6,7 @@ use crate::loader::Loader;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, ChangeSet, Changes, Event, Op},
+    effects::{AccountChanges, ChangeSet, Changes, Event, EventSeqNum, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -51,7 +51,7 @@ impl AccountDataCache {
 pub(crate) struct TransactionDataCache<'r> {
     remote: &'r dyn MoveResolver,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
-    event_data: Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>,
+    event_data: Vec<(Vec<u8>, EventSeqNum, Type, MoveTypeLayout, Value)>,
 }
 
 impl<'r> TransactionDataCache<'r> {
@@ -288,7 +288,7 @@ impl<'r> TransactionDataCache<'r> {
         &mut self,
         loader: &Loader,
         guid: Vec<u8>,
-        seq_num: u64,
+        seq_num: EventSeqNum,
         ty: Type,
         val: Value,
     ) -> PartialVMResult<()> {

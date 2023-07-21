@@ -8,6 +8,7 @@ use crate::{
     language_storage::{ModuleId, StructTag, TypeTag},
 };
 use anyhow::{bail, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::btree_map::{self, BTreeMap};
 
 /// A storage operation.
@@ -321,4 +322,10 @@ impl<Module, Resource> Changes<Module, Resource> {
 pub type AccountChangeSet = AccountChanges<Vec<u8>, Vec<u8>>;
 pub type ChangeSet = Changes<Vec<u8>, Vec<u8>>;
 
-pub type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum EventSeqNum {
+    Explicit { seq_num: u64 },
+    Deferred { ephemeral_id: u64 },
+}
+
+pub type Event = (Vec<u8>, EventSeqNum, TypeTag, Vec<u8>);

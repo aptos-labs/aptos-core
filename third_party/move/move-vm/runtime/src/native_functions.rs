@@ -11,6 +11,7 @@ use move_binary_format::errors::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    effects::EventSeqNum,
     gas_algebra::{InternalGas, NumBytes},
     identifier::Identifier,
     language_storage::TypeTag,
@@ -142,7 +143,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub fn save_event(
         &mut self,
         guid: Vec<u8>,
-        seq_num: u64,
+        seq_num: EventSeqNum,
         ty: Type,
         val: Value,
     ) -> PartialVMResult<bool> {

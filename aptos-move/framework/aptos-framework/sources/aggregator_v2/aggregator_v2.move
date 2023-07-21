@@ -16,12 +16,12 @@ module aptos_framework::aggregator_v2 {
     /// across multiple transactions. See the module description for more details.
     ///
     /// Currently supported types for Element are u64 and u128.
-    struct Aggregator<Element> has store {
+    struct Aggregator<Element> has store, drop {
         value: Element,
         max_value: Element,
     }
 
-    struct AggregatorSnapshot<Element> has store {
+    struct AggregatorSnapshot<Element> has store, drop {
         value: Element,
     }
 

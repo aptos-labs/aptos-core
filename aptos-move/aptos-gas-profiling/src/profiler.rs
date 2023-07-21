@@ -7,9 +7,8 @@ use crate::log::{
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
 use aptos_gas_meter::AptosGasMeter;
-use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
-};
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+use aptos_vm_types::change_set::ChangeSetEvent;
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -481,7 +480,7 @@ where
 
         fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
-        fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
+        fn storage_fee_per_event(&self, event_size: usize) -> Fee;
 
         fn storage_discount_for_events(&self, total_cost: Fee) -> Fee;
 
@@ -514,7 +513,7 @@ where
     fn charge_storage_fee_for_all<'a>(
         &mut self,
         write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-        events: impl IntoIterator<Item = &'a ContractEvent>,
+        events: impl IntoIterator<Item = &'a ChangeSetEvent>,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
     ) -> VMResult<()> {
@@ -547,7 +546,7 @@ where
         let mut event_fee = Fee::new(0);
         let mut event_fees = vec![];
         for event in events {
-            let fee = self.storage_fee_per_event(event);
+            let fee = self.storage_fee_per_event(event.size());
             event_fees.push(EventStorage {
                 ty: event.type_tag().clone(),
                 cost: fee,

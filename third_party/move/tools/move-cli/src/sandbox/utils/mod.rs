@@ -161,7 +161,7 @@ pub(crate) fn explain_execution_effects(
         // TODO: better event printing
         for (event_key, event_sequence_number, _event_type, event_data) in events {
             println!(
-                "Emitted {:?} as the {}th event to stream {:?}",
+                "Emitted {:?} as the {:?} event to stream {:?}",
                 event_data, event_sequence_number, event_key
             )
         }

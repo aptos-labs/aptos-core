@@ -4,7 +4,7 @@
 
 use crate::natives::helpers::make_module_natives;
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::InternalGasPerAbstractMemoryUnit;
+use move_core_types::{effects::EventSeqNum, gas_algebra::InternalGasPerAbstractMemoryUnit};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
@@ -41,7 +41,7 @@ fn native_write_to_event_store(
 
     let cost = gas_params.unit_cost * std::cmp::max(msg.legacy_abstract_memory_size(), 1.into());
 
-    if !context.save_event(guid, seq_num, ty, msg)? {
+    if !context.save_event(guid, EventSeqNum::Explicit { seq_num }, ty, msg)? {
         return Ok(NativeResult::err(cost, 0));
     }
 

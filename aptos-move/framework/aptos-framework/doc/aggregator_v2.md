@@ -35,7 +35,7 @@ across multiple transactions. See the module description for more details.
 Currently supported types for Element are u64 and u128.
 
 
-<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt; <b>has</b> store
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt; <b>has</b> drop, store
 </code></pre>
 
 
@@ -68,7 +68,7 @@ Currently supported types for Element are u64 and u128.
 
 
 
-<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;Element&gt; <b>has</b> store
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;Element&gt; <b>has</b> drop, store
 </code></pre>
 
 
@@ -94,6 +94,17 @@ Currently supported types for Element are u64 and u128.
 ## Constants
 
 
+<a name="0x1_aggregator_v2_EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED"></a>
+
+Element type of the aggregator not supported. Raised by create_aggregator() call,
+if Element type is not supported (currently u64 or u128).
+
+
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED">EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED</a>: u64 = 3;
+</code></pre>
+
+
+
 <a name="0x1_aggregator_v2_EAGGREGATOR_OVERFLOW"></a>
 
 The value of aggregator overflows. Raised by uncoditional add() call
@@ -110,17 +121,6 @@ The value of aggregator underflows (goes below zero). Raised by uncoditional sub
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 = 2;
-</code></pre>
-
-
-
-<a name="0x1_aggregator_v2_EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED"></a>
-
-Element type of the aggregator not supported. Raised by create_aggregator() call,
-if Element type is not supported (currently u64 or u128).
-
-
-<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED">EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED</a>: u64 = 3;
 </code></pre>
 
 

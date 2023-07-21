@@ -20,7 +20,6 @@ use aptos_gas_schedule::{
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
-    contract_event::ContractEvent,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeatures, APTOS_MAX_KNOWN_VERSION,
@@ -31,9 +30,10 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use aptos_vm_types::storage::ChangeSetConfigs;
+use aptos_vm_types::{change_set::ChangeSetEvent, storage::ChangeSetConfigs};
 use move_core_types::{
     account_address::AccountAddress,
+    effects::EventSeqNum,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveValue},
@@ -628,8 +628,8 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
 }
 
 /// Verify the consistency of the genesis `WriteSet`
-fn verify_genesis_write_set(events: &[ContractEvent]) {
-    let new_epoch_events: Vec<&ContractEvent> = events
+fn verify_genesis_write_set(events: &[ChangeSetEvent]) {
+    let new_epoch_events: Vec<&ChangeSetEvent> = events
         .iter()
         .filter(|e| e.key() == &NewEpochEvent::event_key())
         .collect();
@@ -638,7 +638,10 @@ fn verify_genesis_write_set(events: &[ContractEvent]) {
         1,
         "There should only be exactly one NewEpochEvent"
     );
-    assert_eq!(new_epoch_events[0].sequence_number(), 0,);
+    assert_eq!(
+        new_epoch_events[0].sequence_number(),
+        &EventSeqNum::Explicit { seq_num: 0 },
+    );
 }
 
 /// An enum specifying whether the compiled stdlib/scripts should be used or freshly built versions

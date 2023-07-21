@@ -5,17 +5,124 @@ use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
 use aptos_state_view::StateView;
 use aptos_types::{
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, ReadWriteEvent},
+    event::EventKey,
     state_store::state_key::{StateKey, StateKeyInner},
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},
 };
 use move_binary_format::errors::Location;
-use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
+use move_core_types::{
+    effects::EventSeqNum,
+    language_storage::TypeTag,
+    vm_status::{err_msg, StatusCode, VMStatus},
+};
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
     BTreeMap,
 };
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ChangeSetEvent {
+    /// The unique key that the event was emitted to
+    key: EventKey,
+    /// The number of messages that have been emitted to the path previously
+    sequence_number: EventSeqNum,
+    /// The type of the data
+    type_tag: TypeTag,
+    /// The data payload of the event
+    event_data: Vec<u8>,
+}
+
+impl ChangeSetEvent {
+    pub fn new(
+        key: EventKey,
+        sequence_number: EventSeqNum,
+        type_tag: TypeTag,
+        event_data: Vec<u8>,
+    ) -> Self {
+        Self {
+            key,
+            sequence_number,
+            type_tag,
+            event_data,
+        }
+    }
+
+    pub fn key(&self) -> &EventKey {
+        &self.key
+    }
+
+    pub fn sequence_number(&self) -> &EventSeqNum {
+        &self.sequence_number
+    }
+
+    pub fn event_data(&self) -> &[u8] {
+        &self.event_data
+    }
+
+    pub fn type_tag(&self) -> &TypeTag {
+        &self.type_tag
+    }
+
+    pub fn size(&self) -> usize {
+        self.key.size() + 8 /* u64 */ //+ bcs::to_bytes(&self.type_tag).unwrap().len() + self.event_data.len()
+    }
+}
+
+impl From<ContractEvent> for ChangeSetEvent {
+    fn from(e: ContractEvent) -> Self {
+        ChangeSetEvent::new(
+            *e.key(),
+            EventSeqNum::Explicit {
+                seq_num: e.sequence_number(),
+            },
+            e.type_tag().clone(),
+            e.event_data().to_vec(),
+        )
+    }
+}
+
+impl TryInto<ContractEvent> for ChangeSetEvent {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> anyhow::Result<ContractEvent> {
+        match self.sequence_number {
+            EventSeqNum::Deferred { .. } => {
+                anyhow::bail!("Expected materialized ChangeSetEvent")
+            },
+            EventSeqNum::Explicit { seq_num } => Ok(ContractEvent::new(
+                self.key,
+                seq_num,
+                self.type_tag,
+                self.event_data,
+            )),
+        }
+    }
+}
+
+impl ReadWriteEvent for ChangeSetEvent {
+    fn get_event_data(&self) -> (EventKey, EventSeqNum, &TypeTag, &[u8]) {
+        (
+            self.key,
+            self.sequence_number,
+            &self.type_tag,
+            &self.event_data,
+        )
+    }
+
+    fn update_event_data(&mut self, sequence_number: u64, event_data: Vec<u8>) {
+        match &self.sequence_number {
+            EventSeqNum::Explicit { seq_num } => assert!(*seq_num == sequence_number),
+            EventSeqNum::Deferred { .. } => {
+                self.sequence_number = EventSeqNum::Explicit {
+                    seq_num: sequence_number,
+                }
+            },
+        };
+        self.event_data = event_data;
+    }
+}
 
 /// A change set produced by the VM.
 ///
@@ -27,7 +134,7 @@ pub struct VMChangeSet {
     module_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
-    events: Vec<ContractEvent>,
+    events: Vec<ChangeSetEvent>,
 }
 
 macro_rules! squash_writes_pair {
@@ -62,7 +169,7 @@ impl VMChangeSet {
         module_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
-        events: Vec<ContractEvent>,
+        events: Vec<ChangeSetEvent>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
         let change_set = Self {
@@ -111,7 +218,7 @@ impl VMChangeSet {
             module_write_set,
             aggregator_write_set: BTreeMap::new(),
             aggregator_delta_set: BTreeMap::new(),
-            events,
+            events: events.into_iter().map(ChangeSetEvent::from).collect(),
         };
         checker.check_change_set(&change_set)?;
         Ok(change_set)
@@ -134,7 +241,12 @@ impl VMChangeSet {
         let write_set = write_set_mut
             .freeze()
             .expect("Freezing a WriteSet does not fail.");
-        StorageChangeSet::new(write_set, events)
+        let storage_events = events
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()
+            .expect("ChangeSetEvent should be materialized");
+        StorageChangeSet::new(write_set, storage_events)
     }
 
     /// Converts VM-native change set into its storage representation with fully
@@ -184,7 +296,7 @@ impl VMChangeSet {
         &self.aggregator_delta_set
     }
 
-    pub fn events(&self) -> &[ContractEvent] {
+    pub fn events(&self) -> &[ChangeSetEvent] {
         &self.events
     }
 

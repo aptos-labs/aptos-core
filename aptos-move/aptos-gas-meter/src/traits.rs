@@ -3,10 +3,8 @@
 
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa};
 use aptos_gas_schedule::VMGasParameters;
-use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
-};
-use aptos_vm_types::storage::StorageGasParameters;
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+use aptos_vm_types::{change_set::ChangeSetEvent, storage::StorageGasParameters};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes};
 use move_vm_types::gas::GasMeter as MoveGasMeter;
@@ -107,7 +105,7 @@ pub trait AptosGasMeter: MoveGasMeter {
     fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
     /// Calculates the storage fee for an event.
-    fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
+    fn storage_fee_per_event(&self, event_size: usize) -> Fee;
 
     /// Calculates the discount applied to the event storage fees, based on a free quota.
     fn storage_discount_for_events(&self, total_cost: Fee) -> Fee;
@@ -125,7 +123,7 @@ pub trait AptosGasMeter: MoveGasMeter {
     fn charge_storage_fee_for_all<'a>(
         &mut self,
         write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-        events: impl IntoIterator<Item = &'a ContractEvent>,
+        events: impl IntoIterator<Item = &'a ChangeSetEvent>,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
     ) -> VMResult<()> {
@@ -146,7 +144,7 @@ pub trait AptosGasMeter: MoveGasMeter {
             acc + self.storage_fee_per_write(key, op)
         });
         let event_fee = events.into_iter().fold(Fee::new(0), |acc, event| {
-            acc + self.storage_fee_per_event(event)
+            acc + self.storage_fee_per_event(event.size())
         });
         let event_discount = self.storage_discount_for_events(event_fee);
         let event_net_fee = event_fee

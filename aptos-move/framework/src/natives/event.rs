@@ -8,9 +8,9 @@ use aptos_native_interface::{
 };
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMError;
-use move_core_types::account_address::AccountAddress;
 #[cfg(feature = "testing")]
 use move_core_types::vm_status::StatusCode;
+use move_core_types::{account_address::AccountAddress, effects::EventSeqNum};
 use move_vm_runtime::native_functions::NativeFunction;
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
@@ -51,7 +51,53 @@ fn native_write_to_event_store(
             + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
     )?;
 
-    if !context.save_event(guid, seq_num, ty, msg)? {
+    if !context.save_event(guid, EventSeqNum::Explicit { seq_num }, ty, msg)? {
+        return Err(SafeNativeError::Abort { abort_code: 0 });
+    }
+
+    Ok(smallvec![])
+}
+
+/***************************************************************************************************
+ * native fun write_concurrent_to_event_store
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[inline]
+fn native_write_concurrent_to_event_store(
+    context: &mut SafeNativeContext,
+    mut ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.len() == 3);
+
+    let ty = ty_args.pop().unwrap();
+    let msg = arguments.pop_back().unwrap();
+    let agg_snapshot_seq_num = safely_pop_arg!(arguments, StructRef);
+    let guid = safely_pop_arg!(arguments, Vec<u8>);
+
+    let seq_num_field_ref = agg_snapshot_seq_num
+        .borrow_field(0)?
+        .value_as::<Reference>()?;
+    let seq_num_ephemeral_id = seq_num_field_ref.read_ref()?.value_as::<u64>()?;
+
+    // TODO(Gas): Get rid of abstract memory size
+    context.charge(
+        EVENT_WRITE_CONCURRENT_TO_EVENT_STORE_BASE
+            + EVENT_WRITE_CONCURRENT_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT
+                * context.abs_val_size(&msg),
+    )?;
+
+    if !context.save_event(
+        guid,
+        EventSeqNum::Deferred {
+            ephemeral_id: seq_num_ephemeral_id,
+        },
+        ty,
+        msg,
+    )? {
         return Err(SafeNativeError::Abort { abort_code: 0 });
     }
 
@@ -112,6 +158,11 @@ pub fn make_all(
     natives.extend([(
         "write_to_event_store",
         native_write_to_event_store as RawSafeNative,
+    )]);
+
+    natives.extend([(
+        "write_concurrent_to_event_store",
+        native_write_concurrent_to_event_store as RawSafeNative,
     )]);
 
     builder.make_named_natives(natives)

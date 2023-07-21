@@ -20,7 +20,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use claims::assert_ok;
-use move_core_types::language_storage::TypeTag;
+use move_core_types::{effects::EventSeqNum, language_storage::TypeTag};
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -625,13 +625,13 @@ where
 #[derive(Clone, Debug)]
 pub struct MockEvent {
     key: EventKey,
-    sequence_number: u64,
+    sequence_number: EventSeqNum,
     type_tag: TypeTag,
     event_data: Vec<u8>,
 }
 
 impl ReadWriteEvent for MockEvent {
-    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]) {
+    fn get_event_data(&self) -> (EventKey, EventSeqNum, &TypeTag, &[u8]) {
         (
             self.key,
             self.sequence_number,
@@ -640,7 +640,15 @@ impl ReadWriteEvent for MockEvent {
         )
     }
 
-    fn update_event_data(&mut self, event_data: Vec<u8>) {
+    fn update_event_data(&mut self, sequence_number: u64, event_data: Vec<u8>) {
+        match &self.sequence_number {
+            EventSeqNum::Explicit { seq_num } => assert!(*seq_num == sequence_number),
+            EventSeqNum::Deferred { .. } => {
+                self.sequence_number = EventSeqNum::Explicit {
+                    seq_num: sequence_number,
+                }
+            },
+        };
         self.event_data = event_data;
     }
 }

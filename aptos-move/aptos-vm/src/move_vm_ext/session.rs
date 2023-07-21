@@ -15,13 +15,15 @@ use aptos_framework::natives::{
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     block_metadata::BlockMetadata,
-    contract_event::ContractEvent,
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
     transaction::SignatureCheckedTransaction,
     write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::{ChangeSetEvent, VMChangeSet},
+    storage::ChangeSetConfigs,
+};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -407,7 +409,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .map(|(guid, seq_num, ty_tag, blob)| {
                 let key = bcs::from_bytes(guid.as_slice())
                     .map_err(|_| VMStatus::error(StatusCode::EVENT_KEY_MISMATCH, None))?;
-                Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
+                // TODO fix here and afterwards
+                Ok(ChangeSetEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
         VMChangeSet::new(

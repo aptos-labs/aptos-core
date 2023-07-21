@@ -26,7 +26,6 @@ use aptos_block_executor::{
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
-    contract_event::ContractEvent,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
@@ -34,14 +33,14 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{change_set::ChangeSetEvent, output::VMOutput};
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
-    type Event = ContractEvent;
+    type Event = ChangeSetEvent;
     type Key = StateKey;
     type Value = WriteOp;
 }
@@ -115,7 +114,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn get_events(&self) -> Vec<ContractEvent> {
+    fn get_events(&self) -> Vec<ChangeSetEvent> {
         self.vm_output
             .lock()
             .as_ref()

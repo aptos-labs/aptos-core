@@ -9,7 +9,9 @@ use crate::{
 };
 use anyhow::{Error, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use move_core_types::{
+    effects::EventSeqNum, language_storage::TypeTag, move_resource::MoveStructType,
+};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -21,9 +23,9 @@ use std::{convert::TryFrom, ops::Deref};
 /// in the event data, processes them, and calls `update_event_data` to update the event data.
 pub trait ReadWriteEvent {
     /// Returns the event data.
-    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]);
+    fn get_event_data(&self) -> (EventKey, EventSeqNum, &TypeTag, &[u8]);
     /// Updates the event data.
-    fn update_event_data(&mut self, event_data: Vec<u8>);
+    fn update_event_data(&mut self, seq_num: u64, event_data: Vec<u8>);
 }
 
 /// Support versioning of the data structure.
@@ -33,20 +35,25 @@ pub enum ContractEvent {
 }
 
 impl ReadWriteEvent for ContractEvent {
-    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]) {
+    fn get_event_data(&self) -> (EventKey, EventSeqNum, &TypeTag, &[u8]) {
         match self {
             ContractEvent::V0(event) => (
                 *event.key(),
-                event.sequence_number(),
+                EventSeqNum::Explicit {
+                    seq_num: event.sequence_number(),
+                },
                 event.type_tag(),
                 event.event_data(),
             ),
         }
     }
 
-    fn update_event_data(&mut self, event_data: Vec<u8>) {
+    fn update_event_data(&mut self, seq_num: u64, event_data: Vec<u8>) {
         match self {
-            ContractEvent::V0(event) => event.event_data = event_data,
+            ContractEvent::V0(event) => {
+                assert_eq!(event.sequence_number, seq_num);
+                event.event_data = event_data;
+            },
         }
     }
 }

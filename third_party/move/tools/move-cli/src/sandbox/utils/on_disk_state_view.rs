@@ -13,6 +13,7 @@ use move_bytecode_utils::module_cache::GetModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_core_types::{
     account_address::AccountAddress,
+    effects::EventSeqNum,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     metadata::Metadata,
@@ -29,7 +30,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);
+type Event = (Vec<u8>, EventSeqNum, TypeTag, Vec<u8>);
 
 /// subdirectory of `DEFAULT_STORAGE_DIR/<addr>` where resources are stored
 pub const RESOURCES_DIR: &str = "resources";
@@ -305,7 +306,7 @@ impl OnDiskStateView {
     pub fn save_event(
         &self,
         event_key: &[u8],
-        event_sequence_number: u64,
+        event_sequence_number: EventSeqNum,
         event_type: TypeTag,
         event_data: Vec<u8>,
     ) -> Result<()> {
