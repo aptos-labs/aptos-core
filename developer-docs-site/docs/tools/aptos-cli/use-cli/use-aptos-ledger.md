@@ -75,9 +75,9 @@ yes
 
 After the above command, you will be prompted to confirm the transaction on your Ledger device. Once you confirm, the transaction will be submitted to the network. Note: Make sure you have `Blind Signing` enabled on your Ledger device. Otherwise you will not be able to sign transactions.
 
-## Common Errors:
+## Common Errors
 
-#### Error: Wrong raw transaction length
+### Error: Wrong raw transaction length
 Your raw transaction or package size is too big. Currently the Aptos ledger app can only support up to 20kb transaction.
 ```bash
 {
@@ -85,7 +85,7 @@ Your raw transaction or package size is too big. Currently the Aptos ledger app 
 }
 ```
 
-#### Error: Ledger device is locked
+### Error: Ledger device is locked
 Make sure your Ledger device is unlocked and you have Aptos app opened
 ```bash
 {
