@@ -32,15 +32,15 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
-    block_executor::partitioner::{BlockExecutorTransactions, SubBlocksForShard},
+    block_executor::partitioner::SubBlocksForShard,
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
     transaction::{
-        EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        WriteSetPayload,
+        analyzed_transaction::AnalyzedTransaction, EntryFunction, ExecutionError, ExecutionStatus,
+        ModuleBundle, Multisig, MultisigTransactionPayload, SignatureCheckedTransaction,
+        SignedTransaction, Transaction, TransactionOutput, TransactionPayload, TransactionStatus,
+        VMValidatorResult, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteSet,
@@ -1514,7 +1514,7 @@ impl VMExecutor for AptosVM {
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            BlockExecutorTransactions::Unsharded(transactions),
+            transactions,
             state_view,
             Self::get_concurrency_level(),
             maybe_block_gas_limit,
@@ -1529,7 +1529,7 @@ impl VMExecutor for AptosVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         sharded_block_executor: &ShardedBlockExecutor<S>,
-        transactions: Vec<SubBlocksForShard<Transaction>>,
+        transactions: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

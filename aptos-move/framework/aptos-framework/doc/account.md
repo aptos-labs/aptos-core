@@ -2971,4 +2971,4 @@ The guid_creation_num of the Account is up to MAX_U64.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

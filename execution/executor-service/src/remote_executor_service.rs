@@ -93,14 +93,19 @@ mod tests {
         block_executor::partitioner::{
             CrossShardDependencies, SubBlock, SubBlocksForShard, TransactionWithDependencies,
         },
-        transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
+        transaction::{
+            analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction,
+            TransactionOutput, TransactionStatus,
+        },
     };
     use aptos_vm::sharded_block_executor::{
         block_executor_client::BlockExecutorClient, ShardedBlockExecutor,
     };
     use std::sync::Arc;
 
-    fn generate_transactions(executor: &mut FakeExecutor) -> (Vec<Transaction>, AccountData) {
+    fn generate_transactions(
+        executor: &mut FakeExecutor,
+    ) -> (Vec<AnalyzedTransaction>, AccountData) {
         let sender = executor.create_raw_account_data(3_000_000_000, 10);
         let receiver = executor.create_raw_account_data(3_000_000_000, 10);
         executor.add_account_data(&sender);
@@ -109,35 +114,39 @@ mod tests {
         let transfer_amount = 1_000;
 
         // execute transaction
-        let txns: Vec<Transaction> = vec![
+        let txns: Vec<AnalyzedTransaction> = vec![
             Transaction::UserTransaction(peer_to_peer_txn(
                 sender.account(),
                 receiver.account(),
                 10,
                 transfer_amount,
                 100,
-            )),
+            ))
+            .into(),
             Transaction::UserTransaction(peer_to_peer_txn(
                 sender.account(),
                 receiver.account(),
                 11,
                 transfer_amount,
                 100,
-            )),
+            ))
+            .into(),
             Transaction::UserTransaction(peer_to_peer_txn(
                 sender.account(),
                 receiver.account(),
                 12,
                 transfer_amount,
                 100,
-            )),
+            ))
+            .into(),
             Transaction::UserTransaction(peer_to_peer_txn(
                 sender.account(),
                 receiver.account(),
                 13,
                 transfer_amount,
                 100,
-            )),
+            ))
+            .into(),
         ];
         (txns, receiver)
     }

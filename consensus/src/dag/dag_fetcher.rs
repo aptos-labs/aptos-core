@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{types::NodeMetadata, RpcHandler};
 use crate::{
     dag::{
         dag_network::DAGNetworkSender,
@@ -9,11 +10,13 @@ use crate::{
     },
     network::TConsensusMsg,
 };
+use anyhow::ensure;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_types::epoch_state::EpochState;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
+use thiserror::Error as ThisError;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
@@ -84,14 +87,22 @@ impl DagFetcher {
                 .responders(&self.epoch_state.verifier.get_ordered_account_addresses());
             let remote_request = {
                 let dag_reader = self.dag.read();
-                if dag_reader.all_exists(local_request.node().parents()) {
+
+                let missing_parents: Vec<NodeMetadata> = dag_reader
+                    .filter_missing(local_request.node().parents_metadata())
+                    .cloned()
+                    .collect();
+
+                if missing_parents.is_empty() {
                     local_request.notify();
                     continue;
                 }
+
+                let target = local_request.node();
                 RemoteFetchRequest::new(
-                    local_request.node().metadata().clone(),
-                    dag_reader.lowest_round(),
-                    dag_reader.bitmask(),
+                    target.metadata().epoch(),
+                    missing_parents,
+                    dag_reader.bitmask(local_request.node().round()),
                 )
             };
             let network_request = DAGMessage::from(remote_request.clone()).into_network_message();
@@ -103,17 +114,90 @@ impl DagFetcher {
                 .and_then(FetchResponse::try_from)
                 .and_then(|response| response.verify(&remote_request, &self.epoch_state.verifier))
             {
+                let ceritified_nodes = response.certified_nodes();
                 // TODO: support chunk response or fallback to state sync
-                let mut dag_writer = self.dag.write();
-                for rounds in response.certified_nodes() {
-                    for node in rounds {
+                {
+                    let mut dag_writer = self.dag.write();
+                    for node in ceritified_nodes {
                         if let Err(e) = dag_writer.add_node(node) {
                             error!("Failed to add node {}", e);
                         }
                     }
                 }
-                local_request.notify();
+
+                if self
+                    .dag
+                    .read()
+                    .all_exists(local_request.node().parents_metadata())
+                {
+                    local_request.notify();
+                } else {
+                    // TODO: implement retry logic
+                }
             }
         }
+    }
+}
+
+#[derive(Debug, ThisError)]
+pub enum FetchRequestHandleError {
+    #[error("parents are missing")]
+    ParentsMissing,
+}
+
+pub struct FetchRequestHandler {
+    dag: Arc<RwLock<Dag>>,
+    author_to_index: HashMap<Author, usize>,
+}
+
+impl FetchRequestHandler {
+    pub fn new(dag: Arc<RwLock<Dag>>, epoch_state: Arc<EpochState>) -> Self {
+        Self {
+            dag,
+            author_to_index: epoch_state.verifier.address_to_validator_index().clone(),
+        }
+    }
+}
+
+impl RpcHandler for FetchRequestHandler {
+    type Request = RemoteFetchRequest;
+    type Response = FetchResponse;
+
+    fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
+        let dag_reader = self.dag.read();
+
+        // `Certified Node`: In the good case, there should exist at least one honest validator that
+        // signed the Certified Node that has the all the parents to fulfil this
+        // request.
+        // `Node`: In the good case, the sender of the Node should have the parents in its local DAG
+        // to satisfy this request.
+        ensure!(
+            dag_reader.all_exists(message.targets().iter()),
+            FetchRequestHandleError::ParentsMissing
+        );
+
+        let certified_nodes: Vec<_> = dag_reader
+            .reachable(
+                message.targets(),
+                Some(message.exists_bitmask().first_round()),
+                |_| true,
+            )
+            .filter_map(|node_status| {
+                let arc_node = node_status.as_node();
+                self.author_to_index
+                    .get(arc_node.author())
+                    .and_then(|author_idx| {
+                        if !message.exists_bitmask().has(arc_node.round(), *author_idx) {
+                            Some(arc_node.as_ref().clone())
+                        } else {
+                            None
+                        }
+                    })
+            })
+            .collect();
+
+        // TODO: decide if the response is too big and act accordingly.
+
+        Ok(FetchResponse::new(message.epoch(), certified_nodes))
     }
 }

@@ -28,7 +28,7 @@ class PrivateKey:
         return self.hex()
 
     @staticmethod
-    def from_hex(value: str) -> PrivateKey:
+    def from_str(value: str) -> PrivateKey:
         if value[0:2] == "0x":
             value = value[2:]
         return PrivateKey(SigningKey(bytes.fromhex(value)))
@@ -248,10 +248,10 @@ class Test(unittest.TestCase):
 
     def test_multisig(self):
         # Generate signatory private keys.
-        private_key_1 = PrivateKey.from_hex(
+        private_key_1 = PrivateKey.from_str(
             "4e5e3be60f4bbd5e98d086d932f3ce779ff4b58da99bf9e5241ae1212a29e5fe"
         )
-        private_key_2 = PrivateKey.from_hex(
+        private_key_2 = PrivateKey.from_str(
             "1e70e49b78f976644e2c51754a2f049d3ff041869c669523ba95b172c7329901"
         )
         # Generate multisig public key with threshold of 1.

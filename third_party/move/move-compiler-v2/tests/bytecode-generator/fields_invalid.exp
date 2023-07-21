@@ -1,0 +1,22 @@
+// ---- Model Dump
+module 0x42::fields {
+    struct T {
+        h: u64,
+    }
+    struct S {
+        f: u64,
+        g: fields::T,
+    }
+    private fun write_ref(x: &fields::S) {
+        select fields::T.h(select fields::S.g(x)) = 42;
+        Tuple()
+    }
+} // end 0x42::fields
+
+
+Diagnostics:
+error: expected `&mut` but found `&fields::S`
+   ┌─ tests/bytecode-generator/fields_invalid.move:13:9
+   │
+13 │         x.g.h = 42;
+   │         ^
