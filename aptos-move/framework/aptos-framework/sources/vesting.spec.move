@@ -120,7 +120,6 @@ spec aptos_framework::vesting {
     spec fun spec_shareholder(vesting_contract_address: address, shareholder_or_beneficiary: address): address;
 
     spec shareholder(vesting_contract_address: address, shareholder_or_beneficiary: address): address {
-        pragma verify = true;
         pragma opaque;
         include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
         ensures [abstract] result == spec_shareholder(vesting_contract_address, shareholder_or_beneficiary);
@@ -151,7 +150,6 @@ spec aptos_framework::vesting {
         // TODO: Calls `unlock_stake` which is not verified.
         // Current verification times out.
         pragma verify = false;
-
         include UnlockRewardsAbortsIf;
     }
 
@@ -179,7 +177,7 @@ spec aptos_framework::vesting {
 
     spec unlock_rewards_many(contract_addresses: vector<address>) {
         // TODO: Calls `unlock_rewards` in loop.
-        pragma aborts_if_is_partial;
+        pragma verify = false;
         aborts_if len(contract_addresses) == 0;
         include PreconditionAbortsIf;
     }
@@ -187,13 +185,12 @@ spec aptos_framework::vesting {
     spec vest(contract_address: address) {
         // TODO: Calls `staking_contract::distribute` which is not verified.
         pragma verify = false;
-
         include UnlockRewardsAbortsIf;
     }
 
     spec vest_many(contract_addresses: vector<address>) {
         // TODO: Calls `vest` in loop.
-        pragma aborts_if_is_partial;
+        pragma verify = false;
         aborts_if len(contract_addresses) == 0;
         include PreconditionAbortsIf;
     }
@@ -207,8 +204,7 @@ spec aptos_framework::vesting {
 
     spec distribute(contract_address: address) {
         // TODO: Can't handle abort in loop.
-        pragma aborts_if_is_partial;
-
+        pragma verify = false;
         include ActiveVestingContractAbortsIf<VestingContract>;
 
         let vesting_contract = global<VestingContract>(contract_address);
@@ -217,14 +213,13 @@ spec aptos_framework::vesting {
 
     spec distribute_many(contract_addresses: vector<address>) {
         // TODO: Calls `distribute` in loop.
-        pragma aborts_if_is_partial;
+        pragma verify = false;
         aborts_if len(contract_addresses) == 0;
     }
 
     spec terminate_vesting_contract(admin: &signer, contract_address: address) {
         // TODO: Calls `staking_contract::distribute` which is not verified.
-        pragma aborts_if_is_partial;
-
+        pragma verify = false;
         include ActiveVestingContractAbortsIf<VestingContract>;
 
         let vesting_contract = global<VestingContract>(contract_address);
@@ -233,13 +228,12 @@ spec aptos_framework::vesting {
 
     spec admin_withdraw(admin: &signer, contract_address: address) {
         // TODO: Calls `withdraw_stake` which is not verified.
-        pragma aborts_if_is_partial;
+        pragma verify = false;
 
         let vesting_contract = global<VestingContract>(contract_address);
         aborts_if vesting_contract.state != VESTING_POOL_TERMINATED;
 
         include VerifyAdminAbortsIf;
-
         include WithdrawStakeAbortsIf { vesting_contract };
     }
 
@@ -250,7 +244,7 @@ spec aptos_framework::vesting {
         commission_percentage: u64,
     ) {
         // TODO: Calls `staking_contract::switch_operator` which is not verified.
-        pragma aborts_if_is_partial;
+        pragma verify = false;
 
         include VerifyAdminAbortsIf;
 
@@ -422,7 +416,7 @@ spec aptos_framework::vesting {
 
     spec unlock_stake(vesting_contract: &VestingContract, amount: u64) {
         // TODO: Calls `staking_contract::unlock_stake` which is not verified.
-        pragma aborts_if_is_partial;
+        pragma verify = false;
         include UnlockStakeAbortsIf;
     }
 
@@ -443,8 +437,7 @@ spec aptos_framework::vesting {
 
     spec withdraw_stake(vesting_contract: &VestingContract, contract_address: address): Coin<AptosCoin> {
         // TODO: Calls `staking_contract::distribute` which is not verified.
-        pragma aborts_if_is_partial;
-
+        pragma verify = false;
         include WithdrawStakeAbortsIf;
     }
 
