@@ -14,7 +14,7 @@ const HEAD_RELEASE_BUNDLE_BYTES: &[u8] =
     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/generated/head.mrb"));
 #[cfg(windows)]
 const HEAD_RELEASE_BUNDLE_BYTES: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "\\generated\\head.mrb"));
+    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "\\generated\\head.mrb"));
 
 static HEAD_RELEASE_BUNDLE: Lazy<ReleaseBundle> = Lazy::new(|| {
     bcs::from_bytes::<ReleaseBundle>(HEAD_RELEASE_BUNDLE_BYTES).expect("bcs succeeds")
