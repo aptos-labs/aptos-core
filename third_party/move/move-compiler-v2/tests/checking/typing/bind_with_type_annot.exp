@@ -1,0 +1,22 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    private fun t0() {
+        {
+          let () = Tuple();
+          {
+            let x: u64 = 0;
+            x;
+            {
+              let (x: u64, b: bool, M::R{ f: f: u64 }) = Tuple(0, false, pack M::R(0));
+              x;
+              b;
+              f;
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x8675309::M

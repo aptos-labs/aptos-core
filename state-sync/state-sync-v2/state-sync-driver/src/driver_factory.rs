@@ -7,8 +7,8 @@ use crate::{
     driver_client::{ClientNotificationListener, DriverClient, DriverNotification},
     metadata_storage::MetadataStorageInterface,
     notification_handlers::{
-        CommitNotificationListener, ConsensusNotificationHandler, ErrorNotificationListener,
-        MempoolNotificationHandler,
+        CommitNotification, CommitNotificationListener, ConsensusNotificationHandler,
+        ErrorNotificationListener, MempoolNotificationHandler, StorageServiceNotificationHandler,
     },
     storage_synchronizer::StorageSynchronizer,
 };
@@ -21,9 +21,13 @@ use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_time_service::TimeService;
 use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
-use futures::{channel::mpsc, executor::block_on};
+use futures::{
+    channel::{mpsc, mpsc::UnboundedSender},
+    executor::block_on,
+};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -34,11 +38,12 @@ pub struct DriverFactory {
 }
 
 impl DriverFactory {
-    /// Creates and spawns a new state sync driver
+    /// Creates and spawns a new state sync driver and returns the factory
     pub fn create_and_spawn_driver<
         ChunkExecutor: ChunkExecutorTrait + 'static,
         MempoolNotifier: MempoolNotificationSender + 'static,
         MetadataStorage: MetadataStorageInterface + Clone + Send + Sync + 'static,
+        StorageServiceNotifier: StorageServiceNotificationSender + 'static,
     >(
         create_runtime: bool,
         node_config: &NodeConfig,
@@ -46,13 +51,55 @@ impl DriverFactory {
         storage: DbReaderWriter,
         chunk_executor: Arc<ChunkExecutor>,
         mempool_notification_sender: MempoolNotifier,
+        storage_service_notification_sender: StorageServiceNotifier,
+        metadata_storage: MetadataStorage,
+        consensus_listener: ConsensusNotificationListener,
+        event_subscription_service: EventSubscriptionService,
+        aptos_data_client: AptosDataClient,
+        streaming_service_client: StreamingServiceClient,
+        time_service: TimeService,
+    ) -> Self {
+        let (driver_factory, _) = Self::create_and_spawn_driver_internal(
+            create_runtime,
+            node_config,
+            waypoint,
+            storage,
+            chunk_executor,
+            mempool_notification_sender,
+            storage_service_notification_sender,
+            metadata_storage,
+            consensus_listener,
+            event_subscription_service,
+            aptos_data_client,
+            streaming_service_client,
+            time_service,
+        );
+        driver_factory
+    }
+
+    /// A simple utility function that creates a new state sync driver
+    /// and returns both the factory as well as the commit notification
+    /// sender for the driver. This is useful for testing.
+    pub(crate) fn create_and_spawn_driver_internal<
+        ChunkExecutor: ChunkExecutorTrait + 'static,
+        MempoolNotifier: MempoolNotificationSender + 'static,
+        MetadataStorage: MetadataStorageInterface + Clone + Send + Sync + 'static,
+        StorageServiceNotifier: StorageServiceNotificationSender + 'static,
+    >(
+        create_runtime: bool,
+        node_config: &NodeConfig,
+        waypoint: Waypoint,
+        storage: DbReaderWriter,
+        chunk_executor: Arc<ChunkExecutor>,
+        mempool_notification_sender: MempoolNotifier,
+        storage_service_notification_sender: StorageServiceNotifier,
         metadata_storage: MetadataStorage,
         consensus_listener: ConsensusNotificationListener,
         mut event_subscription_service: EventSubscriptionService,
         aptos_data_client: AptosDataClient,
         streaming_service_client: StreamingServiceClient,
         time_service: TimeService,
-    ) -> Self {
+    ) -> (Self, UnboundedSender<CommitNotification>) {
         // Notify subscribers of the initial on-chain config values
         match (&*storage.reader).fetch_latest_state_checkpoint_version() {
             Ok(synced_version) => {
@@ -84,6 +131,8 @@ impl DriverFactory {
                 .state_sync_driver
                 .mempool_commit_ack_timeout_ms,
         );
+        let storage_service_notification_handler =
+            StorageServiceNotificationHandler::new(storage_service_notification_sender);
 
         // Create a new runtime (if required)
         let driver_runtime = if create_runtime {
@@ -98,10 +147,11 @@ impl DriverFactory {
         let (storage_synchronizer, _, _) = StorageSynchronizer::new(
             node_config.state_sync.state_sync_driver,
             chunk_executor,
-            commit_notification_sender,
+            commit_notification_sender.clone(),
             error_notification_sender,
             event_subscription_service.clone(),
             mempool_notification_handler.clone(),
+            storage_service_notification_handler.clone(),
             metadata_storage.clone(),
             storage.clone(),
             driver_runtime.as_ref(),
@@ -124,6 +174,7 @@ impl DriverFactory {
             event_subscription_service,
             mempool_notification_handler,
             metadata_storage,
+            storage_service_notification_handler,
             storage_synchronizer,
             aptos_data_client,
             streaming_service_client,
@@ -138,10 +189,13 @@ impl DriverFactory {
             tokio::spawn(state_sync_driver.start_driver());
         }
 
-        Self {
+        // Create the driver factory
+        let driver_factory = Self {
             client_notification_sender,
             _driver_runtime: driver_runtime,
-        }
+        };
+
+        (driver_factory, commit_notification_sender)
     }
 
     /// Returns a new client that can be used to communicate with the driver

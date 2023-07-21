@@ -1,0 +1,70 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        f: u64,
+        b: bool,
+    }
+    private fun t0() {
+        {
+          let x: u64 = 0;
+          {
+            let x: bool = false;
+            x;
+            Tuple()
+          };
+          x;
+          {
+            let x: bool = false;
+            x;
+            Tuple()
+          };
+          x;
+          {
+            let x: bool = false;
+            {
+              let x: address = 0x0;
+              x;
+              Tuple()
+            };
+            x;
+            Tuple()
+          };
+          x;
+          Tuple()
+        }
+    }
+    private fun t1(cond: bool) {
+        {
+          let x: u64 = 0;
+          if cond {
+            {
+              let (a: bool, x: bool) = Tuple(false, false);
+              And(a, x);
+              Tuple()
+            }
+          } else {
+            {
+              let x: address = 0x0;
+              x;
+              Tuple()
+            }
+          };
+          x;
+          Tuple()
+        }
+    }
+    private fun t2() {
+        {
+          let x: u64 = 0;
+          loop {
+            {
+              let M::S{ f: _, b: x: bool } = pack M::S(0, false);
+              x;
+              break
+            }
+          };
+          x;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M

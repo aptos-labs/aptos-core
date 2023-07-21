@@ -89,7 +89,7 @@ pub async fn handle_metrics_ingest(
             },
             Ok(Err(err)) => {
                 METRICS_INGEST_BACKEND_REQUEST_DURATION
-                    .with_label_values(&[name, "Unknown"])
+                    .with_label_values(&[&claims.peer_id.to_string(), name, "Unknown"])
                     .observe(start_timer.elapsed().as_secs_f64());
                 error!(
                     "error sending remote write request for client {}: {}",
@@ -98,7 +98,14 @@ pub async fn handle_metrics_ingest(
                 );
                 return Err(());
             },
-            Err(_) => return Err(()),
+            Err(err) => {
+                error!(
+                    "timed out sending remote write for client {}: {}",
+                    name.clone(),
+                    err
+                );
+                return Err(());
+            },
         }
         Ok(())
     });

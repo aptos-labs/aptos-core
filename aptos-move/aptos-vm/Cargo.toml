@@ -23,6 +23,7 @@ aptos-framework =  { workspace = true }
 aptos-gas = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-memory-usage-tracker = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-mvhashmap = { workspace = true }
@@ -34,6 +35,7 @@ aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
+futures = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }

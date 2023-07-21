@@ -8,20 +8,20 @@ use crate::{
 use aptos_logger::{error, info};
 use aptos_secure_net::NetworkServer;
 use aptos_vm::sharded_block_executor::block_executor_client::{
-    BlockExecutorClient, LocalExecutorClient,
+    BlockExecutorClient, VMExecutorClient,
 };
 use std::net::SocketAddr;
 
 /// A service that provides support for remote execution. Essentially, it reads a request from
 /// the remote executor client and executes the block locally and returns the result.
 pub struct ExecutorService {
-    client: LocalExecutorClient,
+    client: VMExecutorClient,
 }
 
 impl ExecutorService {
     pub fn new(num_executor_threads: usize) -> Self {
         Self {
-            client: LocalExecutorClient::new(num_executor_threads),
+            client: VMExecutorClient::new(num_executor_threads),
         }
     }
 
@@ -93,14 +93,19 @@ mod tests {
         block_executor::partitioner::{
             CrossShardDependencies, SubBlock, SubBlocksForShard, TransactionWithDependencies,
         },
-        transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
+        transaction::{
+            analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction,
+            TransactionOutput, TransactionStatus,
+        },
     };
     use aptos_vm::sharded_block_executor::{
         block_executor_client::BlockExecutorClient, ShardedBlockExecutor,
     };
     use std::sync::Arc;
 
-    fn generate_transactions(executor: &mut FakeExecutor) -> (Vec<Transaction>, AccountData) {
+    fn generate_transactions(
+        executor: &mut FakeExecutor,
+    ) -> (Vec<AnalyzedTransaction>, AccountData) {
         let sender = executor.create_raw_account_data(3_000_000_000, 10);
         let receiver = executor.create_raw_account_data(3_000_000_000, 10);
         executor.add_account_data(&sender);
@@ -109,35 +114,39 @@ mod tests {
         let transfer_amount = 1_000;
 
         // execute transaction
-        let txns: Vec<Transaction> = vec![
+        let txns: Vec<AnalyzedTransaction> = vec![
             Transaction::UserTransaction(peer_to_peer_txn(
                 sender.account(),
                 receiver.account(),
                 10,
                 transfer_amount,
                 100,
-            )),
+            ))
+            .into(),
             Transaction::UserTransaction(peer_to_peer_txn(
                 sender.account(),
                 receiver.account(),
                 11,
                 transfer_amount,
                 100,
-            )),
+            ))
+            .into(),
             Transaction::UserTransaction(peer_to_peer_txn(
                 sender.account(),
                 receiver.account(),
                 12,
                 transfer_amount,
                 100,
-            )),
+            ))
+            .into(),
             Transaction::UserTransaction(peer_to_peer_txn(
                 sender.account(),
                 receiver.account(),
                 13,
                 transfer_amount,
                 100,
-            )),
+            ))
+            .into(),
         ];
         (txns, receiver)
     }
@@ -207,7 +216,7 @@ mod tests {
             let output = client
                 .execute_block(sub_blocks_for_shard, executor.data_store(), 2, None)
                 .unwrap();
-            verify_txn_output(1_000, &output, &mut executor, &receiver);
+            verify_txn_output(1_000, &output[0], &mut executor, &receiver);
         }
     }
 

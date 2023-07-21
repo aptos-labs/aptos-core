@@ -22,6 +22,7 @@ aptos-consensus-notifications = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-enum-conversion-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }

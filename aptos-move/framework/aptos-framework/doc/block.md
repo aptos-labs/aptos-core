@@ -849,4 +849,4 @@ The CurrentTimeMicroseconds existed under the @aptos_framework.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

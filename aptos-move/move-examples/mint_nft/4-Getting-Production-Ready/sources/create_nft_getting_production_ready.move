@@ -24,7 +24,7 @@
 ///
 /// Move unit tests
 /// We added a few unit tests to make sure that our code is working as expected. For more information on how to write
-/// Move unit tests, see: https://aptos.dev/guides/move-guides/book/unit-testing
+/// Move unit tests, see: https://aptos.dev/move/book/unit-testing
 ///
 /// - How to interact with this module
 /// 1. Configure the admin account name address in Move.toml file.

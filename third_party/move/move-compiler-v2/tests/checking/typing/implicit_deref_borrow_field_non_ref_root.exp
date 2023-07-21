@@ -1,0 +1,15 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        f: u64,
+    }
+    private fun t0(cond: bool,s: M::S) {
+        select M::S.f(s);
+        select M::S.f(if cond {
+          pack M::S(0)
+        } else {
+          pack M::S(1)
+        });
+        Tuple()
+    }
+} // end 0x8675309::M

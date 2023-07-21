@@ -26,9 +26,12 @@ spec aptos_framework::reconfiguration {
 
         include AbortsIfNotAptosFramework;
         let addr = signer::address_of(aptos_framework);
+        let post config = global<Configuration>(@aptos_framework);
         requires exists<Account>(addr);
         aborts_if !(global<Account>(addr).guid_creation_num == 2);
         aborts_if exists<Configuration>(@aptos_framework);
+        ensures exists<Configuration>(@aptos_framework);
+        ensures config.epoch == 0 && config.last_reconfiguration_time == 0;
     }
 
     spec current_epoch(): u64 {
@@ -74,6 +77,18 @@ spec aptos_framework::reconfiguration {
 
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
+        aborts_if false;
+        let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
+            && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
+        ensures success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch) + 1;
+        ensures !success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch);
+        ensures (success && event::counter<NewEpochEvent>(old(global<Configuration>(@aptos_framework)).events) <
+            MAX_U64) ==>
+            event::counter<NewEpochEvent>(global<Configuration>(@aptos_framework).events) ==
+                event::counter<NewEpochEvent>(old(global<Configuration>(@aptos_framework)).events) + 1;
+    }
+
+    spec reconfiguration_enabled {
         aborts_if false;
     }
 }

@@ -31,6 +31,7 @@ spec aptos_framework::resource_account {
 
         //coin property
         aborts_if coin::is_account_registered<AptosCoin>(resource_addr) && coin_store_resource.frozen;
+        ensures exists<aptos_framework::coin::CoinStore<AptosCoin>>(resource_addr);
     }
 
     spec create_resource_account_and_publish_package(
@@ -55,6 +56,9 @@ spec aptos_framework::resource_account {
     ) {
         let resource_addr = signer::address_of(resource);
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIf;
+        ensures exists<Container>(signer::address_of(origin));
+        ensures vector::length(optional_auth_key) != 0 ==>
+            global<aptos_framework::account::Account>(resource_addr).authentication_key == optional_auth_key;
     }
 
     spec schema RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIf {
@@ -101,8 +105,10 @@ spec aptos_framework::resource_account {
         aborts_if !exists<Container>(source_addr);
         let resource_addr = signer::address_of(resource);
 
-        let container = borrow_global_mut<Container>(source_addr);
+        let container = global<Container>(source_addr);
         aborts_if !simple_map::spec_contains_key(container.store, resource_addr);
         aborts_if !exists<account::Account>(resource_addr);
+        ensures simple_map::spec_contains_key(old(global<Container>(source_addr)).store, resource_addr) &&
+        simple_map::spec_len(old(global<Container>(source_addr)).store) == 1 ==> !exists<Container>(source_addr);
     }
 }

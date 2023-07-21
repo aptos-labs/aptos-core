@@ -20,13 +20,16 @@ ark-ff = { workspace = true }
 ark-std = { workspace = true }
 bcs = { workspace = true }
 blst = { workspace = true }
+bulletproofs = { workspace = true }
 bytes = { workspace = true }
 curve25519-dalek = { workspace = true }
+curve25519-dalek-ng = { workspace = true }
 digest = { workspace = true }
 ed25519-dalek = { workspace = true }
 hex = { workspace = true }
 hkdf = { workspace = true }
 libsecp256k1 = { workspace = true }
+merlin = { workspace = true }
 more-asserts = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
@@ -93,3 +96,6 @@ harness = false
 name = "secp256k1"
 harness = false
 
+[[bench]]
+name = "bulletproofs"
+harness = false

@@ -1,5 +1,9 @@
 // Copyright © Aptos Foundation
 
+use super::{
+    dag_fetcher::FetchRequestHandler, reliable_broadcast::CertifiedNodeHandler,
+    storage::DAGStorage, types::TDAGMessage,
+};
 use crate::{
     dag::{
         dag_network::RpcHandler, dag_store::Dag, reliable_broadcast::NodeBroadcastHandler,
@@ -7,6 +11,7 @@ use crate::{
     },
     network::{IncomingDAGRequest, TConsensusMsg},
 };
+use anyhow::bail;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
@@ -20,6 +25,9 @@ use std::sync::Arc;
 struct NetworkHandler {
     dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
     node_receiver: NodeBroadcastHandler,
+    certified_node_receiver: CertifiedNodeHandler,
+    fetch_receiver: FetchRequestHandler,
+    epoch_state: Arc<EpochState>,
 }
 
 impl NetworkHandler {
@@ -28,25 +36,54 @@ impl NetworkHandler {
         dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
         signer: ValidatorSigner,
         epoch_state: Arc<EpochState>,
+        storage: Arc<dyn DAGStorage>,
     ) -> Self {
         Self {
             dag_rpc_rx,
-            node_receiver: NodeBroadcastHandler::new(dag, signer, epoch_state.verifier.clone()),
+            node_receiver: NodeBroadcastHandler::new(
+                dag.clone(),
+                signer,
+                epoch_state.clone(),
+                storage,
+            ),
+            certified_node_receiver: CertifiedNodeHandler::new(dag.clone()),
+            epoch_state: epoch_state.clone(),
+            fetch_receiver: FetchRequestHandler::new(dag, epoch_state),
         }
     }
 
     async fn start(mut self) {
+        // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         while let Some(msg) = self.dag_rpc_rx.next().await {
             if let Err(e) = self.process_rpc(msg).await {
-                warn!(error = ?e, "error sending rpc response for request");
+                warn!(error = ?e, "error processing rpc");
             }
         }
     }
 
     async fn process_rpc(&mut self, rpc_request: IncomingDAGRequest) -> anyhow::Result<()> {
-        let dag_message: DAGMessage = TConsensusMsg::from_network_message(rpc_request.req)?;
+        let dag_message: DAGMessage = rpc_request.req.try_into()?;
+
+        let author = dag_message
+            .author()
+            .map_err(|_| anyhow::anyhow!("unexpected rpc message {:?}", dag_message))?;
+        if author != rpc_request.sender {
+            bail!("message author and network author mismatch");
+        }
+
         let response: anyhow::Result<DAGMessage> = match dag_message {
-            DAGMessage::NodeMsg(node) => self.node_receiver.process(node).map(|r| r.into()),
+            DAGMessage::NodeMsg(node) => node
+                .verify(&self.epoch_state.verifier)
+                .and_then(|_| self.node_receiver.process(node))
+                .map(|r| r.into()),
+            DAGMessage::CertifiedNodeMsg(node) => node
+                .verify(&self.epoch_state.verifier)
+                .and_then(|_| self.certified_node_receiver.process(node))
+                .map(|r| r.into()),
+            DAGMessage::FetchRequest(request) => request
+                .verify(&self.epoch_state.verifier)
+                .and_then(|_| self.fetch_receiver.process(request))
+                .map(|r| r.into()),
             _ => {
                 error!("unknown rpc message {:?}", dag_message);
                 Err(anyhow::anyhow!("unknown rpc message"))
@@ -60,11 +97,11 @@ impl NetworkHandler {
                     .to_bytes(&response_msg.into_network_message())
                     .map(Bytes::from)
             })
-            .map_err(RpcError::Error);
+            .map_err(RpcError::ApplicationError);
 
         rpc_request
             .response_sender
             .send(response)
-            .map_err(|_| anyhow::anyhow!("unable to process rpc"))
+            .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))
     }
 }

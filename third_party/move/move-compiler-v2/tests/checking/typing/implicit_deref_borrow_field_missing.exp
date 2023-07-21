@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: field `g` not declared in struct `M::S`
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_missing.move:5:9
+  │
+5 │         s.g;
+  │         ^^^
+
+error: field `g` not declared in struct `M::S`
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_missing.move:6:9
+  │
+6 │         sref.g;
+  │         ^^^^^^
+
+error: field `h` not declared in struct `M::S`
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_missing.move:7:9
+  │
+7 │         s_mut.h;
+  │         ^^^^^^^

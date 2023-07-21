@@ -1,0 +1,31 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct S {
+        dummy_field: bool,
+    }
+    private fun imm<T>(_x: &T) {
+        Tuple()
+    }
+    private fun imm_imm<T>(_x: &T,_y: &T) {
+        Tuple()
+    }
+    private fun imm_mut<T>(_x: &T,_y: &mut T) {
+        Tuple()
+    }
+    private fun mut_imm<T>(_x: &mut T,_y: &T) {
+        Tuple()
+    }
+    private fun t0() {
+        M::imm<u64>(Borrow(Mutable)(0));
+        M::imm<u64>(Borrow(Immutable)(0));
+        M::imm<M::S>(Borrow(Mutable)(pack M::S(false)));
+        M::imm<M::S>(Borrow(Immutable)(pack M::S(false)));
+        Tuple()
+    }
+    private fun t1() {
+        M::imm_mut<u64>(Borrow(Mutable)(0), Borrow(Mutable)(0));
+        M::mut_imm<u64>(Borrow(Mutable)(0), Borrow(Mutable)(0));
+        M::imm_imm<u64>(Borrow(Mutable)(0), Borrow(Mutable)(0));
+        Tuple()
+    }
+} // end 0x8675309::M

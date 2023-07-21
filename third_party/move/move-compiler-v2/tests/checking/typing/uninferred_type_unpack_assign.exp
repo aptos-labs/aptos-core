@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unable to infer type: `M::S<?2>`
+  ┌─ tests/checking/typing/uninferred_type_unpack_assign.move:5:15
+  │
+5 │         S{} = S{};
+  │               ^^^
