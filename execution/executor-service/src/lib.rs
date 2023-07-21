@@ -3,7 +3,7 @@
 use aptos_state_view::in_memory_state_view::InMemoryStateView;
 use aptos_types::{
     block_executor::partitioner::SubBlocksForShard,
-    transaction::{Transaction, TransactionOutput},
+    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
     vm_status::VMStatus,
 };
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ pub enum BlockExecutionRequest {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ExecuteBlockCommand {
-    pub(crate) sub_blocks: SubBlocksForShard<Transaction>,
+    pub(crate) sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
     // Currently we only support the state view backed by in-memory hashmap, which means that
     // the controller needs to pre-read all the KV pairs from the storage and pass them to the
     // executor service. In the future, we will support other types of state view, e.g., the

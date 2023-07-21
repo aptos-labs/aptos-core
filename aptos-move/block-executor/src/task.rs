@@ -94,9 +94,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
         delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
     );
 
-    /// Return the amount of gas consumed by the transaction.
-    fn gas_used(&self) -> u64;
-
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
 }

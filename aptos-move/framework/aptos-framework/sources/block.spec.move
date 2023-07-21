@@ -1,6 +1,6 @@
 spec aptos_framework::block {
     spec module {
-        use aptos_std::chain_status;
+        use aptos_framework::chain_status;
         // After genesis, `BlockResource` exist.
         invariant [suspendable] chain_status::is_operating() ==> exists<BlockResource>(@aptos_framework);
     }

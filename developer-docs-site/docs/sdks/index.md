@@ -6,7 +6,7 @@ hidden: false
 
 # Use the Aptos SDKs
 
-Use these Aptos software development kits (SDKs), in combination with the [Aptos CLI](/tools/aptos-cli-tool/use-aptos-cli.md) for your development on the Aptos blockchain.
+Use these Aptos software development kits (SDKs), in combination with the [Aptos CLI](/tools/aptos-cli/use-cli/use-aptos-cli.md) for your development on the Aptos blockchain.
 
 - ### [TypeScript SDK](ts-sdk/index.md)
 

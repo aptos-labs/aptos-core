@@ -595,4 +595,4 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY
