@@ -38,7 +38,8 @@ pub trait DAGNetworkSender: Send + Sync {
         &self,
         responders: Vec<Author>,
         message: DAGMessage,
-        timeout: Duration,
+        retry_interval: Duration,
+        rpc_timeout: Duration,
     ) -> RpcWithFallback;
 }
 
@@ -72,7 +73,7 @@ impl Responders {
 pub struct RpcWithFallback {
     responders: Responders,
     message: DAGMessage,
-    timeout: Duration,
+    rpc_timeout: Duration,
 
     terminated: bool,
     futures: Pin<
@@ -86,19 +87,20 @@ impl RpcWithFallback {
     pub fn new(
         responders: Vec<Author>,
         message: DAGMessage,
-        timeout: Duration,
+        retry_interval: Duration,
+        rpc_timeout: Duration,
         sender: Arc<dyn DAGNetworkSender>,
         time_service: TimeService,
     ) -> Self {
         Self {
             responders: Responders::new(responders, 1, 4),
             message,
-            timeout,
+            rpc_timeout,
 
             terminated: false,
             futures: Box::pin(FuturesUnordered::new()),
             sender,
-            interval: Box::pin(time_service.interval(timeout)),
+            interval: Box::pin(time_service.interval(retry_interval)),
         }
     }
 }
@@ -134,7 +136,7 @@ impl Stream for RpcWithFallback {
                         self.sender.clone(),
                         peer,
                         self.message.clone(),
-                        self.timeout,
+                        self.rpc_timeout,
                     ));
                     self.futures.push(future);
                 }

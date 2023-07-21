@@ -98,7 +98,8 @@ impl DAGNetworkSender for TestDAGSender {
         &self,
         _responders: Vec<Author>,
         _message: DAGMessage,
-        _timeout: Duration,
+        _retry_timeout: Duration,
+        _rpc_timeout: Duration,
     ) -> RpcWithFallback {
         unimplemented!();
     }

@@ -111,6 +111,7 @@ impl DagFetcher {
             let mut rpc = RpcWithFallback::new(
                 responders,
                 remote_request.clone().into(),
+                Duration::from_millis(500),
                 Duration::from_secs(1),
                 self.network.clone(),
                 self.time_service.clone(),

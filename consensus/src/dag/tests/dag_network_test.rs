@@ -58,12 +58,14 @@ impl DAGNetworkSender for MockDAGNetworkSender {
         &self,
         responders: Vec<Author>,
         message: DAGMessage,
-        timeout: Duration,
+        retry_interval: Duration,
+        rpc_timeout: Duration,
     ) -> RpcWithFallback {
         RpcWithFallback::new(
             responders,
             message,
-            timeout,
+            retry_interval,
+            rpc_timeout,
             Arc::new(self.clone()),
             self.time_service.clone(),
         )
@@ -95,7 +97,12 @@ async fn test_send_rpc_with_fallback() {
 
     let message = TestMessage(vec![42; validators.len() - 1]);
     let mut rpc = sender
-        .send_rpc_with_fallbacks(validators, message.into(), Duration::from_millis(100))
+        .send_rpc_with_fallbacks(
+            validators,
+            message.into(),
+            Duration::from_millis(100),
+            Duration::from_secs(5),
+        )
         .await;
 
     assert_ok!(rpc.next().await.unwrap());
