@@ -11,9 +11,11 @@ from aptos_sdk.transactions import (
     TransactionArgument,
     TransactionPayload,
 )
+
 from .common import FAUCET_URL, NODE_URL
 
 WIDTH = 19
+
 
 def truncate(address: str) -> str:
     return address[0:6] + "..." + address[-6:]

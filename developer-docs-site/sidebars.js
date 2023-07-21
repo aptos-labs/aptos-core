@@ -346,9 +346,7 @@ const sidebars = {
         slug: "/category/examples",
         keywords: ["examples"],
       },
-      items: [
-        "guides/account-management/key-rotation",
-      ],
+      items: ["guides/account-management/key-rotation"],
     },
     {
       type: "category",
