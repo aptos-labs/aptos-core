@@ -137,7 +137,8 @@ impl OutputFallbackHandler {
 
     /// Initiates a fallback to output syncing (if we haven't already)
     pub fn fallback_to_outputs(&mut self) {
-        if self.fallback_start_time.lock().is_none() {
+        let missing_fallback_start_time = self.fallback_start_time.lock().is_none();
+        if missing_fallback_start_time {
             self.set_fallback_start_time(self.time_service.now());
             info!(LogSchema::new(LogEntry::Driver).message(&format!(
                 "Falling back to output syncing for at least {:?} seconds!",
