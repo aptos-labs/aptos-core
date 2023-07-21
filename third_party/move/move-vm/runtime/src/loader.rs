@@ -279,7 +279,7 @@ impl ModuleCache {
         let module = module.self_id();
         StructType {
             fields: vec![],
-            type_phantom_constraint: struct_handle
+            phantom_ty_args_mask: struct_handle
                 .type_parameters
                 .iter()
                 .map(|ty| ty.is_phantom)
@@ -339,7 +339,7 @@ impl ModuleCache {
     // `make_type` is the entry point to "translate" a `SignatureToken` to a `Type`
     fn make_type(&self, module: BinaryIndexedView, tok: &SignatureToken) -> PartialVMResult<Type> {
         Self::make_type_internal(module, tok, &|struct_name, module_id| {
-            Ok(self.resolve_struct_by_name(struct_name, module_id)?.0)
+            self.resolve_struct_by_name(struct_name, module_id)
         })
     }
 
@@ -363,7 +363,7 @@ impl ModuleCache {
                             break;
                         }
                         if struct_type.name.as_ident_str() == struct_name {
-                            return Ok(CachedStructIndex(idx));
+                            return Ok((CachedStructIndex(idx), struct_type.clone()));
                         }
                     }
                     Err(
@@ -375,7 +375,7 @@ impl ModuleCache {
                         ),
                     )
                 } else {
-                    Ok(self.resolve_struct_by_name(struct_name, module_id)?.0)
+                    self.resolve_struct_by_name(struct_name, module_id)
                 }
             },
         )
@@ -389,7 +389,7 @@ impl ModuleCache {
         resolver: &F,
     ) -> PartialVMResult<Type>
     where
-        F: Fn(&IdentStr, &ModuleId) -> PartialVMResult<CachedStructIndex>,
+        F: Fn(&IdentStr, &ModuleId) -> PartialVMResult<(CachedStructIndex, Arc<StructType>)>,
     {
         let res = match tok {
             SignatureToken::Bool => Type::Bool,
@@ -422,10 +422,10 @@ impl ModuleCache {
                     *module.address_identifier_at(module_handle.address),
                     module.identifier_at(module_handle.name).to_owned(),
                 );
-                let def_idx = resolver(struct_name, &module_id)?;
+                let (def_idx, struct_) = resolver(struct_name, &module_id)?;
                 Type::Struct {
                     index: def_idx,
-                    ability: struct_handle.abilities,
+                    ability: struct_.abilities,
                 }
             },
             SignatureToken::StructInstantiation(sh_idx, tys) => {
@@ -440,12 +440,12 @@ impl ModuleCache {
                     *module.address_identifier_at(module_handle.address),
                     module.identifier_at(module_handle.name).to_owned(),
                 );
-                let def_idx = resolver(struct_name, &module_id)?;
+                let (def_idx, struct_) = resolver(struct_name, &module_id)?;
                 Type::StructInstantiation {
                     index: def_idx,
-                    base_ability: struct_handle.abilities,
+                    base_ability_set: struct_.abilities,
                     ty_args: type_parameters,
-                    is_phantom_params: struct_handle
+                    phantom_ty_args_mask: struct_
                         .type_parameters
                         .iter()
                         .map(|ty| ty.is_phantom)
@@ -1247,8 +1247,8 @@ impl Loader {
                     Type::StructInstantiation {
                         index: idx,
                         ty_args: type_params,
-                        base_ability: struct_type.abilities,
-                        is_phantom_params: struct_type.type_phantom_constraint.clone(),
+                        base_ability_set: struct_type.abilities,
+                        phantom_ty_args_mask: struct_type.phantom_ty_args_mask.clone(),
                     }
                 }
             },
@@ -1681,8 +1681,8 @@ impl Loader {
             Type::Struct { ability, .. } => Ok(*ability),
             Type::StructInstantiation {
                 ty_args,
-                base_ability,
-                is_phantom_params,
+                base_ability_set: base_ability,
+                phantom_ty_args_mask: is_phantom_params,
                 ..
             } => {
                 let type_argument_abilities = ty_args
@@ -1842,8 +1842,8 @@ impl<'a> Resolver<'a> {
                 .iter()
                 .map(|ty| self.subst(ty, ty_args))
                 .collect::<PartialVMResult<_>>()?,
-            base_ability: struct_.abilities,
-            is_phantom_params: struct_.type_phantom_constraint.clone(),
+            base_ability_set: struct_.abilities,
+            phantom_ty_args_mask: struct_.phantom_ty_args_mask.clone(),
         })
     }
 
@@ -1994,8 +1994,8 @@ impl<'a> Resolver<'a> {
                         .iter()
                         .map(|ty| ty.subst(args))
                         .collect::<PartialVMResult<Vec<_>>>()?,
-                    base_ability: struct_.abilities,
-                    is_phantom_params: struct_.type_phantom_constraint.clone(),
+                    base_ability_set: struct_.abilities,
+                    phantom_ty_args_mask: struct_.phantom_ty_args_mask.clone(),
                 })
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),

@@ -113,7 +113,7 @@ impl DepthFormula {
 pub struct StructType {
     pub fields: Vec<Type>,
     pub field_names: Vec<Identifier>,
-    pub type_phantom_constraint: Vec<bool>,
+    pub phantom_ty_args_mask: Vec<bool>,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
     pub name: Identifier,
@@ -147,8 +147,8 @@ pub enum Type {
     StructInstantiation {
         index: CachedStructIndex,
         ty_args: Vec<Type>,
-        base_ability: AbilitySet,
-        is_phantom_params: Vec<bool>,
+        base_ability_set: AbilitySet,
+        phantom_ty_args_mask: Vec<bool>,
     },
     Reference(Box<Type>),
     MutableReference(Box<Type>),
@@ -199,8 +199,8 @@ impl Type {
             Type::StructInstantiation {
                 index: def_idx,
                 ty_args: instantiation,
-                base_ability,
-                is_phantom_params,
+                base_ability_set: base_ability,
+                phantom_ty_args_mask: is_phantom_params,
             } => {
                 let mut inst = vec![];
                 for ty in instantiation {
@@ -209,8 +209,8 @@ impl Type {
                 Type::StructInstantiation {
                     index: *def_idx,
                     ty_args: inst,
-                    base_ability: *base_ability,
-                    is_phantom_params: is_phantom_params.clone(),
+                    base_ability_set: *base_ability,
+                    phantom_ty_args_mask: is_phantom_params.clone(),
                 }
             },
         };
