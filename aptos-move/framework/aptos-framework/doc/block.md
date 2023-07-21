@@ -706,7 +706,6 @@ The BlockResource existed under the @aptos_framework.
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>let</b> <b>post</b> block_resource = <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>ensures</b> block_resource.epoch_interval == new_epoch_interval;
-    <b>ensures</b> addr == @aptos_framework;
 }
 </code></pre>
 
