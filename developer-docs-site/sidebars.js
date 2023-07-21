@@ -366,7 +366,8 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
-            "guides/resource-accounts/using-resource-accounts",
+            "guides/resource-accounts/utilizing-resource-accounts",
+            "guides/resource-accounts/understanding-resource-accounts",
           ],
         },
       ],
