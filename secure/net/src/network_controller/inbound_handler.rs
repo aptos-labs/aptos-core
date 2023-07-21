@@ -11,6 +11,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use aptos_logger::error;
 
 #[allow(dead_code)]
 pub struct InboundHandler {
@@ -46,26 +47,25 @@ impl InboundHandler {
     pub fn start(&mut self) {
         let inbound_handlers = self.inbound_handlers.clone(); // Clone the hashmap for the thread
         let server_clone = self.server.clone(); // Clone the server to move into the thread
-        // Spawn a thread to handle incoming messages
+                                                // Spawn a thread to handle incoming messages
         let thread_name = format!("{}_network_inbound_handler", self.service);
         let builder = thread::Builder::new().name(thread_name);
-        builder.spawn(move || {
-            loop {
-                // Receive incoming messages from the server
-                if let Err(e) = Self::process_one_incoming_message(&server_clone, &inbound_handlers)
-                {
-                    println!("Error processing incoming messages: {:?}", e);
+        builder
+            .spawn(move || {
+                loop {
+                    // Receive incoming messages from the server
+                    if let Err(e) =
+                        Self::process_one_incoming_message(&server_clone, &inbound_handlers)
+                    {
+                        error!("Error processing incoming messages: {:?}", e);
+                    }
                 }
-            }
-        }).expect("Failed to spawn network_inbound_handler thread");
+            })
+            .expect("Failed to spawn network_inbound_handler thread");
     }
 
     // Helper function to short-circuit the network message not to be sent over the network for self messages
-    pub fn send_incoming_message_to_handler(
-        &self,
-        message_type: &MessageType,
-        message: Message,
-    ) {
+    pub fn send_incoming_message_to_handler(&self, message_type: &MessageType, message: Message) {
         // Check if there is a registered handler for the sender
         if let Some(handler) = self.inbound_handlers.lock().unwrap().get(message_type) {
             // Send the message to the registered handler

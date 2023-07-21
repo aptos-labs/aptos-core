@@ -32,7 +32,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm::{
-    sharded_block_executor::{ShardedBlockExecutor},
+    sharded_block_executor::{executor_shard::ExecutorClient, ShardedBlockExecutor},
     VMExecutor,
 };
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
@@ -210,7 +210,7 @@ impl VMExecutor for MockVM {
         Ok(outputs)
     }
 
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: CoordinatorToExecutorClient<S>>(
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         _state_view: Arc<S>,

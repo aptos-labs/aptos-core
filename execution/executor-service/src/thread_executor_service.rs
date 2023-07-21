@@ -32,9 +32,11 @@ impl ThreadExecutorService {
         let thread_name = format!("ThreadExecutorService-{}", shard_id);
         let builder = thread::Builder::new().name(thread_name);
 
-        let child = builder.spawn(move || {
-            executor_service.start();
-        }).expect("Failed to spawn thread");
+        let child = builder
+            .spawn(move || {
+                executor_service.start();
+            })
+            .expect("Failed to spawn thread");
 
         Self {
             _child: child,

@@ -6,7 +6,7 @@ use crate::{
         counters::SHARDED_BLOCK_EXECUTION_SECONDS,
         cross_shard_client::{CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
-        executor_shard::{CrossShardClient},
+        executor_shard::{CoordinatorClient, CrossShardClient},
         messages::CrossShardMsg,
         ExecutorShardCommand,
     },
@@ -20,7 +20,6 @@ use aptos_types::{
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::{collections::HashSet, sync::Arc};
-use crate::sharded_block_executor::executor_shard::CoordinatorClient;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -79,10 +78,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        println!(
+        trace!(
             "executing sub block for shard {} and round {}",
-            self.shard_id,
-            round
+            self.shard_id, round
         );
         let cross_shard_commit_sender =
             CrossShardCommitSender::new(self.shard_id, self.cross_shard_client.clone(), &sub_block);
@@ -115,18 +113,19 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     maybe_block_gas_limit,
                     Some(cross_shard_commit_sender),
                 );
-                println!("executed sub block for shard {} and round {}", self.shard_id, round);
+                trace!(
+                    "executed sub block for shard {} and round {}",
+                    self.shard_id, round
+                );
                 // Send a self message to stop the cross-shard commit receiver.
                 cross_shard_client_clone.send_cross_shard_msg(
                     self.shard_id,
                     round,
                     CrossShardMsg::StopMsg,
                 );
-                println!("sent stop message for shard {} and round {}", self.shard_id, round);
                 callback.send(ret).unwrap();
             });
         });
-        println!("waiting for sub block for shard {} and round {}", self.shard_id, round);
         block_on(callback_receiver).unwrap()
     }
 
@@ -155,7 +154,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 concurrency_level,
                 maybe_block_gas_limit,
             )?);
-            println!("Finished executing sub block for shard {} and round {}", self.shard_id, round);
+            trace!(
+                "Finished executing sub block for shard {} and round {}",
+                self.shard_id, round
+            );
         }
         Ok(result)
     }

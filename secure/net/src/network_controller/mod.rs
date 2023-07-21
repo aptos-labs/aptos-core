@@ -5,8 +5,10 @@ use crate::network_controller::{
 };
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+};
 
 mod error;
 mod inbound_handler;
@@ -70,7 +72,11 @@ pub struct NetworkController {
 
 impl NetworkController {
     pub fn new(service: String, listen_addr: SocketAddr, timeout_ms: u64) -> Self {
-        let inbound_handler = Arc::new(Mutex::new(InboundHandler::new(service.clone(), listen_addr, timeout_ms)));
+        let inbound_handler = Arc::new(Mutex::new(InboundHandler::new(
+            service.clone(),
+            listen_addr,
+            timeout_ms,
+        )));
         let outbound_handler = OutboundHandler::new(service, listen_addr, inbound_handler.clone());
         Self {
             inbound_handler,
@@ -94,7 +100,9 @@ impl NetworkController {
     pub fn create_inbound_channel(&mut self, message_type: String) -> Receiver<Message> {
         let (inbound_sender, inbound_receiver) = unbounded();
 
-        self.inbound_handler.lock().unwrap()
+        self.inbound_handler
+            .lock()
+            .unwrap()
             .register_handler(message_type, inbound_sender);
 
         inbound_receiver
@@ -120,8 +128,10 @@ mod tests {
         let server_port2 = utils::get_available_port();
         let server_addr2 = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port2);
 
-        let mut network_controller1 = NetworkController::new("test1".to_string(), server_addr1, 1000);
-        let mut network_controller2 = NetworkController::new("test2".to_string(), server_addr2, 1000);
+        let mut network_controller1 =
+            NetworkController::new("test1".to_string(), server_addr1, 1000);
+        let mut network_controller2 =
+            NetworkController::new("test2".to_string(), server_addr2, 1000);
 
         let test1_sender =
             network_controller2.create_outbound_channel(server_addr1, "test1".to_string());

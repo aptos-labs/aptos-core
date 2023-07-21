@@ -303,7 +303,6 @@ impl NetworkServer {
         };
 
         if let Err((remote, err)) = &result {
-            println!("Error reading from the server: {:?} for remote addr {:?} ", err, remote);
             self.increment_counter(Method::Read, MethodResult::Failure);
             warn!(SecureNetLogSchema::new(
                 &self.service,

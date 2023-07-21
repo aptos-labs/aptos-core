@@ -2,7 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{counters::NUM_EXECUTOR_SHARDS};
+use crate::sharded_block_executor::{
+    counters::NUM_EXECUTOR_SHARDS, executor_shard::ExecutorClient,
+};
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -11,9 +13,7 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
-use crate::sharded_block_executor::executor_shard::ExecutorClient;
 
-pub mod block_executor_client;
 mod counters;
 mod cross_shard_client;
 mod cross_shard_state_view;
@@ -22,9 +22,9 @@ pub mod local_executor_shard;
 pub mod messages;
 pub mod sharded_executor_service;
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod test_utils;
+#[cfg(test)]
+mod tests;
 
 /// Coordinator for sharded block executors that manages multiple shards and aggregates the results.
 pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> {

@@ -1,25 +1,25 @@
 // Copyright © Aptos Foundation
 
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
-use aptos_types::transaction::{Transaction, TransactionOutput};
-use move_core_types::account_address::AccountAddress;
-use rand::rngs::OsRng;
-use std::sync::{Arc, Mutex};
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
-use aptos_types::block_executor::partitioner::SubBlocksForShard;
-use std::collections::HashMap;
-use aptos_crypto::hash::CryptoHash;
-use rand::Rng;
-use crate::{AptosVM, VMExecutor};
-use crate::sharded_block_executor::executor_shard::{ExecutorClient};
-use crate::sharded_block_executor::ShardedBlockExecutor;
-use aptos_types::{
-    state_store::state_key::StateKeyInner,
+use crate::{
+    sharded_block_executor::{executor_shard::ExecutorClient, ShardedBlockExecutor},
+    AptosVM, VMExecutor,
 };
+use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_crypto::hash::CryptoHash;
 use aptos_language_e2e_tests::{
-    data_store::FakeDataStore,
-
-    account::AccountData, common_transactions::peer_to_peer_txn, executor::FakeExecutor,
+    account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
+    executor::FakeExecutor,
+};
+use aptos_types::{
+    block_executor::partitioner::SubBlocksForShard,
+    state_store::state_key::StateKeyInner,
+    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
+};
+use move_core_types::account_address::AccountAddress;
+use rand::{rngs::OsRng, Rng};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
 };
 
 pub fn generate_account_at(executor: &mut FakeExecutor, address: AccountAddress) -> AccountData {
@@ -102,13 +102,14 @@ pub fn compare_txn_outputs(
     }
 }
 
-pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>) {
+pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>(
+    sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
+) {
     let num_txns = 400;
     let num_shards = 8;
     let mut executor = FakeExecutor::from_head_genesis();
     let mut transactions = Vec::new();
     for _ in 0..num_txns {
-
         transactions.push(generate_non_conflicting_p2p(&mut executor).0)
     }
     let partitioner = ShardedBlockPartitioner::new(num_shards);
@@ -126,11 +127,14 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
         &executor.data_store(),
         None,
     )
-        .unwrap();
+    .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }
 
-pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
+pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
+    sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
+    concurrency: usize,
+) {
     let num_txns = 800;
     let num_shards = sharded_block_executor.num_shards();
     let num_accounts = 80;
@@ -157,7 +161,10 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>> (s
     let partitioner = ShardedBlockPartitioner::new(num_shards);
     let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
 
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone()).into_iter().map(|t| t.into_txn()).collect();
+    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone())
+        .into_iter()
+        .map(|t| t.into_txn())
+        .collect();
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
@@ -172,7 +179,10 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>> (s
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }
 
-pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>, concurrency: usize) {
+pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataStore>>(
+    sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
+    concurrency: usize,
+) {
     let mut rng = OsRng;
     let max_accounts = 200;
     let max_txns = 1000;
@@ -202,7 +212,10 @@ pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataSt
     let partitioner = ShardedBlockPartitioner::new(num_shards);
     let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
 
-    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone()).into_iter().map(|t| t.into_txn()).collect();
+    let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone())
+        .into_iter()
+        .map(|t| t.into_txn())
+        .collect();
 
     let sharded_txn_output = sharded_block_executor
         .execute_block(

@@ -12,13 +12,14 @@ mod error;
 pub mod process_executor_service;
 mod remote_cordinator_client;
 mod remote_cross_shard_client;
-pub mod remote_executor_service;
 mod remote_executor_client;
-mod thread_executor_service;
+pub mod remote_executor_service;
+#[cfg(test)]
+mod test_utils;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod test_utils;
+mod thread_executor_service;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RemoteExecutionResult {

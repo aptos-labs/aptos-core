@@ -24,11 +24,10 @@ use aptos_types::{
     vm_status::VMStatus,
 };
 use aptos_vm::{
-    sharded_block_executor::{ShardedBlockExecutor},
+    sharded_block_executor::{executor_shard::ExecutorClient, ShardedBlockExecutor},
     VMExecutor,
 };
 use std::sync::Arc;
-use aptos_vm::sharded_block_executor::executor_shard::ExecutorClient;
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db

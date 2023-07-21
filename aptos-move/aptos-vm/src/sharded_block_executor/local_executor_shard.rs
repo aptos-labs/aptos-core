@@ -1,17 +1,17 @@
 // Copyright © Aptos Foundation
 
 use crate::sharded_block_executor::{
-    executor_shard::{CrossShardClient},
+    executor_shard::{CoordinatorClient, CrossShardClient, ExecutorClient},
     messages::CrossShardMsg,
     sharded_executor_service::ShardedExecutorService,
     ExecutorShardCommand,
 };
 use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING_ROUNDS;
-use aptos_logger::{trace};
+use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{RoundId, ShardId},
-    transaction::TransactionOutput,
+    block_executor::partitioner::{RoundId, ShardId, SubBlocksForShard},
+    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
@@ -19,9 +19,6 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use aptos_types::block_executor::partitioner::SubBlocksForShard;
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
-use crate::sharded_block_executor::executor_shard::{ExecutorClient, CoordinatorClient};
 
 /// A block executor that receives transactions from a channel and executes them in parallel.
 /// It runs in the local machine.
@@ -90,7 +87,10 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
             cross_shard_msg_txs.push(current_shard_msg_txs);
             cross_shard_msg_rxs.push(current_shard_msg_rxs);
         }
-        let executor_shards = command_rxs.into_iter().zip(result_txs.into_iter()).zip(cross_shard_msg_rxs.into_iter())
+        let executor_shards = command_rxs
+            .into_iter()
+            .zip(result_txs.into_iter())
+            .zip(cross_shard_msg_rxs.into_iter())
             .enumerate()
             .map(|(shard_id, ((command_rx, result_tx), cross_shard_rxs))| {
                 Self::new(
@@ -141,14 +141,17 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         state_view: Arc<S>,
         block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         concurrency_level_per_shard: usize,
-        maybe_block_gas_limit: Option<u64>) {
+        maybe_block_gas_limit: Option<u64>,
+    ) {
         for (i, sub_blocks_for_shard) in block.into_iter().enumerate() {
-            self.command_txs[i].send(ExecutorShardCommand::ExecuteSubBlocks(
-                state_view.clone(),
-                sub_blocks_for_shard,
-                concurrency_level_per_shard,
-                maybe_block_gas_limit,
-            )).unwrap();
+            self.command_txs[i]
+                .send(ExecutorShardCommand::ExecuteSubBlocks(
+                    state_view.clone(),
+                    sub_blocks_for_shard,
+                    concurrency_level_per_shard,
+                    maybe_block_gas_limit,
+                ))
+                .unwrap();
         }
     }
 
@@ -165,7 +168,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
 impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {
     fn drop(&mut self) {
         for command_tx in self.command_txs.iter() {
-            let _ =  command_tx.send(ExecutorShardCommand::Stop);
+            let _ = command_tx.send(ExecutorShardCommand::Stop);
         }
 
         // wait for join handles to finish
@@ -174,7 +177,6 @@ impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {
         }
     }
 }
-
 
 pub struct LocalCoordinatorClient<S> {
     command_rx: Receiver<ExecutorShardCommand<S>>,

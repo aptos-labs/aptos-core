@@ -140,7 +140,6 @@ mod tests {
         thread,
         time::Duration,
     };
-    use dashmap::DashMap;
 
     pub static EMPTY_VIEW: Lazy<Arc<InMemoryStateView>> =
         Lazy::new(|| Arc::new(InMemoryStateView::new(HashMap::new())));

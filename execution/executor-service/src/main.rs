@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use clap::Parser;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 #[derive(Debug, Parser)]
 struct Args {

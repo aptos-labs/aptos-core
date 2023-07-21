@@ -49,7 +49,7 @@ impl ExecutorService {
 
         Self {
             controller,
-            executor_service
+            executor_service,
         }
     }
 

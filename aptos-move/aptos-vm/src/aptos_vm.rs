@@ -12,7 +12,7 @@ use crate::{
     data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
     move_vm_ext::{MoveResolverExt, RespawnedSession, SessionExt, SessionId},
-    sharded_block_executor::{ShardedBlockExecutor},
+    sharded_block_executor::{executor_shard::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,
@@ -78,7 +78,6 @@ use std::{
         Arc,
     },
 };
-use crate::sharded_block_executor::executor_shard::ExecutorClient;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();

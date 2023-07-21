@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    network_controller::{Message, MessageType, NetworkMessage},
+    network_controller::{inbound_handler::InboundHandler, Message, MessageType, NetworkMessage},
     NetworkClient,
 };
+use aptos_retrier::{fixed_retry_strategy, retry};
 use crossbeam_channel::{Receiver, Select};
 use std::{
     collections::HashMap,
@@ -11,8 +12,6 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use aptos_retrier::{fixed_retry_strategy, retry};
-use crate::network_controller::inbound_handler::InboundHandler;
 
 #[allow(dead_code)]
 pub struct OutboundHandler {
@@ -21,17 +20,21 @@ pub struct OutboundHandler {
     address: SocketAddr,
     // Used to route outgoing messages to correct network client with the correct message type
     handlers: Arc<Mutex<Vec<(Receiver<Message>, SocketAddr, MessageType)>>>,
-    inbound_handler: Arc<Mutex<InboundHandler>>
+    inbound_handler: Arc<Mutex<InboundHandler>>,
 }
 
 impl OutboundHandler {
-    pub fn new(service: String, listen_addr: SocketAddr, inbound_handler: Arc<Mutex<InboundHandler>>) -> Self {
+    pub fn new(
+        service: String,
+        listen_addr: SocketAddr,
+        inbound_handler: Arc<Mutex<InboundHandler>>,
+    ) -> Self {
         Self {
             service,
             network_clients: Arc::new(Mutex::new(HashMap::new())),
             address: listen_addr,
             handlers: Arc::new(Mutex::new(Vec::new())),
-            inbound_handler
+            inbound_handler,
         }
     }
 
@@ -58,14 +61,16 @@ impl OutboundHandler {
         let thread_name = format!("{}_network_outbound_handler", self.service);
         let builder = thread::Builder::new().name(thread_name);
         let inbound_handler = self.inbound_handler.clone();
-        builder.spawn(move || loop {
-            Self::process_one_outgoing_message(
-                outbound_handlers.clone(),
-                network_clients.clone(),
-                &address,
-                inbound_handler.clone(),
-            )
-        }).expect("Failed to spawn outbound handler thread");
+        builder
+            .spawn(move || loop {
+                Self::process_one_outgoing_message(
+                    outbound_handlers.clone(),
+                    network_clients.clone(),
+                    &address,
+                    inbound_handler.clone(),
+                )
+            })
+            .expect("Failed to spawn outbound handler thread");
     }
 
     fn process_one_outgoing_message(
@@ -88,7 +93,10 @@ impl OutboundHandler {
         if remote_addr == socket_addr {
             // If the remote address is the same as the local address, then we are sending a message to ourselves
             // so we should just pass it to the inbound handler
-            inbound_handler.lock().unwrap().send_incoming_message_to_handler(message_type, msg);
+            inbound_handler
+                .lock()
+                .unwrap()
+                .send_incoming_message_to_handler(message_type, msg);
             return;
         }
         let mut binding = network_clients.lock().unwrap();
@@ -97,10 +105,9 @@ impl OutboundHandler {
             *socket_addr,
             msg,
             message_type.clone(),
-        )).unwrap();
+        ))
+        .unwrap();
 
-        retry(fixed_retry_strategy(5, 20), || {
-            network_client.write(&msg)
-        }).unwrap();
+        retry(fixed_retry_strategy(5, 20), || network_client.write(&msg)).unwrap();
     }
 }

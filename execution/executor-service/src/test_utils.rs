@@ -1,26 +1,19 @@
 // Copyright © Aptos Foundation
 
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
-use aptos_types::transaction::{Transaction, TransactionOutput};
-use std::sync::{Arc};
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
-use aptos_crypto::hash::CryptoHash;
+use aptos_language_e2e_tests::{
+    account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
+    executor::FakeExecutor,
+};
 use aptos_types::{
     state_store::state_key::StateKeyInner,
+    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
 };
-use aptos_language_e2e_tests::{
-    data_store::FakeDataStore,
-
-    account::AccountData, common_transactions::peer_to_peer_txn, executor::FakeExecutor,
+use aptos_vm::{
+    sharded_block_executor::{executor_shard::ExecutorClient, ShardedBlockExecutor},
+    AptosVM, VMExecutor,
 };
-use aptos_types::account_address::AccountAddress;
-use aptos_vm::{AptosVM, VMExecutor};
-use aptos_vm::sharded_block_executor::executor_shard::ExecutorClient;
-use aptos_vm::sharded_block_executor::ShardedBlockExecutor;
-
-pub fn generate_account_at(executor: &mut FakeExecutor, address: AccountAddress) -> AccountData {
-    executor.new_account_data_at(address)
-}
+use std::sync::Arc;
 
 fn generate_non_conflicting_sender_receiver(
     executor: &mut FakeExecutor,
@@ -54,7 +47,7 @@ pub fn generate_p2p_txn(
         transfer_amount,
         100,
     ))
-        .into();
+    .into();
     sender.increment_sequence_number();
     txn
 }
@@ -98,13 +91,14 @@ pub fn compare_txn_outputs(
     }
 }
 
-pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>> (sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>) {
+pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>(
+    sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
+) {
     let num_txns = 400;
     let num_shards = sharded_block_executor.num_shards();
     let mut executor = FakeExecutor::from_head_genesis();
     let mut transactions = Vec::new();
     for _ in 0..num_txns {
-
         transactions.push(generate_non_conflicting_p2p(&mut executor).0)
     }
     let partitioner = ShardedBlockPartitioner::new(num_shards);
@@ -122,6 +116,6 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
         &executor.data_store(),
         None,
     )
-        .unwrap();
+    .unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }
