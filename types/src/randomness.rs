@@ -9,27 +9,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct DKGTranscript {
-    // dkg todo: fill in the fields
-    pub dummy_bytes: Vec<u8>,
-}
-
-impl DKGTranscript {
-    pub fn new() -> Self {
-        Self {
-            dummy_bytes: vec![0],
-        }
-    }
-}
-
-impl Default for DKGTranscript {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct Randomness {
     // dkg todo: fill in the fields
     pub dummy_bytes: Vec<u8>,

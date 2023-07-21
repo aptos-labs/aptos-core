@@ -2,7 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::randomness::{DKGTranscript, Randomness};
+use aptos_dkg::pvss::scrape::Transcript;
+use crate::randomness::Randomness;
 use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use serde::{Deserialize, Serialize};
@@ -28,7 +29,7 @@ pub struct BlockMetadata {
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
     // dkg todo
-    dkg_transcripts: Vec<DKGTranscript>,
+    dkg_transcripts: Vec<Transcript>,
     maybe_randomness: Option<Randomness>,
 }
 
@@ -41,7 +42,7 @@ impl BlockMetadata {
         previous_block_votes_bitvec: Vec<u8>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
-        dkg_transcripts: Vec<DKGTranscript>,
+        dkg_transcripts: Vec<Transcript>,
         maybe_randomness: Option<Randomness>,
     ) -> Self {
         Self {
@@ -110,7 +111,7 @@ impl BlockMetadata {
         self.round
     }
 
-    pub fn dkg_transcripts(&self) -> &Vec<DKGTranscript> {
+    pub fn dkg_transcripts(&self) -> &Vec<Transcript> {
         &self.dkg_transcripts
     }
 

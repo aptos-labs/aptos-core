@@ -16,7 +16,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    randomness::{DKGTranscript, Randomness},
+    randomness::Randomness,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -348,7 +348,7 @@ impl Block {
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
-        dkg_transcripts: Vec<DKGTranscript>,
+        dkg_transcripts: Vec<aptos_dkg::pvss::scrape::Transcript>,
         maybe_randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         if block_gas_limit.is_some() {
@@ -378,7 +378,7 @@ impl Block {
     fn new_block_metadata(
         &self,
         validators: &[AccountAddress],
-        dkg_transcripts: Vec<DKGTranscript>,
+        dkg_transcripts: Vec<aptos_dkg::pvss::scrape::Transcript>,
         maybe_randomness: Option<Randomness>,
     ) -> BlockMetadata {
         BlockMetadata::new(
