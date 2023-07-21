@@ -149,9 +149,8 @@ spec aptos_framework::vesting {
 
     spec unlock_rewards(contract_address: address) {
         // TODO: Calls `unlock_stake` which is not verified.
-        // Current verification times out even with partial.
+        // Current verification times out.
         pragma verify = false;
-        pragma aborts_if_is_partial;
 
         include UnlockRewardsAbortsIf;
     }
@@ -159,6 +158,7 @@ spec aptos_framework::vesting {
     spec schema UnlockRewardsAbortsIf {
         contract_address: address;
 
+        // Cause timeout here
         include TotalAccumulatedRewardsAbortsIf { vesting_contract_address: contract_address };
 
         let vesting_contract = global<VestingContract>(contract_address);
@@ -186,9 +186,7 @@ spec aptos_framework::vesting {
 
     spec vest(contract_address: address) {
         // TODO: Calls `staking_contract::distribute` which is not verified.
-        // Current verification times out even with partial.
         pragma verify = false;
-        pragma aborts_if_is_partial;
 
         include UnlockRewardsAbortsIf;
     }
