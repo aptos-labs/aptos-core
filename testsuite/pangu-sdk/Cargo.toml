@@ -1,0 +1,11 @@
+[package]
+name = "aptos-pangu-sdk"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde  = { workspace = true }
+serde_json  = { workspace = true }
+regex  = { workspace = true }
+tempfile = { workspace = true }
+serde_yaml = { workspace = true }

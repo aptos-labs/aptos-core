@@ -152,6 +152,7 @@ members = [
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
+    "testsuite/pangu-sdk",
     "testsuite/dos/http_test",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
@@ -347,6 +348,7 @@ aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
 aptos-num-variants = { path = "crates/num-variants" }
 aptos-openapi = { path = "crates/aptos-openapi" }
 aptos-package-builder = { path = "aptos-move/package-builder" }
+aptos-pangu-sdk = { path = "testsuite/pangu-sdk" }
 aptos-peer-monitoring-service-client = { path = "network/peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "network/peer-monitoring-service/server" }
 aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }

@@ -2630,6 +2630,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-pangu-sdk"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde 1.0.149",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "tempfile",
+]
+
+[[package]]
 name = "aptos-peer-monitoring-service-client"
 version = "0.1.0"
 dependencies = [
