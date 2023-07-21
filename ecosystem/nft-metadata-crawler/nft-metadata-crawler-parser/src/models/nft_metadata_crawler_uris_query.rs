@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 
-use std::{thread, time::Duration};
-
 use crate::schema::nft_metadata_crawler_uris;
 use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, PooledConnection},
 };
 use serde::{Deserialize, Serialize};
+use std::{thread, time::Duration};
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(token_uri))]
