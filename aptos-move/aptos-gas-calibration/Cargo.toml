@@ -29,3 +29,4 @@ move-ir-compiler = { workspace = true }
 move-vm-test-utils = { workspace = true }
 nalgebra = { workspace = true }
 float-cmp = { workspace = true }
+walkdir = { workspace = true }

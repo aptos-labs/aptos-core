@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas_algebra::Expression;
+use aptos_gas_algebra::DynamicExpression;
 use std::collections::BTreeMap;
 
 /// expand out the AST and collect only terms
@@ -19,32 +19,32 @@ use std::collections::BTreeMap;
 /// * case 2: var -> Vec(var)
 /// * case 3: e1 * e2 -> t1 * t2
 /// * case 4: e1 * e2 -> t1 + t2
-pub fn normalize(expr: Expression) -> Vec<Expression> {
-    let mut result: Vec<Expression> = Vec::new();
+pub fn normalize(expr: DynamicExpression) -> Vec<DynamicExpression> {
+    let mut result: Vec<DynamicExpression> = Vec::new();
     match expr {
-        Expression::GasValue { value } => {
-            result.push(Expression::GasValue { value });
+        DynamicExpression::GasValue { value } => {
+            result.push(DynamicExpression::GasValue { value });
             return result;
         },
-        Expression::GasParam { name } => {
-            result.push(Expression::GasParam { name });
+        DynamicExpression::GasParam { name } => {
+            result.push(DynamicExpression::GasParam { name });
             return result;
         },
-        Expression::Mul { left, right } => {
+        DynamicExpression::Mul { left, right } => {
             let t1 = normalize(*left);
             let t2 = normalize(*right);
-            let mut subresult: Vec<Expression> = Vec::new();
+            let mut subresult: Vec<DynamicExpression> = Vec::new();
             for a_i in t1 {
                 for b_j in &t2 {
-                    match a_i.clone() {
-                        Expression::GasValue { .. } => {
-                            subresult.push(Expression::Mul {
+                    match &a_i {
+                        DynamicExpression::GasValue { .. } => {
+                            subresult.push(DynamicExpression::Mul {
                                 left: Box::new(a_i.clone()),
                                 right: Box::new(b_j.clone()),
                             });
                         },
                         _ => {
-                            subresult.push(Expression::Mul {
+                            subresult.push(DynamicExpression::Mul {
                                 left: Box::new(b_j.clone()),
                                 right: Box::new(a_i.clone()),
                             });
@@ -55,7 +55,7 @@ pub fn normalize(expr: Expression) -> Vec<Expression> {
             result.extend(subresult.clone());
             return result;
         },
-        Expression::Add { left, right } => {
+        DynamicExpression::Add { left, right } => {
             let t1 = normalize(*left);
             let t2 = normalize(*right);
             result.extend(t1.clone());
@@ -74,11 +74,11 @@ pub fn normalize(expr: Expression) -> Vec<Expression> {
 /// ### Example
 ///
 /// (A + A) * (5 + 5) => 5A + 5A + 5A + 5A => 20A
-pub fn collect_terms(terms: Vec<Expression>) -> BTreeMap<String, u64> {
+pub fn collect_terms(terms: Vec<DynamicExpression>) -> BTreeMap<String, u64> {
     let mut map: BTreeMap<String, u64> = BTreeMap::new();
     for term in terms {
         match term {
-            Expression::GasValue { value } => {
+            DynamicExpression::GasValue { value } => {
                 let key: String = value.to_string();
                 if !map.contains_key(&key) {
                     map.insert(key, value);
@@ -86,26 +86,26 @@ pub fn collect_terms(terms: Vec<Expression>) -> BTreeMap<String, u64> {
                     map.entry(key).and_modify(|v| *v += value);
                 }
             },
-            Expression::GasParam { name } => {
+            DynamicExpression::GasParam { name } => {
                 if !map.contains_key(&name) {
                     map.insert(name, 1);
                 } else {
                     map.entry(name).and_modify(|v| *v += 1);
                 }
             },
-            Expression::Mul { left, right } => {
+            DynamicExpression::Mul { left, right } => {
                 let mut key: String = String::new();
                 let mut val: u64 = 0;
 
                 match *right {
-                    Expression::GasParam { name } => {
+                    DynamicExpression::GasParam { name } => {
                         key = name;
                     },
                     _ => {},
                 }
 
                 match *left {
-                    Expression::GasValue { value } => {
+                    DynamicExpression::GasValue { value } => {
                         val = value;
                     },
                     _ => {},
@@ -120,7 +120,5 @@ pub fn collect_terms(terms: Vec<Expression>) -> BTreeMap<String, u64> {
             _ => {},
         }
     }
-    map.insert(String::from("STARTUP_COST"), 1);
-    //let _ = map.remove("RET").unwrap();
     map
 }

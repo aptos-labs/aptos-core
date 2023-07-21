@@ -1607,6 +1607,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "nalgebra",
+ "walkdir",
 ]
 
 [[package]]
