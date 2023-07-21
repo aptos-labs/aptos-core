@@ -3,9 +3,9 @@
 /**
  * TransactionWorker provides a simple framework for receiving payloads to be processed.
  *
- * Once one `start()` the process, the worker acquires the current account's next sequence number
- * (by using the AccountSequenceNumber class), generates a signed transaction and pushes an async
- * submission process into a `outstandingTransactions` queue.
+ * Once one `start()` the process and pushes a new transaction, the worker acquires
+ * the current account's next sequence number (by using the AccountSequenceNumber class),
+ * generates a signed transaction and pushes an async submission process into the `outstandingTransactions` queue.
  * At the same time, the worker processes transactions by reading the `outstandingTransactions` queue
  * and submits the next transaction to chain, it
  * 1) waits for resolution of the submission process or get pre-execution validation error
@@ -25,9 +25,9 @@ const promiseFulfilledStatus = "fulfilled";
 
 export enum TransactionWorkerEvents {
   TransactionSent = "transactionSent",
-  SentFailed = "sentFailed",
+  TransactionSendFailed = "transactionsendFailed",
   TransactionExecuted = "transactionExecuted",
-  ExecutionFailed = "executionFailed",
+  TransactionExecutionFailed = "transactionexecutionFailed",
 }
 
 export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
@@ -43,17 +43,26 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
   // process has started
   started: boolean;
 
-  // transactions payloads waiting to be generated and signed
-  // TODO support entry function payload from ABI builder
+  /**
+   * transactions payloads waiting to be generated and signed
+   *
+   * TODO support entry function payload from ABI builder
+   */
   transactionsQueue = new AsyncQueue<TxnBuilderTypes.TransactionPayload>();
 
-  // signed transactions waiting to be submitted
+  /**
+   * signed transactions waiting to be submitted
+   */
   outstandingTransactions = new AsyncQueue<[Promise<PendingTransaction>, bigint]>();
 
-  // transactions that have been submitted to chain
+  /**
+   * transactions that have been submitted to chain
+   */
   sentTransactions: Array<[string, bigint, any]> = [];
 
-  // transactions that have been committed to chain
+  /**
+   * transactions that have been committed to chain
+   */
   executedTransactions: Array<[string, bigint, any]> = [];
 
   /**
@@ -61,16 +70,18 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
    *
    * @param provider - a client provider
    * @param sender - a sender as AptosAccount
-   * @param maxWaitTime - the max wait time to wait before resyncing the sequence number to the current on-chain state
-   * @param maximumInFlight - submit up to `maximumInFlight` transactions per account
-   * @param sleepTime - If `maximumInFlight` are in flight, wait `sleepTime` seconds before re-evaluating
+   * @param maxWaitTime - the max wait time to wait before resyncing the sequence number
+   * to the current on-chain state, default to 30
+   * @param maximumInFlight - submit up to `maximumInFlight` transactions per account.
+   * Mempool limits the number of transactions per account to 100, hence why we default to 100.
+   * @param sleepTime - If `maximumInFlight` are in flight, wait `sleepTime` seconds before re-evaluating, default to 10
    */
   constructor(
     provider: Provider,
     account: AptosAccount,
-    maxWaitTime: number,
-    maximumInFlight: number,
-    sleepTime: number,
+    maxWaitTime: number = 30,
+    maximumInFlight: number = 100,
+    sleepTime: number = 10,
   ) {
     super();
     this.provider = provider;
@@ -101,6 +112,8 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
       if (error instanceof AsyncQueueCancelledError) {
         return;
       }
+      // TODO use future log service
+      /* eslint-disable no-console */
       console.log(error);
     }
   }
@@ -149,7 +162,10 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
           } else {
             // send transaction failed
             this.sentTransactions.push([sentTransaction.status, sequenceNumber, sentTransaction.reason]);
-            this.emit(TransactionWorkerEvents.SentFailed, [this.sentTransactions.length, sentTransaction.reason]);
+            this.emit(TransactionWorkerEvents.TransactionSendFailed, [
+              this.sentTransactions.length,
+              sentTransaction.reason,
+            ]);
           }
         }
       }
@@ -157,6 +173,8 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
       if (error instanceof AsyncQueueCancelledError) {
         return;
       }
+      // TODO use future log service
+      /* eslint-disable no-console */
       console.log(error);
     }
   }
@@ -183,7 +201,7 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
       } else {
         // transaction execution failed
         this.executedTransactions.push([executedTransaction.status, sequenceNumber, executedTransaction.reason]);
-        this.emit(TransactionWorkerEvents.ExecutionFailed, [
+        this.emit(TransactionWorkerEvents.TransactionExecutionFailed, [
           this.executedTransactions.length,
           executedTransaction.reason,
         ]);

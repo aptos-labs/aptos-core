@@ -100,7 +100,7 @@ async function main() {
   await Promise.all(promises);
 
   async function batchTransactions(payloads: TxnBuilderTypes.Transaction[], sender: AptosAccount) {
-    const transactionWorker = new TransactionWorker(provider, sender, 30, 100, 10);
+    const transactionWorker = new TransactionWorker(provider, sender);
 
     transactionWorker.start();
 
@@ -127,7 +127,7 @@ async function main() {
       }
     });
 
-    transactionWorker.on(TransactionWorkerEvents.SentFailed, async (data) => {
+    transactionWorker.on(TransactionWorkerEvents.TransactionSendFailed, async (data) => {
       /**
        * transaction sent failed, up to the user to decide next steps.
        * whether to stop the worker by transactionWorker.stop() and handle
@@ -146,7 +146,7 @@ async function main() {
       }
     });
 
-    transactionWorker.on(TransactionWorkerEvents.ExecutionFailed, async (data) => {
+    transactionWorker.on(TransactionWorkerEvents.TransactionExecutionFailed, async (data) => {
       /**
        * transaction execution failed, up to the user to decide next steps.
        * whether to stop the worker by transactionWorker.stop() and handle

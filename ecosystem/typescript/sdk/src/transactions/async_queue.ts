@@ -2,10 +2,12 @@
  * The AsyncQueue class is an async-aware data structure that provides a queue-like
  * behavior for managing asynchronous tasks or operations.
  * It allows to enqueue items and dequeue them asynchronously.
+ * This is not thread-safe but it is async concurrency safe and
+ * it does not guarantee ordering for those that call into and await on enqueue.
  */
 
 export class AsyncQueue<T> {
-  private queue: T[] = [];
+  readonly queue: T[] = [];
 
   // The resolveMap is used to handle the resolution of promises when items are enqueued and dequeued.
   private resolveMap: Map<number, (value: T) => void> = new Map();
