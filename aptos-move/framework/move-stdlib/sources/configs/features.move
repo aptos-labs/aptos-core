@@ -196,9 +196,9 @@ module std::features {
 
     /// Whether alternate gas payer is supported
     /// Lifetime: transient
-    const GAS_PAYER_ENABLED: u64 = 22;
-    public fun gas_payer_enabled(): bool acquires Features {
-        is_enabled(GAS_PAYER_ENABLED)
+    const FEE_PAYER_ENABLED: u64 = 22;
+    public fun fee_payer_enabled(): bool acquires Features {
+        is_enabled(FEE_PAYER_ENABLED)
     }
 
     /// Whether enable MOVE functions to call create_auid method to create AUIDs.
@@ -207,6 +207,17 @@ module std::features {
     public fun get_auids(): u64 { APTOS_UNIQUE_IDENTIFIERS }
     public fun auids_enabled(): bool acquires Features {
         is_enabled(APTOS_UNIQUE_IDENTIFIERS)
+    }
+
+    /// Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
+    /// available. This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const BULLETPROOFS_NATIVES: u64 = 24;
+
+    public fun get_bulletproofs_feature(): u64 { BULLETPROOFS_NATIVES }
+
+    public fun bulletproofs_enabled(): bool acquires Features {
+        is_enabled(BULLETPROOFS_NATIVES)
     }
 
     // ============================================================================================

@@ -20,6 +20,8 @@ pub const EXP_EXT: &str = "exp";
 struct TestConfig {
     /// Whether only type check should be run.
     check_only: bool,
+    /// Whether we should dump the AST after successful type check.
+    dump_ast: bool,
     /// A sequence of bytecode processors to run for this test.
     pipeline: FunctionTargetPipeline,
 }
@@ -61,11 +63,13 @@ impl TestConfig {
         if path.contains("/checking/") {
             Self {
                 check_only: true,
+                dump_ast: true,
                 pipeline: FunctionTargetPipeline::default(),
             }
         } else if path.contains("/bytecode-generator/") {
             Self {
                 check_only: false,
+                dump_ast: true,
                 pipeline: FunctionTargetPipeline::default(),
             }
         } else {
@@ -92,36 +96,45 @@ impl TestConfig {
         // Run context checker
         let env = move_compiler_v2::run_checker(options)?;
         let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+        if ok && self.dump_ast {
+            let out = &mut test_output.borrow_mut();
+            out.push_str("// ---- Model Dump\n");
+            out.push_str(&env.dump_env());
+            out.push('\n');
+        }
         if ok && !self.check_only {
             // Run stackless bytecode generator
             let mut targets = move_compiler_v2::run_bytecode_gen(&env);
-            // Run the target pipeline.
-            self.pipeline.run_with_hook(
-                &env,
-                &mut targets,
-                // Hook which is run before steps in the pipeline. Prints out initial
-                // bytecode from the generator.
-                |targets_before| {
-                    let baseline = &mut test_output.borrow_mut();
-                    Self::check_diags(baseline, &env);
-                    baseline.push_str(&move_stackless_bytecode::print_targets_for_test(
-                        &env,
-                        "initial bytecode",
-                        targets_before,
-                    ));
-                },
-                // Hook which is run after every step in the pipeline. Prints out
-                // bytecode after the processor.
-                |_, processor, targets_after| {
-                    let baseline = &mut test_output.borrow_mut();
-                    Self::check_diags(baseline, &env);
-                    baseline.push_str(&move_stackless_bytecode::print_targets_for_test(
-                        &env,
-                        &format!("after {}:", processor.name()),
-                        targets_after,
-                    ));
-                },
-            );
+            let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+            if ok {
+                // Run the target pipeline.
+                self.pipeline.run_with_hook(
+                    &env,
+                    &mut targets,
+                    // Hook which is run before steps in the pipeline. Prints out initial
+                    // bytecode from the generator.
+                    |targets_before| {
+                        let out = &mut test_output.borrow_mut();
+                        Self::check_diags(out, &env);
+                        out.push_str(&move_stackless_bytecode::print_targets_for_test(
+                            &env,
+                            "initial bytecode",
+                            targets_before,
+                        ));
+                    },
+                    // Hook which is run after every step in the pipeline. Prints out
+                    // bytecode after the processor.
+                    |_, processor, targets_after| {
+                        let out = &mut test_output.borrow_mut();
+                        Self::check_diags(out, &env);
+                        out.push_str(&move_stackless_bytecode::print_targets_for_test(
+                            &env,
+                            &format!("after {}:", processor.name()),
+                            targets_after,
+                        ));
+                    },
+                );
+            }
         }
 
         // Generate/check baseline.

@@ -1,0 +1,19 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        f: bool,
+    }
+    private fun t0(x: bool,r: M::R) {
+        Or(true, false);
+        Or(false, true);
+        Or(true, false);
+        Or(true, true);
+        Or(x, x);
+        Or(select M::R.f(r), select M::R.f(r));
+        Or(Or(true, false), Or(true, false));
+        {
+          let M::R{ f: _ } = r;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M

@@ -73,7 +73,7 @@
 mod metrics;
 mod node;
 mod updater;
-mod utils;
+pub mod utils;
 
 #[cfg(test)]
 mod sparse_merkle_test;
@@ -84,6 +84,7 @@ use crate::sparse_merkle::{
     metrics::{LATEST_GENERATION, OLDEST_GENERATION, TIMER},
     node::{NodeInner, SubTree},
     updater::SubTreeUpdater,
+    utils::get_state_shard_id,
 };
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -91,7 +92,8 @@ use aptos_crypto::{
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
-    nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt,
+    nibble::{nibble_path::NibblePath, Nibble},
+    proof::SparseMerkleProofExt,
     state_store::state_storage_usage::StateStorageUsage,
 };
 use std::{
@@ -101,7 +103,7 @@ use std::{
 };
 use thiserror::Error;
 
-type NodePosition = bitvec::vec::BitVec<bitvec::order::Msb0, u8>;
+type NodePosition = bitvec::vec::BitVec<u8, bitvec::order::Msb0>;
 const BITS_IN_NIBBLE: usize = 4;
 const BITS_IN_BYTE: usize = 8;
 
@@ -521,17 +523,63 @@ where
     }
 
     /// Compares an old and a new SMTs and return the newly created node hashes in between.
-    pub fn new_node_hashes_since(&self, since_smt: &Self) -> HashMap<NibblePath, HashValue> {
+    ///
+    /// Assumes 16 shards in total.
+    pub fn new_node_hashes_since(
+        &self,
+        since_smt: &Self,
+        shard_id: u8,
+    ) -> HashMap<NibblePath, HashValue> {
         let _timer = TIMER
             .with_label_values(&["new_node_hashes_since"])
             .start_timer();
 
         assert!(self.base_smt.is_the_same(&since_smt.base_smt));
         let mut node_hashes = HashMap::new();
+        let mut subtree = self.smt.root_weak();
+        let mut pos = NodePosition::with_capacity(HashValue::LENGTH_IN_BITS);
+        let since_generation = since_smt.smt.generation() + 1;
+        // Assume 16 shards here.
+        // We check the top 4 levels first, if there is any leaf node belongs to the shard we are
+        // requesting, we collect that node and return earlier (because there is no nodes below
+        // this point).
+        // Otherwise, once we reach the 5th level (the level of the root of each shard), all nodes
+        // at or below it belongs to the requested shard.
+        for i in (0..4).rev() {
+            if let Some(node) = subtree.get_node_if_in_mem(since_generation) {
+                match node.inner().borrow() {
+                    NodeInner::Internal(internal_node) => {
+                        subtree = match (shard_id >> i) & 1 {
+                            0 => {
+                                pos.push(false);
+                                internal_node.left.weak()
+                            },
+                            1 => {
+                                pos.push(true);
+                                internal_node.right.weak()
+                            },
+                            _ => {
+                                unreachable!()
+                            },
+                        }
+                    },
+                    NodeInner::Leaf(leaf_node) => {
+                        if get_state_shard_id(leaf_node.key) == shard_id {
+                            let mut nibble_path = NibblePath::new_even(vec![]);
+                            nibble_path.push(Nibble::from(shard_id));
+                            node_hashes.insert(nibble_path, subtree.hash());
+                        }
+                        return node_hashes;
+                    },
+                }
+            } else {
+                return node_hashes;
+            }
+        }
         Self::new_node_hashes_since_impl(
-            self.smt.root_weak(),
+            subtree,
             since_smt.smt.generation() + 1,
-            &mut NodePosition::with_capacity(HashValue::LENGTH_IN_BITS),
+            &mut pos,
             &mut node_hashes,
         );
         node_hashes
@@ -574,8 +622,8 @@ where
                     let mut path = NibblePath::new_even(leaf_node.key.to_vec());
                     if !is_nibble {
                         path.truncate(pos.len() / BITS_IN_NIBBLE + 1);
+                        node_hashes.insert(path, subtree.hash());
                     }
-                    node_hashes.insert(path, subtree.hash());
                 },
             }
         }

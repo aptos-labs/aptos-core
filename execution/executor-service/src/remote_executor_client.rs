@@ -8,7 +8,7 @@ use aptos_secure_net::NetworkClient;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::SubBlocksForShard,
-    transaction::{Transaction, TransactionOutput},
+    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
     vm_status::VMStatus,
 };
 use aptos_vm::sharded_block_executor::block_executor_client::BlockExecutorClient;
@@ -60,17 +60,18 @@ impl RemoteExecutorClient {
 impl BlockExecutorClient for RemoteExecutorClient {
     fn execute_block<S: StateView + Sync>(
         &self,
-        sub_blocks: SubBlocksForShard<Transaction>,
+        sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let input = BlockExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
             sub_blocks,
             state_view: S::as_in_memory_state_view(state_view),
             concurrency_level,
             maybe_block_gas_limit,
         });
+
         self.execute_block_with_retry(input).inner
     }
 }

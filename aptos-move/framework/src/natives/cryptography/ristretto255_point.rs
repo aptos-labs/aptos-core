@@ -54,7 +54,7 @@ impl Display for RistrettoPointHandle {
 /// value which is passed into session functions, so its accessible from natives of this extension.
 #[derive(Default, Tid)]
 pub struct NativeRistrettoPointContext {
-    point_data: RefCell<PointStore>,
+    pub point_data: RefCell<PointStore>,
 }
 
 //
@@ -70,7 +70,7 @@ const E_TOO_MANY_POINTS_CREATED: u64 = 0x09_0004;
 /// A structure representing mutable data of the NativeRistrettoPointContext. This is in a RefCell
 /// of the overall context so we can mutate while still accessing the overall context.
 #[derive(Default)]
-struct PointStore {
+pub struct PointStore {
     points: Vec<RistrettoPoint>,
 }
 
@@ -93,25 +93,25 @@ impl NativeRistrettoPointContext {
 
 impl PointStore {
     /// Re-sets a RistrettoPoint that was previously allocated.
-    fn set_point(&mut self, handle: &RistrettoPointHandle, point: RistrettoPoint) {
+    pub fn set_point(&mut self, handle: &RistrettoPointHandle, point: RistrettoPoint) {
         self.points[handle.0 as usize] = point
     }
 
     /// Gets a RistrettoPoint that was previously allocated.
-    fn get_point(&self, handle: &RistrettoPointHandle) -> &RistrettoPoint {
+    pub fn get_point(&self, handle: &RistrettoPointHandle) -> &RistrettoPoint {
         //&self.points[handle.0 as usize]
         self.points.get(handle.0 as usize).unwrap()
     }
 
     /// Gets a RistrettoPoint that was previously allocated.
-    fn get_point_mut(&mut self, handle: &RistrettoPointHandle) -> &mut RistrettoPoint {
+    pub fn get_point_mut(&mut self, handle: &RistrettoPointHandle) -> &mut RistrettoPoint {
         //&mut self.points[handle.0 as usize]
         self.points.get_mut(handle.0 as usize).unwrap()
     }
 
     /// Returns mutable references to two different Ristretto points in the vector using split_at_mut.
     /// Note that Rust's linear types prevent us from simply returning `(&mut points[i], &mut points[j])`.
-    fn get_two_muts(
+    pub fn get_two_muts(
         &mut self,
         a: &RistrettoPointHandle,
         b: &RistrettoPointHandle,
@@ -237,6 +237,27 @@ pub(crate) fn native_point_decompress(
     let id = point_data.safe_add_point(point)?;
 
     Ok(smallvec![Value::u64(id), Value::bool(true)])
+}
+
+pub(crate) fn native_point_clone(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    assert_eq!(ty_args.len(), 0);
+    assert_eq!(args.len(), 1);
+
+    context.charge(gas_params.point_clone * NumArgs::one())?;
+
+    let point_context = context.extensions().get::<NativeRistrettoPointContext>();
+    let mut point_data = point_context.point_data.borrow_mut();
+    let handle = pop_as_ristretto_handle(&mut args)?;
+    let point = point_data.get_point(&handle);
+    let clone = *point;
+    let result_handle = point_data.safe_add_point(clone)?;
+
+    Ok(smallvec![Value::u64(result_handle)])
 }
 
 pub(crate) fn native_point_compress(
@@ -484,6 +505,7 @@ pub(crate) fn native_basepoint_double_mul(
     Ok(smallvec![Value::u64(result_handle)])
 }
 
+// NOTE: This was supposed to be more clearly named with *_sha2_512_*
 pub(crate) fn native_new_point_from_sha512(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,
@@ -527,6 +549,38 @@ pub(crate) fn native_new_point_from_64_uniform_bytes(
 
     let point = RistrettoPoint::from_uniform_bytes(&slice);
     let result_handle = point_data.safe_add_point(point)?;
+
+    Ok(smallvec![Value::u64(result_handle)])
+}
+
+pub(crate) fn native_double_scalar_mul(
+    gas_params: &GasParameters,
+    context: &mut SafeNativeContext,
+    mut _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    assert_eq!(args.len(), 4);
+
+    context.charge(gas_params.point_double_mul * NumArgs::one())?;
+
+    let point_context = context.extensions().get::<NativeRistrettoPointContext>();
+    let mut point_data = point_context.point_data.borrow_mut();
+
+    let scalar2 = pop_scalar_from_bytes(&mut args)?;
+    let scalar1 = pop_scalar_from_bytes(&mut args)?;
+    let handle2 = pop_as_ristretto_handle(&mut args)?;
+    let handle1 = pop_as_ristretto_handle(&mut args)?;
+
+    let points = vec![
+        point_data.get_point(&handle1),
+        point_data.get_point(&handle2),
+    ];
+
+    let scalars = vec![scalar1, scalar2];
+
+    let result = RistrettoPoint::vartime_multiscalar_mul(scalars.iter(), points.into_iter());
+
+    let result_handle = point_data.safe_add_point(result)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -610,7 +664,7 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
 // =========================================================================================
 // Helpers
 
-fn get_point_handle(move_point: &StructRef) -> SafeNativeResult<RistrettoPointHandle> {
+pub fn get_point_handle(move_point: &StructRef) -> SafeNativeResult<RistrettoPointHandle> {
     let field_ref = move_point
         .borrow_field(HANDLE_FIELD_INDEX)?
         .value_as::<Reference>()?;
@@ -627,9 +681,18 @@ pub fn get_point_handle_from_struct(move_point: Value) -> SafeNativeResult<Ristr
     get_point_handle(&move_struct)
 }
 
-/// Pops a RistrettoPointHandle off the argument stack
+/// Pops a RistrettoPointHandle off the argument stack (when the argument is a &RistrettoPoint struct
+/// that wraps the u64 handle)
 fn pop_ristretto_handle(args: &mut VecDeque<Value>) -> SafeNativeResult<RistrettoPointHandle> {
     get_point_handle(&safely_pop_arg!(args, StructRef))
+}
+
+/// Pops a RistrettoPointHandle off the argument stack (when the argument is the u64 handle itself)
+/// TODO: rename this and the above function to be more clear
+fn pop_as_ristretto_handle(args: &mut VecDeque<Value>) -> SafeNativeResult<RistrettoPointHandle> {
+    let handle = safely_pop_arg!(args, u64);
+
+    Ok(RistrettoPointHandle(handle))
 }
 
 /// Checks if `COMPRESSED_POINT_NUM_BYTES` bytes were given as input and, if so, returns Some(CompressedRistretto).

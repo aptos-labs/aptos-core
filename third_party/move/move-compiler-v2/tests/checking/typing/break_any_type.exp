@@ -1,0 +1,29 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct Coin {
+        dummy_field: bool,
+    }
+    private fun foo(c: M::Coin) {
+        M::Coin{ dummy_field: _ } = c;
+        Tuple()
+    }
+    private fun t0() {
+        loop {
+          if true {
+            Add(0, break);
+            Tuple()
+          } else {
+            break
+          }
+        }
+    }
+    private fun t1() {
+        loop {
+          if true {
+            M::foo(break)
+          } else {
+            break
+          }
+        }
+    }
+} // end 0x8675309::M

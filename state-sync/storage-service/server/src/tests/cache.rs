@@ -51,7 +51,7 @@ async fn test_cachable_requests_compression() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
     utils::update_storage_server_summary(&mut service, end_version, 10);
     tokio::spawn(service.start());
 
@@ -118,7 +118,7 @@ async fn test_cachable_requests_data_versions() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
     utils::update_storage_server_summary(&mut service, end_version, 10);
     tokio::spawn(service.start());
 
@@ -195,7 +195,7 @@ async fn test_cachable_requests_eviction() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
     utils::update_storage_server_summary(&mut service, version + 10, 10);
     tokio::spawn(service.start());
 

@@ -330,18 +330,25 @@ let (x1, y, z1) = three(); // ERROR!
 All of the different structures in `let` can be combined! With that we arrive at this general
 grammar for `let` statements:
 
-> _let-binding_ → **let** _pattern-or-list_ _type-annotation_<sub>_opt_</sub>
-> _initializer_<sub>_opt_</sub> > _pattern-or-list_ → _pattern_ | **(** _pattern-list_ **)** >
-> _pattern-list_ → _pattern_ **,**<sub>_opt_</sub> | _pattern_ **,** _pattern-list_ >
-> _type-annotation_ → **:** _type_ _initializer_ → **=** _expression_
+> _let-binding_ → **let** _pattern-or-list_ _type-annotation_<sub>_opt_</sub> _initializer_<sub>_opt_</sub>
+
+> _pattern-or-list_ → _pattern_ | **(** _pattern-list_ **)**
+
+> _pattern-list_ → _pattern_ **,**<sub>_opt_</sub> | _pattern_ **,** _pattern-list_
+
+> _type-annotation_ → **:** _type_
+
+> _initializer_ → **=** _expression_
 
 The general term for the item that introduces the bindings is a _pattern_. The pattern serves to
 both destructure data (possibly recursively) and introduce the bindings. The pattern grammar is as
 follows:
 
-> _pattern_ → _local-variable_ | _struct-type_ **{** _field-binding-list_ **}** >
-> _field-binding-list_ → _field-binding_ **,**<sub>_opt_</sub> | _field-binding_ **,**
-> _field-binding-list_ > _field-binding_ → _field_ | _field_ **:** _pattern_
+> _pattern_ → _local-variable_ | _struct-type_ **{** _field-binding-list_ **}**
+
+> _field-binding-list_ → _field-binding_ **,**<sub>_opt_</sub> | _field-binding_ **,** _field-binding-list_
+
+> _field-binding_ → _field_ | _field_ **:** _pattern_
 
 A few concrete examples with this grammar applied:
 

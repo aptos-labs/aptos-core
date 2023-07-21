@@ -146,11 +146,7 @@ impl NodeKey {
 
     // Returns the shard_id of the NodeKey, or None if it is root.
     pub fn get_shard_id(&self) -> Option<u8> {
-        if self.nibble_path().num_nibbles() > 0 {
-            Some(u8::from(self.nibble_path().get_nibble(0)))
-        } else {
-            None
-        }
+        self.nibble_path().get_shard_id()
     }
 }
 
@@ -286,13 +282,6 @@ impl Arbitrary for InternalNode {
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         hash_map(any::<Nibble>(), any::<Child>(), 1..=16)
-            .prop_filter(
-                "InternalNode constructor panics when its only child is a leaf.",
-                |children| {
-                    !(children.len() == 1
-                        && children.values().next().expect("Must exist.").is_leaf())
-                },
-            )
             .prop_map(InternalNode::new)
             .boxed()
     }
@@ -308,16 +297,6 @@ impl InternalNode {
         // Assert the internal node must have >= 1 children. If it only has one child, it cannot be
         // a leaf node. Otherwise, the leaf node should be a child of this internal node's parent.
         ensure!(!children.is_empty(), "Children must not be empty");
-        if children.len() == 1 {
-            ensure!(
-                !children
-                    .values()
-                    .next()
-                    .expect("Must have 1 element")
-                    .is_leaf(),
-                "If there's only one child, it must not be a leaf."
-            );
-        }
 
         let leaf_count = children.values().map(Child::leaf_count).sum();
         Ok(Self {
@@ -581,6 +560,8 @@ impl InternalNode {
         n: Nibble,
         reader: Option<&R>,
     ) -> Result<(Option<NodeKey>, Vec<NodeInProof>)> {
+        assert!(self.leaf_count > 1);
+
         let mut siblings = vec![];
         let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
 

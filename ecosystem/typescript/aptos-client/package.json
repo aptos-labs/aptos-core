@@ -1,0 +1,74 @@
+{
+  "name": "@aptos-labs/aptos-client",
+  "description": "client package for accessing the Aptos network API",
+  "packageManager": "pnpm@8.3.1",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=15.10.0"
+  },
+  "exports": {
+    "browser": {
+      "import": "./dist/browser/index.browser.mjs",
+      "require": "./dist/browser/index.browser.js",
+      "types": "./dist/browser/index.browser.d.ts"
+    },
+    "node": {
+      "import": "./dist/node/index.node.mjs",
+      "require": "./dist/node/index.node.js",
+      "types": "./dist/node/index.node.d.ts"
+    }
+  },
+  "browser": {
+    "./dist/node/index.node.mjs": "./dist/browser/index.browser.mjs",
+    "./dist/node/index.node.js": "./dist/browser/index.browser.js"
+  },
+  "main": "./dist/node/index.node.js",
+  "module": "./dist/node/index.node.mjs",
+  "types": "./dist/types/index.node.d.ts",
+  "files": [
+    "./dist/"
+  ],
+  "scripts": {
+    "build:clean": "rm -rf dist",
+    "build": "pnpm build:clean && pnpm run _build:types && pnpm _build:node && pnpm _build:browser",
+    "_build:browser": "tsup src/index.browser.ts --format cjs,esm --dts --out-dir dist/browser",
+    "_build:node": "tsup src/index.node.ts --format cjs,esm --dts --out-dir dist/node",
+    "_build:types": "tsc src/types.ts src/index.node.ts --outDir dist/types --declaration",
+    "lint": "eslint \"**/*.ts\"",
+    "fmt": "pnpm _fmt --write",
+    "_fmt": "prettier 'src/**/*.ts' '.eslintrc.js'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aptos-labs/aptos-core.git"
+  },
+  "homepage": "https://github.com/aptos-labs/aptos-core",
+  "bugs": {
+    "url": "https://github.com/aptos-labs/aptos-core/issues"
+  },
+  "author": "aptoslabs.com",
+  "keywords": [
+    "Aptos",
+    "Aptos Labs",
+    "Aptos SDK"
+  ],
+  "dependencies": {
+    "axios": "0.27.2",
+    "got": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "18.6.2",
+    "ts-node": "10.9.1",
+    "tsup": "6.2.3",
+    "typescript": "4.8.2",
+    "eslint": "8.23.0",
+    "prettier": "2.6.2",
+    "eslint-config-prettier": "8.5.0",
+    "eslint-config-airbnb-base": "15.0.0",
+    "eslint-config-airbnb-typescript": "17.0.0",
+    "eslint-plugin-import": "2.26.0",
+    "@typescript-eslint/eslint-plugin": "5.36.2",
+    "@typescript-eslint/parser": "5.36.2"
+  },
+  "version": "0.0.2"
+}
