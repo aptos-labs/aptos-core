@@ -150,8 +150,13 @@ impl<'a> TokenClient<'a> {
         .encode();
 
         // create and submit transaction
-        build_and_submit_transaction(self.api_client, account, payload, options.unwrap_or_default())
-            .await
+        build_and_submit_transaction(
+            self.api_client,
+            account,
+            payload,
+            options.unwrap_or_default(),
+        )
+        .await
     }
 
     /// Creates a token with the given fields. Does not support property keys.
@@ -197,8 +202,13 @@ impl<'a> TokenClient<'a> {
         .encode();
 
         // create and submit transaction
-        build_and_submit_transaction(self.api_client, account, payload, options.unwrap_or_default())
-            .await
+        build_and_submit_transaction(
+            self.api_client,
+            account,
+            payload,
+            options.unwrap_or_default(),
+        )
+        .await
     }
 
     /// Retrieves collection metadata from the API.
@@ -321,8 +331,13 @@ impl<'a> TokenClient<'a> {
         .encode();
 
         // create and submit transaction
-        build_and_submit_transaction(self.api_client, account, payload, options.unwrap_or_default())
-            .await
+        build_and_submit_transaction(
+            self.api_client,
+            account,
+            payload,
+            options.unwrap_or_default(),
+        )
+        .await
     }
 
     pub async fn claim_token(
@@ -346,8 +361,13 @@ impl<'a> TokenClient<'a> {
         .encode();
 
         // create and submit transaction
-        build_and_submit_transaction(self.api_client, account, payload, options.unwrap_or_default())
-            .await
+        build_and_submit_transaction(
+            self.api_client,
+            account,
+            payload,
+            options.unwrap_or_default(),
+        )
+        .await
     }
 }
 

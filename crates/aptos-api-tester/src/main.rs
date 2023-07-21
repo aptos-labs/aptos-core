@@ -5,33 +5,29 @@
 
 mod utils;
 
-use std::collections::BTreeMap;
-use std::future::Future;
-use std::path::PathBuf;
-use std::time::Instant;
-
+use crate::utils::{TestFailure, TestLog, TestResult};
 use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_rest_client::{Account, Client, FaucetClient};
-use aptos_sdk::bcs;
-use aptos_sdk::coin_client::CoinClient;
-use aptos_sdk::token_client::{
-    build_and_submit_transaction, CollectionData, CollectionMutabilityConfig, RoyaltyOptions,
-    TokenClient, TokenData, TokenMutabilityConfig, TransactionOptions,
+use aptos_sdk::{
+    bcs,
+    coin_client::CoinClient,
+    token_client::{
+        build_and_submit_transaction, CollectionData, CollectionMutabilityConfig, RoyaltyOptions,
+        TokenClient, TokenData, TokenMutabilityConfig, TransactionOptions,
+    },
+    types::LocalAccount,
 };
-use aptos_sdk::types::LocalAccount;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
-use move_core_types::ident_str;
-use move_core_types::language_storage::ModuleId;
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{EntryFunction, TransactionPayload},
+};
+use move_core_types::{ident_str, language_storage::ModuleId};
 use once_cell::sync::Lazy;
+use std::{collections::BTreeMap, future::Future, path::PathBuf, time::Instant};
 use url::Url;
-
-use utils::TestFailure;
-use utils::TestLog;
-use utils::TestResult;
 
 // network urls
 static DEVNET_NODE_URL: Lazy<Url> =
