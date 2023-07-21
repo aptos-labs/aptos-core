@@ -277,6 +277,7 @@ const sidebars = {
               ],
             },
             "tools/aptos-cli/use-cli/use-aptos-cli",
+            "tools/aptos-cli/use-cli/use-aptos-ledger",
           ],
         },
         {
