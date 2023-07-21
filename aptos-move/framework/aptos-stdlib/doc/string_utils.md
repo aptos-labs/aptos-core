@@ -745,4 +745,4 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

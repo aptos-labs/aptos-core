@@ -3,7 +3,10 @@
 use super::helpers::new_node;
 use crate::dag::{
     tests::helpers::new_certified_node,
-    types::{CertifiedNode, Node, NodeCertificate, NodeMetadata, TDAGMessage},
+    types::{
+        CertifiedNode, DagSnapshotBitmask, Node, NodeCertificate, NodeMetadata, RemoteFetchRequest,
+        TDAGMessage,
+    },
 };
 use aptos_consensus_types::common::Payload;
 use aptos_crypto::HashValue;
@@ -80,4 +83,60 @@ fn test_certified_node_verify() {
             .to_string(),
         "unable to verify: Invalid bitvec from the multi-signature"
     );
+}
+
+#[test]
+fn test_remote_fetch_request() {
+    let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+
+    let parents: Vec<_> = (0..3)
+        .map(|idx| {
+            NodeMetadata::new_for_test(1, 3, signers[idx].author(), 100, HashValue::random())
+        })
+        .collect();
+
+    let request = RemoteFetchRequest::new(
+        1,
+        parents.clone(),
+        DagSnapshotBitmask::new(1, vec![vec![false; 5]]),
+    );
+    assert_eq!(
+        request.verify(&validator_verifier).unwrap_err().to_string(),
+        "invalid bitmask: each round length is not equal to validator count"
+    );
+
+    let request = RemoteFetchRequest::new(
+        1,
+        vec![parents[0].clone()],
+        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]]),
+    );
+    assert_ok!(request.verify(&validator_verifier));
+
+    let request = RemoteFetchRequest::new(
+        1,
+        parents,
+        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]]),
+    );
+    assert_ok!(request.verify(&validator_verifier));
+}
+
+#[test]
+fn test_dag_snapshot_bitmask() {
+    let bitmask = DagSnapshotBitmask::new(1, vec![vec![false, false, false, true]]);
+
+    assert!(!bitmask.has(1, 0));
+    assert!(bitmask.has(1, 3));
+    assert!(!bitmask.has(2, 0));
+    assert_eq!(bitmask.first_round(), 1);
+
+    let bitmask = DagSnapshotBitmask::new(1, vec![vec![false, true, true, true], vec![
+        false, true, false, false,
+    ]]);
+
+    assert!(!bitmask.has(1, 0));
+    assert!(bitmask.has(1, 3));
+    assert!(!bitmask.has(2, 0));
+    assert!(bitmask.has(2, 1));
+    assert!(!bitmask.has(10, 10));
+    assert_eq!(bitmask.first_round(), 1);
 }

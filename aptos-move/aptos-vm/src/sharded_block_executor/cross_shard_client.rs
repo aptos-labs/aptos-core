@@ -14,7 +14,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId, SubBlock},
     state_store::state_key::StateKey,
-    transaction::Transaction,
+    transaction::analyzed_transaction::AnalyzedTransaction,
     write_set::TransactionWrite,
 };
 use std::{
@@ -66,7 +66,7 @@ impl CrossShardCommitSender {
     pub fn new(
         shard_id: ShardId,
         message_txs: Arc<Vec<Vec<Mutex<Sender<CrossShardMsg>>>>>,
-        sub_block: &SubBlock<Transaction>,
+        sub_block: &SubBlock<AnalyzedTransaction>,
     ) -> Self {
         let mut dependent_edges = HashMap::new();
         let mut num_dependent_edges = 0;

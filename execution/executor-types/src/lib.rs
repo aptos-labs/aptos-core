@@ -90,7 +90,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// Executes a block.
     fn execute_block(
         &self,
-        block: ExecutableBlock<Transaction>,
+        block: ExecutableBlock,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error>;

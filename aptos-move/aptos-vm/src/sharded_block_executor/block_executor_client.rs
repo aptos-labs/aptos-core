@@ -4,8 +4,8 @@ use crate::block_executor::{AptosTransactionOutput, BlockAptosVM};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{BlockExecutorTransactions, SubBlocksForShard},
-    transaction::{Transaction, TransactionOutput},
+    block_executor::partitioner::SubBlocksForShard,
+    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
@@ -13,7 +13,7 @@ use std::sync::Arc;
 pub trait BlockExecutorClient {
     fn execute_block<S: StateView + Sync + Send>(
         &self,
-        transactions: SubBlocksForShard<Transaction>,
+        transactions: SubBlocksForShard<AnalyzedTransaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
@@ -23,17 +23,22 @@ pub trait BlockExecutorClient {
 impl BlockExecutorClient for VMExecutorClient {
     fn execute_block<S: StateView + Sync + Send>(
         &self,
-        sub_blocks: SubBlocksForShard<Transaction>,
+        sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
+        let txns = sub_blocks
+            .into_txns()
+            .into_iter()
+            .map(|txn| txn.into_txn())
+            .collect();
         Ok(vec![BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             self.executor_thread_pool.clone(),
-            BlockExecutorTransactions::Sharded(sub_blocks),
+            txns,
             state_view,
             concurrency_level,
             maybe_block_gas_limit,
