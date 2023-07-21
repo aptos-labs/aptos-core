@@ -13,7 +13,6 @@ use std::{
     thread,
 };
 
-#[allow(dead_code)]
 pub struct OutboundHandler {
     service: String,
     network_clients: Arc<Mutex<HashMap<SocketAddr, NetworkClient>>>,

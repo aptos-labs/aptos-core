@@ -4,6 +4,7 @@ use crate::{
     network_controller::{error::Error, Message, MessageType, NetworkMessage},
     NetworkServer,
 };
+use aptos_logger::error;
 use crossbeam_channel::Sender;
 use std::{
     collections::HashMap,
@@ -11,9 +12,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use aptos_logger::error;
 
-#[allow(dead_code)]
 pub struct InboundHandler {
     service: String,
     server: Arc<Mutex<NetworkServer>>,

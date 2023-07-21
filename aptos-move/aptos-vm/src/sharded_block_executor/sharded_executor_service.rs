@@ -80,7 +80,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!(
             "executing sub block for shard {} and round {}",
-            self.shard_id, round
+            self.shard_id,
+            round
         );
         let cross_shard_commit_sender =
             CrossShardCommitSender::new(self.shard_id, self.cross_shard_client.clone(), &sub_block);
@@ -115,7 +116,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
                 trace!(
                     "executed sub block for shard {} and round {}",
-                    self.shard_id, round
+                    self.shard_id,
+                    round
                 );
                 // Send a self message to stop the cross-shard commit receiver.
                 cross_shard_client_clone.send_cross_shard_msg(
@@ -156,7 +158,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             )?);
             trace!(
                 "Finished executing sub block for shard {} and round {}",
-                self.shard_id, round
+                self.shard_id,
+                round
             );
         }
         Ok(result)
