@@ -1,5 +1,7 @@
 /// This module provides an interface for aggregators (version 2).
 module aptos_framework::aggregator_v2 {
+    use std::option::{Self, Option};
+
     /// Represents an integer which supports parallel additions and subtractions
     /// across multiple transactions. See the module description for more details.
     struct Aggregator has store {
