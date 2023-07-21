@@ -8,7 +8,7 @@ use crate::{
     metadata_storage::MetadataStorageInterface,
     notification_handlers::{
         CommitNotificationListener, ConsensusNotificationHandler, ErrorNotificationListener,
-        MempoolNotificationHandler, StorageServiceNotificationHandler,
+        MempoolNotificationHandler,
     },
     storage_synchronizer::StorageSynchronizer,
 };
@@ -21,7 +21,6 @@ use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReaderWriter;
-use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_time_service::TimeService;
 use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
 use futures::{channel::mpsc, executor::block_on};
@@ -40,7 +39,6 @@ impl DriverFactory {
         ChunkExecutor: ChunkExecutorTrait + 'static,
         MempoolNotifier: MempoolNotificationSender + 'static,
         MetadataStorage: MetadataStorageInterface + Clone + Send + Sync + 'static,
-        StorageServiceNotifier: StorageServiceNotificationSender + 'static,
     >(
         create_runtime: bool,
         node_config: &NodeConfig,
@@ -48,7 +46,6 @@ impl DriverFactory {
         storage: DbReaderWriter,
         chunk_executor: Arc<ChunkExecutor>,
         mempool_notification_sender: MempoolNotifier,
-        storage_service_notification_sender: StorageServiceNotifier,
         metadata_storage: MetadataStorage,
         consensus_listener: ConsensusNotificationListener,
         mut event_subscription_service: EventSubscriptionService,
@@ -87,8 +84,6 @@ impl DriverFactory {
                 .state_sync_driver
                 .mempool_commit_ack_timeout_ms,
         );
-        let storage_service_notification_handler =
-            StorageServiceNotificationHandler::new(storage_service_notification_sender);
 
         // Create a new runtime (if required)
         let driver_runtime = if create_runtime {
@@ -107,7 +102,6 @@ impl DriverFactory {
             error_notification_sender,
             event_subscription_service.clone(),
             mempool_notification_handler.clone(),
-            storage_service_notification_handler.clone(),
             metadata_storage.clone(),
             storage.clone(),
             driver_runtime.as_ref(),
@@ -130,7 +124,6 @@ impl DriverFactory {
             event_subscription_service,
             mempool_notification_handler,
             metadata_storage,
-            storage_service_notification_handler,
             storage_synchronizer,
             aptos_data_client,
             streaming_service_client,

@@ -9,7 +9,6 @@ use crate::{
     metrics,
     notification_handlers::{
         CommitNotification, CommittedTransactions, ErrorNotification, MempoolNotificationHandler,
-        StorageServiceNotificationHandler,
     },
     utils,
 };
@@ -21,7 +20,6 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::{DbReader, DbReaderWriter, StateSnapshotReceiver};
-use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::{
@@ -174,19 +172,13 @@ impl<
     > StorageSynchronizer<ChunkExecutor, MetadataStorage>
 {
     /// Returns a new storage synchronizer alongside the executor and committer handles
-    pub fn new<
-        MempoolNotifier: MempoolNotificationSender,
-        StorageServiceNotifier: StorageServiceNotificationSender,
-    >(
+    pub fn new<MempoolNotifier: MempoolNotificationSender>(
         driver_config: StateSyncDriverConfig,
         chunk_executor: Arc<ChunkExecutor>,
         commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
         error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
         event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
         mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
-        storage_service_notification_handler: StorageServiceNotificationHandler<
-            StorageServiceNotifier,
-        >,
         metadata_storage: MetadataStorage,
         storage: DbReaderWriter,
         runtime: Option<&Runtime>,
@@ -219,7 +211,6 @@ impl<
             error_notification_sender.clone(),
             event_subscription_service,
             mempool_notification_handler,
-            storage_service_notification_handler,
             pending_transaction_chunks.clone(),
             runtime.clone(),
             storage.reader.clone(),
@@ -536,14 +527,12 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
 fn spawn_committer<
     ChunkExecutor: ChunkExecutorTrait + 'static,
     MempoolNotifier: MempoolNotificationSender,
-    StorageServiceNotifier: StorageServiceNotificationSender,
 >(
     chunk_executor: Arc<ChunkExecutor>,
     mut committer_listener: mpsc::Receiver<NotificationId>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
     mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
-    storage_service_notification_handler: StorageServiceNotificationHandler<StorageServiceNotifier>,
     pending_transaction_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
     storage: Arc<dyn DbReader>,
@@ -589,7 +578,6 @@ fn spawn_committer<
                         storage.clone(),
                         mempool_notification_handler.clone(),
                         event_subscription_service.clone(),
-                        storage_service_notification_handler.clone(),
                     )
                     .await;
                 },
