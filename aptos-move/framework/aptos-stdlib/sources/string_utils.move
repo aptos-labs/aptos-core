@@ -108,6 +108,7 @@ module aptos_std::string_utils {
     }
 
     #[testonly]
+    /// #[test_only]
     struct FakeCons<T, N> has copy, drop, store {
         car: T,
         cdr: N,
