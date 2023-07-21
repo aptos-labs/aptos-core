@@ -284,7 +284,7 @@ impl AptosVM {
     ) -> (VMStatus, VMOutput) {
         let mut session = self
             .0
-            .new_session(resolver, SessionId::epilogue_meta(txn_data), true);
+            .new_session(resolver, SessionId::epilogue_meta(txn_data));
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -1024,7 +1024,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
-        let mut session = self.0.new_session(resolver, SessionId::prologue(txn), true);
+        let mut session = self.0.new_session(resolver, SessionId::prologue(txn));
         if let Err(err) = self.validate_signature_checked_transaction(
             &mut session,
             resolver,
@@ -1044,7 +1044,7 @@ impl AptosVM {
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
             resolver.release_resource_group_cache();
-            session = self.0.new_session(resolver, SessionId::txn(txn), true);
+            session = self.0.new_session(resolver, SessionId::txn(txn));
         }
 
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
@@ -1200,7 +1200,7 @@ impl AptosVM {
                 )
             },
             WriteSetPayload::Script { script, execute_as } => {
-                let mut tmp_session = self.0.new_session(resolver, session_id, true);
+                let mut tmp_session = self.0.new_session(resolver, session_id);
                 let senders = match txn_sender {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
@@ -1310,9 +1310,9 @@ impl AptosVM {
             ..Default::default()
         };
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session =
-            self.0
-                .new_session(resolver, SessionId::block_meta(&block_metadata), true);
+        let mut session = self
+            .0
+            .new_session(resolver, SessionId::block_meta(&block_metadata));
 
         let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         session
@@ -1356,7 +1356,6 @@ impl AptosVM {
             &simulation_vm.0.as_move_resolver(state_view),
             txn,
             &log_context,
-            true,
         );
 
         // Because simulation returns a VMOutput, it has both writes and deltas
@@ -1373,7 +1372,6 @@ impl AptosVM {
                     &simulation_vm.0.as_move_resolver(state_view),
                     txn,
                     &log_context,
-                    false,
                 );
 
                 // Make sure to return the right types. Note that here conversion
@@ -1405,7 +1403,7 @@ impl AptosVM {
             gas_budget,
         ));
         let resolver = vm.as_move_resolver(state_view);
-        let mut session = vm.new_session(&resolver, SessionId::Void, true);
+        let mut session = vm.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.0.extract_module_metadata(&module_id);
@@ -1583,9 +1581,7 @@ impl VMValidator for AptosVM {
         };
 
         let resolver = self.as_move_resolver(state_view);
-        let mut session = self
-            .0
-            .new_session(&resolver, SessionId::prologue(&txn), true);
+        let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn));
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,
             &resolver,
@@ -1619,9 +1615,8 @@ impl VMAdapter for AptosVM {
         &self,
         resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
-        aggregator_enabled: bool,
     ) -> SessionExt<'r, '_> {
-        self.0.new_session(resolver, session_id, aggregator_enabled)
+        self.0.new_session(resolver, session_id)
     }
 
     fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
@@ -1812,7 +1807,6 @@ impl AptosSimulationVM {
         resolver: &impl MoveResolverExt,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
-        aggregator_enabled: bool,
     ) -> (VMStatus, VMOutput) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
@@ -1822,9 +1816,7 @@ impl AptosSimulationVM {
 
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
-        let mut session =
-            self.0
-                .new_session(resolver, SessionId::txn_meta(&txn_data), aggregator_enabled);
+        let mut session = self.0.new_session(resolver, SessionId::txn_meta(&txn_data));
         if let Err(err) =
             self.validate_simulated_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {

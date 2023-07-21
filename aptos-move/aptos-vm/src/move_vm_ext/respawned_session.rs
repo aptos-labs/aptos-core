@@ -51,7 +51,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                     vm.get_features(),
                 )
             },
-            session_builder: |resolver| Some(vm.new_session(resolver, session_id, true)),
+            session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
         }
         .build())
     }
