@@ -42,14 +42,19 @@ impl ReleaseBundle {
 
     /// Read a release bundle from a file.
     pub fn read(file: PathBuf) -> anyhow::Result<ReleaseBundle> {
-        let content =
-            std::fs::read(&file).with_context(|| format!("while reading `{}`", file.display()))?;
-        Ok(bcs::from_bytes::<ReleaseBundle>(&content)?)
+        let content = std::fs::read_to_string(&file)
+            .with_context(|| format!("while reading `{}`", file.display()))?;
+        Ok(serde_yaml::from_str(&content)?)
+    }
+
+    /// Read a relase bundle from a string.
+    pub fn read_str(s: &str) -> anyhow::Result<ReleaseBundle> {
+        Ok(serde_yaml::from_str(s)?)
     }
 
     /// Write a release bundle to file
     pub fn write(&self, path: PathBuf) -> anyhow::Result<()> {
-        std::fs::write(&path, bcs::to_bytes(self)?)
+        std::fs::write(&path, serde_yaml::to_string(self)?)
             .with_context(|| format!("while writing `{}`", path.display()))?;
         Ok(())
     }

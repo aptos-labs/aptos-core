@@ -67,7 +67,7 @@ impl ReleaseOptions {
         }
         let bundle = ReleaseBundle::new(released_packages, source_paths);
         std::fs::create_dir_all(output.parent().unwrap())?;
-        std::fs::write(&output, bcs::to_bytes(&bundle)?)?;
+        bundle.write(output)?;
         Ok(())
     }
 
