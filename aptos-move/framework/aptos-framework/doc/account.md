@@ -2950,7 +2950,6 @@ The guid_creation_num of the Account is up to MAX_U64.
 <b>include</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_NewSignatureFromBytesAbortsIf">ed25519::NewSignatureFromBytesAbortsIf</a> { bytes: signed_message_bytes };
 <b>include</b> account_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a> ==&gt; <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_NewSignatureFromBytesAbortsIf">multi_ed25519::NewSignatureFromBytesAbortsIf</a> { bytes: signed_message_bytes };
 <b>aborts_if</b> account_scheme != <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> && account_scheme != <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>;
-<b>ensures</b> account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a> || account_scheme == <a href="account.md#0x1_account_MULTI_ED25519_SCHEME">MULTI_ED25519_SCHEME</a>;
 </code></pre>
 
 
