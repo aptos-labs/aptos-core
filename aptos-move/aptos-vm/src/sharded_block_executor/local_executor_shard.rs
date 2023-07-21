@@ -20,8 +20,8 @@ use std::{
     thread,
 };
 
-/// A block executor that receives transactions from a channel and executes them in parallel.
-/// It runs in the local machine.
+/// Executor service that runs on local machine and waits for commands from the coordinator and executes
+/// them in parallel.
 pub struct LocalExecutorService<S: StateView + Sync + Send + 'static> {
     _executor_service: Arc<ShardedExecutorService<S>>,
     join_handle: Option<thread::JoinHandle<()>>,
@@ -114,7 +114,7 @@ pub struct LocalExecutorClient<S: StateView + Sync + Send + 'static> {
     // Channels to receive execution results from the executor shards.
     result_rxs: Vec<Receiver<Result<Vec<Vec<TransactionOutput>>, VMStatus>>>,
 
-    executor_shards: Vec<LocalExecutorService<S>>,
+    executor_services: Vec<LocalExecutorService<S>>,
 }
 
 impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
@@ -126,7 +126,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
         Self {
             command_txs: command_tx,
             result_rxs: result_rx,
-            executor_shards,
+            executor_services: executor_shards,
         }
     }
 }
@@ -172,8 +172,8 @@ impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {
         }
 
         // wait for join handles to finish
-        for executor_shard in self.executor_shards.iter_mut() {
-            let _ = executor_shard.join_handle.take().unwrap().join();
+        for executor_service in self.executor_services.iter_mut() {
+            let _ = executor_service.join_handle.take().unwrap().join();
         }
     }
 }

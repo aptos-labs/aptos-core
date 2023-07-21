@@ -9,6 +9,7 @@ use aptos_types::{
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
+// Interface to communicate from the block executor coordinator to the executor shards.
 pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn num_shards(&self) -> usize;
     fn execute_block(
@@ -22,6 +23,7 @@ pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn get_execution_result(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus>;
 }
 
+// Interface to communicate from the executor shards to the block executor coordinator.
 pub trait CoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn receive_execute_command(&self) -> ExecutorShardCommand<S>;
 
