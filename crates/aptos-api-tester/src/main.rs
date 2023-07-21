@@ -6,8 +6,10 @@
 mod counters;
 mod utils;
 
-use crate::counters::{test_error, test_fail, test_latency, test_success};
-use crate::utils::{NetworkName, TestFailure, TestName, TestResult};
+use crate::{
+    counters::{test_error, test_fail, test_latency, test_success},
+    utils::{NetworkName, TestFailure, TestName, TestResult},
+};
 use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
