@@ -218,13 +218,10 @@ module knight::knight {
         );
     }
 
-    #[test_only]
-    use std::signer;
-
-    #[test(creator = @token_objects, user1 = @0x456)]
+    #[test(creator = @knight, user1 = @0x456)]
     public fun test_knight(creator: &signer, user1: &signer) acquires HealthPoint, KnightToken {
-        // This test assumes that the creator's address is equal to @token_objects.
-        assert!(signer::address_of(creator) == @token_objects, 0);
+        // This test assumes that the creator's address is equal to @knight.
+        assert!(signer::address_of(creator) == @knight, 0);
 
         // ---------------------------------------------------------------------
         // Creator creates the collection, and mints corn and meat tokens in it.
