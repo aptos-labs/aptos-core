@@ -3,6 +3,9 @@ title: "Conceptual understanding"
 id: "understanding-resource-accounts"
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Conceptual understanding
 
 ## What is a resource account?
