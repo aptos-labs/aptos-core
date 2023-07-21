@@ -3,7 +3,7 @@
 
 use crate::errors::{SafeNativeError, SafeNativeResult};
 use aptos_gas_algebra::{
-    AbstractValueSize, Expression, GasExpression, GasQuantity, InternalGasUnit,
+    AbstractValueSize, DynamicExpression, GasExpression, GasQuantity, InternalGasUnit,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
@@ -34,7 +34,7 @@ pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
 
     pub(crate) enable_incremental_gas_charging: bool,
 
-    pub(crate) gas_hook: Option<&'c (dyn Fn(Expression) + Send + Sync)>,
+    pub(crate) gas_hook: Option<&'c (dyn Fn(DynamicExpression) + Send + Sync)>,
 }
 
 impl<'a, 'b, 'c, 'd> Deref for SafeNativeContext<'a, 'b, 'c, 'd> {

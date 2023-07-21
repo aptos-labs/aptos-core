@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::gas_meter_helpers::{get_dir_paths, get_functional_identifiers, record_gas_meter};
 use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_gas_algebra::Expression;
+use aptos_gas_algebra::DynamicExpression;
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use move_binary_format::CompiledModule;
 use move_ir_compiler::Compiler;
 use std::{
     fs::{read_dir, read_to_string},
     path::PathBuf,
-    time::Instant,
 };
+use walkdir::WalkDir;
 
 pub struct GasMeters {
     pub regular_meter: Vec<u128>,
-    pub abstract_meter: Vec<Vec<Expression>>,
+    pub abstract_meter: Vec<Vec<DynamicExpression>>,
 }
 
 /// Compile every Move sample and run each sample with two different measuring methods.
@@ -87,7 +87,6 @@ pub fn compile_and_run_samples() -> GasMeters {
 /// The second is with the Abstract Algebra Gas Meter to record abstract gas usage.
 pub fn compile_and_run_samples_ir() -> GasMeters {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples_ir");
-    let dirs = read_dir(path.as_path()).unwrap();
 
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
@@ -97,44 +96,66 @@ pub fn compile_and_run_samples_ir() -> GasMeters {
         abstract_meter: Vec::new(),
     };
 
-    for file in dirs {
-        if let Ok(file) = file {
-            let file_path = file.path();
+    // Walk through all subdirectories and files in the root directory
+    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+        let path_entry = entry.path();
 
-            if file_path.is_file() {
-                // compile module
-                let code = read_to_string(&file_path).expect("Failed to read file contents");
-                let module = Compiler::new(vec![])
-                    .into_compiled_module(&code)
-                    .expect("should compile mvir");
+        // Check if the entry is a file
+        if path_entry.is_file() {
+            // ignore all non .mvir files
+            if let Some(file_ext) = path_entry.extension() {
+                if let Some(ext) = file_ext.to_str() {
+                    if ext != "mvir" {
+                        continue;
+                    }
+                }
+            }
 
-                // get relevant module metadata
-                let module_id = module.self_id();
-                let identifier = &module_id.name().to_string();
-                let address = module_id.address();
-                let func_identifiers =
-                    get_functional_identifiers(module.clone(), identifier, *address, String::new());
+            if let Some(file_name) = path_entry.file_name() {
+                // Convert the file_name to a string slice
+                if let Some(_file_name_str) = file_name.to_str() {
+                    // compile module
+                    let code = read_to_string(&path_entry).expect("Failed to read file contents");
+                    let module = Compiler::new(vec![])
+                        .into_compiled_module(&code)
+                        .expect("should compile mvir");
 
-                // build .mv of module
-                let mut module_blob: Vec<u8> = vec![];
-                module
-                    .serialize(&mut module_blob)
-                    .expect("Failed to serialize module");
+                    // get relevant module metadata
+                    let module_id = module.self_id();
+                    let identifier = &module_id.name().to_string();
+                    let address = module_id.address();
+                    let func_identifiers = get_functional_identifiers(
+                        module.clone(),
+                        identifier,
+                        *address,
+                        String::new(),
+                    );
 
-                println!("BLOB {:#?}\n", module);
+                    // build .mv of module
+                    let mut module_blob: Vec<u8> = vec![];
+                    module
+                        .serialize(&mut module_blob)
+                        .expect("Failed to serialize module");
 
-                // publish module
-                executor.add_module(&module_id, module_blob);
+                    //println!("BLOB {:#?}\n", module);
 
-                for func_identifier in func_identifiers {
-                    let elapsed =
-                        executor.exec_module(&module_id, &func_identifier, vec![], vec![]);
-                    gas_meter.regular_meter.push(elapsed);
+                    // publish module
+                    executor.add_module(&module_id, module_blob);
 
-                    // record with abstract gas meter
-                    let gas_formula =
-                        executor.exec_abstract_usage(&module_id, &func_identifier, vec![], vec![]);
-                    gas_meter.abstract_meter.push(gas_formula);
+                    for func_identifier in func_identifiers {
+                        let elapsed =
+                            executor.exec_module(&module_id, &func_identifier, vec![], vec![]);
+                        gas_meter.regular_meter.push(elapsed);
+
+                        // record with abstract gas meter
+                        let gas_formula = executor.exec_abstract_usage(
+                            &module_id,
+                            &func_identifier,
+                            vec![],
+                            vec![],
+                        );
+                        gas_meter.abstract_meter.push(gas_formula);
+                    }
                 }
             }
         }

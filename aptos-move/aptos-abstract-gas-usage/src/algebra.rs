@@ -3,7 +3,7 @@
 
 use crate::visitor::CalibrationVisitor;
 use aptos_gas_algebra::{
-    Expression, Fee, FeePerGasUnit, GasExpression, InternalGas, InternalGasUnit, Octa,
+    DynamicExpression, Fee, FeePerGasUnit, GasExpression, InternalGas, InternalGasUnit, Octa,
 };
 use aptos_gas_meter::GasAlgebra;
 use aptos_gas_schedule::VMGasParameters;
@@ -16,8 +16,8 @@ pub struct CalibrationAlgebra<A> {
     // GasAlgebra that is used to delegate work
     pub base: A,
     // Mapping of simplified like-terms
-    //pub coeff_buffer: BTreeMap<String, u64>,
-    pub shared_buffer: Arc<Mutex<Vec<Expression>>>,
+    // pub coeff_buffer: BTreeMap<String, u64>,
+    pub shared_buffer: Arc<Mutex<Vec<DynamicExpression>>>,
 }
 
 /// Algebra implementation
@@ -44,6 +44,10 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
     ) -> PartialVMResult<()> {
         let node = abstract_amount.to_dynamic();
         self.shared_buffer.lock().unwrap().push(node);
+
+        let amount =
+            abstract_amount.evaluate(self.base.feature_version(), &self.base.vm_gas_params());
+        self.base.charge_execution(amount)?;
         Ok(())
     }
 
@@ -54,6 +58,9 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         //// TODO
         let mut visitor = CalibrationVisitor { node: Vec::new() };
         abstract_amount.visit(&mut visitor);
+        let amount =
+            abstract_amount.evaluate(self.base.feature_version(), &self.base.vm_gas_params());
+        self.base.charge_execution(amount)?;
         Ok(())
     }
 

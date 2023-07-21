@@ -7,29 +7,31 @@ mod math;
 mod math_interface;
 mod solve;
 use aptos_abstract_gas_usage::{collect_terms, normalize};
-use aptos_gas_algebra::Expression;
-use gas_meter::compile_and_run_samples_ir;
+use aptos_gas_algebra::DynamicExpression;
+use gas_meter::{compile_and_run_samples, compile_and_run_samples_ir};
 use math_interface::{convert_to_matrix_format, total_num_of_cols, total_num_rows};
 use solve::{build_coefficient_matrix, build_constant_matrix, solve};
 use std::collections::BTreeMap;
 
-/*
- * Error types:
- *
- * - Samples not running long enough (i.e., run the simple ones in loops)
- */
-
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
 
+    let samples = compile_and_run_samples();
     let samples_ir = compile_and_run_samples_ir();
-    println!("\nrunning times (RHS): {:?}", samples_ir.regular_meter);
-    //let samples_ir = compile_and_run_samples();
+    // println!("\nrunning times (RHS): {:?}", samples_ir.regular_meter);
 
     println!("\n\nabstract gas formulae (LHS): ");
-    let mut system_of_equations: Vec<Vec<Expression>> = Vec::new();
+    let mut system_of_equations: Vec<Vec<DynamicExpression>> = Vec::new();
     for formula in samples_ir.abstract_meter {
-        let mut terms: Vec<Expression> = Vec::new();
+        let mut terms: Vec<DynamicExpression> = Vec::new();
+        for term in formula {
+            let normal = normalize(term);
+            terms.extend(normal);
+        }
+        system_of_equations.push(terms);
+    }
+    for formula in samples.abstract_meter {
+        let mut terms: Vec<DynamicExpression> = Vec::new();
         for term in formula {
             let normal = normalize(term);
             terms.extend(normal);

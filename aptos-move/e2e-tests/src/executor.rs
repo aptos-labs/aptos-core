@@ -18,12 +18,11 @@ use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
-use aptos_gas_algebra::Expression;
+use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_gas_schedule::{
-    InitialGasSchedule, MiscGasParameters, NativeGasParameters, VMGasParameters,
-    LATEST_GAS_FEATURE_VERSION,
+    InitialGasSchedule, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
@@ -86,6 +85,8 @@ pub const TRACE_DIR_DATA: &str = "data";
 pub const TRACE_DIR_INPUT: &str = "input";
 pub const TRACE_DIR_OUTPUT: &str = "output";
 
+const POSTFIX: &str = "_should_error";
+
 /// Maps block number N to the index of the input and output transactions
 pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 
@@ -106,7 +107,7 @@ pub struct FakeExecutor {
 
 pub enum GasMeterType {
     RegularMeter(Vec<u128>),
-    AbstractMeter(Vec<Expression>),
+    AbstractMeter(Vec<DynamicExpression>),
 }
 
 impl FakeExecutor {
@@ -693,25 +694,29 @@ impl FakeExecutor {
             let mut session = vm.new_session(&remote_view, SessionId::void());
             // TODO: preload module
 
-            // preload module to ensure cache is hot
-            let _ = session.load_module(module);
+            // load function name into cache to ensure cache is hot
+            let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
 
             // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
             let mut i = 0;
             let iterations = 10; // TODO: change this to support CLI flag
             let mut times = Vec::new();
             while i < iterations {
+                let fun_name = Self::name(function_name);
+                let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
+                let ty = type_params.clone();
+                let arg = args.clone();
+                // TODO: consider using StandardGasMeter
+                let gas_meter = &mut UnmeteredGasMeter;
+
                 let start = Instant::now();
-                let result = session.execute_function_bypass_visibility(
-                    module,
-                    &Self::name(function_name),
-                    type_params.clone(),
-                    args.clone(),
-                    &mut UnmeteredGasMeter,
-                );
+                let result = session
+                    .execute_function_bypass_visibility(module, &fun_name, ty, arg, gas_meter);
                 let elapsed = start.elapsed();
                 if let Err(err) = result {
-                    println!("Should error, but ignoring for now... {}", err);
+                    if !should_error {
+                        println!("Should error, but ignoring for now... {}", err);
+                    }
                 }
                 times.push(elapsed.as_micros());
                 i += 1;
@@ -743,9 +748,9 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-    ) -> Vec<Expression> {
+    ) -> Vec<DynamicExpression> {
         // Define the shared buffers
-        let a1 = Arc::new(Mutex::new(Vec::<Expression>::new()));
+        let a1 = Arc::new(Mutex::new(Vec::<DynamicExpression>::new()));
         let a2 = Arc::clone(&a1);
 
         let write_set = {
@@ -762,9 +767,7 @@ impl FakeExecutor {
             );
 
             builder.set_gas_hook(move |expression| {
-                //println!("TEST PRINT expression {:?}\n", expression);
                 a2.lock().unwrap().push(expression);
-                //println!("A2 VEC: {:?}\n", a2.lock().unwrap());
             });
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
@@ -779,12 +782,12 @@ impl FakeExecutor {
             let remote_view = StorageAdapter::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
 
-            // preload module to ensure cache is hot
-            let _ = session.load_module(module);
+            let fun_name = Self::name(function_name);
+            let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
 
             let result = session.execute_function_bypass_visibility(
                 module,
-                &Self::name(function_name),
+                &fun_name,
                 type_params,
                 args,
                 &mut StandardGasMeter::new(CalibrationAlgebra {
@@ -800,10 +803,10 @@ impl FakeExecutor {
                 }),
             );
             if let Err(err) = result {
-                println!("Should error, but ignoring for now... {}", err);
+                if !should_error {
+                    println!("Should error, but ignoring for now... {}", err);
+                }
             }
-
-            //println!("A3 ARC: {:?}\n", a1.lock().unwrap());
 
             let change_set = session
                 .finish(

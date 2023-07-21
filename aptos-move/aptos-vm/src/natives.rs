@@ -59,20 +59,6 @@ pub fn aptos_natives(
 }
 
 pub fn aptos_natives_abstract_usage(builder: &mut SafeNativeBuilder) -> NativeFunctionTable {
-    /*let mut builder = SafeNativeBuilder::new(
-        gas_feature_version,
-        native_gas_params,
-        misc_gas_params,
-        timed_features,
-        features,
-    );
-    builder.set_gas_hook(move |expression| {
-        //// closure function should take Expression node and put it into
-        //// shared buffer, a1 and a2
-        // a2.lock().unwrap().push(expression);
-        println!("expression: {:?}", expression);
-    });*/
-
     #[allow(unreachable_code)]
     aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, builder)
         .into_iter()
