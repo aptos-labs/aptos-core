@@ -701,22 +701,23 @@ impl FakeExecutor {
             let mut session =
                 vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
 
-            // preload module to ensure cache is hot
-            let _ = session.load_module(module);
+            // load function name into cache to ensure cache is hot
+            let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
 
             // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
             let mut i = 0;
             let iterations = 10; // TODO: change this to support CLI flag
             let mut times = Vec::new();
             while i < iterations {
+                let fun_name = Self::name(function_name);
+                let ty = type_params.clone();
+                let arg = args.clone();
+                // TODO: consider using StandardGasMeter
+                let gas_meter = &mut UnmeteredGasMeter;
+
                 let start = Instant::now();
-                let result = session.execute_function_bypass_visibility(
-                    module,
-                    &Self::name(function_name),
-                    type_params.clone(),
-                    args.clone(),
-                    &mut UnmeteredGasMeter,
-                );
+                let result = session
+                    .execute_function_bypass_visibility(module, &fun_name, ty, arg, gas_meter);
                 let elapsed = start.elapsed();
                 if let Err(err) = result {
                     println!("Should error, but ignoring for now... {}", err);
@@ -784,9 +785,6 @@ impl FakeExecutor {
             let remote_view = StorageAdapter::new(&self.data_store);
             let mut session =
                 vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
-
-            // preload module to ensure cache is hot
-            let _ = session.load_module(module);
 
             let result = session.execute_function_bypass_visibility(
                 module,

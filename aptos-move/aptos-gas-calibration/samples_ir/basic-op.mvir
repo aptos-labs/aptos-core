@@ -1,0 +1,239 @@
+module 0xcafe.BasicOp {
+    /////////////////////////////////////////////////
+    // INSTRUCTIONS:
+    // * `ADD`
+    // * `MUL`
+    // * `SHL`
+    // * `SHR`
+    
+
+    /////////////////////////////////////////////////
+    // ADD calibrating and tuning
+    
+    public entry calibrate_add() {
+    label b0:
+        _ = (1000 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1);
+        return;
+    }
+
+    public entry calibrate_add_many() {
+    label b0:
+        _ = (1 + 1);
+        _ = (1 + 1);
+        _ = (1 + 1);
+        _ = (1 + 1);
+        _ = (1 + 1);
+        _ = (1 + 1);
+        return;                
+    }
+
+    public entry calibrate_add_many_terms() {
+    label b0:
+        _ = (1000 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1);
+        _ = (1000 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1);
+        _ = (1000 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1);
+        _ = (1000 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1);
+        _ = (1000 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1);
+        _ = (1000 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1);
+        return;
+    }
+
+
+    /////////////////////////////////////////////////
+    // MUL calibrating and tuning
+    
+    public entry calibrate_mul() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (100 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    public entry calibrate_mul_many() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (1 * 1);
+        _ = (1 * 1);
+        _ = (1 * 1);
+        _ = (1 * 1);
+        _ = (1 * 1);
+        _ = (1 * 1);
+        _ = (1 * 1);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    } 
+
+    public entry calibrate_mul_many_terms() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (1000 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1);
+        _ = (1000 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1);
+        _ = (1000 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1);
+        _ = (1000 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1);
+        _ = (1000 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1);
+        _ = (1000 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1 * 1);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }        
+
+
+    /////////////////////////////////////////////////
+    // DIV calibrating and tuning  
+
+    public entry calibrate_div_many() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (1 / 1);
+        _ = (1 / 1);
+        _ = (1 / 1);
+        _ = (1 / 1);
+        _ = (1 / 1);
+        _ = (1 / 1);
+        _ = (1 / 1);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    public entry calibrate_div_many_terms() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (1000 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1);
+        _ = (1000 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1);
+        _ = (1000 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1);
+        _ = (1000 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1);
+        _ = (1000 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1);
+        _ = (1000 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1 / 1);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }  
+
+    /////////////////////////////////////////////////
+    // MOD calibrating and tuning    
+
+    public entry calibrate_mod_many() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (5 % 2);
+        _ = (5 % 2);
+        _ = (5 % 2);
+        _ = (5 % 2);
+        _ = (5 % 2);
+        _ = (5 % 2);
+        _ = (5 % 2);
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }    
+
+
+    /////////////////////////////////////////////////
+    // Shr and Shl calibrating and tuning
+
+    public entry calibrate_shl() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (1u8 << 1u8);
+        _ = (7u64 << 1u8);
+        _ = (1000u128 << 1u8);
+        _ = (3u16 << 1u8);
+        _ = (7u32 << 1u8);
+        _ = (1000u256 << 1u8);
+
+        jump loop_start;
+    label loop_end:
+        return;           
+    }
+
+    public entry calibrate_shr() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (1u8 >> 1u8);
+        _ = (7u64 >> 1u8);
+        _ = (1000u128 >> 1u8);
+        _ = (3u16 >> 1u8);
+        _ = (7u32 >> 1u8);
+        _ = (1000u256 >> 1u8);
+
+        jump loop_start;
+    label loop_end:
+        return;           
+    } 
+
+    public entry calibrate_shr_and_shl() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = (1u8 >> 1u8);
+        _ = (7u64 >> 1u8);
+        _ = (1000u128 >> 1u8);
+        _ = (3u16 >> 1u8);
+        _ = (7u32 >> 1u8);
+        _ = (1000u256 >> 1u8);
+
+        _ = (123u256 << 1u8);
+        _ = (123453u256 << 13u8);
+        _ = (123453678909u256 << 76u8);
+        _ = (1234536789093546757803u256 << 168u8);
+        _ = (1234536789093546757803786604381691994985672142341299639418u256 << 202u8);
+
+        jump loop_start;
+    label loop_end:
+        return;           
+    }        
+}

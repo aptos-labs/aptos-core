@@ -75,7 +75,7 @@ pub fn convert_to_matrix_format(input: Vec<BTreeMap<String, u64>>) -> Vec<Vec<f6
     let ncols = total_num_of_cols(input.clone());
     let mut result: Vec<Vec<f64>> = Vec::new();
     let generic_maps = convert_to_generic_map(input);
-    println!("KEYS {:?}\n", generic_maps);
+    //println!("KEYS {:?}\n", generic_maps);
     for eq in generic_maps {
         let vec_format: Vec<f64> = eq.values().cloned().collect();
         assert_eq!(vec_format.len(), ncols);

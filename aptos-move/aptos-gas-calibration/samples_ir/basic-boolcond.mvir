@@ -1,0 +1,228 @@
+module 0xcafe.BoolCond {
+    /////////////////////////////////////////////////
+    // INSTRUCTIONS:
+    // * `AND`
+    // * `OR`
+    // * `NOT`
+    // * `XOR`
+    // * `BIT_AND`
+    // * `BIT_OR`
+    
+    public entry calibrate_and() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = true && false;
+        _ = true && false;
+        _ = true && false;               
+        _ = true && false;
+        _ = true && false;
+        _ = true && false;
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_and_many() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;               
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+
+        jump loop_start;
+    label loop_end:
+        return;
+    } 
+
+    public entry calibrate_or() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = true || false;
+        _ = true || false;
+        _ = true || false;               
+        _ = true || false;
+        _ = true || false;
+        _ = true || false;
+
+        jump loop_start;
+    label loop_end:
+        return;
+    } 
+
+    public entry calibrate_or_and() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = true || false;
+        _ = true || false;
+        _ = true || false;               
+        _ = true || false;
+        _ = true || false;
+        _ = true || false;
+        _ = true || false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;               
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true || false || true || false || true || false || true && false && true && false && true && false && true && false;
+        _ = true || false || true || false || true || false || true && false && true && false && true && false && true && false;               
+        _ = true || false || true || false || true || false || true && false && true && false && true && false && true && false;
+        _ = true || false || true || false || true || false || true && false && true && false && true && false && true && false;
+        _ = true || false || true || false || true || false || true && false && true && false && true && false && true && false;
+        _ = true || false || true || false || true || false || true && false && true && false && true && false && true && false;
+        _ = true || false || true || false || true || false || true && false && true && false && true && false && true && false;
+        _ = true || false || true || false || true || false || true && false && true && false && true && false && true && false;
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }      
+
+    public entry calibrate_not() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = !(true || false);
+        _ = !(true || false);
+        _ = !(true || false);               
+        _ = !(true || false);
+        _ = !(true || false);
+        _ = !(true || false);
+        _ = !(true || false);
+        _ = !(true || false);
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;               
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = true && false && true && false && true && false && true && false && true && false && true && false && true && false;
+        _ = !(true || false || true || false || true || false || true && false && true && false && true && false && true && false);
+        _ = !(true || false || true || false || true || false || true && false && true && false && true && false && true && false);               
+        _ = !(true || false || true || false || true || false || true && false && true && false && true && false && true && false);
+        _ = !(true || false || true || false || true || false || true && false && true && false && true && false && true && false);
+        _ = !(true || false || true || false || true || false || true && false && true && false && true && false && true && false);
+        _ = !(true || false || true || false || true || false || true && false && true && false && true && false && true && false);
+        _ = !(true || false || true || false || true || false || true && false && true && false && true && false && true && false);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    } 
+
+    public entry calibrate_xor() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = 1 ^ 3;
+        _ = 1 ^ 3;
+        _ = 1 ^ 3;               
+        _ = 1 ^ 3;
+        _ = 1 ^ 3;
+        _ = 1 ^ 3;
+        _ = 1 ^ 3;     
+
+        jump loop_start;
+    label loop_end:
+        return;
+    } 
+
+    public entry calibrate_binary_or() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = 1 | 3;
+        _ = 1 | 3;
+        _ = 1 | 3;               
+        _ = 1 | 3;
+        _ = 1 | 3;
+        _ = 1 | 3;    
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_binary_and() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = 1 & 3;
+        _ = 1 & 3;
+        _ = 1 & 3;               
+        _ = 1 & 3;
+        _ = 1 & 3;
+        _ = 1 & 3;
+        _ = 1 & 3;     
+
+        jump loop_start;
+    label loop_end:
+        return;
+    } 
+
+    public entry calibrate_binary_and_or_xor() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        _ = 1 & 3 ^ 2 | 1;
+        _ = 1 & 3 ^ 2 | 1;
+        _ = 1 & 3 ^ 2 | 1;               
+        _ = 1 & 3 ^ 2 | 1;
+        _ = 1 & 3 ^ 2 | 1;
+        _ = 1 & 3 ^ 2 | 1;
+        _ = 1 & 3 ^ 2 | 1;     
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }                          
+}

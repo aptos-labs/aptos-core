@@ -92,17 +92,17 @@ pub fn compute_least_square_solutions(
     let A_T = A.transpose();
     let A_TA = A_T.clone().mul(A.clone());
 
-    println!("A_TA {}\n", A_TA);
+    //println!("A_TA {}\n", A_TA);
 
     let A_Tb = A_T.clone().mul(b.clone());
-    println!("A_Tb {}\n", A_Tb);
+    //println!("A_Tb {}\n", A_Tb);
 
     if !A_TA.is_invertible() {
         return Err("cannot invert A_TA matrix".to_string());
     }
 
     let inverse = A_TA.try_inverse().expect("inverse should work");
-    println!("INVERSE MATRIX {}\n", inverse);
+    //println!("INVERSE MATRIX {}\n", inverse);
     let x_hat = inverse.mul(&A_Tb);
     Ok(x_hat)
 }

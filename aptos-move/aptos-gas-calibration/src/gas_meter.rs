@@ -121,7 +121,7 @@ pub fn compile_and_run_samples_ir() -> GasMeters {
                     .serialize(&mut module_blob)
                     .expect("Failed to serialize module");
 
-                println!("BLOB {:#?}\n", module);
+                //println!("BLOB {:#?}\n", module);
 
                 // publish module
                 executor.add_module(&module_id, module_blob);

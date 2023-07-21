@@ -1,0 +1,192 @@
+module 0xcafe.BasicCast {
+    /////////////////////////////////////////////////
+    // INSTRUCTIONS:
+    // * `CastU8`
+    // * `CastU16`
+    // * `CastU32`
+    // * `CastU64`    
+    // * `CastU128`
+    // * `CastU256`
+
+    public entry calibrate_castu8() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (to_u8(1u8), to_u8(2u8), to_u8(3u8), to_u8(4u8), to_u8(5u8), to_u8(6u8), to_u8(7u8), to_u8(9u8), to_u8(10u8));
+        (to_u8(1u8), to_u8(2u8), to_u8(3u8), to_u8(4u8), to_u8(5u8), to_u8(6u8), to_u8(7u8), to_u8(9u8), to_u8(10u8));
+        (to_u8(1u8), to_u8(2u8), to_u8(3u8), to_u8(4u8), to_u8(5u8), to_u8(6u8), to_u8(7u8), to_u8(9u8), to_u8(10u8));
+        (to_u8(1u8), to_u8(2u8), to_u8(3u8), to_u8(4u8), to_u8(5u8), to_u8(6u8), to_u8(7u8), to_u8(9u8), to_u8(10u8));
+        (to_u8(1u8), to_u8(2u8), to_u8(3u8), to_u8(4u8), to_u8(5u8), to_u8(6u8), to_u8(7u8), to_u8(9u8), to_u8(10u8));
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();               
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    public entry calibrate_castu16() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (to_u16(1u16), to_u16(2u16), to_u16(3u16), to_u16(4u16), to_u16(5u16), to_u16(6u16), to_u16(7u16), to_u16(9u16), to_u16(10u16));
+        (to_u16(1u16), to_u16(2u16), to_u16(3u16), to_u16(4u16), to_u16(5u16), to_u16(6u16), to_u16(7u16), to_u16(9u16), to_u16(10u16));
+        (to_u16(1u16), to_u16(2u16), to_u16(3u16), to_u16(4u16), to_u16(5u16), to_u16(6u16), to_u16(7u16), to_u16(9u16), to_u16(10u16));
+        (to_u16(1u16), to_u16(2u16), to_u16(3u16), to_u16(4u16), to_u16(5u16), to_u16(6u16), to_u16(7u16), to_u16(9u16), to_u16(10u16));
+        (to_u16(1u16), to_u16(2u16), to_u16(3u16), to_u16(4u16), to_u16(5u16), to_u16(6u16), to_u16(7u16), to_u16(9u16), to_u16(10u16));
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();               
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    public entry calibrate_castu32() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (to_u32(1u8), to_u32(2u16), to_u32(3u32), to_u32(4u64), to_u32(5u128), to_u32(6u256), to_u32(7u32), to_u32(9u32), to_u32(10u32));
+        (to_u32(1u8), to_u32(2u16), to_u32(3u32), to_u32(4u64), to_u32(5u128), to_u32(6u256), to_u32(7u32), to_u32(9u32), to_u32(10u32));
+        (to_u32(1u8), to_u32(2u16), to_u32(3u32), to_u32(4u64), to_u32(5u128), to_u32(6u256), to_u32(7u32), to_u32(9u32), to_u32(10u32));
+        (to_u32(1u8), to_u32(2u16), to_u32(3u32), to_u32(4u64), to_u32(5u128), to_u32(6u256), to_u32(7u32), to_u32(9u32), to_u32(10u32));
+        (to_u32(1u8), to_u32(2u16), to_u32(3u32), to_u32(4u64), to_u32(5u128), to_u32(6u256), to_u32(7u32), to_u32(9u32), to_u32(10u32));
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();             
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    } 
+
+    public entry calibrate_castu64() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (to_u64(1u64), to_u64(2u64), to_u64(3u64), to_u64(4u64), to_u64(5u64), to_u64(6u64), to_u64(7u64), to_u64(9u64), to_u64(10u64));
+        (to_u64(1u64), to_u64(2u64), to_u64(3u64), to_u64(4u64), to_u64(5u64), to_u64(6u64), to_u64(7u64), to_u64(9u64), to_u64(10u64));
+        (to_u64(1u64), to_u64(2u64), to_u64(3u64), to_u64(4u64), to_u64(5u64), to_u64(6u64), to_u64(7u64), to_u64(9u64), to_u64(10u64));
+        (to_u64(1u64), to_u64(2u64), to_u64(3u64), to_u64(4u64), to_u64(5u64), to_u64(6u64), to_u64(7u64), to_u64(9u64), to_u64(10u64));
+        (to_u64(1u64), to_u64(2u64), to_u64(3u64), to_u64(4u64), to_u64(5u64), to_u64(6u64), to_u64(7u64), to_u64(9u64), to_u64(10u64));
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();              
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    } 
+
+    public entry calibrate_castu128() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (to_u128(1u128), to_u128(2u128), to_u128(3u128), to_u128(4u128), to_u128(5u128), to_u128(6u128), to_u128(7u128), to_u128(9u128), to_u128(10u128));
+        (to_u128(1u128), to_u128(2u128), to_u128(3u128), to_u128(4u128), to_u128(5u128), to_u128(6u128), to_u128(7u128), to_u128(9u128), to_u128(10u128));
+        (to_u128(1u128), to_u128(2u128), to_u128(3u128), to_u128(4u128), to_u128(5u128), to_u128(6u128), to_u128(7u128), to_u128(9u128), to_u128(10u128));
+        (to_u128(1u128), to_u128(2u128), to_u128(3u128), to_u128(4u128), to_u128(5u128), to_u128(6u128), to_u128(7u128), to_u128(9u128), to_u128(10u128));
+        (to_u128(1u128), to_u128(2u128), to_u128(3u128), to_u128(4u128), to_u128(5u128), to_u128(6u128), to_u128(7u128), to_u128(9u128), to_u128(10u128));
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();             
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    } 
+
+    public entry calibrate_castu256() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (to_u256(1u256), to_u256(2u256), to_u256(3u256), to_u256(4u256), to_u256(5u256), to_u256(6u256), to_u256(7u256), to_u256(9u256), to_u256(10u256));
+        (to_u256(1u256), to_u256(2u256), to_u256(3u256), to_u256(4u256), to_u256(5u256), to_u256(6u256), to_u256(7u256), to_u256(9u256), to_u256(10u256));
+        (to_u256(1u256), to_u256(2u256), to_u256(3u256), to_u256(4u256), to_u256(5u256), to_u256(6u256), to_u256(7u256), to_u256(9u256), to_u256(10u256));
+        (to_u256(1u256), to_u256(2u256), to_u256(3u256), to_u256(4u256), to_u256(5u256), to_u256(6u256), to_u256(7u256), to_u256(9u256), to_u256(10u256));
+        (to_u256(1u256), to_u256(2u256), to_u256(3u256), to_u256(4u256), to_u256(5u256), to_u256(6u256), to_u256(7u256), to_u256(9u256), to_u256(10u256));
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();               
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }
+
+    public entry calibrate_cast_mix() {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < 1000) loop_end;
+        i = move(i) + 1;
+
+        (to_u8(1u8), to_u8(2u8), to_u8(3u8), to_u8(4u8), to_u8(5u8), to_u8(6u8), to_u8(7u8), to_u8(9u8), to_u8(10u8));
+        (to_u8(1u8), to_u8(2u8), to_u8(3u8), to_u8(4u8), to_u8(5u8), to_u8(6u8), to_u8(7u8), to_u8(9u8), to_u8(10u8));
+        (to_u16(1u16), to_u16(2u16), to_u16(3u16), to_u16(4u16), to_u16(5u16), to_u16(6u16), to_u16(7u16), to_u16(9u16), to_u16(10u16));
+        (to_u16(1u16), to_u16(2u16), to_u16(3u16), to_u16(4u16), to_u16(5u16), to_u16(6u16), to_u16(7u16), to_u16(9u16), to_u16(10u16));
+        (to_u32(1u32), to_u32(2u32), to_u32(3u32), to_u32(4u32), to_u32(5u32), to_u32(6u32), to_u32(7u32), to_u32(9u32), to_u32(10u32));
+        (to_u32(1u32), to_u32(2u32), to_u32(3u32), to_u32(4u32), to_u32(5u32), to_u32(6u32), to_u32(7u32), to_u32(9u32), to_u32(10u32));
+        (to_u64(1u64), to_u64(2u64), to_u64(3u64), to_u64(4u64), to_u64(5u64), to_u64(6u64), to_u64(7u64), to_u64(9u64), to_u64(10u64));
+        (to_u64(1u64), to_u64(2u64), to_u64(3u64), to_u64(4u64), to_u64(5u64), to_u64(6u64), to_u64(7u64), to_u64(9u64), to_u64(10u64));
+        (to_u128(1u128), to_u128(2u128), to_u128(3u128), to_u128(4u128), to_u128(5u128), to_u128(6u128), to_u128(7u128), to_u128(9u128), to_u128(10u128));
+        (to_u128(1u128), to_u128(2u128), to_u128(3u128), to_u128(4u128), to_u128(5u128), to_u128(6u128), to_u128(7u128), to_u128(9u128), to_u128(10u128));
+        (to_u256(1u256), to_u256(2u256), to_u256(3u256), to_u256(4u256), to_u256(5u256), to_u256(6u256), to_u256(7u256), to_u256(9u256), to_u256(10u256));
+        (to_u256(1u256), to_u256(2u256), to_u256(3u256), to_u256(4u256), to_u256(5u256), to_u256(6u256), to_u256(7u256), to_u256(9u256), to_u256(10u256));
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();
+        _,_,_,_,_,_,_,_,_ = ();               
+
+        jump loop_start;
+    label loop_end:
+        return;          
+    }                           
+}

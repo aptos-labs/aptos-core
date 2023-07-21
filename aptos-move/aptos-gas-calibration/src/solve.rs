@@ -21,7 +21,7 @@ pub fn build_coefficient_matrix(input: Vec<Vec<f64>>, nrows: usize, ncols: usize
     for (idx, eq) in input.iter().enumerate() {
         add_gas_formula_to_coefficient_matrix(idx, ncols, eq, &mut coeff_matrix);
     }
-    println!("coeff: {}\n", coeff_matrix);
+    // println!("coeff: {}\n", coeff_matrix);
     coeff_matrix
 }
 
@@ -37,7 +37,7 @@ pub fn build_constant_matrix(input: Vec<u128>, nrows: usize, ncols: usize) -> DM
     for (idx, run_time) in input.iter().enumerate() {
         add_running_time_to_constant_matrix(idx, *run_time as f64, &mut const_matrix);
     }
-    println!("const: {}\n", const_matrix);
+    // println!("const: {}\n", const_matrix);
     const_matrix
 }
 
@@ -59,7 +59,7 @@ pub fn solve(
 
         let map = generic_map(input);
         let keys: Vec<String> = map.keys().map(|key| key.to_string()).collect();
-        println!("gas params: {:?}\n", keys);
+        //println!("gas params: {:?}\n", keys);
 
         let nrows = x_hat.nrows();
         let ncols = x_hat.ncols();
@@ -127,7 +127,7 @@ fn report_undetermined_gas_params(
 
     let map = generic_map(input);
     let keys: Vec<String> = map.keys().map(|key| key.to_string()).collect();
-    println!("gas params: {:?}\n", keys);
+    //println!("gas params: {:?}\n", keys);
 
     println!("free variables are:\n");
     for col in free_variables {
