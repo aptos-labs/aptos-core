@@ -26,6 +26,7 @@ AptosCoin
 AptosLabs
 AptosNet
 AptosRelease
+AptosToken
 AptosWalletAdapterProvider
 BCS
 BFT
@@ -72,6 +73,7 @@ DoS
 DocGen
 delegator
 delegators
+deletable
 dropdown
 EACCOUNT
 EALREADY
@@ -112,8 +114,11 @@ EpochChangeProof
 Ethereum
 ExternalMarkdown
 ExtendRef
+FACoin
 FAQ
 FLAC
+FA
+FAs
 FT
 FTs
 Failover
@@ -245,6 +250,8 @@ TokenClient
 TokenData
 TokenStore
 TokenTransfers
+TokenV
+Tokenization
 TransactionBuilder
 TransactionBuilderABI
 TransactionFee
@@ -325,6 +332,7 @@ config
 configs
 const
 copyable
+cryptocurrency
 cryptographic
 cryptographically
 customizable
@@ -336,6 +344,8 @@ data's
 deallocate
 debuggability
 deduping
+defi
+deletable
 deployer
 deprioritize
 dereference
@@ -359,10 +369,12 @@ faq
 fetchList
 filesystem
 findable
+flexibilities
 fn
 fullnode
 fullnode's
 fullnodes
+fungibility
 gcloud
 gcp
 gcs
@@ -378,6 +390,7 @@ href
 http
 ide
 ie
+illiquid
 img
 incrementing
 init
@@ -433,7 +446,6 @@ npmjs
 octa
 octas
 offchain
-on-chain
 onboarding
 onchain
 onwards
@@ -502,6 +514,7 @@ subcommands
 subdirectory
 subtype
 subtyping
+superset
 svg
 synchronizer
 terraform
@@ -510,6 +523,8 @@ th
 tl
 todo
 todolist
+tokenization
+tokenized
 toml
 toolchain
 topologies
@@ -519,6 +534,7 @@ txns
 txt
 typesafe
 uint
+undeletable
 unexportable
 ungated
 unixtime
@@ -568,3 +584,4 @@ ANSClient
 FaucetClient
 CoinClient
 RESTful
+FungibleAssetsClient

@@ -23,7 +23,7 @@ pub fn generate_execution_config_upgrade_proposal(
         &writer,
         is_testnet,
         next_execution_hash.clone(),
-        "aptos_framework::execution_config",
+        &["aptos_framework::execution_config"],
         |writer| {
             let execution_config_blob = bcs::to_bytes(execution_config).unwrap();
             assert!(execution_config_blob.len() < 65536);

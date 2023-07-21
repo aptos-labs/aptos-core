@@ -9,7 +9,7 @@ use crate::{
     epoch_by_version::EpochByVersionSchema,
     ledger_db::LedgerDb,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
-    schema::state_value::StateValueSchema,
+    schema::{state_value::StateValueSchema, state_value_index::StateValueIndexSchema},
     stale_state_value_index::StaleStateValueIndexSchema,
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
@@ -61,8 +61,6 @@ use claims::{assert_ge, assert_le};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
-#[cfg(test)]
-use std::collections::HashMap;
 use std::{collections::HashSet, ops::Deref, sync::Arc};
 
 pub(crate) mod buffered_state;
@@ -96,6 +94,7 @@ pub(crate) struct StateDb {
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
     pub state_kv_pruner: StateKvPrunerManager,
+    pub skip_usage: bool,
 }
 
 pub(crate) struct StateStore {
@@ -196,6 +195,9 @@ impl DbReader for StateDb {
     }
 
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+        if self.skip_usage {
+            return Ok(StateStorageUsage::new_untracked());
+        }
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
             Ok(self
                 .ledger_db
@@ -308,6 +310,7 @@ impl StateStore {
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
+        skip_usage: bool,
     ) -> Self {
         Self::sync_commit_progress(
             Arc::clone(&ledger_db),
@@ -321,6 +324,7 @@ impl StateStore {
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
+            skip_usage,
         });
         if empty_buffered_state_for_restore {
             let buffered_state = Mutex::new(BufferedState::new(
@@ -450,6 +454,7 @@ impl StateStore {
             state_merkle_pruner,
             epoch_snapshot_pruner,
             state_kv_pruner,
+            skip_usage: false,
         });
         let buffered_state = Self::create_buffered_state_from_latest_snapshot(
             &state_db, 0, /*hack_for_tests=*/ false,
@@ -465,16 +470,18 @@ impl StateStore {
         check_max_versions_after_snapshot: bool,
     ) -> Result<BufferedState> {
         let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
-        let num_transactions = ledger_store
-            .get_latest_transaction_info_option()?
-            .map(|(version, _)| version + 1)
-            .unwrap_or(0);
+        let num_transactions = ledger_store.get_latest_version().map_or(0, |v| v + 1);
 
-        // The latest snapshot can be at exactly num_transactions or before it.
         let latest_snapshot_version = state_db
             .state_merkle_db
-            .get_state_snapshot_version_before(num_transactions + 1)
+            .get_state_snapshot_version_before(num_transactions)
             .expect("Failed to query latest node on initialization.");
+
+        info!(
+            num_transactions = num_transactions,
+            latest_snapshot_version = latest_snapshot_version,
+            "Initializing BufferedState."
+        );
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             state_db
                 .state_merkle_db
@@ -590,12 +597,12 @@ impl StateStore {
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
     ) -> Result<PrefixedStateValueIterator> {
-        // TODO(grao): Support sharding here.
         PrefixedStateValueIterator::new(
-            self.state_kv_db.metadata_db(),
+            &self.state_kv_db,
             key_prefix.clone(),
             first_key_opt.cloned(),
             desired_version,
+            self.state_kv_db.enabled_sharding(),
         )
     }
 
@@ -615,6 +622,8 @@ impl StateStore {
         first_version: Version,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        state_kv_metadata_batch: &SchemaBatch,
+        put_state_value_indices: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_writesets"])
@@ -642,12 +651,15 @@ impl StateStore {
             None,
             batch,
             sharded_state_kv_batches,
+            /*skip_usage=*/ false,
         )?;
 
         self.put_state_values(
             value_state_sets.to_vec(),
             first_version,
             sharded_state_kv_batches,
+            state_kv_metadata_batch,
+            put_state_value_indices,
         )?;
 
         Ok(())
@@ -662,6 +674,9 @@ impl StateStore {
         sharded_state_cache: Option<&ShardedStateCache>,
         ledger_batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        state_kv_metadata_batch: &SchemaBatch,
+        put_state_value_indices: bool,
+        skip_usage: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
@@ -674,13 +689,20 @@ impl StateStore {
             sharded_state_cache,
             ledger_batch,
             sharded_state_kv_batches,
+            skip_usage,
         )?;
 
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["add_state_kv_batch"])
             .start_timer();
 
-        self.put_state_values(value_state_sets, first_version, sharded_state_kv_batches)
+        self.put_state_values(
+            value_state_sets,
+            first_version,
+            sharded_state_kv_batches,
+            state_kv_metadata_batch,
+            put_state_value_indices,
+        )
     }
 
     pub fn put_state_values(
@@ -688,6 +710,8 @@ impl StateStore {
         value_state_sets: Vec<&ShardedStateUpdates>,
         first_version: Version,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        state_kv_metadata_batch: &SchemaBatch,
+        put_state_value_indices: bool,
     ) -> Result<()> {
         sharded_state_kv_batches
             .par_iter()
@@ -705,6 +729,22 @@ impl StateStore {
                     })
                     .collect::<Result<_>>()
             })?;
+
+        // Eventually this index will move to indexer side. For now we temporarily write this into
+        // metadata db to unblock the sharded DB migration.
+        // TODO(grao): Remove when we are ready.
+        if put_state_value_indices {
+            value_state_sets
+                .par_iter()
+                .enumerate()
+                .try_for_each(|(i, updates)| {
+                    let version = first_version + i as Version;
+                    updates.iter().flatten().try_for_each(|(k, _)| {
+                        state_kv_metadata_batch
+                            .put::<StateValueIndexSchema>(&(k.clone(), version), &())
+                    })
+                })?;
+        }
 
         Ok(())
     }
@@ -735,6 +775,7 @@ impl StateStore {
         sharded_state_cache: Option<&ShardedStateCache>,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        skip_usage: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -856,25 +897,26 @@ impl StateStore {
             })
             .collect();
 
-        for i in 0..num_versions {
-            let mut items_delta = 0;
-            let mut bytes_delta = 0;
-            for usage_delta in usage_deltas.iter() {
-                items_delta += usage_delta[i].0;
-                bytes_delta += usage_delta[i].1;
+        if !skip_usage {
+            for i in 0..num_versions {
+                let mut items_delta = 0;
+                let mut bytes_delta = 0;
+                for usage_delta in usage_deltas.iter() {
+                    items_delta += usage_delta[i].0;
+                    bytes_delta += usage_delta[i].1;
+                }
+                usage = StateStorageUsage::new(
+                    (usage.items() as i64 + items_delta) as usize,
+                    (usage.bytes() as i64 + bytes_delta) as usize,
+                );
+                let version = first_version + i as u64;
+                batch
+                    .put::<VersionDataSchema>(&version, &usage.into())
+                    .unwrap();
             }
-            usage = StateStorageUsage::new(
-                (usage.items() as i64 + items_delta) as usize,
-                (usage.bytes() as i64 + bytes_delta) as usize,
-            );
-            let version = first_version + i as u64;
-            batch
-                .put::<VersionDataSchema>(&version, &usage.into())
-                .unwrap();
-        }
 
-        if !expected_usage.is_untracked() {
-            ensure!(
+            if !expected_usage.is_untracked() {
+                ensure!(
                 expected_usage == usage,
                 "Calculated state db usage at version {} not expected. expected: {:?}, calculated: {:?}, base version: {:?}, base version usage: {:?}",
                 first_version + value_state_sets.len() as u64 - 1,
@@ -883,10 +925,11 @@ impl StateStore {
                 base_version,
                 base_version_usage,
             );
-        }
+            }
 
-        STATE_ITEMS.set(usage.items() as i64);
-        TOTAL_STATE_BYTES.set(usage.bytes() as i64);
+            STATE_ITEMS.set(usage.items() as i64);
+            TOTAL_STATE_BYTES.set(usage.bytes() as i64);
+        }
 
         Ok(())
     }
@@ -897,20 +940,19 @@ impl StateStore {
     pub fn merklize_value_set(
         &self,
         value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
-        node_hashes: Option<&HashMap<aptos_types::nibble::nibble_path::NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
-        let (top_levels_batch, sharded_batch, hash) = self.state_merkle_db.merklize_value_set(
-            value_set,
-            node_hashes,
-            version,
-            base_version,
-            None, // previous epoch ending version
-        )?;
+        let (top_levels_batch, sharded_batch, root_hash) =
+            self.state_merkle_db.merklize_value_set(
+                value_set,
+                version,
+                base_version,
+                /*previous_epoch_ending_version=*/ None,
+            )?;
         self.state_merkle_db
             .commit(version, top_levels_batch, sharded_batch)?;
-        Ok(hash)
+        Ok(root_hash)
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {

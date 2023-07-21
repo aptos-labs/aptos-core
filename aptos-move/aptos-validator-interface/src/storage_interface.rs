@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::AptosValidatorInterface;
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{bail, ensure, Result};
 use aptos_config::config::{
     RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
@@ -80,11 +80,7 @@ impl AptosValidatorInterface for DBDebuggerInterface {
     }
 
     async fn get_latest_version(&self) -> Result<Version> {
-        let (version, _) = self
-            .0
-            .get_latest_transaction_info_option()?
-            .ok_or_else(|| anyhow!("DB doesn't have any transaction."))?;
-        Ok(version)
+        self.0.get_latest_version()
     }
 
     async fn get_version_by_account_sequence(

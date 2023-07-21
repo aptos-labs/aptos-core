@@ -116,13 +116,12 @@ impl IncrementalProofState {
         }
         self.completed = true;
 
-        let proof = match validator_verifier
+        match validator_verifier
             .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature.clone()))
         {
             Ok(sig) => ProofOfStore::new(self.info.clone(), sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
-        };
-        proof
+        }
     }
 }
 

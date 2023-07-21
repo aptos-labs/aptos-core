@@ -16,8 +16,8 @@ numFullnodeGroups: 1
 
 # -- Options for multicluster mode. This is *experimental only*.
 multicluster:
-  enabled: false 
-  targetClusters: ["cluster1", "cluster2", "cluster3"]
+  enabled: false
+  targetClusters: ["forge-multiregion-1", "forge-multiregion-2", "forge-multiregion-3"]
 
 # -- Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart.
 overrideNodeConfig: false
@@ -151,7 +151,7 @@ service:
     # -- Enable the REST API on the validator
     enableRestApi: true
     # -- Enable the metrics port on the validator
-    enableMetricsPort: true
+    enableMetricsPort: false
   fullnode:
     external:
       # -- The Kubernetes ServiceType to use for fullnodes' HAProxy
@@ -167,7 +167,7 @@ service:
     # -- Enable the REST API on fullnodes
     enableRestApi: true
     # -- Enable the metrics port on fullnodes
-    enableMetricsPort: true
+    enableMetricsPort: false
 
 serviceAccount:
   # -- Specifies whether a service account should be created

@@ -13,7 +13,7 @@ Also see the [System Integrators Guide](../guides/system-integrators-guide.md) f
 
 ## Understanding rate limits
 
-As with the [Aptos Indexer](./indexing.md#rate-limits), the Aptos REST API has a rate limit of 1000 requests per five minutes by IP address, whether submitting transactions or querying the API on Aptos-provided nodes. (As a node operator, you may raise those limits on your own node.) Note that this limit can change with or without prior notice.
+As with the [Aptos Indexer](./indexing.md#rate-limits), the Aptos REST API has a rate limit of 5000 requests per five minutes by IP address, whether submitting transactions or querying the API on Aptos-provided nodes. (As a node operator, you may raise those limits on your own node.) Note that this limit can change with or without prior notice.
 
 ## Viewing current and historical state
 
@@ -27,12 +27,12 @@ Most integrations into the Aptos blockchain benefit from a holistic and comprehe
 Ensure the [fullnode](../nodes/deployments.md) you're communicating with is up to date. The fullnode must reach the version containing your transaction to retrieve relevant data from it. There can be latency from the fullnodes retrieving state from [validator fullnodes](../concepts/fullnodes.md), which in turn rely upon [validator nodes](../concepts/validator-nodes.md) as the source of truth.
 :::
 
-The storage service on a node employs two forms of pruning that erase data from nodes: 
+The storage service on a node employs two forms of pruning that erase data from nodes:
 
 * state
 * events, transactions, and everything else
 
-While either of these may be disabled, storing the state versions is not particularly sustainable. 
+While either of these may be disabled, storing the state versions is not particularly sustainable.
 
 Events and transactions pruning can be disabled via setting the [`enable_ledger_pruner`](https://github.com/aptos-labs/aptos-core/blob/cf0bc2e4031a843cdc0c04e70b3f7cd92666afcf/config/src/config/storage_config.rs#L141) to `false` in `storage_config.rs`. This is default behavior in Mainnet. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node.
 
@@ -44,17 +44,28 @@ The REST API offers querying transactions and events in these ways:
 
 ## Reading state with the View function
 
-View functions do not modify blockchain state. A [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) can be used to read potentially complex on-chain state using Move. For example, you can evaluate who has the highest bid in an auction contract. Here are related files:
+View functions do not modify blockchain state when called from the API. A [View](https://github.com/aptos-labs/aptos-core/blob/main/api/src/view_function.rs) function and its [input](https://github.com/aptos-labs/aptos-core/blob/main/api/types/src/view.rs) can be used to read potentially complex on-chain state using Move. For example, you can evaluate who has the highest bid in an auction contract. Here are related files:
 
 * [`view_function.rs`](https://github.com/aptos-labs/aptos-core/blob/main/api/src/tests/view_function.rs) for an example
 * related [Move](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/aptos-move/framework/aptos-framework/sources/coin.move#L226) code
 * [specification](https://github.com/aptos-labs/aptos-core/blob/90c33dc7a18662839cd50f3b70baece0e2dbfc71/api/doc/spec.yaml#L8513).
 
-The View function operates like the [Aptos Simulation API](../guides/system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. The function is immutable if tagged as `#[view]`, the compiler will confirm it so and if fail otherwise. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
+The view function operates like the [Aptos Simulation API](../guides/system-integrators-guide.md#testing-transactions-or-transaction-pre-execution), though with no side effects and a accessible output path. View functions can be called via the `/view` endpoint. Calls to view functions require the module and function names along with input type parameters and values.
 
-In order to use the View functions, you need to pass `--bytecode-version 6` to the [Aptos CLI](../tools/install-cli/index.md) when publishing the module.
+A function does not have to be immutable to be tagged as `#[view]`, but if the function is mutable it will not result in state mutation when called from the API.
+If you want to tag a mutable function as `#[view]`, consider making it private so that it cannot be maliciously called during runtime.
 
-> Note: Calling View functions is not yet supported by the Aptos CLI.
+In order to use the View functions, you need to [publish the module](../move/move-on-aptos/cli.md#publishing-a-move-package-with-a-named-address) through the [Aptos CLI](../tools/install-cli/index.md).
+
+In the Aptos CLI, a view function request would look like this:
+```
+aptos move view --function-id devnet::message::get_message --profile devnet --args address:devnet                   
+{
+  "Result": [
+    "View functions rock!"
+  ]
+}
+```
 
 In the TypeScript SDK, a view function request would look like this:
 ```
@@ -73,13 +84,13 @@ The view function returns a list of values as a vector. By default, the results 
 
 ## Exchanging and tracking coins
 
-Aptos has a standard *Coin type* define in [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that symbolize the type parameter or use generic for `Coin<T>`. 
+Aptos has a standard *Coin type* define in [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that symbolize the type parameter or use generic for `Coin<T>`.
 
 Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
 
 ### Transferring coins between users
 
-Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. 
+Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist.
 
 :::caution
 It is important to note that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.

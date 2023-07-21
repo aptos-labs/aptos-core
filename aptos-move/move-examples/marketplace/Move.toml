@@ -1,11 +1,11 @@
 [package]
-name = "MarketPlace"
-version = "0.0.1"
+name = "Marketplace"
+version = "0.0.0"
+
+[addresses]
+marketplace = "_"
 
 [dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }
 AptosToken = { local = "../../framework/aptos-token" }
-
-[addresses]
-std = "0x1"
-marketplace = "_"
+AptosTokenObjects = { local = "../../framework/aptos-token-objects" }

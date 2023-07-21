@@ -1,0 +1,8 @@
+apiVersion: v2
+name: aptos-kube-state-metrics
+version: 5.7.0
+
+dependencies:
+  - name: kube-state-metrics
+    version: 5.7.0
+    repository: "https://prometheus-community.github.io/helm-charts"

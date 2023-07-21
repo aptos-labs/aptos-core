@@ -7,7 +7,7 @@
 use crate::{
     core_mempool::{
         index::TxnPointer,
-        transaction::{MempoolTransaction, TimelineState},
+        transaction::{InsertionInfo, MempoolTransaction, TimelineState},
         transaction_store::TransactionStore,
     },
     counters,
@@ -48,11 +48,21 @@ impl Mempool {
 
     /// This function will be called once the transaction has been stored.
     pub(crate) fn commit_transaction(&mut self, sender: &AccountAddress, sequence_number: u64) {
+        self.transactions
+            .commit_transaction(sender, sequence_number);
+    }
+
+    pub(crate) fn log_commit_transaction(
+        &self,
+        sender: &AccountAddress,
+        sequence_number: u64,
+        block_timestamp: Duration,
+    ) {
         trace!(
             LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
             is_rejected = false
         );
-        self.log_latency(*sender, sequence_number, counters::COMMIT_ACCEPTED_LABEL);
+        self.log_commit_latency(*sender, sequence_number, block_timestamp);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
@@ -61,9 +71,6 @@ impl Mempool {
                 ranking_score,
             );
         }
-
-        self.transactions
-            .commit_transaction(sender, sequence_number);
     }
 
     fn log_reject_transaction(
@@ -111,19 +118,50 @@ impl Mempool {
             .reject_transaction(sender, sequence_number, hash);
     }
 
+    pub(crate) fn log_txn_latency(
+        insertion_info: InsertionInfo,
+        bucket: &str,
+        stage: &'static str,
+    ) {
+        if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
+            counters::core_mempool_txn_commit_latency(
+                stage,
+                insertion_info.submitted_by_label(),
+                bucket,
+                time_delta,
+            );
+        }
+    }
+
     fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
-        if let Some((&insertion_time, is_end_to_end, bucket)) = self
+        if let Some((&insertion_info, bucket)) = self
             .transactions
-            .get_insertion_time_and_bucket(&account, sequence_number)
+            .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
-                let scope = if is_end_to_end {
-                    counters::E2E_LABEL
-                } else {
-                    counters::LOCAL_LABEL
-                };
-                counters::core_mempool_txn_commit_latency(stage, scope, bucket, time_delta);
-            }
+            Self::log_txn_latency(insertion_info, bucket, stage);
+        }
+    }
+
+    fn log_commit_latency(
+        &self,
+        account: AccountAddress,
+        sequence_number: u64,
+        block_timestamp: Duration,
+    ) {
+        if let Some((&insertion_info, bucket)) = self
+            .transactions
+            .get_insertion_info_and_bucket(&account, sequence_number)
+        {
+            Self::log_txn_latency(insertion_info, bucket, counters::COMMIT_ACCEPTED_LABEL);
+
+            let insertion_timestamp =
+                aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
+            counters::core_mempool_txn_commit_latency(
+                counters::COMMIT_ACCEPTED_BLOCK_LABEL,
+                insertion_info.submitted_by_label(),
+                bucket,
+                block_timestamp.saturating_sub(insertion_timestamp),
+            );
         }
     }
 
@@ -139,6 +177,7 @@ impl Mempool {
         ranking_score: u64,
         db_sequence_number: u64,
         timeline_state: TimelineState,
+        client_submitted: bool,
     ) -> MempoolStatus {
         trace!(
             LogSchema::new(LogEntry::AddTxn)
@@ -166,6 +205,7 @@ impl Mempool {
             timeline_state,
             db_sequence_number,
             now,
+            client_submitted,
         );
 
         let status = self.transactions.insert(txn_info);

@@ -97,7 +97,7 @@ impl<'env> Context<'env> {
     // Returns the blocks inserted in insertion ordering
     pub fn finish_blocks(&mut self) -> (Label, BasicBlocks, Vec<(Label, BlockInfo)>) {
         self.next_label = None;
-        let start = mem::replace(&mut self.start, None);
+        let start = self.start.take();
         let blocks = mem::take(&mut self.blocks);
         let block_ordering = mem::take(&mut self.block_ordering);
         let block_info = mem::take(&mut self.block_info);

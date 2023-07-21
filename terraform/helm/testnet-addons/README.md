@@ -14,6 +14,7 @@ Additional components for aptos-nodes testnet
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| cloud | string | `"EKS"` |  |
 | genesis.chain_id | string | `nil` | Aptos Chain ID |
 | genesis.numValidators | string | `nil` | Number of validators deployed in this testnet |
 | genesis.username_prefix | string | `"aptos-node"` | Validator username prefix, used to get genesis secrets. This should be the fullname for the aptos-node helm release |
@@ -21,6 +22,8 @@ Additional components for aptos-nodes testnet
 | ingress.acm_certificate | string | `nil` | The ACM certificate to install on the ingress |
 | ingress.cookieDurationSeconds | int | `86400` | If stickiness is enabled, how long the session cookie should last |
 | ingress.enableStickyness | bool | `true` | Whether to enable session stickiness on the underlying load balancer |
+| ingress.gce_managed_certificate | string | `nil` | The GCE certificate to install on the ingress |
+| ingress.gce_static_ip | string | `nil` | The GCE static IP to install on the ingress |
 | ingress.loadBalancerSourceRanges | string | `nil` | List of CIDRs to accept traffic from |
 | ingress.wafAclArn | string | `nil` | The ARN of the WAF ACL to install on the ingress |
 | load_test.affinity | object | `{}` |  |

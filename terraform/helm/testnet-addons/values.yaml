@@ -1,3 +1,6 @@
+# Cloud provider
+cloud: EKS
+
 # -- Default image tag to use for all aptos images
 imageTag: devnet
 
@@ -50,7 +53,7 @@ load_test:
   # -- The fullnode groups to target
   fullnode:
     groups:
-    - name: fullnode
+      - name: fullnode
   config:
     # -- The number of fullnode groups to run traffic against
     numFullnodeGroups:
@@ -66,6 +69,12 @@ load_test:
     txn_expiration_time_secs: 30
     # -- Whether to submit transactions through validator REST API
     use_validators: false
+    # -- If true, run $numFullnodeGroups parallel load tests
+    use_pfns: true
+    # -- Default 20k * $duration
+    expected_max_txns: 6000000
+    max_transactions_per_account: 5
+    transaction_type: coin-transfer
 
 serviceAccount:
   # -- Specifies whether a service account should be created
@@ -80,6 +89,10 @@ service:
 ingress:
   # -- The ACM certificate to install on the ingress
   acm_certificate:
+  # -- The GCE static IP to install on the ingress
+  gce_static_ip:
+  # -- The GCE certificate to install on the ingress
+  gce_managed_certificate:
   # -- The ARN of the WAF ACL to install on the ingress
   wafAclArn:
   # -- List of CIDRs to accept traffic from

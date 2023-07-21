@@ -1,0 +1,24 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct X1 {
+        x2: M::X2,
+    }
+    struct X2 {
+        x3: M::X3,
+    }
+    struct X3 {
+        f: u64,
+    }
+    private fun t0(x1: &M::X1,x1_mut: &mut M::X1) {
+        Borrow(Immutable)(select M::X1.x2(x1));
+        Borrow(Immutable)(select M::X2.x3(select M::X1.x2(x1)));
+        Borrow(Immutable)(select M::X3.f(select M::X2.x3(select M::X1.x2(x1))));
+        Borrow(Immutable)(select M::X1.x2(x1_mut));
+        Borrow(Immutable)(select M::X2.x3(select M::X1.x2(x1_mut)));
+        Borrow(Immutable)(select M::X3.f(select M::X2.x3(select M::X1.x2(x1_mut))));
+        Borrow(Mutable)(select M::X1.x2(x1_mut));
+        Borrow(Mutable)(select M::X2.x3(select M::X1.x2(x1_mut)));
+        Borrow(Mutable)(select M::X3.f(select M::X2.x3(select M::X1.x2(x1_mut))));
+        Tuple()
+    }
+} // end 0x8675309::M

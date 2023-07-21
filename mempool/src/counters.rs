@@ -23,6 +23,7 @@ pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 
 // Core mempool stages labels
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
+pub const COMMIT_ACCEPTED_BLOCK_LABEL: &str = "commit_accepted_block";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
 pub const COMMIT_REJECTED_DUPLICATE_LABEL: &str = "commit_rejected_duplicate";
 pub const COMMIT_IGNORED_LABEL: &str = "commit_ignored";
@@ -85,17 +86,20 @@ pub const SENT_LABEL: &str = "sent";
 // invalid ACK type labels
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
-// Inserted transaction scope labels
-pub const LOCAL_LABEL: &str = "local";
-pub const E2E_LABEL: &str = "e2e";
-
 // Event types for ranking_score
 pub const INSERT_LABEL: &str = "insert";
 pub const REMOVE_LABEL: &str = "remove";
 
-// Histogram buckets that make more sense at larger timescales than DEFAULT_BUCKETS
-const LARGER_LATENCY_BUCKETS: &[f64; 11] = &[
-    0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 40.0, 80.0, 160.0, 320.0,
+// The submission point where the transaction originated from
+pub const SUBMITTED_BY_CLIENT_LABEL: &str = "client";
+pub const SUBMITTED_BY_DOWNSTREAM_LABEL: &str = "downstream";
+pub const SUBMITTED_BY_PEER_VALIDATOR_LABEL: &str = "peer_validator";
+
+// Histogram buckets that expand DEFAULT_BUCKETS with larger timescales
+// and some more granularity between 100-250 ms
+const MEMPOOL_LATENCY_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.125, 0.15, 0.2, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0,
+    100.0, 250.0, 500.0,
 ];
 
 // Histogram buckets for tracking ranking score (see below test for the formula)
@@ -179,24 +183,25 @@ pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
 
 pub fn core_mempool_txn_commit_latency(
     stage: &'static str,
-    scope: &'static str,
+    submitted_by: &'static str,
     bucket: &str,
     latency: Duration,
 ) {
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
-        .with_label_values(&[stage, scope, bucket])
+        .with_label_values(&[stage, submitted_by, bucket])
         .observe(latency.as_secs_f64());
 }
 
 /// Counter tracking latency of txns reaching various stages in committing
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
 static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
-    let histogram_opts = histogram_opts!(
+    register_histogram_vec!(
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
-        LARGER_LATENCY_BUCKETS.to_vec()
-    );
-    register_histogram_vec!(histogram_opts, &["stage", "scope", "bucket"]).unwrap()
+        &["stage", "submitted_by", "bucket"],
+        MEMPOOL_LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
 });
 
 pub fn core_mempool_txn_ranking_score(

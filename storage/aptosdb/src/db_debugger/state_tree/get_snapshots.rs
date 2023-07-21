@@ -16,7 +16,7 @@ pub struct Cmd {
     #[clap(flatten)]
     db_dir: DbDir,
 
-    #[clap(long, default_value = "18446744073709551615")]
+    #[clap(long, default_value_t = 18446744073709551615)]
     next_version: Version,
 }
 

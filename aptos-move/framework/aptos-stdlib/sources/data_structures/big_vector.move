@@ -211,17 +211,13 @@ module aptos_std::big_vector {
 
         while (num_buckets_left > 0) {
             let pop_bucket = table_with_length::remove(&mut v.buckets, num_buckets_left - 1);
-            let pop_bucket_length = vector::length(&pop_bucket);
-            let i = 0;
-            while(i < pop_bucket_length){
-                vector::push_back(&mut push_bucket, vector::pop_back(&mut pop_bucket));
+            vector::for_each_reverse(pop_bucket, |val| {
+                vector::push_back(&mut push_bucket, val);
                 if (vector::length(&push_bucket) == v.bucket_size) {
                     vector::push_back(&mut new_buckets, push_bucket);
                     push_bucket = vector[];
                 };
-                i = i + 1;
-            };
-            vector::destroy_empty(pop_bucket);
+            });
             num_buckets_left = num_buckets_left - 1;
         };
 

@@ -8,6 +8,10 @@ on:
         required: true
         type: string
         description: The git SHA1 to test.
+      RUNNER_NAME:
+        required: false
+        default: executor-benchmark-runner 
+        type: string
   # This allows the workflow to be triggered manually from the Github UI or CLI
   # NOTE: because the "number" type is not supported, we default to 720 minute timeout
   workflow_dispatch:
@@ -16,11 +20,19 @@ on:
         required: true
         type: string
         description: The git SHA1 to test.
+      RUNNER_NAME:
+        required: false
+        default: executor-benchmark-runner 
+        type: choice
+        options:
+        - spot-runner
+        - executor-benchmark-runner
+        description: The name of the runner to use for the test.
 
 jobs:
   sequential-execution-performance:
     timeout-minutes: 30
-    runs-on: executor-benchmark-runner
+    runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -36,7 +48,7 @@ jobs:
 
   parallel-execution-performance:
     timeout-minutes: 60
-    runs-on: executor-benchmark-runner
+    runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -52,7 +64,7 @@ jobs:
 
   single-node-performance:
     timeout-minutes: 60
-    runs-on: executor-benchmark-runner
+    runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:

@@ -3,7 +3,7 @@
 
 mod advertise;
 mod compression;
-mod mock;
+pub mod mock;
 mod peers;
 mod poller;
 mod priority;

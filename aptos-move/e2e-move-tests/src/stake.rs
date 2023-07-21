@@ -102,6 +102,10 @@ pub fn leave_validator_set(
     )
 }
 
+pub fn increase_lockup(harness: &mut MoveHarness, account: &Account) -> TransactionStatus {
+    harness.run_transaction_payload(account, aptos_stdlib::stake_increase_lockup())
+}
+
 pub fn get_stake_pool(harness: &MoveHarness, pool_address: &AccountAddress) -> StakePool {
     harness
         .read_resource::<StakePool>(

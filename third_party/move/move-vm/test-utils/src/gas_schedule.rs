@@ -355,7 +355,8 @@ impl<'b> GasMeter for GasStatus<'b> {
         &mut self,
         _addr: AccountAddress,
         _ty: impl TypeView,
-        _loaded: Option<(NumBytes, impl ValueView)>,
+        _val: Option<impl ValueView>,
+        _bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         Ok(())
     }

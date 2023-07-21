@@ -5,7 +5,7 @@
 //! parameters and traits to help manipulate them.
 
 use crate::{
-    algebra::{AbstractValueSize, Fee, Gas},
+    algebra::{Fee, Gas},
     instr::InstructionGasParameters,
     misc::MiscGasParameters,
     transaction::TransactionGasParameters,
@@ -13,8 +13,7 @@ use crate::{
 };
 use aptos_logger::error;
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
-    state_store::state_key::StateKey, write_set::WriteOp,
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -31,8 +30,20 @@ use move_vm_types::{
     views::{TypeView, ValueView},
 };
 use std::collections::BTreeMap;
-
+// This gas feature version must be bumped up when one of the following conditions arises
+//  - A new gas parameter is added, removed or renamed in `aptos_framework.rs` or `move_stdlib.rs`
+//  - Changing how gas is calculated in any way (needs to be gated by a new feature version in the
+//    first place)
+//  - << What else? >>
+//
 // Change log:
+// - V11
+//   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
+// - V10
+//   - Added generate_unique_address and get_txn_hash native functions
+//   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
+// - V9
+//   - Accurate tracking of the cost of loading resource groups
 // - V8
 //   - Added BLS12-381 operations.
 // - V7
@@ -52,14 +63,14 @@ use std::collections::BTreeMap;
 //   - Storage charges:
 //     - Distinguish between new and existing resources
 //     - One item write comes with 1K free bytes
-//     - abort with STORATGE_WRITE_LIMIT_REACHED if WriteOps or Events are too large
+//     - abort with STORAGE_WRITE_LIMIT_REACHED if WriteOps or Events are too large
 // - V2
 //   - Table
 //     - Fix the gas formula for loading resources so that they are consistent with other
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 8;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 11;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -71,7 +82,7 @@ pub trait FromOnChainGasSchedule: Sized {
     fn from_on_chain_gas_schedule(
         gas_schedule: &BTreeMap<String, u64>,
         feature_version: u64,
-    ) -> Option<Self>;
+    ) -> Result<Self, String>;
 }
 
 /// A trait for converting to a list of entries of the on-chain gas schedule.
@@ -100,8 +111,8 @@ impl FromOnChainGasSchedule for NativeGasParameters {
     fn from_on_chain_gas_schedule(
         gas_schedule: &BTreeMap<String, u64>,
         feature_version: u64,
-    ) -> Option<Self> {
-        Some(Self {
+    ) -> Result<Self, String> {
+        Ok(Self {
             move_stdlib: FromOnChainGasSchedule::from_on_chain_gas_schedule(
                 gas_schedule,
                 feature_version,
@@ -164,8 +175,8 @@ impl FromOnChainGasSchedule for AptosGasParameters {
     fn from_on_chain_gas_schedule(
         gas_schedule: &BTreeMap<String, u64>,
         feature_version: u64,
-    ) -> Option<Self> {
-        Some(Self {
+    ) -> Result<Self, String> {
+        Ok(Self {
             misc: FromOnChainGasSchedule::from_on_chain_gas_schedule(
                 gas_schedule,
                 feature_version,
@@ -222,6 +233,9 @@ impl InitialGasSchedule for AptosGasParameters {
 pub trait AptosGasMeter: MoveGasMeter {
     /// Returns the gas feature version.
     fn feature_version(&self) -> u64;
+
+    /// Returns the struct that contains all (non-storage) gas parameters.
+    fn gas_params(&self) -> &AptosGasParameters;
 
     /// Returns the remaining balance, measured in (external) gas units.
     ///
@@ -330,6 +344,18 @@ pub trait AptosGasMeter: MoveGasMeter {
 
         Ok(())
     }
+
+    /// Return the total gas used for execution.
+    fn execution_gas_used(&self) -> Gas;
+
+    /// Return the total gas used for io.
+    fn io_gas_used(&self) -> Gas;
+
+    /// Return the total gas used for storage.
+    fn storage_fee_used_in_gas_units(&self) -> Gas;
+
+    /// Return the total fee used for storage.
+    fn storage_fee_used(&self) -> Fee;
 }
 
 /// The official gas meter used inside the Aptos VM.
@@ -340,13 +366,13 @@ pub struct StandardGasMeter {
     gas_params: AptosGasParameters,
     storage_gas_params: StorageGasParameters,
     balance: InternalGas,
-    memory_quota: AbstractValueSize,
 
     execution_gas_used: InternalGas,
     io_gas_used: InternalGas,
+    // The gas consumed by the storage operations.
+    storage_fee_in_internal_units: InternalGas,
+    // The storage fee consumed by the storage operations.
     storage_fee_used: Fee,
-
-    should_leak_memory_for_native: bool,
 }
 
 impl StandardGasMeter {
@@ -356,7 +382,6 @@ impl StandardGasMeter {
         storage_gas_params: StorageGasParameters,
         balance: impl Into<Gas>,
     ) -> Self {
-        let memory_quota = gas_params.txn.memory_quota;
         let balance = balance.into().to_unit_with_params(&gas_params.txn);
 
         Self {
@@ -366,9 +391,8 @@ impl StandardGasMeter {
             balance,
             execution_gas_used: 0.into(),
             io_gas_used: 0.into(),
+            storage_fee_in_internal_units: 0.into(),
             storage_fee_used: 0.into(),
-            memory_quota,
-            should_leak_memory_for_native: false,
         }
     }
 
@@ -383,31 +407,6 @@ impl StandardGasMeter {
                 self.balance = 0.into();
                 Err(PartialVMError::new(StatusCode::OUT_OF_GAS))
             },
-        }
-    }
-
-    #[inline]
-    fn use_heap_memory(&mut self, amount: AbstractValueSize) -> PartialVMResult<()> {
-        if self.feature_version >= 3 {
-            match self.memory_quota.checked_sub(amount) {
-                Some(remaining_quota) => {
-                    self.memory_quota = remaining_quota;
-                    Ok(())
-                },
-                None => {
-                    self.memory_quota = 0.into();
-                    Err(PartialVMError::new(StatusCode::MEMORY_LIMIT_EXCEEDED))
-                },
-            }
-        } else {
-            Ok(())
-        }
-    }
-
-    #[inline]
-    fn release_heap_memory(&mut self, amount: AbstractValueSize) {
-        if self.feature_version >= 3 {
-            self.memory_quota += amount;
         }
     }
 
@@ -447,21 +446,8 @@ impl MoveGasMeter for StandardGasMeter {
     fn charge_native_function_before_execution(
         &mut self,
         _ty_args: impl ExactSizeIterator<Item = impl TypeView>,
-        args: impl ExactSizeIterator<Item = impl ValueView>,
+        _args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
-        // TODO(Gas): https://github.com/aptos-labs/aptos-core/issues/5485
-        if self.should_leak_memory_for_native {
-            return Ok(());
-        }
-
-        self.release_heap_memory(args.fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self
-                .gas_params
-                .misc
-                .abs_val
-                .abstract_heap_size(val, self.feature_version)
-        }));
-
         Ok(())
     }
 
@@ -469,18 +455,8 @@ impl MoveGasMeter for StandardGasMeter {
     fn charge_native_function(
         &mut self,
         amount: InternalGas,
-        ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView>>,
+        _ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView>>,
     ) -> PartialVMResult<()> {
-        if let Some(ret_vals) = ret_vals {
-            self.use_heap_memory(ret_vals.fold(AbstractValueSize::zero(), |acc, val| {
-                acc + self
-                    .gas_params
-                    .misc
-                    .abs_val
-                    .abstract_heap_size(val, self.feature_version)
-            }))?;
-        }
-
         self.charge_execution(amount)
     }
 
@@ -489,35 +465,21 @@ impl MoveGasMeter for StandardGasMeter {
         &mut self,
         _addr: AccountAddress,
         _ty: impl TypeView,
-        loaded: Option<(NumBytes, impl ValueView)>,
+        val: Option<impl ValueView>,
+        bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
-        if self.feature_version != 0 {
-            // TODO(Gas): Rewrite this in a better way.
-            if let Some((_, val)) = &loaded {
-                self.use_heap_memory(
-                    self.gas_params
-                        .misc
-                        .abs_val
-                        .abstract_heap_size(val, self.feature_version),
-                )?;
-            }
+        if self.feature_version <= 8 && val.is_none() && bytes_loaded != 0.into() {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message("in legacy versions, number of bytes loaded must be zero when the resource does not exist ".to_string()));
         }
         let cost = self
             .storage_gas_params
             .pricing
-            .calculate_read_gas(loaded.map(|(num_bytes, _)| num_bytes));
+            .calculate_read_gas(val.is_some(), bytes_loaded);
         self.charge_io(cost)
     }
 
     #[inline]
-    fn charge_pop(&mut self, popped_val: impl ValueView) -> PartialVMResult<()> {
-        self.release_heap_memory(
-            self.gas_params
-                .misc
-                .abs_val
-                .abstract_heap_size(popped_val, self.feature_version),
-        );
-
+    fn charge_pop(&mut self, _popped_val: impl ValueView) -> PartialVMResult<()> {
         self.charge_execution(self.gas_params.instr.pop)
     }
 
@@ -542,19 +504,12 @@ impl MoveGasMeter for StandardGasMeter {
     #[inline]
     fn charge_call_generic(
         &mut self,
-        module_id: &ModuleId,
+        _module_id: &ModuleId,
         _func_name: &str,
         ty_args: impl ExactSizeIterator<Item = impl TypeView>,
         args: impl ExactSizeIterator<Item = impl ValueView>,
         num_locals: NumArgs,
     ) -> PartialVMResult<()> {
-        // Save the info for charge_native_function_before_execution.
-        self.should_leak_memory_for_native = (*module_id.address() == CORE_CODE_ADDRESS
-            && module_id.name().as_str() == "table")
-            || (self.feature_version >= 4
-                && *module_id.address() == CORE_CODE_ADDRESS
-                && module_id.name().as_str() == "event");
-
         let params = &self.gas_params.instr;
 
         let mut cost = params.call_generic_base
@@ -576,14 +531,8 @@ impl MoveGasMeter for StandardGasMeter {
     #[inline]
     fn charge_ld_const_after_deserialization(
         &mut self,
-        val: impl ValueView,
+        _val: impl ValueView,
     ) -> PartialVMResult<()> {
-        self.use_heap_memory(
-            self.gas_params
-                .misc
-                .abs_val
-                .abstract_heap_size(val, self.feature_version),
-        )?;
         Ok(())
     }
 
@@ -594,8 +543,6 @@ impl MoveGasMeter for StandardGasMeter {
             .misc
             .abs_val
             .abstract_value_size_stack_and_heap(val, self.feature_version);
-
-        self.use_heap_memory(heap_size)?;
 
         // Note(Gas): this makes a deep copy so we need to charge for the full value size
         let instr_params = &self.gas_params.instr;
@@ -623,14 +570,6 @@ impl MoveGasMeter for StandardGasMeter {
     ) -> PartialVMResult<()> {
         let num_args = NumArgs::new(args.len() as u64);
 
-        self.use_heap_memory(args.fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self
-                .gas_params
-                .misc
-                .abs_val
-                .abstract_stack_size(val, self.feature_version)
-        }))?;
-
         let params = &self.gas_params.instr;
         let cost = match is_generic {
             false => params.pack_base + params.pack_per_field * num_args,
@@ -646,14 +585,6 @@ impl MoveGasMeter for StandardGasMeter {
         args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
         let num_args = NumArgs::new(args.len() as u64);
-
-        self.release_heap_memory(args.fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self
-                .gas_params
-                .misc
-                .abs_val
-                .abstract_stack_size(val, self.feature_version)
-        }));
 
         let params = &self.gas_params.instr;
         let cost = match is_generic {
@@ -671,8 +602,6 @@ impl MoveGasMeter for StandardGasMeter {
             .abs_val
             .abstract_value_size_stack_and_heap(val, self.feature_version);
 
-        self.use_heap_memory(heap_size)?;
-
         // Note(Gas): this makes a deep copy so we need to charge for the full value size
         let instr_params = &self.gas_params.instr;
         let cost = instr_params.read_ref_base
@@ -684,33 +613,13 @@ impl MoveGasMeter for StandardGasMeter {
     fn charge_write_ref(
         &mut self,
         _new_val: impl ValueView,
-        old_val: impl ValueView,
+        _old_val: impl ValueView,
     ) -> PartialVMResult<()> {
-        self.release_heap_memory(
-            self.gas_params
-                .misc
-                .abs_val
-                .abstract_heap_size(old_val, self.feature_version),
-        );
-
         self.charge_execution(self.gas_params.instr.write_ref_base)
     }
 
     #[inline]
     fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        self.release_heap_memory(
-            self.gas_params
-                .misc
-                .abs_val
-                .abstract_heap_size(&lhs, self.feature_version),
-        );
-        self.release_heap_memory(
-            self.gas_params
-                .misc
-                .abs_val
-                .abstract_heap_size(&rhs, self.feature_version),
-        );
-
         let instr_params = &self.gas_params.instr;
         let abs_val_params = &self.gas_params.misc.abs_val;
         let per_unit = instr_params.eq_per_abs_val_unit;
@@ -725,19 +634,6 @@ impl MoveGasMeter for StandardGasMeter {
 
     #[inline]
     fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        self.release_heap_memory(
-            self.gas_params
-                .misc
-                .abs_val
-                .abstract_heap_size(&lhs, self.feature_version),
-        );
-        self.release_heap_memory(
-            self.gas_params
-                .misc
-                .abs_val
-                .abstract_heap_size(&rhs, self.feature_version),
-        );
-
         let instr_params = &self.gas_params.instr;
         let abs_val_params = &self.gas_params.misc.abs_val;
         let per_unit = instr_params.neq_per_abs_val_unit;
@@ -822,10 +718,6 @@ impl MoveGasMeter for StandardGasMeter {
     ) -> PartialVMResult<()> {
         let num_args = NumArgs::new(args.len() as u64);
 
-        self.use_heap_memory(args.fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self.gas_params.misc.abs_val.abstract_packed_size(val)
-        }))?;
-
         let params = &self.gas_params.instr;
         let cost = params.vec_pack_base + params.vec_pack_per_elem * num_args;
         self.charge_execution(cost)
@@ -836,12 +728,8 @@ impl MoveGasMeter for StandardGasMeter {
         &mut self,
         _ty: impl TypeView,
         expect_num_elements: NumArgs,
-        elems: impl ExactSizeIterator<Item = impl ValueView>,
+        _elems: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
-        self.release_heap_memory(elems.fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self.gas_params.misc.abs_val.abstract_packed_size(val)
-        }));
-
         let params = &self.gas_params.instr;
         let cost =
             params.vec_unpack_base + params.vec_unpack_per_expected_elem * expect_num_elements;
@@ -872,10 +760,8 @@ impl MoveGasMeter for StandardGasMeter {
     fn charge_vec_push_back(
         &mut self,
         _ty: impl TypeView,
-        val: impl ValueView,
+        _val: impl ValueView,
     ) -> PartialVMResult<()> {
-        self.use_heap_memory(self.gas_params.misc.abs_val.abstract_packed_size(val))?;
-
         self.charge_execution(self.gas_params.instr.vec_push_back_base)
     }
 
@@ -883,12 +769,8 @@ impl MoveGasMeter for StandardGasMeter {
     fn charge_vec_pop_back(
         &mut self,
         _ty: impl TypeView,
-        val: Option<impl ValueView>,
+        _val: Option<impl ValueView>,
     ) -> PartialVMResult<()> {
-        if let Some(val) = val {
-            self.release_heap_memory(self.gas_params.misc.abs_val.abstract_packed_size(val));
-        }
-
         self.charge_execution(self.gas_params.instr.vec_pop_back_base)
     }
 
@@ -900,16 +782,8 @@ impl MoveGasMeter for StandardGasMeter {
     #[inline]
     fn charge_drop_frame(
         &mut self,
-        locals: impl Iterator<Item = impl ValueView>,
+        _locals: impl Iterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
-        self.release_heap_memory(locals.fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self
-                .gas_params
-                .misc
-                .abs_val
-                .abstract_heap_size(val, self.feature_version)
-        }));
-
         Ok(())
     }
 }
@@ -917,6 +791,10 @@ impl MoveGasMeter for StandardGasMeter {
 impl AptosGasMeter for StandardGasMeter {
     fn feature_version(&self) -> u64 {
         self.feature_version
+    }
+
+    fn gas_params(&self) -> &AptosGasParameters {
+        &self.gas_params
     }
 
     fn balance(&self) -> Gas {
@@ -992,6 +870,7 @@ impl AptosGasMeter for StandardGasMeter {
 
         self.charge(gas_consumed_internal)?;
 
+        self.storage_fee_in_internal_units += gas_consumed_internal;
         self.storage_fee_used += amount;
         if self.feature_version >= 7 && self.storage_fee_used > self.gas_params.txn.max_storage_fee
         {
@@ -1027,5 +906,24 @@ impl AptosGasMeter for StandardGasMeter {
         let cost = self.gas_params.txn.calculate_intrinsic_gas(txn_size);
         self.charge_execution(cost)
             .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn execution_gas_used(&self) -> Gas {
+        self.execution_gas_used
+            .to_unit_round_up_with_params(&self.gas_params.txn)
+    }
+
+    fn io_gas_used(&self) -> Gas {
+        self.io_gas_used
+            .to_unit_round_up_with_params(&self.gas_params.txn)
+    }
+
+    fn storage_fee_used_in_gas_units(&self) -> Gas {
+        self.storage_fee_in_internal_units
+            .to_unit_round_up_with_params(&self.gas_params.txn)
+    }
+
+    fn storage_fee_used(&self) -> Fee {
+        self.storage_fee_used
     }
 }

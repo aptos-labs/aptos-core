@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: native struct `C::T` cannot be packed or unpacked
+   ┌─ tests/checking/typing/native_structs_pack_unpack.move:12:13
+   │
+12 │         let C::T {} = c;
+   │             ^^^^
+
+error: struct `C::T` is native and does not support field selection
+   ┌─ tests/checking/typing/native_structs_pack_unpack.move:15:17
+   │
+15 │         let f = c.f;
+   │                 ^^^
+
+error: native struct `C::T` cannot be packed or unpacked
+  ┌─ tests/checking/typing/native_structs_pack_unpack.move:9:9
+  │
+9 │         C::T {}
+  │         ^^^^

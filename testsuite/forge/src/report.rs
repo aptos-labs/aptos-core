@@ -2,9 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_logger::info;
 use aptos_transaction_emitter_lib::emitter::stats::TxnStats;
 use serde::Serialize;
-use std::{fmt, time::Duration};
+use std::fmt;
 
 #[derive(Default, Debug, Serialize)]
 pub struct TestReport {
@@ -37,32 +38,19 @@ impl TestReport {
             self.text.push('\n');
         }
         self.text.push_str(&text);
+        info!("{}", text);
     }
 
-    pub fn report_txn_stats(&mut self, test_name: String, stats: &TxnStats, window: Duration) {
-        let submitted_txn = stats.submitted;
-        let expired_txn = stats.expired;
-        let avg_tps = stats.committed / window.as_secs();
-        let avg_latency_client = if stats.committed == 0 {
-            0u64
-        } else {
-            stats.latency / stats.committed
-        };
-        let p99_latency = stats.latency_buckets.percentile(99, 100);
-        self.report_metric(test_name.clone(), "submitted_txn", submitted_txn as f64);
-        self.report_metric(test_name.clone(), "expired_txn", expired_txn as f64);
-        self.report_metric(test_name.clone(), "avg_tps", avg_tps as f64);
-        self.report_metric(test_name.clone(), "avg_latency", avg_latency_client as f64);
-        self.report_metric(test_name.clone(), "p99_latency", p99_latency as f64);
-        let expired_text = if expired_txn == 0 {
-            "no expired txns".to_string()
-        } else {
-            format!("(!) expired {} out of {} txns", expired_txn, submitted_txn)
-        };
-        self.report_text(format!(
-            "{} : {:.0} TPS, {:.1} ms latency, {:.1} ms p99 latency,{}",
-            test_name, avg_tps, avg_latency_client, p99_latency, expired_text
-        ));
+    pub fn report_txn_stats(&mut self, test_name: String, stats: &TxnStats) {
+        let rate = stats.rate();
+        self.report_metric(test_name.clone(), "submitted_txn", stats.submitted as f64);
+        self.report_metric(test_name.clone(), "expired_txn", stats.expired as f64);
+        self.report_metric(test_name.clone(), "avg_tps", rate.committed as f64);
+        self.report_metric(test_name.clone(), "avg_latency", rate.latency as f64);
+        self.report_metric(test_name.clone(), "p50_latency", rate.p50_latency as f64);
+        self.report_metric(test_name.clone(), "p90_latency", rate.p90_latency as f64);
+        self.report_metric(test_name.clone(), "p99_latency", rate.p99_latency as f64);
+        self.report_text(format!("{} : {}", test_name, rate));
     }
 
     pub fn print_report(&self) {

@@ -16,7 +16,7 @@ impl Test for PerformanceBenchmark {
 impl NetworkLoadTest for PerformanceBenchmark {}
 
 impl NetworkTest for PerformanceBenchmark {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

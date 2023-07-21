@@ -26,8 +26,6 @@ use tracing::{error, info};
 type ChainID = u32;
 type StartingVersion = u64;
 
-const WORKER_RESTART_DELAY_IF_METADATA_NOT_FOUND_IN_SECS: u64 = 60;
-
 pub struct Worker {
     /// Redis client.
     redis_client: redis::Client,
@@ -86,39 +84,33 @@ impl Worker {
         loop {
             let conn = self
                 .redis_client
-                .get_tokio_connection()
+                .get_tokio_connection_manager()
                 .await
                 .expect("Get redis connection failed.");
-
             let mut rpc_client = create_grpc_client(self.fullnode_grpc_address.clone()).await;
 
             // 1. Fetch metadata.
             let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store {
-                IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
-                    GcsFileStoreOperator::new(gcs_file_store.gcs_file_store_bucket_name.clone()),
-                ),
+                IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
+                    Box::new(GcsFileStoreOperator::new(
+                        gcs_file_store.gcs_file_store_bucket_name.clone(),
+                        gcs_file_store
+                            .gcs_file_store_service_account_key_path
+                            .clone(),
+                    ))
+                },
                 IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
                     LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
                 ),
             };
 
             file_store_operator.verify_storage_bucket_existence().await;
-            let mut starting_version = 0;
-            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+            let starting_version = file_store_operator
+                .get_starting_version()
+                .await
+                .unwrap_or(0);
 
-            if let Some(metadata) = file_store_metadata {
-                info!("[Indexer Cache] File store metadata: {:?}", metadata);
-                starting_version = metadata.version;
-            } else {
-                error!("[Indexer Cache] File store is empty. Exit after 1 minute.");
-                tokio::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(
-                        WORKER_RESTART_DELAY_IF_METADATA_NOT_FOUND_IN_SECS,
-                    ))
-                    .await;
-                    std::process::exit(1);
-                });
-            }
+            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
 
             // 2. Start streaming RPC.
             let request = tonic::Request::new(GetTransactionsFromNodeRequest {
@@ -139,7 +131,7 @@ impl Worker {
 
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
-    cache_operator: &mut CacheOperator<redis::aio::Connection>,
+    cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
 ) -> anyhow::Result<GrpcDataStatus> {
     match response.response.unwrap() {
         Response::Status(status) => {
@@ -205,10 +197,10 @@ async fn process_transactions_from_node_response(
 
 /// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
 async fn setup_cache_with_init_signal(
-    conn: redis::aio::Connection,
+    conn: redis::aio::ConnectionManager,
     init_signal: TransactionsFromNodeResponse,
 ) -> (
-    CacheOperator<redis::aio::Connection>,
+    CacheOperator<redis::aio::ConnectionManager>,
     ChainID,
     StartingVersion,
 ) {
@@ -239,7 +231,7 @@ async fn setup_cache_with_init_signal(
 
 // Infinite streaming processing. Retry if error happens; crash if fatal.
 async fn process_streaming_response(
-    conn: redis::aio::Connection,
+    conn: redis::aio::ConnectionManager,
     file_store_metadata: Option<FileStoreMetadata>,
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,

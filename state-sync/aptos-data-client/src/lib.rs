@@ -7,6 +7,7 @@ pub mod client;
 pub mod error;
 pub mod global_summary;
 pub mod interface;
+mod latency_monitor;
 mod logging;
 mod metrics;
 mod peer_states;

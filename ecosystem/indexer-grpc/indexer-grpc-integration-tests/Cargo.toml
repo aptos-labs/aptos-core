@@ -1,0 +1,46 @@
+[package]
+name = "aptos-indexer-grpc-integration-tests"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-indexer-grpc-cache-worker = { workspace = true }
+aptos-indexer-grpc-data-service = { workspace = true }
+aptos-indexer-grpc-file-store = { workspace = true }
+aptos-indexer-grpc-server-framework = { workspace = true }
+aptos-indexer-grpc-utils = { workspace = true }
+aptos-inspection-service = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-protos = { workspace = true }
+aptos-runtimes = { workspace = true }
+aptos-transaction-emitter-lib = { workspace = true }
+aptos-transaction-generator-lib = { workspace = true }
+aptos-types = { workspace = true }
+async-trait = { workspace = true }
+backoff = { workspace = true }
+base64  = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+futures-core = { workspace = true }
+futures-util = { workspace = true }
+itertools = { workspace = true }
+prometheus = { workspace = true }
+prost = { workspace = true }
+redis = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+warp = { workspace = true }
+
+[features]
+integration-tests = []

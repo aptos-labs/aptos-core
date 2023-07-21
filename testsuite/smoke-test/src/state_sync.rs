@@ -182,7 +182,7 @@ async fn test_full_node_bootstrap_snapshot_transactions_or_outputs() {
     let mut swarm = SwarmBuilder::new_local(1)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
-            config.state_sync.storage_service.max_network_chunk_bytes = 300 * 1024;
+            config.state_sync.storage_service.max_network_chunk_bytes = 500 * 1024;
         }))
         .build()
         .await;

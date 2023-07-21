@@ -38,6 +38,7 @@ use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::BorrowMut,
     collections::BTreeMap,
     ops::{Deref, DerefMut},
     sync::Arc,
@@ -57,6 +58,16 @@ pub enum SessionId {
     Genesis {
         // id to identify this specific genesis build
         id: HashValue,
+    },
+    Prologue {
+        sender: AccountAddress,
+        sequence_number: u64,
+        script_hash: Vec<u8>,
+    },
+    Epilogue {
+        sender: AccountAddress,
+        sequence_number: u64,
+        script_hash: Vec<u8>,
     },
     // For those runs that are not a transaction and the output of which won't be committed.
     Void,
@@ -85,6 +96,30 @@ impl SessionId {
         }
     }
 
+    pub fn prologue(txn: &SignatureCheckedTransaction) -> Self {
+        Self::prologue_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
+    }
+
+    pub fn prologue_meta(txn_data: &TransactionMetadata) -> Self {
+        Self::Prologue {
+            sender: txn_data.sender,
+            sequence_number: txn_data.sequence_number,
+            script_hash: txn_data.script_hash.clone(),
+        }
+    }
+
+    pub fn epilogue(txn: &SignatureCheckedTransaction) -> Self {
+        Self::epilogue_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
+    }
+
+    pub fn epilogue_meta(txn_data: &TransactionMetadata) -> Self {
+        Self::Epilogue {
+            sender: txn_data.sender,
+            sequence_number: txn_data.sequence_number,
+            script_hash: txn_data.script_hash.clone(),
+        }
+    }
+
     pub fn void() -> Self {
         Self::Void
     }
@@ -95,7 +130,9 @@ impl SessionId {
 
     pub fn sender(&self) -> Option<AccountAddress> {
         match self {
-            SessionId::Txn { sender, .. } => Some(*sender),
+            SessionId::Txn { sender, .. }
+            | SessionId::Prologue { sender, .. }
+            | SessionId::Epilogue { sender, .. } => Some(*sender),
             SessionId::BlockMeta { .. } | SessionId::Genesis { .. } | SessionId::Void => None,
         }
     }
@@ -199,19 +236,21 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut change_set_filtered = MoveChangeSet::new();
         let mut resource_group_change_set = MoveChangeSet::new();
 
+        let mut resource_group_cache = remote.release_resource_group_cache();
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
-                let resource_group = runtime.with_module_metadata(&struct_tag.module_id(), |md| {
-                    get_resource_group_from_metadata(&struct_tag, md)
-                });
+                let resource_group_tag = runtime
+                    .with_module_metadata(&struct_tag.module_id(), |md| {
+                        get_resource_group_from_metadata(&struct_tag, md)
+                    });
 
-                if let Some(resource_group) = resource_group {
+                if let Some(resource_group_tag) = resource_group_tag {
                     resource_groups
-                        .entry(resource_group)
+                        .entry(resource_group_tag)
                         .or_insert_with(AccountChangeSet::new)
                         .add_resource_op(struct_tag, blob_op)
                         .map_err(|_| common_error())?;
@@ -227,9 +266,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 )
                 .map_err(|_| common_error())?;
 
-            for (resource_tag, resources) in resource_groups {
-                let mut source_data = remote
-                    .release_resource_group_cache(&addr, &resource_tag)
+            for (resource_group_tag, resources) in resource_groups {
+                let mut source_data = resource_group_cache
+                    .borrow_mut()
+                    .get_mut(&addr)
+                    .and_then(|t| t.remove(&resource_group_tag))
                     .unwrap_or_default();
                 let create = source_data.is_empty();
 
@@ -259,7 +300,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     MoveStorageOp::Modify(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
                 };
                 resource_group_change_set
-                    .add_resource_op(addr, resource_tag, op)
+                    .add_resource_op(addr, resource_group_tag, op)
                     .map_err(|_| common_error())?;
             }
         }
@@ -354,13 +395,13 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let write_set = write_set_mut
             .freeze()
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))?;
+            .map_err(|_| VMStatus::error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
             .map(|(guid, seq_num, ty_tag, blob)| {
                 let key = bcs::from_bytes(guid.as_slice())
-                    .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH, None))?;
+                    .map_err(|_| VMStatus::error(StatusCode::EVENT_KEY_MISMATCH, None))?;
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
@@ -398,7 +439,7 @@ impl<'r> WriteOpConverter<'r> {
         use WriteOp::*;
 
         let existing_value_opt = self.remote.get_state_value(state_key).map_err(|_| {
-            VMStatus::Error(
+            VMStatus::error(
                 StatusCode::STORAGE_ERROR,
                 err_msg("Storage read failed when converting change set."),
             )
@@ -406,14 +447,14 @@ impl<'r> WriteOpConverter<'r> {
 
         let write_op = match (existing_value_opt, move_storage_op) {
             (None, Modify(_) | Delete) => {
-                return Err(VMStatus::Error(
+                return Err(VMStatus::error(
                     // Possible under speculative execution, returning storage error waiting for re-execution
                     StatusCode::STORAGE_ERROR,
                     err_msg("When converting write op: updating non-existent value."),
                 ));
             },
             (Some(_), New(_)) => {
-                return Err(VMStatus::Error(
+                return Err(VMStatus::error(
                     // Possible under speculative execution, returning storage error waiting for re-execution
                     StatusCode::STORAGE_ERROR,
                     err_msg("When converting write op: Recreating existing value."),
@@ -458,7 +499,7 @@ impl<'r> WriteOpConverter<'r> {
         let existing_value_opt = self
             .remote
             .get_state_value(state_key)
-            .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))?;
+            .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         let data = serialize(&value);
 
         let op = match existing_value_opt {

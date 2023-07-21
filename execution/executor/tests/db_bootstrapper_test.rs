@@ -87,7 +87,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let executor = BlockExecutor::<AptosVM>::new(db.clone());
     let output = executor
         .execute_block(
-            (block_id, block(txns, BLOCK_GAS_LIMIT)),
+            (block_id, block(txns, BLOCK_GAS_LIMIT)).into(),
             executor.committed_block_id(),
             BLOCK_GAS_LIMIT,
         )

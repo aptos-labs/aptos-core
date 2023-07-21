@@ -53,15 +53,7 @@ fn native_exists_at(
     })?;
 
     if let Some(num_bytes) = num_bytes {
-        match num_bytes {
-            Some(num_bytes) => {
-                context
-                    .charge(gas_params.per_item_loaded + num_bytes * gas_params.per_byte_loaded)?;
-            },
-            None => {
-                context.charge(gas_params.per_item_loaded)?;
-            },
-        }
+        context.charge(gas_params.per_item_loaded + num_bytes * gas_params.per_byte_loaded)?;
     }
 
     Ok(smallvec![Value::bool(exists)])

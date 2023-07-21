@@ -34,7 +34,9 @@ use aptos_genesis::{
 use aptos_logger::info;
 use aptos_types::{
     account_address::{AccountAddress, AccountAddressWithChecks},
-    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+    on_chain_config::{
+        ExecutionConfigV1, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType,
+    },
 };
 use aptos_vm_genesis::{default_gas_schedule, AccountBalance, EmployeePool};
 use async_trait::async_trait;
@@ -85,7 +87,7 @@ impl GenesisTool {
 #[derive(Parser)]
 pub struct GenerateGenesis {
     /// Output directory for Genesis file and waypoint
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, value_parser)]
     output_dir: Option<PathBuf>,
     /// Whether this is mainnet genesis.
     ///
@@ -295,7 +297,9 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
             consensus_config: OnChainConsensusConfig::default(),
-            execution_config: OnChainExecutionConfig::default(),
+            execution_config: OnChainExecutionConfig::V1(ExecutionConfigV1 {
+                transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            }),
             gas_schedule: default_gas_schedule(),
         },
     )?)

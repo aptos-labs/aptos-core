@@ -6,19 +6,21 @@ use crate::{
     error::Error,
     global_summary::GlobalDataSummary,
     interface::{AptosDataClientInterface, Response},
+    latency_monitor::LatencyMonitor,
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
     metrics::{set_gauge, start_request_timer, DataType},
 };
-use aptos_config::network_id::PeerNetworkId;
+use aptos_config::{config::AptosDataClientConfig, network_id::PeerNetworkId};
 use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
+use aptos_storage_interface::DbReader;
 use aptos_storage_service_types::{
     requests::{DataRequest, StorageServiceRequest},
     responses::StorageServerSummary,
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use futures::StreamExt;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use tokio::{runtime::Handle, task::JoinHandle};
 
 // Useful constants
@@ -30,29 +32,45 @@ const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 /// A poller for storage summaries that is responsible for periodically refreshing
 /// the view of advertised data in the network.
 pub struct DataSummaryPoller {
-    data_client: AptosDataClient, // The data client through which to poll peers
-    poll_loop_interval: Duration, // The interval between polling loop executions
-    runtime: Option<Handle>,      // An optional runtime on which to spawn the poller threads
-    time_service: TimeService,    // The service to monitor elapsed time
+    data_client_config: AptosDataClientConfig, // The configuration for the data client
+    data_client: AptosDataClient,              // The data client through which to poll peers
+    poll_loop_interval: Duration,              // The interval between polling loop executions
+    runtime: Option<Handle>, // An optional runtime on which to spawn the poller threads
+    storage: Arc<dyn DbReader>, // The reader interface to storage
+    time_service: TimeService, // The service to monitor elapsed time
 }
 
 impl DataSummaryPoller {
     pub fn new(
+        data_client_config: AptosDataClientConfig,
         data_client: AptosDataClient,
         poll_loop_interval: Duration,
         runtime: Option<Handle>,
+        storage: Arc<dyn DbReader>,
         time_service: TimeService,
     ) -> Self {
         Self {
+            data_client_config,
             data_client,
             poll_loop_interval,
             runtime,
+            storage,
             time_service,
         }
     }
 
     /// Runs the poller that continuously updates the global data summary
     pub async fn start_poller(self) {
+        // Create and start the latency monitor
+        start_latency_monitor(
+            self.data_client_config,
+            self.data_client.clone(),
+            self.storage.clone(),
+            self.time_service.clone(),
+            self.runtime.clone(),
+        );
+
+        // Start the poller
         info!(
             (LogSchema::new(LogEntry::DataSummaryPoller)
                 .message("Starting the Aptos data poller!"))
@@ -225,6 +243,30 @@ pub(crate) fn poll_peer(
         runtime.spawn(poller)
     } else {
         tokio::spawn(poller)
+    }
+}
+
+/// Spawns the dedicated latency monitor
+fn start_latency_monitor(
+    data_client_config: AptosDataClientConfig,
+    data_client: AptosDataClient,
+    storage: Arc<dyn DbReader>,
+    time_service: TimeService,
+    runtime: Option<Handle>,
+) -> JoinHandle<()> {
+    // Create the latency monitor
+    let latency_monitor = LatencyMonitor::new(
+        data_client_config,
+        Arc::new(data_client),
+        storage,
+        time_service,
+    );
+
+    // Spawn the latency monitor
+    if let Some(runtime) = runtime {
+        runtime.spawn(async move { latency_monitor.start_latency_monitor().await })
+    } else {
+        tokio::spawn(async move { latency_monitor.start_latency_monitor().await })
     }
 }
 

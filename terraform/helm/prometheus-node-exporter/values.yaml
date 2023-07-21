@@ -1,0 +1,5 @@
+prometheus-node-exporter:
+  namespaceOverride: monitoring
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9100"

@@ -1,10 +1,6 @@
 #import "./CurrentTokenOwnershipFieldsFragment";
-query getOwnedTokens($address: String!, $offset: Int, $limit: Int) {
-  current_token_ownerships_v2(
-    where: { owner_address: { _eq: $address }, amount: { _gt: 0 } }
-    offset: $offset
-    limit: $limit
-  ) {
+query getOwnedTokens($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int) {
+  current_token_ownerships_v2(where: $where_condition, offset: $offset, limit: $limit) {
     ...CurrentTokenOwnershipFields
   }
 }

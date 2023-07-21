@@ -232,7 +232,7 @@ fn populate_intrinsic_decl(
                     // TODO: in theory, we should also do some type checking on the function
                     // signature. This is implicitly done by Boogie right now, but we may want to
                     // make it more explicit and do the checking ourselves.
-                    if let Operation::Function(mid, fid, ..) = &entry.oper {
+                    if let Operation::SpecFunction(mid, fid, ..) = &entry.oper {
                         let qid = mid.qualified(*fid);
                         decl.intrinsic_to_spec_fun.insert(key_sym, qid);
                         if decl.spec_fun_to_intrinsic.insert(qid, key_sym).is_some() {

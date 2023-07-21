@@ -1,0 +1,103 @@
+## IMPORTANT NOTE TO EDITORS OF THIS FILE ##
+
+## If you are trying to change how this CI works, you MUST go read the important
+## note at the top of docker-build-test.yaml. In short, to test this, you must temporarily
+## change docker-build-test to use the pull_request trigger instead of pull_request_target.
+
+## Make sure to add the CICD:CICD:build-images and CICD:run-e2e-tests labels to test
+## this within an in-review PR.
+
+## If the above approach is too slow (since you have to wait for the rust images
+## to build), you can cut the iteration time dramatically by changing the envs
+##   - Replace env.IMAGE_TAG for a known image tag
+##   - env.GIT_SHA will resolve to that of your PR branch
+
+# These tests ensure that the Node API, the OpenAPI spec that is generated from it,
+# and the TS SDK inner client that is generated from that, all match up.
+name: "Node API Compatibility Tests"
+on:
+  # This is called from within the docker-build-test.yaml workflow since we depend
+  # on the images having been built before this workflow runs.
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+        description: Use this to override the git SHA1, branch name (e.g. devnet) or tag to release the SDK from
+
+env:
+  # This is the docker image tag that will be used for the SDK release.
+  # It is also used to pull the docker images for the CI.
+  IMAGE_TAG: ${{ inputs.GIT_SHA || 'devnet' }} # default to "devnet" tag when not running on workflow_call
+  GIT_SHA: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }} # default to PR branch sha when not running on workflow_call
+
+jobs:
+  # Confirm that the generated client within the TS SDK has been re-generated
+  # if there are any changes that would affect it within the PR / commit. If
+  # everything is checked in, run tests, build the SDK, and upload it to npmjs.
+  node-api-compatibility-tests:
+    runs-on: high-perf-docker
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
+        with:
+          node-version-file: .node-version
+          registry-url: "https://registry.npmjs.org"
+
+      # Self hosted runners don't have pnpm preinstalled.
+      # https://github.com/actions/setup-node/issues/182
+      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+
+      # When using high-perf-docker, the CI is actually run with two containers
+      # in a k8s pod, one for docker commands run in the CI steps (docker), and
+      # one for everything else (runner). These containers share some volume
+      # mounts, ${{ runner.temp }} is one of them. Writing the specs here ensures
+      # the docker run step writes to a same place that the runner can read from.
+      - run: mkdir -p ${{ runner.temp }}/specs
+
+      # Build the API specs.
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        name: generate-yaml-spec
+        with:
+          max_attempts: 3
+          timeout_minutes: 20
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
+
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        name: generate-json-spec
+        with:
+          max_attempts: 3
+          timeout_minutes: 20
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f json -o /specs/spec.json
+
+      # Confirm that the specs we built here are the same as those checked in.
+      - run: echo "If this step fails, run the following commands locally to fix it:"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/spec.yaml"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/spec.json"
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.yaml api/doc/spec.yaml
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/spec.json
+
+      # Run package install. If install fails, it probably means the lockfile
+      # was not included in the commit.
+      - run: cd ./ecosystem/typescript/sdk && pnpm install --frozen-lockfile
+
+      # Ensure any changes to the generated client were checked in.
+      - run: cd ./ecosystem/typescript/sdk && pnpm generate-client -o /tmp/generated_client
+      - run: echo "If this step fails, run the following command locally to fix it:"
+      - run: echo "cd ecosystem/typescript/sdk && pnpm generate-client"
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/

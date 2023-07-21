@@ -10,6 +10,12 @@ export const NetworkToNodeAPI: Record<string, string> = {
   devnet: "https://fullnode.devnet.aptoslabs.com/v1",
 };
 
+export const NodeAPIToNetwork: Record<string, string> = {
+  "https://fullnode.mainnet.aptoslabs.com/v1": "mainnet",
+  "https://fullnode.testnet.aptoslabs.com/v1": "testnet",
+  "https://fullnode.devnet.aptoslabs.com/v1": "devnet",
+};
+
 export enum Network {
   MAINNET = "mainnet",
   TESTNET = "testnet",
@@ -18,5 +24,5 @@ export enum Network {
 
 export interface CustomEndpoints {
   fullnodeUrl: string;
-  indexerUrl: string;
+  indexerUrl?: string;
 }

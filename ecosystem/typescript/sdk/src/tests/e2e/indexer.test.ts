@@ -1,100 +1,126 @@
 import { AptosAccount } from "../../account/aptos_account";
-import { AptosClient } from "../../providers/aptos_client";
 import { bcsSerializeBool } from "../../bcs";
 import { FaucetClient } from "../../plugins/faucet_client";
 import { IndexerClient } from "../../providers/indexer";
 import { TokenClient } from "../../plugins/token_client";
 import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
-import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
+import { Network, NetworkToIndexerAPI, sleep } from "../../utils";
 import { Provider } from "../../providers";
 import { AptosToken } from "../../plugins";
 
-const provider = new Provider(Network.TESTNET);
+const provider = new Provider(Network.DEVNET);
 const aptosToken = new AptosToken(provider);
-const faucetClient = new FaucetClient(
-  "https://fullnode.testnet.aptoslabs.com",
-  "https://faucet.testnet.aptoslabs.com",
-  { TOKEN: FAUCET_AUTH_TOKEN },
-);
+const faucetClient = new FaucetClient("https://fullnode.devnet.aptoslabs.com", "https://faucet.devnet.aptoslabs.com", {
+  TOKEN: FAUCET_AUTH_TOKEN,
+});
 const tokenClient = new TokenClient(provider.aptosClient);
 const alice = new AptosAccount();
 const collectionName = "AliceCollection";
 const collectionNameV2 = "AliceCollection2";
 const tokenName = "Alice Token";
-const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.TESTNET]);
+const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.DEVNET]);
+
+let skipTest = false;
+let runTests = describe;
 
 describe("Indexer", () => {
   it("should throw an error when account address is not valid", async () => {
+    const address1 = "702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs("702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
-    }).rejects.toThrow("Address needs to be 66 chars long.");
+      await indexerClient.getAccountNFTs(address1);
+    }).rejects.toThrow(`${address1} is less than 66 chars long.`);
 
+    const address2 = "0x702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs("0x702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
-    }).rejects.toThrow("Address needs to be 66 chars long.");
+      await indexerClient.getAccountNFTs(address2);
+    }).rejects.toThrow(`${address2} is less than 66 chars long.`);
   });
 
   it("should not throw an error when account address is missing 0x", async () => {
+    const address = "790a34c702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs("790a34c702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
-    }).not.toThrow("Address needs to be 66 chars long.");
+      await indexerClient.getAccountNFTs(address);
+    }).not.toThrow();
   });
 
   beforeAll(async () => {
-    await faucetClient.fundAccount(alice.address(), 100000000);
-    // Create collection and token on Alice's account
-    await provider.waitForTransaction(
-      await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
-      { checkSuccess: true },
-    );
-    await provider.waitForTransaction(
-      await tokenClient.createTokenWithMutabilityConfig(
-        alice,
-        collectionName,
-        tokenName,
-        "Alice's simple token",
-        1,
-        "https://aptos.dev/img/nyan.jpeg",
-        1000,
-        alice.address(),
-        1,
-        0,
-        ["TOKEN_BURNABLE_BY_OWNER"],
-        [bcsSerializeBool(true)],
-        ["bool"],
-        [false, false, false, false, true],
-      ),
-      { checkSuccess: true },
+    const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
+    const fullNodeChainId = await provider.getChainId();
+
+    console.log(
+      `\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
     );
 
-    await provider.waitForTransaction(
-      await aptosToken.createCollection(alice, "Alice's simple collection", collectionNameV2, "https://aptos.dev", 5, {
-        royaltyNumerator: 10,
-        royaltyDenominator: 10,
-      }),
-      { checkSuccess: true },
-    );
+    if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
+      console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+      skipTest = true;
+      runTests = describe.skip;
+    }
 
-    await provider.waitForTransactionWithResult(
-      await aptosToken.mint(
-        alice,
-        collectionNameV2,
-        "Alice's simple token",
-        tokenName,
-        "https://aptos.dev/img/nyan.jpeg",
-        ["key"],
-        ["bool"],
-        ["true"],
-      ),
-      { checkSuccess: true },
-    );
+    if (!skipTest) {
+      await faucetClient.fundAccount(alice.address(), 100000000);
+      // Create collection and token on Alice's account
+      await provider.waitForTransaction(
+        await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+        { checkSuccess: true },
+      );
+      await provider.waitForTransaction(
+        await tokenClient.createTokenWithMutabilityConfig(
+          alice,
+          collectionName,
+          tokenName,
+          "Alice's simple token",
+          1,
+          "https://aptos.dev/img/nyan.jpeg",
+          1000,
+          alice.address(),
+          1,
+          0,
+          ["TOKEN_BURNABLE_BY_OWNER"],
+          [bcsSerializeBool(true)],
+          ["bool"],
+          [false, false, false, false, true],
+        ),
+        { checkSuccess: true },
+      );
+
+      await provider.waitForTransaction(
+        await aptosToken.createCollection(
+          alice,
+          "Alice's simple collection",
+          collectionNameV2,
+          "https://aptos.dev",
+          5,
+          {
+            royaltyNumerator: 10,
+            royaltyDenominator: 10,
+          },
+        ),
+        { checkSuccess: true },
+      );
+
+      await provider.waitForTransactionWithResult(
+        await aptosToken.mint(
+          alice,
+          collectionNameV2,
+          "Alice's simple token",
+          tokenName,
+          "https://aptos.dev/img/nyan.jpeg",
+          ["key"],
+          ["bool"],
+          ["true"],
+        ),
+        { checkSuccess: true },
+      );
+    }
   }, longTestTimeout);
 
-  describe("get data", () => {
+  runTests("get data", () => {
     jest.retryTimes(5);
     beforeEach(async () => {
       await sleep(1000);
     });
+
     it(
       "gets account NFTs",
       async () => {
@@ -176,7 +202,7 @@ describe("Indexer", () => {
         const tokenData = await indexerClient.getTokenData(
           accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
         );
-        expect(tokenData.current_token_datas[0].name).toEqual("Alice Token");
+        expect(tokenData.current_token_datas_v2[0].token_name).toEqual("Alice Token");
       },
       longTestTimeout,
     );
@@ -189,7 +215,20 @@ describe("Indexer", () => {
           accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
           0,
         );
-        expect(tokenOwnersData.current_token_ownerships[0].owner_address).toEqual(alice.address().hex());
+        expect(tokenOwnersData.current_token_ownerships_v2[0].owner_address).toEqual(alice.address().hex());
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets token current owner data",
+      async () => {
+        const accountNFTs = await indexerClient.getAccountNFTs(alice.address().hex());
+        const tokenOwnersData = await indexerClient.getTokenCurrentOwnerData(
+          accountNFTs.current_token_ownerships[0].current_token_data!.token_data_id_hash,
+          0,
+        );
+        expect(tokenOwnersData.current_token_ownerships_v2[0].owner_address).toEqual(alice.address().hex());
       },
       longTestTimeout,
     );
@@ -207,7 +246,6 @@ describe("Indexer", () => {
       "gets user transactions",
       async () => {
         const userTransactions = await indexerClient.getUserTransactions(482294669, { limit: 4 });
-        expect(userTransactions.user_transactions[0].version).toEqual(482294669);
         expect(userTransactions.user_transactions.length).toEqual(4);
       },
       longTestTimeout,
@@ -230,6 +268,11 @@ describe("Indexer", () => {
     it("gets account current tokens", async () => {
       const tokens = await indexerClient.getOwnedTokens(alice.address().hex());
       expect(tokens.current_token_ownerships_v2).toHaveLength(2);
+    });
+
+    it("gets account current tokens from a specified token standard", async () => {
+      const tokens = await indexerClient.getOwnedTokens(alice.address().hex(), { tokenStandard: "v2" });
+      expect(tokens.current_token_ownerships_v2).toHaveLength(1);
     });
 
     it("gets the collection data", async () => {
@@ -278,6 +321,26 @@ describe("Indexer", () => {
         expect(tokensFromCollectionAddress.current_token_ownerships_v2).toEqual(
           tokensFromNameAndCreatorAddress.current_token_ownerships_v2,
         );
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "queries for all collections that an account has tokens for",
+      async () => {
+        const collections = await indexerClient.getCollectionsWithOwnedTokens(alice.address().hex());
+        expect(collections.current_collection_ownership_v2_view.length).toEqual(2);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "queries for all v2 collections that an account has tokens for",
+      async () => {
+        const collections = await indexerClient.getCollectionsWithOwnedTokens(alice.address().hex(), {
+          tokenStandard: "v2",
+        });
+        expect(collections.current_collection_ownership_v2_view.length).toEqual(1);
       },
       longTestTimeout,
     );

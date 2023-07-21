@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Parser)]
 pub struct TransferCoins {
     /// Address of account to send APT to
-    #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) account: AccountAddress,
 
     /// Amount of Octas (10^-8 APT) to transfer

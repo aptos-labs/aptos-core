@@ -16,5 +16,5 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-framework = { workspace = true }
 bcs = { workspace = true }
+clap = { workspace = true }
 move-binary-format = { workspace = true }
-structopt = { workspace = true }

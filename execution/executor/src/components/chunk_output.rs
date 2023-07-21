@@ -16,9 +16,15 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
+    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
-use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, AptosVM, VMExecutor};
+use aptos_vm::{
+    sharded_block_executor::{
+        sharded_executor_client::ShardedExecutorClient, ShardedBlockExecutor,
+    },
+    AptosVM, VMExecutor,
+};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use once_cell::sync::Lazy;
@@ -26,10 +32,9 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 
 pub static SHARDED_BLOCK_EXECUTOR: Lazy<Arc<Mutex<ShardedBlockExecutor<CachedStateView>>>> =
     Lazy::new(|| {
-        Arc::new(Mutex::new(ShardedBlockExecutor::new(
-            AptosVM::get_num_shards(),
-            None, // Defaults to num_cpus / num_shards
-        )))
+        let executor_clients =
+            ShardedExecutorClient::create_sharded_executor_clients(AptosVM::get_num_shards(), None);
+        Arc::new(Mutex::new(ShardedBlockExecutor::new(executor_clients)))
     });
 
 pub struct ChunkOutput {
@@ -45,6 +50,27 @@ pub struct ChunkOutput {
 
 impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
+        transactions: ExecutableTransactions<Transaction>,
+        state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> Result<Self> {
+        match transactions {
+            ExecutableTransactions::Unsharded(txns) => {
+                Self::by_transaction_execution_unsharded::<V>(
+                    txns,
+                    state_view,
+                    maybe_block_gas_limit,
+                )
+            },
+            ExecutableTransactions::Sharded(block) => Self::by_transaction_execution_sharded::<V>(
+                block,
+                state_view,
+                maybe_block_gas_limit,
+            ),
+        }
+    }
+
+    fn by_transaction_execution_unsharded<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
@@ -65,26 +91,26 @@ impl ChunkOutput {
     }
 
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        block: Vec<SubBlocksForShard<Transaction>>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs = Self::execute_block_sharded::<V>(
-            transactions.clone(),
+            block.clone(),
             state_view_arc.clone(),
             maybe_block_gas_limit,
         )?;
 
-        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+        // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
 
+        // Unwrapping here is safe because the execution has finished and it is guaranteed that
+        // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
 
         Ok(Self {
-            transactions,
+            transactions: SubBlocksForShard::flatten(block),
             transaction_outputs,
-            // Unwrapping here is safe because the execution has finished and it is guaranteed that
-            // the state view is not used anymore.
             state_cache: state_view.into_state_cache(),
         })
     }
@@ -152,13 +178,13 @@ impl ChunkOutput {
     }
 
     fn execute_block_sharded<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        block: Vec<SubBlocksForShard<Transaction>>,
         state_view: Arc<CachedStateView>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block_sharded(
             SHARDED_BLOCK_EXECUTOR.lock().deref(),
-            transactions,
+            block,
             state_view,
             maybe_block_gas_limit,
         )?)

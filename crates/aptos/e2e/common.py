@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 NODE_PORT = 8080
+METRICS_PORT = 9101
 FAUCET_PORT = 8081
 
 

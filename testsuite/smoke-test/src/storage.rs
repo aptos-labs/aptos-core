@@ -131,7 +131,7 @@ async fn test_db_restore() {
         backup_path.path(),
         db_dir.as_path(),
         &[],
-        node0_config.storage.rocksdb_configs.use_state_kv_db,
+        node0_config.storage.rocksdb_configs.split_ledger_db,
         None,
     );
 
@@ -408,7 +408,7 @@ pub(crate) fn db_restore(
     backup_path: &Path,
     db_path: &Path,
     trusted_waypoints: &[Waypoint],
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
     target_verion: Option<Version>, /* target version should be same as epoch ending version to start a node */
 ) {
     let now = Instant::now();
@@ -424,8 +424,8 @@ pub(crate) fn db_restore(
         cmd.arg(&w.to_string());
     });
 
-    if use_state_kv_db {
-        cmd.arg("--use-state-kv-db");
+    if split_ledger_db {
+        cmd.arg("--split-ledger-db");
     }
     if let Some(version) = target_verion {
         cmd.arg("--target-version");

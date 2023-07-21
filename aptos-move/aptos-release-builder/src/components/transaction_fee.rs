@@ -19,7 +19,7 @@ pub fn generate_fee_distribution_proposal(
         &writer,
         is_testnet,
         next_execution_hash,
-        "aptos_framework::transaction_fee",
+        &["aptos_framework::transaction_fee"],
         |writer| {
             emitln!(
                 writer,

@@ -74,7 +74,8 @@ impl FaucetCliArgs {
             Duration::from_secs(30),
             None,
             self.max_gas_amount,
-            30,
+            25, // transaction_expiration_secs
+            30, // wait_for_outstanding_txns_secs
             true,
         );
 
@@ -125,4 +126,10 @@ fn process_account_address(str: &str) -> AccountAddress {
     } else {
         panic!("Account address is in an invalid format {}", str)
     }
+}
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    FaucetCliArgs::command().debug_assert()
 }

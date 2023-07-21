@@ -14,7 +14,7 @@
 version: "3.8"
 services:
   redis:
-    image: redis:6.2
+    image: ${REDIS_IMAGE_REPO:-redis}:6.2
     networks:
       shared:
         ipv4_address:  172.16.1.12
@@ -23,6 +23,18 @@ services:
       - 6379
     ports:
       - 6379:6379
+
+  redis-replica:
+    image: ${REDIS_IMAGE_REPO:-redis}:6.2
+    command: redis-server --replicaof redis 6379
+    networks:
+      shared:
+        ipv4_address:  172.16.1.22
+    restart: unless-stopped
+    expose:
+      - 6379
+    depends_on:
+      - redis
 
   indexer-grpc-cache-worker:
     image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-devnet}"
@@ -83,8 +95,10 @@ services:
       - '/opt/aptos/data-service-config.yaml'
     ports:
       - "50052:50052" # GRPC
+      - "18084:8084" # health
     depends_on:
       - indexer-grpc-cache-worker
+      - redis-replica
 
 # This joins the indexer-grpc compose with the validator-testnet compose using a shared docker network
 networks:

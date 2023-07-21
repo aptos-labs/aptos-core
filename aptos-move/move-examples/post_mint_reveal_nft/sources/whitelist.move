@@ -134,11 +134,8 @@ module post_mint_reveal_nft::whitelist {
         let now = timestamp::now_seconds();
         assert!(now < whitelist_stage.whitelist_minting_end_time, error::invalid_argument(EINVALID_UPDATE_AFTER_MINTING));
 
-        let i = 0;
-        while (i < vector::length(&wl_addresses)) {
-            let wl_address = vector::borrow(&wl_addresses, i);
+        vector::for_each_ref(&wl_addresses, |wl_address| {
             bucket_table::add(&mut whitelist_stage.whitelisted_address, *wl_address, mint_limit);
-            i = i + 1;
-        };
+        });
     }
 }

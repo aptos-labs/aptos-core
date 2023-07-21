@@ -24,7 +24,9 @@ use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
 };
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures, state_store::state_value::StateValue,
+    block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::state_value::StateValue,
     transaction::Transaction,
 };
 use aptos_vm::AptosVM;
@@ -33,7 +35,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput>;
@@ -41,7 +43,7 @@ pub trait TransactionBlockExecutor: Send + Sync {
 
 impl TransactionBlockExecutor for AptosVM {
     fn execute_transaction_block(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
@@ -105,7 +107,7 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: ExecutableBlock<Transaction>,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
@@ -175,12 +177,15 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: ExecutableBlock<Transaction>,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-        let (block_id, transactions) = block;
+        let ExecutableBlock {
+            block_id,
+            transactions,
+        } = block;
         let committed_block = self.block_tree.root_block();
         let mut block_vec = self
             .block_tree

@@ -7,13 +7,20 @@ use crate::{
     types::{AccountIdentifier, Amount},
     AccountAddress, ApiResult,
 };
+use aptos_rest_client::aptos_api_types::{EntryFunctionId, ViewRequest};
 use aptos_types::stake_pool::StakePool;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
     fmt::{Display, Formatter},
     str::FromStr,
 };
+
+static DELEGATION_POOL_GET_STAKE_FUNCTION: Lazy<EntryFunctionId> =
+    Lazy::new(|| "0x1::delegation_pool::get_stake".parse().unwrap());
+static STAKE_GET_LOCKUP_SECS_FUNCTION: Lazy<EntryFunctionId> =
+    Lazy::new(|| "0x1::stake::get_lockup_secs".parse().unwrap());
 
 /// Errors that can be returned by the API
 ///
@@ -102,6 +109,8 @@ pub enum OperationType {
     InitializeStakePool,
     ResetLockup,
     UnlockStake,
+    UpdateCommission,
+    WithdrawUndelegatedFunds,
     DistributeStakingRewards,
     AddDelegatedStake,
     UnlockDelegatedStake,
@@ -122,7 +131,9 @@ impl OperationType {
     const STAKING_REWARD: &'static str = "staking_reward";
     const UNLOCK_DELEGATED_STAKE: &'static str = "unlock_delegated_stake";
     const UNLOCK_STAKE: &'static str = "unlock_stake";
+    const UPDATE_COMMISSION: &'static str = "update_commission";
     const WITHDRAW: &'static str = "withdraw";
+    const WITHDRAW_UNDELEGATED_FUNDS: &'static str = "withdraw_undelegated_funds";
 
     pub fn all() -> Vec<OperationType> {
         use OperationType::*;
@@ -137,6 +148,7 @@ impl OperationType {
             InitializeStakePool,
             ResetLockup,
             UnlockStake,
+            WithdrawUndelegatedFunds,
             DistributeStakingRewards,
             AddDelegatedStake,
             UnlockDelegatedStake,
@@ -159,9 +171,11 @@ impl FromStr for OperationType {
             Self::INITIALIZE_STAKE_POOL => Ok(OperationType::InitializeStakePool),
             Self::RESET_LOCKUP => Ok(OperationType::ResetLockup),
             Self::UNLOCK_STAKE => Ok(OperationType::UnlockStake),
+            Self::UPDATE_COMMISSION => Ok(OperationType::UpdateCommission),
             Self::DISTRIBUTE_STAKING_REWARDS => Ok(OperationType::DistributeStakingRewards),
             Self::ADD_DELEGATED_STAKE => Ok(OperationType::AddDelegatedStake),
             Self::UNLOCK_DELEGATED_STAKE => Ok(OperationType::UnlockDelegatedStake),
+            Self::WITHDRAW_UNDELEGATED_FUNDS => Ok(OperationType::WithdrawUndelegatedFunds),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
@@ -183,9 +197,11 @@ impl Display for OperationType {
             InitializeStakePool => Self::INITIALIZE_STAKE_POOL,
             ResetLockup => Self::RESET_LOCKUP,
             UnlockStake => Self::UNLOCK_STAKE,
+            UpdateCommission => Self::UPDATE_COMMISSION,
             DistributeStakingRewards => Self::DISTRIBUTE_STAKING_REWARDS,
             AddDelegatedStake => Self::ADD_DELEGATED_STAKE,
             UnlockDelegatedStake => Self::UNLOCK_DELEGATED_STAKE,
+            WithdrawUndelegatedFunds => Self::WITHDRAW_UNDELEGATED_FUNDS,
             Fee => Self::FEE,
         })
     }
@@ -313,5 +329,178 @@ pub async fn get_stake_balances(
         }
     } else {
         Ok(None)
+    }
+}
+
+pub async fn get_delegation_stake_balances(
+    rest_client: &aptos_rest_client::Client,
+    account_identifier: &AccountIdentifier,
+    owner_address: AccountAddress,
+    pool_address: AccountAddress,
+    version: u64,
+) -> ApiResult<Option<BalanceResult>> {
+    // get requested_balance
+    let balances_response = rest_client
+        .view(
+            &ViewRequest {
+                function: DELEGATION_POOL_GET_STAKE_FUNCTION.clone(),
+                type_arguments: vec![],
+                arguments: vec![
+                    serde_json::Value::String(pool_address.to_string()),
+                    serde_json::Value::String(owner_address.to_string()),
+                ],
+            },
+            Some(version),
+        )
+        .await?;
+
+    let requested_balance =
+        parse_requested_balance(account_identifier, balances_response.into_inner());
+
+    // get lockup_secs
+    let lockup_secs_response = rest_client
+        .view(
+            &ViewRequest {
+                function: STAKE_GET_LOCKUP_SECS_FUNCTION.clone(),
+                type_arguments: vec![],
+                arguments: vec![serde_json::Value::String(pool_address.to_string())],
+            },
+            Some(version),
+        )
+        .await?;
+    let lockup_expiration = parse_lockup_expiration(lockup_secs_response.into_inner());
+
+    if let Some(balance) = requested_balance {
+        Ok(Some(BalanceResult {
+            balance: Some(Amount {
+                value: balance,
+                currency: native_coin(),
+            }),
+            lockup_expiration,
+        }))
+    } else {
+        Err(ApiError::InternalError(Some(
+            "Unable to construct BalanceResult instance".to_string(),
+        )))
+    }
+}
+
+fn parse_requested_balance(
+    account_identifier: &AccountIdentifier,
+    balances_result: Vec<serde_json::Value>,
+) -> Option<String> {
+    if account_identifier.is_delegator_active_stake() {
+        return balances_result
+            .get(0)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
+    } else if account_identifier.is_delegator_inactive_stake() {
+        return balances_result
+            .get(1)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
+    } else if account_identifier.is_delegator_pending_inactive_stake() {
+        return balances_result
+            .get(2)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
+    } else if account_identifier.is_total_stake() {
+        return Some(
+            balances_result
+                .iter()
+                .map(|v| {
+                    v.as_str()
+                        .map(|s| s.to_owned())
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .unwrap_or(0)
+                })
+                .sum::<u64>()
+                .to_string(),
+        );
+    }
+
+    None
+}
+
+fn parse_lockup_expiration(lockup_secs_result: Vec<serde_json::Value>) -> u64 {
+    return lockup_secs_result
+        .get(0)
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+        .unwrap_or(0);
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::types::SubAccountIdentifier;
+
+    #[test]
+    fn test_parse_requested_balance() {
+        let balances_result = vec![
+            serde_json::Value::String("300".to_string()),
+            serde_json::Value::String("200".to_string()),
+            serde_json::Value::String("100".to_string()),
+        ];
+
+        // Total stake balance is sum of all 3
+        assert_eq!(
+            Some("600".to_string()),
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_delegated_total_stake("0xabc")),
+                },
+                balances_result.clone()
+            )
+        );
+
+        assert_eq!(
+            Some("300".to_string()),
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_delegated_active_stake("0xabc")),
+                },
+                balances_result.clone()
+            )
+        );
+
+        assert_eq!(
+            Some("200".to_string()),
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_delegated_inactive_stake("0xabc")),
+                },
+                balances_result.clone()
+            )
+        );
+
+        assert_eq!(
+            Some("100".to_string()),
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_delegated_pending_inactive_stake(
+                        "0xabc"
+                    )),
+                },
+                balances_result.clone()
+            )
+        );
+
+        assert_eq!(
+            None,
+            parse_requested_balance(
+                &AccountIdentifier {
+                    address: "0x123".to_string(),
+                    sub_account: Some(SubAccountIdentifier::new_active_stake()),
+                },
+                balances_result
+            )
+        );
+    }
+
+    #[test]
+    fn test_parse_lockup_expiration() {
+        let lockup_secs_result = vec![serde_json::Value::String("123456".to_string())];
+        assert_eq!(123456, parse_lockup_expiration(lockup_secs_result));
     }
 }

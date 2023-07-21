@@ -77,6 +77,14 @@ resource "helm_release" "validator" {
           effect = "NoExecute"
         }]
       }
+      haproxy = {
+        nodeSelector = var.gke_enable_node_autoprovisioning ? {} : {
+          "cloud.google.com/gke-nodepool" = google_container_node_pool.utilities.name
+        }
+      }
+      service = {
+        domain = local.domain
+      }
     }),
     var.helm_values_file != "" ? file(var.helm_values_file) : "{}",
     jsonencode(var.helm_values),

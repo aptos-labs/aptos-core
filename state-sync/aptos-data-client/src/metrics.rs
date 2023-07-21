@@ -8,16 +8,13 @@ use aptos_metrics_core::{
     HistogramTimer, HistogramVec, IntCounterVec, IntGaugeVec,
 };
 
-/// The special label TOTAL_COUNT stores the sum of all values in the counter.
-pub const TOTAL_COUNT_LABEL: &str = "TOTAL_COUNT";
+// Useful metric constants and labels
 pub const PRIORITIZED_PEER: &str = "prioritized_peer";
+pub const PROPOSE_TO_SEEN_LATENCY_LABEL: &str = "propose_to_seen_latency";
+pub const PROPOSE_TO_SYNC_LATENCY_LABEL: &str = "propose_to_sync_latency";
 pub const REGULAR_PEER: &str = "regular_peer";
-
-// Latency buckets for network latencies (i.e., the defaults only go up
-// to 10 seconds, but we usually require more).
-const NETWORK_LATENCY_BUCKETS: [f64; 14] = [
-    0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0,
-];
+pub const SEEN_TO_SYNC_LATENCY_LABEL: &str = "seen_to_sync_latency";
+pub const TOTAL_COUNT_LABEL: &str = "TOTAL_COUNT";
 
 // TOOD(joshlind): add peer priorities back to the requests
 
@@ -51,12 +48,18 @@ pub static ERROR_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+// Latency buckets for network latencies (seconds)
+const REQUEST_LATENCY_BUCKETS_SECS: [f64; 18] = [
+    0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0,
+    60.0,
+];
+
 /// Counter for tracking request latencies
 pub static REQUEST_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     let histogram_opts = histogram_opts!(
         "aptos_data_client_request_latencies",
         "Counters related to request latencies",
-        NETWORK_LATENCY_BUCKETS.to_vec()
+        REQUEST_LATENCY_BUCKETS_SECS.to_vec()
     );
     register_histogram_vec!(histogram_opts, &["request_type", "network"]).unwrap()
 });
@@ -111,6 +114,23 @@ pub static OPTIMAL_CHUNK_SIZES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+// Latency buckets for the sync latencies (seconds). Note: there are a
+// lot of buckets here because we really care about sync latencies.
+const SYNC_LATENCY_BUCKETS_SECS: [f64; 36] = [
+    0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8,
+    1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0, 120.0, 180.0,
+];
+
+/// Counter for tracking various sync latencies
+pub static SYNC_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    let histogram_opts = histogram_opts!(
+        "aptos_data_client_sync_latencies",
+        "Counters related to sync latencies",
+        SYNC_LATENCY_BUCKETS_SECS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["label"]).unwrap()
+});
+
 /// An enum representing the various types of data that can be
 /// fetched via the data client.
 pub enum DataType {
@@ -151,6 +171,11 @@ pub fn increment_request_counter(
     counter
         .with_label_values(&[TOTAL_COUNT_LABEL, network.as_str()])
         .inc();
+}
+
+/// Observes the value for the provided histogram and label
+pub fn observe_value_with_label(histogram: &Lazy<HistogramVec>, label: &str, value: f64) {
+    histogram.with_label_values(&[label]).observe(value)
 }
 
 /// Sets the gauge with the specific label and value

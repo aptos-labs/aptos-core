@@ -6,7 +6,10 @@
 
 //! This crate defines [`trait StateView`](StateView).
 
-use crate::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
+use crate::{
+    account_with_state_view::{AccountWithStateView, AsAccountWithStateView},
+    in_memory_state_view::InMemoryStateView,
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -20,6 +23,7 @@ use std::ops::Deref;
 
 pub mod account_with_state_cache;
 pub mod account_with_state_view;
+pub mod in_memory_state_view;
 
 /// `StateView` is a trait that defines a read-only snapshot of the global state. It is passed to
 /// the VM for transaction execution, during which the VM is guaranteed to read anything at the
@@ -47,6 +51,10 @@ pub trait TStateView {
 
     /// Get state storage usage info at epoch ending.
     fn get_usage(&self) -> Result<StateStorageUsage>;
+
+    fn as_in_memory_state_view(&self) -> InMemoryStateView {
+        unreachable!("in-memory state view conversion not supported yet")
+    }
 }
 
 pub trait StateView: TStateView<Key = StateKey> {}

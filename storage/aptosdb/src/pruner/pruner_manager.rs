@@ -10,8 +10,9 @@ use aptos_types::transaction::Version;
 /// The `PrunerManager` is meant to be part of a `AptosDB` instance and runs in the background to
 /// prune old data.
 ///
-/// It creates a worker thread on construction and joins it on destruction. When destructed, it
-/// quits the worker thread eagerly without waiting for all pending work to be done.
+/// If the pruner is enabled. It creates a worker thread on construction and joins it on
+/// destruction. When destructed, it quits the worker thread eagerly without waiting for
+/// all pending work to be done.
 pub trait PrunerManager: Sync {
     type Pruner: DBPruner;
 
@@ -19,16 +20,20 @@ pub trait PrunerManager: Sync {
 
     fn get_prune_window(&self) -> Version;
 
-    fn get_min_viable_version(&self) -> Version;
+    fn get_min_viable_version(&self) -> Version {
+        unimplemented!()
+    }
 
     fn get_min_readable_version(&self) -> Version;
 
     /// Sets pruner target version when necessary.
     fn maybe_set_pruner_target_db_version(&self, latest_version: Version);
 
-    fn set_pruner_target_db_version(&self, latest_version: Version);
+    // Only used at the end of fast sync to store the min_readable_version to db and update the
+    // in memory progress.
+    fn save_min_readable_version(&self, min_readable_version: Version) -> anyhow::Result<()>;
 
-    fn pruner(&self) -> &Self::Pruner;
+    fn is_pruning_pending(&self) -> bool;
 
     /// (For tests only.) Notifies the worker thread and waits for it to finish its job by polling
     /// an internal counter.
@@ -54,11 +59,14 @@ pub trait PrunerManager: Sync {
         let end = Instant::now() + TIMEOUT;
 
         while Instant::now() < end {
-            if !self.pruner().is_pruning_pending() {
+            if !self.is_pruning_pending() {
                 return Ok(());
             }
             sleep(Duration::from_millis(1));
         }
         anyhow::bail!("Timeout waiting for pruner worker.");
     }
+
+    #[cfg(test)]
+    fn set_worker_target_version(&self, target_version: Version);
 }

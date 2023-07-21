@@ -1,12 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{TransactionCommitter, TransactionExecutor};
+use crate::{
+    block_partitioning::BlockPartitioningStage, GasMesurement, TransactionCommitter,
+    TransactionExecutor,
+};
+use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::transaction::{Transaction, Version};
-use aptos_vm::counters::TXN_GAS_USAGE;
+use aptos_types::{
+    block_executor::partitioner::ExecutableBlock,
+    transaction::{Transaction, Version},
+};
 use std::{
     marker::PhantomData,
     sync::{
@@ -14,7 +20,7 @@ use std::{
         Arc,
     },
     thread::JoinHandle,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 #[derive(Clone, Debug)]
@@ -24,6 +30,8 @@ pub struct PipelineConfig {
     pub skip_commit: bool,
     pub allow_discards: bool,
     pub allow_aborts: bool,
+    pub num_executor_shards: usize,
+    pub async_partitioning: bool,
 }
 
 pub struct Pipeline<V> {
@@ -47,14 +55,18 @@ where
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
 
-        let (block_sender, block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
+        let (raw_block_sender, raw_block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
             if config.delay_execution_start {
                 (num_blocks.unwrap() + 1).max(50)
             } else {
                 50
             }, /* bound */
         );
-        let (commit_sender, commit_receiver) = mpsc::sync_channel(
+
+        // Assume the distributed executor and the distributed partitioner share the same worker set.
+        let num_partitioner_shards = config.num_executor_shards;
+
+        let (commit_sender, commit_receiver) = mpsc::sync_channel::<CommitBlockMessage>(
             if config.split_stages || config.skip_commit {
                 (num_blocks.unwrap() + 1).max(3)
             } else {
@@ -76,46 +88,125 @@ where
             (None, None)
         };
 
-        let exe_thread = std::thread::Builder::new()
-            .name("txn_executor".to_string())
-            .spawn(move || {
-                start_execution_rx.map(|rx| rx.recv());
+        let mut join_handles = vec![];
 
-                let mut exe = TransactionExecutor::new(
-                    executor_1,
-                    parent_block_id,
-                    version,
-                    Some(commit_sender),
-                    config.allow_discards,
-                    config.allow_aborts,
-                );
-                let start_time = Instant::now();
-                let mut executed = 0;
-                let start_gas = TXN_GAS_USAGE.get_sample_sum();
-                while let Ok(transactions) = block_receiver.recv() {
-                    info!("Received block of size {:?} to execute", transactions.len());
-                    executed += transactions.len();
-                    exe.execute_block(transactions);
-                    info!("Finished executing block");
-                }
+        let mut partitioning_stage = BlockPartitioningStage::new(num_partitioner_shards);
 
-                let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
+        let mut exe = TransactionExecutor::new(
+            executor_1,
+            parent_block_id,
+            version,
+            Some(commit_sender),
+            config.allow_discards,
+            config.allow_aborts,
+        );
 
-                let elapsed = start_time.elapsed().as_secs_f32();
-                info!(
-                    "Overall execution TPS: {} txn/s (over {} txns)",
-                    executed as f32 / elapsed,
-                    executed
-                );
-                info!(
-                    "Overall execution GPS: {} gas/s (over {} txns)",
-                    delta_gas as f32 / elapsed,
-                    executed
-                );
+        if config.async_partitioning {
+            let (executable_block_sender, executable_block_receiver) =
+                mpsc::sync_channel::<ExecuteBlockMessage>(3);
 
-                start_commit_tx.map(|tx| tx.send(()));
-            })
-            .expect("Failed to spawn transaction executor thread.");
+            let partitioning_thread = std::thread::Builder::new()
+                .name("block_partitioning".to_string())
+                .spawn(move || {
+                    while let Ok(txns) = raw_block_receiver.recv() {
+                        let exe_block_msg = partitioning_stage.process(txns);
+                        executable_block_sender.send(exe_block_msg).unwrap();
+                    }
+                })
+                .expect("Failed to spawn block partitioner thread.");
+            join_handles.push(partitioning_thread);
+
+            let exe_thread = std::thread::Builder::new()
+                .name("txn_executor".to_string())
+                .spawn(move || {
+                    start_execution_rx.map(|rx| rx.recv());
+                    let start_time = Instant::now();
+                    let mut executed = 0;
+                    let start_gas_measurement = GasMesurement::start();
+                    while let Ok(msg) = executable_block_receiver.recv() {
+                        let ExecuteBlockMessage {
+                            current_block_start_time,
+                            partition_time,
+                            block,
+                        } = msg;
+                        let block_size = block.transactions.num_transactions();
+                        info!("Received block of size {:?} to execute", block_size);
+                        executed += block_size;
+                        exe.execute_block(current_block_start_time, partition_time, block);
+                        info!("Finished executing block");
+                    }
+
+                    let (delta_gas, delta_gas_count) = start_gas_measurement.end();
+
+                    let elapsed = start_time.elapsed().as_secs_f64();
+                    info!(
+                        "Overall execution TPS: {} txn/s (over {} txns)",
+                        executed as f64 / elapsed,
+                        executed
+                    );
+                    info!(
+                        "Overall execution GPS: {} gas/s (over {} txns)",
+                        delta_gas / elapsed,
+                        executed
+                    );
+                    info!(
+                        "Overall execution GPT: {} gas/txn (over {} txns)",
+                        delta_gas / (delta_gas_count as f64).max(1.0),
+                        executed
+                    );
+
+                    start_commit_tx.map(|tx| tx.send(()));
+                })
+                .expect("Failed to spawn transaction executor thread.");
+            join_handles.push(exe_thread);
+        } else {
+            let par_exe_thread = std::thread::Builder::new()
+                .name("txn_partitioner_executor".to_string())
+                .spawn(move || {
+                    start_execution_rx.map(|rx| rx.recv());
+                    let start_time = Instant::now();
+                    let mut executed = 0;
+                    let start_gas_measurement = GasMesurement::start();
+                    while let Ok(raw_block) = raw_block_receiver.recv() {
+                        info!(
+                            "Received block of size {:?} to partition-then-execute.",
+                            raw_block.len()
+                        );
+                        let ExecuteBlockMessage {
+                            current_block_start_time,
+                            partition_time,
+                            block,
+                        } = partitioning_stage.process(raw_block);
+                        let block_size = block.transactions.num_transactions();
+                        executed += block_size;
+                        exe.execute_block(current_block_start_time, partition_time, block);
+                        info!("Finished executing block");
+                    }
+
+                    let (delta_gas, delta_gas_count) = start_gas_measurement.end();
+
+                    let elapsed = start_time.elapsed().as_secs_f64();
+                    info!(
+                        "Overall execution TPS: {} txn/s (over {} txns)",
+                        executed as f64 / elapsed,
+                        executed
+                    );
+                    info!(
+                        "Overall execution GPS: {} gas/s (over {} txns)",
+                        delta_gas / elapsed,
+                        executed
+                    );
+                    info!(
+                        "Overall execution GPT: {} gas/txn (over {} txns)",
+                        delta_gas / (delta_gas_count as f64).max(1.0),
+                        executed
+                    );
+
+                    start_commit_tx.map(|tx| tx.send(()));
+                })
+                .expect("Failed to spawn transaction executor thread.");
+            join_handles.push(par_exe_thread);
+        }
 
         let skip_commit = config.skip_commit;
 
@@ -131,7 +222,7 @@ where
                 }
             })
             .expect("Failed to spawn transaction committer thread.");
-        let join_handles = vec![exe_thread, commit_thread];
+        join_handles.push(commit_thread);
 
         (
             Self {
@@ -139,7 +230,7 @@ where
                 phantom: PhantomData,
                 start_execution_tx,
             },
-            block_sender,
+            raw_block_sender,
         )
     }
 
@@ -152,4 +243,22 @@ where
             handle.join().unwrap()
         }
     }
+}
+
+/// Message from partitioning stage to execution stage.
+pub struct ExecuteBlockMessage {
+    pub current_block_start_time: Instant,
+    pub partition_time: Duration,
+    pub block: ExecutableBlock<Transaction>,
+}
+
+/// Message from execution stage to commit stage.
+pub struct CommitBlockMessage {
+    pub(crate) block_id: HashValue,
+    pub(crate) root_hash: HashValue,
+    pub(crate) first_block_start_time: Instant,
+    pub(crate) current_block_start_time: Instant,
+    pub(crate) partition_time: Duration,
+    pub(crate) execution_time: Duration,
+    pub(crate) num_txns: usize,
 }

@@ -20,7 +20,7 @@ jobs:
       VALIDATOR_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/validator
       FAUCET_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/faucet
       INDEXER_GRPC_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/indexer-grpc
-      IMAGE_TAG: ${{ inputs.GIT_SHA || 'f4100b21da4e9ba10fadd184e92e3d1c22bc282e' }} # hardcode to a known good build when not running on workflow_call
+      IMAGE_TAG: ${{ inputs.GIT_SHA || 'devnet' }} # hardcode to a known good build when not running on workflow_call
 
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
@@ -36,23 +36,12 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - name: Run validator-testnet docker compose
-        run: docker-compose up -d
-        shell: bash
-        working-directory: docker/compose/validator-testnet
+      - name: Install grpcurl
+        uses: aptos-labs/aptos-core/.github/actions/install-grpcurl@main
 
-      - name: Wait for the validator to make some progress
-        run: sleep 30
+      - name: Set up and verify indexer GRPC local docker
         shell: bash
-
-      - name: Run indexer-grpc docker compose
-        run: docker-compose up -d
-        shell: bash
-        working-directory: docker/compose/indexer-grpc
-
-      - name: Test with grpcurl
-        run: ./docker/compose/indexer-grpc/test_indexer_grpc_docker_compose.sh
-        shell: bash
+        run: ./testsuite/indexer_grpc_local.py --verbose start
 
       - name: Print docker-compose validator-testnet logs on failure
         if: ${{ failure() }}

@@ -79,9 +79,11 @@ module std::bcs_tests {
         bcs::to_bytes(&box127(true));
     }
 
+    /* Deactivated because we now limit the depth of values you could create inside the VM
     #[test]
     #[expected_failure(abort_code = 453, location = std::bcs)]
     fun encode_129() {
         bcs::to_bytes(&Box { x: box127(true) });
     }
+    */
 }

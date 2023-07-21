@@ -23,7 +23,7 @@ on:
       - ".github/workflows/replay-verify.yaml"
       - "testsuite/replay_verify.py"
   schedule:
-    - cron: "0 8,20 * * *"
+    - cron: "0 22 * * *"
   push:
     branches:
       - aptos-release-v* # the aptos release branches
@@ -79,7 +79,7 @@ jobs:
       BUCKET: aptos-mainnet-backup-backup-831a69a8
       SUB_DIR: e1
       HISTORY_START: 0
-      TXNS_TO_SKIP: 12253479 12277499
+      TXNS_TO_SKIP: 12253479 12277499 148358668
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s3-public.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"

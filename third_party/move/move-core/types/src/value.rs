@@ -29,6 +29,7 @@ pub const MOVE_STRUCT_TYPE: &str = "type";
 pub const MOVE_STRUCT_FIELDS: &str = "fields";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum MoveStruct {
     /// The representation used by the MoveVM
     Runtime(Vec<MoveValue>),
@@ -42,6 +43,7 @@ pub enum MoveStruct {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum MoveValue {
     U8(u8),
     U64(u64),
@@ -59,6 +61,7 @@ pub enum MoveValue {
 
 /// A layout associated with a named field
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub struct MoveFieldLayout {
     pub name: Identifier,
     pub layout: MoveTypeLayout,
@@ -71,6 +74,7 @@ impl MoveFieldLayout {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum MoveStructLayout {
     /// The representation used by the MoveVM
     Runtime(Vec<MoveTypeLayout>),
@@ -84,6 +88,7 @@ pub enum MoveStructLayout {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum MoveTypeLayout {
     #[serde(rename(serialize = "bool", deserialize = "bool"))]
     Bool,

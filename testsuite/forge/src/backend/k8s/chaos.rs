@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dump_string_to_file, K8sSwarm, Result, Swarm, SwarmChaos, SwarmNetworkBandwidth,
-    SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN,
+    dump_string_to_file, K8sSwarm, Result, Swarm, SwarmChaos, SwarmCpuStress, SwarmNetEm,
+    SwarmNetworkBandwidth, SwarmNetworkDelay, SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN,
 };
 use anyhow::bail;
 use aptos_logger::info;
+use aptos_sdk::{move_types::account_address::AccountAddress, types::PeerId};
 use std::process::{Command, Stdio};
 use tempfile::TempDir;
 
@@ -32,6 +33,21 @@ macro_rules! NETWORK_LOSS_CHAOS_TEMPLATE {
     };
 }
 
+macro_rules! NETEM_CHAOS_TEMPLATE {
+    () => {
+        "chaos/netem.yaml"
+    };
+}
+
+macro_rules! CPU_STRESS_CHAOS_TEMPLATE {
+    () => {
+        "chaos/cpu_stress.yaml"
+    };
+}
+
+// The node name for an address that could not be found in the swarm
+const INVALID_NODE_STRING: &str = "invalid-node";
+
 impl K8sSwarm {
     /// Injects the SwarmChaos into the specified namespace
     pub fn inject_swarm_chaos(&self, chaos: &SwarmChaos) -> Result<()> {
@@ -42,7 +58,7 @@ impl K8sSwarm {
 
     /// Removes the SwarmChaos from the specified namespace, if it exists
     /// Most types of Chaos are represented by a single NetworkChaos CRD, so we can just reconstruct
-    /// it and kubectl delete -f it. However, Delay Chaos is represnted by however many pairwise delays there
+    /// it and kubectl delete -f it. However, Delay Chaos is represented by however many pairwise delays there
     /// are (GroupNetworkDelay ie region), so we need to delete each one individually.
     pub fn remove_swarm_chaos(&self, chaos: &SwarmChaos) -> Result<()> {
         match chaos {
@@ -84,31 +100,10 @@ impl K8sSwarm {
         let mut network_chaos_specs = vec![];
 
         for group_network_delay in &swarm_network_delay.group_network_delays {
-            let source_instance_labels = group_network_delay
-                .source_nodes
-                .iter()
-                .map(|node| {
-                    if let Some(v) = self.validator(*node) {
-                        v.name()
-                    } else {
-                        "invalid-node"
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(",");
-
-            let target_instance_labels = group_network_delay
-                .target_nodes
-                .iter()
-                .map(|node| {
-                    if let Some(v) = self.validator(*node) {
-                        v.name()
-                    } else {
-                        "invalid-node"
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(",");
+            let source_instance_labels =
+                self.get_instance_labels(&group_network_delay.source_nodes);
+            let target_instance_labels =
+                self.get_instance_labels(&group_network_delay.target_nodes);
 
             network_chaos_specs.push(format!(
                 include_str!(DELAY_NETWORK_CHAOS_TEMPLATE!()),
@@ -166,12 +161,62 @@ impl K8sSwarm {
         ))
     }
 
+    fn create_netem_template(&self, swarm_netem: &SwarmNetEm) -> Result<String> {
+        let mut network_chaos_specs = vec![];
+
+        for group_netem in &swarm_netem.group_netems {
+            let source_instance_labels = self.get_instance_labels(&group_netem.source_nodes);
+            let target_instance_labels = self.get_instance_labels(&group_netem.target_nodes);
+
+            network_chaos_specs.push(format!(
+                include_str!(NETEM_CHAOS_TEMPLATE!()),
+                name = &group_netem.name,
+                namespace = self.kube_namespace,
+                delay_latency_ms = group_netem.delay_latency_ms,
+                delay_jitter_ms = group_netem.delay_jitter_ms,
+                delay_correlation_percentage = group_netem.delay_correlation_percentage,
+                loss_percentage = group_netem.loss_percentage,
+                loss_correlation_percentage = group_netem.loss_correlation_percentage,
+                instance_labels = &source_instance_labels,
+                target_instance_labels = &target_instance_labels,
+                rate = group_netem.rate_in_mbps,
+            ));
+        }
+
+        Ok(network_chaos_specs.join("\n---\n"))
+    }
+
+    /// Creates the CPU stress template, which can be used to inject CPU stress into a pod.
+    /// This can be used to simulate nodes with different available CPU resource even though the
+    /// nodes have identical hardware. For example, a node with 4 cores can be simulated as a node
+    /// with 2 cores by setting num_workers to 2.
+    fn create_cpu_stress_template(&self, swarm_cpu_stress: &SwarmCpuStress) -> Result<String> {
+        let mut cpu_stress_specs = vec![];
+
+        for group_cpu_stress in &swarm_cpu_stress.group_cpu_stresses {
+            let instance_labels = self.get_instance_labels(&group_cpu_stress.target_nodes);
+
+            cpu_stress_specs.push(format!(
+                include_str!(CPU_STRESS_CHAOS_TEMPLATE!()),
+                name = &group_cpu_stress.name,
+                namespace = self.kube_namespace,
+                num_workers = group_cpu_stress.num_workers,
+                load_per_worker = group_cpu_stress.load_per_worker,
+                instance_labels = &instance_labels,
+            ));
+        }
+
+        Ok(cpu_stress_specs.join("\n---\n"))
+    }
+
     fn create_chaos_template(&self, chaos: &SwarmChaos) -> Result<String> {
         match chaos {
             SwarmChaos::Delay(c) => self.create_network_delay_template(c),
             SwarmChaos::Partition(c) => self.create_network_partition_template(c),
             SwarmChaos::Bandwidth(c) => self.create_network_bandwidth_template(c),
             SwarmChaos::Loss(c) => self.create_network_loss_template(c),
+            SwarmChaos::NetEm(c) => self.create_netem_template(c),
+            SwarmChaos::CpuStress(c) => self.create_cpu_stress_template(c),
         }
     }
 
@@ -217,5 +262,27 @@ impl K8sSwarm {
             .expect("Failed to delete chaos by template");
 
         Ok(())
+    }
+
+    /// Returns the instance labels for the given peers
+    /// as a string (separated by commas).
+    fn get_instance_labels(&self, peers: &[PeerId]) -> String {
+        peers
+            .iter()
+            .map(|node| self.get_node_name(node))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    /// Returns the name of the node associated with the given account address
+    fn get_node_name(&self, node: &AccountAddress) -> &str {
+        if let Some(validator) = self.validator(*node) {
+            validator.name()
+        } else if let Some(fullnode) = self.full_node(*node) {
+            fullnode.name()
+        } else {
+            // TODO: should we throw an error here instead of failing silently?
+            INVALID_NODE_STRING
+        }
     }
 }

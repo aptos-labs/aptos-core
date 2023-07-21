@@ -7,8 +7,10 @@
 
 #![deny(missing_docs)]
 
-use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
-use aptos_types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey};
+pub use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
+pub use aptos_types::{
+    account_address::AccountAddress, transaction::authenticator::AuthenticationKey,
+};
 use hex::encode;
 use ledger_apdu::APDUCommand;
 use ledger_transport_hid::{hidapi::HidApi, LedgerHIDError, TransportNativeHID};

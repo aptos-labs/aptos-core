@@ -29,9 +29,7 @@ pub trait MoveResolverExt:
 
     fn release_resource_group_cache(
         &self,
-        address: &AccountAddress,
-        resource_group: &StructTag,
-    ) -> Option<BTreeMap<StructTag, Vec<u8>>>;
+    ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>;
 
     // Move to API does not belong here
     fn is_resource_group(&self, struct_tag: &StructTag) -> bool {

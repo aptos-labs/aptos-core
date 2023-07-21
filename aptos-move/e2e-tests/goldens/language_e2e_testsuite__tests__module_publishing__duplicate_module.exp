@@ -10,7 +10,7 @@ Ok(
                                     AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 00f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1014d },
                                 ),
                                 hash: OnceCell(Uninit),
-                            }: CreationWithMetadata(a11ceb0b0600000008010002020204030605050b01070c060812200a32050c3707000000010000000200000000014d01540166f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100020102030001000000010200, metadata:V0 { payer: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, deposit: 0, creation_time_usecs: 0 }),
+                            }: Creation(a11ceb0b0600000008010002020204030605050b01070c060812200a32050c3707000000010000000200000000014d01540166f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100020102030001000000010200),
                             StateKey {
                                 inner: AccessPath(
                                     AccessPath { address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: 010000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e7400 },
@@ -22,7 +22,7 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 7,
+            gas_used: 2,
             status: Keep(
                 Success,
             ),

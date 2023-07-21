@@ -1,0 +1,5 @@
+kube-state-metrics:
+  namespaceOverride: monitoring
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"

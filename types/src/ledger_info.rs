@@ -258,7 +258,7 @@ impl LedgerInfoWithV0 {
     }
 
     pub fn get_voters(&self, validator_addresses: &[AccountAddress]) -> Vec<AccountAddress> {
-        self.signatures.get_voter_addresses(validator_addresses)
+        self.signatures.get_signers_addresses(validator_addresses)
     }
 
     pub fn get_num_voters(&self) -> usize {
@@ -266,7 +266,7 @@ impl LedgerInfoWithV0 {
     }
 
     pub fn get_voters_bitvec(&self) -> &BitVec {
-        self.signatures.get_voters_bitvec()
+        self.signatures.get_signers_bitvec()
     }
 
     pub fn verify_signatures(

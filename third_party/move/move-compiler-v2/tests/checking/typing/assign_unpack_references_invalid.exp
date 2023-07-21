@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: expected `&u64` but found `integer`
+  ┌─ tests/checking/typing/assign_unpack_references_invalid.move:9:13
+  │
+9 │         f = 0;
+  │             ^
+
+error: expected `&M::S` but found `M::S`
+   ┌─ tests/checking/typing/assign_unpack_references_invalid.move:10:9
+   │
+10 │         s2 = S { f: 0 }
+   │         ^^
+
+error: expected `&mut u64` but found `integer`
+   ┌─ tests/checking/typing/assign_unpack_references_invalid.move:17:13
+   │
+17 │         f = 0;
+   │             ^
+
+error: expected `&mut M::S` but found `M::S`
+   ┌─ tests/checking/typing/assign_unpack_references_invalid.move:18:9
+   │
+18 │         s2 = S { f: 0 }
+   │         ^^
+
+error: mutability mismatch (&mut != &)
+   ┌─ tests/checking/typing/assign_unpack_references_invalid.move:26:9
+   │
+26 │         f = &0;
+   │         ^
+
+error: mutability mismatch (&mut != &)
+   ┌─ tests/checking/typing/assign_unpack_references_invalid.move:27:9
+   │
+27 │         s2 = &S { f: 0 }
+   │         ^^

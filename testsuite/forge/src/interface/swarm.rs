@@ -64,7 +64,7 @@ pub trait Swarm: Sync {
     ) -> Result<PeerId>;
 
     /// Adds a FullNode to the swarm and returns the PeerId
-    fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId>;
+    async fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId>;
 
     /// Removes the FullNode with the provided PeerId
     fn remove_full_node(&mut self, id: PeerId) -> Result<()>;
@@ -109,6 +109,8 @@ pub trait Swarm: Sync {
     fn aptos_public_info_for_node(&mut self, idx: usize) -> AptosPublicInfo<'_> {
         self.chain_info_for_node(idx).into_aptos_public_info()
     }
+
+    fn get_default_pfn_node_config(&self) -> NodeConfig;
 }
 
 impl<T: ?Sized> SwarmExt for T where T: Swarm {}

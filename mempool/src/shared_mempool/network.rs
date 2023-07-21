@@ -23,7 +23,7 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
-    application::{error::Error, interface::NetworkClientInterface},
+    application::{error::Error, interface::NetworkClientInterface, metadata::PeerMetadata},
     transport::ConnectionMetadata,
 };
 use aptos_types::{transaction::SignedTransaction, PeerId};
@@ -103,38 +103,64 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         }
     }
 
-    /// Add a peer to sync states, and returns `false` if the peer already is in storage
-    pub fn add_peer(&self, peer: PeerNetworkId, metadata: ConnectionMetadata) -> bool {
-        let mut sync_states = self.sync_states.write();
-        let is_new_peer = !sync_states.contains_key(&peer);
-        if self.is_upstream_peer(&peer, Some(&metadata)) {
-            // If we have a new peer, let's insert new data, otherwise, let's just update the current state
-            if is_new_peer {
-                counters::active_upstream_peers(&peer.network_id()).inc();
-                sync_states.insert(
-                    peer,
-                    PeerSyncState::new(metadata, self.mempool_config.broadcast_buckets.len()),
-                );
-            } else if let Some(peer_state) = sync_states.get_mut(&peer) {
-                peer_state.metadata = metadata;
-            }
-        }
-        drop(sync_states);
-
-        // Always need to update the prioritized peers, because of `is_alive` state changes
-        self.update_prioritized_peers();
-        is_new_peer
+    /// Returns peers to add (with metadata) and peers to disable
+    fn get_upstream_peers_to_add_and_disable(
+        &self,
+        updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> (Vec<(PeerNetworkId, ConnectionMetadata)>, Vec<PeerNetworkId>) {
+        let sync_states = self.sync_states.read();
+        let to_disable: Vec<_> = sync_states
+            .keys()
+            .filter(|previous_peer| !updated_peers.contains_key(previous_peer))
+            .copied()
+            .collect();
+        let to_add: Vec<_> = updated_peers
+            .iter()
+            .filter(|(peer, _)| !sync_states.contains_key(peer))
+            .map(|(peer, metadata)| (*peer, metadata.get_connection_metadata()))
+            .filter(|(peer, metadata)| self.is_upstream_peer(peer, Some(metadata)))
+            .collect();
+        (to_add, to_disable)
     }
 
-    /// Disables a peer if it can be restarted, otherwise removes it
-    pub fn disable_peer(&self, peer: PeerNetworkId) {
-        // All other nodes have their state immediately restarted anyways, so let's free them
-        if self.sync_states.write().remove(&peer).is_some() {
-            counters::active_upstream_peers(&peer.network_id()).dec();
+    /// Returns newly added peers
+    fn add_and_disable_upstream_peers(
+        &self,
+        to_add: &[(PeerNetworkId, ConnectionMetadata)],
+        to_disable: &[PeerNetworkId],
+    ) {
+        let mut sync_states = self.sync_states.write();
+        for (peer, metadata) in to_add.iter().cloned() {
+            counters::active_upstream_peers(&peer.network_id()).inc();
+            sync_states.insert(
+                peer,
+                PeerSyncState::new(metadata, self.mempool_config.broadcast_buckets.len()),
+            );
         }
+        for peer in to_disable {
+            // All other nodes have their state immediately restarted anyways, so let's free them
+            if sync_states.remove(peer).is_some() {
+                counters::active_upstream_peers(&peer.network_id()).dec();
+            }
+        }
+    }
 
-        // Always update prioritized peers to be in line with peer states
+    /// Update peers based on updated view of connected peers. Return (peers newly added that need
+    /// to start broadcasts, peers that will be disabled from broadcasts).
+    pub fn update_peers(
+        &self,
+        all_connected_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
+        // Get the upstream peers to add or disable, using a read lock
+        let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
+        if to_add.is_empty() && to_disable.is_empty() {
+            return (vec![], vec![]);
+        }
+        // If there are updates, apply using a write lock
+        self.add_and_disable_upstream_peers(&to_add, &to_disable);
         self.update_prioritized_peers();
+
+        (to_add.iter().map(|(peer, _)| *peer).collect(), to_disable)
     }
 
     fn update_prioritized_peers(&self) {

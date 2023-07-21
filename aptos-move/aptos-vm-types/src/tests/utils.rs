@@ -4,6 +4,7 @@
 use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet, output::VMOutput};
 use aptos_aggregator::delta_change_set::{serialize, DeltaChangeSet, DeltaOp};
 use aptos_types::{
+    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionStatus},
     write_set::{WriteOp, WriteSetMut},
@@ -89,7 +90,7 @@ pub(crate) fn build_vm_output(
     const STATUS: TransactionStatus = TransactionStatus::Keep(ExecutionStatus::Success);
     VMOutput::new(
         build_change_set(write_set, delta_change_set),
-        GAS_USED,
+        FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
     )
 }

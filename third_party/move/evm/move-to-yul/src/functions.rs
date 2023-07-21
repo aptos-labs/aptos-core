@@ -545,6 +545,10 @@ impl<'a> FunctionGenerator<'a> {
                             builtin(YulFunction::Neq, dest, srcs)
                         }
                     },
+
+                    // Unimplemented
+                    Vector => unimplemented!("vector"),
+
                     // Specification or other operations which can be ignored here
                     GetField(_, _, _, _)
                     | GetGlobal(_, _, _)

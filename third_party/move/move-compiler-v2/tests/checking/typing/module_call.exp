@@ -1,0 +1,85 @@
+
+Diagnostics:
+error: invalid call of `X::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call.move:43:26
+   │
+43 │         let () = X::bing(X::baz(X::bar(X::foo()))); // invalid
+   │                          ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::bing`: argument count mismatch (expected 3 but found 1)
+   ┌─ tests/checking/typing/module_call.move:43:18
+   │
+43 │         let () = X::bing(X::baz(X::bar(X::foo()))); // invalid
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call.move:44:27
+   │
+44 │         let () = X::bing (X::baz (X::bar (X::foo()))); // invalid
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::bing`: argument count mismatch (expected 3 but found 1)
+   ┌─ tests/checking/typing/module_call.move:44:18
+   │
+44 │         let () = X::bing (X::baz (X::bar (X::foo()))); // invalid
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call.move:45:27
+   │
+45 │         let () = X::bing (X::baz (X::bar(1))); // invalid
+   │                           ^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::bing`: argument count mismatch (expected 3 but found 1)
+   ┌─ tests/checking/typing/module_call.move:45:18
+   │
+45 │         let () = X::bing (X::baz (X::bar(1))); // invalid
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `X::bing`: argument count mismatch (expected 3 but found 1)
+   ┌─ tests/checking/typing/module_call.move:46:18
+   │
+46 │         let () = X::bing (X::baz (@0x0, 1)); // invalid
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call.move:51:23
+   │
+51 │         let () = bing(baz(bar(foo()))); // invalid
+   │                       ^^^^^^^^^^^^^^^
+
+error: invalid call of `M::bing`: argument count mismatch (expected 3 but found 1)
+   ┌─ tests/checking/typing/module_call.move:51:18
+   │
+51 │         let () = bing(baz(bar(foo()))); // invalid
+   │                  ^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call.move:52:24
+   │
+52 │         let () = bing (baz (bar (foo()))); // invalid
+   │                        ^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::bing`: argument count mismatch (expected 3 but found 1)
+   ┌─ tests/checking/typing/module_call.move:52:18
+   │
+52 │         let () = bing (baz (bar (foo()))); // invalid
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::baz`: argument count mismatch (expected 2 but found 1)
+   ┌─ tests/checking/typing/module_call.move:53:24
+   │
+53 │         let () = bing (baz (bar(1))); // invalid
+   │                        ^^^^^^^^^^^^
+
+error: invalid call of `M::bing`: argument count mismatch (expected 3 but found 1)
+   ┌─ tests/checking/typing/module_call.move:53:18
+   │
+53 │         let () = bing (baz (bar(1))); // invalid
+   │                  ^^^^^^^^^^^^^^^^^^^
+
+error: invalid call of `M::bing`: argument count mismatch (expected 3 but found 1)
+   ┌─ tests/checking/typing/module_call.move:54:18
+   │
+54 │         let () = bing (baz (@0x0, 1)); // invalid
+   │                  ^^^^^^^^^^^^^^^^^^^^

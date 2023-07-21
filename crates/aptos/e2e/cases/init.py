@@ -3,6 +3,7 @@
 
 import os
 
+import requests
 from common import TestError
 from test_helpers import RunHelper
 from test_results import test_case
@@ -41,3 +42,21 @@ def test_init(run_helper: RunHelper, test_name=None):
         raise TestError(
             f"Failed to query local testnet for account {account_info.account_address}"
         ) from e
+
+
+@test_case
+def test_metrics_accessible(run_helper: RunHelper, test_name=None):
+    # Assert that the metrics endpoint is accessible and returns valid json if
+    # requested. If the endpoint is not accessible or does not return valid
+    # JSON this will throw an exception which will be caught as a test failure.
+    metrics_url = run_helper.get_metrics_url(json=True)
+    requests.get(metrics_url).json()
+
+
+@test_case
+def test_aptos_header_included(run_helper: RunHelper, test_name=None):
+    # Make sure the aptos-cli header is included on the original request
+    response = requests.get(run_helper.get_metrics_url())
+
+    if 'request_source_client="aptos-cli' not in response.text:
+        raise TestError("Request should contain the correct aptos header: aptos-cli")

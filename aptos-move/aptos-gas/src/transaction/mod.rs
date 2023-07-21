@@ -18,7 +18,7 @@ use move_core_types::gas_algebra::{
 
 mod storage;
 
-pub use storage::{ChangeSetConfigs, StorageGasParameters};
+pub use storage::{ChangeSetConfigs, StorageGasParameters, StoragePricing};
 
 const GAS_SCALING_FACTOR: u64 = 1_000_000;
 
@@ -79,18 +79,22 @@ crate::params::define_gas_parameters!(
             GAS_SCALING_FACTOR
         ],
         // Gas Parameters for reading data from storage.
-        [load_data_base: InternalGas, "load_data.base", 16_000],
         [
-            load_data_per_byte: InternalGasPerByte,
-            "load_data.per_byte",
-            1_000
+            storage_io_per_state_slot_read: InternalGasPerArg,
+            { 0..=9 => "load_data.base", 10.. => "storage_io_per_state_slot_read"},
+            300_000,
+        ],
+        [
+            storage_io_per_state_byte_read: InternalGasPerByte,
+            { 0..=9 => "load_data.per_byte", 10.. => "storage_io_per_state_byte_read"},
+            300,
         ],
         [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
         [
-            write_data_per_op: InternalGasPerArg,
-            "write_data.per_op",
-            160_000
+            storage_io_per_state_slot_write: InternalGasPerArg,
+            { 0..=9 => "write_data.per_op", 10.. => "storage_io_per_state_slot_write"},
+            300_000,
         ],
         [
             write_data_per_new_item: InternalGasPerArg,
@@ -98,9 +102,9 @@ crate::params::define_gas_parameters!(
             1_280_000
         ],
         [
-            write_data_per_byte_in_key: InternalGasPerByte,
-            "write_data.per_byte_in_key",
-            10_000
+            storage_io_per_state_byte_write: InternalGasPerByte,
+            { 0..=9 => "write_data.per_byte_in_key", 10.. => "storage_io_per_state_byte_write"},
+            5_000
         ],
         [
             write_data_per_byte_in_val: InternalGasPerByte,

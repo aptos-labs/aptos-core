@@ -401,18 +401,17 @@ module aptos_framework::vesting {
             return shareholder_or_beneficiary
         };
         let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
-        let i = 0;
-        let len = vector::length(shareholders);
-        while (i < len) {
-            let shareholder = *vector::borrow(shareholders, i);
-            // This will still return the shareholder if shareholder == beneficiary.
-            if (shareholder_or_beneficiary == get_beneficiary(vesting_contract, shareholder)) {
-                return shareholder
-            };
-            i = i + 1;
-        };
+        let result = @0x0;
+        vector::any(shareholders, |shareholder| {
+            if (shareholder_or_beneficiary == get_beneficiary(vesting_contract, *shareholder)) {
+                result = *shareholder;
+                true
+            } else {
+                false
+            }
+        });
 
-        @0x0
+        result
     }
 
     /// Create a vesting schedule with the given schedule of distributions, a vesting start time and period duration.
@@ -464,22 +463,18 @@ module aptos_framework::vesting {
         let grant = coin::zero<AptosCoin>();
         let grant_amount = 0;
         let grant_pool = pool_u64::create(MAXIMUM_SHAREHOLDERS);
-        let len = vector::length(shareholders);
-        let i = 0;
-        while (i < len) {
-            let shareholder = *vector::borrow(shareholders, i);
+        vector::for_each_ref(shareholders, |shareholder| {
+            let shareholder: address = *shareholder;
             let (_, buy_in) = simple_map::remove(&mut buy_ins, &shareholder);
             let buy_in_amount = coin::value(&buy_in);
             coin::merge(&mut grant, buy_in);
             pool_u64::buy_in(
                 &mut grant_pool,
-                *vector::borrow(shareholders, i),
+                shareholder,
                 buy_in_amount,
             );
             grant_amount = grant_amount + buy_in_amount;
-
-            i = i + 1;
-        };
+        });
         assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
 
         // If this is the first time this admin account has created a vesting contract, initialize the admin store.
@@ -553,12 +548,10 @@ module aptos_framework::vesting {
 
         assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
 
-        let i = 0;
-        while (i < len) {
-            let contract_address = *vector::borrow(&contract_addresses, i);
+        vector::for_each_ref(&contract_addresses, |contract_address| {
+            let contract_address: address = *contract_address;
             unlock_rewards(contract_address);
-            i = i + 1;
-        };
+        });
     }
 
     /// Unlock any vested portion of the grant.
@@ -620,12 +613,10 @@ module aptos_framework::vesting {
 
         assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
 
-        let i = 0;
-        while (i < len) {
-            let contract_address = *vector::borrow(&contract_addresses, i);
+        vector::for_each_ref(&contract_addresses, |contract_address| {
+            let contract_address = *contract_address;
             vest(contract_address);
-            i = i + 1;
-        };
+        });
     }
 
     /// Distribute any withdrawable stake from the stake pool.
@@ -643,18 +634,14 @@ module aptos_framework::vesting {
         // Distribute coins to all shareholders in the vesting contract.
         let grant_pool = &vesting_contract.grant_pool;
         let shareholders = &pool_u64::shareholders(grant_pool);
-        let len = vector::length(shareholders);
-        let i = 0;
-        while (i < len) {
-            let shareholder = *vector::borrow(shareholders, i);
+        vector::for_each_ref(shareholders, |shareholder| {
+            let shareholder = *shareholder;
             let shares = pool_u64::shares(grant_pool, shareholder);
             let amount = pool_u64::shares_to_amount_with_total_coins(grant_pool, shares, total_distribution_amount);
             let share_of_coins = coin::extract(&mut coins, amount);
             let recipient_address = get_beneficiary(vesting_contract, shareholder);
             aptos_account::deposit_coins(recipient_address, share_of_coins);
-
-            i = i + 1;
-        };
+        });
 
         // Send any remaining "dust" (leftover due to rounding error) to the withdrawal address.
         if (coin::value(&coins) > 0) {
@@ -679,12 +666,10 @@ module aptos_framework::vesting {
 
         assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
 
-        let i = 0;
-        while (i < len) {
-            let contract_address = *vector::borrow(&contract_addresses, i);
+        vector::for_each_ref(&contract_addresses, |contract_address| {
+            let contract_address = *contract_address;
             distribute(contract_address);
-            i = i + 1;
-        };
+        });
     }
 
     /// Terminate the vesting contract and send all funds back to the withdrawal address.
@@ -1017,15 +1002,12 @@ module aptos_framework::vesting {
 
         stake::initialize_for_test_custom(aptos_framework, MIN_STAKE, GRANT_AMOUNT * 10, 3600, true, 10, 10000, 1000000);
 
-        let len = vector::length(accounts);
-        let i = 0;
-        while (i < len) {
-            let addr = *vector::borrow(accounts, i);
+        vector::for_each_ref(accounts, |addr| {
+            let addr: address = *addr;
             if (!account::exists_at(addr)) {
                 create_account(addr);
             };
-            i = i + 1;
-        };
+        });
     }
 
     #[test_only]
@@ -1058,13 +1040,9 @@ module aptos_framework::vesting {
         vesting_denominator: u64,
     ): address acquires AdminStore {
         let schedule = vector::empty<FixedPoint32>();
-        let i = 0;
-        let len = vector::length(vesting_numerators);
-        while (i < len) {
-            let num = *vector::borrow(vesting_numerators, i);
-            vector::push_back(&mut schedule, fixed_point32::create_from_rational(num, vesting_denominator));
-            i = i + 1;
-        };
+        vector::for_each_ref(vesting_numerators, |num| {
+            vector::push_back(&mut schedule, fixed_point32::create_from_rational(*num, vesting_denominator));
+        });
         let vesting_schedule = create_vesting_schedule(
             schedule,
             timestamp::now_seconds() + VESTING_SCHEDULE_CLIFF,
@@ -1073,13 +1051,10 @@ module aptos_framework::vesting {
 
         let admin_address = signer::address_of(admin);
         let buy_ins = simple_map::create<address, Coin<AptosCoin>>();
-        let i = 0;
-        let len = vector::length(shares);
-        while (i < len) {
+        vector::enumerate_ref(shares, |i, share| {
             let shareholder = *vector::borrow(shareholders, i);
-            simple_map::add(&mut buy_ins, shareholder, stake::mint_coins(*vector::borrow(shares, i)));
-            i = i + 1;
-        };
+            simple_map::add(&mut buy_ins, shareholder, stake::mint_coins(*share));
+        });
 
         create_vesting_contract(
             admin,

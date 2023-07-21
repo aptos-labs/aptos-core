@@ -1,9 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{NetworkContext, NetworkTest, Swarm, SwarmExt, Test};
+use crate::{multi_region_network_test::chunk_peers, LoadDestination, NetworkLoadTest};
+use aptos_forge::{
+    GroupCpuStress, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmCpuStress, SwarmExt, Test,
+};
 use aptos_logger::info;
+use aptos_types::PeerId;
 use rand::Rng;
 use tokio::runtime::Runtime;
 
@@ -99,7 +102,7 @@ impl NetworkLoadTest for ExecutionDelayTest {
 }
 
 impl NetworkTest for ExecutionDelayTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
@@ -184,7 +187,7 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
 }
 
 impl NetworkTest for NetworkUnreliabilityTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
@@ -192,5 +195,109 @@ impl NetworkTest for NetworkUnreliabilityTest {
 impl Test for NetworkUnreliabilityTest {
     fn name(&self) -> &'static str {
         "NetworkUnreliabilityWrapper"
+    }
+}
+
+#[derive(Clone)]
+pub struct CpuChaosConfig {
+    pub num_groups: usize,
+    pub load_per_worker: u64,
+}
+
+impl Default for CpuChaosConfig {
+    fn default() -> Self {
+        Self {
+            num_groups: 4,
+            load_per_worker: 100,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct CpuChaosTest {
+    cpu_chaos_config: CpuChaosConfig,
+}
+
+impl CpuChaosTest {
+    pub fn new_with_config(cpu_chaos_config: CpuChaosConfig) -> Self {
+        Self { cpu_chaos_config }
+    }
+
+    /// Creates a new SwarmCpuStress to be injected via chaos. Note:
+    /// CPU chaos is only done for the validators in the swarm (and
+    /// not the fullnodes).
+    fn create_cpu_chaos(&self, swarm: &mut dyn Swarm) -> SwarmCpuStress {
+        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+        let cpu_chaos_config = self.cpu_chaos_config.clone();
+        create_swarm_cpu_stress(all_validators, Some(cpu_chaos_config))
+    }
+}
+
+impl Test for CpuChaosTest {
+    fn name(&self) -> &'static str {
+        "CpuChaosWrapper"
+    }
+}
+
+/// Creates a SwarmCpuStress to be injected via chaos. CPU chaos
+/// is added to all the given peers using the specified config.
+pub fn create_swarm_cpu_stress(
+    all_peers: Vec<PeerId>,
+    cpu_chaos_config: Option<CpuChaosConfig>,
+) -> SwarmCpuStress {
+    // Determine the CPU chaos config to use
+    let cpu_chaos_config = cpu_chaos_config.unwrap_or_default();
+
+    // Chunk the peers into groups and create a GroupCpuStress for each group
+    let all_peers = all_peers.iter().map(|id| vec![*id]).collect();
+    let peer_chunks = chunk_peers(all_peers, cpu_chaos_config.num_groups);
+    let group_cpu_stresses = peer_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(idx, chunk)| {
+            // Lower bound the number of workers
+            let num_workers = if cpu_chaos_config.num_groups > idx {
+                (cpu_chaos_config.num_groups - idx) as u64
+            } else {
+                1
+            };
+
+            // Create the cpu stress for the group
+            info!(
+                "Creating CPU stress for group {} with {} workers",
+                idx, num_workers
+            );
+            GroupCpuStress {
+                name: format!("group-{}-cpu-stress", idx),
+                target_nodes: chunk,
+                num_workers,
+                load_per_worker: cpu_chaos_config.load_per_worker,
+            }
+        })
+        .collect();
+
+    SwarmCpuStress { group_cpu_stresses }
+}
+
+impl NetworkLoadTest for CpuChaosTest {
+    fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
+        let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm());
+
+        ctx.swarm()
+            .inject_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))?;
+
+        Ok(LoadDestination::FullnodesOtherwiseValidators)
+    }
+
+    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        let swarm_cpu_stress = self.create_cpu_chaos(swarm);
+
+        swarm.remove_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))
+    }
+}
+
+impl NetworkTest for CpuChaosTest {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

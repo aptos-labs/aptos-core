@@ -90,6 +90,25 @@ module 0xCAFE::test {
         };
     }
 
+    // Valuable data that should not be able to be fabricated by a malicious tx
+    struct MyPrecious {
+        value: u64,
+    }
+
+    public entry fun ensure_no_fabrication(my_precious: Option<MyPrecious>) {
+        if (std::option::is_none(&my_precious)) {
+            std::option::destroy_none(my_precious)
+        } else {
+            let MyPrecious { value : _ } = std::option::destroy_some(my_precious);
+        }
+    }
+
+    public entry fun ensure_vector_vector_u8(o: Object<ModuleData>, _: vector<vector<u8>>) acquires ModuleData {
+        let addr = aptos_std::object::object_address(&o);
+        // guaranteed to exist
+        borrow_global_mut<ModuleData>(addr).state = std::string::utf8(b"vector<vector<u8>>");
+    }
+
     fun convert(x: u128): String {
         let s = std::vector::empty();
         let ascii0 = 48;

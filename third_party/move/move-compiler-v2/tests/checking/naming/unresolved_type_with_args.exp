@@ -1,0 +1,73 @@
+
+Diagnostics:
+error: undeclared `0x8675309::M::S`
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:3:22
+  │
+3 │     fun foo<T, U>(x: S<T>): G<T, U> {
+  │                      ^
+
+error: type cannot have type arguments
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:3:22
+  │
+3 │     fun foo<T, U>(x: S<T>): G<T, U> {
+  │                      ^
+
+error: undeclared `0x8675309::M::G`
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:3:29
+  │
+3 │     fun foo<T, U>(x: S<T>): G<T, U> {
+  │                             ^
+
+error: type cannot have type arguments
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:3:29
+  │
+3 │     fun foo<T, U>(x: S<T>): G<T, U> {
+  │                             ^
+
+error: undeclared `0x8675309::M::A`
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:2:28
+  │
+2 │     struct Mine<T, U> { f: A<T, U>, g: X<U> }
+  │                            ^
+
+error: type cannot have type arguments
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:2:28
+  │
+2 │     struct Mine<T, U> { f: A<T, U>, g: X<U> }
+  │                            ^
+
+error: undeclared `0x8675309::M::X`
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:2:40
+  │
+2 │     struct Mine<T, U> { f: A<T, U>, g: X<U> }
+  │                                        ^
+
+error: type cannot have type arguments
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:2:40
+  │
+2 │     struct Mine<T, U> { f: A<T, U>, g: X<U> }
+  │                                        ^
+
+error: undeclared `0x8675309::M::B`
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:4:16
+  │
+4 │         let _: B<U> = (0: P<U, T>);
+  │                ^
+
+error: undeclared `0x8675309::M::P`
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:4:27
+  │
+4 │         let _: B<U> = (0: P<U, T>);
+  │                           ^
+
+error: type cannot have type arguments
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:4:16
+  │
+4 │         let _: B<U> = (0: P<U, T>);
+  │                ^
+
+error: type cannot have type arguments
+  ┌─ tests/checking/naming/unresolved_type_with_args.move:4:27
+  │
+4 │         let _: B<U> = (0: P<U, T>);
+  │                           ^

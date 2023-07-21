@@ -17,7 +17,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     metadata::Metadata,
     parser,
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::{resource_size, ModuleResolver, ResourceResolver},
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
@@ -418,8 +418,10 @@ impl ResourceResolver for OnDiskStateView {
         address: &AccountAddress,
         struct_tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
-        self.get_resource_bytes(*address, struct_tag.clone())
+    ) -> Result<(Option<Vec<u8>>, usize)> {
+        let buf = self.get_resource_bytes(*address, struct_tag.clone())?;
+        let buf_size = resource_size(&buf);
+        Ok((buf, buf_size))
     }
 }
 

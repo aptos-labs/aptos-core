@@ -4,6 +4,8 @@
 use move_binary_format::file_format_common::VERSION_MAX;
 use move_bytecode_verifier::VerifierConfig;
 
+pub const DEFAULT_MAX_VALUE_NEST_DEPTH: u64 = 128;
+
 /// Dynamic config options for the Move VM.
 pub struct VMConfig {
     pub verifier: VerifierConfig,
@@ -14,6 +16,8 @@ pub struct VMConfig {
     // When this flag is set to true, MoveVM will check invariant violation in swap_loc
     pub enable_invariant_violation_check_in_swap_loc: bool,
     pub type_size_limit: bool,
+    /// Maximum value nest depth for structs
+    pub max_value_nest_depth: Option<u64>,
 }
 
 impl Default for VMConfig {
@@ -24,6 +28,7 @@ impl Default for VMConfig {
             paranoid_type_checks: false,
             enable_invariant_violation_check_in_swap_loc: true,
             type_size_limit: false,
+            max_value_nest_depth: Some(DEFAULT_MAX_VALUE_NEST_DEPTH),
         }
     }
 }

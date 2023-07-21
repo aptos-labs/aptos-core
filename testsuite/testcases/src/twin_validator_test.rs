@@ -19,7 +19,7 @@ impl Test for TwinValidatorTest {
 impl NetworkLoadTest for TwinValidatorTest {}
 
 impl NetworkTest for TwinValidatorTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         let runtime = Runtime::new().unwrap();
 
         let all_validators_ids = ctx

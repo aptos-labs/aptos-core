@@ -6,15 +6,19 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
+    collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     token_utils::TokenWriteSet,
     v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping},
 };
 use crate::{
+    database::PgPoolConnection,
     schema::{current_token_datas_v2, token_datas_v2},
     util::standardize_address,
 };
+use anyhow::Context;
 use aptos_api_types::{WriteResource as APIWriteResource, WriteTableItem as APIWriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
+use diesel::{prelude::*, sql_query, sql_types::Text};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +43,7 @@ pub struct TokenDataV2 {
     pub token_standard: String,
     pub is_fungible_v2: Option<bool>,
     pub transaction_timestamp: chrono::NaiveDateTime,
+    pub decimals: i64,
 }
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -58,6 +63,13 @@ pub struct CurrentTokenDataV2 {
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub decimals: i64,
+}
+
+#[derive(Debug, QueryableByName)]
+pub struct TokenDataIdFromTable {
+    #[diesel(sql_type = Text)]
+    pub token_data_id: String,
 }
 
 impl TokenDataV2 {
@@ -71,10 +83,21 @@ impl TokenDataV2 {
         if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
             let token_data_id = standardize_address(&write_resource.address.to_string());
             // Get maximum, supply, and is fungible from fungible asset if this is a fungible token
-            let (maximum, supply, is_fungible_v2) = (None, BigDecimal::zero(), Some(false));
+            let (mut maximum, mut supply, mut decimals, mut is_fungible_v2) =
+                (None, BigDecimal::zero(), 0, Some(false));
             // Get token properties from 0x4::property_map::PropertyMap
             let mut token_properties = serde_json::Value::Null;
             if let Some(metadata) = token_v2_metadata.get(&token_data_id) {
+                let fungible_asset_metadata = metadata.fungible_asset_metadata.as_ref();
+                let fungible_asset_supply = metadata.fungible_asset_supply.as_ref();
+                if let Some(metadata) = fungible_asset_metadata {
+                    if let Some(fa_supply) = fungible_asset_supply {
+                        maximum = fa_supply.get_maximum();
+                        supply = fa_supply.current.clone();
+                        decimals = metadata.decimals as i64;
+                        is_fungible_v2 = Some(true);
+                    }
+                }
                 token_properties = metadata
                     .property_map
                     .as_ref()
@@ -105,6 +128,7 @@ impl TokenDataV2 {
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2,
                     transaction_timestamp: txn_timestamp,
+                    decimals,
                 },
                 CurrentTokenDataV2 {
                     token_data_id,
@@ -120,6 +144,7 @@ impl TokenDataV2 {
                     is_fungible_v2,
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
+                    decimals,
                 },
             )))
         } else {
@@ -177,6 +202,7 @@ impl TokenDataV2 {
                         token_standard: TokenStandard::V1.to_string(),
                         is_fungible_v2: None,
                         transaction_timestamp: txn_timestamp,
+                        decimals: 0,
                     },
                     CurrentTokenDataV2 {
                         token_data_id,
@@ -192,6 +218,7 @@ impl TokenDataV2 {
                         is_fungible_v2: None,
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
+                        decimals: 0,
                     },
                 )));
             } else {
@@ -204,5 +231,35 @@ impl TokenDataV2 {
             }
         }
         Ok(None)
+    }
+
+    /// Try to see if an address is a token. We'll try a few times in case there is a race condition,
+    /// and if we can't find after 3 times, we'll assume that it's not a token.
+    /// TODO: An improvement is that we'll make another query to see if address is a coin.
+    pub fn is_address_token(conn: &mut PgPoolConnection, address: &str) -> bool {
+        let mut retried = 0;
+        while retried < QUERY_RETRIES {
+            retried += 1;
+            match Self::get_by_token_data_id(conn, address) {
+                Ok(_) => return true,
+                Err(_) => {
+                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                },
+            }
+        }
+        false
+    }
+
+    /// TODO: Change this to a KV store
+    fn get_by_token_data_id(conn: &mut PgPoolConnection, address: &str) -> anyhow::Result<String> {
+        let mut res: Vec<Option<TokenDataIdFromTable>> =
+            sql_query("SELECT token_data_id FROM current_token_datas_v2 WHERE token_data_id = $1")
+                .bind::<Text, _>(address)
+                .get_results(conn)?;
+        Ok(res
+            .pop()
+            .context("token data result empty")?
+            .context("token data result null")?
+            .token_data_id)
     }
 }

@@ -1,0 +1,9 @@
+error[E05001]: ability constraint not satisfied
+   ┌─ tests/move_check/typing/pay_me_a_river.move:13:9
+   │
+ 8 │         let payments: &mut Payments;
+   │                       ------------- The type '&mut 0x8675309::M::Payments' does not have the ability 'key'
+   ·
+13 │         move_to(&asigner, payments);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Invalid call of 'move_to'
+

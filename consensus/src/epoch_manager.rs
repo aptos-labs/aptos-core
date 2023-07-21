@@ -807,6 +807,10 @@ impl EpochManager {
             error!("Failed to read on-chain consensus config {}", error);
         }
 
+        if let Err(error) = &onchain_execution_config {
+            error!("Failed to read on-chain execution config {}", error);
+        }
+
         self.epoch_state = Some(Arc::new(epoch_state.clone()));
 
         match self.storage.start() {
@@ -1039,7 +1043,7 @@ impl EpochManager {
     }
 
     fn process_rpc_request(
-        &self,
+        &mut self,
         peer_id: Author,
         request: IncomingRpcRequest,
     ) -> anyhow::Result<()> {
@@ -1059,6 +1063,19 @@ impl EpochManager {
                     tx.push(peer_id, request)
                 } else {
                     Err(anyhow::anyhow!("Quorum store not started"))
+                }
+            },
+            IncomingRpcRequest::DAGRequest(request) => {
+                let dag_message = request.req;
+
+                if dag_message.epoch == self.epoch() {
+                    // TODO: send message to DAG handler
+                    Ok(())
+                } else {
+                    monitor!(
+                        "process_different_epoch_dag_rpc",
+                        self.process_different_epoch(dag_message.epoch, peer_id)
+                    )
                 }
             },
         }

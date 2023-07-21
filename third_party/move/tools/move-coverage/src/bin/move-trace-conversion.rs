@@ -59,3 +59,9 @@ fn main() {
             .expect("Unable to serialize trace map to output file")
     }
 }
+
+#[test]
+fn verify_tool() {
+    use clap::CommandFactory;
+    Args::command().debug_assert()
+}

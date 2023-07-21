@@ -16,7 +16,7 @@ use move_model::{
         StructEnv, StructId,
     },
     symbol::Symbol,
-    ty::{PrimitiveType, Type},
+    ty::{PrimitiveType, ReferenceKind, Type},
 };
 use std::{collections::BTreeMap, rc::Rc, str::FromStr};
 use thiserror::Error;
@@ -142,7 +142,9 @@ impl<'a> ExtendedChecker<'a> {
             Primitive(_) | TypeParameter(_) => {
                 // Any primitive type allowed, any parameter expected to instantiate with primitive
             },
-            Reference(false, bt) if matches!(bt.as_ref(), Primitive(PrimitiveType::Signer)) => {
+            Reference(ReferenceKind::Immutable, bt)
+                if matches!(bt.as_ref(), Primitive(PrimitiveType::Signer)) =>
+            {
                 // Reference to signer allowed
             },
             Vector(ety) => {
