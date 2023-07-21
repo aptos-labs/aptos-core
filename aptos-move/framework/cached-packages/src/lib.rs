@@ -10,11 +10,9 @@ pub mod aptos_token_objects_sdk_builder;
 pub mod aptos_token_sdk_builder;
 
 #[cfg(unix)]
-const HEAD_RELEASE_BUNDLE_BYTES: &[u8] =
-    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/generated/head.mrb"));
+const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/head.mrb"));
 #[cfg(windows)]
-const HEAD_RELEASE_BUNDLE_BYTES: &[u8] =
-    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "\\generated\\head.mrb"));
+const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "\\head.mrb"));
 
 static HEAD_RELEASE_BUNDLE: Lazy<ReleaseBundle> = Lazy::new(|| {
     bcs::from_bytes::<ReleaseBundle>(HEAD_RELEASE_BUNDLE_BYTES).expect("bcs succeeds")
