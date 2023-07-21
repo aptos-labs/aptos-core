@@ -74,6 +74,7 @@ yes
 ```
 
 After the above command, you will be prompted to confirm the transaction on your Ledger device. Once you confirm, the transaction will be submitted to the network. Note: Make sure you have `Blind Signing` enabled on your Ledger device. Otherwise you will not be able to sign transactions.
+`Blind Signing` - confirming a smart contract interaction you can’t verify through a human readable language.
 
 ## Common Errors
 
