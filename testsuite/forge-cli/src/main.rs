@@ -500,7 +500,8 @@ fn single_test_suite(
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        // TODO: don't land, this is just to test the forge test on this PR
+        "realistic_env_max_load" => graceful_overload(),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         // Rest of the tests:
