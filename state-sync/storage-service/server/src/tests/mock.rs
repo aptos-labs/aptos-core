@@ -19,7 +19,6 @@ use aptos_network::{
     },
 };
 use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
-use aptos_storage_service_notifications::StorageServiceNotifier;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
     StorageServiceMessage,
@@ -66,7 +65,6 @@ impl MockClient {
     ) -> (
         Self,
         StorageServiceServer<StorageReader>,
-        StorageServiceNotifier,
         MockTimeService,
         Arc<PeersAndMetadata>,
     ) {
@@ -103,7 +101,7 @@ impl MockClient {
             StorageServiceNetworkEvents::new(NetworkServiceEvents::new(network_and_events));
 
         // Create the storage service notifier and listener
-        let (storage_service_notifier, storage_service_listener) =
+        let (_storage_service_notifier, storage_service_listener) =
             aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
 
         // Create the storage service
@@ -127,7 +125,6 @@ impl MockClient {
         (
             mock_client,
             storage_server,
-            storage_service_notifier,
             mock_time_service.into_mock(),
             peers_and_metadata,
         )
