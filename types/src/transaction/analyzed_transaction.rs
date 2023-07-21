@@ -17,7 +17,7 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AnalyzedTransaction {
     transaction: Transaction,
     /// Set of storage locations that are read by the transaction - this doesn't include location

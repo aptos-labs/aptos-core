@@ -522,6 +522,7 @@ dependencies = [
  "criterion",
  "crossbeam",
  "dashmap",
+ "itertools",
  "move-binary-format",
  "num_cpus",
  "once_cell",

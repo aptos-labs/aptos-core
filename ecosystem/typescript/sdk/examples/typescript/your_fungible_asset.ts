@@ -22,7 +22,7 @@ import {
  This example depends on the FACoin.move module built with fungible asset having already been published to the destination blockchain.
 
  One method to do so is to use the CLI:
- * Acquire the Aptos CLI, see https://aptos.dev/cli-tools/aptos-cli-tool/install-aptos-cli
+ * Acquire the Aptos CLI, see https://aptos.dev/cli-tools/aptos-cli/use-cli/install-aptos-cli
  * `pnpm your_fungible_asset ~/aptos-core/aptos-move/move-examples/fungible_asset/fa_coin`.
  * Open another terminal and `aptos move compile --package-dir ~/aptos-core/aptos-move/move-examples/fungible_asset/fa_coin --save-metadata --named-addresses FACoin=<Alice address from above step>`.
  * Return to the first terminal and press enter.
