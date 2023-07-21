@@ -11,10 +11,68 @@ use crate::{
 };
 use move_ir_types::location::sp;
 use move_symbol_pool::Symbol;
+use std::collections::BTreeSet;
 
 const CONTRACT_ATTR: &str = "contract";
 const CALLABLE_ATTR: &str = "callable";
 const EXTERNAL_ATTR: &str = "external";
+
+// The following appear in test code under /evm/.
+const ACTOR_ATTR: &str = "actor";
+const INIT_ATTR: &str = "init";
+const MESSAGE_ATTR: &str = "message";
+const ABI_STRUCT_ATTR: &str = "abi_struct";
+const CREATE_ATTR: &str = "create";
+const DECODE_ATTR: &str = "decode";
+const DELETE_ATTR: &str = "delete";
+const ENCODE_ATTR: &str = "encode";
+const ENCODE_PACKED_ATTR: &str = "encode_packed";
+const EVENT_ATTR: &str = "event";
+const EVM_ARITH_ATTR: &str = "evm_arith";
+const EVM_TEST_ATTR: &str = "evm_test";
+const FALLBACK_ATTR: &str = "fallback";
+const INTERFACE_ATTR: &str = "interface";
+const INTERFACE_ID_ATTR: &str = "interface_id";
+const SELECTOR_ATTR: &str = "selector";
+const STATE_ATTR: &str = "state";
+const STORAGE_ATTR: &str = "storage";
+
+const EVM_CONTRACT_ATTR: &str = "evm_contract";
+const PAYABLE_ATTR: &str = "payable";
+const RECEIVE_ATTR: &str = "receive";
+const VIEW_ATTR: &str = "view";
+const PURE_ATTR: &str = "pure";
+
+pub(crate) fn add_attributes_for_evm(known_attributes: &mut BTreeSet<String>) {
+    known_attributes.insert(CALLABLE_ATTR.to_string());
+    known_attributes.insert(CONTRACT_ATTR.to_string());
+    known_attributes.insert(EXTERNAL_ATTR.to_string());
+
+    known_attributes.insert(ABI_STRUCT_ATTR.to_string());
+    known_attributes.insert(ACTOR_ATTR.to_string());
+    known_attributes.insert(CREATE_ATTR.to_string());
+    known_attributes.insert(DECODE_ATTR.to_string());
+    known_attributes.insert(DELETE_ATTR.to_string());
+    known_attributes.insert(ENCODE_ATTR.to_string());
+    known_attributes.insert(ENCODE_PACKED_ATTR.to_string());
+    known_attributes.insert(EVENT_ATTR.to_string());
+    known_attributes.insert(EVM_ARITH_ATTR.to_string());
+    known_attributes.insert(EVM_TEST_ATTR.to_string());
+    known_attributes.insert(FALLBACK_ATTR.to_string());
+    known_attributes.insert(INIT_ATTR.to_string());
+    known_attributes.insert(INTERFACE_ATTR.to_string());
+    known_attributes.insert(INTERFACE_ID_ATTR.to_string());
+    known_attributes.insert(MESSAGE_ATTR.to_string());
+    known_attributes.insert(SELECTOR_ATTR.to_string());
+    known_attributes.insert(STATE_ATTR.to_string());
+    known_attributes.insert(STORAGE_ATTR.to_string());
+
+    known_attributes.insert(EVM_CONTRACT_ATTR.to_string());
+    known_attributes.insert(PAYABLE_ATTR.to_string());
+    known_attributes.insert(RECEIVE_ATTR.to_string());
+    known_attributes.insert(VIEW_ATTR.to_string());
+    known_attributes.insert(PURE_ATTR.to_string());
+}
 
 pub(crate) fn derive_for_evm(
     _env: &mut CompilationEnv,

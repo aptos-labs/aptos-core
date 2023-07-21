@@ -4,6 +4,7 @@
 
 use super::aliases::{AliasMapBuilder, OldAliasMap};
 use crate::{
+    command_line::SKIP_ATTRIBUTE_CHECKS,
     diag,
     diagnostics::Diagnostic,
     expansion::{
@@ -14,7 +15,11 @@ use crate::{
     parser::ast::{
         self as P, Ability, ConstantName, Field, FunctionName, ModuleName, StructName, Var,
     },
-    shared::{known_attributes::AttributePosition, unique_map::UniqueMap, *},
+    shared::{
+        known_attributes::{AttributeKind, AttributePosition, KnownAttribute},
+        unique_map::UniqueMap,
+        *,
+    },
     FullyCompiledProgram,
 };
 use move_command_line_common::parser::{parse_u16, parse_u256, parse_u32};
@@ -574,12 +579,37 @@ fn unique_attributes(
             | E::Attribute_::Assigned(n, _)
             | E::Attribute_::Parameterized(n, _) => *n,
         };
-        let name_ = match known_attributes::KnownAttribute::resolve(sym) {
-            None => E::AttributeName_::Unknown(sym),
+        let name_ = match KnownAttribute::resolve(sym) {
+            None => {
+                let flags = &context.env.flags();
+                if !flags.skip_attribute_checks() {
+                    let known_attributes = &context.env.get_known_attributes();
+                    if !is_nested && !known_attributes.contains(sym.as_str()) {
+                        let msg = format!("Attribute name '{}' is unknown (use --{} CLI option to ignore); known attributes are '{:?}'.",
+					  sym.as_str(),
+					  SKIP_ATTRIBUTE_CHECKS, known_attributes);
+                        context
+                            .env
+                            .add_diag(diag!(Declarations::UnknownAttribute, (nloc, msg)));
+                    } else if is_nested && known_attributes.contains(sym.as_str()) {
+                        let msg = format!(
+                            "Known attribute '{}' is not expected in a nested attribute position.",
+                            sym.as_str()
+                        );
+                        context
+                            .env
+                            .add_diag(diag!(Declarations::InvalidAttribute, (nloc, msg)));
+                    };
+                }
+                E::AttributeName_::Unknown(sym)
+            },
             Some(known) => {
                 debug_assert!(known.name() == sym.as_str());
                 if is_nested {
-                    let msg = "Known attribute '{}' is not expected in a nested attribute position";
+                    let msg = format!(
+                        "Known attribute '{}' is not expected in a nested attribute position",
+                        sym.as_str()
+                    );
                     context
                         .env
                         .add_diag(diag!(Declarations::InvalidAttribute, (nloc, msg)));

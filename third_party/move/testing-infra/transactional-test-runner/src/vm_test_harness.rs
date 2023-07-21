@@ -18,7 +18,9 @@ use move_command_line_common::{
     address::ParsedAddress, files::verify_and_create_named_address_mapping,
 };
 use move_compiler::{
-    compiled_unit::AnnotatedCompiledUnit, shared::PackagePaths, FullyCompiledProgram,
+    compiled_unit::AnnotatedCompiledUnit,
+    shared::{known_attributes::KnownAttribute, Flags, PackagePaths},
+    FullyCompiledProgram,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -37,7 +39,10 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
 use once_cell::sync::Lazy;
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 const STD_ADDR: AccountAddress = AccountAddress::ONE;
 
@@ -104,6 +109,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 
     fn default_syntax(&self) -> SyntaxChoice {
         self.default_syntax
+    }
+
+    fn known_attributes(&self) -> &BTreeSet<String> {
+        KnownAttribute::get_all_attribute_names()
     }
 
     fn run_config(&self) -> TestRunConfig {
@@ -399,7 +408,8 @@ static PRECOMPILED_MOVE_STDLIB: Lazy<FullyCompiledProgram> = Lazy::new(|| {
             named_address_map: move_stdlib::move_stdlib_named_addresses(),
         }],
         None,
-        move_compiler::Flags::empty(),
+        Flags::empty().set_skip_attribute_checks(true), // no point in checking.
+        KnownAttribute::get_all_attribute_names(),
     )
     .unwrap();
     match program_res {
@@ -416,6 +426,8 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
         move_stdlib::move_stdlib_files(),
         vec![],
         move_stdlib::move_stdlib_named_addresses(),
+        Flags::empty().set_skip_attribute_checks(true), // no point in checking here.
+        KnownAttribute::get_all_attribute_names(),
     )
     .build()
     .unwrap();

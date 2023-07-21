@@ -10,7 +10,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColo
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_abigen::Abigen;
-use move_compiler::shared::PackagePaths;
+use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
 use move_model::{
@@ -59,6 +59,8 @@ pub fn run_move_prover<W: WriteColor>(
             named_address_map: addrs,
         }],
         options.model_builder.clone(),
+        options.skip_attribute_checks,
+        KnownAttribute::get_all_attribute_names(),
     )?;
     run_move_prover_with_model(&env, error_writer, options, Some(now))
 }
