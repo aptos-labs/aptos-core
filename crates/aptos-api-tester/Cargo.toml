@@ -13,16 +13,15 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-sdk = { workspace = true }
-aptos-rest-client = { workspace = true }
-aptos-api-types = { workspace = true }
-aptos-types = { workspace = true }
-tokio = { workspace = true }
-url = { workspace = true }
-once_cell = { workspace = true }
-rand = { workspace = true }
 anyhow = { workspace = true }
+aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-framework = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-sdk = { workspace = true }
+aptos-types = { workspace = true }
 move-core-types = { workspace = true }
-
+once_cell = { workspace = true }
+rand = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
