@@ -10,7 +10,7 @@ use crate::{
     hash::CryptoHash,
     traits::*,
 };
-use p256::{ecdsa::signature::Signer, elliptic_curve::sec1};
+use p256::{ecdsa::signature::Signer, elliptic_curve::sec1, NistP256};
 use p256;
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
@@ -75,6 +75,7 @@ impl P256PublicKey {
     /// Serialize a P256PublicKey.
     // TODO: Better error handling here. Also should we compress?
     pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
+        let enc = self.0.to_encoded_point(false);
         let bytes = &*self.0.to_encoded_point(false).to_bytes();
         bytes.try_into().unwrap()
     }
@@ -86,8 +87,9 @@ impl P256PublicKey {
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
-        let enc_point = sec1::EncodedPoint::from_bytes(bytes);
-        match p256::ecdsa::VerifyingKey::from_bytes(bytes) {
+        // TODO: Better error handling
+        let enc_point: sec1::EncodedPoint<NistP256> = sec1::EncodedPoint<NistP256>::from_bytes(bytes).unwrap();
+        match p256::ecdsa::VerifyingKey::from_encoded_point(&enc_point) {
             Ok(p256_public_key) => Ok(P256PublicKey(p256_public_key)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
@@ -125,7 +127,8 @@ impl SigningKey for P256PrivateKey {
 impl Uniform for P256PrivateKey {
     fn generate<R>(rng: &mut R) -> Self
     where
-        R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
+       // R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
+       R: p256::elliptic_curve::rand_core::RngCore + p256::elliptic_curve::rand_core::CryptoRng,
     {
         P256PrivateKey(p256::ecdsa::SigningKey::random(rng))
     }
