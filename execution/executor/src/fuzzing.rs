@@ -17,7 +17,10 @@ use aptos_types::{
     block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
-    transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput,
+        TransactionToCommit, Version,
+    },
     vm_status::VMStatus,
 };
 use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
@@ -53,7 +56,7 @@ pub struct FakeVM;
 
 impl TransactionBlockExecutor for FakeVM {
     fn execute_transaction_block(
-        transactions: ExecutableTransactions<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
@@ -68,7 +71,7 @@ impl TransactionBlockExecutor for FakeVM {
 impl VMExecutor for FakeVM {
     fn execute_block_sharded<S: StateView + Send + Sync>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _block: Vec<SubBlocksForShard<Transaction>>,
+        _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

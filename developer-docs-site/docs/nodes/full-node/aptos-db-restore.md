@@ -34,7 +34,7 @@ Each type of data in the backup storage is organized as follows:
 
 ## Restore a DB using the public backup files
 
-The [Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md) supports two kinds of restore operations by reading from the public backup files:
+The [Aptos CLI](../../tools/aptos-cli/use-cli/use-aptos-cli.md) supports two kinds of restore operations by reading from the public backup files:
 1. Recreating a database with minimal transaction history at a user-specified transaction version (or the latest version the backup has)
 2. Restoring the database over a specific period. In addition to the above, this option ensures that the recreated database carries the ledger history of the user-designated version range.
 
