@@ -10,7 +10,7 @@ use aptos_types::{
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
 };
 use aptos_vm::{
-    sharded_block_executor::{executor_shard::ExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     AptosVM, VMExecutor,
 };
 use std::sync::Arc;

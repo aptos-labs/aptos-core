@@ -4,7 +4,6 @@ use crate::{
     block_executor::AptosTransactionOutput,
     sharded_block_executor::{
         cross_shard_state_view::CrossShardStateView,
-        executor_shard::CrossShardClient,
         messages::{CrossShardMsg, CrossShardMsg::RemoteTxnWriteMsg, RemoteTxnWrite},
     },
 };
@@ -144,4 +143,12 @@ impl TransactionCommitHook for CrossShardCommitSender {
     fn on_execution_aborted(&self, _txn_idx: TxnIndex) {
         todo!("on_transaction_aborted not supported for sharded execution yet")
     }
+}
+
+// CrossShardClient is a trait that defines the interface for sending and receiving messages across
+// shards.
+pub trait CrossShardClient: Send + Sync {
+    fn send_cross_shard_msg(&self, shard_id: ShardId, round: RoundId, msg: CrossShardMsg);
+
+    fn receive_cross_shard_msg(&self, current_round: RoundId) -> CrossShardMsg;
 }

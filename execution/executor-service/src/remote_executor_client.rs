@@ -10,7 +10,7 @@ use aptos_types::{
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
     vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::executor_shard::ExecutorClient;
+use aptos_vm::sharded_block_executor::executor_client::ExecutorClient;
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     net::SocketAddr,

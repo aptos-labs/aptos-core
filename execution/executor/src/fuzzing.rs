@@ -24,7 +24,7 @@ use aptos_types::{
     vm_status::VMStatus,
 };
 use aptos_vm::{
-    sharded_block_executor::{executor_shard::ExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     VMExecutor,
 };
 use std::sync::Arc;

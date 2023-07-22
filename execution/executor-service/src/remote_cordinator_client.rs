@@ -6,7 +6,9 @@ use aptos_state_view::in_memory_state_view::InMemoryStateView;
 use aptos_types::{
     block_executor::partitioner::ShardId, transaction::TransactionOutput, vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::{executor_shard::CoordinatorClient, ExecutorShardCommand};
+use aptos_vm::sharded_block_executor::{
+    coordinator_client::CoordinatorClient, ExecutorShardCommand,
+};
 use crossbeam_channel::{Receiver, Sender};
 use std::{net::SocketAddr, sync::Arc};
 

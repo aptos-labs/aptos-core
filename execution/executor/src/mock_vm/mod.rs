@@ -32,7 +32,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm::{
-    sharded_block_executor::{executor_shard::ExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     VMExecutor,
 };
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};

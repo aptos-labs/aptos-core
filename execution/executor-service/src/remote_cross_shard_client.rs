@@ -3,7 +3,9 @@
 use aptos_block_partitioner::sharded_block_partitioner::MAX_ALLOWED_PARTITIONING_ROUNDS;
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_types::block_executor::partitioner::{RoundId, ShardId};
-use aptos_vm::sharded_block_executor::{executor_shard::CrossShardClient, messages::CrossShardMsg};
+use aptos_vm::sharded_block_executor::{
+    cross_shard_client::CrossShardClient, messages::CrossShardMsg,
+};
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     net::SocketAddr,

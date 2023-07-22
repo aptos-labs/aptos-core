@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::{
-    counters::NUM_EXECUTOR_SHARDS, executor_shard::ExecutorClient,
+    counters::NUM_EXECUTOR_SHARDS, executor_client::ExecutorClient,
 };
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
@@ -14,10 +14,11 @@ use aptos_types::{
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
 
+pub mod coordinator_client;
 mod counters;
-mod cross_shard_client;
+pub mod cross_shard_client;
 mod cross_shard_state_view;
-pub mod executor_shard;
+pub mod executor_client;
 pub mod local_executor_shard;
 pub mod messages;
 pub mod sharded_executor_service;

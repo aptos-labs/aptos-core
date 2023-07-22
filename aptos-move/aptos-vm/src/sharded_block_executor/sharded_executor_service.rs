@@ -3,10 +3,10 @@
 use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
+        coordinator_client::CoordinatorClient,
         counters::SHARDED_BLOCK_EXECUTION_SECONDS,
-        cross_shard_client::{CrossShardCommitReceiver, CrossShardCommitSender},
+        cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
-        executor_shard::{CoordinatorClient, CrossShardClient},
         messages::CrossShardMsg,
         ExecutorShardCommand,
     },

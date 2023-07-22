@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    sharded_block_executor::{executor_shard::ExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     AptosVM, VMExecutor,
 };
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
