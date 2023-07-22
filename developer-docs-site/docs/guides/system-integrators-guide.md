@@ -98,7 +98,7 @@ At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/88
 * An [event handle](../concepts/events.md) for all new types of coins added to the account.
 * An event handle for all key rotations for the account.
 
-Read more about [Accounts](../concepts/accounts.md) and [set one up](https://github.com/aptos-labs/aptos-core/blob/main/developer-docs-site/docs/concepts/accounts.md#creating-an-account).
+Read more about [Accounts](../concepts/accounts.md) and [set one up](../tools/aptos-cli/use-cli/use-aptos-cli.md#initialize-local-configuration-and-create-an-account).
 
 ## Transactions
 
