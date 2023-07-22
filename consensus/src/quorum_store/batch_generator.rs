@@ -224,8 +224,9 @@ impl BatchGenerator {
             .flatten()
             .cloned()
             .collect();
-
+        counters::IN_PROGRESS_TXNS_NUM.observe(exclude_txns.len() as f64);
         trace!("QS: excluding txs len: {:?}", exclude_txns.len());
+
         let mut pulled_txns = self
             .mempool_proxy
             .pull_internal(
@@ -250,6 +251,9 @@ impl BatchGenerator {
         } else {
             counters::PULLED_TXNS_COUNT.inc();
             counters::PULLED_TXNS_NUM.observe(pulled_txns.len() as f64);
+            if pulled_txns.len() as u64 == max_count {
+                counters::PULLED_FULL_TXNS_FULL.inc();
+            }
         }
         counters::BATCH_CREATION_DURATION.observe_duration(self.last_end_batch_time.elapsed());
 

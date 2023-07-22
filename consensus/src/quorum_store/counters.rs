@@ -292,6 +292,25 @@ pub static PULLED_EMPTY_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of how many times txns pulled are full (equals max_count).
+pub static PULLED_FULL_TXNS_FULL: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_pulled_full_txn_count",
+        "Count of the pulled full txns."
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of txns excluded on pull.
+pub static IN_PROGRESS_TXNS_NUM: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "quorum_store_in_progress_txns_num",
+        "Histogram for the number of txns excluded on pull.",
+        TRANSACTION_COUNT_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
 /// Count of the created batches since last restart.
 pub static CREATED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
