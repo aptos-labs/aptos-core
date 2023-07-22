@@ -23,19 +23,22 @@ pub struct AnalyzedTransaction {
     /// Set of storage locations that are read by the transaction - this doesn't include location
     /// that are written by the transactions to avoid duplication of locations across read and write sets
     /// This can be accurate or strictly overestimated.
-    read_hints: Vec<StorageLocation>,
+    pub read_hints: Vec<StorageLocation>,
     /// Set of storage locations that are written by the transaction. This can be accurate or strictly
     /// overestimated.
-    write_hints: Vec<StorageLocation>,
+    pub write_hints: Vec<StorageLocation>,
     /// A transaction is predictable if neither the read_hint or the write_hint have wildcards.
     predictable_transaction: bool,
     /// The hash of the transaction - this is cached for performance reasons.
     hash: HashValue,
+
+    /// Temporarily ID used by partitioner.
+    pub maybe_txn_id_in_partition_session: Option<usize>,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 // TODO(skedia): Evaluate if we need to cache the HashValue for efficiency reasons.
-pub enum StorageLocation {
+pub enum StorageLocationInner {
     // A specific storage location denoted by an address and a struct tag.
     Specific(StateKey),
     // Storage location denoted by a struct tag and any arbitrary address.
@@ -45,17 +48,32 @@ pub enum StorageLocation {
     WildCardTable(TableHandle),
 }
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct StorageLocation {
+    inner: StorageLocationInner,
+    #[serde(skip_serializing)]
+    pub maybe_id_in_partition_session: Option<usize>,
+}
 impl StorageLocation {
     pub fn into_state_key(self) -> StateKey {
-        match self {
-            StorageLocation::Specific(state_key) => state_key,
+        match self.inner {
+            StorageLocationInner::Specific(state_key) => state_key,
             _ => panic!("Cannot convert wildcard storage location to state key"),
         }
     }
     pub fn maybe_state_key(&self) -> Option<&StateKey> {
-        match self {
-            StorageLocation::Specific(state_key) => Some(state_key),
+        match &self.inner {
+            StorageLocationInner::Specific(state_key) => Some(state_key),
             _ => None,
+        }
+    }
+}
+
+impl From<StorageLocationInner> for StorageLocation {
+    fn from(inner: StorageLocationInner) -> Self {
+        Self {
+            inner,
+            maybe_id_in_partition_session: None,
         }
     }
 }
@@ -69,14 +87,15 @@ impl AnalyzedTransaction {
         let hints_contain_wildcard = read_hints
             .iter()
             .chain(write_hints.iter())
-            .any(|hint| !matches!(hint, StorageLocation::Specific(_)));
-        let hash = transaction.hash();
+            .any(|hint| !matches!(hint.inner, StorageLocationInner::Specific(_)));
+        let hash = CryptoHash::hash(&transaction);
         AnalyzedTransaction {
             transaction,
             read_hints,
             write_hints,
             predictable_transaction: !hints_contain_wildcard,
             hash,
+            maybe_txn_id_in_partition_session: None,
         }
     }
 
@@ -137,17 +156,17 @@ impl AnalyzedTransaction {
     }
 
     pub fn account_resource_location(address: AccountAddress) -> StorageLocation {
-        StorageLocation::Specific(StateKey::access_path(AccessPath::new(
+        StorageLocationInner::Specific(StateKey::access_path(AccessPath::new(
             address,
             AccountResource::struct_tag().access_vector(),
-        )))
+        ))).into()
     }
 
     pub fn coin_store_location(address: AccountAddress) -> StorageLocation {
-        StorageLocation::Specific(StateKey::access_path(AccessPath::new(
+        StorageLocationInner::Specific(StateKey::access_path(AccessPath::new(
             address,
             CoinStoreResource::struct_tag().access_vector(),
-        )))
+        ))).into()
     }
 
     pub fn analyzed_transaction_for_create_account(

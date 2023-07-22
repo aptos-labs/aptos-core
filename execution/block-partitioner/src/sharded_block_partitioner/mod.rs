@@ -30,6 +30,7 @@ use std::env::VarError;
 use std::time::Instant;
 use aptos_types::block_executor::partitioner::{CrossShardDependencies, ShardedTxnIndex, SubBlock, TransactionWithDependencies};
 use aptos_types::state_store::state_key::StateKey;
+use aptos_types::transaction::analyzed_transaction::StorageLocation;
 use crate::sharded_block_partitioner::counters::{ADD_EDGES_MISC_SECONDS, FLATTEN_TO_ROUNDS_MISC_SECONDS, SHARDED_PARTITIONER_MISC_SECONDS};
 use crate::simple_partitioner::SimplePartitioner;
 
@@ -294,7 +295,12 @@ impl ShardedBlockPartitioner {
         augmented_matrix
     }
 
-    pub fn flatten_to_rounds(&self, max_partitioning_rounds: RoundId, cross_shard_dep_avoid_threshold: f32, mut txns_by_shard: Vec<Vec<AnalyzedTransaction>>) -> Vec<Vec<Vec<AnalyzedTransaction>>> {
+    pub fn flatten_to_rounds(
+        &self,
+        max_partitioning_rounds: RoundId,
+        cross_shard_dep_avoid_threshold: f32,
+        mut txns_by_shard: Vec<Vec<AnalyzedTransaction>>
+    ) -> Vec<Vec<Vec<AnalyzedTransaction>>> {
         let total_txns: usize = txns_by_shard.iter().map(|txns_for_shard|txns_for_shard.len()).sum();
         let mut txn_matrix: Vec<Vec<Vec<AnalyzedTransaction>>> = Vec::new();
         let mut current_round = 0;
@@ -333,16 +339,21 @@ impl ShardedBlockPartitioner {
         txn_matrix
     }
 
-    fn add_edges(&self, matrix: Vec<Vec<Vec<AnalyzedTransaction>>>, maybe_num_keys: Option<usize>) -> Vec<SubBlocksForShard<Transaction>> {
+    fn add_edges(
+        &self,
+        matrix: Vec<Vec<Vec<AnalyzedTransaction>>>,
+        num_keys: Option<usize>,
+    ) -> Vec<SubBlocksForShard<Transaction>> {
         let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["main"]).start_timer();
+        let num_keys = num_keys.unwrap();
         let mut ret: Vec<SubBlocksForShard<Transaction>> = (0..self.num_shards).map(|shard_id| SubBlocksForShard { shard_id, sub_blocks: vec![] }).collect();
         let mut global_txn_counter: usize = 0;
-        let mut global_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::with_capacity(maybe_num_keys.unwrap_or(0));
+        let mut global_owners_by_loc_id: Vec<Option<ShardedTxnIndex>> = vec![None; num_keys];// HashMap<StateKey, ShardedDTxnIndex>;
         for (round_id, row) in matrix.into_iter().enumerate() {
             for (shard_id, txns) in row.into_iter().enumerate() {
                 let start_index_for_cur_sub_block = global_txn_counter;
                 let mut twds_for_cur_sub_block: Vec<TransactionWithDependencies<Transaction>> = Vec::with_capacity(txns.len());
-                let mut local_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::with_capacity(maybe_num_keys.unwrap_or(0));
+                let mut local_owners_by_loc_id: HashMap<usize, ShardedTxnIndex> = HashMap::new();
                 for txn in txns {
                     let cur_sharded_txn_idx = ShardedTxnIndex {
                         txn_index: global_txn_counter,
@@ -350,9 +361,8 @@ impl ShardedBlockPartitioner {
                         round_id,
                     };
                     let mut cur_txn_csd = CrossShardDependencies::default();
-                    for loc in txn.read_hints() {
-                        let key = loc.maybe_state_key().unwrap();
-                        match global_owners_of_key.get(key) {
+                    for loc in txn.read_hints().iter() {
+                        match &global_owners_by_loc_id[*loc.maybe_id_in_partition_session.as_ref().unwrap()] {
                             Some(owner) => {
                                 ret.get_mut(owner.shard_id).unwrap()
                                     .get_sub_block_mut(owner.round_id).unwrap()
@@ -363,10 +373,10 @@ impl ShardedBlockPartitioner {
                         }
                     }
 
-                    for loc in txn.write_hints() {
-                        let key = loc.maybe_state_key().unwrap();
-                        local_owners_of_key.insert(key.clone(), cur_sharded_txn_idx);
-                        match global_owners_of_key.get(key) {
+                    for loc in txn.write_hints().iter() {
+                        let loc_id = *loc.maybe_id_in_partition_session.as_ref().unwrap();
+                        local_owners_by_loc_id.insert(loc_id, cur_sharded_txn_idx);
+                        match &global_owners_by_loc_id[loc_id] {
                             Some(owner) => {
                                 ret.get_mut(owner.shard_id).unwrap()
                                     .get_sub_block_mut(owner.round_id).unwrap()
@@ -376,8 +386,7 @@ impl ShardedBlockPartitioner {
                             None => {},
                         }
                     }
-
-                    let twd = TransactionWithDependencies::new(txn.into(), cur_txn_csd);
+                    let twd = TransactionWithDependencies::new(txn.into_txn(), cur_txn_csd);
                     twds_for_cur_sub_block.push(twd);
                     global_txn_counter += 1;
                 }
@@ -385,14 +394,14 @@ impl ShardedBlockPartitioner {
                 let cur_sub_block = SubBlock::new(start_index_for_cur_sub_block, twds_for_cur_sub_block);
                 ret.get_mut(shard_id).unwrap().add_sub_block(cur_sub_block);
 
-                for (key, owner) in local_owners_of_key {
-                    global_owners_of_key.insert(key, owner);
+                for (key, owner) in local_owners_by_loc_id {
+                    global_owners_by_loc_id[key] = Some(owner);
                 }
             }
         }
         let duration = timer.stop_and_record();
         let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["drop"]).start_timer();
-        drop(global_owners_of_key);
+        drop(global_owners_by_loc_id);
         let duration = timer.stop_and_record();
         ret
     }

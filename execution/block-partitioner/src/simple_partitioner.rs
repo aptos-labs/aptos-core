@@ -39,7 +39,7 @@ impl SimplePartitioner {
         let mut txns_by_sender_id: Vec<Vec<AnalyzedTransaction>> = Vec::new();
         let mut key_ids_by_key: HashMap<StateKey, usize> = HashMap::new();
         let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
-        for (_txn_id, txn) in txns.into_iter().enumerate() {
+        for (txn_id, mut txn) in txns.into_iter().enumerate() {
             let sender = txn.sender();
             let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
                 let ret = num_senders;
@@ -48,19 +48,21 @@ impl SimplePartitioner {
                 key_ids_by_sender_id.push(HashSet::new());
                 ret
             });
-            for storage_location in txn.write_hints().iter().chain(txn.read_hints().iter()) {
+            for storage_location in txn.write_hints.iter_mut().chain(txn.read_hints.iter_mut()) {
                 let key = storage_location.maybe_state_key().unwrap().clone();
                 let key_id = *key_ids_by_key.entry(key).or_insert_with(||{
                     let ret = num_keys;
                     num_keys += 1;
                     ret
                 });
+                storage_location.maybe_id_in_partition_session = Some(key_id);
                 key_ids_by_sender_id[sender_id].insert(key_id);
             }
+            txn.maybe_txn_id_in_partition_session = Some(txn_id);
             txns_by_sender_id[sender_id].push(txn);
         }
-        timer.stop_and_record();
-
+        let duration = timer.stop_and_record();
+        println!("simple_par/preprocess={duration:?}");
         /*
         Now txns_by_sender becomes:
         {
@@ -84,7 +86,8 @@ impl SimplePartitioner {
             let set_id = uf.find(sender_id);
             sender_groups_by_set_id.entry(set_id).or_insert_with(Vec::new).push(sender_id);
         }
-        timer.stop_and_record();
+        let duration = timer.stop_and_record();
+        println!("simple_par/union_find={duration:?}");
 
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["cap_group_size"]).start_timer();
         // If a sender group is too large,
@@ -107,14 +110,6 @@ impl SimplePartitioner {
             sub_groups
         }).collect();
 
-        let mut group_ids_by_sender_id: Vec<usize> = vec![usize::MAX; num_senders];
-        for (gid, sender_group) in capped_sender_groups.iter().enumerate() {
-            for sender_id in sender_group.sender_ids.iter() {
-                group_ids_by_sender_id[*sender_id] = gid;
-            }
-        }
-        let duration = timer.stop_and_record();
-        // println!("cap_group_size={}", duration);
         /*
         Now capped_sender_groups becomes:
         [
@@ -127,6 +122,15 @@ impl SimplePartitioner {
             [Z],
         ]
         */
+
+        let mut group_ids_by_sender_id: Vec<usize> = vec![usize::MAX; num_senders];
+        for (gid, sender_group) in capped_sender_groups.iter().enumerate() {
+            for sender_id in sender_group.sender_ids.iter() {
+                group_ids_by_sender_id[*sender_id] = gid;
+            }
+        }
+        let duration = timer.stop_and_record();
+        //println!("simple_par/cap_group_size={}", duration);
 
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["schedule"]).start_timer();
         let loads_by_sub_group: Vec<u64> = capped_sender_groups.iter().map(|g| g.total_load).collect();
