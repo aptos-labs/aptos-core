@@ -2804,11 +2804,7 @@ impl Loader {
         ty: &Type,
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<TypeTag> {
-        gas_context.cost += gas_context.cost_base;
-        if gas_context.cost > gas_context.max_cost {
-            return Err(PartialVMError::new(StatusCode::OUT_OF_GAS)
-                .with_message("Type instantiation exceeds maximum gas".to_string()));
-        }
+        gas_context.charge(gas_context.cost_base)?;
         Ok(match ty {
             Type::Bool => TypeTag::Bool,
             Type::U8 => TypeTag::U8,
