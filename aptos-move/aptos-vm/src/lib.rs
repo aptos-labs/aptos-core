@@ -123,7 +123,7 @@ mod transaction_validation;
 mod verifier;
 
 pub use crate::aptos_vm::AptosVM;
-use crate::sharded_block_executor::ShardedBlockExecutor;
+use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::SubBlocksForShard,
@@ -161,8 +161,8 @@ pub trait VMExecutor: Send + Sync {
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
-        sharded_block_executor: &ShardedBlockExecutor<S>,
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
+        sharded_block_executor: &ShardedBlockExecutor<S, E>,
         block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
