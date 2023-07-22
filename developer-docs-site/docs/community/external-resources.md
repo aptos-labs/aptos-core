@@ -26,6 +26,7 @@ To add your own resource, click **Edit this page** at the bottom, add your resou
 
 | Contribution | Description | Author | Date added/updated |
 | --- | --- | --- | --- |
+[Fullnode security](https://forum.aptoslabs.com/t/fullnode-security/281760) | Demonstrates basic security methods for protecting Fullnode. | [cryptomolot](https://forum.aptoslabs.com/u/unlimitedmolot) | 2023-07-22 |
 | [Alerts integration on your validator/full node](https://forum.aptoslabs.com/t/alerts-integration-on-your-validator-full-node/196210) | Explains how to integrate alerts on your validator (fullnode). | [cryptomolot](https://forum.aptoslabs.com/u/unlimitedmolot) | 2023-06-11 |
 | [Tools to monitor your validator](https://forum.aptoslabs.com/t/tools-to-monitore-your-validator/197163) | Explains what tools to use to monitor your validator (fullnode). | [cryptomolot](https://forum.aptoslabs.com/u/unlimitedmolot) and [p1xel32](https://forum.aptoslabs.com/u/p1xel32) | 2023-06-11 |
 | [How to join validator set via snapshot](https://forum.aptoslabs.com/t/how-to-join-validator-set-via-snapshot/207568) | Demonstrates a method to join a validator set with a snapshot. | [cryptomolot](https://forum.aptoslabs.com/u/unlimitedmolot) | 2023-06-11 |
