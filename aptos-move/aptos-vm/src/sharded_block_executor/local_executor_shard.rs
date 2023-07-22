@@ -23,8 +23,8 @@ use std::{
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
 pub struct LocalExecutorService<S: StateView + Sync + Send + 'static> {
-    _executor_service: Arc<ShardedExecutorService<S>>,
     join_handle: Option<thread::JoinHandle<()>>,
+    phantom: std::marker::PhantomData<S>,
 }
 
 impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
@@ -53,8 +53,8 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
             .spawn(move || executor_service_clone.start())
             .unwrap();
         Self {
-            _executor_service: executor_service,
             join_handle: Some(join_handle),
+            phantom: std::marker::PhantomData,
         }
     }
 
