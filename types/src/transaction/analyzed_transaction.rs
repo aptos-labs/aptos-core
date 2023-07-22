@@ -34,6 +34,7 @@ pub struct AnalyzedTransaction {
 
     /// Temporarily ID used by partitioner.
     pub maybe_txn_id_in_partition_session: Option<usize>,
+    pub maybe_sender_id_in_partition_session: Option<usize>,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -96,6 +97,7 @@ impl AnalyzedTransaction {
             predictable_transaction: !hints_contain_wildcard,
             hash,
             maybe_txn_id_in_partition_session: None,
+            maybe_sender_id_in_partition_session: None,
         }
     }
 

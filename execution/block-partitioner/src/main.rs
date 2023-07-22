@@ -56,7 +56,7 @@ fn main() {
         let result = BlockPartitioner::partition(&partitioner, transactions, args.num_shards);
         let elapsed = now.elapsed();
         println!("Time taken to partition: {:?}", elapsed);
-        report_sub_block_matrix(&result);
+        // report_sub_block_matrix(&result);
     }
 }
 

@@ -118,7 +118,7 @@ where
                 .spawn(move || {
                     let partitioner: Arc<dyn BlockPartitioner> = match config.partitioner_impl {
                         PartitionerImpl::NoOp => Arc::new(NoOpPartitioner {}),
-                        PartitionerImpl::Simple => Arc::new(SimplePartitioner {}),
+                        PartitionerImpl::Simple => Arc::new(SimplePartitioner::new(8)),
                         PartitionerImpl::Sharded(concurrency_level) => {
                             Arc::new(ShardedBlockPartitioner::new(concurrency_level))
                         },
@@ -182,7 +182,7 @@ where
                 .spawn(move || {
                     let partitioner: Arc<dyn BlockPartitioner> = match config.partitioner_impl {
                         PartitionerImpl::NoOp => Arc::new(NoOpPartitioner {}),
-                        PartitionerImpl::Simple => Arc::new(SimplePartitioner {}),
+                        PartitionerImpl::Simple => Arc::new(SimplePartitioner::new(8)),
                         PartitionerImpl::Sharded(concurrency_level) => {
                             Arc::new(ShardedBlockPartitioner::new(concurrency_level))
                         },

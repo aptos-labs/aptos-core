@@ -12,16 +12,28 @@ use aptos_types::{
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
+use dashmap::{DashMap, DashSet};
 use once_cell::sync::Lazy;
+use rayon::{ThreadPool, ThreadPoolBuilder};
+use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator};
 use aptos_metrics_core::{HistogramVec, register_histogram_vec, exponential_buckets};
 use aptos_types::block_executor::partitioner::ShardedTxnIndex;
 use crate::union_find::UnionFind;
+use rayon::iter::ParallelIterator;
 
 type Sender = Option<AccountAddress>;
 
-pub struct SimplePartitioner {}
+pub struct SimplePartitioner {
+    thread_pool: ThreadPool,
+}
 impl SimplePartitioner {
+    pub fn new(concurrency_level: usize) -> Self {
+        SimplePartitioner {
+            thread_pool: ThreadPoolBuilder::new().num_threads(concurrency_level).build().unwrap()
+        }
+    }
     /// If `maybe_load_imbalance_tolerance` is none,
     /// it is guaranteed that the returned txn groups do not have cross-group conflicts.
     ///
@@ -31,38 +43,46 @@ impl SimplePartitioner {
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
     ) -> (Vec<Vec<AnalyzedTransaction>>, usize) {
-        let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
+        let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["group_by_sender"]).start_timer();
         let num_txns = txns.len();
-        let mut num_senders: usize = 0;
-        let mut num_keys: usize = 0;
-        let mut key_ids_by_sender_id: Vec<HashSet<usize>> = Vec::new();
         let mut txns_by_sender_id: Vec<Vec<AnalyzedTransaction>> = Vec::new();
-        let mut key_ids_by_key: HashMap<StateKey, usize> = HashMap::new();
+        let mut key_ids_by_sender_id: Vec<DashSet<usize>> = Vec::new();
         let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
         for (txn_id, mut txn) in txns.into_iter().enumerate() {
             let sender = txn.sender();
             let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
-                let ret = num_senders;
-                num_senders += 1;
+                let ret = txns_by_sender_id.len();
                 txns_by_sender_id.push(vec![]);
-                key_ids_by_sender_id.push(HashSet::new());
+                key_ids_by_sender_id.push(DashSet::new());
                 ret
             });
-            for storage_location in txn.write_hints.iter_mut().chain(txn.read_hints.iter_mut()) {
-                let key = storage_location.maybe_state_key().unwrap().clone();
-                let key_id = *key_ids_by_key.entry(key).or_insert_with(||{
-                    let ret = num_keys;
-                    num_keys += 1;
-                    ret
-                });
-                storage_location.maybe_id_in_partition_session = Some(key_id);
-                key_ids_by_sender_id[sender_id].insert(key_id);
-            }
             txn.maybe_txn_id_in_partition_session = Some(txn_id);
+            txn.maybe_sender_id_in_partition_session = Some(sender_id);
             txns_by_sender_id[sender_id].push(txn);
         }
+        let num_senders = txns_by_sender_id.len();
         let duration = timer.stop_and_record();
-        println!("simple_par/preprocess={duration:?}");
+        // println!("group_by_sender={duration:?}");
+
+        let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["count_storage_locations"]).start_timer();
+        let mut num_keys = AtomicUsize::new(0);
+        let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(64);
+        self.thread_pool.install(||{
+            txns_by_sender_id.par_iter_mut().for_each(|txns|{
+                for txn in txns {
+                    for storage_location in txn.write_hints.iter_mut().chain(txn.read_hints.iter_mut()) {
+                        let key = storage_location.maybe_state_key().unwrap().clone();
+                        let key_id = *key_ids_by_key.entry(key).or_insert_with(||{
+                            num_keys.fetch_add(1, Ordering::SeqCst)
+                        });
+                        storage_location.maybe_id_in_partition_session = Some(key_id);
+                        key_ids_by_sender_id.get(txn.maybe_sender_id_in_partition_session.unwrap()).unwrap().insert(key_id);
+                    }
+                }
+            });
+        });
+        let duration = timer.stop_and_record();
+        // println!("count_storage_locations={duration:?}");
         /*
         Now txns_by_sender becomes:
         {
@@ -73,10 +93,10 @@ impl SimplePartitioner {
         */
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["union_find"]).start_timer();
         // The union-find approach.
-        let mut uf = UnionFind::new(num_senders + num_keys);
+        let mut uf = UnionFind::new(num_senders + num_keys.load(Ordering::SeqCst));
         for (sender_id, key_ids) in key_ids_by_sender_id.iter().enumerate() {
-            for &key_id in key_ids.iter() {
-                let key_id_in_uf = num_senders + key_id;
+            for key_id in key_ids.iter() {
+                let key_id_in_uf = num_senders + *key_id.key();
                 uf.union(key_id_in_uf, sender_id);
             }
         }
@@ -87,7 +107,7 @@ impl SimplePartitioner {
             sender_groups_by_set_id.entry(set_id).or_insert_with(Vec::new).push(sender_id);
         }
         let duration = timer.stop_and_record();
-        println!("simple_par/union_find={duration:?}");
+        // println!("simple_par/union_find={duration:?}");
 
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["cap_group_size"]).start_timer();
         // If a sender group is too large,
@@ -156,7 +176,7 @@ impl SimplePartitioner {
         drop(key_ids_by_key);
         drop(sender_ids_by_sender);
         let duration = timer.stop_and_record();
-        (txns_by_shard_id, num_keys)
+        (txns_by_shard_id, num_keys.load(Ordering::SeqCst))
     }
 }
 

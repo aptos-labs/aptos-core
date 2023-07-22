@@ -118,6 +118,7 @@ pub struct ShardedBlockPartitioner {
     control_txs: Vec<Sender<ControlMsg>>,
     result_rxs: Vec<Receiver<PartitioningResp>>,
     shard_threads: Vec<thread::JoinHandle<()>>,
+    helper: SimplePartitioner,
 }
 
 pub static MAX_ALLOWED_PARTITIONING_ROUNDS: usize = 8;
@@ -164,6 +165,7 @@ impl ShardedBlockPartitioner {
             control_txs,
             result_rxs,
             shard_threads: shard_join_handles,
+            helper: SimplePartitioner::new(8),
         }
     }
 
@@ -425,8 +427,7 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         let ret = match std::env::var("SHARDED_PARTITIONER__INIT_WITH_SIMPLE_PARTITIONER") {
             Ok(v) if v.as_str() == "1" => {
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["init_with_simple"]).start_timer();
-                let simple_partitioner = SimplePartitioner{};
-                let (txns_by_shard_id, num_keys) = simple_partitioner.partition(transactions, self.num_shards);
+                let (txns_by_shard_id, num_keys) = self.helper.partition(transactions, self.num_shards);
                 timer.stop_and_record();
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["flatten_to_rounds"]).start_timer();
                 let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard_id);
