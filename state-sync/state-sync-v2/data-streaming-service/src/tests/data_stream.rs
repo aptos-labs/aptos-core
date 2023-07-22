@@ -462,10 +462,11 @@ async fn test_continuous_stream_epoch_change_retry() {
 
 #[tokio::test]
 async fn test_continuous_stream_optimistic_fetch_retry() {
-    // Create a test streaming service config
+    // Create a test streaming service config with subscriptions disabled
     let max_request_retry = 3;
     let max_concurrent_requests = 3;
     let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: false,
         max_concurrent_requests,
         max_request_retry,
         ..Default::default()
@@ -643,22 +644,28 @@ async fn test_continuous_stream_optimistic_fetch_timeout() {
         ..Default::default()
     };
 
+    // Create a test streaming service config with subscriptions disabled
+    let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: false,
+        ..Default::default()
+    };
+
     // Test both types of continuous data streams
     let (data_stream_1, stream_listener_1) = create_continuous_transaction_stream(
         data_client_config,
-        DataStreamingServiceConfig::default(),
+        streaming_service_config,
         MAX_ADVERTISED_TRANSACTION,
         MAX_ADVERTISED_EPOCH_END,
     );
     let (data_stream_2, stream_listener_2) = create_continuous_transaction_output_stream(
         data_client_config,
-        DataStreamingServiceConfig::default(),
+        streaming_service_config,
         MAX_ADVERTISED_TRANSACTION_OUTPUT,
         MAX_ADVERTISED_EPOCH_END,
     );
     let (data_stream_3, stream_listener_3) = create_continuous_transaction_or_output_stream(
         data_client_config,
-        DataStreamingServiceConfig::default(),
+        streaming_service_config,
         MAX_ADVERTISED_TRANSACTION_OUTPUT,
         MAX_ADVERTISED_EPOCH_END,
     );
@@ -1221,10 +1228,10 @@ fn insert_response_into_pending_queue(
     pending_response: PendingClientResponse,
 ) {
     // Clear the queue
-    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
-    sent_requests.as_mut().unwrap().clear();
+    data_stream.clear_sent_data_requests_queue();
 
     // Insert the pending response
+    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
     let pending_response = Arc::new(Mutex::new(Box::new(pending_response)));
     sent_requests.as_mut().unwrap().push_front(pending_response);
 }

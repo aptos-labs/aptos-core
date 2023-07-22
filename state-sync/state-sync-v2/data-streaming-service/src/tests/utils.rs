@@ -612,6 +612,47 @@ impl AptosDataClientInterface for MockAptosDataClient {
         };
         Ok(create_data_client_response(transactions_or_outputs))
     }
+
+    async fn subscribe_to_transaction_outputs_with_proof(
+        &self,
+        _known_version: Version,
+        _known_epoch: Epoch,
+        _subscription_stream_id: u64,
+        _subscription_stream_index: u64,
+        _request_timeout_ms: u64,
+    ) -> aptos_data_client::error::Result<
+        Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
+    > {
+        unimplemented!();
+    }
+
+    async fn subscribe_to_transactions_with_proof(
+        &self,
+        _known_version: Version,
+        _known_epoch: Epoch,
+        _include_events: bool,
+        _subscription_stream_id: u64,
+        _subscription_stream_index: u64,
+        _request_timeout_ms: u64,
+    ) -> aptos_data_client::error::Result<
+        Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
+    > {
+        unimplemented!();
+    }
+
+    async fn subscribe_to_transactions_or_outputs_with_proof(
+        &self,
+        _known_version: Version,
+        _known_epoch: Epoch,
+        _include_events: bool,
+        _subscription_stream_id: u64,
+        _subscription_stream_index: u64,
+        _request_timeout_ms: u64,
+    ) -> aptos_data_client::error::Result<
+        Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
+    > {
+        unimplemented!();
+    }
 }
 
 #[derive(Debug)]

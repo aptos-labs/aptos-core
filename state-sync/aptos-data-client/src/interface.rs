@@ -129,6 +129,47 @@ pub trait AptosDataClientInterface {
         include_events: bool,
         request_timeout_ms: u64,
     ) -> error::Result<Response<TransactionOrOutputListWithProof>>;
+
+    /// Subscribes to new transaction output lists with proofs. Subscriptions
+    /// start at `known_version + 1` and `known_epoch` (inclusive). The end
+    /// version and proof version are specified by the server. If the data
+    /// cannot be fetched, an error is returned.
+    async fn subscribe_to_transaction_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        subscription_stream_id: u64,
+        subscription_stream_index: u64,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+
+    /// Subscribes to new transaction lists with proofs. Subscriptions start
+    /// at `known_version + 1` and `known_epoch` (inclusive). The end version
+    /// and proof version are specified by the server. If the data cannot be
+    /// fetched, an error is returned.
+    async fn subscribe_to_transactions_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+        subscription_stream_id: u64,
+        subscription_stream_index: u64,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+
+    /// Subscribes to new transaction or output lists with proofs. Subscriptions
+    /// start at `known_version + 1` and `known_epoch` (inclusive). The end
+    /// version and proof version are specified by the server. If the data
+    /// cannot be fetched, an error is returned.
+    async fn subscribe_to_transactions_or_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+        subscription_stream_id: u64,
+        subscription_stream_index: u64,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
 }
 
 /// A response error that users of the Aptos Data Client can use to notify

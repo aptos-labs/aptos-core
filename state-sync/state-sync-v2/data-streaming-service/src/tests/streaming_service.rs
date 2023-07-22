@@ -19,6 +19,10 @@ use crate::{
     },
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
+};
 use claims::{assert_le, assert_matches, assert_ok, assert_some};
 
 macro_rules! unexpected_payload_type {
@@ -779,22 +783,18 @@ async fn test_notifications_optimistic_fetch_outputs() {
                     ledger_info_with_sigs,
                     outputs_with_proofs,
                 ) => {
-                    let ledger_info = ledger_info_with_sigs.ledger_info();
-                    // Verify the epoch of the ledger info
-                    assert_eq!(ledger_info.epoch(), next_expected_epoch);
+                    // Verify the continuous outputs payload
+                    let (new_expected_version, new_expected_epoch) =
+                        verify_continuous_outputs_with_proof(
+                            next_expected_epoch,
+                            next_expected_version,
+                            ledger_info_with_sigs,
+                            outputs_with_proofs,
+                        );
 
-                    // Verify the output start version matches the expected version
-                    let first_output_version = outputs_with_proofs.first_transaction_output_version;
-                    assert_eq!(Some(next_expected_version), first_output_version);
-
-                    let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
-                    next_expected_version += num_outputs;
-
-                    // Update epochs if we've hit the epoch end
-                    let last_output_version = first_output_version.unwrap() + num_outputs - 1;
-                    if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
-                        next_expected_epoch += 1;
-                    }
+                    // Update the next expected version and epoch
+                    next_expected_version = new_expected_version;
+                    next_expected_epoch = new_expected_epoch;
                 },
                 data_payload => unexpected_payload_type!(data_payload),
             }
@@ -831,25 +831,83 @@ async fn test_notifications_optimistic_fetch_transactions() {
                     ledger_info_with_sigs,
                     transactions_with_proofs,
                 ) => {
-                    let ledger_info = ledger_info_with_sigs.ledger_info();
-                    // Verify the epoch of the ledger info
-                    assert_eq!(ledger_info.epoch(), next_expected_epoch);
+                    // Verify the continuous transactions payload
+                    let (new_expected_version, new_expected_epoch) =
+                        verify_continuous_transactions_with_proof(
+                            next_expected_epoch,
+                            next_expected_version,
+                            ledger_info_with_sigs,
+                            transactions_with_proofs,
+                        );
 
-                    // Verify the transaction start version matches the expected version
-                    let first_transaction_version =
-                        transactions_with_proofs.first_transaction_version;
-                    assert_eq!(Some(next_expected_version), first_transaction_version);
+                    // Update the next expected version and epoch
+                    next_expected_version = new_expected_version;
+                    next_expected_epoch = new_expected_epoch;
+                },
+                data_payload => unexpected_payload_type!(data_payload),
+            }
+        } else {
+            assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
+            return assert_eq!(next_expected_version, MAX_REAL_TRANSACTION + 1);
+        }
+    }
+}
 
-                    let num_transactions = transactions_with_proofs.transactions.len() as u64;
-                    next_expected_version += num_transactions;
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_optimistic_fetch_transactions_or_outputs() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service_with_data_delay();
 
-                    // Update epochs if we've hit the epoch end
-                    let last_transaction_version =
-                        first_transaction_version.unwrap() + num_transactions - 1;
-                    if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch()
-                    {
-                        next_expected_epoch += 1;
-                    }
+    // Request a continuous transaction or output stream and get a data stream listener
+    let mut stream_listener = streaming_client
+        .continuously_stream_transactions_or_outputs(
+            MIN_ADVERTISED_TRANSACTION - 1,
+            MIN_ADVERTISED_EPOCH_END,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Read the data notifications from the stream and verify the payloads
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
+    loop {
+        if let Ok(data_notification) = get_data_notification(&mut stream_listener).await {
+            match data_notification.data_payload {
+                DataPayload::ContinuousTransactionsWithProof(
+                    ledger_info_with_sigs,
+                    transactions_with_proofs,
+                ) => {
+                    // Verify the continuous transactions payload
+                    let (new_expected_version, new_expected_epoch) =
+                        verify_continuous_transactions_with_proof(
+                            next_expected_epoch,
+                            next_expected_version,
+                            ledger_info_with_sigs,
+                            transactions_with_proofs,
+                        );
+
+                    // Update the next expected version and epoch
+                    next_expected_version = new_expected_version;
+                    next_expected_epoch = new_expected_epoch;
+                },
+                DataPayload::ContinuousTransactionOutputsWithProof(
+                    ledger_info_with_sigs,
+                    outputs_with_proofs,
+                ) => {
+                    // Verify the continuous outputs payload
+                    let (new_expected_version, new_expected_epoch) =
+                        verify_continuous_outputs_with_proof(
+                            next_expected_epoch,
+                            next_expected_version,
+                            ledger_info_with_sigs,
+                            outputs_with_proofs,
+                        );
+
+                    // Update the next expected version and epoch
+                    next_expected_version = new_expected_version;
+                    next_expected_epoch = new_expected_epoch;
                 },
                 data_payload => unexpected_payload_type!(data_payload),
             }
@@ -1532,6 +1590,7 @@ pub fn create_streaming_client_and_server(
 
     // Create the data streaming service config
     let data_streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: false,
         max_concurrent_requests: 3,
         max_concurrent_state_requests: 6,
         ..Default::default()
@@ -1546,4 +1605,70 @@ pub fn create_streaming_client_and_server(
     );
 
     (streaming_client, streaming_service)
+}
+
+/// Verifies the continuous transaction outputs payload
+/// and returns the new expected version and epoch.
+fn verify_continuous_outputs_with_proof(
+    expected_epoch: u64,
+    expected_version: u64,
+    ledger_info_with_sigs: LedgerInfoWithSignatures,
+    outputs_with_proofs: TransactionOutputListWithProof,
+) -> (u64, u64) {
+    // Verify the ledger info epoch matches the expected epoch
+    let ledger_info = ledger_info_with_sigs.ledger_info();
+    assert_eq!(ledger_info.epoch(), expected_epoch);
+
+    // Verify the output start version matches the expected version
+    let first_output_version = outputs_with_proofs.first_transaction_output_version;
+    assert_eq!(Some(expected_version), first_output_version);
+
+    // Calculate the next expected version
+    let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
+    let next_expected_version = expected_version + num_outputs;
+
+    // Calculate the next expected epoch
+    let last_output_version = first_output_version.unwrap() + num_outputs - 1;
+    let next_expected_epoch =
+        if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
+            expected_epoch + 1
+        } else {
+            expected_epoch
+        };
+
+    // Return the new expected epoch and version
+    (next_expected_version, next_expected_epoch)
+}
+
+/// Verifies the continuous transaction payload
+/// and returns the new expected version and epoch.
+fn verify_continuous_transactions_with_proof(
+    expected_epoch: u64,
+    expected_version: u64,
+    ledger_info_with_sigs: LedgerInfoWithSignatures,
+    transactions_with_proofs: TransactionListWithProof,
+) -> (u64, u64) {
+    // Verify the ledger info epoch matches the expected epoch
+    let ledger_info = ledger_info_with_sigs.ledger_info();
+    assert_eq!(ledger_info.epoch(), expected_epoch);
+
+    // Verify the transaction start version matches the expected version
+    let first_transaction_version = transactions_with_proofs.first_transaction_version;
+    assert_eq!(Some(expected_version), first_transaction_version);
+
+    // Calculate the next expected version
+    let num_transactions = transactions_with_proofs.transactions.len() as u64;
+    let next_expected_version = expected_version + num_transactions;
+
+    // Update epochs if we've hit the epoch end
+    let last_transaction_version = first_transaction_version.unwrap() + num_transactions - 1;
+    let next_expected_epoch =
+        if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch() {
+            expected_epoch + 1
+        } else {
+            expected_epoch
+        };
+
+    // Return the new expected epoch and version
+    (next_expected_version, next_expected_epoch)
 }

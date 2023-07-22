@@ -270,6 +270,35 @@ mock! {
             include_events: bool,
             request_timeout_ms: u64,
         ) -> Result<Response<TransactionOrOutputListWithProof>>;
+
+        async fn subscribe_to_transaction_outputs_with_proof(
+            &self,
+            known_version: Version,
+            known_epoch: Epoch,
+            subscription_stream_id: u64,
+            subscription_stream_index: u64,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+
+        async fn subscribe_to_transactions_with_proof(
+            &self,
+            known_version: Version,
+            known_epoch: Epoch,
+            include_events: bool,
+            subscription_stream_id: u64,
+            subscription_stream_index: u64,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+
+        async fn subscribe_to_transactions_or_outputs_with_proof(
+            &self,
+            known_version: Version,
+            known_epoch: Epoch,
+            include_events: bool,
+            subscription_stream_id: u64,
+            subscription_stream_index: u64,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
     }
 }
 

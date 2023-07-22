@@ -35,6 +35,11 @@ impl Error {
             Self::UnexpectedErrorEncountered(_) => "unexpected_error_encountered",
         }
     }
+
+    /// Returns true iff the error is a timeout error
+    pub fn is_timeout(&self) -> bool {
+        matches!(self, Self::TimeoutWaitingForResponse(_))
+    }
 }
 
 impl From<aptos_storage_service_client::Error> for Error {
