@@ -46,6 +46,10 @@ resource "google_container_cluster" "aptos" {
     workload_pool = "${var.project}.svc.id.goog"
   }
 
+  cost_management_config {
+    enabled = true
+  }
+
   addons_config {
     network_policy_config {
       disabled = false
