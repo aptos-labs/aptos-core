@@ -22,7 +22,7 @@ jobs:
   rust-unit-coverage:
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
     timeout-minutes: 120
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-unit-coverage"]
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -44,7 +44,7 @@ jobs:
   rust-smoke-coverage:
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
     timeout-minutes: 120
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-smoke-coverage"]
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:

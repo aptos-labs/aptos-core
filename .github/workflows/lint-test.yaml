@@ -81,7 +81,8 @@ jobs:
         working-directory: developer-docs-site
 
   rust-cryptohasher-domain-separation-check:
-    runs-on: high-perf-docker
+    runs-on:
+      [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-cryptohasher-domain-separation-check"]
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
@@ -91,7 +92,7 @@ jobs:
       - run: python3 scripts/check-cryptohasher-symbols.py
 
   rust-lint:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-lint"]
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -102,7 +103,7 @@ jobs:
       - run: scripts/rust_lint.sh --check
 
   rust-doc-test:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-doc-test"]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -113,7 +114,7 @@ jobs:
       - run: cargo test --locked --doc --workspace --exclude aptos-node-checker
 
   rust-unit-test:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-unit-test"]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -138,7 +139,7 @@ jobs:
           BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
 
   rust-consensus-only-unit-test:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-consensus-only-unit-test"]
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
@@ -156,7 +157,7 @@ jobs:
           RUST_MIN_STACK: 4297152
 
   rust-network-perf-unit-test:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-network-perf-unit-test"]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -172,7 +173,7 @@ jobs:
           cargo nextest run --locked -p aptos-peer-monitoring-service-server --no-fail-fast -F network-perf-test
 
   rust-smoke-test:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-smoke-test"]
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -202,7 +203,7 @@ jobs:
           retention-days: 14
 
   rust-consensus-only-smoke-test:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-consensus-only-smoke-test"]
     if: ${{ !github.ref || github.ref != 'aptos-node-v1.2.0' }}
     steps:
       - uses: actions/checkout@v3
@@ -229,7 +230,7 @@ jobs:
           retention-days: 14
 
   rust-network-perf-smoke-test:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-rust-network-perf-smoke-test"]
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -255,7 +256,7 @@ jobs:
           retention-days: 14
 
   check-vm-features:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-check-vm-features"]
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main

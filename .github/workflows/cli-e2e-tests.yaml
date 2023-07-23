@@ -18,7 +18,7 @@ jobs:
   # we ensure that the Aptos CLI works with all 3 prod networks, at least
   # based on the tests in the test suite.
   run-cli-tests:
-    runs-on: high-perf-docker
+    runs-on: [high-perf-docker-nextgen, "jit:${{ github.run_id }}-${{ github.run_attempt }}-run-cli-tests"]
     permissions:
       contents: read
       id-token: write

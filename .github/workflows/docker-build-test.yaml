@@ -111,7 +111,7 @@ jobs:
 
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@ci-nextgen
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -122,7 +122,7 @@ jobs:
 
   rust-images-indexer:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@ci-nextgen
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
@@ -138,7 +138,7 @@ jobs:
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@ci-nextgen
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
@@ -154,7 +154,7 @@ jobs:
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@ci-nextgen
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
@@ -172,7 +172,7 @@ jobs:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image') ||
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@ci-nextgen
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -207,7 +207,7 @@ jobs:
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
       )
-    uses: aptos-labs/aptos-core/.github/workflows/cli-e2e-tests.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/cli-e2e-tests.yaml@ci-nextgen
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -220,7 +220,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
       github.event.pull_request.auto_merge != null ||
       contains(github.event.pull_request.body, '#e2e')
-    uses: aptos-labs/aptos-core/.github/workflows/docker-indexer-grpc-test.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/docker-indexer-grpc-test.yaml@ci-nextgen
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -242,7 +242,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@ci-nextgen
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -273,7 +273,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@ci-nextgen
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -301,7 +301,7 @@ jobs:
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@ci-nextgen
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -323,7 +323,7 @@ jobs:
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' &&
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@ci-nextgen
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -346,7 +346,7 @@ jobs:
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' &&
       contains(github.event.pull_request.labels.*.name, 'CICD:run-multiregion-test')
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@ci-nextgen
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
