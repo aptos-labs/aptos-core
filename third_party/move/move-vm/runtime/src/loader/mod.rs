@@ -1762,8 +1762,7 @@ impl<'a> Resolver<'a> {
             }
         }
 
-        let index = struct_inst.def;
-        let struct_ = self.loader.get_struct_type(index)?;
+        let struct_ = &struct_inst.definition_struct_type;
         Ok(Type::StructInstantiation {
             index: struct_inst.def,
             ty_args: struct_inst
@@ -1777,11 +1776,14 @@ impl<'a> Resolver<'a> {
     }
 
     pub(crate) fn get_field_type(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
-        let handle = match &self.binary {
-            BinaryType::Module(module) => &module.field_handles[idx.0 as usize],
+        match &self.binary {
+            BinaryType::Module(module) => {
+                let handle = &module.field_handles[idx.0 as usize];
+
+                Ok(handle.definition_struct_type.fields[handle.offset].clone())
+            },
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
-        };
-        Ok(self.loader.get_struct_type(handle.owner)?.fields[handle.offset].clone())
+        }
     }
 
     pub(crate) fn instantiate_generic_field(
@@ -1793,14 +1795,14 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => &module.field_instantiations[idx.0 as usize],
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        let struct_type = self.loader.get_struct_type(field_instantiation.owner)?;
 
         let instantiation_types = field_instantiation
             .instantiation
             .iter()
             .map(|inst_ty| inst_ty.subst(ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        struct_type.fields[field_instantiation.offset].subst(&instantiation_types)
+        field_instantiation.definition_struct_type.fields[field_instantiation.offset]
+            .subst(&instantiation_types)
     }
 
     pub(crate) fn get_struct_fields(
@@ -1823,7 +1825,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => module.struct_instantiation_at(idx.0),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        let struct_type = self.loader.get_struct_type(struct_inst.def)?;
+        let struct_type = &struct_inst.definition_struct_type;
 
         let instantiation_types = struct_inst
             .instantiation
@@ -1897,7 +1899,7 @@ impl<'a> Resolver<'a> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let index = module.field_handles[idx.0 as usize].owner;
-                let struct_ = self.loader.get_struct_type(index)?;
+                let struct_ = &module.field_handles[idx.0 as usize].definition_struct_type;
                 Ok(Type::Struct {
                     index,
                     ability: struct_.abilities,
@@ -1914,10 +1916,10 @@ impl<'a> Resolver<'a> {
     ) -> PartialVMResult<Type> {
         match &self.binary {
             BinaryType::Module(module) => {
-                let index = module.field_instantiations[idx.0 as usize].owner;
-                let struct_ = self.loader.get_struct_type(index)?;
+                let struct_ = &module.field_instantiations[idx.0 as usize].definition_struct_type;
+                let owner_index = module.field_instantiations[idx.0 as usize].owner;
                 Ok(Type::StructInstantiation {
-                    index,
+                    index: owner_index,
                     ty_args: module.field_instantiations[idx.0 as usize]
                         .instantiation
                         .iter()
@@ -2051,7 +2053,11 @@ impl Module {
             for struct_def in module.struct_defs() {
                 let idx = struct_refs[struct_def.struct_handle.0 as usize];
                 let field_count = cache.structs[idx.0].fields.len() as u16;
-                structs.push(StructDef { field_count, idx });
+                structs.push(StructDef {
+                    field_count,
+                    idx,
+                    definition_struct_type: cache.struct_at(idx),
+                });
                 let name =
                     module.identifier_at(module.struct_handle_at(struct_def.struct_handle).name);
                 struct_map.insert(name.to_owned(), idx);
@@ -2069,6 +2075,7 @@ impl Module {
                     field_count,
                     def: struct_def.idx,
                     instantiation,
+                    definition_struct_type: struct_def.definition_struct_type.clone(),
                 });
             }
 
@@ -2153,22 +2160,29 @@ impl Module {
             for f_handle in module.field_handles() {
                 let def_idx = f_handle.owner;
                 let owner = structs[def_idx.0 as usize].idx;
+                let definition_struct_type =
+                    structs[def_idx.0 as usize].definition_struct_type.clone();
                 let offset = f_handle.field as usize;
-                field_handles.push(FieldHandle { offset, owner });
+                field_handles.push(FieldHandle {
+                    offset,
+                    owner,
+                    definition_struct_type,
+                });
             }
 
             for f_inst in module.field_instantiations() {
                 let fh_idx = f_inst.handle;
-                let owner = field_handles[fh_idx.0 as usize].owner;
                 let offset = field_handles[fh_idx.0 as usize].offset;
                 let mut instantiation = vec![];
+                let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
                 for ty in &module.signature_at(f_inst.type_parameters).0 {
                     instantiation.push(cache.make_type_while_loading(&module, ty)?);
                 }
                 field_instantiations.push(FieldInstantiation {
                     offset,
-                    owner,
+                    owner: owner_struct_def.idx,
                     instantiation,
+                    definition_struct_type: owner_struct_def.definition_struct_type.clone(),
                 });
             }
 
@@ -2664,6 +2678,7 @@ struct StructDef {
     field_count: u16,
     // `ModuelCache::structs` global table index
     idx: CachedStructIndex,
+    definition_struct_type: Arc<StructType>,
 }
 
 #[derive(Debug, Clone)]
@@ -2672,6 +2687,7 @@ struct StructInstantiation {
     field_count: u16,
     // `ModuelCache::structs` global table index. It is the generic type.
     def: CachedStructIndex,
+    definition_struct_type: Arc<StructType>,
     instantiation: Vec<Type>,
 }
 
@@ -2681,6 +2697,7 @@ struct FieldHandle {
     offset: usize,
     // `ModuelCache::structs` global table index. It is the generic type.
     owner: CachedStructIndex,
+    definition_struct_type: Arc<StructType>,
 }
 
 // A field instantiation. The offset is the only used information when operating on a field
@@ -2688,8 +2705,8 @@ struct FieldHandle {
 struct FieldInstantiation {
     offset: usize,
     // `ModuelCache::structs` global table index. It is the generic type.
-    #[allow(unused)]
     owner: CachedStructIndex,
+    definition_struct_type: Arc<StructType>,
     instantiation: Vec<Type>,
 }
 
