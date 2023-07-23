@@ -528,6 +528,9 @@ where
                     }
                 }
                 ExecutionStatus::Success(MockOutput(
+                    // FIXME
+                    behavior.writes.clone(),
+                    behavior.writes.clone(),
                     behavior.writes.clone(),
                     behavior.deltas.clone(),
                     reads_result,
@@ -545,6 +548,8 @@ where
 // TODO: name members.
 pub(crate) struct MockOutput<K, V>(
     pub(crate) Vec<(K, V)>,
+    pub(crate) Vec<(K, V)>,
+    pub(crate) Vec<(K, V)>,
     pub(crate) Vec<(K, DeltaOp)>,
     pub(crate) Vec<Option<Vec<u8>>>,
     pub(crate) OnceCell<Vec<(K, WriteOp)>>,
@@ -558,17 +563,27 @@ where
 {
     type Txn = MockTransaction<K, V>;
 
-    fn get_writes(&self) -> Vec<(K, V)> {
+    fn get_resource_writes(&self) -> Vec<(K, V)> {
         self.0.clone()
     }
 
-    fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
+    fn get_module_writes(&self) -> Vec<(K, V)> {
         self.1.clone()
+    }
+
+    fn get_aggregator_writes(&self) -> Vec<(K, V)> {
+        self.2.clone()
+    }
+
+    fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
+        self.3.clone()
     }
 
     fn skip_output() -> Self {
         Self(
-            /*writes = */ vec![],
+            /*resource_writes = */ vec![],
+            /*module_writes = */ vec![],
+            /*aggregator_writes = */ vec![],
             /*deltas = */ vec![],
             /*read results = */ vec![],
             /*materialized delta writes = */ OnceCell::new(),
@@ -577,7 +592,7 @@ where
     }
 
     fn incorporate_delta_writes(&self, delta_writes: Vec<(K, WriteOp)>) {
-        assert_ok!(self.3.set(delta_writes));
+        assert_ok!(self.5.set(delta_writes));
     }
 
     fn fee_statement(&self) -> FeeStatement {
@@ -585,6 +600,6 @@ where
         // Next two arguments are different kinds of execution gas that are counted
         // towards the block limit. We split the total into two pieces for these arguments.
         // TODO: add variety to generating fee statement based on total gas (self.4).
-        FeeStatement::new(self.4, self.4 / 2, (self.4 + 1) / 2, 0, 0)
+        FeeStatement::new(self.6, self.6 / 2, (self.6 + 1) / 2, 0, 0)
     }
 }

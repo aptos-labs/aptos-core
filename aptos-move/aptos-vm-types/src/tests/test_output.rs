@@ -35,17 +35,20 @@ fn test_ok_output_equality_no_deltas() {
 
     // Check the output of `try_materialize`.
     assert!(vm_output.delta_change_set().is_empty());
-    assert_eq!(vm_output.write_set(), output.write_set());
+    assert_eq!(
+        vm_output.aggregator_write_set(),
+        output.aggregator_write_set()
+    );
     assert_eq!(vm_output.gas_used(), output.gas_used());
     assert_eq!(vm_output.status(), output.status());
 
     // Check the output of `into_transaction_output`.
-    assert_eq!(txn_output_1.write_set(), output.write_set());
+    assert_eq!(txn_output_1.write_set(), output.aggregator_write_set());
     assert_eq!(txn_output_1.gas_used(), output.gas_used());
     assert_eq!(txn_output_1.status(), output.status());
 
     // Check the output of `output_with_delta_writes`.
-    assert_eq!(txn_output_2.write_set(), output.write_set());
+    assert_eq!(txn_output_2.write_set(), output.aggregator_write_set());
     assert_eq!(txn_output_2.gas_used(), output.gas_used());
     assert_eq!(txn_output_2.status(), output.status());
 }
@@ -87,7 +90,7 @@ fn test_ok_output_equality_with_deltas() {
     // Check the output of `try_materialize`. Note that all deltas have to
     // be removed.
     assert!(vm_output.delta_change_set().is_empty());
-    assert_eq!(vm_output.write_set(), &expected_write_set);
+    assert_eq!(vm_output.aggregator_write_set(), &expected_write_set);
     assert_eq!(vm_output.gas_used(), output.gas_used());
     assert_eq!(vm_output.status(), output.status());
 

@@ -102,9 +102,15 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
             Some(delta_op) => Ok(delta_op
                 .try_into_write_op(self.base, state_key)?
                 .as_state_value()),
-            None => match self.change_set.write_set().get(state_key) {
+            None => match self.change_set.resource_write_set().get(state_key) {
                 Some(write_op) => Ok(write_op.as_state_value()),
-                None => self.base.get_state_value(state_key),
+                None => match self.change_set.module_write_set().get(state_key) {
+                    Some(write_op) => Ok(write_op.as_state_value()),
+                    None => match self.change_set.aggregator_write_set().get(state_key) {
+                        Some(write_op) => Ok(write_op.as_state_value()),
+                        None => self.base.get_state_value(state_key),
+                    },
+                },
             },
         }
     }
@@ -125,7 +131,7 @@ mod test {
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{
         state_store::table::TableHandle,
-        write_set::{WriteOp, WriteSetMut},
+        write_set::{WriteOp, WriteSet, WriteSetMut},
     };
     use aptos_vm_types::check_change_set::CheckChangeSet;
     use move_core_types::account_address::AccountAddress;
@@ -164,8 +170,15 @@ mod test {
         let write_set = WriteSetMut::new(write_set_ops.into_iter())
             .freeze()
             .unwrap();
-        let change_set =
-            VMChangeSet::new(write_set, delta_change_set, vec![], &NoOpChangeSetChecker).unwrap();
+        let change_set = VMChangeSet::new(
+            WriteSet::default(),
+            WriteSet::default(),
+            write_set,
+            delta_change_set,
+            vec![],
+            &NoOpChangeSetChecker,
+        )
+        .unwrap();
         let change_set_state_view = ChangeSetStateView::new(&base_view, change_set).unwrap();
 
         assert_eq!(

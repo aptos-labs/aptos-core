@@ -227,7 +227,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                         .as_ref()
                         .expect("Aggregator failures not yet tested")
                         .iter()
-                        .zip(output.2.iter())
+                        .zip(output.4.iter())
                         .for_each(|(baseline_read, result_read)| {
                             baseline_read.assert_read_result(result_read)
                         });
@@ -236,7 +236,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                         .as_ref()
                         .expect("Aggregator failures not yet tested")
                         .iter()
-                        .zip(output.3.get().expect("Delta writes must be set").iter())
+                        .zip(output.5.get().expect("Delta writes must be set").iter())
                         .for_each(|(baseline_delta_write, (_, result_delta_write))| {
                             assert_eq!(
                                 *baseline_delta_write,
@@ -252,11 +252,13 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                     assert_eq!(output.0.len(), 0);
                     assert_eq!(output.1.len(), 0);
                     assert_eq!(output.2.len(), 0);
-                    assert_eq!(output.4, 0);
+                    assert_eq!(output.3.len(), 0);
+                    assert_eq!(output.4.len(), 0);
+                    assert_eq!(output.6, 0);
 
                     // Implies that materialize_delta_writes was never called, as should
                     // be for skipped transactions.
-                    assert_none!(output.3.get());
+                    assert_none!(output.5.get());
                 });
             },
             Err(BlockExecutorError::UserError(idx)) => {

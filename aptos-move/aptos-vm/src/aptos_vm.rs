@@ -18,7 +18,6 @@ use crate::{
     verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
-use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
@@ -498,7 +497,12 @@ impl AptosVM {
         }
 
         gas_meter.charge_storage_fee_for_all(
-            change_set.write_set().iter(),
+            change_set.resource_write_set().iter().chain(
+                change_set
+                    .module_write_set()
+                    .iter()
+                    .chain(change_set.aggregator_write_set()),
+            ),
             change_set.events(),
             txn_data.transaction_size,
             txn_data.gas_unit_price,
@@ -1199,14 +1203,7 @@ impl AptosVM {
 
         match writeset_payload {
             WriteSetPayload::Direct(change_set) => {
-                let write_set = change_set.write_set().clone();
-                let events = change_set.events().to_vec();
-                VMChangeSet::new(
-                    write_set,
-                    DeltaChangeSet::empty(),
-                    events,
-                    &change_set_configs,
-                )
+                VMChangeSet::from_storage_change_set(change_set.clone(), &change_set_configs)
             },
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(resolver, session_id, true);
@@ -1293,7 +1290,13 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_writeset(resolver, change_set.write_set())?;
+        self.read_writeset(resolver, change_set.resource_write_set())?;
+        self.read_writeset(resolver, change_set.module_write_set())?;
+        assert!(
+            change_set.aggregator_write_set().is_empty(),
+            "waypoint change set has no aggregator writes"
+        );
+
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = VMOutput::new(change_set, FeeStatement::zero(), VMStatus::Executed.into());

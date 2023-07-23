@@ -40,7 +40,7 @@ use aptos_types::{
         TransactionStatus, VMValidatorResult,
     },
     vm_status::VMStatus,
-    write_set::WriteSet,
+    write_set::{WriteSet, WriteSetMut},
 };
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
@@ -708,8 +708,20 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.unpack();
-            write_set
+            let (
+                resource_write_set,
+                module_write_set,
+                aggregator_write_set,
+                _delta_change_set,
+                _events,
+            ) = change_set.unpack();
+            WriteSetMut::new(
+                resource_write_set
+                    .into_iter()
+                    .chain(module_write_set.into_iter().chain(aggregator_write_set)),
+            )
+            .freeze()
+            .expect("should succeed")
         };
         self.data_store.add_write_set(&write_set);
     }
@@ -760,8 +772,20 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.unpack();
-            write_set
+            let (
+                resource_write_set,
+                module_write_set,
+                aggregator_write_set,
+                _delta_change_set,
+                _events,
+            ) = change_set.unpack();
+            WriteSetMut::new(
+                resource_write_set
+                    .into_iter()
+                    .chain(module_write_set.into_iter().chain(aggregator_write_set)),
+            )
+            .freeze()
+            .expect("should succeed")
         };
         self.data_store.add_write_set(&write_set);
     }
@@ -803,7 +827,20 @@ impl FakeExecutor {
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (write_set, _delta_change_set, _events) = change_set.unpack();
+        let (
+            resource_write_set,
+            module_write_set,
+            aggregator_write_set,
+            _delta_change_set,
+            _events,
+        ) = change_set.unpack();
+        let write_set = WriteSetMut::new(
+            resource_write_set
+                .into_iter()
+                .chain(module_write_set.into_iter().chain(aggregator_write_set)),
+        )
+        .freeze()
+        .expect("should succeed");
         Ok(write_set)
     }
 

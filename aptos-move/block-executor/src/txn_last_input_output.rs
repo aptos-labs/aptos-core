@@ -191,7 +191,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             input.iter().filter_map(|desc| desc.module_path()).collect();
         let written_modules: Vec<AccessPath> = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => output
-                .get_writes()
+                .get_module_writes()
                 .into_iter()
                 .filter_map(|(k, _)| k.module_path())
                 .collect(),
@@ -271,9 +271,11 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             None => HashSet::new(),
             Some(txn_output) => match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
-                    .get_writes()
+                    .get_resource_writes()
                     .into_iter()
                     .map(|(k, _)| k)
+                    .chain(t.get_module_writes().into_iter().map(|(k, _)| k))
+                    .chain(t.get_aggregator_writes().into_iter().map(|(k, _)| k))
                     .chain(t.get_deltas().into_iter().map(|(k, _)| k))
                     .collect(),
                 ExecutionStatus::Abort(_) => HashSet::new(),

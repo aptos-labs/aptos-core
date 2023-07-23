@@ -9,7 +9,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSet},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_core_types::vm_status::VMStatus;
 
@@ -53,8 +53,16 @@ impl VMOutput {
         (self.change_set, self.fee_statement, self.status)
     }
 
-    pub fn write_set(&self) -> &WriteSet {
-        self.change_set.write_set()
+    pub fn resource_write_set(&self) -> &WriteSet {
+        self.change_set.resource_write_set()
+    }
+
+    pub fn module_write_set(&self) -> &WriteSet {
+        self.change_set.module_write_set()
+    }
+
+    pub fn aggregator_write_set(&self) -> &WriteSet {
+        self.change_set.aggregator_write_set()
     }
 
     pub fn delta_change_set(&self) -> &DeltaChangeSet {
@@ -109,13 +117,24 @@ impl VMOutput {
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
         let materialized_output = self.try_materialize(state_view)?;
         let (change_set, gas_used, status) = materialized_output.unpack();
-        let (write_set, delta_change_set, events) = change_set.unpack();
+        let (resource_write_set, module_write_set, aggregator_write_set, delta_change_set, events) =
+            change_set.unpack();
 
         debug_assert!(
             delta_change_set.is_empty(),
             "DeltaChangeSet must be empty after materialization."
         );
 
+        // TODO: With Aggregators V2, the aggregator write set is empty.
+        let write_set = WriteSetMut::new(
+            resource_write_set.into_iter().chain(
+                module_write_set
+                    .into_iter()
+                    .chain(aggregator_write_set.into_iter()),
+            ),
+        )
+        .freeze()
+        .expect("freeze should not fail");
         Ok(TransactionOutput::new(write_set, events, gas_used, status))
     }
 
@@ -126,8 +145,14 @@ impl VMOutput {
         delta_writes: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         let (change_set, gas_used, status) = self.unpack();
-        let (write_set, mut delta_change_set, events) = change_set.unpack();
-        let mut write_set_mut = write_set.into_mut();
+        let (
+            resource_write_set,
+            module_write_set,
+            aggregator_write_set,
+            mut delta_change_set,
+            events,
+        ) = change_set.unpack();
+        let mut aggregator_write_set_mut = aggregator_write_set.into_mut();
 
         // We should have a materialized delta for every delta in the output.
         assert_eq!(delta_writes.len(), delta_change_set.len());
@@ -138,12 +163,23 @@ impl VMOutput {
                 delta_change_set.remove(&item.0).is_some(),
                 "Delta writes contain a key which does not exist in DeltaChangeSet."
             );
-            write_set_mut.insert(item)
+            aggregator_write_set_mut.insert(item)
         });
 
-        let write_set = write_set_mut
+        let aggregator_write_set = aggregator_write_set_mut
             .freeze()
             .expect("Freezing of WriteSet should succeed.");
+
+        // TODO: With Aggregators V2, the aggregator write set is empty.
+        let write_set = WriteSetMut::new(
+            resource_write_set.into_iter().chain(
+                module_write_set
+                    .into_iter()
+                    .chain(aggregator_write_set.into_iter()),
+            ),
+        )
+        .freeze()
+        .expect("freeze should not fail");
         TransactionOutput::new(write_set, events, gas_used, status)
     }
 }

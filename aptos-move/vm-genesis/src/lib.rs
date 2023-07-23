@@ -26,6 +26,7 @@ use aptos_types::{
         TimedFeatures, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
+    write_set::WriteSetMut,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -154,7 +155,15 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let cs2 = session.finish(&mut (), &configs).unwrap();
     let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let (write_set, delta_change_set, events) = change_set.unpack();
+    let (resource_write_set, module_write_set, aggregator_write_set, delta_change_set, events) =
+        change_set.unpack();
+    let write_set = WriteSetMut::new(
+        resource_write_set
+            .into_iter()
+            .chain(module_write_set.into_iter().chain(aggregator_write_set)),
+    )
+    .freeze()
+    .expect("should succeed");
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
@@ -262,7 +271,15 @@ pub fn encode_genesis_change_set(
     let cs2 = session.finish(&mut (), &configs).unwrap();
     let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let (write_set, delta_change_set, events) = change_set.unpack();
+    let (resource_write_set, module_write_set, aggregator_write_set, delta_change_set, events) =
+        change_set.unpack();
+    let write_set = WriteSetMut::new(
+        resource_write_set
+            .into_iter()
+            .chain(module_write_set.into_iter().chain(aggregator_write_set)),
+    )
+    .freeze()
+    .expect("should succeed");
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not

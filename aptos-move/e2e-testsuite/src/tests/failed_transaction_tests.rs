@@ -56,7 +56,17 @@ fn failed_transaction_cleanup_test() {
         &log_context,
         &change_set_configs,
     );
-    assert!(!out1.write_set().is_empty());
+
+    let write_set = out1
+        .resource_write_set()
+        .iter()
+        .chain(
+            out1.module_write_set()
+                .iter()
+                .chain(out1.aggregator_write_set().iter()),
+        )
+        .collect_vec();
+    assert!(!write_set.is_empty());
     assert_eq!(out1.gas_used(), 90_000);
     assert!(!out1.status().is_discarded());
     assert_eq!(

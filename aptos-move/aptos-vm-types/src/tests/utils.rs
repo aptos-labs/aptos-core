@@ -7,7 +7,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionStatus},
-    write_set::{WriteOp, WriteSetMut},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_core_types::vm_status::VMStatus;
 
@@ -44,13 +44,17 @@ pub(crate) fn delete() -> WriteOp {
 /// Returns a write op from the change set stored at state key corresponding
 /// to an id.
 pub(crate) fn get_write_op(change_set: &VMChangeSet, id: u128) -> WriteOp {
-    change_set.write_set().get(&key(id)).unwrap().clone()
+    change_set
+        .aggregator_write_set()
+        .get(&key(id))
+        .unwrap()
+        .clone()
 }
 
 /// Returns true if there is a write op in the change set for the state key
 /// corresponding to an id.
 pub(crate) fn contains_write_op(change_set: &VMChangeSet, id: u128) -> bool {
-    change_set.write_set().get(&key(id)).is_some()
+    change_set.aggregator_write_set().get(&key(id)).is_some()
 }
 
 /// Returns a delta op from the change set stored at state key corresponding
@@ -71,6 +75,8 @@ pub(crate) fn build_change_set(
     delta_change_set: DeltaChangeSet,
 ) -> VMChangeSet {
     VMChangeSet::new(
+        WriteSet::default(),
+        WriteSet::default(),
         write_set.freeze().unwrap(),
         delta_change_set,
         vec![],
