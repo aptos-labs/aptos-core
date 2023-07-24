@@ -42,5 +42,5 @@ jobs:
 
       - name: Run python unit tests
         if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
-        run: poetry run python -m unittest **/*test.py -b
+        run: find . -name '*test.py' | xargs poetry run python -m unittest
         working-directory: testsuite
