@@ -270,6 +270,8 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         match &self.outputs[txn_idx as usize].load_full() {
             None => HashSet::new(),
             Some(txn_output) => match &txn_output.output_status {
+                // TODO: This chaining is a bit ugly, and involves unnecessary
+                // copies of writes/deltas. Maybe expose as a trait method?
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
                     .get_resource_writes()
                     .into_iter()

@@ -55,18 +55,22 @@ impl VMOutput {
         (self.change_set, self.fee_statement, self.status)
     }
 
+    /// Returns the changes the transaction wants to apply to the state.
     pub fn change_set(&self) -> &VMChangeSet {
         &self.change_set
     }
 
+    /// Returns the total gas used by transaction which produced this output.
     pub fn gas_used(&self) -> u64 {
         self.fee_statement.gas_used()
     }
 
+    /// Returns the fees for executing a transaction which produced this output.
     pub fn fee_statement(&self) -> &FeeStatement {
         &self.fee_statement
     }
 
+    /// Returns the the execution status of the transaction which produced this output.
     pub fn status(&self) -> &TransactionStatus {
         &self.status
     }

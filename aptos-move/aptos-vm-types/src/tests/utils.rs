@@ -81,6 +81,8 @@ pub(crate) fn build_change_set(
     VMChangeSet::new(
         StateChange::empty(),
         StateChange::empty(),
+        // TODO: This tests only aggregator flow, let's make sure
+        // other writes are tested.
         StateChange::new(write_set),
         delta_change_set,
         vec![],

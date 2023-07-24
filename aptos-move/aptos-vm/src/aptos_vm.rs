@@ -1289,7 +1289,7 @@ impl AptosVM {
         self.read_writeset(resolver, change_set.write_set_iter())?;
         assert!(
             change_set.aggregator_write_set().is_empty(),
-            "waypoint change set has no aggregator writes"
+            "Waypoint change set should not have any aggregator writes."
         );
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();

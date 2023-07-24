@@ -90,7 +90,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output to be set to get resource writes")
             .change_set()
             .resource_write_set()
             .iter()
@@ -98,11 +98,13 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
     fn get_module_writes(&self) -> Vec<(StateKey, WriteOp)> {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output to be set to get module writes")
             .change_set()
             .module_write_set()
             .iter()
@@ -110,11 +112,13 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
     fn get_aggregator_writes(&self) -> Vec<(StateKey, WriteOp)> {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output to be set to get aggregator writes")
             .change_set()
             .aggregator_write_set()
             .iter()

@@ -10,7 +10,9 @@ use anyhow::{bail, Result};
 use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        state_key::{StateKey, StateKeyInner},
+        state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
     },
     write_set::TransactionWrite,
 };
@@ -98,19 +100,31 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
     }
 
     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
+        // TODO: `get_state_value` should differentiate between different types
+        // of storage data.
+        if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
+            // We are fetching a module.
+            return match self.change_set.module_write_set().get(state_key) {
+                Some(write_op) => Ok(write_op.as_state_value()),
+                None => self.base.get_state_value(state_key),
+            };
+        }
+
         match self.change_set.delta_change_set().get(state_key) {
+            // The value to resolve delta has to come from `base`.
             Some(delta_op) => Ok(delta_op
                 .try_into_write_op(self.base, state_key)?
                 .as_state_value()),
-            None => match self.change_set.resource_write_set().get(state_key) {
-                Some(write_op) => Ok(write_op.as_state_value()),
-                None => match self.change_set.module_write_set().get(state_key) {
+            None => {
+                // Otherwise, this can be either a resource or an aggregator write.
+                match self.change_set.resource_write_set().get(state_key) {
                     Some(write_op) => Ok(write_op.as_state_value()),
+                    // Can be aggregator or `base`.
                     None => match self.change_set.aggregator_write_set().get(state_key) {
                         Some(write_op) => Ok(write_op.as_state_value()),
                         None => self.base.get_state_value(state_key),
                     },
-                },
+                }
             },
         }
     }
@@ -129,10 +143,7 @@ mod test {
     use super::*;
     use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::{
-        state_store::table::TableHandle,
-        write_set::{WriteOp, WriteSet, WriteSetMut},
-    };
+    use aptos_types::{state_store::table::TableHandle, write_set::WriteOp};
     use aptos_vm_types::{change_set::StateChange, check_change_set::CheckChangeSet};
     use move_core_types::account_address::AccountAddress;
 
@@ -170,6 +181,7 @@ mod test {
         let change_set = VMChangeSet::new(
             StateChange::empty(),
             StateChange::empty(),
+            // TODO: Test beyond deltas & aggregators.
             StateChange::new(write_set),
             delta_change_set,
             vec![],

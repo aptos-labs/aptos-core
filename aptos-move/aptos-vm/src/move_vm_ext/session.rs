@@ -323,7 +323,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut resource_write_set = StateChange::empty();
         let mut module_write_set = StateChange::empty();
         let mut aggregator_write_set = StateChange::empty();
-
         let mut delta_change_set = DeltaChangeSet::empty();
 
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
