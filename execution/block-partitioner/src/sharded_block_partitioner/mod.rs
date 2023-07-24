@@ -35,7 +35,7 @@ use crate::sharded_block_partitioner::counters::{ADD_EDGES_MISC_SECONDS, FLATTEN
 use crate::simple_partitioner::SimplePartitioner;
 
 mod conflict_detector;
-mod counters;
+pub mod counters;
 mod cross_shard_messages;
 mod dependency_analysis;
 mod dependent_edges;
@@ -366,10 +366,20 @@ impl ShardedBlockPartitioner {
                     for loc in txn.read_hints().iter() {
                         match &global_owners_by_loc_id[*loc.maybe_id_in_partition_session.as_ref().unwrap()] {
                             Some(owner) => {
+                                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["loc_clone"]).start_timer();
+                                let loc_clone_1 = loc.clone();
+                                let loc_clone_2 = loc.clone();
+                                timer.stop_and_record();
+
+                                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_dependent"]).start_timer();
                                 ret.get_mut(owner.shard_id).unwrap()
                                     .get_sub_block_mut(owner.round_id).unwrap()
-                                    .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc.clone()]);
-                                cur_txn_csd.add_required_edge(*owner, loc.clone());
+                                    .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc_clone_1]);
+                                timer.stop_and_record();
+
+                                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_required"]).start_timer();
+                                cur_txn_csd.add_required_edge(*owner, loc_clone_2);
+                                timer.stop_and_record();
                             },
                             None => {},
                         }
@@ -377,13 +387,25 @@ impl ShardedBlockPartitioner {
 
                     for loc in txn.write_hints().iter() {
                         let loc_id = *loc.maybe_id_in_partition_session.as_ref().unwrap();
+                        let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["local_owner_insert"]).start_timer();
                         local_owners_by_loc_id.insert(loc_id, cur_sharded_txn_idx);
+                        timer.stop_and_record();
                         match &global_owners_by_loc_id[loc_id] {
                             Some(owner) => {
-                                ret.get_mut(owner.shard_id).unwrap()
-                                    .get_sub_block_mut(owner.round_id).unwrap()
-                                    .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc.clone()]);
-                                cur_txn_csd.add_required_edge(*owner, loc.clone());
+                                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["loc_clone"]).start_timer();
+                                let loc_clone_1 = loc.clone();
+                                let loc_clone_2 = loc.clone();
+                                timer.stop_and_record();
+
+                                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_dependent"]).start_timer();
+                                let x = ret.get_mut(owner.shard_id).unwrap()
+                                    .get_sub_block_mut(owner.round_id).unwrap();
+                                x.add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc_clone_1]);
+                                timer.stop_and_record();
+
+                                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_required"]).start_timer();
+                                cur_txn_csd.add_required_edge(*owner, loc_clone_2);
+                                timer.stop_and_record();
                             },
                             None => {},
                         }

@@ -5,6 +5,7 @@ use clap::Parser;
 use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Mutex, time::Instant};
+use aptos_block_partitioner::sharded_block_partitioner::counters::SHARDED_PARTITIONER_MISC_SECONDS;
 use aptos_block_partitioner::simple_partitioner::{SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS, SimplePartitioner};
 use aptos_logger::{error, info};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
@@ -38,6 +39,9 @@ fn main() {
 
     // let partitioner = SimplePartitioner{};
     let partitioner = ShardedBlockPartitioner::new(args.num_shards);
+    let mut loc_clone_tracker = Calculator::default();
+    let mut add_dependent_tracker = Calculator::default();
+    let mut add_required_tracker = Calculator:: default();
     for _ in 0..args.num_blocks {
         println!("Creating {} transactions", args.block_size);
         let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
@@ -55,6 +59,13 @@ fn main() {
         let now = Instant::now();
         let result = BlockPartitioner::partition(&partitioner, transactions, args.num_shards);
         let elapsed = now.elapsed();
+        let loc_clone = loc_clone_tracker.new_val(SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["loc_clone"]).get_sample_sum());
+        let add_dependent = add_dependent_tracker.new_val(SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_dependent"]).get_sample_sum());
+        let add_required = add_dependent_tracker.new_val(SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_required"]).get_sample_sum());
+        println!("loc_clone={loc_clone}");
+        println!("add_dependent={add_dependent}");
+        println!("add_required={add_required}");
+
         println!("Time taken to partition: {:?}", elapsed);
         // report_sub_block_matrix(&result);
     }
@@ -64,4 +75,24 @@ fn main() {
 fn verify_tool() {
     use clap::CommandFactory;
     Args::command().debug_assert()
+}
+
+struct Calculator {
+    val: f64,
+}
+
+impl Calculator {
+    pub fn new_val(&mut self, val: f64) -> f64 {
+        let ret = val - self.val;
+        self.val = val;
+        ret
+    }
+}
+
+impl Default for Calculator {
+    fn default() -> Self {
+        Self {
+            val: 0.0,
+        }
+    }
 }
