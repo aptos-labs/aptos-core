@@ -129,7 +129,7 @@ fn native_destroy(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
 
     // Actually remove the aggregator.
-    let id = AggregatorID::new(handle, key);
+    let id = AggregatorID::legacy(handle, key);
     aggregator_data.remove_aggregator(id);
 
     Ok(smallvec![])
