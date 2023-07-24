@@ -61,7 +61,7 @@ Follow the below detailed steps:
 
   **Using Aptos-core source code**
   
-  Run the [Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
+  Run the [Aptos CLI](../../tools/aptos-cli/use-cli/use-aptos-cli.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
 
   :::tip
 

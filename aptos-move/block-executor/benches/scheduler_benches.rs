@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 // Run this bencher via `cargo bench --features fuzzing`.
-use aptos_parallel_executor::proptest_types::bencher::Bencher;
+use aptos_block_executor::proptest_types::bencher::Bencher;
 use criterion::{criterion_group, criterion_main, Criterion};
 use proptest::prelude::*;
 

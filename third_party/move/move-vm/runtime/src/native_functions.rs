@@ -156,6 +156,10 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         }
     }
 
+    pub fn emitted_events(&self, guid: Vec<u8>, ty: Type) -> PartialVMResult<Vec<Value>> {
+        self.data_store.emitted_events(guid, ty)
+    }
+
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
         self.resolver.loader().type_to_type_tag(ty)
     }

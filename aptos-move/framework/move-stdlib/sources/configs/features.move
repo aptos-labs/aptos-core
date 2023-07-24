@@ -209,6 +209,17 @@ module std::features {
         is_enabled(APTOS_UNIQUE_IDENTIFIERS)
     }
 
+    /// Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
+    /// available. This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const BULLETPROOFS_NATIVES: u64 = 24;
+
+    public fun get_bulletproofs_feature(): u64 { BULLETPROOFS_NATIVES }
+
+    public fun bulletproofs_enabled(): bool acquires Features {
+        is_enabled(BULLETPROOFS_NATIVES)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

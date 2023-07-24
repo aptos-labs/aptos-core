@@ -3,7 +3,7 @@ name = 'knight'
 version = '1.0.0'
 
 [addresses]
-token_objects = "_"
+knight = "_"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }

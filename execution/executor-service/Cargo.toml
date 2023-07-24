@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-block-partitioner = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-executor-types = { workspace = true }
@@ -22,11 +23,20 @@ aptos-logger = { workspace = true }
 aptos-retrier = { workspace = true }
 aptos-secure-net = { workspace = true }
 aptos-state-view = { workspace = true }
+aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
+aptos-vm = { workspace = true, features = ["testing"] }
 bcs = { workspace = true }
 clap = { workspace = true }
+crossbeam-channel = { workspace = true }
 itertools = { workspace = true }
+num_cpus = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+aptos-language-e2e-tests = { workspace = true }
+aptos-vm = { workspace = true }

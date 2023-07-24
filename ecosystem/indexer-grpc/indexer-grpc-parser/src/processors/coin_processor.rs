@@ -4,6 +4,7 @@
 use super::processor_trait::{ProcessingResult, ProcessorTrait};
 use crate::{
     models::coin_models::{
+        account_transactions::AccountTransaction,
         coin_activities::{CoinActivity, CurrentCoinBalancePK},
         coin_balances::{CoinBalance, CurrentCoinBalance},
         coin_infos::{CoinInfo, CoinInfoQuery},
@@ -52,12 +53,14 @@ fn insert_to_db_impl(
     coin_balances: &[CoinBalance],
     current_coin_balances: &[CurrentCoinBalance],
     coin_supply: &[CoinSupply],
+    account_transactions: &[AccountTransaction],
 ) -> Result<(), diesel::result::Error> {
     insert_coin_activities(conn, coin_activities)?;
     insert_coin_infos(conn, coin_infos)?;
     insert_coin_balances(conn, coin_balances)?;
     insert_current_coin_balances(conn, current_coin_balances)?;
     insert_coin_supply(conn, coin_supply)?;
+    insert_account_transactions(conn, account_transactions)?;
     Ok(())
 }
 
@@ -71,6 +74,7 @@ fn insert_to_db(
     coin_balances: Vec<CoinBalance>,
     current_coin_balances: Vec<CurrentCoinBalance>,
     coin_supply: Vec<CoinSupply>,
+    account_transactions: Vec<AccountTransaction>,
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -89,6 +93,7 @@ fn insert_to_db(
                 &coin_balances,
                 &current_coin_balances,
                 &coin_supply,
+                &account_transactions,
             )
         }) {
         Ok(_) => Ok(()),
@@ -100,6 +105,8 @@ fn insert_to_db(
                 let coin_infos = clean_data_for_db(coin_infos, true);
                 let coin_balances = clean_data_for_db(coin_balances, true);
                 let current_coin_balances = clean_data_for_db(current_coin_balances, true);
+                let coin_supply = clean_data_for_db(coin_supply, true);
+                let account_transactions = clean_data_for_db(account_transactions, true);
 
                 insert_to_db_impl(
                     pg_conn,
@@ -108,6 +115,7 @@ fn insert_to_db(
                     &coin_balances,
                     &current_coin_balances,
                     &coin_supply,
+                    &account_transactions,
                 )
             }),
     }
@@ -131,11 +139,7 @@ fn insert_coin_activities(
                     event_creation_number,
                     event_sequence_number,
                 ))
-                .do_update()
-                .set((
-                    inserted_at.eq(excluded(inserted_at)),
-                    event_index.eq(excluded(event_index)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -239,6 +243,26 @@ fn insert_coin_supply(
     Ok(())
 }
 
+fn insert_account_transactions(
+    conn: &mut PgConnection,
+    item_to_insert: &[AccountTransaction],
+) -> Result<(), diesel::result::Error> {
+    use schema::account_transactions::dsl::*;
+
+    let chunks = get_chunks(item_to_insert.len(), AccountTransaction::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::account_transactions::table)
+                .values(&item_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, account_address))
+                .do_nothing(),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl ProcessorTrait for CoinTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -264,6 +288,8 @@ impl ProcessorTrait for CoinTransactionProcessor {
             HashMap::new();
         let mut all_coin_supply = vec![];
 
+        let mut account_transactions = HashMap::new();
+
         for txn in &transactions {
             let (
                 mut coin_activities,
@@ -280,16 +306,25 @@ impl ProcessorTrait for CoinTransactionProcessor {
                 all_coin_infos.entry(key).or_insert(value);
             }
             all_current_coin_balances.extend(current_coin_balances);
+
+            account_transactions.extend(AccountTransaction::from_transaction(txn));
         }
         let mut all_coin_infos = all_coin_infos.into_values().collect::<Vec<CoinInfo>>();
         let mut all_current_coin_balances = all_current_coin_balances
             .into_values()
             .collect::<Vec<CurrentCoinBalance>>();
+        let mut account_transactions = account_transactions
+            .into_values()
+            .collect::<Vec<AccountTransaction>>();
 
         // Sort by PK
         all_coin_infos.sort_by(|a, b| a.coin_type.cmp(&b.coin_type));
         all_current_coin_balances.sort_by(|a, b| {
             (&a.owner_address, &a.coin_type).cmp(&(&b.owner_address, &b.coin_type))
+        });
+        account_transactions.sort_by(|a, b| {
+            (&a.transaction_version, &a.account_address)
+                .cmp(&(&b.transaction_version, &b.account_address))
         });
 
         let tx_result = insert_to_db(
@@ -302,6 +337,7 @@ impl ProcessorTrait for CoinTransactionProcessor {
             all_coin_balances,
             all_current_coin_balances,
             all_coin_supply,
+            account_transactions,
         );
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),

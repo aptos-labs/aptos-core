@@ -145,12 +145,15 @@ module aptos_framework::code {
         let allowed_deps = check_dependencies(addr, &pack);
 
         // Check package against conflicts
+        // To avoid prover compiler error on spec
+        // the package need to be an immutable variable
         let module_names = get_module_names(&pack);
-        let packages = &mut borrow_global_mut<PackageRegistry>(addr).packages;
-        let len = vector::length(packages);
+        let package_immutable = &borrow_global<PackageRegistry>(addr).packages;
+        let len = vector::length(package_immutable);
         let index = len;
         let upgrade_number = 0;
-        vector::enumerate_ref(packages, |i, old| {
+        vector::enumerate_ref(package_immutable
+        , |i, old| {
             let old: &PackageMetadata = old;
             if (old.name == pack.name) {
                 upgrade_number = old.upgrade_number + 1;
@@ -164,6 +167,7 @@ module aptos_framework::code {
         // Assign the upgrade counter.
         pack.upgrade_number = upgrade_number;
 
+        let packages = &mut borrow_global_mut<PackageRegistry>(addr).packages;
         // Update registry
         let policy = pack.upgrade_policy;
         if (index < len) {

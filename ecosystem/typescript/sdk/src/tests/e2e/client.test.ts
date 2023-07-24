@@ -57,7 +57,7 @@ test(
       });
       expect(response.config.headers).toHaveProperty("x-aptos-client", `aptos-ts-sdk/${VERSION}`);
       expect(response.config.headers).toHaveProperty("my", "header");
-      expect(response.config.headers).toHaveProperty("Content-Type", "application/x.aptos.signed_transaction+bcs");
+      expect(response.config.headers).toHaveProperty("content-type", "application/x.aptos.signed_transaction+bcs");
     } catch (error: any) {
       // should not get here
       expect(true).toBe(false);
@@ -78,7 +78,7 @@ test(
         originMethod: "test 200 status",
         overrides: { TOKEN: "my-token" },
       });
-      expect(response.config.headers).toHaveProperty("Authorization", "Bearer my-token");
+      expect(response.config.headers).toHaveProperty("authorization", "Bearer my-token");
     } catch (error: any) {
       // should not get here
       expect(true).toBe(false);
@@ -98,7 +98,7 @@ test(
         body: null,
         originMethod: "test 200 status",
       });
-      expect(response.config.headers).not.toHaveProperty("Authorization", "Bearer my-token");
+      expect(response.config.headers).not.toHaveProperty("authorization", "Bearer my-token");
     } catch (error: any) {
       // should not get here
       expect(true).toBe(false);

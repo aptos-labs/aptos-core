@@ -41,7 +41,7 @@ impl BlockPartitioningStage {
             txns.len()
         );
         let block_id = HashValue::random();
-        let block: ExecutableBlock<Transaction> = match &self.maybe_partitioner {
+        let block: ExecutableBlock = match &self.maybe_partitioner {
             None => (block_id, txns).into(),
             Some(partitioner) => {
                 let last_txn = txns.pop().unwrap();
@@ -56,7 +56,7 @@ impl BlockPartitioningStage {
                     .unwrap()
                     .transactions
                     .push(TransactionWithDependencies::new(
-                        last_txn,
+                        last_txn.into(),
                         CrossShardDependencies::default(),
                     ));
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))

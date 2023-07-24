@@ -55,7 +55,7 @@ The view function operates like the [Aptos Simulation API](../guides/system-inte
 A function does not have to be immutable to be tagged as `#[view]`, but if the function is mutable it will not result in state mutation when called from the API.
 If you want to tag a mutable function as `#[view]`, consider making it private so that it cannot be maliciously called during runtime.
 
-In order to use the View functions, you need to [publish the module](../move/move-on-aptos/cli.md#publishing-a-move-package-with-a-named-address) through the [Aptos CLI](../tools/install-cli/index.md).
+In order to use the View functions, you need to [publish the module](../move/move-on-aptos/cli.md#publishing-a-move-package-with-a-named-address) through the [Aptos CLI](../tools/aptos-cli/install-cli/index.md).
 
 In the Aptos CLI, a view function request would look like this:
 ```

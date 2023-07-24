@@ -19,7 +19,8 @@ use crate::{
     },
 };
 use aptos_protos::{
-    transaction::v1::UserTransaction as UserTransactionPB, util::timestamp::Timestamp,
+    transaction::v1::{UserTransaction as UserTransactionPB, UserTransactionRequest},
+    util::timestamp::Timestamp,
 };
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
@@ -105,15 +106,24 @@ impl UserTransaction {
                     .unwrap_or_default(),
                 epoch,
             },
-            user_request
-                .signature
-                .as_ref()
-                .map(|s| {
-                    Signature::from_user_transaction(s, &user_request.sender, version, block_height)
-                        .unwrap()
-                })
-                .unwrap_or_default(), // empty vec if signature is None
+            Self::get_signatures(user_request, version, block_height),
         )
+    }
+
+    /// Empty vec if signature is None
+    pub fn get_signatures(
+        user_request: &UserTransactionRequest,
+        version: i64,
+        block_height: i64,
+    ) -> Vec<Signature> {
+        user_request
+            .signature
+            .as_ref()
+            .map(|s| {
+                Signature::from_user_transaction(s, &user_request.sender, version, block_height)
+                    .unwrap()
+            })
+            .unwrap_or_default()
     }
 }
 

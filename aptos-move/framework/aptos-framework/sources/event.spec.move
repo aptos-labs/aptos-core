@@ -7,7 +7,7 @@ spec aptos_framework::event {
     spec emit_event {
         pragma opaque;
         aborts_if [abstract] false;
-        ensures handle_ref.counter < MAX_U64 ==> handle_ref.counter == old(handle_ref.counter) + 1;
+        ensures [concrete] handle_ref.counter == old(handle_ref.counter) + 1;
     }
 
     /// Native function use opaque.

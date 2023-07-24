@@ -3,6 +3,15 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    account_transactions (account_address, transaction_version) {
+        transaction_version -> Int8,
+        #[max_length = 66]
+        account_address -> Varchar,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     block_metadata_transactions (version) {
         version -> Int8,
         block_height -> Int8,
@@ -583,11 +592,11 @@ diesel::table! {
         #[max_length = 66]
         object_address -> Varchar,
         #[max_length = 66]
-        owner_address -> Nullable<Varchar>,
+        owner_address -> Varchar,
         #[max_length = 66]
         state_key_hash -> Varchar,
-        guid_creation_num -> Nullable<Numeric>,
-        allow_ungated_transfer -> Nullable<Bool>,
+        guid_creation_num -> Numeric,
+        allow_ungated_transfer -> Bool,
         is_deleted -> Bool,
         inserted_at -> Timestamp,
     }
@@ -916,6 +925,7 @@ diesel::table! {
 }
 
 diesel::allow_tables_to_appear_in_same_query!(
+    account_transactions,
     block_metadata_transactions,
     coin_activities,
     coin_balances,

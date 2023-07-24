@@ -1,15 +1,16 @@
 /// This module implements the knight token (non-fungible token) including the
 /// functions create the collection and the knight tokens, and the function to feed a
 /// knight token with food tokens to increase the knight's health point.
-module token_objects::knight {
-    use std::option;
-    use std::string::{Self, String};
+module knight::knight {
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object};
     use aptos_token_objects::collection;
     use aptos_token_objects::property_map;
     use aptos_token_objects::token;
-    use token_objects::food::{Self, FoodToken};
+    use std::option;
+    use std::signer;
+    use std::string::{Self, String};
+    use knight::food::{Self, FoodToken};
 
     /// The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -80,7 +81,7 @@ module token_objects::knight {
     #[view]
     /// Returns the knight token address by name
     public fun knight_token_address(knight_token_name: String): address {
-        token::create_token_address(&@token_objects, &string::utf8(KNIGHT_COLLECTION_NAME), &knight_token_name)
+        token::create_token_address(&@knight, &string::utf8(KNIGHT_COLLECTION_NAME), &knight_token_name)
     }
 
     /// Mints an knight token. This function mints a new knight token and transfers it to the
@@ -115,8 +116,10 @@ module token_objects::knight {
         let property_mutator_ref = property_map::generate_mutator_ref(&constructor_ref);
 
         // Transfers the token to the `soul_bound_to` address
-        let linear_transfer_ref = object::generate_linear_transfer_ref(&transfer_ref);
-        object::transfer_with_ref(linear_transfer_ref, receiver);
+        if (receiver != signer::address_of(creator)) {
+            let linear_transfer_ref = object::generate_linear_transfer_ref(&transfer_ref);
+            object::transfer_with_ref(linear_transfer_ref, receiver);
+        };
 
         // Initializes the knight health point as 0
         move_to(&object_signer, HealthPoint { value: 1 });
@@ -215,13 +218,10 @@ module token_objects::knight {
         );
     }
 
-    #[test_only]
-    use std::signer;
-
-    #[test(creator = @token_objects, user1 = @0x456)]
+    #[test(creator = @knight, user1 = @0x456)]
     public fun test_knight(creator: &signer, user1: &signer) acquires HealthPoint, KnightToken {
-        // This test assumes that the creator's address is equal to @token_objects.
-        assert!(signer::address_of(creator) == @token_objects, 0);
+        // This test assumes that the creator's address is equal to @knight.
+        assert!(signer::address_of(creator) == @knight, 0);
 
         // ---------------------------------------------------------------------
         // Creator creates the collection, and mints corn and meat tokens in it.

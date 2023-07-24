@@ -17,7 +17,7 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AnalyzedTransaction {
     transaction: Transaction,
     /// Set of storage locations that are read by the transaction - this doesn't include location
@@ -47,6 +47,13 @@ pub enum StorageLocation {
 
 impl StorageLocation {
     pub fn into_state_key(self) -> StateKey {
+        match self {
+            StorageLocation::Specific(state_key) => state_key,
+            _ => panic!("Cannot convert wildcard storage location to state key"),
+        }
+    }
+
+    pub fn state_key(&self) -> &StateKey {
         match self {
             StorageLocation::Specific(state_key) => state_key,
             _ => panic!("Cannot convert wildcard storage location to state key"),

@@ -503,6 +503,11 @@ impl<
             self.get_continuous_syncing_mode()
         {
             self.output_fallback_handler.fallback_to_outputs();
+            metrics::set_gauge(
+                &metrics::DRIVER_FALLBACK_MODE,
+                ExecutingComponent::ContinuousSyncer.get_label(),
+                1,
+            );
         }
 
         Ok(())

@@ -97,7 +97,7 @@ Completed generating configuration:
 Aptos is running, press ctrl-c to exit
 ```
 
-Use the [Aptos CLI tool](../../tools/install-cli/index.md) to interact with your local testnet. The above output contains information you will use for starting the [Aptos CLI tool](../../tools/aptos-cli-tool/use-aptos-cli.md):
+Use the [Aptos CLI tool](../../tools/aptos-cli/install-cli/index.md) to interact with your local testnet. The above output contains information you will use for starting the [Aptos CLI tool](../../tools/aptos-cli/use-cli/use-aptos-cli.md):
 
 * `Aptos root key path`: The root key (also known as the mint or faucet key) controls the account that can mint tokens. Available in the docker compose folder under `aptos_root_key`.
 * `Waypoint`: A verifiable checkpoint of the blockchain (available in the docker compose folder under waypoint.txt)

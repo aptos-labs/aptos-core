@@ -76,11 +76,8 @@ fn main() {
             .create_release(
                 true,
                 Some(
-                    PathBuf::from(
-                        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR defined"),
-                    )
-                    .join("generated")
-                    .join("head.mrb"),
+                    PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR defined"))
+                        .join("head.mrb"),
                 ),
             )
             .expect("release build failed");

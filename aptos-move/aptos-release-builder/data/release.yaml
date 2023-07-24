@@ -33,7 +33,7 @@ proposals:
     - Execution:
         V2:
           transaction_shuffler_type:
-            sender_aware_v1: 32
+            deprecated_sender_aware_v1: 32
           block_gas_limit : 35000
   - name: enable_aptos_unique_identifiers
     metadata:
@@ -58,3 +58,14 @@ proposals:
         enabled:
           - partial_governance_voting
           - delegation_pool_partial_governance_voting
+  - name: bulletproofs_natives
+    metadata:
+      title: "Bulletproofs natives"
+      description: "AIP-xx: TBD"
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/3444"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-xx.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - aptos_unique_identifiers

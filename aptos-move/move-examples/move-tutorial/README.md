@@ -35,7 +35,7 @@ You should obtain a copy of the content of the directory in which this `README.m
 step_1 step_2 step_2_sol step_3 ...
 ```
 
-You also need a recent version of the [Aptos CLI](../../../developer-docs-site/docs/tools/install-cli/index.md). This tutorial is written using the following version:
+You also need a recent version of the [Aptos CLI](../../../developer-docs-site/docs/tools/aptos-cli/install-cli/index.md). This tutorial is written using the following version:
 
 ```shell
 > aptos --version
@@ -492,7 +492,7 @@ Read more about [phantom type](../../../developer-docs-site/docs/move/book/gener
 
 ## Step 7:  Use the Move Prover
     
-> NOTE: Before running the Move Prover, ensure that the [Move Prover](../../../developer-docs-site/docs/tools/install-cli/install-move-prover.md) and associated tools are installed.
+> NOTE: Before running the Move Prover, ensure that the [Move Prover](../../../developer-docs-site/docs/tools/aptos-cli/install-cli/install-move-prover.md) and associated tools are installed.
 
 Smart contracts deployed on the blockchain may manipulate high-value assets. As a technique that uses strict
 mathematical methods to describe behavior and reason correctness of computer systems, formal verification

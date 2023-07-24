@@ -218,6 +218,10 @@ impl Node {
         &self.parents
     }
 
+    pub fn parents_metadata(&self) -> impl Iterator<Item = &NodeMetadata> {
+        self.parents().iter().map(|cert| &cert.metadata)
+    }
+
     pub fn author(&self) -> &Author {
         self.metadata.author()
     }
@@ -480,40 +484,80 @@ impl BroadcastStatus for CertificateAckState {
 /// if a node exist at [start_round + index][validator_index].
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RemoteFetchRequest {
-    target: NodeMetadata,
-    start_round: Round,
-    exists_bitmask: Vec<Vec<bool>>,
+    epoch: u64,
+    targets: Vec<NodeMetadata>,
+    exists_bitmask: DagSnapshotBitmask,
 }
 
 impl RemoteFetchRequest {
-    pub fn new(target: NodeMetadata, start_round: Round, exists_bitmask: Vec<Vec<bool>>) -> Self {
+    pub fn new(epoch: u64, parents: Vec<NodeMetadata>, exists_bitmask: DagSnapshotBitmask) -> Self {
         Self {
-            target,
-            start_round,
+            epoch,
+            targets: parents,
             exists_bitmask,
         }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn targets(&self) -> &[NodeMetadata] {
+        &self.targets
+    }
+
+    pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {
+        &self.exists_bitmask
+    }
+}
+
+impl TDAGMessage for RemoteFetchRequest {
+    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(
+            self.exists_bitmask
+                .bitmask
+                .iter()
+                .all(|round| round.len() == verifier.len()),
+            "invalid bitmask: each round length is not equal to validator count"
+        );
+
+        Ok(())
     }
 }
 
 /// Represents a response to FetchRequest, `certified_nodes` are indexed by [round][validator_index]
 /// It should fill in gaps from the `exists_bitmask` according to the parents from the `target_digest` node.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct FetchResponse {
     epoch: u64,
-    certifies_nodes: Vec<Vec<CertifiedNode>>,
+    certified_nodes: Vec<CertifiedNode>,
 }
 
 impl FetchResponse {
-    pub fn certified_nodes(self) -> Vec<Vec<CertifiedNode>> {
-        self.certifies_nodes
+    pub fn new(epoch: u64, certified_nodes: Vec<CertifiedNode>) -> Self {
+        Self {
+            epoch,
+            certified_nodes,
+        }
+    }
+
+    pub fn certified_nodes(self) -> Vec<CertifiedNode> {
+        self.certified_nodes
     }
 
     pub fn verify(
         self,
         _request: &RemoteFetchRequest,
-        _validator_verifier: &ValidatorVerifier,
+        validator_verifier: &ValidatorVerifier,
     ) -> anyhow::Result<Self> {
-        todo!("verification");
+        ensure!(
+            self.certified_nodes
+                .iter()
+                .all(|node| node.verify(validator_verifier).is_ok()),
+            "unable to verify certified nodes"
+        );
+
+        Ok(self)
     }
 }
 
@@ -571,7 +615,7 @@ impl TConsensusMsg for DAGMessage {
             DAGMessage::VoteMsg(vote) => vote.metadata.epoch,
             DAGMessage::CertifiedNodeMsg(node) => node.metadata.epoch,
             DAGMessage::CertifiedAckMsg(ack) => ack.epoch,
-            DAGMessage::FetchRequest(req) => req.target.epoch,
+            DAGMessage::FetchRequest(req) => req.epoch,
             DAGMessage::FetchResponse(res) => res.epoch,
             #[cfg(test)]
             DAGMessage::TestMessage(_) => 1,
@@ -616,5 +660,35 @@ pub struct TestAck(pub Vec<u8>);
 impl TDAGMessage for TestAck {
     fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         todo!()
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct DagSnapshotBitmask {
+    bitmask: Vec<Vec<bool>>,
+    first_round: Round,
+}
+
+impl DagSnapshotBitmask {
+    pub fn new(first_round: Round, bitmask: Vec<Vec<bool>>) -> Self {
+        Self {
+            bitmask,
+            first_round,
+        }
+    }
+
+    pub fn has(&self, round: Round, author_idx: usize) -> bool {
+        let round_idx = match round.checked_sub(self.first_round) {
+            Some(idx) => idx as usize,
+            None => return false,
+        };
+        self.bitmask
+            .get(round_idx)
+            .and_then(|round| round.get(author_idx).cloned())
+            .unwrap_or(false)
+    }
+
+    pub fn first_round(&self) -> Round {
+        self.first_round
     }
 }

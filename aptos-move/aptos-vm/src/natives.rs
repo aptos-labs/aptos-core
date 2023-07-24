@@ -76,7 +76,9 @@ pub fn assert_no_test_natives(err_msg: &str) {
                     && func_name.as_str() == "generate_keys_internal"
                 || module_name.as_str() == "bls12381" && func_name.as_str() == "sign_internal"
                 || module_name.as_str() == "bls12381"
-                    && func_name.as_str() == "generate_proof_of_possession_internal")
+                    && func_name.as_str() == "generate_proof_of_possession_internal"
+                || module_name.as_str() == "event"
+                    && func_name.as_str() == "emitted_events_internal")
         }),
         "{}",
         err_msg

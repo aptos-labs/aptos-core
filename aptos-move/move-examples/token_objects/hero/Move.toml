@@ -1,9 +1,9 @@
 [package]
-name = "TokenObjects"
+name = "Hero"
 version = "0.0.0"
 
 [addresses]
-token_objects = "_"
+hero = "_"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }

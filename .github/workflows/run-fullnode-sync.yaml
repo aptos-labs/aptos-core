@@ -70,6 +70,7 @@ jobs:
           CONTINUOUS_SYNCING_MODE: ${{ inputs.CONTINUOUS_SYNCING_MODE }}
           DATA_DIR_FILE_PATH: /tmp/
           NODE_LOG_FILE_PATH: /tmp/node_log
+          METRICS_DUMP_FILE_PATH: /tmp/metrics
 
       - name: Upload node logs as an artifact
         uses: actions/upload-artifact@v3
@@ -78,6 +79,15 @@ jobs:
           name: node_log
           path: |
             /tmp/node_log
+          retention-days: 14
+
+      - name: Upload the metrics dump as an artifact
+        uses: actions/upload-artifact@v3
+        if: ${{ always() }}
+        with:
+          name: metrics
+          path: |
+            /tmp/metrics
           retention-days: 14
 
       - name: Post to a Slack channel on failure

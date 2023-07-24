@@ -1,4 +1,4 @@
-module token_objects::token_lockup {
+module token_lockup::token_lockup {
    use std::signer;
    use std::option;
    use std::error;

@@ -10,7 +10,7 @@ This is a step-by-step guide to install an Aptos node using Docker. Follow these
 ## Before you proceed
 
 Make sure the following are installed on your local computer:
-   - **Aptos CLI**: https://aptos.dev/tools/install-cli/index
+   - **Aptos CLI**: https://aptos.dev/tools/aptos-cli/install-cli/index
    - **Docker and Docker-compose:** https://docs.docker.com/engine/install/
 
 :::caution Note on Apple M1

@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use super::{reliable_broadcast::CertifiedNodeHandler, storage::DAGStorage, types::TDAGMessage};
+use super::{
+    dag_fetcher::FetchRequestHandler, reliable_broadcast::CertifiedNodeHandler,
+    storage::DAGStorage, types::TDAGMessage,
+};
 use crate::{
     dag::{
         dag_network::RpcHandler, dag_store::Dag, reliable_broadcast::NodeBroadcastHandler,
@@ -23,6 +26,7 @@ struct NetworkHandler {
     dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
     node_receiver: NodeBroadcastHandler,
     certified_node_receiver: CertifiedNodeHandler,
+    fetch_receiver: FetchRequestHandler,
     epoch_state: Arc<EpochState>,
 }
 
@@ -42,8 +46,9 @@ impl NetworkHandler {
                 epoch_state.clone(),
                 storage,
             ),
-            certified_node_receiver: CertifiedNodeHandler::new(dag),
-            epoch_state,
+            certified_node_receiver: CertifiedNodeHandler::new(dag.clone()),
+            epoch_state: epoch_state.clone(),
+            fetch_receiver: FetchRequestHandler::new(dag, epoch_state),
         }
     }
 
@@ -66,8 +71,6 @@ impl NetworkHandler {
             bail!("message author and network author mismatch");
         }
 
-        // TODO: verify epoch number and author
-
         let response: anyhow::Result<DAGMessage> = match dag_message {
             DAGMessage::NodeMsg(node) => node
                 .verify(&self.epoch_state.verifier)
@@ -76,6 +79,10 @@ impl NetworkHandler {
             DAGMessage::CertifiedNodeMsg(node) => node
                 .verify(&self.epoch_state.verifier)
                 .and_then(|_| self.certified_node_receiver.process(node))
+                .map(|r| r.into()),
+            DAGMessage::FetchRequest(request) => request
+                .verify(&self.epoch_state.verifier)
+                .and_then(|_| self.fetch_receiver.process(request))
                 .map(|r| r.into()),
             _ => {
                 error!("unknown rpc message {:?}", dag_message);

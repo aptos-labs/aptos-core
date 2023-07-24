@@ -1,0 +1,12 @@
+[package]
+name = "Veiled coin"
+version = "0.0.1"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+
+[addresses]
+std = "0x1"
+aptos_std = "0x1"
+aptos_framework = "0x1"
+veiled_coin = "_"

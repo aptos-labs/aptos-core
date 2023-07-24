@@ -6,7 +6,7 @@ name: "fullnode-fast-testnet-main"
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0,12 * * *" # At hour 0 and 12 - aka twice a day (UTC)
+    - cron: "0 3 * * *" # Once a day, at 03:00 (UTC)
 
 permissions:
   contents: read

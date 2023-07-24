@@ -60,7 +60,7 @@ impl DagDriver {
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let mut dag_writer = self.dag.write();
         let round = node.metadata().round();
-        if dag_writer.all_exists(node.parents()) {
+        if dag_writer.all_exists(node.parents_metadata()) {
             dag_writer.add_node(node)?;
             if self.current_round == round {
                 let maybe_strong_links = dag_writer

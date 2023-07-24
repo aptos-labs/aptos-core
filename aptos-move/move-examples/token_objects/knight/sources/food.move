@@ -1,16 +1,18 @@
 /// This module implements the the food tokens (fungible token). When the module initializes,
 /// it creates the collection and two fungible tokens such as Corn and Meat.
-module token_objects::food {
-    use std::error;
-    use std::option;
-    use std::signer;
-    use std::string::{Self, String};
+module knight::food {
     use aptos_framework::fungible_asset::{Self, Metadata};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
     use aptos_token_objects::collection;
     use aptos_token_objects::property_map;
     use aptos_token_objects::token;
+    use std::error;
+    use std::option;
+    use std::signer;
+    use std::string::{Self, String};
+
+    friend knight::knight;
 
     /// The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -52,8 +54,6 @@ module token_objects::food {
     /// The condition of a knight
     const CONDITION_HUNGRY: vector<u8> = b"Hungry";
     const CONDITION_GOOD: vector<u8> = b"Good";
-
-    friend token_objects::knight;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     // Food Token
@@ -131,7 +131,7 @@ module token_objects::food {
     #[view]
     /// Returns the food token address by name
     public fun food_token_address(food_token_name: String): address {
-        token::create_token_address(&@token_objects, &string::utf8(FOOD_COLLECTION_NAME), &food_token_name)
+        token::create_token_address(&@knight, &string::utf8(FOOD_COLLECTION_NAME), &food_token_name)
     }
 
     /// Mints the given amount of the corn token to the given receiver.
@@ -277,10 +277,10 @@ module token_objects::food {
         init_module(creator);
     }
 
-    #[test(creator = @token_objects, user1 = @0x456, user2 = @0x789)]
+    #[test(creator = @knight, user1 = @0x456, user2 = @0x789)]
     public fun test_food(creator: &signer, user1: &signer, user2: &signer) acquires FoodToken {
-        // This test assumes that the creator's address is equal to @token_objects.
-        assert!(signer::address_of(creator) == @token_objects, 0);
+        // This test assumes that the creator's address is equal to @knight.
+        assert!(signer::address_of(creator) == @knight, 0);
 
         // ---------------------------------------------------------------------
         // Creator creates the collection, and mints corn and meat tokens in it.

@@ -18,7 +18,7 @@ First, understand the data is almost identical between the two nodes. The VFN is
 To failover from an outdated or erroneous validator node to an updated and reliable validator fullnode, follow these steps:
 
 1. Ensure your machine meets the [validator hardware requirements](node-requirements.md#hardware-requirements).
-1. Update your validator fullnode with the latest version of the [Aptos CLI](../../../tools/install-cli/index.md)
+1. Update your validator fullnode with the latest version of the [Aptos CLI](../../../tools/aptos-cli/install-cli/index.md)
 1. Copy the configuration files between the two nodes. See the files in the [validator setup](running-validator-node/index.md) documentation you used for the full list.
 1. Synchonize data on the validator fullnode:
    * For mainnet, use [state synchronization](../../../guides/state-sync.md).

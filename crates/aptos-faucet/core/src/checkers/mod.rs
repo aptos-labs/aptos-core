@@ -147,7 +147,6 @@ pub enum Checker {
 #[derive(Clone, Debug)]
 pub struct CheckerData {
     pub time_request_received_secs: u64,
-    pub amount: u64,
     pub receiver: AccountAddress,
     pub source_ip: IpAddr,
     pub headers: Arc<HeaderMap>,

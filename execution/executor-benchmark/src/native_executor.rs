@@ -337,7 +337,7 @@ impl NativeExecutor {
 
 impl TransactionBlockExecutor for NativeExecutor {
     fn execute_transaction_block(
-        transactions: ExecutableTransactions<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {

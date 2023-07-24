@@ -5,7 +5,7 @@ id: "create-a-smart-contract"
 
 # 1. Create a Smart Contract
 
-This is the first chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md). If you haven’t done it, review that introduction, and ensure your environment meets the [prerequisites](../../tools/install-cli/index.md) listed there.
+This is the first chapter of the tutorial on [building an end-to-end dapp on Aptos](./index.md). If you haven’t done it, review that introduction, and ensure your environment meets the [prerequisites](../../tools/aptos-cli/install-cli/index.md) listed there.
 
 Now that you are all set up and at your terminal:
 

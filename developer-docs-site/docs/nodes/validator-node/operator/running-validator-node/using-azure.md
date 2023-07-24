@@ -20,7 +20,7 @@ This guide assumes that you already have Azure account setup.
 Make sure you complete these prerequisite steps before you proceed:
 
 - **Azure account**: https://azure.microsoft.com/
-- **Aptos CLI**: https://aptos.dev/tools/install-cli/index
+- **Aptos CLI**: https://aptos.dev/tools/aptos-cli/install-cli/index
 - **Terraform 1.3.6**: https://www.terraform.io/downloads.html
 - **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
 - **Azure CLI**: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli

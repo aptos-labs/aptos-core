@@ -20,6 +20,9 @@ inputs:
   NODE_LOG_FILE_PATH:
     description: "The file path for the node logs to be written to."
     required: true
+  METRICS_DUMP_FILE_PATH:
+    description: "The file path for the node metrics to be written to."
+    required: true
 
 runs:
   using: composite
@@ -42,3 +45,4 @@ runs:
         CONTINUOUS_SYNCING_MODE: ${{ inputs.CONTINUOUS_SYNCING_MODE }}
         DATA_DIR_FILE_PATH: ${{ inputs.DATA_DIR_FILE_PATH }}
         NODE_LOG_FILE_PATH: ${{ inputs.NODE_LOG_FILE_PATH }}
+        METRICS_DUMP_FILE_PATH: ${{ inputs.METRICS_DUMP_FILE_PATH }}

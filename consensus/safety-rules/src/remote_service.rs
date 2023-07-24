@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 pub trait RemoteService {
     fn client(&self) -> SerializerClient {
         let network_client = NetworkClient::new(
-            "safety-rules",
+            "safety-rules".to_string(),
             self.server_address(),
             self.network_timeout_ms(),
         );
@@ -35,7 +35,8 @@ pub fn execute(storage: PersistentSafetyStorage, listen_addr: SocketAddr, networ
     }
 
     let mut serializer_service = SerializerService::new(safety_rules);
-    let mut network_server = NetworkServer::new("safety-rules", listen_addr, network_timeout_ms);
+    let mut network_server =
+        NetworkServer::new("safety-rules".to_string(), listen_addr, network_timeout_ms);
 
     loop {
         if let Err(e) = process_one_message(&mut network_server, &mut serializer_service) {

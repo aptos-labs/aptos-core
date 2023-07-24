@@ -22,7 +22,6 @@ use aptos_sdk::{
 use async_trait::async_trait;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use tokio::sync::RwLock;
 
 static MINTER_SCRIPT: &[u8] = include_bytes!(
@@ -54,7 +53,7 @@ pub struct MintFunderConfig {
 }
 
 impl MintFunderConfig {
-    pub async fn build_funder(&self) -> Result<MintFunder> {
+    pub async fn build_funder(self) -> Result<MintFunder> {
         let key = self.api_connection_config.get_key()?;
 
         let faucet_account = LocalAccount::new(
@@ -66,19 +65,10 @@ impl MintFunderConfig {
         );
 
         let mut minter = MintFunder::new(
-            faucet_account,
-            self.api_connection_config.chain_id,
             self.api_connection_config.node_url.clone(),
-            self.transaction_submission_config.maximum_amount,
-            self.transaction_submission_config
-                .get_gas_unit_price_ttl_secs(),
-            self.transaction_submission_config.gas_unit_price_override,
-            self.transaction_submission_config.max_gas_amount,
-            self.transaction_submission_config
-                .transaction_expiration_secs,
-            self.transaction_submission_config
-                .wait_for_outstanding_txns_secs,
-            self.transaction_submission_config.wait_for_transactions,
+            self.api_connection_config.chain_id,
+            self.transaction_submission_config,
+            faucet_account,
         );
 
         if !self.do_not_delegate {
@@ -93,66 +83,46 @@ impl MintFunderConfig {
 }
 
 pub struct MintFunder {
+    /// URL of an Aptos node API.
+    node_url: Url,
+
+    txn_config: TransactionSubmissionConfig,
+
     faucet_account: RwLock<LocalAccount>,
 
     transaction_factory: TransactionFactory,
 
-    /// URL of an Aptos node API.
-    node_url: Url,
-
-    /// The maximum amount to fund an account.
-    maximum_amount: Option<u64>,
-
-    /// See comment of gas_unit_price.
     gas_unit_price_manager: GasUnitPriceManager,
-
-    /// If this is Some, we'll use this. If not, we'll get the gas_unit_price
-    /// from the gas_unit_price_manager.
-    gas_unit_price_override: Option<u64>,
 
     /// When recovering from being overloaded, this struct ensures we handle
     /// requests in the order they came in.
     outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
-
-    /// Amount of time we'll wait for the seqnum to catch up before resetting it.
-    wait_for_outstanding_txns_secs: u64,
-
-    /// If set, we won't return responses until the transaction is processed.
-    wait_for_transactions: bool,
 }
 
 impl MintFunder {
     pub fn new(
-        faucet_account: LocalAccount,
-        chain_id: ChainId,
         node_url: Url,
-        maximum_amount: Option<u64>,
-        gas_unit_price_ttl_secs: Duration,
-        gas_unit_price_override: Option<u64>,
-        max_gas_amount: u64,
-        transaction_expiration_secs: u64,
-        wait_for_outstanding_txns_secs: u64,
-        wait_for_transactions: bool,
+        chain_id: ChainId,
+        txn_config: TransactionSubmissionConfig,
+        faucet_account: LocalAccount,
     ) -> Self {
         let gas_unit_price_manager =
-            GasUnitPriceManager::new(node_url.clone(), gas_unit_price_ttl_secs);
+            GasUnitPriceManager::new(node_url.clone(), txn_config.get_gas_unit_price_ttl_secs());
+        let transaction_factory = TransactionFactory::new(chain_id)
+            .with_max_gas_amount(txn_config.max_gas_amount)
+            .with_transaction_expiration_time(txn_config.transaction_expiration_secs);
         Self {
-            faucet_account: RwLock::new(faucet_account),
-            transaction_factory: TransactionFactory::new(chain_id)
-                .with_max_gas_amount(max_gas_amount)
-                .with_transaction_expiration_time(transaction_expiration_secs),
             node_url,
-            maximum_amount,
+            txn_config,
+            faucet_account: RwLock::new(faucet_account),
+            transaction_factory,
             gas_unit_price_manager,
-            gas_unit_price_override,
             outstanding_requests: RwLock::new(vec![]),
-            wait_for_outstanding_txns_secs,
-            wait_for_transactions,
         }
     }
 
     async fn get_gas_unit_price(&self) -> Result<u64, AptosTapError> {
-        match self.gas_unit_price_override {
+        match self.txn_config.gas_unit_price_override {
             Some(gas_unit_price) => Ok(gas_unit_price),
             None => self
                 .gas_unit_price_manager
@@ -173,11 +143,6 @@ impl MintFunder {
 
     /// todo explain / rename
     pub async fn use_delegated_account(&mut self) -> Result<()> {
-        // Save the maximum amount and temporarily set it to None so for
-        // for delegation we can mint as much as we want.
-        let maximum_amount = self.maximum_amount;
-        self.maximum_amount = None;
-
         // Build a client.
         let client = self.get_api_client();
 
@@ -187,7 +152,7 @@ impl MintFunder {
         // Create the account, wait for the response.
         self.process(
             &client,
-            Some(100_000_000_000),
+            100_000_000_000,
             delegated_account
                 .authentication_key()
                 .clone()
@@ -229,9 +194,7 @@ impl MintFunder {
             delegated_account.address().to_hex_literal()
         );
 
-        // Update the faucet account and restore the maximum amount.
         self.faucet_account = RwLock::new(delegated_account);
-        self.maximum_amount = maximum_amount;
 
         Ok(())
     }
@@ -243,24 +206,21 @@ impl MintFunder {
         Client::new(self.node_url.clone())
     }
 
-    // todo rename
     pub async fn process(
         &self,
         client: &Client,
-        amount: Option<u64>,
+        amount: u64,
         receiver_address: AccountAddress,
         check_only: bool,
         wait_for_transactions: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
-        let amount = self.get_amount(amount);
-
         let (_faucet_seq, receiver_seq) = update_sequence_numbers(
             client,
             &self.faucet_account,
             &self.outstanding_requests,
             receiver_address,
             amount,
-            self.wait_for_outstanding_txns_secs,
+            self.txn_config.wait_for_outstanding_txns_secs,
         )
         .await?;
 
@@ -310,20 +270,25 @@ impl FunderTrait for MintFunder {
         amount: Option<u64>,
         receiver_address: AccountAddress,
         check_only: bool,
+        did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
         let client = self.get_api_client();
+        let amount = self.get_amount(amount, did_bypass_checkers);
         self.process(
             &client,
             amount,
             receiver_address,
             check_only,
-            self.wait_for_transactions,
+            self.txn_config.wait_for_transactions,
         )
         .await
     }
 
-    fn get_amount(&self, amount: Option<u64>) -> u64 {
-        match (amount, self.maximum_amount) {
+    fn get_amount(&self, amount: Option<u64>, did_bypass_checkers: bool) -> u64 {
+        match (
+            amount,
+            self.txn_config.get_maximum_amount(did_bypass_checkers),
+        ) {
             (Some(amount), Some(maximum_amount)) => std::cmp::min(amount, maximum_amount),
             (Some(amount), None) => amount,
             (None, Some(maximum_amount)) => maximum_amount,

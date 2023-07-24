@@ -9,7 +9,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 You, as a developer, maybe also a game fancier, recently starts to develop a game and hope to
 integrate it with some web3 experience. You spontaneously think Aptos supports fungible tokens
 with abundant APIs in the token standard. So you wanna give a try to issue an in-game currency
-called *silver coin* by using the [Aptos command line interface (CLI)](../../tools/install-cli/index.md). There is only two requirements:
+called *silver coin* by using the [Aptos command line interface (CLI)](../../tools/aptos-cli/install-cli/index.md). There is only two requirements:
 - The token is fungible
 - The token is associated with a URL that points to the coin image.
 

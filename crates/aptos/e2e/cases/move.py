@@ -233,3 +233,31 @@ def test_move_view(run_helper: RunHelper, test_name=None):
         raise TestError(
             f"View function [test_big_number] did not return correct result"
         )
+
+    # Test view function with with vector arguments
+    # Follow 2 lines are for testing vector of u16-u256
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "move",
+            "view",
+            "--assume-yes",
+            "--function-id",
+            "default::cli_e2e_tests::test_vector",
+            "--args",
+            "string:1234",  # Notice this is testing u8 vector instead of actual string
+            f"u16:[1,2]",
+            f"u32:[1,2]",
+            f"u64:[1,2]",
+            f"u128:[1,2]",
+            f"u256:[1,2]",
+            f'address:["0x123","0x456"]',
+            "bool:[true,false]",
+            'string:["abc","efg"]',
+        ],
+    )
+
+    response = json.loads(response.stdout)
+    if response["Result"] == None or len(response["Result"]) != 9:
+        raise TestError(f"View function [test_vector] did not return correct result")

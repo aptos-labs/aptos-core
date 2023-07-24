@@ -295,4 +295,14 @@ impl<'r> TransactionDataCache<'r> {
         let ty_layout = loader.type_to_type_layout(&ty)?;
         Ok(self.event_data.push((guid, seq_num, ty, ty_layout, val)))
     }
+
+    pub(crate) fn emitted_events(&self, guid: Vec<u8>, ty: Type) -> PartialVMResult<Vec<Value>> {
+        let mut events = vec![];
+        for event in self.event_data.iter() {
+            if event.0 == guid && event.2 == ty {
+                events.push(event.4.copy_value()?);
+            }
+        }
+        Ok(events)
+    }
 }
