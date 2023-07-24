@@ -241,15 +241,11 @@ export class AptosClient {
    */
     @parseApiError
     async getObjectResource(
-      address: MaybeHexString,
+      objectAddress: MaybeHexString,
+      resourceType: Gen.MoveStructTag,
       query?: { ledgerVersion?: AnyNumber },
     ): Promise<Gen.MoveResource> {
-      const resources = await this.getAccountResources(address, query);
-      if(resources.length !== 2 || resources.find((r) => r.type === "0x1::object::ObjectCore") === undefined) {
-        throw new Error("Invalid 0x1::object::Object address");
-      }
-
-      return resources.filter((r) => r.type !== "0x1::object::ObjectCore")[0];
+      return await this.getAccountResource(objectAddress, resourceType, query);
     }
 
   /** Generates a signed transaction that can be submitted to the chain for execution. */
