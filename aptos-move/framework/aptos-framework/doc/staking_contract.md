@@ -2634,8 +2634,6 @@ a staking_contract exists for the staker/operator pair.
 </code></pre>
 
 
-
-
 <a name="0x1_staking_contract_Create_Staking_Contract_With_Coins_Abortsif"></a>
 
 

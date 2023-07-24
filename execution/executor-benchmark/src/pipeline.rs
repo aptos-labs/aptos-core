@@ -249,7 +249,7 @@ where
 pub struct ExecuteBlockMessage {
     pub current_block_start_time: Instant,
     pub partition_time: Duration,
-    pub block: ExecutableBlock<Transaction>,
+    pub block: ExecutableBlock,
 }
 
 /// Message from execution stage to commit stage.

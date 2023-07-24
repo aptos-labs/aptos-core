@@ -398,4 +398,4 @@ Creates a new royalty, verifying that it is a valid percentage
 </details>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

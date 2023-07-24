@@ -144,6 +144,7 @@ pub enum Operation {
     ReadRef,
     WriteRef,
     FreezeRef,
+    Vector,
     Havoc(HavocKind),
     Stop,
 
@@ -218,6 +219,7 @@ impl Operation {
             Operation::ReadRef => false,
             Operation::WriteRef => false,
             Operation::FreezeRef => false,
+            Operation::Vector => false,
             Operation::Havoc(_) => false,
             Operation::Stop => false,
             Operation::WriteBack(..) => false,
@@ -1026,6 +1028,9 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             },
             FreezeRef => {
                 write!(f, "freeze_ref")?;
+            },
+            Vector => {
+                write!(f, "vector")?;
             },
 
             // Memory model

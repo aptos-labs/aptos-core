@@ -402,7 +402,7 @@ class ModuleId:
     @staticmethod
     def from_str(module_id: str) -> ModuleId:
         split = module_id.split("::")
-        return ModuleId(AccountAddress.from_hex(split[0]), split[1])
+        return ModuleId(AccountAddress.from_str(split[0]), split[1])
 
     @staticmethod
     def deserialize(deserializer: Deserializer) -> ModuleId:
@@ -534,11 +534,11 @@ class Test(unittest.TestCase):
         amount_input = 5000
 
         # Accounts and crypto
-        sender_private_key = ed25519.PrivateKey.from_hex(sender_key_input)
+        sender_private_key = ed25519.PrivateKey.from_str(sender_key_input)
         sender_public_key = sender_private_key.public_key()
         sender_account_address = AccountAddress.from_key(sender_public_key)
 
-        receiver_private_key = ed25519.PrivateKey.from_hex(receiver_key_input)
+        receiver_private_key = ed25519.PrivateKey.from_str(receiver_key_input)
         receiver_public_key = receiver_private_key.public_key()
         receiver_account_address = AccountAddress.from_key(receiver_public_key)
 
@@ -604,11 +604,11 @@ class Test(unittest.TestCase):
         chain_id_input = 4
 
         # Accounts and crypto
-        sender_private_key = ed25519.PrivateKey.from_hex(sender_key_input)
+        sender_private_key = ed25519.PrivateKey.from_str(sender_key_input)
         sender_public_key = sender_private_key.public_key()
         sender_account_address = AccountAddress.from_key(sender_public_key)
 
-        receiver_private_key = ed25519.PrivateKey.from_hex(receiver_key_input)
+        receiver_private_key = ed25519.PrivateKey.from_str(receiver_key_input)
         receiver_public_key = receiver_private_key.public_key()
         receiver_account_address = AccountAddress.from_key(receiver_public_key)
 

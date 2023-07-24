@@ -1,6 +1,6 @@
 spec aptos_framework::state_storage {
     spec module {
-        use aptos_std::chain_status;
+        use aptos_framework::chain_status;
         pragma verify = true;
         pragma aborts_if_is_strict;
         // After genesis, `StateStorageUsage` and `GasParameter` exist.
@@ -21,7 +21,7 @@ spec aptos_framework::state_storage {
     }
 
     spec on_new_block(epoch: u64) {
-        use aptos_std::chain_status;
+        use aptos_framework::chain_status;
         requires chain_status::is_operating();
         aborts_if false;
         ensures epoch == global<StateStorageUsage>(@aptos_framework).epoch;

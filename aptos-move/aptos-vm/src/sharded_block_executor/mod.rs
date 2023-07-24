@@ -7,7 +7,7 @@ use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::SubBlocksForShard,
-    transaction::{Transaction, TransactionOutput},
+    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use block_executor_client::BlockExecutorClient;
 use move_core_types::vm_status::VMStatus;
@@ -40,7 +40,12 @@ pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {
 }
 
 pub enum ExecutorShardCommand<S> {
-    ExecuteSubBlocks(Arc<S>, SubBlocksForShard<Transaction>, usize, Option<u64>),
+    ExecuteSubBlocks(
+        Arc<S>,
+        SubBlocksForShard<AnalyzedTransaction>,
+        usize,
+        Option<u64>,
+    ),
     Stop,
 }
 
@@ -81,7 +86,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     pub fn execute_block(
         &self,
         state_view: Arc<S>,
-        block: Vec<SubBlocksForShard<Transaction>>,
+        block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
