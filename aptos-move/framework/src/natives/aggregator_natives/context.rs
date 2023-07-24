@@ -4,11 +4,11 @@
 use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
     delta_change_set::{DeltaOp, DeltaUpdate},
+    resolver::AggregatorResolver,
 };
 use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::Location;
-use move_table_extension::TableResolver;
 use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},
@@ -38,7 +38,7 @@ pub struct AggregatorChangeSet {
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
-    pub(crate) resolver: &'a dyn TableResolver,
+    pub(crate) resolver: &'a dyn AggregatorResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
     pub(crate) aggregator_enabled: bool,
 }
@@ -48,7 +48,7 @@ impl<'a> NativeAggregatorContext<'a> {
     /// passed into VM session.
     pub fn new(
         txn_hash: [u8; 32],
-        resolver: &'a dyn TableResolver,
+        resolver: &'a dyn AggregatorResolver,
         aggregator_enabled: bool,
     ) -> Self {
         Self {
@@ -155,42 +155,14 @@ impl AggregatorChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::{
-        aggregator_extension::aggregator_id_for_test, delta_change_set::serialize,
-    };
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::state_store::state_key::StateKey;
+    use aptos_aggregator::{aggregator_id_for_test, AggregatorStore};
     use claims::{assert_matches, assert_ok};
 
-    fn get_test_resolver() -> FakeDataStore {
-        #[allow(clippy::redundant_closure)]
-        let mut state_view = FakeDataStore::default();
-
-        let AggregatorID {
-            handle: handle_500,
-            key: key_500,
-        } = aggregator_id_for_test(500);
-        let AggregatorID {
-            handle: handle_600,
-            key: key_600,
-        } = aggregator_id_for_test(600);
-        let AggregatorID {
-            handle: handle_700,
-            key: key_700,
-        } = aggregator_id_for_test(700);
-
-        state_view.set_legacy(
-            StateKey::table_item(handle_500.into(), key_500.0.to_vec()),
-            serialize(&150),
-        );
-        state_view.set_legacy(
-            StateKey::table_item(handle_600.into(), key_600.0.to_vec()),
-            serialize(&100),
-        );
-        state_view.set_legacy(
-            StateKey::table_item(handle_700.into(), key_700.0.to_vec()),
-            serialize(&200),
-        );
+    fn get_test_resolver() -> AggregatorStore {
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_id(aggregator_id_for_test(500), 150);
+        state_view.set_from_id(aggregator_id_for_test(600), 100);
+        state_view.set_from_id(aggregator_id_for_test(700), 200);
         state_view
     }
 

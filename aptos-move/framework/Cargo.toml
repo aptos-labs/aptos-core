@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-aggregator = { workspace = true }
+aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-gas-algebra-ext = { workspace = true }
 aptos-move-stdlib = { workspace = true }
@@ -82,7 +82,6 @@ tiny-keccak = { workspace = true }
 
 [dev-dependencies]
 aptos-gas = { workspace = true }
-aptos-language-e2e-tests = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 claims = { workspace = true }
 move-cli = { workspace = true }
