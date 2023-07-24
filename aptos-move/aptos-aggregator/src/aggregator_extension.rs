@@ -376,9 +376,7 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::delta_change_set::serialize;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::state_store::state_key::StateKey;
     use claims::{assert_err, assert_ok};
     use once_cell::sync::Lazy;
 
@@ -409,45 +407,6 @@ mod test {
     }
 
     #[test]
-    fn test_get_stored_aggregator_disabled() {
-        #[allow(clippy::redundant_closure)]
-        let mut fake_resolver = FakeDataStore::default();
-        let AggregatorID { handle, key } = aggregator_id_for_test(500);
-        fake_resolver.set_legacy(
-            StateKey::table_item(handle.into(), key.0.to_vec()),
-            serialize(&150),
-        );
-
-        let mut aggregator_data = AggregatorData::default();
-
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(500), 500)
-            .expect("Get aggregator failed");
-        assert_eq!(aggregator.state, AggregatorState::Data);
-        assert_eq!(aggregator.value, 150);
-        assert_ok!(aggregator.add(50));
-        assert_eq!(aggregator.state, AggregatorState::Data);
-        assert_eq!(aggregator.value, 200);
-    }
-
-    #[test]
-    fn test_get_created_aggregator_disabled() {
-        let mut aggregator_data = AggregatorData::default();
-        aggregator_data.create_new_aggregator(aggregator_id_for_test(500), 500);
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(500), 500)
-            .expect("Get aggregator failed");
-        assert_eq!(aggregator.state, AggregatorState::Data);
-        assert_eq!(aggregator.value, 0);
-    }
-
-    #[test]
-    fn test_unknown_aggregator_disabled_fail() {
-        let mut aggregator_data = AggregatorData::default();
-        assert_err!(aggregator_data.get_aggregator(aggregator_id_for_test(200), 200,));
-    }
-
-    #[test]
     fn test_materialize_overflow() {
         let mut aggregator_data = AggregatorData::default();
 
@@ -461,23 +420,6 @@ mod test {
     }
 
     #[test]
-    fn test_materialize_overflow_aggregator_disabled() {
-        #[allow(clippy::redundant_closure)]
-        let mut fake_resolver = FakeDataStore::default();
-        let AggregatorID { handle, key } = aggregator_id_for_test(500);
-        fake_resolver.set_legacy(
-            StateKey::table_item(handle.into(), key.0.to_vec()),
-            serialize(&200),
-        );
-
-        let mut aggregator_data = AggregatorData::default();
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(500), 500)
-            .expect("Get aggregator failed");
-        assert_err!(aggregator.add(400));
-    }
-
-    #[test]
     fn test_materialize_underflow() {
         let mut aggregator_data = AggregatorData::default();
 
@@ -487,21 +429,6 @@ mod test {
             .expect("Get aggregator failed");
         assert_ok!(aggregator.add(400));
         assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
-    }
-
-    #[test]
-    fn test_materialize_underflow_aggregator_disabled() {
-        let mut fake_resolver = FakeDataStore::default();
-        let AggregatorID { handle, key } = aggregator_id_for_test(500);
-        fake_resolver.set_legacy(
-            StateKey::table_item(handle.into(), key.0.to_vec()),
-            serialize(&150),
-        );
-        let mut aggregator_data = AggregatorData::default();
-        let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(500), 600)
-            .expect("Get aggregator failed");
-        assert_err!(aggregator.sub(400));
     }
 
     #[test]

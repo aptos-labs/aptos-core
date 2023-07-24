@@ -75,7 +75,6 @@ impl<'a> NativeAggregatorContext<'a> {
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
-                    // Aggregator state can be a delta only if aggregators are enabled.
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op =
@@ -83,7 +82,6 @@ impl<'a> NativeAggregatorContext<'a> {
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
-                    // Aggregator state can be a delta only if aggregators are enabled.
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
@@ -147,44 +145,9 @@ impl AggregatorChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::{
-        aggregator_extension::aggregator_id_for_test, delta_change_set::serialize,
-    };
+    use aptos_aggregator::aggregator_extension::aggregator_id_for_test;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::state_store::state_key::StateKey;
     use claims::{assert_matches, assert_ok};
-
-    fn get_test_resolver() -> FakeDataStore {
-        #[allow(clippy::redundant_closure)]
-        let mut state_view = FakeDataStore::default();
-
-        let AggregatorID {
-            handle: handle_500,
-            key: key_500,
-        } = aggregator_id_for_test(500);
-        let AggregatorID {
-            handle: handle_600,
-            key: key_600,
-        } = aggregator_id_for_test(600);
-        let AggregatorID {
-            handle: handle_700,
-            key: key_700,
-        } = aggregator_id_for_test(700);
-
-        state_view.set_legacy(
-            StateKey::table_item(handle_500.into(), key_500.0.to_vec()),
-            serialize(&150),
-        );
-        state_view.set_legacy(
-            StateKey::table_item(handle_600.into(), key_600.0.to_vec()),
-            serialize(&100),
-        );
-        state_view.set_legacy(
-            StateKey::table_item(handle_700.into(), key_700.0.to_vec()),
-            serialize(&200),
-        );
-        state_view
-    }
 
     // All aggregators are initialized deterministically based on their ID,
     // with the following spec.
@@ -209,8 +172,8 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
 
-        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(100), 100,));
-        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(200), 200,));
+        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(100), 100));
+        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(200), 200));
         aggregator_data
             .get_aggregator(aggregator_id_for_test(500), 500)
             .unwrap()
@@ -235,7 +198,8 @@ mod test {
 
     #[test]
     fn test_into_change_set() {
-        let resolver = get_test_resolver();
+        let resolver = FakeDataStore::default();
+
         let context = NativeAggregatorContext::new([0; 32], &resolver);
 
         test_set_up(&context);
