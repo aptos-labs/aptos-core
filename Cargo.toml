@@ -48,6 +48,7 @@ members = [
     "consensus/consensus-types",
     "consensus/safety-rules",
     "crates/aptos",
+    "crates/aptos-api-tester",
     "crates/aptos-bitvec",
     "crates/aptos-build-info",
     "crates/aptos-compression",
