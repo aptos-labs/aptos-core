@@ -1,7 +1,7 @@
 [package]
-name = "aptos-sdk"
-description = "The Official Aptos SDK"
-version = "0.0.3"
+name = "aptos-api-tester"
+description = "Aptos developer API tester"
+version = "0.1.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -16,19 +16,11 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-global-constants = { workspace = true }
+aptos-framework = { workspace = true }
 aptos-rest-client = { workspace = true }
+aptos-sdk = { workspace = true }
 aptos-types = { workspace = true }
-bcs = { workspace = true }
-ed25519-dalek-bip32 = { workspace = true }
 move-core-types = { workspace = true }
-rand_core = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tiny-bip39 = { workspace = true }
-
-[dev-dependencies]
 once_cell = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
