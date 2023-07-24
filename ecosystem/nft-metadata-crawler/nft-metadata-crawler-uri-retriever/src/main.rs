@@ -44,9 +44,10 @@ async fn send_publish_uris(
     token: String,
 ) -> anyhow::Result<String> {
     let links = process_file()?;
+    info!("Publishing {} links to PubSub", links.len());
     publish_uris(links, force, grpc_client, topic_name, token).await?;
 
-    Ok(format!("{} to {}", start, end))
+    Ok(format!("Successfully published {} to {}", start, end))
 }
 
 #[async_trait::async_trait]
