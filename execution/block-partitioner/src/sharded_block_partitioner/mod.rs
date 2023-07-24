@@ -428,13 +428,16 @@ impl BlockPartitioner for ShardedBlockPartitioner {
             Ok(v) if v.as_str() == "1" => {
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["init_with_simple"]).start_timer();
                 let (txns_by_shard_id, num_keys) = self.helper.partition(transactions, self.num_shards);
-                timer.stop_and_record();
+                let duration = timer.stop_and_record();
+                println!("init_with_simple={duration:?}");
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["flatten_to_rounds"]).start_timer();
                 let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard_id);
-                timer.stop_and_record();
+                let duration = timer.stop_and_record();
+                println!("flatten_to_rounds={duration:?}");
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
                 let ret = self.add_edges(matrix, Some(num_keys));
-                timer.stop_and_record();
+                let duration = timer.stop_and_record();
+                println!("add_edges={duration:?}");
                 ret
             }
             _ => {
