@@ -39,6 +39,8 @@ fn main() {
 
     // let partitioner = SimplePartitioner{};
     let partitioner = ShardedBlockPartitioner::new(args.num_shards);
+    let mut global_owner_update_tracker = Calculator::default();
+    let mut local_owner_update_tracker = Calculator::default();
     let mut loc_clone_tracker = Calculator::default();
     let mut add_dependent_tracker = Calculator::default();
     let mut add_required_tracker = Calculator:: default();
@@ -59,9 +61,13 @@ fn main() {
         let now = Instant::now();
         let result = BlockPartitioner::partition(&partitioner, transactions, args.num_shards);
         let elapsed = now.elapsed();
+        let global_owner_update = global_owner_update_tracker.new_val(SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["global_owner_update"]).get_sample_sum());
+        let local_owner_update = local_owner_update_tracker.new_val(SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["local_owner_update"]).get_sample_sum());
         let loc_clone = loc_clone_tracker.new_val(SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["loc_clone"]).get_sample_sum());
         let add_dependent = add_dependent_tracker.new_val(SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_dependent"]).get_sample_sum());
-        let add_required = add_dependent_tracker.new_val(SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_required"]).get_sample_sum());
+        let add_required = add_required_tracker.new_val(SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_required"]).get_sample_sum());
+        println!("global_owner_update={global_owner_update}");
+        println!("local_owner_update={local_owner_update}");
         println!("loc_clone={loc_clone}");
         println!("add_dependent={add_dependent}");
         println!("add_required={add_required}");

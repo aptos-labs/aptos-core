@@ -387,7 +387,7 @@ impl ShardedBlockPartitioner {
 
                     for loc in txn.write_hints().iter() {
                         let loc_id = *loc.maybe_id_in_partition_session.as_ref().unwrap();
-                        let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["local_owner_insert"]).start_timer();
+                        let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["local_owner_update"]).start_timer();
                         local_owners_by_loc_id.insert(loc_id, cur_sharded_txn_idx);
                         timer.stop_and_record();
                         match &global_owners_by_loc_id[loc_id] {
@@ -418,9 +418,11 @@ impl ShardedBlockPartitioner {
                 let cur_sub_block = SubBlock::new(start_index_for_cur_sub_block, twds_for_cur_sub_block);
                 ret.get_mut(shard_id).unwrap().add_sub_block(cur_sub_block);
 
+                let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["global_owner_update"]).start_timer();
                 for (key, owner) in local_owners_by_loc_id {
                     global_owners_by_loc_id[key] = Some(owner);
                 }
+                timer.stop_and_record();
             }
         }
         let duration = timer.stop_and_record();
