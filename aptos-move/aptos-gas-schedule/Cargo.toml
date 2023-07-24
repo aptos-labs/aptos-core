@@ -1,0 +1,24 @@
+[package]
+name = "aptos-gas-schedule"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-gas-algebra = { workspace = true }
+aptos-global-constants = { workspace = true }
+aptos-types = { workspace = true }
+either = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
+paste = { workspace = true }
+
+[features]
+testing = ["aptos-global-constants/testing"]

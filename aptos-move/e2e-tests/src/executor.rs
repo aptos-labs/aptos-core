@@ -17,11 +17,9 @@ use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
-use aptos_gas::{
-    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasMeter,
-    LATEST_GAS_FEATURE_VERSION,
-};
+use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
@@ -52,6 +50,7 @@ use aptos_vm::{
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::storage::ChangeSetConfigs;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -511,12 +510,13 @@ impl FakeExecutor {
                 &txn,
                 &log_context,
                 |gas_feature_version, gas_params, storage_gas_params, balance| {
-                    let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
-                        gas_feature_version,
-                        gas_params,
-                        storage_gas_params,
-                        balance,
-                    ));
+                    let gas_meter =
+                        MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+                            gas_feature_version,
+                            gas_params,
+                            storage_gas_params,
+                            balance,
+                        )));
                     let gas_profiler = match txn.payload() {
                         TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
                         TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
@@ -676,7 +676,7 @@ impl FakeExecutor {
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
-                AbstractValueSizeGasParameters::zeros(),
+                MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
@@ -728,7 +728,7 @@ impl FakeExecutor {
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
-                AbstractValueSizeGasParameters::zeros(),
+                MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
@@ -776,7 +776,7 @@ impl FakeExecutor {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
-            AbstractValueSizeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             self.features.clone(),
