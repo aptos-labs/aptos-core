@@ -11,13 +11,15 @@ use crate::{
     },
 };
 #[allow(unused_imports)]
-use anyhow::Error;
-use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
+use anyhow::{bail, Error};
+use aptos_aggregator::{
+    aggregator_extension::AggregatorID,
+    resolver::{AggregatorReadMode, TAggregatorView},
+};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
-    aggregator::AggregatorID,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
         state_key::StateKey,
