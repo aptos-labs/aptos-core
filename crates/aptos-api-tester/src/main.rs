@@ -6,9 +6,9 @@
 mod counters;
 mod utils;
 
-use crate::{
-    counters::{test_error, test_fail, test_latency, test_success},
-    utils::{NetworkName, TestFailure, TestName, TestResult},
+use crate::utils::{
+    set_metrics, NetworkName, TestFailure, TestName, TestResult, DEVNET_FAUCET_URL,
+    DEVNET_NODE_URL, TESTNET_FAUCET_URL, TESTNET_NODE_URL,
 };
 use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
@@ -31,19 +31,7 @@ use aptos_types::{
     transaction::{EntryFunction, TransactionPayload},
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
-use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, future::Future, path::PathBuf, time::Instant};
-use url::Url;
-
-// network urls
-static DEVNET_NODE_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
-static DEVNET_FAUCET_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
-static TESTNET_NODE_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
-static TESTNET_FAUCET_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
 
 // fail messages
 static FAIL_ACCOUNT_DATA: &str = "wrong account data";
@@ -78,31 +66,17 @@ async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
 
     // process the result
     let output = match result {
-        Ok(_) => {
-            test_success(&test_name.to_string(), &network_type.to_string()).inc();
-            test_latency(&test_name.to_string(), &network_type.to_string(), "success")
-                .observe(time);
-
-            TestResult::Success
-        },
-        Err(failure) => {
-            match &failure {
-                TestFailure::Error(_) => {
-                    test_error(&test_name.to_string(), &network_type.to_string()).inc();
-                    test_latency(&test_name.to_string(), &network_type.to_string(), "error")
-                        .observe(time);
-                },
-                TestFailure::Fail(_) => {
-                    test_fail(&test_name.to_string(), &network_type.to_string()).inc();
-                    test_latency(&test_name.to_string(), &network_type.to_string(), "fail")
-                        .observe(time);
-                },
-            };
-
-            TestResult::from(failure)
-        },
+        Ok(_) => TestResult::Success,
+        Err(failure) => TestResult::from(failure),
     };
 
+    // set metrics and log
+    set_metrics(
+        &output,
+        &test_name.to_string(),
+        &network_type.to_string(),
+        time,
+    );
     info!(
         "{} {} result:{:?} in time:{:?}",
         network_type.to_string(),
@@ -110,6 +84,7 @@ async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
         output,
         time,
     );
+
     Ok(output)
 }
 
