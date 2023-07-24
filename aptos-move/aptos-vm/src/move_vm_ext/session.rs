@@ -375,21 +375,29 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
 
         for (id, change) in aggregator_change_set.changes {
-            let AggregatorID { handle, key } = id;
-            let key_bytes = key.0.to_vec();
-            let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
+            match id {
+                // Process Aggregator V1.
+                AggregatorID::Legacy { handle, key } => {
+                    let key_bytes = key.0.to_vec();
+                    let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
 
-            match change {
-                AggregatorChange::Write(value) => {
-                    let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                    aggregator_write_set.insert(state_key, write_op);
+                    match change {
+                        AggregatorChange::Write(value) => {
+                            let write_op = woc.convert_aggregator_mod(&state_key, value)?;
+                            aggregator_write_set.insert(state_key, write_op);
+                        },
+                        AggregatorChange::Merge(delta_op) => {
+                            aggregator_delta_set.insert(state_key, delta_op);
+                        },
+                        AggregatorChange::Delete => {
+                            let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
+                            aggregator_write_set.insert(state_key, write_op);
+                        },
+                    }
                 },
-                AggregatorChange::Merge(delta_op) => {
-                    aggregator_delta_set.insert(state_key, delta_op);
-                },
-                AggregatorChange::Delete => {
-                    let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                    aggregator_write_set.insert(state_key, write_op);
+                // Process Aggregator V2.
+                AggregatorID::Ephemeral(_) => {
+                    unreachable!("Ephemeral IDs for aggregators are not used.")
                 },
             }
         }
