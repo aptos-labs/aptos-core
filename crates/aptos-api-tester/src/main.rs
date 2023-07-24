@@ -26,7 +26,7 @@ use aptos_types::{
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
 use once_cell::sync::Lazy;
-use std::{collections::BTreeMap, future::Future, path::PathBuf, time::Instant};
+use std::{collections::BTreeMap, f32::consts::E, future::Future, path::PathBuf, time::Instant};
 use url::Url;
 
 // network urls
@@ -38,6 +38,22 @@ static TESTNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
 static TESTNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
+
+// fail messages
+static FAIL_ACCOUNT_DATA: &str = "wrong account data";
+static FAIL_BALANCE: &str = "wrong balance";
+static FAIL_BALANCE_AFTER_TRANSACTION: &str = "wrong balance after transaction";
+static FAIL_BALANCE_BEFORE_TRANSACTION: &str = "wrong balance before transaction";
+static FAIL_COLLECTION_DATA: &str = "wrong collection data";
+static FAIL_TOKEN_DATA: &str = "wrong token data";
+static FAIL_TOKEN_BALANCE: &str = "wrong token balance";
+static FAIL_TOKENS_BEFORE_CLAIM: &str = "found tokens for receiver when shouldn't";
+static FAIL_TOKEN_BALANCE_AFTER_TRANSACTION: &str = "wrong token balance after transaction";
+static FAIL_BYTECODE: &str = "wrong bytecode";
+static FAIL_MODULE_INTERACTION: &str = "module interaction isn't reflected correctly";
+static ERROR_NO_VERSION: &str = "transaction did not return version";
+static ERROR_NO_BYTECODE: &str = "error while getting bytecode from blobs";
+static ERROR_MODULE_INTERACTION: &str = "module interaction isn't reflected";
 
 // Processes a test result.
 async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
@@ -51,7 +67,7 @@ async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
     let result = fut.await;
 
     // end timer
-    let time = (Instant::now() - start).as_secs_f64();
+    let time = (Instant::now() - start).as_micros() as f64;
 
     // process the result
     let output = match result {
@@ -91,7 +107,7 @@ async fn test_newaccount(
     let actual_account = response.inner();
 
     if &expected_account != actual_account {
-        return Err(TestFailure::Fail("wrong account data"));
+        return Err(TestFailure::Fail(FAIL_ACCOUNT_DATA));
     }
 
     // check account balance
@@ -104,7 +120,7 @@ async fn test_newaccount(
         .value;
 
     if expected_balance != actual_balance {
-        return Err(TestFailure::Fail("wrong balance"));
+        return Err(TestFailure::Fail(FAIL_WRONG_BALANCE));
     }
 
     Ok(())
@@ -146,17 +162,13 @@ async fn test_cointransfer(
         .value;
 
     if expected_receiver_balance != actual_receiver_balance {
-        return Err(TestFailure::Fail("wrong balance after coin transfer"));
+        return Err(TestFailure::Fail(FAIL_BALANCE_AFTER_TRANSACTION));
     }
 
     // check account balance with a lower version number
     let version = match response.inner().version() {
         Some(version) => version,
-        _ => {
-            return Err(TestFailure::Error(anyhow!(
-                "transaction did not return version"
-            )))
-        },
+        _ => return Err(TestFailure::Error(anyhow!(ERROR_NO_VERSION))),
     };
 
     let expected_balance_at_version = U64(starting_receiver_balance);
@@ -168,9 +180,7 @@ async fn test_cointransfer(
         .value;
 
     if expected_balance_at_version != actual_balance_at_version {
-        return Err(TestFailure::Fail(
-            "wrong balance at version before the coin transfer",
-        ));
+        return Err(TestFailure::Fail(FAIL_BALANCE_BEFORE_TRANSACTION));
     }
 
     Ok(())
@@ -243,7 +253,7 @@ async fn test_mintnft(
         .await?;
 
     if expected_collection_data != actual_collection_data {
-        return Err(TestFailure::Fail("wrong collection data"));
+        return Err(TestFailure::Fail(FAIL_COLLECTION_DATA));
     }
 
     // check token metadata
@@ -272,7 +282,7 @@ async fn test_mintnft(
         .await?;
 
     if expected_token_data != actual_token_data {
-        return Err(TestFailure::Fail("wrong token data"));
+        return Err(TestFailure::Fail(FAIL_TOKEN_DATA));
     }
 
     // offer token
@@ -303,7 +313,7 @@ async fn test_mintnft(
         .amount;
 
     if expected_sender_token_balance != actual_sender_token_balance {
-        return Err(TestFailure::Fail("wrong token balance"));
+        return Err(TestFailure::Fail(FAIL_TOKEN_BALANCE));
     }
 
     // check that token store isn't initialized for the receiver
@@ -317,9 +327,7 @@ async fn test_mintnft(
         .await
         .is_ok()
     {
-        return Err(TestFailure::Fail(
-            "found tokens for receiver when shouldn't",
-        ));
+        return Err(TestFailure::Fail(FAIL_TOKENS_BEFORE_CLAIM));
     }
 
     // claim token
@@ -349,7 +357,7 @@ async fn test_mintnft(
         .amount;
 
     if expected_receiver_token_balance != actual_receiver_token_balance {
-        return Err(TestFailure::Fail("wrong token balance"));
+        return Err(TestFailure::Fail(FAIL_TOKEN_BALANCE_AFTER_TRANSACTION));
     }
 
     Ok(())
@@ -391,7 +399,7 @@ async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<H
 
     let blob = match blobs.get(0) {
         Some(bytecode) => bytecode.clone(),
-        None => return Err(anyhow!("error while getting bytecode from blobs")),
+        None => return Err(anyhow!(ERROR_NO_BYTECODE)),
     };
 
     Ok(HexEncodedBytes::from(blob))
@@ -449,7 +457,7 @@ async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), 
     let actual_bytecode = &response.inner().bytecode;
 
     if expected_bytecode != actual_bytecode {
-        return Err(TestFailure::Fail("wrong bytecode"));
+        return Err(TestFailure::Fail(FAIL_BYTECODE));
     }
 
     // interact with module
@@ -460,17 +468,11 @@ async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), 
     let expected_message = message.to_string();
     let actual_message = match get_message(client, account.address()).await {
         Some(message) => message,
-        None => {
-            return Err(TestFailure::Error(anyhow!(
-                "module interaction isn't reflected"
-            )))
-        },
+        None => return Err(TestFailure::Error(anyhow!(ERROR_MODULE_INTERACTION,))),
     };
 
     if expected_message != actual_message {
-        return Err(TestFailure::Fail(
-            "module interaction isn't reflected correctly",
-        ));
+        return Err(TestFailure::Fail(FAIL_MODULE_INTERACTION));
     }
 
     Ok(())
