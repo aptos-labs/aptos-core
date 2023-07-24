@@ -11,6 +11,8 @@ use aptos_types::{
     transaction::ExecutionStatus,
     vm_status::{StatusCode, VMStatus},
 };
+use aptos_types::state_store::state_key::StateKey;
+use aptos_types::write_set::WriteOp;
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::storage::StorageGasParameters;
@@ -57,7 +59,7 @@ fn failed_transaction_cleanup_test() {
         &change_set_configs,
     );
 
-    let write_set = out1.change_set().write_set_iter().collect_vec();
+    let write_set: Vec<(&StateKey, &WriteOp)> = out1.change_set().write_set_iter().collect();
     assert!(!write_set.is_empty());
     assert_eq!(out1.gas_used(), 90_000);
     assert!(!out1.status().is_discarded());

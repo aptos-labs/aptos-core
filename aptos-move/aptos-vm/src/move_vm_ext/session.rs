@@ -24,7 +24,10 @@ use aptos_types::{
     transaction::SignatureCheckedTransaction,
     write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::{StateChange, VMChangeSet}, storage::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::{StateChange, VMChangeSet},
+    storage::ChangeSetConfigs,
+};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
