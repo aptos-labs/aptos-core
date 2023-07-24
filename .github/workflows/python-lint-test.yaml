@@ -42,5 +42,5 @@ jobs:
 
       - name: Run python unit tests
         if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
-        run: poetry run python -m unittest **/*test.py -b
+        run: poetry run python -m unittest **/*_test.py -b
         working-directory: testsuite
