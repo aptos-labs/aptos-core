@@ -6,7 +6,6 @@ use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::HashValue;
-use aptos_executor_service::remote_executor_client::RemoteExecutorClient;
 use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
     data_store::FakeDataStore,
@@ -22,7 +21,10 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
-    sharded_block_executor::{block_executor_client::VMExecutorClient, ShardedBlockExecutor},
+    sharded_block_executor::{
+        local_executor_shard::{LocalExecutorClient, LocalExecutorService},
+        ShardedBlockExecutor,
+    },
 };
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use once_cell::sync::Lazy;
@@ -192,7 +194,8 @@ struct TransactionBenchState<S> {
     num_transactions: usize,
     strategy: S,
     account_universe: AccountUniverse,
-    parallel_block_executor: Option<Arc<ShardedBlockExecutor<FakeDataStore>>>,
+    parallel_block_executor:
+        Option<Arc<ShardedBlockExecutor<FakeDataStore, LocalExecutorClient<FakeDataStore>>>>,
     block_partitioner: Option<ShardedBlockPartitioner>,
     validator_set: ValidatorSet,
     state_view: Arc<FakeDataStore>,
@@ -228,7 +231,8 @@ where
         universe_strategy: impl Strategy<Value = AccountUniverseGen>,
         num_transactions: usize,
         num_executor_shards: usize,
-        remote_executor_addresses: Option<Vec<SocketAddr>>,
+        // TODO(skedia): add support for remote executor addresses.
+        _remote_executor_addresses: Option<Vec<SocketAddr>>,
     ) -> Self {
         let mut runner = TestRunner::default();
         let universe_gen = universe_strategy
@@ -246,18 +250,9 @@ where
         let (parallel_block_executor, block_partitioner) = if num_executor_shards == 1 {
             (None, None)
         } else {
-            let parallel_block_executor =
-                if let Some(remote_executor_addresses) = remote_executor_addresses {
-                    let remote_executor_clients = remote_executor_addresses
-                        .into_iter()
-                        .map(|addr| RemoteExecutorClient::new(addr, 10000))
-                        .collect::<Vec<RemoteExecutorClient>>();
-                    Arc::new(ShardedBlockExecutor::new(remote_executor_clients))
-                } else {
-                    let local_executor_client =
-                        VMExecutorClient::create_vm_clients(num_executor_shards, None);
-                    Arc::new(ShardedBlockExecutor::new(local_executor_client))
-                };
+            let client =
+                LocalExecutorService::setup_local_executor_shards(num_executor_shards, None);
+            let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(client));
             (
                 Some(parallel_block_executor),
                 Some(ShardedBlockPartitioner::new(num_executor_shards)),

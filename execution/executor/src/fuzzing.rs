@@ -23,7 +23,10 @@ use aptos_types::{
     },
     vm_status::VMStatus,
 };
-use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
+use aptos_vm::{
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
+    VMExecutor,
+};
 use std::sync::Arc;
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
@@ -69,8 +72,8 @@ impl TransactionBlockExecutor for FakeVM {
 }
 
 impl VMExecutor for FakeVM {
-    fn execute_block_sharded<S: StateView + Send + Sync>(
-        _sharded_block_executor: &ShardedBlockExecutor<S>,
+    fn execute_block_sharded<S: StateView + Send + Sync, E: ExecutorClient<S>>(
+        _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,

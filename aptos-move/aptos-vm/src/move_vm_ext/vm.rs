@@ -12,11 +12,11 @@ use aptos_framework::natives::{
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
-use move_table_extension::NativeTableContext;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
@@ -39,7 +39,7 @@ pub fn get_max_binary_format_version(features: &Features, gas_feature_version: u
 impl MoveVmExt {
     pub fn new(
         native_gas_params: NativeGasParameters,
-        abs_val_size_gas_params: AbstractValueSizeGasParameters,
+        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
         chain_id: u8,
         features: Features,
@@ -56,14 +56,13 @@ impl MoveVmExt {
         let type_size_limit = true;
 
         let verifier_config = verifier_config(&features, &timed_features);
-        let features = Arc::new(features);
 
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives(
-                    native_gas_params,
-                    abs_val_size_gas_params,
                     gas_feature_version,
+                    native_gas_params,
+                    misc_gas_params,
                     timed_features,
                     features.clone(),
                 ),
@@ -77,7 +76,7 @@ impl MoveVmExt {
                 },
             )?,
             chain_id,
-            features,
+            features: Arc::new(features),
         })
     }
 

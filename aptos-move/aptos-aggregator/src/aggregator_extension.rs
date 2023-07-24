@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::delta_change_set::{addition, deserialize, subtraction};
+use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::vm_status::StatusCode;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
-use move_table_extension::{TableHandle, TableResolver};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Describes the state of each aggregator instance.

@@ -31,7 +31,10 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
+use aptos_vm::{
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
+    VMExecutor,
+};
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
@@ -207,8 +210,8 @@ impl VMExecutor for MockVM {
         Ok(outputs)
     }
 
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
-        _sharded_block_executor: &ShardedBlockExecutor<S>,
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
+        _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
