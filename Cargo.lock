@@ -4001,7 +4001,6 @@ dependencies = [
  "move-core-types",
  "move-unit-test",
  "move-vm-runtime",
- "move-vm-test-utils",
  "move-vm-types",
  "num_cpus",
  "once_cell",
