@@ -10,18 +10,30 @@ use serde::{Deserialize, Serialize};
 
 mod error;
 pub mod process_executor_service;
-pub mod remote_executor_client;
+mod remote_cordinator_client;
+mod remote_cross_shard_client;
+mod remote_executor_client;
 pub mod remote_executor_service;
+#[cfg(test)]
+mod test_utils;
+#[cfg(test)]
+mod tests;
 #[cfg(test)]
 mod thread_executor_service;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct BlockExecutionResult {
+pub struct RemoteExecutionResult {
     pub inner: Result<Vec<Vec<TransactionOutput>>, VMStatus>,
 }
 
+impl RemoteExecutionResult {
+    pub fn new(inner: Result<Vec<Vec<TransactionOutput>>, VMStatus>) -> Self {
+        Self { inner }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum BlockExecutionRequest {
+pub enum RemoteExecutionRequest {
     ExecuteBlock(ExecuteBlockCommand),
 }
 
@@ -36,4 +48,22 @@ pub struct ExecuteBlockCommand {
     pub(crate) state_view: InMemoryStateView,
     pub(crate) concurrency_level: usize,
     pub(crate) maybe_block_gas_limit: Option<u64>,
+}
+
+impl ExecuteBlockCommand {
+    pub fn into(
+        self,
+    ) -> (
+        SubBlocksForShard<AnalyzedTransaction>,
+        InMemoryStateView,
+        usize,
+        Option<u64>,
+    ) {
+        (
+            self.sub_blocks,
+            self.state_view,
+            self.concurrency_level,
+            self.maybe_block_gas_limit,
+        )
+    }
 }

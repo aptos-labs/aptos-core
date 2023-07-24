@@ -159,6 +159,10 @@ const config = {
               to: "/category/nft",
             },
             {
+              label: "Examples",
+              to: "/category/examples",
+            },
+            {
               label: "Build E2E Dapp on Aptos",
               to: "tutorials/build-e2e-dapp/e2e-dapp-index",
             },
@@ -343,6 +347,10 @@ const config = {
           {
             to: "/move/move-on-aptos",
             from: "/guides/move-guides/aptos-move-guides",
+          },
+          {
+            to: "/tools/aptos-cli/install-cli",
+            from: "/tools/install-cli",
           },
         ],
         createRedirects(existingPath) {
