@@ -1,24 +1,17 @@
-module token_objects::unit_tests {
-   #[test_only]
-   use std::signer;
-   #[test_only]
+#[test_only]
+module token_lockup::unit_tests {
    use aptos_framework::object;
-   #[test_only]
    use aptos_framework::account;
-   #[test_only]
    use aptos_framework::timestamp;
-   #[test_only]
-   use token_objects::token_lockup;
-   #[test_only]
-   use std::string::{Self};
-   #[test_only]
    use aptos_token_objects::token::{Token};
+   use std::signer;
+   use std::string::{Self};
+   use token_lockup::token_lockup;
 
    const TEST_START_TIME: u64 = 1000000000;
    // 24 hours in one day * 60 minutes in one hour * 60 seconds in one minute * 7 days
    const LOCKUP_PERIOD_SECS: u64 = (24 * 60 * 60) * 7;
 
-   #[test_only]
    fun setup_test(
        creator: &signer,
        owner_1: &signer,
@@ -34,12 +27,11 @@ module token_objects::unit_tests {
          token_lockup::initialize_collection(creator);
    }
 
-   #[test_only]
    fun fast_forward_secs(seconds: u64) {
       timestamp::update_global_time_for_test_secs(timestamp::now_seconds() + seconds);
    }
 
-   #[test (creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
+   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
    /// Tests transferring multiple tokens to different owners with slightly different initial lockup times
    fun test_happy_path(
       creator: &signer,
@@ -47,13 +39,7 @@ module token_objects::unit_tests {
       owner_2: &signer,
       aptos_framework: &signer,
    ) {
-      setup_test(
-         creator,
-         owner_1,
-         owner_2,
-         aptos_framework,
-         TEST_START_TIME
-      );
+      setup_test(creator, owner_1, owner_2, aptos_framework, TEST_START_TIME);
 
       let owner_1_addr = signer::address_of(owner_1);
       let owner_2_addr = signer::address_of(owner_2);
@@ -77,7 +63,6 @@ module token_objects::unit_tests {
       assert!(token_lockup::view_last_transfer(token_2_obj) == TEST_START_TIME, 1);
       assert!(token_lockup::view_last_transfer(token_3_obj) == TEST_START_TIME + 1, 2);
 
-
       // transfer the first token from owner_1 to owner_2
       token_lockup::transfer(owner_1, token_1_obj, owner_2_addr);
       // transfer the second token from owner_2 to owner_1
@@ -97,7 +82,7 @@ module token_objects::unit_tests {
       assert!(object::is_owner(token_3_obj, owner_2_addr), 8);
    }
 
-   #[test (creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
+   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
    #[expected_failure(abort_code = 0x50003, location = aptos_framework::object)]
    fun transfer_raw_fail(
       creator: &signer,
@@ -105,13 +90,7 @@ module token_objects::unit_tests {
       owner_2: &signer,
       aptos_framework: &signer,
    ) {
-      setup_test(
-         creator,
-         owner_1,
-         owner_2,
-         aptos_framework,
-         TEST_START_TIME
-      );
+      setup_test(creator, owner_1, owner_2, aptos_framework, TEST_START_TIME);
 
       let token_1_constructor_ref = token_lockup::mint_to(creator, string::utf8(b"Token #1"), signer::address_of(owner_1));
       object::transfer_raw(
@@ -121,21 +100,15 @@ module token_objects::unit_tests {
       );
    }
 
-   #[test (creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
-   #[expected_failure(abort_code = 0x50000, location = token_objects::token_lockup)]
+   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
+   #[expected_failure(abort_code = 0x50000, location = token_lockup::token_lockup)]
    fun transfer_too_early(
       creator: &signer,
       owner_1: &signer,
       owner_2: &signer,
       aptos_framework: &signer,
    ) {
-      setup_test(
-         creator,
-         owner_1,
-         owner_2,
-         aptos_framework,
-         TEST_START_TIME
-      );
+      setup_test(creator, owner_1, owner_2, aptos_framework, TEST_START_TIME);
 
       let token_1_constructor_ref = token_lockup::mint_to(creator, string::utf8(b"Token #1"), signer::address_of(owner_1));
       let token_1_obj = object::object_from_constructor_ref(&token_1_constructor_ref);
@@ -145,21 +118,15 @@ module token_objects::unit_tests {
       token_lockup::transfer(owner_1, token_1_obj, signer::address_of(owner_2));
    }
 
-   #[test (creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
-   #[expected_failure(abort_code = 0x50001, location = token_objects::token_lockup)]
+   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
+   #[expected_failure(abort_code = 0x50001, location = token_lockup::token_lockup)]
    fun transfer_wrong_owner(
       creator: &signer,
       owner_1: &signer,
       owner_2: &signer,
       aptos_framework: &signer,
    ) {
-      setup_test(
-         creator,
-         owner_1,
-         owner_2,
-         aptos_framework,
-         TEST_START_TIME
-      );
+      setup_test(creator, owner_1, owner_2, aptos_framework, TEST_START_TIME);
 
       let token_1_constructor_ref = token_lockup::mint_to(creator, string::utf8(b"Token #1"), signer::address_of(owner_1));
       let token_1_obj = object::object_from_constructor_ref<Token>(&token_1_constructor_ref);

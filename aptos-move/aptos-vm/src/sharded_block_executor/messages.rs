@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
 
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum CrossShardMsg {
     RemoteTxnWriteMsg(RemoteTxnWrite),
     StopMsg,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RemoteTxnWrite {
     state_key: StateKey,
     // The write op is None if the transaction is aborted.

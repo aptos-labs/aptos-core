@@ -145,7 +145,7 @@ impl FundApi {
     ) -> poem::Result<(), AptosTapErrorResponse> {
         let (checker_data, bypass, _semaphore_permit) = self
             .components
-            .preprocess_request(fund_request.0, source_ip, header_map, true)
+            .preprocess_request(&fund_request.0, source_ip, header_map, true)
             .await?;
 
         if bypass {
@@ -157,7 +157,7 @@ impl FundApi {
         // to fund the account.
         self.components
             .funder
-            .fund(Some(checker_data.amount), checker_data.receiver, true)
+            .fund(fund_request.amount, checker_data.receiver, true, bypass)
             .await?;
 
         Ok(())
@@ -193,7 +193,7 @@ impl FundApiComponents {
     /// of the output of this function.
     async fn preprocess_request(
         &self,
-        fund_request: FundRequest,
+        fund_request: &FundRequest,
         source_ip: RealIp,
         header_map: &HeaderMap,
         dry_run: bool,
@@ -231,15 +231,7 @@ impl FundApiComponents {
             },
         };
 
-        // This is a little gross because the Funder also calls this internally
-        // but it's okay for now.
-        let amount = self.funder.get_amount(fund_request.amount);
-
-        // Include some additional logging that the logging middleware doesn't do.
-        info!(source_ip = source_ip, account = receiver, amount = amount);
-
         let checker_data = CheckerData {
-            amount,
             receiver,
             source_ip,
             headers: Arc::new(header_map.clone()),
@@ -296,13 +288,13 @@ impl FundApiComponents {
         dry_run: bool,
     ) -> poem::Result<Vec<SignedTransaction>, AptosTapError> {
         let (checker_data, bypass, _semaphore_permit) = self
-            .preprocess_request(fund_request, source_ip, header_map, dry_run)
+            .preprocess_request(&fund_request, source_ip, header_map, dry_run)
             .await?;
 
         // Fund the account.
         let fund_result = self
             .funder
-            .fund(Some(checker_data.amount), checker_data.receiver, false)
+            .fund(fund_request.amount, checker_data.receiver, false, bypass)
             .await;
 
         // This might be empty if there is an error and we never got to the
@@ -311,6 +303,15 @@ impl FundApiComponents {
             Ok(txns) => transaction_hashes(&txns.iter().collect::<Vec<&SignedTransaction>>()),
             Err(e) => e.txn_hashes.to_vec(),
         };
+
+        // Include some additional logging that the logging middleware doesn't do.
+        info!(
+            source_ip = checker_data.source_ip,
+            address = checker_data.receiver,
+            requested_amount = fund_request.amount,
+            txn_hashes = txn_hashes,
+            success = fund_result.is_ok(),
+        );
 
         // Give all Checkers the chance to run the completion step. We should
         // monitor for failures in these steps because they could lead to an

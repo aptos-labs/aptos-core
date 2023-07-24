@@ -19,11 +19,12 @@ impl FunderTrait for FakeFunder {
         _amount: Option<u64>,
         _receiver_address: AccountAddress,
         _check_only: bool,
+        _did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
         Ok(vec![])
     }
 
-    fn get_amount(&self, amount: Option<u64>) -> u64 {
+    fn get_amount(&self, amount: Option<u64>, _did_bypass_checkers: bool) -> u64 {
         amount.unwrap_or(100)
     }
 }
