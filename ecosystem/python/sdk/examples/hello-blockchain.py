@@ -13,13 +13,14 @@ One method to do so is to use the CLI:
     * `python -m examples.hello-blockchain ${your_address_from_aptos_init}`
 """
 
+import asyncio
 import sys
 from typing import Optional
 
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
+from aptos_sdk.async_client import FaucetClient, ResourceNotFound, RestClient
 from aptos_sdk.bcs import Serializer
-from aptos_sdk.client import FaucetClient, RestClient
 from aptos_sdk.transactions import (
     EntryFunction,
     TransactionArgument,
@@ -30,15 +31,20 @@ from .common import FAUCET_URL, NODE_URL
 
 
 class HelloBlockchainClient(RestClient):
-    def get_message(
+    async def get_message(
         self, contract_address: str, account_address: AccountAddress
     ) -> Optional[str]:
         """Retrieve the resource message::MessageHolder::message"""
-        return self.account_resource(
-            account_address, f"0x{contract_address}::message::MessageHolder"
-        )
+        try:
+            return await self.account_resource(
+                account_address, f"0x{contract_address}::message::MessageHolder"
+            )
+        except ResourceNotFound:
+            return None
 
-    def set_message(self, contract_address: str, sender: Account, message: str) -> str:
+    async def set_message(
+        self, contract_address: str, sender: Account, message: str
+    ) -> str:
         """Potentially initialize and set the resource message::MessageHolder::message"""
 
         payload = EntryFunction.natural(
@@ -47,13 +53,13 @@ class HelloBlockchainClient(RestClient):
             [],
             [TransactionArgument(message, Serializer.str)],
         )
-        signed_transaction = self.create_single_signer_bcs_transaction(
+        signed_transaction = await self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload)
         )
-        return self.submit_bcs_transaction(signed_transaction)
+        return await self.submit_bcs_transaction(signed_transaction)
 
 
-if __name__ == "__main__":
+async def main():
     assert len(sys.argv) == 2, "Expecting the contract address"
     contract_address = sys.argv[1]
 
@@ -67,27 +73,40 @@ if __name__ == "__main__":
     rest_client = HelloBlockchainClient(NODE_URL)
     faucet_client = FaucetClient(FAUCET_URL, rest_client)
 
-    faucet_client.fund_account(alice.address(), 20_000)
-    faucet_client.fund_account(bob.address(), 20_000)
+    alice_fund = faucet_client.fund_account(alice.address(), 10_000_000)
+    bob_fund = faucet_client.fund_account(bob.address(), 10_000_000)
+    await asyncio.gather(*[alice_fund, bob_fund])
+
+    alice_balance = rest_client.account_balance(alice.address())
+    bob_balance = rest_client.account_balance(bob.address())
+    [alice_balance, bob_balance] = await asyncio.gather(*[alice_balance, bob_balance])
 
     print("\n=== Initial Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
+    print(f"Alice: {alice_balance}")
+    print(f"Bob: {bob_balance}")
 
     print("\n=== Testing Alice ===")
-    print(
-        f"Initial value: {rest_client.get_message(contract_address, alice.address())}"
-    )
+    message = await rest_client.get_message(contract_address, alice.address())
+    print(f"Initial value: {message}")
     print('Setting the message to "Hello, Blockchain"')
-    txn_hash = rest_client.set_message(contract_address, alice, "Hello, Blockchain")
-    rest_client.wait_for_transaction(txn_hash)
+    txn_hash = await rest_client.set_message(
+        contract_address, alice, "Hello, Blockchain"
+    )
+    await rest_client.wait_for_transaction(txn_hash)
 
-    print(f"New value: {rest_client.get_message(contract_address, alice.address())}")
+    message = await rest_client.get_message(contract_address, alice.address())
+    print(f"New value: {message}")
 
     print("\n=== Testing Bob ===")
-    print(f"Initial value: {rest_client.get_message(contract_address, bob.address())}")
+    message = await rest_client.get_message(contract_address, bob.address())
+    print(f"Initial value: {message}")
     print('Setting the message to "Hello, Blockchain"')
-    txn_hash = rest_client.set_message(contract_address, bob, "Hello, Blockchain")
-    rest_client.wait_for_transaction(txn_hash)
+    txn_hash = await rest_client.set_message(contract_address, bob, "Hello, Blockchain")
+    await rest_client.wait_for_transaction(txn_hash)
 
-    print(f"New value: {rest_client.get_message(contract_address, bob.address())}")
+    message = await rest_client.get_message(contract_address, bob.address())
+    print(f"New value: {message}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

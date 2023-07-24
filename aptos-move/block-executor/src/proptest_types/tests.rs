@@ -5,9 +5,12 @@
 use crate::{
     errors::Error,
     executor::BlockExecutor,
-    proptest_types::types::{
-        DeltaDataView, EmptyDataView, ExpectedOutput, KeyType, Output, Task, Transaction,
-        TransactionGen, TransactionGenParams, ValueType,
+    proptest_types::{
+        baseline::BaselineOutput,
+        types::{
+            DeltaDataView, EmptyDataView, KeyType, MockOutput, MockTask, MockTransaction,
+            TransactionGen, TransactionGenParams, ValueType, MAX_GAS_PER_TXN,
+        },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
@@ -48,10 +51,10 @@ fn run_transactions<K, V, E>(
 
     let length = transactions.len();
     for i in abort_transactions {
-        *transactions.get_mut(i.index(length)).unwrap() = Transaction::Abort;
+        *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::Abort;
     }
     for i in skip_rest_transactions {
-        *transactions.get_mut(i.index(length)).unwrap() = Transaction::SkipRest;
+        *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::SkipRest;
     }
 
     let data_view = EmptyDataView::<KeyType<K>, ValueType<V>> {
@@ -67,10 +70,10 @@ fn run_transactions<K, V, E>(
 
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
-            Transaction<KeyType<K>, ValueType<V>, E>,
-            Task<KeyType<K>, ValueType<V>, E>,
+            MockTransaction<KeyType<K>, ValueType<V>, E>,
+            MockTask<KeyType<K>, ValueType<V>, E>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-            NoOpTransactionCommitHook<Output<KeyType<K>, ValueType<V>, E>, usize>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType<V>, E>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -85,9 +88,7 @@ fn run_transactions<K, V, E>(
             continue;
         }
 
-        let baseline =
-            ExpectedOutput::generate_baseline(&transactions, None, maybe_block_gas_limit);
-        baseline.assert_output(&output);
+        BaselineOutput::generate(&transactions, maybe_block_gas_limit).assert_output(&output);
     }
 }
 
@@ -204,13 +205,10 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<
-                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
-                usize,
-            >,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -220,9 +218,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         )
         .execute_transactions_parallel((), &transactions, &data_view);
 
-        let baseline =
-            ExpectedOutput::generate_baseline(&transactions, None, maybe_block_gas_limit);
-        baseline.assert_output(&output);
+        BaselineOutput::generate(&transactions, maybe_block_gas_limit).assert_output(&output);
     }
 }
 
@@ -260,13 +256,10 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<
-                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
-                usize,
-            >,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -276,19 +269,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         )
         .execute_transactions_parallel((), &transactions, &data_view);
 
-        let delta_writes = output
-            .as_ref()
-            .expect("Must be success")
-            .iter()
-            .map(|out| out.delta_writes())
-            .collect();
-
-        let baseline = ExpectedOutput::generate_baseline(
-            &transactions,
-            Some(delta_writes),
-            maybe_block_gas_limit,
-        );
-        baseline.assert_output(&output);
+        BaselineOutput::generate(&transactions, maybe_block_gas_limit).assert_output(&output);
     }
 }
 
@@ -399,29 +380,19 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     // Adjust the writes of txn indices[0] to contain module write to key 42.
     let w_index = indices[0].index(num_txns);
-    *transactions.get_mut(w_index).unwrap() = match transactions.get_mut(w_index).unwrap() {
-        Transaction::Write {
-            incarnation,
-            reads,
-            writes_and_deltas,
-            events,
+    match transactions.get_mut(w_index).unwrap() {
+        MockTransaction::Write {
+            incarnation_counter: _,
+            incarnation_behaviors,
         } => {
-            let mut new_writes_and_deltas = vec![];
-            for (incarnation_writes, incarnation_deltas) in writes_and_deltas {
-                assert!(!incarnation_writes.is_empty());
-                let val = incarnation_writes[0].1.clone();
-                let insert_idx = indices[1].index(incarnation_writes.len());
-                incarnation_writes.insert(insert_idx, (KeyType(universe[42], true), val));
-                new_writes_and_deltas
-                    .push((incarnation_writes.clone(), incarnation_deltas.clone()));
-            }
-
-            Transaction::Write {
-                incarnation: incarnation.clone(),
-                reads: reads.clone(),
-                writes_and_deltas: new_writes_and_deltas,
-                events: events.clone(),
-            }
+            incarnation_behaviors.iter_mut().for_each(|behavior| {
+                assert!(!behavior.writes.is_empty());
+                let insert_idx = indices[1].index(behavior.writes.len());
+                let val = behavior.writes[0].1.clone();
+                behavior
+                    .writes
+                    .insert(insert_idx, (KeyType(universe[42], true), val));
+            });
         },
         _ => {
             unreachable!();
@@ -441,13 +412,10 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     // Confirm still no intersection
     let output = BlockExecutor::<
-        Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
-        Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+        MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+        MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        NoOpTransactionCommitHook<
-            Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
-            usize,
-        >,
+        NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>, usize>,
         ExecutableTestType,
     >::new(
         num_cpus::get(),
@@ -460,27 +428,18 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
     let r_index = indices[2].index(num_txns);
-    *transactions.get_mut(r_index).unwrap() = match transactions.get_mut(r_index).unwrap() {
-        Transaction::Write {
-            incarnation,
-            reads,
-            writes_and_deltas,
-            events,
+    match transactions.get_mut(r_index).unwrap() {
+        MockTransaction::Write {
+            incarnation_counter: _,
+            incarnation_behaviors,
         } => {
-            let mut new_reads = vec![];
-            for incarnation_reads in reads {
-                assert!(!incarnation_reads.is_empty());
-                let insert_idx = indices[3].index(incarnation_reads.len());
-                incarnation_reads.insert(insert_idx, KeyType(universe[42], true));
-                new_reads.push(incarnation_reads.clone());
-            }
-
-            Transaction::Write {
-                incarnation: incarnation.clone(),
-                reads: new_reads,
-                writes_and_deltas: writes_and_deltas.clone(),
-                events: events.clone(),
-            }
+            incarnation_behaviors.iter_mut().for_each(|behavior| {
+                assert!(!behavior.reads.is_empty());
+                let insert_idx = indices[3].index(behavior.reads.len());
+                behavior
+                    .reads
+                    .insert(insert_idx, KeyType(universe[42], true));
+            });
         },
         _ => {
             unreachable!();
@@ -496,20 +455,17 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     for _ in 0..200 {
         let output = BlockExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<
-                Output<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
-                usize,
-            >,
+            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>, usize>,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
-            Some(max(w_index, r_index) as u64 + 1),
+            Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
             None,
-        ) // Ensure enough gas limit to commit the module txns
+        ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
         .execute_transactions_parallel((), &transactions, &data_view);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -560,7 +516,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
     }
 
     #[test]
@@ -570,7 +526,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 10) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 10 * MAX_GAS_PER_TXN / 2)));
     }
 
     #[test]
@@ -580,7 +536,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
     }
 
     #[test]
@@ -590,7 +546,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
     }
 
     #[test]
@@ -600,7 +556,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+        run_transactions::<[u8; 32], [u8; 32], ContractEvent>(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000 * MAX_GAS_PER_TXN / 2)));
     }
 }
 
@@ -608,6 +564,7 @@ proptest! {
 fn dynamic_read_writes_with_block_gas_limit_test() {
     dynamic_read_writes_with_block_gas_limit(
         3000,
+        // TODO: here and below, use proptest randomness, not thread_rng.
         Some(rand::thread_rng().gen_range(0, 3000) as u64),
     );
     dynamic_read_writes_with_block_gas_limit(3000, Some(0));
@@ -624,7 +581,10 @@ fn deltas_writes_mixed_with_block_gas_limit_test() {
 
 #[test]
 fn deltas_resolver_with_block_gas_limit_test() {
-    deltas_resolver_with_block_gas_limit(1000, Some(rand::thread_rng().gen_range(0, 1000) as u64));
+    deltas_resolver_with_block_gas_limit(
+        1000,
+        Some(rand::thread_rng().gen_range(0, 1000 * MAX_GAS_PER_TXN / 2)),
+    );
     deltas_resolver_with_block_gas_limit(1000, Some(0));
 }
 
@@ -642,7 +602,7 @@ fn module_publishing_fallback_with_block_gas_limit_test() {
     module_publishing_fallback_with_block_gas_limit(
         3000,
         // Need to execute at least 2 txns to trigger module publishing fallback
-        Some(rand::thread_rng().gen_range(1, 3000) as u64),
+        Some(rand::thread_rng().gen_range(1, 3000 * MAX_GAS_PER_TXN / 2)),
     );
 }
 
@@ -653,7 +613,7 @@ fn module_publishing_races_with_block_gas_limit_test() {
     for _ in 0..5 {
         publishing_fixed_params_with_block_gas_limit(
             300,
-            Some(rand::thread_rng().gen_range(0, 300) as u64),
+            Some(rand::thread_rng().gen_range(0, 300 * MAX_GAS_PER_TXN / 2)),
         );
     }
 }

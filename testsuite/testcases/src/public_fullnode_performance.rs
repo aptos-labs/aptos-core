@@ -59,6 +59,8 @@ impl PFNPerformance {
         let shuffled_peer_ids = self.gather_and_shuffle_peer_ids(swarm);
 
         // Create network emulation chaos for the swarm
+        // TODO: VFNs and VNs need to be colocated
+        let shuffled_peer_ids = shuffled_peer_ids.iter().map(|id| vec![*id]).collect();
         create_multi_region_swarm_network_chaos(shuffled_peer_ids, None)
     }
 
@@ -97,7 +99,7 @@ impl NetworkLoadTest for PFNPerformance {
     /// the swarm; and (ii) use those PFNs as the load destination.
     fn setup(&self, ctx: &mut NetworkContext) -> Result<LoadDestination> {
         // Add the PFNs to the swarm
-        let num_pfns = 10;
+        let num_pfns = 7;
         let pfn_peer_ids = create_and_add_pfns(ctx, num_pfns)?;
 
         // Add CPU chaos to the swarm

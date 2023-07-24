@@ -6,35 +6,17 @@ error: type argument count mismatch (expected 1 but got 0)
 6 │     const S1: S = S { f: 0 };
   │               ^
 
-error: invalid type for constant
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:6:15
-  │
-6 │     const S1: S = S { f: 0 };
-  │               ^
-
 error: type argument count mismatch (expected 1 but got 0)
   ┌─ tests/checking/typing/bad_type_argument_arity_const.move:7:15
   │
 7 │     const S2: S<> = S { f: 0 };
   │               ^
 
-error: invalid type for constant
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:7:15
-  │
-7 │     const S2: S<> = S { f: 0 };
-  │               ^^^
-
 error: type argument count mismatch (expected 1 but got 2)
   ┌─ tests/checking/typing/bad_type_argument_arity_const.move:8:15
   │
 8 │     const S3: S<u64, bool> = S { f: 0 };
   │               ^
-
-error: invalid type for constant
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:8:15
-  │
-8 │     const S3: S<u64, bool> = S { f: 0 };
-  │               ^^^^^^^^^^^^
 
 error: type argument count mismatch (expected 1 but got 2)
   ┌─ tests/checking/typing/bad_type_argument_arity_const.move:9:17
@@ -42,8 +24,26 @@ error: type argument count mismatch (expected 1 but got 2)
 9 │     const S4: S<S<u64, bool>> = S { f: S { f: 0 } };
   │                 ^
 
-error: invalid type for constant
-  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:9:15
+error: not a valid constant expression
+  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:6:19
+  │
+6 │     const S1: S = S { f: 0 };
+  │                   ^^^^^^^^^^
+
+error: not a valid constant expression
+  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:7:21
+  │
+7 │     const S2: S<> = S { f: 0 };
+  │                     ^^^^^^^^^^
+
+error: not a valid constant expression
+  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:8:30
+  │
+8 │     const S3: S<u64, bool> = S { f: 0 };
+  │                              ^^^^^^^^^^
+
+error: not a valid constant expression
+  ┌─ tests/checking/typing/bad_type_argument_arity_const.move:9:33
   │
 9 │     const S4: S<S<u64, bool>> = S { f: S { f: 0 } };
-  │               ^^^^^^^^^^^^^^^
+  │                                 ^^^^^^^^^^^^^^^^^^^

@@ -18,6 +18,10 @@ Learn the Aptos `token` interface and how to use it to [generate your first NFT]
 
 Learn how to [deploy and manage a coin](first-coin.md). The `coin` interface is defined in the [`coin.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) Move module.
 
+### [Your First Fungible Asset](first-fungible-asset.md)
+
+Learn how to [deploy and manage a fungible asset](first-fungible-asset.md). The `fungible asset` interface is defined in the [`fungible_asset.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/fungible_asset.move) Move module.
+
 ### [Your First Move Module](first-move-module.md)
 
 [Write your first Move module](first-move-module.md) for the Aptos blockchain.

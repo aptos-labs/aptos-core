@@ -4,9 +4,12 @@
 
 use crate::{
     executor::BlockExecutor,
-    proptest_types::types::{
-        EmptyDataView, ExpectedOutput, KeyType, Output, Task, Transaction, TransactionGen,
-        TransactionGenParams, ValueType,
+    proptest_types::{
+        baseline::BaselineOutput,
+        types::{
+            EmptyDataView, KeyType, MockOutput, MockTask, MockTransaction, TransactionGen,
+            TransactionGenParams, ValueType,
+        },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
@@ -36,8 +39,8 @@ pub(crate) struct BencherState<
 > where
     Vec<u8>: From<V>,
 {
-    transactions: Vec<Transaction<KeyType<K>, ValueType<V>, E>>,
-    expected_output: ExpectedOutput<ValueType<V>>,
+    transactions: Vec<MockTransaction<KeyType<K>, ValueType<V>, E>>,
+    baseline_output: BaselineOutput<ValueType<V>>,
 }
 
 impl<K, V, E> Bencher<K, V, E>
@@ -105,11 +108,11 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
-        let expected_output = ExpectedOutput::generate_baseline(&transactions, None, None);
+        let baseline_output = BaselineOutput::generate(&transactions, None);
 
         Self {
             transactions,
-            expected_output,
+            baseline_output,
         }
     }
 
@@ -126,14 +129,14 @@ where
         );
 
         let output = BlockExecutor::<
-            Transaction<KeyType<K>, ValueType<V>, E>,
-            Task<KeyType<K>, ValueType<V>, E>,
+            MockTransaction<KeyType<K>, ValueType<V>>,
+            MockTask<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-            NoOpTransactionCommitHook<Output<KeyType<K>, ValueType<V>, E>, usize>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType<V>, E>, usize>,
             ExecutableTestType,
         >::new(num_cpus::get(), executor_thread_pool, None, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
-        self.expected_output.assert_output(&output);
+        self.baseline_output.assert_output(&output);
     }
 }

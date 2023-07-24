@@ -10,7 +10,6 @@ funder_config:
   node_url: "http://127.0.0.1:8080"
   chain_id: 4
   key_file_path: "/tmp/mint.key"
-  amount_to_fund: 2000
   do_not_delegate: false
   mint_account_address: "0xA550C18"
 handler_config:

@@ -340,6 +340,10 @@ describe("BuilderUtils", () => {
     let serializer = new Serializer();
     serializeArg(undefined, new TypeTagStruct(optionStructTag(new TypeTagU8())), serializer);
     expect(serializer.getBytes()).toEqual(new Uint8Array([0x0]));
+
+    let serializer2 = new Serializer();
+    serializeArg(null, new TypeTagStruct(optionStructTag(new TypeTagU8())), serializer2);
+    expect(serializer2.getBytes()).toEqual(new Uint8Array([0x0]));
   });
 
   it("serializes an option num arg", async () => {
@@ -368,51 +372,6 @@ describe("BuilderUtils", () => {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
       ]),
     );
-  });
-
-  it("throws when nested type too high", async () => {
-    let serializer = new Serializer();
-    expect(() => {
-      serializeArg(
-        "abc",
-        new TypeTagStruct(
-          optionStructTag(
-            new TypeTagStruct(
-              optionStructTag(
-                new TypeTagStruct(
-                  optionStructTag(
-                    new TypeTagStruct(
-                      optionStructTag(
-                        new TypeTagStruct(
-                          optionStructTag(
-                            new TypeTagStruct(
-                              optionStructTag(
-                                new TypeTagStruct(
-                                  optionStructTag(
-                                    new TypeTagStruct(
-                                      optionStructTag(
-                                        new TypeTagStruct(
-                                          optionStructTag(new TypeTagStruct(objectStructTag(new TypeTagU8()))),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        serializer,
-      );
-    }).toThrow("Arguments are too nested, must be no greater than 8");
   });
 
   it("throws when unsupported struct type", async () => {

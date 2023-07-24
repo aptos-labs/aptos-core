@@ -76,6 +76,15 @@ fn test_resource_account_common(pkg: &str) {
 }
 
 #[test]
+fn test_veiled_coin() {
+    let named_address = BTreeMap::from([(
+        String::from("veiled_coin"),
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+    )]);
+    run_tests_for_pkg("veiled_coin", named_address);
+}
+
+#[test]
 fn test_common_account() {
     test_common("common_account");
 }
@@ -101,6 +110,11 @@ fn test_hello_blockchain() {
 }
 
 #[test]
+fn test_drand_lottery() {
+    test_common("drand");
+}
+
+#[test]
 fn test_marketplace() {
     test_common("marketplace")
 }
@@ -112,10 +126,16 @@ fn test_message_board() {
 
 #[test]
 fn test_fungible_asset() {
-    let named_address = BTreeMap::from([(
-        String::from("example_addr"),
-        AccountAddress::from_hex_literal("0xcafe").unwrap(),
-    )]);
+    let named_address = BTreeMap::from([
+        (
+            String::from("example_addr"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("FACoin"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
     run_tests_for_pkg(
         "fungible_asset/managed_fungible_asset",
         named_address.clone(),
@@ -128,7 +148,7 @@ fn test_fungible_asset() {
         "fungible_asset/preminted_managed_coin",
         named_address.clone(),
     );
-    run_tests_for_pkg("fungible_asset/simple_managed_coin", named_address);
+    run_tests_for_pkg("fungible_asset/fa_coin", named_address);
 }
 
 #[test]
@@ -174,13 +194,28 @@ fn test_shared_account() {
 
 #[test]
 fn test_token_objects() {
-    let named_address = BTreeMap::from([(
-        String::from("token_objects"),
-        AccountAddress::from_hex_literal("0xcafe").unwrap(),
-    )]);
-    run_tests_for_pkg("token_objects/hero", named_address.clone());
-    run_tests_for_pkg("token_objects/token_lockup", named_address.clone());
-    run_tests_for_pkg("token_objects/ambassador/move", named_address);
+    let named_addresses = BTreeMap::from([
+        (
+            String::from("ambassador"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("hero"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("knight"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("token_lockup"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("token_objects/ambassador", named_addresses.clone());
+    run_tests_for_pkg("token_objects/hero", named_addresses.clone());
+    run_tests_for_pkg("token_objects/knight", named_addresses.clone());
+    run_tests_for_pkg("token_objects/token_lockup", named_addresses);
 }
 
 #[test]
@@ -217,4 +252,19 @@ fn test_swap() {
         ),
     ]);
     run_tests_for_pkg("swap", named_address);
+}
+
+#[test]
+fn test_package_manager() {
+    let named_address = BTreeMap::from([
+        (
+            String::from("deployer"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("package"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("package_manager", named_address);
 }
