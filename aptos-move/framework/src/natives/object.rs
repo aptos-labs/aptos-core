@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
-    safely_assert_eq, safely_pop_arg,
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
+    SafeNativeResult,
 };
-use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, InternalGasPerByte},
@@ -16,7 +16,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::PartialVMError, values::Value,
 };
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native exists_at<T>
@@ -32,7 +32,6 @@ pub struct ExistsAtGasParameters {
 }
 
 fn native_exists_at(
-    gas_params: &ExistsAtGasParameters,
     context: &mut SafeNativeContext,
     mut ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -43,7 +42,7 @@ fn native_exists_at(
     let type_ = ty_args.pop().unwrap();
     let address = safely_pop_arg!(args, AccountAddress);
 
-    context.charge(gas_params.base)?;
+    context.charge(OBJECT_EXISTS_AT_BASE)?;
 
     let (exists, num_bytes) = context.exists_at(address, &type_).map_err(|err| {
         PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
@@ -53,7 +52,9 @@ fn native_exists_at(
     })?;
 
     if let Some(num_bytes) = num_bytes {
-        context.charge(gas_params.per_item_loaded + num_bytes * gas_params.per_byte_loaded)?;
+        context.charge(
+            OBJECT_EXISTS_AT_PER_ITEM_LOADED + OBJECT_EXISTS_AT_PER_BYTE_LOADED * num_bytes,
+        )?;
     }
 
     Ok(smallvec![Value::bool(exists)])
@@ -63,25 +64,10 @@ fn native_exists_at(
  * module
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub exists_at: ExistsAtGasParameters,
-}
-
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [(
-        "exists_at",
-        make_safe_native(
-            gas_params.exists_at,
-            timed_features,
-            features,
-            native_exists_at,
-        ),
-    )];
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
+    let natives = [("exists_at", native_exists_at as RawSafeNative)];
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }
