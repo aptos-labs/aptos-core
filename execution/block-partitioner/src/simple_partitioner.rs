@@ -47,14 +47,12 @@ impl SimplePartitioner {
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["group_by_sender"]).start_timer();
         let num_txns = txns.len();
         let mut txns_by_sender_id: Vec<Vec<AnalyzedTransaction>> = Vec::new();
-        let mut key_ids_by_sender_id: Mutex<Vec<HashSet<usize>>> = Mutex::new(Vec::new());
         let mut sender_ids_by_sender: HashMap<Sender, usize> = HashMap::new();
         for (txn_id, mut txn) in txns.into_iter().enumerate() {
             let sender = txn.sender();
             let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
                 let ret = txns_by_sender_id.len();
                 txns_by_sender_id.push(vec![]);
-                key_ids_by_sender_id.lock().unwrap().push(HashSet::new());
                 ret
             });
             txn.maybe_txn_id_in_partition_session = Some(txn_id);
@@ -77,7 +75,6 @@ impl SimplePartitioner {
                             num_keys.fetch_add(1, Ordering::SeqCst)
                         });
                         storage_location.maybe_id_in_partition_session = Some(key_id);
-                        key_ids_by_sender_id.lock().unwrap().get_mut(txn.maybe_sender_id_in_partition_session.unwrap()).unwrap().insert(key_id);
                     }
                 }
             });
@@ -95,10 +92,13 @@ impl SimplePartitioner {
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["union_find"]).start_timer();
         // The union-find approach.
         let mut uf = UnionFind::new(num_senders + num_keys.load(Ordering::SeqCst));
-        for (sender_id, key_ids) in key_ids_by_sender_id.lock().unwrap().iter().enumerate() {
-            for key_id in key_ids.iter() {
-                let key_id_in_uf = num_senders + *key_id;
-                uf.union(key_id_in_uf, sender_id);
+        for (sender_id, txns) in txns_by_sender_id.iter().enumerate() {
+            for txn in txns.iter() {
+                for loc in txn.write_hints.iter().chain(txn.read_hints.iter()) {
+                    let key_id = *loc.maybe_id_in_partition_session.as_ref().unwrap();
+                    let key_id_in_uf = num_senders + key_id;
+                    uf.union(key_id_in_uf, sender_id);
+                }
             }
         }
 
@@ -173,7 +173,6 @@ impl SimplePartitioner {
         drop(capped_sender_groups);
         drop(loads_by_sub_group);
         drop(group_ids_by_sender_id);
-        drop(key_ids_by_sender_id);
         drop(key_ids_by_key);
         drop(sender_ids_by_sender);
         let duration = timer.stop_and_record();
