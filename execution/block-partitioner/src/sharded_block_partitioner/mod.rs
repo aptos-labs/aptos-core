@@ -165,7 +165,7 @@ impl ShardedBlockPartitioner {
             control_txs,
             result_rxs,
             shard_threads: shard_join_handles,
-            helper: SimplePartitioner::new(8),
+            helper: SimplePartitioner::new(16),
         }
     }
 
