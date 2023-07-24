@@ -59,7 +59,7 @@ pub fn create_epoch_ending_ledger_info() -> LedgerInfoWithSignatures {
 /// Creates a single test event
 pub fn create_event(event_key: Option<EventKey>) -> ContractEvent {
     let event_key = event_key.unwrap_or_else(EventKey::random);
-    ContractEvent::new(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
+    ContractEvent::new_v0(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
 }
 
 /// Creates a test driver configuration for full nodes

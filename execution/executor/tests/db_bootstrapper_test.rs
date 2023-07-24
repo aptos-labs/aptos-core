@@ -255,7 +255,7 @@ fn test_new_genesis() {
         .freeze()
         .unwrap(),
         vec![
-            ContractEvent::new(
+            ContractEvent::new_v0(
                 *configuration.events().key(),
                 0,
                 TypeTag::Struct(Box::new(
@@ -263,7 +263,7 @@ fn test_new_genesis() {
                 )),
                 vec![],
             ),
-            ContractEvent::new(
+            ContractEvent::new_v0(
                 new_block_event_key(),
                 0,
                 TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
