@@ -204,11 +204,13 @@ pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + 
 /// Then we can generate the baseline by sequentially executing the behavior prescribed for
 /// those latest incarnations.
 #[derive(Clone, Debug)]
-pub(crate) struct MockIncarnation<K, V> {
+pub(crate) struct MockIncarnation<K, V, E> {
     /// A vector of keys to be read during mock incarnation execution.
     pub(crate) reads: Vec<K>,
     /// A vector of keys and corresponding values to be written during mock incarnation execution.
     pub(crate) writes: Vec<(K, V)>,
+    // A vector of events
+    pub(crate) events: Vec<E>,
     /// A vector of keys and corresponding deltas to be produced during mock incarnation execution.
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     /// total execution gas to be charged for mock incarnation execution.
@@ -229,8 +231,7 @@ pub(crate) enum MockTransaction<K, V, E> {
         incarnation_counter: Arc<AtomicUsize>,
         /// A vector of mock behaviors prescribed for each incarnation of the transaction, chosen
         /// round robin depending on the incarnation counter value).
-        incarnation_behaviors: Vec<MockIncarnation<K, V>>,
-        events: Vec<E>,
+        incarnation_behaviors: Vec<MockIncarnation<K, V, E>>,
     },
     /// Skip the execution of trailing transactions.
     SkipRest,
@@ -238,15 +239,15 @@ pub(crate) enum MockTransaction<K, V, E> {
     Abort,
 }
 
-impl<K, V> MockTransaction<K, V> {
-    pub(crate) fn from_behavior(behavior: MockIncarnation<K, V>) -> Self {
+impl<K, V, E> MockTransaction<K, V, E> {
+    pub(crate) fn from_behavior(behavior: MockIncarnation<K, V, E>) -> Self {
         Self::Write {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: vec![behavior],
         }
     }
 
-    pub(crate) fn from_behaviors(behaviors: Vec<MockIncarnation<K, V>>) -> Self {
+    pub(crate) fn from_behaviors(behaviors: Vec<MockIncarnation<K, V, E>>) -> Self {
         Self::Write {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: behaviors,
@@ -349,14 +350,14 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             .collect()
     }
 
-    fn new_mock_write_txn<K: Clone + Hash + Debug + Eq + Ord>(
+    fn new_mock_write_txn<K: Clone + Hash + Debug + Eq + Ord, E: Debug + Clone + ReadWriteEvent>(
         self,
         universe: &[K],
         module_read_fn: &dyn Fn(usize) -> bool,
         module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
-    ) -> MockTransaction<KeyType<K>, ValueType<V>> {
+    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
         let reads = Self::reads_from_gen(universe, self.reads, &module_read_fn);
         let gas = Self::gas_from_gen(self.gas);
 
@@ -373,6 +374,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         .map(|(((writes, deltas), reads), gas)| MockIncarnation {
             reads,
             writes,
+            events,
             deltas,
             gas,
         })
@@ -413,7 +415,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         universe: &[K],
         delta_threshold: usize,
         allow_deletes: bool,
-    ) -> MockTransaction<KeyType<K>, ValueType<V>> {
+    ) -> MockTransaction<KeyType<K>, ValueType<V>, E> {
         let is_module_read = |_| -> bool { false };
         let is_module_write = |_| -> bool { false };
         let is_delta = |i, v: &V| -> Option<DeltaOp> {
@@ -471,17 +473,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             false, // Module deletion isn't allowed
         )
     }
-}
-
-impl<K, V, E> TransactionType for Transaction<K, V, E>
-where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
-{
-    type Event = E;
-    type Key = K;
-    type Value = V;
 }
 
 ///////////////////////////////////////////////////////////////////////////
