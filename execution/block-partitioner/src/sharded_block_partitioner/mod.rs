@@ -160,12 +160,13 @@ impl ShardedBlockPartitioner {
                 messages_txs.iter().map(|txs| txs[i].clone()).collect(),
             ));
         }
+        let helper_concurrency = std::env::var("SHARDED_PARTITIONER__HELPER_CONCURRENCY").ok().map(|v|v.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
         Self {
             num_shards,
             control_txs,
             result_rxs,
             shard_threads: shard_join_handles,
-            helper: SimplePartitioner::new(16),
+            helper: SimplePartitioner::new(helper_concurrency),
         }
     }
 
@@ -406,11 +407,11 @@ impl ShardedBlockPartitioner {
             }
         }
         let duration = timer.stop_and_record();
-        // println!("add_edges/main={duration:?}");
+        println!("add_edges/main={duration:?}");
         let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["drop"]).start_timer();
         drop(global_owners_by_loc_id);
         let duration = timer.stop_and_record();
-        // println!("add_edges/drop_owner_table={duration:?}");
+        println!("add_edges/drop_owner_table={duration:?}");
         ret
     }
 }
@@ -435,15 +436,15 @@ impl BlockPartitioner for ShardedBlockPartitioner {
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["init_with_simple"]).start_timer();
                 let (txns_by_shard_id, num_keys) = self.helper.partition(transactions, self.num_shards);
                 let duration = timer.stop_and_record();
-                // println!("simple_par={duration:?}");
+                println!("simple_par={duration:?}");
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["flatten_to_rounds"]).start_timer();
                 let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard_id);
                 let duration = timer.stop_and_record();
-                // println!("flatten_to_rounds={duration:?}");
+                println!("flatten_to_rounds={duration:?}");
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
                 let ret = self.add_edges(matrix, Some(num_keys));
                 let duration = timer.stop_and_record();
-                // println!("add_edges={duration:?}");
+                println!("add_edges={duration:?}");
                 ret
             }
             _ => {

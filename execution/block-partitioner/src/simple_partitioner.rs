@@ -69,7 +69,7 @@ impl SimplePartitioner {
         let num_senders = num_senders.load(Ordering::SeqCst);
         let num_keys = num_keys.load(Ordering::SeqCst);
         let duration = timer.stop_and_record();
-        // println!("simple_par/preprocess={duration:?}");
+        println!("simple_par/preprocess={duration:?}");
 
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["union_find"]).start_timer();
         // The union-find approach.
@@ -89,7 +89,7 @@ impl SimplePartitioner {
             sender_groups_by_set_id.entry(set_id).or_insert_with(Vec::new).push(sender_id);
         }
         let duration = timer.stop_and_record();
-        // println!("simple_par/union_find={duration:?}");
+        println!("simple_par/union_find={duration:?}");
 
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["cap_group_size"]).start_timer();
         // If a sender group is too large,
@@ -132,13 +132,13 @@ impl SimplePartitioner {
             }
         }
         let duration = timer.stop_and_record();
-        // println!("simple_par/cap_group_size={}", duration);
+        println!("simple_par/cap_group_size={}", duration);
 
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["schedule"]).start_timer();
         let loads_by_sub_group: Vec<u64> = capped_sender_groups.iter().map(|g| g.total_load).collect();
         let (_, shard_ids_by_group_id) = scheduling::assign_tasks_to_workers(&loads_by_sub_group, num_executor_shards);
         timer.stop_and_record();
-        // println!("simple_par/schedule={}", duration);
+        println!("simple_par/schedule={}", duration);
 
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["build_return_object"]).start_timer();
         let mut txns_by_shard_id: Vec<Vec<AnalyzedTransaction>> = vec![vec![]; num_executor_shards];
@@ -149,7 +149,7 @@ impl SimplePartitioner {
             txns_by_shard_id.get_mut(shard_id).unwrap().push(txn);
         }
         let duration = timer.stop_and_record();
-        // println!("simple_par/build_return_object={duration:?}");
+        println!("simple_par/build_return_object={duration:?}");
 
         let timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["drop"]).start_timer();
         self.thread_pool.spawn(move ||{
@@ -161,7 +161,7 @@ impl SimplePartitioner {
             drop(shard_ids_by_group_id);
         });
         let duration = timer.stop_and_record();
-        // println!("simple_par/drop={duration:?}");
+        println!("simple_par/drop={duration:?}");
         (txns_by_shard_id, num_keys)
     }
 }
