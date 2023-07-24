@@ -5,7 +5,7 @@
 use crate::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag},
 };
 use anyhow::{bail, Result};
 use std::collections::btree_map::{self, BTreeMap};
@@ -320,5 +320,3 @@ impl<Module, Resource> Changes<Module, Resource> {
 // types.
 pub type AccountChangeSet = AccountChanges<Vec<u8>, Vec<u8>>;
 pub type ChangeSet = Changes<Vec<u8>, Vec<u8>>;
-
-pub type Event = (Vec<u8>, u64, TypeTag, Vec<u8>);

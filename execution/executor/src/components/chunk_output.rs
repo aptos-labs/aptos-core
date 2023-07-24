@@ -17,6 +17,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
+    contract_event::ContractEvent,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{
@@ -390,9 +391,19 @@ pub fn update_counters_for_processed_chunk(
         }
 
         for event in output.events() {
-            let is_core = event.key().get_creator_address() == CORE_CODE_ADDRESS;
+            let is_core = match event {
+                ContractEvent::V0(v0) => v0.key().get_creator_address() == CORE_CODE_ADDRESS,
+                ContractEvent::V1(_v1) => {
+                    // TODO(eventv2): support v1 events
+                    false
+                },
+            };
             let creation_number = if is_core && detailed_counters {
-                event.key().get_creation_number().to_string()
+                if let ContractEvent::V0(v0) = event {
+                    v0.key().get_creation_number().to_string()
+                } else {
+                    "event".to_string()
+                }
             } else {
                 "event".to_string()
             };

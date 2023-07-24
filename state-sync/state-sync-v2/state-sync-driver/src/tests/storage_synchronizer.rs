@@ -81,7 +81,7 @@ async fn test_apply_transaction_outputs() {
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
         .lock()
-        .subscribe_to_events(vec![*event_to_commit.key()])
+        .subscribe_to_events(vec![*event_to_commit.v0().unwrap().key()])
         .unwrap();
 
     // Attempt to apply a chunk of outputs
@@ -214,7 +214,7 @@ async fn test_execute_transactions() {
     // Subscribe to the expected event
     let mut event_listener = event_subscription_service
         .lock()
-        .subscribe_to_events(vec![*event_to_commit.key()])
+        .subscribe_to_events(vec![*event_to_commit.v0().unwrap().key()])
         .unwrap();
 
     // Attempt to execute a chunk of transactions

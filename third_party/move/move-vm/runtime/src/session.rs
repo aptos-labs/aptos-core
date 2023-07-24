@@ -13,7 +13,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Changes, Event},
+    effects::{ChangeSet, Changes},
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
@@ -256,7 +256,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// This function should always succeed with no user errors returned, barring invariant violations.
     ///
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
-    pub fn finish(self) -> VMResult<(ChangeSet, Vec<Event>)> {
+    pub fn finish(self) -> VMResult<ChangeSet> {
         self.data_cache
             .into_effects(self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
@@ -265,44 +265,38 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn finish_with_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
-    ) -> VMResult<(Changes<Vec<u8>, Resource>, Vec<Event>)> {
+    ) -> VMResult<Changes<Vec<u8>, Resource>> {
         self.data_cache
             .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Same like `finish`, but also extracts the native context extensions from the session.
-    pub fn finish_with_extensions(
-        self,
-    ) -> VMResult<(ChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
+    pub fn finish_with_extensions(self) -> VMResult<(ChangeSet, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
             native_extensions,
             ..
         } = self;
-        let (change_set, events) = data_cache
+        let change_set = data_cache
             .into_effects(self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))?;
-        Ok((change_set, events, native_extensions))
+        Ok((change_set, native_extensions))
     }
 
     pub fn finish_with_extensions_with_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
-    ) -> VMResult<(
-        Changes<Vec<u8>, Resource>,
-        Vec<Event>,
-        NativeContextExtensions<'r>,
-    )> {
+    ) -> VMResult<(Changes<Vec<u8>, Resource>, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
             native_extensions,
             ..
         } = self;
-        let (change_set, events) = data_cache
+        let change_set = data_cache
             .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))?;
-        Ok((change_set, events, native_extensions))
+        Ok((change_set, native_extensions))
     }
 
     /// Try to load a resource from remote storage and create a corresponding GlobalValue
