@@ -3,9 +3,8 @@
 use anyhow::Context;
 use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
 use clap::Parser;
-use google_cloud_auth::project::{create_token_source, Config};
 use google_cloud_googleapis::pubsub::v1::publisher_client::PublisherClient;
-use nft_metadata_crawler_utils::pubsub::publish_uris;
+use nft_metadata_crawler_utils::{get_token_source, pubsub::publish_uris};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -58,21 +57,13 @@ impl RunnableConfig for URIRetrieverConfig {
             self.google_application_credentials.clone(),
         );
 
-        let ts = create_token_source(Config {
-            audience: None,
-            scopes: Some(&["https://www.googleapis.com/auth/cloud-platform"]),
-            sub: None,
-        })
-        .await
-        .expect("No token source");
+        let ts = get_token_source().await;
 
         // Establish gRPC client
         let channel = Channel::from_static("https://pubsub.googleapis.com")
-            .tls_config(ClientTlsConfig::new().domain_name("pubsub.googleapis.com"))
-            .expect("Unable to create channel")
+            .tls_config(ClientTlsConfig::new().domain_name("pubsub.googleapis.com"))?
             .connect()
-            .await
-            .expect("Unable to connect to pubsub");
+            .await?;
 
         let mut grpc_client = PublisherClient::new(channel);
 
@@ -88,7 +79,7 @@ impl RunnableConfig for URIRetrieverConfig {
             force,
             &mut grpc_client,
             self.topic_name.clone(),
-            ts.token().await.expect("No token").access_token,
+            ts.token().await?.access_token,
         )
         .await
         {
