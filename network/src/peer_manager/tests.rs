@@ -46,7 +46,7 @@ use tokio_util::compat::{
 // it easy to build connections without going through the whole transport pipeline.
 pub fn build_test_transport(
 ) -> BoxedTransport<Connection<MemorySocket>, impl ::std::error::Error + Sync + Send + 'static> {
-    let memory_transport = MemoryTransport::default();
+    let memory_transport = MemoryTransport;
 
     memory_transport
         .and_then(move |socket, addr, origin| async move {
