@@ -5,7 +5,8 @@ use crate::{
     delta_change_set::{addition, subtraction},
     resolver::{AggregatorReadMode, AggregatorResolver},
 };
-use aptos_types::{aggregator::AggregatorID, vm_status::StatusCode};
+pub use aptos_types::aggregator::AggregatorID;
+use aptos_types::vm_status::StatusCode;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -218,8 +219,16 @@ impl Aggregator {
         // In theory, any delta will be applied to existing value. However,
         // something may go wrong, so we guard by throwing an error in
         // extension.
-        let value_from_storage = resolver
-            .get_aggregator_v1_value(id.as_state_key(), AggregatorReadMode::Precise)
+        let maybe_value_from_storage = match id {
+            AggregatorID::Legacy(state_key) => {
+                resolver.get_aggregator_v1_value(state_key, AggregatorReadMode::Precise)
+            },
+            // TODO: use integers directly, or some wrapped type.
+            id => resolver
+                .get_aggregator_v2_value(id, AggregatorReadMode::Precise)
+                .map(Some),
+        };
+        let value_from_storage = maybe_value_from_storage
             .map_err(|e| {
                 extension_error(format!("Could not find the value of the aggregator: {}", e))
             })?
