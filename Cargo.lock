@@ -287,7 +287,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
- "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-table-natives",
  "aptos-types",
@@ -3659,7 +3658,6 @@ dependencies = [
  "move-core-types",
  "move-unit-test",
  "move-vm-runtime",
- "move-vm-test-utils",
  "move-vm-types",
  "num_cpus",
  "once_cell",
