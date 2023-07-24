@@ -12,7 +12,7 @@ use crate::{
     data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
     move_vm_ext::{MoveResolverExt, RespawnedSession, SessionExt, SessionId},
-    sharded_block_executor::ShardedBlockExecutor,
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,
@@ -1527,8 +1527,8 @@ impl VMExecutor for AptosVM {
         ret
     }
 
-    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
-        sharded_block_executor: &ShardedBlockExecutor<S>,
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(
+        sharded_block_executor: &ShardedBlockExecutor<S, C>,
         transactions: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,

@@ -24,7 +24,8 @@ use aptos_types::{
 };
 use aptos_vm::{
     sharded_block_executor::{
-        sharded_executor_client::ShardedExecutorClient, ShardedBlockExecutor,
+        local_executor_shard::{LocalExecutorClient, LocalExecutorService},
+        ShardedBlockExecutor,
     },
     AptosVM, VMExecutor,
 };
@@ -33,12 +34,12 @@ use move_core_types::vm_status::StatusCode;
 use once_cell::sync::Lazy;
 use std::{ops::Deref, sync::Arc, time::Duration};
 
-pub static SHARDED_BLOCK_EXECUTOR: Lazy<Arc<Mutex<ShardedBlockExecutor<CachedStateView>>>> =
-    Lazy::new(|| {
-        let executor_clients =
-            ShardedExecutorClient::create_sharded_executor_clients(AptosVM::get_num_shards(), None);
-        Arc::new(Mutex::new(ShardedBlockExecutor::new(executor_clients)))
-    });
+pub static SHARDED_BLOCK_EXECUTOR: Lazy<
+    Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
+> = Lazy::new(|| {
+    let client = LocalExecutorService::setup_local_executor_shards(AptosVM::get_num_shards(), None);
+    Arc::new(Mutex::new(ShardedBlockExecutor::new(client)))
+});
 
 pub struct ChunkOutput {
     /// Input transactions.

@@ -1,9 +1,9 @@
 [package]
-name = 'ambassador_token'
+name = 'ambassador'
 version = '1.0.0'
 
 [addresses]
-token_objects = "0xCAFE"
+ambassador = "_"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }

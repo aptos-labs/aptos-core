@@ -1,4 +1,4 @@
-module token_objects::hero {
+module hero::hero {
     use std::error;
     use std::option::{Self, Option};
     use std::signer;

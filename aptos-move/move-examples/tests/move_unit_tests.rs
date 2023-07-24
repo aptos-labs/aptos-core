@@ -194,13 +194,28 @@ fn test_shared_account() {
 
 #[test]
 fn test_token_objects() {
-    let named_address = BTreeMap::from([(
-        String::from("token_objects"),
-        AccountAddress::from_hex_literal("0xcafe").unwrap(),
-    )]);
-    run_tests_for_pkg("token_objects/hero", named_address.clone());
-    run_tests_for_pkg("token_objects/token_lockup", named_address.clone());
-    run_tests_for_pkg("token_objects/ambassador/move", named_address);
+    let named_addresses = BTreeMap::from([
+        (
+            String::from("ambassador"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("hero"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("knight"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+        (
+            String::from("token_lockup"),
+            AccountAddress::from_hex_literal("0xcafe").unwrap(),
+        ),
+    ]);
+    run_tests_for_pkg("token_objects/ambassador", named_addresses.clone());
+    run_tests_for_pkg("token_objects/hero", named_addresses.clone());
+    run_tests_for_pkg("token_objects/knight", named_addresses.clone());
+    run_tests_for_pkg("token_objects/token_lockup", named_addresses);
 }
 
 #[test]
