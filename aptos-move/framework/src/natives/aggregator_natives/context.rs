@@ -148,6 +148,14 @@ mod test {
     use aptos_aggregator::{aggregator_id_for_test, AggregatorStore};
     use claims::{assert_matches, assert_ok};
 
+    fn get_test_resolver() -> AggregatorStore {
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_id(aggregator_id_for_test(500), 150);
+        state_view.set_from_id(aggregator_id_for_test(600), 100);
+        state_view.set_from_id(aggregator_id_for_test(700), 200);
+        state_view
+    }
+
     // All aggregators are initialized deterministically based on their ID,
     // with the following spec.
     //
@@ -197,7 +205,8 @@ mod test {
 
     #[test]
     fn test_into_change_set() {
-        let resolver = AggregatorStore::default();
+        let resolver = get_test_resolver();
+
         let context = NativeAggregatorContext::new([0; 32], &resolver);
 
         test_set_up(&context);
