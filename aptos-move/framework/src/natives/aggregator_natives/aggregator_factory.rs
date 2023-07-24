@@ -58,7 +58,7 @@ fn native_new_aggregator(
             .map_err(|_| extension_error("unable to create aggregator key"))?,
     );
 
-    let id = AggregatorID::new(handle, key);
+    let id = AggregatorID::legacy(handle, key);
     aggregator_data.create_new_aggregator(id, limit);
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
