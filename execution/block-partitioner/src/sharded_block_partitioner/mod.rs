@@ -35,7 +35,7 @@ use crate::sharded_block_partitioner::counters::{ADD_EDGES_MISC_SECONDS, FLATTEN
 use crate::simple_partitioner::SimplePartitioner;
 
 mod conflict_detector;
-mod counters;
+pub mod counters;
 mod cross_shard_messages;
 mod dependency_analysis;
 mod dependent_edges;
@@ -165,7 +165,7 @@ impl ShardedBlockPartitioner {
             control_txs,
             result_rxs,
             shard_threads: shard_join_handles,
-            helper: SimplePartitioner::new(8),
+            helper: SimplePartitioner::new(16),
         }
     }
 
@@ -366,10 +366,12 @@ impl ShardedBlockPartitioner {
                     for loc in txn.read_hints().iter() {
                         match &global_owners_by_loc_id[*loc.maybe_id_in_partition_session.as_ref().unwrap()] {
                             Some(owner) => {
+                                let loc_clone_1 = loc.clone();
+                                let loc_clone_2 = loc.clone();
                                 ret.get_mut(owner.shard_id).unwrap()
                                     .get_sub_block_mut(owner.round_id).unwrap()
-                                    .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc.clone()]);
-                                cur_txn_csd.add_required_edge(*owner, loc.clone());
+                                    .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc_clone_1]);
+                                cur_txn_csd.add_required_edge(*owner, loc_clone_2);
                             },
                             None => {},
                         }
@@ -380,10 +382,12 @@ impl ShardedBlockPartitioner {
                         local_owners_by_loc_id.insert(loc_id, cur_sharded_txn_idx);
                         match &global_owners_by_loc_id[loc_id] {
                             Some(owner) => {
+                                let loc_clone_1 = loc.clone();
+                                let loc_clone_2 = loc.clone();
                                 ret.get_mut(owner.shard_id).unwrap()
                                     .get_sub_block_mut(owner.round_id).unwrap()
-                                    .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc.clone()]);
-                                cur_txn_csd.add_required_edge(*owner, loc.clone());
+                                    .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc_clone_1]);
+                                cur_txn_csd.add_required_edge(*owner, loc_clone_2);
                             },
                             None => {},
                         }
@@ -402,9 +406,11 @@ impl ShardedBlockPartitioner {
             }
         }
         let duration = timer.stop_and_record();
+        // println!("add_edges/main={duration:?}");
         let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["drop"]).start_timer();
         drop(global_owners_by_loc_id);
         let duration = timer.stop_and_record();
+        // println!("add_edges/drop_owner_table={duration:?}");
         ret
     }
 }
@@ -429,15 +435,15 @@ impl BlockPartitioner for ShardedBlockPartitioner {
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["init_with_simple"]).start_timer();
                 let (txns_by_shard_id, num_keys) = self.helper.partition(transactions, self.num_shards);
                 let duration = timer.stop_and_record();
-                println!("init_with_simple={duration:?}");
+                // println!("simple_par={duration:?}");
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["flatten_to_rounds"]).start_timer();
                 let matrix = self.flatten_to_rounds(max_partitioning_rounds, cross_shard_dep_avoid_threshold, txns_by_shard_id);
                 let duration = timer.stop_and_record();
-                println!("flatten_to_rounds={duration:?}");
+                // println!("flatten_to_rounds={duration:?}");
                 let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["add_edges"]).start_timer();
                 let ret = self.add_edges(matrix, Some(num_keys));
                 let duration = timer.stop_and_record();
-                println!("add_edges={duration:?}");
+                // println!("add_edges={duration:?}");
                 ret
             }
             _ => {

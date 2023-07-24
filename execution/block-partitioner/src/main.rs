@@ -5,6 +5,7 @@ use clap::Parser;
 use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Mutex, time::Instant};
+use aptos_block_partitioner::sharded_block_partitioner::counters::SHARDED_PARTITIONER_MISC_SECONDS;
 use aptos_block_partitioner::simple_partitioner::{SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS, SimplePartitioner};
 use aptos_logger::{error, info};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
@@ -55,6 +56,7 @@ fn main() {
         let now = Instant::now();
         let result = BlockPartitioner::partition(&partitioner, transactions, args.num_shards);
         let elapsed = now.elapsed();
+
         println!("Time taken to partition: {:?}", elapsed);
         // report_sub_block_matrix(&result);
     }
@@ -64,4 +66,24 @@ fn main() {
 fn verify_tool() {
     use clap::CommandFactory;
     Args::command().debug_assert()
+}
+
+struct Calculator {
+    val: f64,
+}
+
+impl Calculator {
+    pub fn new_val(&mut self, val: f64) -> f64 {
+        let ret = val - self.val;
+        self.val = val;
+        ret
+    }
+}
+
+impl Default for Calculator {
+    fn default() -> Self {
+        Self {
+            val: 0.0,
+        }
+    }
 }
