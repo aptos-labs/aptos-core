@@ -571,7 +571,7 @@ mod tests {
     fn test_create_testnet() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core-2-other/aptos-core/testsuite",
         );
         PanguSDK::create_testnet(None, None, Some(3), None, None, None, None, None, Some("olsen"));
     }
@@ -671,7 +671,7 @@ mod tests {
     fn test_wipe_node() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core-2-other/testsuite/pangu",
         );
 
         match PanguSDK::wipe_node("pangu-olsen", "nodebp-node-1-validator") {
