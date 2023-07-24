@@ -7,8 +7,8 @@ from dacite import from_dict
 from kubernetes import client
 import base64
 from test_framework.logging import log
-import pangu.pangu_lib.util as util
-from pangu.pangu_lib.util import SystemContext, create_temp_vfn_config
+import pangu_lib.util as util
+from pangu_lib.util import SystemContext, create_temp_vfn_config
 
 
 @dataclass
