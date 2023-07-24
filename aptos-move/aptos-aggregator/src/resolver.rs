@@ -52,7 +52,7 @@ pub mod test_utils {
             .flat_map(|b| b.to_vec())
             .collect();
         let key = AggregatorHandle(AccountAddress::from_bytes(bytes).unwrap());
-        AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
+        AggregatorID::legacy(TableHandle(AccountAddress::ZERO), key)
     }
 
     #[derive(Default)]
@@ -60,8 +60,7 @@ pub mod test_utils {
 
     impl AggregatorStore {
         pub fn set_from_id(&mut self, id: AggregatorID, value: u128) {
-            let AggregatorID { handle, key } = id;
-            let state_key = StateKey::table_item(handle, key.0.to_vec());
+            let state_key = id.as_state_key().expect("Only table-based IDs are tested.");
             self.set_from_state_key(state_key, value);
         }
 
@@ -77,8 +76,9 @@ pub mod test_utils {
             id: &AggregatorID,
             _mode: AggregatorReadMode,
         ) -> Result<u128, anyhow::Error> {
-            let AggregatorID { handle, key } = id;
-            let state_key = StateKey::table_item(*handle, key.0.to_vec());
+            let state_key = id
+                .as_state_key()
+                .expect("Only table-based IDs can be accessed in tests.");
             match self.get_state_value_u128(&state_key)? {
                 Some(value) => Ok(value),
                 None => {
