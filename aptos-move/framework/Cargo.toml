@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-aggregator = { workspace = true }
+aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true } 

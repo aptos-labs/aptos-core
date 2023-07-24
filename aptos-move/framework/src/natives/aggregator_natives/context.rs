@@ -4,8 +4,8 @@
 use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
     delta_change_set::{DeltaOp, DeltaUpdate},
+    resolver::AggregatorResolver,
 };
-use aptos_table_natives::TableResolver;
 use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::Location;
@@ -38,14 +38,14 @@ pub struct AggregatorChangeSet {
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
-    pub(crate) resolver: &'a dyn TableResolver,
+    pub(crate) resolver: &'a dyn AggregatorResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
-    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
+    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn AggregatorResolver) -> Self {
         Self {
             txn_hash,
             resolver,
@@ -145,9 +145,16 @@ impl AggregatorChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::aggregator_extension::aggregator_id_for_test;
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use aptos_aggregator::{aggregator_id_for_test, AggregatorStore};
     use claims::{assert_matches, assert_ok};
+
+    fn get_test_resolver() -> AggregatorStore {
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_id(aggregator_id_for_test(500), 150);
+        state_view.set_from_id(aggregator_id_for_test(600), 100);
+        state_view.set_from_id(aggregator_id_for_test(700), 200);
+        state_view
+    }
 
     // All aggregators are initialized deterministically based on their ID,
     // with the following spec.
@@ -198,7 +205,7 @@ mod test {
 
     #[test]
     fn test_into_change_set() {
-        let resolver = FakeDataStore::default();
+        let resolver = get_test_resolver();
 
         let context = NativeAggregatorContext::new([0; 32], &resolver);
 

@@ -400,7 +400,7 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use crate::AggregatorStore;
     use aptos_state_view::TStateView;
     use aptos_types::state_store::{
         state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -653,7 +653,7 @@ mod test {
 
     #[test]
     fn test_failed_write_op_conversion_because_of_empty_storage() {
-        let state_view = FakeDataStore::default();
+        let state_view = AggregatorStore::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &KEY),
@@ -667,7 +667,7 @@ mod test {
 
     #[test]
     fn test_empty_storage_error_propagated() {
-        let state_view = FakeDataStore::default();
+        let state_view = AggregatorStore::default();
         let deltas = vec![(KEY.clone(), delta_add(10, 100))];
         let delta_change_set = DeltaChangeSet::new(deltas);
         assert_err!(delta_change_set.try_into_write_set(&state_view));
@@ -725,8 +725,8 @@ mod test {
 
     #[test]
     fn test_delta_materialization_failure() {
-        let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(KEY.clone(), serialize(&99));
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_state_key(KEY.clone(), 99);
 
         let deltas = vec![(KEY.clone(), delta_add(10, 100))];
         let delta_change_set = DeltaChangeSet::new(deltas);
@@ -738,8 +738,8 @@ mod test {
 
     #[test]
     fn test_successful_write_op_conversion() {
-        let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(KEY.clone(), serialize(&100));
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should succeed!
         let add_op = delta_add(100, 200);
@@ -754,8 +754,8 @@ mod test {
 
     #[test]
     fn test_unsuccessful_write_op_conversion() {
-        let mut state_view = FakeDataStore::default();
-        state_view.set_legacy(KEY.clone(), serialize(&100));
+        let mut state_view = AggregatorStore::default();
+        state_view.set_from_state_key(KEY.clone(), 100);
 
         // Both addition and subtraction should fail!
         let add_op = delta_add(15, 100);
