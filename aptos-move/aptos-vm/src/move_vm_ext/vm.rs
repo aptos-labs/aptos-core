@@ -84,7 +84,6 @@ impl MoveVmExt {
         &self,
         remote: &'r S,
         session_id: SessionId,
-        aggregator_enabled: bool,
     ) -> SessionExt<'r, '_> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
@@ -96,11 +95,7 @@ impl MoveVmExt {
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(
-            txn_hash,
-            remote,
-            aggregator_enabled,
-        ));
+        extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let sender_opt = session_id.sender();
         let script_hash = match session_id {

@@ -40,12 +40,7 @@ fn native_add(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(
-        id,
-        limit,
-        aggregator_context.resolver,
-        aggregator_context.aggregator_enabled,
-    )?;
+    let aggregator = aggregator_data.get_aggregator(id, limit)?;
 
     aggregator.add(value)?;
 
@@ -73,12 +68,7 @@ fn native_read(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(
-        id,
-        limit,
-        aggregator_context.resolver,
-        aggregator_context.aggregator_enabled,
-    )?;
+    let aggregator = aggregator_data.get_aggregator(id, limit)?;
 
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
 
@@ -108,12 +98,7 @@ fn native_sub(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(
-        id,
-        limit,
-        aggregator_context.resolver,
-        aggregator_context.aggregator_enabled,
-    )?;
+    let aggregator = aggregator_data.get_aggregator(id, limit)?;
 
     aggregator.sub(value)?;
 
