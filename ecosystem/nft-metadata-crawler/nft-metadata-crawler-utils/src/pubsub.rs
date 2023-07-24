@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 
+use anyhow::Context;
 use google_cloud_googleapis::pubsub::v1::{
     publisher_client::PublisherClient, subscriber_client::SubscriberClient, AcknowledgeRequest,
     PublishRequest, PublishResponse, PubsubMessage, PullRequest, PullResponse,
 };
 use tonic::{metadata::MetadataValue, transport::Channel, Request, Response};
 
-#[allow(deprecated)]
+/// Publishes a list of CSV strings `links` to PubSub topic `topic_name`
 pub async fn publish_uris(
     links: Vec<String>,
     force: bool,
@@ -26,17 +27,16 @@ pub async fn publish_uris(
 
     request.metadata_mut().insert(
         "authorization",
-        MetadataValue::from_str(format!("Bearer {}", token).as_str())
-            .expect("Unable to create metadata"),
+        MetadataValue::try_from(format!("Bearer {}", token).as_str())?,
     );
 
     grpc_client
         .publish(request)
         .await
-        .map_err(|e| anyhow::anyhow!(e))
+        .context("Failed to publish URIs")
 }
 
-#[allow(deprecated)]
+/// Consumes a maximum of `count` entries from PubSub subscription `subscription_name`
 pub async fn consume_uris(
     count: i32,
     grpc_client: &mut SubscriberClient<Channel>,
@@ -46,22 +46,21 @@ pub async fn consume_uris(
     let mut request = Request::new(PullRequest {
         subscription: subscription_name,
         max_messages: count,
-        return_immediately: true,
+        ..Default::default()
     });
 
     request.metadata_mut().insert(
         "authorization",
-        MetadataValue::from_str(format!("Bearer {}", token).as_str())
-            .expect("Unable to create metadata"),
+        MetadataValue::try_from(format!("Bearer {}", token).as_str())?,
     );
 
     grpc_client
         .pull(request)
         .await
-        .map_err(|e| anyhow::anyhow!(e))
+        .context("Failed to pull URIs")
 }
 
-#[allow(deprecated)]
+/// Sends ACK messages to PubSub `subscription_name` for all IDs in `ack_ids`
 pub async fn send_acks(
     ack_ids: Vec<String>,
     grpc_client: &mut SubscriberClient<Channel>,
@@ -75,12 +74,11 @@ pub async fn send_acks(
 
     request.metadata_mut().insert(
         "authorization",
-        MetadataValue::from_str(format!("Bearer {}", token).as_str())
-            .expect("Unable to create metadata"),
+        MetadataValue::try_from(format!("Bearer {}", token).as_str())?,
     );
 
     grpc_client
         .acknowledge(request)
         .await
-        .map_err(|e| anyhow::anyhow!(e))
+        .context("Failed to send ACKs")
 }

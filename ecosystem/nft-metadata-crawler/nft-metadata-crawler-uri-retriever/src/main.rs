@@ -22,7 +22,8 @@ pub struct URIRetrieverConfig {
     pub topic_name: String,
 }
 
-// Temporary function to process CSV file
+/// Function to process CSV file
+/// TODO: Remove for production, integrate with DB
 fn process_file() -> anyhow::Result<Vec<String>> {
     let file = File::open("./test.csv").context("Failed to open file")?;
     let reader = BufReader::new(file);
@@ -33,7 +34,8 @@ fn process_file() -> anyhow::Result<Vec<String>> {
         .collect()
 }
 
-// Publishes URIs from CSV to PubSub
+/// Publishes URIs from CSV to PubSub
+/// TODO: Remove for production, integrate with DB
 async fn send_publish_uris(
     start: i32,
     end: i32,
@@ -74,11 +76,10 @@ impl RunnableConfig for URIRetrieverConfig {
 
         let mut grpc_client = PublisherClient::new(channel);
 
-        // Parse start and end transaction_versions
-        // let mut parts = req.uri().path().trim_start_matches('/').split('/');
+        // Temporarily stub the parsing of start and end transaction versions and force flag from request
         let start = 1;
         let end = 2;
-        let force = false; // matches!(parts.next(), Some("force"));
+        let force = false;
 
         // Query URIs from database and publish to PubSub
         match send_publish_uris(
@@ -107,7 +108,6 @@ impl RunnableConfig for URIRetrieverConfig {
     }
 }
 
-// Main URI Retriever server flow
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
