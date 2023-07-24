@@ -212,6 +212,10 @@ pub struct Scheduler {
     /// be successful in order to commit the next transaction.
     commit_state: CachePadded<Mutex<(TxnIndex, Wave)>>,
 
+    /// Tracks the minimum transaction index that hasn't finished execution with incarnation 0.
+    /// Alternatively, length of a prefix of all transactions whose first incarnations finished.
+    min_never_executed_idx: CachePadded<AtomicU32>,
+
     // Note: with each thread reading both counters when deciding the next task, and being able
     // to choose either execution or validation task, separately padding these indices may increase
     // (real) cache invalidation traffic more than combat false sharing. Hence, currently we
@@ -260,6 +264,7 @@ impl Scheduler {
                 })
                 .collect(),
             commit_state: CachePadded::new(Mutex::new((0, 0))),
+            min_never_executed_idx: CachePadded::new(AtomicU32::new(0)),
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
@@ -350,14 +355,18 @@ impl Scheduler {
                 return SchedulerTask::Done;
             }
 
-            let (idx_to_validate, wave) =
+            let (idx_to_validate, _wave) =
                 Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
-            let prefer_validate = idx_to_validate < min(idx_to_execute, self.num_txns)
-                && !self.never_executed(idx_to_validate);
+            // TODO: consider subtracting f(concurrency_level) from right side.
+            let should_validate = idx_to_validate
+                < min(
+                    idx_to_execute,
+                    self.min_never_executed_idx.load(Ordering::Relaxed),
+                );
 
-            if !prefer_validate && idx_to_execute >= self.num_txns {
+            if !should_validate && idx_to_execute >= self.num_txns {
                 return if self.done() {
                     // Check again to avoid commit delay due to a race.
                     SchedulerTask::Done
@@ -372,12 +381,12 @@ impl Scheduler {
                     }
                     SchedulerTask::NoTask
                 };
+            } else {
+                debug_assert!(idx_to_validate < self.num_txns);
             }
 
-            if prefer_validate {
-                if let Some((version_to_validate, wave)) =
-                    self.try_validate_next_version(idx_to_validate, wave)
-                {
+            if should_validate {
+                if let Some((version_to_validate, wave)) = self.try_validate_next_version() {
                     return SchedulerTask::ValidationTask(version_to_validate, wave);
                 }
             } else if let Some((version_to_execute, execution_task_type)) =
@@ -704,55 +713,26 @@ impl Scheduler {
         }
     }
 
-    /// Returns true iff no incarnation (even the 0-th one) has set the executed status, i.e.
-    /// iff the execution status is READY_TO_EXECUTE/EXECUTING/SUSPENDED for incarnation 0.
-    fn never_executed(&self, txn_idx: TxnIndex) -> bool {
-        let status = self.txn_status[txn_idx as usize].0.read();
-        matches!(
-            *status,
-            ExecutionStatus::Ready(0, _)
-                | ExecutionStatus::Executing(0)
-                | ExecutionStatus::Suspended(0, _)
-        )
-    }
-
     /// Grab an index to try and validate next (by fetch-and-incrementing validation_idx).
     /// - If the index is out of bounds, return None (and invoke a check of whethre
     /// all txns can be committed).
     /// - If the transaction is ready for validation (EXECUTED state), return the version
     /// to the caller.
     /// - Otherwise, return None.
-    fn try_validate_next_version(
-        &self,
-        idx_to_validate: TxnIndex,
-        wave: Wave,
-    ) -> Option<(Version, Wave)> {
-        // We do compare-and-swap here instead of fetch-and-increment as for execution index
-        // because we would like to not validate transactions when lower indices are in the
-        // 'never_executed' state (to avoid unnecessarily reducing validation index and creating
-        // redundant validation tasks). This is checked in the caller (in 'next_task' function),
-        // but if we used fetch-and-increment, two threads can arrive in a cloned state and
-        // both increment, effectively skipping over the 'never_executed' transaction index.
-        let validation_idx = (idx_to_validate as u64) | ((wave as u64) << 32);
-        let new_validation_idx = ((idx_to_validate + 1) as u64) | ((wave as u64) << 32);
-        if self
-            .validation_idx
-            .compare_exchange(
-                validation_idx,
-                new_validation_idx,
-                Ordering::Acquire,
-                Ordering::SeqCst,
-            )
-            .is_ok()
-        {
-            // Successfully claimed idx_to_validate to attempt validation.
-            // If incarnation was last executed, and thus ready for validation,
-            // return version and wave for validation task, otherwise None.
+    fn try_validate_next_version(&self) -> Option<(Version, Wave)> {
+        let (idx_to_validate, wave) =
+            Self::unpack_validation_idx(self.validation_idx.fetch_add(1, Ordering::SeqCst));
+
+        let min_never_executed = self.min_never_executed_idx.load(Ordering::Relaxed);
+
+        if idx_to_validate >= min_never_executed {
+            // Once the transaction at min_never_executed finishes its first incarnation,
+            // it will pull back the validation index and start a new wave (no previous write-set),
+            // and thus we do not have to validate at the current wave.
             return self
                 .is_executed(idx_to_validate, false)
                 .map(|incarnation| ((idx_to_validate, incarnation), wave));
         }
-
         None
     }
 
@@ -816,15 +796,51 @@ impl Scheduler {
 
     /// Set status of the transaction to Executed(incarnation).
     fn set_executed_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
-        let mut status = self.txn_status[txn_idx as usize].0.write();
-        // The execution is already halted.
-        if matches!(*status, ExecutionStatus::ExecutionHalted) {
-            return;
+        {
+            let mut status = self.txn_status[txn_idx as usize].0.write();
+            // The execution is already halted.
+            if matches!(*status, ExecutionStatus::ExecutionHalted) {
+                return;
+            }
+
+            // Only makes sense when the current status is 'Executing'.
+            debug_assert!(*status == ExecutionStatus::Executing(incarnation));
+            *status = ExecutionStatus::Executed(incarnation);
         }
 
-        // Only makes sense when the current status is 'Executing'.
-        debug_assert!(*status == ExecutionStatus::Executing(incarnation));
-        *status = ExecutionStatus::Executed(incarnation);
+        if incarnation == 0 {
+            // Read is relaxed because in mark_min_executed method, if the thread observes
+            // not executed incarnation 0 status for the next transaction, the thread that
+            // updates that status is guaranteed to see the up-to-date min_never_executed_idx
+            // due to the Acquire-Release semantics of the status lock.
+            let min_never_executed = self.min_never_executed_idx.load(Ordering::Relaxed);
+            if min_never_executed == txn_idx {
+                self.update_never_executed(min_never_executed + 1);
+            }
+        }
+    }
+
+    /// Traverse the indices up and keep increasing min_never_executed_idx as long as the
+    /// encountered transactions have each finished execution with incarnation 0.
+    fn update_never_executed(&self, mut next_idx: TxnIndex) {
+        // CAS would be another way of implementing the update functionality, but here
+        // we can keep incrementing next_idx and storing at the end.
+        loop {
+            if !matches!(
+                *self.txn_status[next_idx as usize].0.read(),
+                ExecutionStatus::Ready(0, _)
+                    | ExecutionStatus::Executing(0)
+                    | ExecutionStatus::Suspended(0, _)
+            ) {
+                // Transaction with next index was executed with incarnation 0.
+                // Will update to consider next transaction in the next loop iteration.
+                next_idx += 1;
+            } else {
+                break;
+            }
+        }
+        self.min_never_executed_idx
+            .store(next_idx, Ordering::Release);
     }
 
     /// After a successful abort, mark the transaction as ready for re-execution with
