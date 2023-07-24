@@ -1,15 +1,18 @@
 // Copyright © Aptos Foundation
 
-use serde::{Deserialize, Serialize};
-use serde_yaml;
-use std::collections::BTreeMap;
-use std::env;
+// Copyright © Aptos Foundation\
+
 #[allow(unused_imports)]
 use std::fs::File;
 #[allow(unused_imports)]
 use std::io::{Error, ErrorKind, Read, Write};
+use serde::{Deserialize, Serialize};
 use std::process::{Command, Stdio};
+use std::collections::BTreeMap;
 use tempfile::NamedTempFile;
+use serde_yaml;
+use std::env;
+
 
 //
 // Related to get_testnets()
@@ -84,7 +87,7 @@ impl HealthcheckSummary {
 /////////////////////////////////////////
 
 //
-// Related to creating a blueprint
+// Related to serialize/deserialize PanguNodeBlueprint
 #[derive(Serialize, Deserialize, Clone)]
 struct PanguNodeBlueprint {
     validator_config_path: String,
@@ -103,11 +106,16 @@ struct PanguNodeBlueprint {
 struct BlueprintCollection {
     blueprints: BTreeMap<String, PanguNodeBlueprint>,
 }
-
+/////////////////////////////////////////
+///
 struct PanguSDK;
 impl PanguSDK {
+    //
+    // This is a light Rust wrapper around the pangu CLI
+
     #[allow(dead_code)]
     pub fn create_testnet(
+        pangu_node_configs: Option<&BlueprintCollection>,
         pangu_node_configs_path: Option<&str>,
         num_of_validators: Option<i32>,
         layout_path: Option<&str>,
@@ -118,6 +126,16 @@ impl PanguSDK {
         name: Option<&str>,
     ) {
         let pangu_dir = Self::pangu_directory();
+        let temp_file: NamedTempFile;
+        let pangu_node_configs_path_value: String = match (pangu_node_configs, pangu_node_configs_path) {
+            (Some(bp), None) => {
+                temp_file =
+                    Self::create_pangu_node_config(bp).expect("Failed to create temporary file");
+                temp_file.path().to_string_lossy().to_string()
+            },
+            (None, Some(path)) => path.to_string(),
+            _ => String::new(),
+        };
         let mut python_command = Command::new("poetry");
         python_command
             .arg("-C")
@@ -128,10 +146,10 @@ impl PanguSDK {
             .arg("testnet")
             .arg("create");
 
-        if let Some(pangu_node_configs_path_value) = pangu_node_configs_path {
+        if !pangu_node_configs_path_value.is_empty() {
             python_command
                 .arg("--pangu-node-configs-path")
-                .arg(pangu_node_configs_path_value);
+                .arg(&pangu_node_configs_path_value);
         } else if let Some(num_of_validators_value) = num_of_validators {
             python_command
                 .arg("--num-of-validators")
@@ -179,22 +197,20 @@ impl PanguSDK {
 
         if command_output.status.success() {
             println!("Testnet creation initiated successfully.");
-            // You can add additional handling if needed.
         } else {
             eprintln!("Failed to create testnet: \n{} \n{}", stderr, stdout);
-            // You can return an error or handle the failure as needed.
         }
     }
 
     #[allow(dead_code)]
     pub fn update_testnet(
         testnet_name: &str,
-        blueprint: Option<&BlueprintCollection>,
-        file_path: Option<&str>,
+        pangu_node_configs: Option<&BlueprintCollection>,
+        pangu_node_configs_path: Option<&str>,
     ) {
         let pangu_dir = Self::pangu_directory();
         let temp_file;
-        let file_path = match (blueprint, file_path) {
+        let pangu_node_configs_path_value = match (pangu_node_configs, pangu_node_configs_path) {
             (Some(bp), None) => {
                 temp_file =
                     Self::create_pangu_node_config(bp).expect("Failed to create temporary file");
@@ -212,7 +228,7 @@ impl PanguSDK {
             .arg("testnet")
             .arg("update")
             .arg(testnet_name)
-            .arg(file_path)
+            .arg(pangu_node_configs_path_value)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
             .output()
@@ -557,7 +573,7 @@ mod tests {
             "PANGU_DIR",
             "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
         );
-        PanguSDK::create_testnet(None, Some(3), None, None, None, None, None, Some("olsen"));
+        PanguSDK::create_testnet(None, None, Some(3), None, None, None, None, None, Some("olsen"));
     }
 
     #[test]
