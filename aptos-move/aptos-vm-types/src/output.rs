@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::change_set::VMChangeSet;
-use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_state_view::StateView;
 use aptos_types::{
-    contract_event::ContractEvent,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::{WriteOp, WriteSetMut},
 };
 use move_core_types::vm_status::VMStatus;
 
@@ -17,12 +15,16 @@ use move_core_types::vm_status::VMStatus;
 /// it must be converted to TransactionOutput.
 #[derive(Debug, Clone)]
 pub struct VMOutput {
+    // All changes to the state, including data, code, events.
     change_set: VMChangeSet,
+    // Encapsulates all gas charges, e.g. execution, I/), storage, etc.
     fee_statement: FeeStatement,
+    // Status of the executed transaction.
     status: TransactionStatus,
 }
 
 impl VMOutput {
+    /// Creates a new instance of VM-specific output.
     pub fn new(
         change_set: VMChangeSet,
         fee_statement: FeeStatement,
@@ -35,8 +37,8 @@ impl VMOutput {
         }
     }
 
-    /// Returns a new empty transaction output. Useful for handling discards or
-    /// system transactions.
+    /// Returns an empty transaction output. Useful for handling discards or
+    /// system transactions which do not contain any state changes.
     pub fn empty_with_status(status: TransactionStatus) -> Self {
         Self {
             change_set: VMChangeSet::empty(),
@@ -53,24 +55,8 @@ impl VMOutput {
         (self.change_set, self.fee_statement, self.status)
     }
 
-    pub fn resource_write_set(&self) -> &WriteSet {
-        self.change_set.resource_write_set()
-    }
-
-    pub fn module_write_set(&self) -> &WriteSet {
-        self.change_set.module_write_set()
-    }
-
-    pub fn aggregator_write_set(&self) -> &WriteSet {
-        self.change_set.aggregator_write_set()
-    }
-
-    pub fn delta_change_set(&self) -> &DeltaChangeSet {
-        self.change_set.delta_change_set()
-    }
-
-    pub fn events(&self) -> &[ContractEvent] {
-        self.change_set.events()
+    pub fn change_set(&self) -> &VMChangeSet {
+        &self.change_set
     }
 
     pub fn gas_used(&self) -> u64 {
@@ -94,7 +80,7 @@ impl VMOutput {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
-        if self.status().is_discarded() || self.delta_change_set().is_empty() {
+        if self.status().is_discarded() || self.change_set().delta_change_set().is_empty() {
             return Ok(self);
         }
 
@@ -116,25 +102,16 @@ impl VMOutput {
         state_view: &impl StateView,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
         let materialized_output = self.try_materialize(state_view)?;
-        let (change_set, gas_used, status) = materialized_output.unpack();
-        let (resource_write_set, module_write_set, aggregator_write_set, delta_change_set, events) =
-            change_set.unpack();
-
         debug_assert!(
-            delta_change_set.is_empty(),
+            materialized_output
+                .change_set()
+                .delta_change_set()
+                .is_empty(),
             "DeltaChangeSet must be empty after materialization."
         );
 
-        // TODO: With Aggregators V2, the aggregator write set is empty.
-        let write_set = WriteSetMut::new(
-            resource_write_set.into_iter().chain(
-                module_write_set
-                    .into_iter()
-                    .chain(aggregator_write_set.into_iter()),
-            ),
-        )
-        .freeze()
-        .expect("freeze should not fail");
+        let (change_set, gas_used, status) = materialized_output.unpack();
+        let (write_set, events) = change_set.try_into_storage_change_set()?.into_inner();
         Ok(TransactionOutput::new(write_set, events, gas_used, status))
     }
 
@@ -145,41 +122,28 @@ impl VMOutput {
         delta_writes: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         let (change_set, gas_used, status) = self.unpack();
-        let (
-            resource_write_set,
-            module_write_set,
-            aggregator_write_set,
-            mut delta_change_set,
-            events,
-        ) = change_set.unpack();
-        let mut aggregator_write_set_mut = aggregator_write_set.into_mut();
 
         // We should have a materialized delta for every delta in the output.
-        assert_eq!(delta_writes.len(), delta_change_set.len());
+        assert_eq!(delta_writes.len(), change_set.delta_change_set().len());
+        debug_assert!(
+            delta_writes
+                .iter()
+                .all(|(k, _)| change_set.delta_change_set().contains(k)),
+            "Delta writes contain a key which does not exist in DeltaChangeSet."
+        );
 
         // Add the delta writes to the write set of the transaction.
-        delta_writes.into_iter().for_each(|item| {
-            debug_assert!(
-                delta_change_set.remove(&item.0).is_some(),
-                "Delta writes contain a key which does not exist in DeltaChangeSet."
-            );
-            aggregator_write_set_mut.insert(item)
-        });
+        let mut write_set_mut = WriteSetMut::new(delta_writes);
+        let (write_set, events) = change_set
+            .try_into_storage_change_set()
+            .expect("Conversion to storage ChangeSet should succeed")
+            .into_inner();
+        write_set_mut.extend(write_set);
 
-        let aggregator_write_set = aggregator_write_set_mut
+        // Construct the final transaction output.
+        let write_set = write_set_mut
             .freeze()
-            .expect("Freezing of WriteSet should succeed.");
-
-        // TODO: With Aggregators V2, the aggregator write set is empty.
-        let write_set = WriteSetMut::new(
-            resource_write_set.into_iter().chain(
-                module_write_set
-                    .into_iter()
-                    .chain(aggregator_write_set.into_iter()),
-            ),
-        )
-        .freeze()
-        .expect("freeze should not fail");
+            .expect("Freezing the write set should not fail");
         TransactionOutput::new(write_set, events, gas_used, status)
     }
 }

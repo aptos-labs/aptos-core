@@ -133,7 +133,7 @@ mod test {
         state_store::table::TableHandle,
         write_set::{WriteOp, WriteSet, WriteSetMut},
     };
-    use aptos_vm_types::check_change_set::CheckChangeSet;
+    use aptos_vm_types::{change_set::StateChange, check_change_set::CheckChangeSet};
     use move_core_types::account_address::AccountAddress;
 
     /// A mock for testing. Always succeeds on checking a change set.
@@ -166,14 +166,11 @@ mod test {
         let mut delta_change_set = DeltaChangeSet::empty();
         delta_change_set.insert((key1.clone(), delta_op));
 
-        let write_set_ops = [(key2.clone(), WriteOp::Modification(serialize(&400)))];
-        let write_set = WriteSetMut::new(write_set_ops.into_iter())
-            .freeze()
-            .unwrap();
+        let write_set = vec![(key2.clone(), WriteOp::Modification(serialize(&400)))];
         let change_set = VMChangeSet::new(
-            WriteSet::default(),
-            WriteSet::default(),
-            write_set,
+            StateChange::empty(),
+            StateChange::empty(),
+            StateChange::new(write_set),
             delta_change_set,
             vec![],
             &NoOpChangeSetChecker,

@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    change_set::VMChangeSet,
+    change_set::{StateChange, VMChangeSet},
     tests::utils::{
         build_change_set, contains_delta_op, contains_write_op, create, delete, get_delta_op,
         get_write_op, key, modify, NoOpChangeSetChecker,
     },
 };
 use aptos_aggregator::delta_change_set::{delta_add, DeltaChangeSet};
-use aptos_types::write_set::WriteSetMut;
 use claims::{assert_matches, assert_ok};
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
@@ -56,45 +55,45 @@ macro_rules! add {
 /// ```
 fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     // Create write sets and delta change sets.
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
+    let mut write_set_1 = StateChange::empty();
+    let mut write_set_2 = StateChange::empty();
     let mut delta_change_set_1 = DeltaChangeSet::empty();
     let mut delta_change_set_2 = DeltaChangeSet::empty();
 
     // Populate sets according to the spec. Skip keys which lead to
     // errors because we test them separately.
-    write_set_1.insert((key(0), create(0)));
-    write_set_1.insert((key(1), modify(1)));
-    write_set_1.insert((key(2), delete()));
-    write_set_2.insert((key(3), create(103)));
-    write_set_2.insert((key(4), modify(104)));
-    write_set_2.insert((key(5), delete()));
+    write_set_1.insert(key(0), create(0));
+    write_set_1.insert(key(1), modify(1));
+    write_set_1.insert(key(2), delete());
+    write_set_2.insert(key(3), create(103));
+    write_set_2.insert(key(4), modify(104));
+    write_set_2.insert(key(5), delete());
 
-    write_set_1.insert((key(7), create(7)));
-    write_set_2.insert((key(7), modify(107)));
-    write_set_1.insert((key(8), create(8)));
-    write_set_2.insert((key(8), delete()));
+    write_set_1.insert(key(7), create(7));
+    write_set_2.insert(key(7), modify(107));
+    write_set_1.insert(key(8), create(8));
+    write_set_2.insert(key(8), delete());
 
-    write_set_1.insert((key(10), modify(10)));
-    write_set_2.insert((key(10), modify(110)));
-    write_set_1.insert((key(11), modify(111)));
-    write_set_2.insert((key(11), delete()));
-    write_set_1.insert((key(12), delete()));
-    write_set_2.insert((key(12), create(112)));
+    write_set_1.insert(key(10), modify(10));
+    write_set_2.insert(key(10), modify(110));
+    write_set_1.insert(key(11), modify(111));
+    write_set_2.insert(key(11), delete());
+    write_set_1.insert(key(12), delete());
+    write_set_2.insert(key(12), create(112));
 
     delta_change_set_1.insert((key(15), add!(15)));
     delta_change_set_2.insert((key(16), add!(116)));
     delta_change_set_1.insert((key(17), add!(17)));
     delta_change_set_2.insert((key(17), add!(117)));
-    write_set_1.insert((key(18), create(18)));
+    write_set_1.insert(key(18), create(18));
     delta_change_set_2.insert((key(18), add!(118)));
-    write_set_1.insert((key(19), modify(19)));
+    write_set_1.insert(key(19), modify(19));
     delta_change_set_2.insert((key(19), add!(119)));
 
     delta_change_set_1.insert((key(22), add!(22)));
-    write_set_2.insert((key(22), modify(122)));
+    write_set_2.insert(key(22), modify(122));
     delta_change_set_1.insert((key(23), add!(23)));
-    write_set_2.insert((key(23), delete()));
+    write_set_2.insert(key(23), delete());
 
     (
         build_change_set(write_set_1, delta_change_set_1),
@@ -185,12 +184,9 @@ fn test_successful_squash() {
 
 #[test]
 fn test_unsuccessful_squash_1() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
-
     // create 6 + create 106 throws an error
-    write_set_1.insert((key(6), create(6)));
-    write_set_2.insert((key(6), create(106)));
+    let write_set_1 = vec![(key(6), create(6))];
+    let write_set_2 = vec![(key(6), create(106))];
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
@@ -207,12 +203,9 @@ fn test_unsuccessful_squash_1() {
 
 #[test]
 fn test_unsuccessful_squash_modify_create() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
-
     // modify 9 + create 109 throws an error
-    write_set_1.insert((key(9), modify(9)));
-    write_set_2.insert((key(9), create(109)));
+    let write_set_1 = vec![(key(9), modify(9))];
+    let write_set_2 = vec![(key(9), create(109))];
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
@@ -229,12 +222,9 @@ fn test_unsuccessful_squash_modify_create() {
 
 #[test]
 fn test_unsuccessful_squash_delete_modify() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
-
     // delete + modify 113 throws an error
-    write_set_1.insert((key(13), delete()));
-    write_set_2.insert((key(13), modify(113)));
+    let write_set_1 = vec![(key(13), delete())];
+    let write_set_2 = vec![(key(13), modify(113))];
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
@@ -251,12 +241,9 @@ fn test_unsuccessful_squash_delete_modify() {
 
 #[test]
 fn test_unsuccessful_squash_delete_delete() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
-
     // delete + delete throws an error
-    write_set_1.insert((key(14), delete()));
-    write_set_2.insert((key(14), delete()));
+    let write_set_1 = vec![(key(14), delete())];
+    let write_set_2 = vec![(key(14), delete())];
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
@@ -273,15 +260,13 @@ fn test_unsuccessful_squash_delete_delete() {
 
 #[test]
 fn test_unsuccessful_squash_delete_delta() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut delta_change_set_2 = DeltaChangeSet::empty();
-
     // delete + +120 throws an error
-    write_set_1.insert((key(20), delete()));
+    let write_set_1 = vec![(key(20), delete())];
+    let mut delta_change_set_2 = DeltaChangeSet::empty();
     delta_change_set_2.insert((key(20), add!(120)));
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(WriteSetMut::default(), delta_change_set_2);
+    let change_set_2 = build_change_set(vec![], delta_change_set_2);
     let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
@@ -295,14 +280,12 @@ fn test_unsuccessful_squash_delete_delta() {
 
 #[test]
 fn test_unsuccessful_squash_delta_create() {
-    let mut write_set_2 = WriteSetMut::default();
-    let mut delta_change_set_1 = DeltaChangeSet::empty();
-
     // +21 + create 122 throws an error
+    let mut delta_change_set_1 = DeltaChangeSet::empty();
     delta_change_set_1.insert((key(21), add!(21)));
-    write_set_2.insert((key(21), create(121)));
+    let write_set_2 = vec![(key(21), create(121))];
 
-    let change_set_1 = build_change_set(WriteSetMut::default(), delta_change_set_1);
+    let change_set_1 = build_change_set(vec![], delta_change_set_1);
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
     let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(

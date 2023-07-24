@@ -11,7 +11,6 @@ use aptos_types::{
     account_config::{self, aptos_test_root_address},
     on_chain_config::{Features, TimedFeatures},
     transaction::{ChangeSet, Script, Version},
-    write_set::WriteSetMut,
 };
 use aptos_vm::{
     data_cache::StorageAdapter,
@@ -143,15 +142,7 @@ where
 
     // Genesis never produces the delta change set.
     assert!(change_set.delta_change_set().is_empty());
-
-    let (resource_write_set, module_write_set, aggregator_write_set, _delta_change_set, events) =
-        change_set.unpack();
-    let write_set = WriteSetMut::new(
-        resource_write_set
-            .into_iter()
-            .chain(module_write_set.into_iter().chain(aggregator_write_set)),
-    )
-    .freeze()
-    .expect("should succeed");
-    ChangeSet::new(write_set, events)
+    change_set
+        .try_into_storage_change_set()
+        .expect("Conversion from VMChangeSet into ChangeSet should always succeed")
 }

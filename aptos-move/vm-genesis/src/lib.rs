@@ -26,7 +26,6 @@ use aptos_types::{
         TimedFeatures, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
-    write_set::WriteSetMut,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -155,27 +154,19 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let cs2 = session.finish(&mut (), &configs).unwrap();
     let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let (resource_write_set, module_write_set, aggregator_write_set, delta_change_set, events) =
-        change_set.unpack();
-    let write_set = WriteSetMut::new(
-        resource_write_set
-            .into_iter()
-            .chain(module_write_set.into_iter().chain(aggregator_write_set)),
-    )
-    .freeze()
-    .expect("should succeed");
-
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        delta_change_set.is_empty(),
+        change_set.delta_change_set().is_empty(),
         "non-empty delta change set in genesis"
     );
+    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(change_set.events());
 
-    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(&events);
-    let change_set = ChangeSet::new(write_set, events);
+    let change_set = change_set
+        .try_into_storage_change_set()
+        .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis");
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
 
@@ -271,27 +262,19 @@ pub fn encode_genesis_change_set(
     let cs2 = session.finish(&mut (), &configs).unwrap();
     let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let (resource_write_set, module_write_set, aggregator_write_set, delta_change_set, events) =
-        change_set.unpack();
-    let write_set = WriteSetMut::new(
-        resource_write_set
-            .into_iter()
-            .chain(module_write_set.into_iter().chain(aggregator_write_set)),
-    )
-    .freeze()
-    .expect("should succeed");
-
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        delta_change_set.is_empty(),
+        change_set.delta_change_set().is_empty(),
         "non-empty delta change set in genesis"
     );
 
-    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(&events);
-    ChangeSet::new(write_set, events)
+    assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(change_set.events());
+    change_set
+        .try_into_storage_change_set()
+        .expect("Constructing a ChangeSet from VMChangeSet should always succeed at genesis")
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {

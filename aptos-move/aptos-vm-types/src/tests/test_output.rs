@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::utils::{build_vm_output, create, key, modify};
+use crate::{
+    change_set::StateChange,
+    tests::utils::{build_vm_output, create, key, modify},
+};
 use aptos_aggregator::delta_change_set::{delta_add, serialize, DeltaChangeSet};
 use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_types::write_set::WriteSetMut;
@@ -16,11 +19,8 @@ fn test_ok_output_equality_no_deltas() {
     //   create 0
     //   modify 1
     // and has no deltas.
-    let mut write_set = WriteSetMut::default();
-    write_set.insert((key(0), create(0)));
-    write_set.insert((key(1), modify(1)));
-
-    // Construct the VMOutput.
+    // Then construct the VMOutput.
+    let write_set = vec![(key(0), create(0)), (key(1), modify(1))];
     let output = build_vm_output(write_set, DeltaChangeSet::empty());
 
     // Different ways to materialize deltas:
@@ -34,21 +34,37 @@ fn test_ok_output_equality_no_deltas() {
     let txn_output_2 = output.clone().output_with_delta_writes(vec![]);
 
     // Check the output of `try_materialize`.
-    assert!(vm_output.delta_change_set().is_empty());
+    assert!(vm_output.change_set().delta_change_set().is_empty());
     assert_eq!(
-        vm_output.aggregator_write_set(),
-        output.aggregator_write_set()
+        vm_output.change_set().aggregator_write_set(),
+        output.change_set().aggregator_write_set()
     );
     assert_eq!(vm_output.gas_used(), output.gas_used());
     assert_eq!(vm_output.status(), output.status());
 
     // Check the output of `into_transaction_output`.
-    assert_eq!(txn_output_1.write_set(), output.aggregator_write_set());
+    assert_eq!(
+        txn_output_1.write_set().into_iter().count(),
+        output.change_set().write_set_iter().count()
+    );
+    assert!(txn_output_1
+        .write_set()
+        .iter()
+        .zip(output.change_set().write_set_iter())
+        .all(|(a, b)| a.eq(&b)));
     assert_eq!(txn_output_1.gas_used(), output.gas_used());
     assert_eq!(txn_output_1.status(), output.status());
 
     // Check the output of `output_with_delta_writes`.
-    assert_eq!(txn_output_2.write_set(), output.aggregator_write_set());
+    assert_eq!(
+        txn_output_2.write_set().into_iter().count(),
+        output.change_set().write_set_iter().count()
+    );
+    assert!(txn_output_2
+        .write_set()
+        .iter()
+        .zip(output.change_set().write_set_iter())
+        .all(|(a, b)| a.eq(&b)));
     assert_eq!(txn_output_2.gas_used(), output.gas_used());
     assert_eq!(txn_output_2.status(), output.status());
 }
@@ -63,9 +79,8 @@ fn test_ok_output_equality_with_deltas() {
     //   create 0
     // and the following delta set:
     //   add 20
-    let mut write_set = WriteSetMut::default();
+    let write_set = vec![(key(0), create(0))];
     let mut delta_change_set = DeltaChangeSet::empty();
-    write_set.insert((key(0), create(0)));
     delta_change_set.insert((key(1), delta_add(20, 100)));
 
     // Construct the VMOutput.
@@ -83,14 +98,16 @@ fn test_ok_output_equality_with_deltas() {
     // This transaction has the following write set:
     //   create 0
     //   modify 50
-    let expected_write_set = WriteSetMut::new(vec![(key(0), create(0)), (key(1), modify(50))])
-        .freeze()
-        .unwrap();
+    let expected_changes = vec![(key(0), create(0)), (key(1), modify(50))];
+    let expected_write_set = WriteSetMut::new(expected_changes.clone()).freeze().unwrap();
 
     // Check the output of `try_materialize`. Note that all deltas have to
     // be removed.
-    assert!(vm_output.delta_change_set().is_empty());
-    assert_eq!(vm_output.aggregator_write_set(), &expected_write_set);
+    assert!(vm_output.change_set().delta_change_set().is_empty());
+    assert_eq!(
+        vm_output.change_set().aggregator_write_set(),
+        &StateChange::new(expected_changes)
+    );
     assert_eq!(vm_output.gas_used(), output.gas_used());
     assert_eq!(vm_output.status(), output.status());
 
@@ -117,9 +134,8 @@ fn test_err_output_equality_with_deltas() {
     // and the following delta set:
     //   add 20
     // Note that the last delta overflows when added to 90.
-    let mut write_set = WriteSetMut::default();
+    let write_set = vec![(key(0), create(0))];
     let mut delta_change_set = DeltaChangeSet::empty();
-    write_set.insert((key(0), create(0)));
     delta_change_set.insert((key(1), delta_add(20, 100)));
 
     // Construct the VMOutput.

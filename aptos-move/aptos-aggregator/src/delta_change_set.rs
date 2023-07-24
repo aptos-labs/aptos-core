@@ -334,6 +334,11 @@ impl DeltaChangeSet {
     }
 
     #[inline]
+    pub fn contains(&self, key: &StateKey) -> bool {
+        self.delta_change_set.contains_key(key)
+    }
+
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.delta_change_set.is_empty()
     }

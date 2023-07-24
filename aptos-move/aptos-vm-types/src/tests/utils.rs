@@ -1,13 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet, output::VMOutput};
+use crate::{
+    change_set::{StateChange, VMChangeSet},
+    check_change_set::CheckChangeSet,
+    output::VMOutput,
+};
 use aptos_aggregator::delta_change_set::{serialize, DeltaChangeSet, DeltaOp};
 use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionStatus},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
 
@@ -71,13 +75,13 @@ pub(crate) fn contains_delta_op(change_set: &VMChangeSet, id: u128) -> bool {
 
 /// Returns a new change set built from writes and deltas.
 pub(crate) fn build_change_set(
-    write_set: WriteSetMut,
+    write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     delta_change_set: DeltaChangeSet,
 ) -> VMChangeSet {
     VMChangeSet::new(
-        WriteSet::default(),
-        WriteSet::default(),
-        write_set.freeze().unwrap(),
+        StateChange::empty(),
+        StateChange::empty(),
+        StateChange::new(write_set),
         delta_change_set,
         vec![],
         &NoOpChangeSetChecker,
@@ -89,7 +93,7 @@ pub(crate) fn build_change_set(
 /// success execution status and uses 100 gas units (values are not significant
 /// for testing purposes).
 pub(crate) fn build_vm_output(
-    write_set: WriteSetMut,
+    write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     delta_change_set: DeltaChangeSet,
 ) -> VMOutput {
     const GAS_USED: u64 = 100;

@@ -40,7 +40,7 @@ use aptos_types::{
         TransactionStatus, VMValidatorResult,
     },
     vm_status::VMStatus,
-    write_set::{WriteSet, WriteSetMut},
+    write_set::WriteSet,
 };
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
@@ -708,20 +708,11 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (
-                resource_write_set,
-                module_write_set,
-                aggregator_write_set,
-                _delta_change_set,
-                _events,
-            ) = change_set.unpack();
-            WriteSetMut::new(
-                resource_write_set
-                    .into_iter()
-                    .chain(module_write_set.into_iter().chain(aggregator_write_set)),
-            )
-            .freeze()
-            .expect("should succeed")
+            let (write_set, _events) = change_set
+                .try_into_storage_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
+            write_set
         };
         self.data_store.add_write_set(&write_set);
     }
@@ -772,20 +763,11 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (
-                resource_write_set,
-                module_write_set,
-                aggregator_write_set,
-                _delta_change_set,
-                _events,
-            ) = change_set.unpack();
-            WriteSetMut::new(
-                resource_write_set
-                    .into_iter()
-                    .chain(module_write_set.into_iter().chain(aggregator_write_set)),
-            )
-            .freeze()
-            .expect("should succeed")
+            let (write_set, _events) = change_set
+                .try_into_storage_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
+            write_set
         };
         self.data_store.add_write_set(&write_set);
     }
@@ -827,20 +809,10 @@ impl FakeExecutor {
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (
-            resource_write_set,
-            module_write_set,
-            aggregator_write_set,
-            _delta_change_set,
-            _events,
-        ) = change_set.unpack();
-        let write_set = WriteSetMut::new(
-            resource_write_set
-                .into_iter()
-                .chain(module_write_set.into_iter().chain(aggregator_write_set)),
-        )
-        .freeze()
-        .expect("should succeed");
+        let (write_set, _events) = change_set
+            .try_into_storage_change_set()
+            .expect("Failed to convert to ChangeSet")
+            .into_inner();
         Ok(write_set)
     }
 

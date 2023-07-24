@@ -22,9 +22,9 @@ use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
     transaction::SignatureCheckedTransaction,
-    write_set::{WriteOp, WriteSetMut},
+    write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use aptos_vm_types::{change_set::{StateChange, VMChangeSet}, storage::ChangeSetConfigs};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -320,9 +320,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let mut resource_write_set_mut = WriteSetMut::new(Vec::new());
-        let mut module_write_set_mut = WriteSetMut::new(Vec::new());
-        let mut aggregator_write_set_mut = WriteSetMut::new(Vec::new());
+        let mut resource_write_set = StateChange::empty();
+        let mut module_write_set = StateChange::empty();
+        let mut aggregator_write_set = StateChange::empty();
 
         let mut delta_change_set = DeltaChangeSet::empty();
 
@@ -349,14 +349,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     configs.legacy_resource_creation_as_modification(),
                 )?;
 
-                resource_write_set_mut.insert((state_key, op))
+                resource_write_set.insert(state_key, op)
             }
 
             for (name, blob_op) in modules {
                 let state_key =
                     StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
                 let op = woc.convert(&state_key, blob_op, false)?;
-                module_write_set_mut.insert((state_key, op))
+                module_write_set.insert(state_key, op)
             }
         }
 
@@ -366,7 +366,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let state_key =
                     StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
                 let op = woc.convert(&state_key, blob_op, false)?;
-                resource_write_set_mut.insert((state_key, op))
+                resource_write_set.insert(state_key, op)
             }
         }
 
@@ -374,7 +374,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
                 let op = woc.convert(&state_key, value_op, false)?;
-                resource_write_set_mut.insert((state_key, op))
+                resource_write_set.insert(state_key, op)
             }
         }
 
@@ -386,25 +386,15 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             match change {
                 AggregatorChange::Write(value) => {
                     let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                    aggregator_write_set_mut.insert((state_key, write_op));
+                    aggregator_write_set.insert(state_key, write_op);
                 },
                 AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
                 AggregatorChange::Delete => {
                     let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                    aggregator_write_set_mut.insert((state_key, write_op));
+                    aggregator_write_set.insert(state_key, write_op);
                 },
             }
         }
-
-        let resource_write_set = resource_write_set_mut
-            .freeze()
-            .map_err(|_| VMStatus::error(StatusCode::DATA_FORMAT_ERROR, None))?;
-        let module_write_set = module_write_set_mut
-            .freeze()
-            .map_err(|_| VMStatus::error(StatusCode::DATA_FORMAT_ERROR, None))?;
-        let aggregator_write_set = aggregator_write_set_mut
-            .freeze()
-            .map_err(|_| VMStatus::error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
