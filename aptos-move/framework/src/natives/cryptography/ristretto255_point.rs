@@ -4,15 +4,16 @@
 //! A crate which extends Move with a RistrettoPoint struct that points to a Rust-native
 //! curve25519_dalek::ristretto::RistrettoPoint.
 
-use crate::{
-    natives::{
-        cryptography::ristretto255::{
-            pop_64_byte_slice, pop_scalar_from_bytes, scalar_from_struct, GasParameters,
-            COMPRESSED_POINT_NUM_BYTES,
-        },
-        helpers::{log2_floor, SafeNativeContext, SafeNativeError, SafeNativeResult},
+use crate::natives::{
+    cryptography::ristretto255::{
+        pop_64_byte_slice, pop_scalar_from_bytes, scalar_from_struct, COMPRESSED_POINT_NUM_BYTES,
     },
-    safely_assert_eq, safely_pop_arg, safely_pop_type_arg,
+    helpers::log2_floor,
+};
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_assert_eq, safely_pop_arg, safely_pop_type_arg, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
 use better_any::{Tid, TidAble};
 use curve25519_dalek::{
@@ -153,22 +154,19 @@ impl PointStore {
 // Partial implementation of GasParameters for point operations
 //
 
-impl GasParameters {
-    /// If 'bytes' canonically-encode a valid RistrettoPoint, returns the point.  Otherwise, returns None.
-    fn decompress_maybe_non_canonical_point_bytes(
-        &self,
-        context: &mut SafeNativeContext,
-        bytes: Vec<u8>,
-    ) -> SafeNativeResult<Option<RistrettoPoint>> {
-        context.charge(self.point_decompress * NumArgs::one())?;
+/// If 'bytes' canonically-encode a valid RistrettoPoint, returns the point.  Otherwise, returns None.
+fn decompress_maybe_non_canonical_point_bytes(
+    context: &mut SafeNativeContext,
+    bytes: Vec<u8>,
+) -> SafeNativeResult<Option<RistrettoPoint>> {
+    context.charge(RISTRETTO255_POINT_DECOMPRESS * NumArgs::one())?;
 
-        let compressed = match compressed_point_from_bytes(bytes) {
-            Some(point) => point,
-            None => return Ok(None),
-        };
+    let compressed = match compressed_point_from_bytes(bytes) {
+        Some(point) => point,
+        None => return Ok(None),
+    };
 
-        Ok(compressed.decompress())
-    }
+    Ok(compressed.decompress())
 }
 
 //
@@ -176,7 +174,6 @@ impl GasParameters {
 //
 
 pub(crate) fn native_point_identity(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     args: VecDeque<Value>,
@@ -184,7 +181,7 @@ pub(crate) fn native_point_identity(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 0);
 
-    context.charge(gas_params.point_identity * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_IDENTITY * NumArgs::one())?;
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
     let point = RistrettoPoint::identity();
@@ -194,7 +191,6 @@ pub(crate) fn native_point_identity(
 }
 
 pub(crate) fn native_point_is_canonical(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -204,13 +200,12 @@ pub(crate) fn native_point_is_canonical(
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
 
-    let opt_point = gas_params.decompress_maybe_non_canonical_point_bytes(context, bytes)?;
+    let opt_point = decompress_maybe_non_canonical_point_bytes(context, bytes)?;
 
     Ok(smallvec![Value::bool(opt_point.is_some())])
 }
 
 pub(crate) fn native_point_decompress(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -220,7 +215,7 @@ pub(crate) fn native_point_decompress(
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
 
-    let point = match gas_params.decompress_maybe_non_canonical_point_bytes(context, bytes)? {
+    let point = match decompress_maybe_non_canonical_point_bytes(context, bytes)? {
         Some(point) => point,
         None => {
             // NOTE: We return (u64::MAX, false) in this case.
@@ -240,7 +235,6 @@ pub(crate) fn native_point_decompress(
 }
 
 pub(crate) fn native_point_clone(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -248,7 +242,7 @@ pub(crate) fn native_point_clone(
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 1);
 
-    context.charge(gas_params.point_clone * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_CLONE * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -261,7 +255,6 @@ pub(crate) fn native_point_clone(
 }
 
 pub(crate) fn native_point_compress(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -269,7 +262,7 @@ pub(crate) fn native_point_compress(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 1);
 
-    context.charge(gas_params.point_compress * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_COMPRESS * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let point_data = point_context.point_data.borrow();
@@ -281,7 +274,6 @@ pub(crate) fn native_point_compress(
 }
 
 pub(crate) fn native_point_mul(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -289,7 +281,7 @@ pub(crate) fn native_point_mul(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 3);
 
-    context.charge(gas_params.point_mul * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_MUL * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -314,7 +306,6 @@ pub(crate) fn native_point_mul(
 }
 
 pub(crate) fn native_point_equals(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -322,7 +313,7 @@ pub(crate) fn native_point_equals(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 2);
 
-    context.charge(gas_params.point_equals * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_EQUALS * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let point_data = point_context.point_data.borrow_mut();
@@ -338,7 +329,6 @@ pub(crate) fn native_point_equals(
 }
 
 pub(crate) fn native_point_neg(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -346,7 +336,7 @@ pub(crate) fn native_point_neg(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 2);
 
-    context.charge(gas_params.point_neg * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_NEG * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -371,7 +361,6 @@ pub(crate) fn native_point_neg(
 }
 
 pub(crate) fn native_point_add(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -379,7 +368,7 @@ pub(crate) fn native_point_add(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 3);
 
-    context.charge(gas_params.point_add * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_ADD * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -414,7 +403,6 @@ pub(crate) fn native_point_add(
 }
 
 pub(crate) fn native_point_sub(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -422,7 +410,7 @@ pub(crate) fn native_point_sub(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 3);
 
-    context.charge(gas_params.point_sub * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_SUB * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -456,7 +444,6 @@ pub(crate) fn native_point_sub(
 }
 
 pub(crate) fn native_basepoint_mul(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -464,7 +451,7 @@ pub(crate) fn native_basepoint_mul(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 1);
 
-    context.charge(gas_params.basepoint_mul * NumArgs::one())?;
+    context.charge(RISTRETTO255_BASEPOINT_MUL * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -480,7 +467,6 @@ pub(crate) fn native_basepoint_mul(
 
 #[allow(non_snake_case)]
 pub(crate) fn native_basepoint_double_mul(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -488,7 +474,7 @@ pub(crate) fn native_basepoint_double_mul(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 3);
 
-    context.charge(gas_params.basepoint_double_mul * NumArgs::one())?;
+    context.charge(RISTRETTO255_BASEPOINT_DOUBLE_MUL * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -507,7 +493,6 @@ pub(crate) fn native_basepoint_double_mul(
 
 // NOTE: This was supposed to be more clearly named with *_sha2_512_*
 pub(crate) fn native_new_point_from_sha512(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -518,9 +503,9 @@ pub(crate) fn native_new_point_from_sha512(
     let bytes = safely_pop_arg!(args, Vec<u8>);
 
     context.charge(
-        gas_params.point_from_64_uniform_bytes * NumArgs::one()
-            + gas_params.sha512_per_hash * NumArgs::one()
-            + gas_params.sha512_per_byte * NumBytes::new(bytes.len() as u64),
+        RISTRETTO255_POINT_FROM_64_UNIFORM_BYTES * NumArgs::one()
+            + RISTRETTO255_SHA512_PER_HASH * NumArgs::one()
+            + RISTRETTO255_SHA512_PER_BYTE * NumBytes::new(bytes.len() as u64),
     )?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
@@ -532,7 +517,6 @@ pub(crate) fn native_new_point_from_sha512(
 }
 
 pub(crate) fn native_new_point_from_64_uniform_bytes(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -540,7 +524,7 @@ pub(crate) fn native_new_point_from_64_uniform_bytes(
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 1);
 
-    context.charge(gas_params.point_from_64_uniform_bytes * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_FROM_64_UNIFORM_BYTES * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -554,14 +538,13 @@ pub(crate) fn native_new_point_from_64_uniform_bytes(
 }
 
 pub(crate) fn native_double_scalar_mul(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(args.len(), 4);
 
-    context.charge(gas_params.point_double_mul * NumArgs::one())?;
+    context.charge(RISTRETTO255_POINT_DOUBLE_MUL * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -592,7 +575,6 @@ pub(crate) fn native_double_scalar_mul(
 /// Pre-conditions: The # of scalars & points are both > 0. This is ensured by the Move calling
 /// function.
 pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     mut ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -613,9 +595,9 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
     // the caller of this native. Therefore, num + 1 >= 2, which implies log2_floor(num + 1) >= 1.
     // So we never divide by zero.
     context.charge(
-        gas_params.point_parse_arg * NumArgs::new(num as u64)
-            + gas_params.scalar_parse_arg * NumArgs::new(num as u64)
-            + gas_params.point_mul * NumArgs::new((num / log2_floor(num + 1).unwrap()) as u64),
+        RISTRETTO255_POINT_PARSE_ARG * NumArgs::new(num as u64)
+            + RISTRETTO255_SCALAR_PARSE_ARG * NumArgs::new(num as u64)
+            + RISTRETTO255_POINT_MUL * NumArgs::new((num / log2_floor(num + 1).unwrap()) as u64),
     )?;
 
     // parse scalars

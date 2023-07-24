@@ -8,9 +8,13 @@ members = [
     "api/types",
     "aptos-move/aptos-aggregator",
     "aptos-move/aptos-debugger",
-    "aptos-move/aptos-gas",
+    "aptos-move/aptos-gas-algebra",
+    "aptos-move/aptos-gas-meter",
     "aptos-move/aptos-gas-profiling",
+    "aptos-move/aptos-gas-schedule",
+    "aptos-move/aptos-gas-schedule-updator",
     "aptos-move/aptos-memory-usage-tracker",
+    "aptos-move/aptos-native-interface",
     "aptos-move/aptos-release-builder",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
@@ -28,7 +32,7 @@ members = [
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
-    "aptos-move/gas-algebra-ext",
+    "aptos-move/framework/table-natives",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
@@ -296,9 +300,11 @@ aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
 aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 fuzzer = { path = "testsuite/fuzzer" }
-aptos-gas = { path = "aptos-move/aptos-gas" }
-aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
+aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
+aptos-gas-algebra = { path = "aptos-move/aptos-gas-algebra" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
+aptos-gas-schedule = { path = "aptos-move/aptos-gas-schedule" }
+aptos-gas-schedule-updator = { path = "aptos-move/aptos-gas-schedule-updator" }
 aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
@@ -328,6 +334,7 @@ aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
+aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network" }
 aptos-network-builder = { path = "network/builder" }
@@ -634,6 +641,7 @@ move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
 move-stackless-bytecode = { path = "third_party/move/move-prover/bytecode" }
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
+aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
 move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
