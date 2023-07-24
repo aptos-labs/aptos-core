@@ -1196,10 +1196,11 @@ impl Client {
                 .into_iter()
                 .map(|event| {
                     let version = event.transaction_version;
-                    let sequence_number = event.event.sequence_number();
+                    let event = event.event.v0()?;
+                    let sequence_number = event.sequence_number();
 
                     Ok(VersionedNewBlockEvent {
-                        event: bcs::from_bytes(event.event.event_data())?,
+                        event: bcs::from_bytes(event.event_data())?,
                         version,
                         sequence_number,
                     })

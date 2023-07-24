@@ -24,6 +24,7 @@ use thiserror::Error;
 const INIT_MODULE_FUN: &str = "init_module";
 const LEGAC_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
+const EVENT_STRUCT_ATTRIBUTE: &str = "event";
 const RESOURCE_GROUP: &str = "resource_group";
 const RESOURCE_GROUP_MEMBER: &str = "resource_group_member";
 const RESOURCE_GROUP_NAME: &str = "group";
@@ -66,6 +67,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.check_and_record_resource_groups(module);
                 self.check_and_record_resource_group_members(module);
                 self.check_and_record_view_functions(module);
+                self.check_and_record_event_structs(module);
                 self.check_entry_functions(module);
                 self.check_init_module(module);
                 self.build_error_map(module)
@@ -397,6 +399,47 @@ impl<'a> ExtendedChecker<'a> {
             }
         } else {
             None
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------------
+// Event structs
+
+impl<'a> ExtendedChecker<'a> {
+    fn check_and_record_event_structs(&mut self, module: &ModuleEnv) {
+        for ref struct_ in module.get_structs() {
+            if let Some(event_attr) = struct_.get_attributes().iter().find(|attr| {
+                if let Attribute::Apply(_, name, _) = attr {
+                    self.env.symbol_pool().string(*name).as_str() == EVENT_STRUCT_ATTRIBUTE
+                } else {
+                    false
+                }
+            }) {
+                if let Attribute::Apply(_, _, attributes) = event_attr {
+                    if !attributes.is_empty() {
+                        self.env.error(
+                            &struct_.get_loc(),
+                            "event attribute must contain no parameters.",
+                        );
+                        continue;
+                    }
+                }
+                // Remember the runtime info that this is a view function
+                let module_id = self.get_runtime_module_id(module);
+                self.output
+                    .entry(module_id)
+                    .or_default()
+                    .struct_attributes
+                    .entry(
+                        self.env
+                            .symbol_pool()
+                            .string(struct_.get_name())
+                            .to_string(),
+                    )
+                    .or_default()
+                    .push(KnownAttribute::event());
+            }
         }
     }
 }

@@ -11,6 +11,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
+    event::NativeEventContext,
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
@@ -25,9 +26,7 @@ use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{
-        AccountChangeSet, ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp,
-    },
+    effects::{AccountChangeSet, ChangeSet as MoveChangeSet, Op as MoveStorageOp},
     language_storage::{ModuleId, StructTag},
     vm_status::{err_msg, StatusCode, VMStatus},
 };
@@ -162,7 +161,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         configs: &ChangeSetConfigs,
     ) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
-        let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
+        let (change_set, mut extensions) = self.inner.finish_with_extensions()?;
 
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
@@ -175,6 +174,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context.into_change_set();
+
+        let event_context: NativeEventContext = extensions.remove();
+        let events = event_context.into_events();
 
         let change_set = Self::convert_change_set(
             self.remote,
@@ -311,7 +313,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         current_time: Option<&CurrentTimeMicroseconds>,
         change_set: MoveChangeSet,
         resource_group_change_set: MoveChangeSet,
-        events: Vec<MoveEvent>,
+        events: Vec<ContractEvent>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
@@ -394,14 +396,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        let events = events
-            .into_iter()
-            .map(|(guid, seq_num, ty_tag, blob)| {
-                let key = bcs::from_bytes(guid.as_slice())
-                    .map_err(|_| VMStatus::error(StatusCode::EVENT_KEY_MISMATCH, None))?;
-                Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
-            })
-            .collect::<Result<Vec<_>, VMStatus>>()?;
         VMChangeSet::new(
             resource_write_set,
             module_write_set,
