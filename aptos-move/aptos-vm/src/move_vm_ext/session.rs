@@ -7,6 +7,7 @@ use crate::{
     move_vm_ext::{write_op_converter::WriteOpConverter, AptosMoveResolver},
     transaction_metadata::TransactionMetadata,
 };
+use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
@@ -349,19 +350,25 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
 
         for (id, change) in aggregator_change_set.changes {
-            let state_key = id.into_state_key();
-            match change {
-                AggregatorChange::Write(value) => {
-                    let write_op = woc.convert_aggregator_modification(&state_key, value)?;
-                    aggregator_write_set.insert(state_key, write_op);
+            match id {
+                // Process Aggregator V1.
+                AggregatorID::Legacy(state_key) => match change {
+                    AggregatorChange::Write(value) => {
+                        let write_op = woc.convert_aggregator_modification(&state_key, value)?;
+                        aggregator_write_set.insert(state_key, write_op);
+                    },
+                    AggregatorChange::Merge(delta_op) => {
+                        aggregator_delta_set.insert(state_key, delta_op);
+                    },
+                    AggregatorChange::Delete => {
+                        let write_op =
+                            woc.convert_aggregator(&state_key, MoveStorageOp::Delete, false)?;
+                        aggregator_write_set.insert(state_key, write_op);
+                    },
                 },
-                AggregatorChange::Merge(delta_op) => {
-                    aggregator_delta_set.insert(state_key, delta_op);
-                },
-                AggregatorChange::Delete => {
-                    let write_op =
-                        woc.convert_aggregator(&state_key, MoveStorageOp::Delete, false)?;
-                    aggregator_write_set.insert(state_key, write_op);
+                // Process Aggregator V2.
+                AggregatorID::Ephemeral(_) => {
+                    unreachable!("Ephemeral IDs for aggregators are not used.")
                 },
             }
         }
