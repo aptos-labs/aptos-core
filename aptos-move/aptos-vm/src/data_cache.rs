@@ -9,7 +9,7 @@ use crate::{
     storage_adapter::ExecutorViewBase,
 };
 #[allow(unused_imports)]
-use anyhow::Error;
+use anyhow::{bail, Error};
 use aptos_aggregator::{
     aggregator_extension::AggregatorID,
     resolver::{AggregatorReadMode, TAggregatorView},
