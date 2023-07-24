@@ -10,19 +10,32 @@ pub struct AggregatorHandle(pub AccountAddress);
 
 /// Uniquely identifies each aggregator instance in storage.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct AggregatorID(StateKey);
+pub enum AggregatorID {
+    // Aggregator V1 is implemented as a state item, and so can be queried by
+    // the state key.
+    Legacy(StateKey),
+    // Aggregator V2 is embedded into resources, and uses ephemeral identifiers
+    // which are unique per block.
+    Ephemeral(u64),
+}
 
 impl AggregatorID {
-    pub fn new(handle: TableHandle, key: AggregatorHandle) -> Self {
+    pub fn legacy(handle: TableHandle, key: AggregatorHandle) -> Self {
         let state_key = StateKey::table_item(handle, key.0.to_vec());
-        AggregatorID(state_key)
+        AggregatorID::Legacy(state_key)
     }
 
-    pub fn as_state_key(&self) -> &StateKey {
-        &self.0
+    pub fn as_state_key(&self) -> Option<&StateKey> {
+        match self {
+            Self::Legacy(state_key) => Some(state_key),
+            Self::Ephemeral(_) => None,
+        }
     }
 
-    pub fn into_state_key(self) -> StateKey {
-        self.0
+    pub fn into_state_key(self) -> Option<StateKey> {
+        match self {
+            Self::Legacy(state_key) => Some(state_key),
+            Self::Ephemeral(_) => None,
+        }
     }
 }
