@@ -54,7 +54,9 @@ fn single_peer_to_peer_with_event() {
     let rec_ev_path = receiver.received_events_key();
     let sent_ev_path = sender.sent_events_key();
     for event in output.events() {
-        assert!(rec_ev_path == event.key() || sent_ev_path == event.key());
+        assert!(
+            rec_ev_path == event.v0().unwrap().key() || sent_ev_path == event.v0().unwrap().key()
+        );
     }
 }
 

@@ -1,28 +1,65 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::get_metadata;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
 #[cfg(feature = "testing")]
-use move_binary_format::errors::PartialVMError;
-use move_core_types::account_address::AccountAddress;
+use aptos_types::account_address::AccountAddress;
+use aptos_types::contract_event::ContractEvent;
 #[cfg(feature = "testing")]
-use move_core_types::vm_status::StatusCode;
+use aptos_types::event::EventKey;
+use ark_std::iterable::Iterable;
+use better_any::{Tid, TidAble};
+use move_binary_format::errors::PartialVMError;
+#[cfg(feature = "testing")]
+use move_binary_format::errors::PartialVMResult;
+use move_core_types::{
+    language_storage::{StructTag, TypeTag},
+    resolver::MoveResolver,
+    vm_status::StatusCode,
+};
 use move_vm_runtime::native_functions::NativeFunction;
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
-use serde::Serialize;
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
-#[derive(Serialize)]
-pub struct GUID {
-    creation_num: u64,
-    addr: AccountAddress,
+/// Cached emitted module events.
+#[derive(Tid)]
+pub struct NativeEventContext {
+    events: Vec<ContractEvent>,
+}
+
+impl NativeEventContext {
+    pub fn new() -> Self {
+        Self { events: Vec::new() }
+    }
+
+    pub fn into_events(self) -> Vec<ContractEvent> {
+        self.events
+    }
+
+    #[cfg(feature = "testing")]
+    fn emitted_v0_events(
+        &self,
+        event_key: &EventKey,
+        ty_tag: &TypeTag,
+    ) -> PartialVMResult<Vec<&[u8]>> {
+        let mut events = vec![];
+        for event in self.events.iter() {
+            if let ContractEvent::V0(e) = event {
+                if e.key() == event_key && e.type_tag() == ty_tag {
+                    events.push(e.event_data());
+                }
+            }
+        }
+        Ok(events)
+    }
 }
 
 /***************************************************************************************************
@@ -51,10 +88,20 @@ fn native_write_to_event_store(
             + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
     )?;
 
-    if !context.save_event(guid, seq_num, ty, msg)? {
-        return Err(SafeNativeError::Abort { abort_code: 0 });
-    }
+    let ty_tag = context.type_to_type_tag(&ty)?;
+    let ty_layout = context.type_to_type_layout(&ty)?;
+    let blob = msg.simple_serialize(&ty_layout).ok_or_else(|| {
+        SafeNativeError::InvariantViolation(PartialVMError::new(
+            StatusCode::VALUE_DESERIALIZATION_ERROR,
+        ))
+    })?;
+    let key = bcs::from_bytes(guid.as_slice()).map_err(|_| {
+        SafeNativeError::InvariantViolation(PartialVMError::new(StatusCode::EVENT_KEY_MISMATCH))
+    })?;
 
+    let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
+    ctx.events
+        .push(ContractEvent::new_v0(key, seq_num, ty_tag, blob));
     Ok(smallvec![])
 }
 
@@ -79,19 +126,76 @@ fn native_emitted_events_by_handle(
 
     let creation_num = guid
         .next()
-        .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?
+        .ok_or_else(|| {
+            SafeNativeError::InvariantViolation(PartialVMError::new(
+                StatusCode::INTERNAL_TYPE_ERROR,
+            ))
+        })?
         .value_as::<u64>()?;
     let addr = guid
         .next()
-        .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?
+        .ok_or_else(|| {
+            SafeNativeError::InvariantViolation(PartialVMError::new(
+                StatusCode::INTERNAL_TYPE_ERROR,
+            ))
+        })?
         .value_as::<AccountAddress>()?;
-    let guid = GUID { creation_num, addr };
-    let events = context.emitted_events(
-        bcs::to_bytes(&guid)
-            .map_err(|_| PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR))?,
-        ty,
-    )?;
+    let key = EventKey::new(creation_num, addr);
+    let ty_tag = context.type_to_type_tag(&ty)?;
+    let ty_layout = context.type_to_type_layout(&ty)?;
+    let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
+    let events = ctx
+        .emitted_v0_events(&key, &ty_tag)?
+        .into_iter()
+        .map(|blob| {
+            Value::simple_deserialize(blob, &ty_layout).ok_or_else(|| {
+                SafeNativeError::InvariantViolation(PartialVMError::new(
+                    StatusCode::VALUE_DESERIALIZATION_ERROR,
+                ))
+            })
+        })
+        .collect::<SafeNativeResult<Vec<Value>>>()?;
     Ok(smallvec![Value::vector_for_testing_only(events)])
+}
+
+#[inline]
+fn native_write_module_event_to_store(
+    context: &mut SafeNativeContext,
+    mut ty_args: Vec<Type>,
+    mut arguments: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.len() == 1);
+
+    let ty = ty_args.pop().unwrap();
+    let msg = arguments.pop_back().unwrap();
+
+    context.charge(
+        EVENT_WRITE_TO_EVENT_STORE_BASE
+            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
+    )?;
+
+    let type_tag = context.type_to_type_tag(&ty)?;
+
+    // Maybe not necessary but just in case
+    let struct_tag = match type_tag {
+        TypeTag::Struct(ref struct_tag) => Ok(struct_tag),
+        _ => Err(SafeNativeError::Abort {
+            // not an struct type
+            abort_code: 0x10001,
+        }),
+    }?;
+    let layout = context.type_to_type_layout(&ty)?;
+    let blob = msg.simple_serialize(&layout).ok_or_else(|| {
+        SafeNativeError::InvariantViolation(
+            PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                .with_message("Event serialization failure".to_string()),
+        )
+    })?;
+    let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
+    ctx.events.push(ContractEvent::new_v2(type_tag, blob));
+
+    Ok(smallvec![])
 }
 
 /***************************************************************************************************
@@ -112,6 +216,11 @@ pub fn make_all(
     natives.extend([(
         "write_to_event_store",
         native_write_to_event_store as RawSafeNative,
+    )]);
+
+    natives.extend([(
+        "write_to_module_event_store",
+        native_write_module_event_to_store as RawSafeNative,
     )]);
 
     builder.make_named_natives(natives)

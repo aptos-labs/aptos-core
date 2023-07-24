@@ -150,8 +150,7 @@ pub fn publish(
         }
 
         if !has_error {
-            let (changeset, events) = session.finish().map_err(|e| e.into_vm_status())?;
-            assert!(events.is_empty());
+            let changeset = session.finish().map_err(|e| e.into_vm_status())?;
             if verbose {
                 explain_publish_changeset(&changeset);
             }

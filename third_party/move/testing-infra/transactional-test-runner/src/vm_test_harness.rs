@@ -393,8 +393,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let res = f(&mut session, &mut gas_status)?;
 
         // save changeset
-        // TODO support events
-        let (changeset, _events) = session.finish()?;
+        let changeset = session.finish()?;
         self.storage.apply(changeset).unwrap();
         Ok(res)
     }
