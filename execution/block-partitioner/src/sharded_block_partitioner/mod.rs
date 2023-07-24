@@ -160,7 +160,7 @@ impl ShardedBlockPartitioner {
                 messages_txs.iter().map(|txs| txs[i].clone()).collect(),
             ));
         }
-        let helper_concurrency = std::env::var("SHARDED_PARTITIONER__HELPER_CONCURRENCY").ok().map(|v|v.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
+        let helper_concurrency = std::env::var("SHARDED_PARTITIONER__HELPER_CONCURRENCY").ok().map(|v|v.parse::<usize>().ok().unwrap_or(16)).unwrap_or(16);
         Self {
             num_shards,
             control_txs,
@@ -320,14 +320,14 @@ impl ShardedBlockPartitioner {
             txns_by_shard = discarded_txns;
             current_round += 1;
             let num_remaining_txns: usize = txns_by_shard.iter().map(|txns| txns.len()).sum();
-            timer.stop_and_record();
-
+            let duration = timer.stop_and_record();
+            println!("flatten_to_rounds/round_{round_id}={duration}");
             if num_remaining_txns as f32 / total_txns as f32 <= 1 as f32 - cross_shard_dep_avoid_threshold {
                 break;
             }
         }
 
-        let _timer = FLATTEN_TO_ROUNDS_MISC_SECONDS.with_label_values(&[format!("last_round").as_str()]).start_timer();
+        let timer = FLATTEN_TO_ROUNDS_MISC_SECONDS.with_label_values(&[format!("last_round").as_str()]).start_timer();
         match std::env::var("SHARDED_PARTITIONER__MERGE_LAST_ROUND") {
             Ok(v) if v.as_str() == "1" => {
                 info!("Let the the last shard handle the leftover.");
@@ -339,6 +339,8 @@ impl ShardedBlockPartitioner {
         }
 
         txn_matrix.push(txns_by_shard);
+        let duration = timer.stop_and_record();
+        println!("flatten_to_rounds/last_round={duration}");
         txn_matrix
     }
 
