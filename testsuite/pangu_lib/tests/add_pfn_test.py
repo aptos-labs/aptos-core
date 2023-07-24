@@ -10,9 +10,7 @@ from typing import Dict
 class node_tests_add_pfn(unittest.TestCase):
     def test_add_pfn_dry(self) -> None:
         expected_reads: Dict[str, bytes] = {
-            "pfn-config-path": open(
-                "./pangu_lib/fixtures/pfn_1.yaml", "rb"
-            ).read(),
+            "pfn-config-path": open("./pangu_lib/fixtures/pfn_1.yaml", "rb").read(),
         }
         expected_writes: Dict[str, bytes] = {
             "workspace/pfn_dry_run": b"",
@@ -52,9 +50,7 @@ class node_tests_add_pfn(unittest.TestCase):
 
     def test_add_pfn_live(self) -> None:
         expected_reads: Dict[str, bytes] = {
-            "pfn-config-path": open(
-                "./pangu_lib/fixtures/pfn_1.yaml", "rb"
-            ).read(),
+            "pfn-config-path": open("./pangu_lib/fixtures/pfn_1.yaml", "rb").read(),
         }
 
         kubernetes: SpyKubernetes = SpyKubernetes()

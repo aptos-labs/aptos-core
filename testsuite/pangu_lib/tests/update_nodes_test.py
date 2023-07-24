@@ -71,9 +71,7 @@ class testnet_update_nodes_test(unittest.TestCase):
             f"{util.TEMPLATE_DIRECTORY}/vfn.yaml": LocalFilesystem().read(
                 "./pangu_lib/fixtures/vfn_1.yaml"
             ),
-            "/tmp/vfn.yaml": LocalFilesystem().read(
-                "./pangu_lib/fixtures/vfn_1.yaml"
-            ),
+            "/tmp/vfn.yaml": LocalFilesystem().read("./pangu_lib/fixtures/vfn_1.yaml"),
         }
         expected_unlinks = ["/tmp/vfn.yaml"] * 10
         #
