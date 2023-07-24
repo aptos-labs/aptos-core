@@ -10,18 +10,21 @@ events emitted to a handle and emit events to the event store.
 
 
 -  [Struct `EventHandle`](#0x1_event_EventHandle)
+-  [Constants](#@Constants_0)
+-  [Function `emit`](#0x1_event_emit)
+-  [Function `write_to_module_event_store`](#0x1_event_write_to_module_event_store)
 -  [Function `new_event_handle`](#0x1_event_new_event_handle)
 -  [Function `emit_event`](#0x1_event_emit_event)
 -  [Function `guid`](#0x1_event_guid)
 -  [Function `counter`](#0x1_event_counter)
 -  [Function `write_to_event_store`](#0x1_event_write_to_event_store)
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
--  [Specification](#@Specification_0)
-    -  [Function `emit_event`](#@Specification_0_emit_event)
-    -  [Function `guid`](#@Specification_0_guid)
-    -  [Function `counter`](#@Specification_0_counter)
-    -  [Function `write_to_event_store`](#@Specification_0_write_to_event_store)
-    -  [Function `destroy_handle`](#@Specification_0_destroy_handle)
+-  [Specification](#@Specification_1)
+    -  [Function `emit_event`](#@Specification_1_emit_event)
+    -  [Function `guid`](#@Specification_1_guid)
+    -  [Function `counter`](#@Specification_1_counter)
+    -  [Function `write_to_event_store`](#@Specification_1_write_to_event_store)
+    -  [Function `destroy_handle`](#@Specification_1_destroy_handle)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -34,12 +37,10 @@ events emitted to a handle and emit events to the event store.
 
 ## Struct `EventHandle`
 
-A handle for an event such that:
-1. Other modules can emit events to this handle.
-2. Storage can use this handle to prove the total number of events that happened in the past.
 
 
-<pre><code><b>struct</b> <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T: drop, store&gt; <b>has</b> store
+<pre><code>#[deprecated]
+<b>struct</b> <a href="event.md#0x1_event_EventHandle">EventHandle</a>&lt;T: drop, store&gt; <b>has</b> store
 </code></pre>
 
 
@@ -66,14 +67,77 @@ A handle for an event such that:
 
 </details>
 
+<a name="@Constants_0"></a>
+
+## Constants
+
+
+<a name="0x1_event_ENOT_EVENT_STRUCT"></a>
+
+The module event passed into <code>emit</code> function is not a valid #[event]-attributed struct type.
+
+
+<pre><code><b>const</b> <a href="event.md#0x1_event_ENOT_EVENT_STRUCT">ENOT_EVENT_STRUCT</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_event_emit"></a>
+
+## Function `emit`
+
+Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s key and counter.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: drop, store&gt;(msg: &T)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: drop + store&gt;(msg: &T) {
+    <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T&gt;(msg);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_event_write_to_module_event_store"></a>
+
+## Function `write_to_module_event_store`
+
+Log <code>msg</code> with the event stream identified by <code>T</code>
+
+
+<pre><code><b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop, store&gt;(msg: &T)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="event.md#0x1_event_write_to_module_event_store">write_to_module_event_store</a>&lt;T: drop + store&gt;(msg: &T);
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_event_new_event_handle"></a>
 
 ## Function `new_event_handle`
 
-Use EventHandleGenerator to generate a unique event handle for <code>sig</code>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="event.md#0x1_event_new_event_handle">new_event_handle</a>&lt;T: drop, store&gt;(<a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a>): <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;
+<pre><code>#[deprecated]
+<b>public</b>(<b>friend</b>) <b>fun</b> <a href="event.md#0x1_event_new_event_handle">new_event_handle</a>&lt;T: drop, store&gt;(<a href="guid.md#0x1_guid">guid</a>: <a href="guid.md#0x1_guid_GUID">guid::GUID</a>): <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;
 </code></pre>
 
 
@@ -98,10 +162,10 @@ Use EventHandleGenerator to generate a unique event handle for <code>sig</code>
 
 ## Function `emit_event`
 
-Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s key and counter.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit_event">emit_event</a>&lt;T: drop, store&gt;(handle_ref: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;, msg: T)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit_event">emit_event</a>&lt;T: drop, store&gt;(handle_ref: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;, msg: T)
 </code></pre>
 
 
@@ -127,10 +191,10 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 
 ## Function `guid`
 
-Return the GUID associated with this EventHandle
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid">guid</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): &<a href="guid.md#0x1_guid_GUID">guid::GUID</a>
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="guid.md#0x1_guid">guid</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): &<a href="guid.md#0x1_guid_GUID">guid::GUID</a>
 </code></pre>
 
 
@@ -152,10 +216,10 @@ Return the GUID associated with this EventHandle
 
 ## Function `counter`
 
-Return the current counter associated with this EventHandle
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_counter">counter</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="event.md#0x1_event_counter">counter</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): u64
 </code></pre>
 
 
@@ -177,10 +241,10 @@ Return the current counter associated with this EventHandle
 
 ## Function `write_to_event_store`
 
-Log <code>msg</code> as the <code>count</code>th event associated with the event stream identified by <code><a href="guid.md#0x1_guid">guid</a></code>
 
 
-<pre><code><b>fun</b> <a href="event.md#0x1_event_write_to_event_store">write_to_event_store</a>&lt;T: drop, store&gt;(<a href="guid.md#0x1_guid">guid</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, count: u64, msg: T)
+<pre><code>#[deprecated]
+<b>fun</b> <a href="event.md#0x1_event_write_to_event_store">write_to_event_store</a>&lt;T: drop, store&gt;(<a href="guid.md#0x1_guid">guid</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, count: u64, msg: T)
 </code></pre>
 
 
@@ -200,10 +264,10 @@ Log <code>msg</code> as the <code>count</code>th event associated with the event
 
 ## Function `destroy_handle`
 
-Destroy a unique handle.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop, store&gt;(handle: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop, store&gt;(handle: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -221,7 +285,7 @@ Destroy a unique handle.
 
 </details>
 
-<a name="@Specification_0"></a>
+<a name="@Specification_1"></a>
 
 ## Specification
 
@@ -233,12 +297,13 @@ Destroy a unique handle.
 
 
 
-<a name="@Specification_0_emit_event"></a>
+<a name="@Specification_1_emit_event"></a>
 
 ### Function `emit_event`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit_event">emit_event</a>&lt;T: drop, store&gt;(handle_ref: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;, msg: T)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit_event">emit_event</a>&lt;T: drop, store&gt;(handle_ref: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;, msg: T)
 </code></pre>
 
 
@@ -251,12 +316,13 @@ Destroy a unique handle.
 
 
 
-<a name="@Specification_0_guid"></a>
+<a name="@Specification_1_guid"></a>
 
 ### Function `guid`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid">guid</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): &<a href="guid.md#0x1_guid_GUID">guid::GUID</a>
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="guid.md#0x1_guid">guid</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): &<a href="guid.md#0x1_guid_GUID">guid::GUID</a>
 </code></pre>
 
 
@@ -267,12 +333,13 @@ Destroy a unique handle.
 
 
 
-<a name="@Specification_0_counter"></a>
+<a name="@Specification_1_counter"></a>
 
 ### Function `counter`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_counter">counter</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="event.md#0x1_event_counter">counter</a>&lt;T: drop, store&gt;(handle_ref: &<a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;): u64
 </code></pre>
 
 
@@ -283,12 +350,13 @@ Destroy a unique handle.
 
 
 
-<a name="@Specification_0_write_to_event_store"></a>
+<a name="@Specification_1_write_to_event_store"></a>
 
 ### Function `write_to_event_store`
 
 
-<pre><code><b>fun</b> <a href="event.md#0x1_event_write_to_event_store">write_to_event_store</a>&lt;T: drop, store&gt;(<a href="guid.md#0x1_guid">guid</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, count: u64, msg: T)
+<pre><code>#[deprecated]
+<b>fun</b> <a href="event.md#0x1_event_write_to_event_store">write_to_event_store</a>&lt;T: drop, store&gt;(<a href="guid.md#0x1_guid">guid</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, count: u64, msg: T)
 </code></pre>
 
 
@@ -300,12 +368,13 @@ Native function use opaque.
 
 
 
-<a name="@Specification_0_destroy_handle"></a>
+<a name="@Specification_1_destroy_handle"></a>
 
 ### Function `destroy_handle`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop, store&gt;(handle: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="event.md#0x1_event_destroy_handle">destroy_handle</a>&lt;T: drop, store&gt;(handle: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt;)
 </code></pre>
 
 

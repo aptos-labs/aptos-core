@@ -11,7 +11,7 @@ use crate::{
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Event, Op},
+    effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
@@ -141,7 +141,6 @@ pub type Message = (AccountAddress, u64, Vec<Vec<u8>>);
 /// A structure to represent success for the execution of an async session operation.
 pub struct AsyncSuccess<'r> {
     pub change_set: ChangeSet,
-    pub events: Vec<Event>,
     pub messages: Vec<Message>,
     pub gas_used: Gas,
     pub ext: NativeContextExtensions<'r>,
@@ -219,7 +218,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                     mutable_reference_outputs: _,
                     mut return_values,
                 },
-                (mut change_set, events, mut native_extensions),
+                (mut change_set, mut native_extensions),
             )) => {
                 if return_values.len() != 1 {
                     Err(async_extension_error(format!(
@@ -238,7 +237,6 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                     let async_ext = native_extensions.remove::<AsyncExtension>();
                     Ok(AsyncSuccess {
                         change_set,
-                        events,
                         messages: async_ext.sent,
                         gas_used,
                         ext: native_extensions,
@@ -311,7 +309,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                     mut mutable_reference_outputs,
                     return_values: _,
                 },
-                (mut change_set, events, mut native_extensions),
+                (mut change_set, mut native_extensions),
             )) => {
                 if mutable_reference_outputs.len() > 1 {
                     Err(async_extension_error(format!(
@@ -332,7 +330,6 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                     let async_ext = native_extensions.remove::<AsyncExtension>();
                     Ok(AsyncSuccess {
                         change_set,
-                        events,
                         messages: async_ext.sent,
                         gas_used,
                         ext: native_extensions,
@@ -430,13 +427,11 @@ impl<'r> Display for AsyncSuccess<'r> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let AsyncSuccess {
             change_set,
-            events,
             messages,
             gas_used,
             ext: _,
         } = self;
         write!(f, "change_set: {:?}", change_set)?;
-        write!(f, ", events: {:?}", events)?;
         write!(f, ", messages: {:?}", messages)?;
         write!(f, ", gas: {}", gas_used)
     }

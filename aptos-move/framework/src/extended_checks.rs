@@ -30,6 +30,7 @@ use thiserror::Error;
 const INIT_MODULE_FUN: &str = "init_module";
 const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
+const EVENT_STRUCT_ATTRIBUTE: &str = "event";
 const RESOURCE_GROUP: &str = "resource_group";
 const RESOURCE_GROUP_MEMBER: &str = "resource_group_member";
 const RESOURCE_GROUP_NAME: &str = "group";

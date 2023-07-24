@@ -130,10 +130,13 @@ pub fn build_model(
         skip_attribute_checks,
         known_attributes,
     };
-    build_config.move_model_for_package(package_path, ModelConfig {
-        target_filter,
-        all_files_as_targets: false,
-    })
+    build_config.move_model_for_package(
+        package_path,
+        ModelConfig {
+            target_filter,
+            all_files_as_targets: false,
+        },
+    )
 }
 
 impl BuiltPackage {
