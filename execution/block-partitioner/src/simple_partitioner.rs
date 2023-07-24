@@ -48,9 +48,10 @@ impl SimplePartitioner {
         let num_txns = txns.len();
         let mut num_senders = AtomicUsize::new(0);
         let mut num_keys = AtomicUsize::new(0);
-        let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(64);
-        let mut txn_counts_by_sender_id: DashMap<usize, AtomicUsize> = DashMap::with_shard_amount(64);
-        let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(64);
+        let shard_amount = std::env::var("SIMPLE_PARTITIONER__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
+        let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(shard_amount);
+        let mut txn_counts_by_sender_id: DashMap<usize, AtomicUsize> = DashMap::with_shard_amount(shard_amount);
+        let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(shard_amount);
         txns.par_iter_mut().for_each(|mut txn| {
             let sender = txn.sender();
             let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
