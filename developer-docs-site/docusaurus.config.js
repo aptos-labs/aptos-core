@@ -348,6 +348,10 @@ const config = {
             to: "/move/move-on-aptos",
             from: "/guides/move-guides/aptos-move-guides",
           },
+          {
+            to: "/tools/aptos-cli/install-cli",
+            from: "/tools/install-cli",
+          },
         ],
         createRedirects(existingPath) {
           if (existingPath.includes("/move")) {

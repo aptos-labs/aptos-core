@@ -52,6 +52,13 @@ impl StorageLocation {
             _ => panic!("Cannot convert wildcard storage location to state key"),
         }
     }
+
+    pub fn state_key(&self) -> &StateKey {
+        match self {
+            StorageLocation::Specific(state_key) => state_key,
+            _ => panic!("Cannot convert wildcard storage location to state key"),
+        }
+    }
 }
 
 impl AnalyzedTransaction {
