@@ -122,11 +122,9 @@ where
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
-        let mut session = GenesisSession(move_vm.new_session(
-            &state_view_storage,
-            SessionId::genesis(genesis_id),
-            true,
-        ));
+        let mut session = GenesisSession(
+            move_vm.new_session(&state_view_storage, SessionId::genesis(genesis_id)),
+        );
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
