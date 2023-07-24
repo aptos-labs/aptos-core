@@ -1351,39 +1351,17 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        // Try to simulate with aggregator enabled.
         let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
             &simulation_vm.0.as_move_resolver(state_view),
             txn,
             &log_context,
         );
-
-        // Because simulation returns a VMOutput, it has both writes and deltas
-        // produced by the transaction. Conversion to TransactionOutput materializes
-        // deltas and merges them with the write set, and can fail (e.g. applying
-        // a delta led to integer overflow). It is important to catch the failing
-        // case and re-simulate the transaction without an aggregator, in order to
-        // obtain the precise location of abort and gas used.
-        match vm_output.into_transaction_output(state_view) {
-            Ok(output) => (vm_status, output),
-            Err(_) => {
-                // Conversion to TransactionOutput failed, re-simulate without aggregators.
-                let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
-                    &simulation_vm.0.as_move_resolver(state_view),
-                    txn,
-                    &log_context,
-                );
-
-                // Make sure to return the right types. Note that here conversion
-                // never fails because delta change set is empty.
-                (
-                    vm_status,
-                    vm_output.into_transaction_output(state_view).expect(
-                        "Conversion to TransactionOutput without aggregator always succeeds.",
-                    ),
-                )
-            },
-        }
+        (
+            vm_status,
+            vm_output
+                .into_transaction_output(state_view)
+                .expect("Simulation cannot fail"),
+        )
     }
 
     pub fn execute_view_function(
