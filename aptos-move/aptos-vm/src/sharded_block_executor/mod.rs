@@ -28,6 +28,7 @@ pub mod global_executor;
 pub mod local_executor_shard;
 pub mod messages;
 pub mod sharded_aggregator_service;
+pub mod remote_state_value;
 pub mod sharded_executor_service;
 #[cfg(test)]
 mod test_utils;
