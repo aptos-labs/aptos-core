@@ -8,7 +8,7 @@ use crate::{
     move_vm_ext::{get_max_binary_format_version, AptosMoveResolver},
 };
 #[allow(unused_imports)]
-use anyhow::Error;
+use anyhow::{bail, Error};
 use aptos_aggregator::{
     aggregator_extension::AggregatorID,
     resolver::{AggregatorReadMode, AggregatorResolver},
@@ -270,12 +270,20 @@ impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
         id: &AggregatorID,
         _mode: AggregatorReadMode,
     ) -> Result<u128, Error> {
-        let AggregatorID { handle, key } = id;
-        let state_key = StateKey::table_item(*handle, key.0.to_vec());
-        match self.get_state_value_u128(&state_key)? {
-            Some(value) => Ok(value),
-            None => {
-                anyhow::bail!("Could not find the value of the aggregator")
+        match id {
+            AggregatorID::Legacy { handle, key } => {
+                // Table-based aggregator is a separate state item.
+                // TODO - should we use as_state_key() ?
+                let state_key = StateKey::table_item(*handle, key.0.to_vec());
+                match self.get_state_value_u128(&state_key)? {
+                    Some(value) => Ok(value),
+                    None => {
+                        bail!("Could not find the value of the aggregator")
+                    },
+                }
+            },
+            AggregatorID::Ephemeral(_) => {
+                unreachable!("Ephemeral identifiers are not yet implemented.")
             },
         }
     }
