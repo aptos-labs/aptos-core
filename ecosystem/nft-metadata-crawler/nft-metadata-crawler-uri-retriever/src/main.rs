@@ -68,6 +68,7 @@ impl RunnableConfig for URIRetrieverConfig {
         let mut grpc_client = PublisherClient::new(channel);
 
         // Temporarily stub the parsing of start and end transaction versions and force flag from request
+        // TODO: Handle parsing of request/trigger for start and end transaction versions and force flag
         let start = 1;
         let end = 2;
         let force = false;
