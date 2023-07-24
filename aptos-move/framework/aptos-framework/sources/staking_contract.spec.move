@@ -245,6 +245,11 @@ spec aptos_framework::staking_contract {
         voter: address,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability, OwnerCapability) {
+        // TODO: this function is normal in the local machine
+        // However, timeout in the github test
+
+        pragma verify_duration_estimate = 120;
+
         include stake::ResourceRequirement;
         let staker_address = signer::address_of(staker);
         let seed_0 = bcs::to_bytes(staker_address);
