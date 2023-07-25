@@ -289,9 +289,9 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
-        let mut session =
-            self.0
-                .new_session(txn_idx, resolver, SessionId::epilogue_meta(txn_data));
+        let mut session = self
+            .0
+            .new_session(txn_idx, resolver, SessionId::epilogue_meta(txn_data));
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -1064,9 +1064,7 @@ impl AptosVM {
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
             resolver.release_resource_group_cache();
-            session = self
-                .0
-                .new_session(txn_idx, resolver, SessionId::txn(txn));
+            session = self.0.new_session(txn_idx, resolver, SessionId::txn(txn));
         }
 
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
@@ -1339,11 +1337,9 @@ impl AptosVM {
             ..Default::default()
         };
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.0.new_session(
-            txn_idx,
-            resolver,
-            SessionId::block_meta(&block_metadata),
-        );
+        let mut session =
+            self.0
+                .new_session(txn_idx, resolver, SessionId::block_meta(&block_metadata));
 
         let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         session
@@ -1627,8 +1623,7 @@ impl VMAdapter for AptosVM {
         resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
-        self.0
-            .new_session(txn_idx, resolver, session_id)
+        self.0.new_session(txn_idx, resolver, session_id)
     }
 
     fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
@@ -1835,11 +1830,9 @@ impl AptosSimulationVM {
 
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
-        let mut session = self.0.new_session(
-            0,
-            resolver,
-            SessionId::txn_meta(&txn_data),
-        );
+        let mut session = self
+            .0
+            .new_session(0, resolver, SessionId::txn_meta(&txn_data));
         if let Err(err) =
             self.validate_simulated_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {

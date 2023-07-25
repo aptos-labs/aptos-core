@@ -15,8 +15,8 @@ use aptos_framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
 };
-use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_mvhashmap::types::TxnIndex;
+use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
