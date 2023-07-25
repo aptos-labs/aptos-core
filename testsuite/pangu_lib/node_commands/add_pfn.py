@@ -1,10 +1,10 @@
-from pangu.pangu_lib.util import SystemContext
+from pangu_lib.util import SystemContext
 from test_framework.logging import log
 from kubernetes import client
-import pangu.pangu_lib.util as util
+import pangu_lib.util as util
 import os
 from dataclasses import dataclass
-from pangu.pangu_lib.testnet_commands.create_testnet import (
+from pangu_lib.testnet_commands.create_testnet import (
     create_persistent_volume_claim,
 )
 

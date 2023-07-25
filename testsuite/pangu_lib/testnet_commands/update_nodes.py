@@ -1,9 +1,9 @@
 from .create_testnet import PanguNodeLayout, SystemContext, parse_pangu_node_config
-import pangu.pangu_lib.util as util
+import pangu_lib.util as util
 from kubernetes import client
-from pangu.pangu_lib.node_commands.restart_node import restart_node_main
+from pangu_lib.node_commands.restart_node import restart_node_main
 from test_framework.logging import log
-from pangu.pangu_lib.util import create_temp_vfn_config
+from pangu_lib.util import create_temp_vfn_config
 from concurrent import futures
 
 
