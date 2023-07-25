@@ -1,24 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    dag::{
-        dag_network::DAGNetworkSender,
-        dag_store::Dag,
-        reliable_broadcast::{
-            BroadcastStatus, CertifiedNodeHandleError, CertifiedNodeHandler,
-            NodeBroadcastHandleError, NodeBroadcastHandler, ReliableBroadcast,
-        },
-        storage::DAGStorage,
-        tests::{
-            dag_test::MockStorage,
-            helpers::{new_certified_node, new_node},
-        },
-        types::{CertifiedAck, DAGMessage, NodeCertificate, TestAck, TestMessage},
-        NodeId, RpcHandler, Vote,
+use crate::dag::{
+    dag_network::{DAGNetworkSender, RpcWithFallback},
+    dag_store::Dag,
+    reliable_broadcast::{
+        BroadcastStatus, CertifiedNodeHandleError, CertifiedNodeHandler, NodeBroadcastHandleError,
+        NodeBroadcastHandler, ReliableBroadcast,
     },
-    network::TConsensusMsg,
-    network_interface::ConsensusMsg,
+    storage::DAGStorage,
+    tests::{
+        dag_test::MockStorage,
+        helpers::{new_certified_node, new_node},
+    },
+    types::{CertifiedAck, DAGMessage, NodeCertificate, TestAck, TestMessage},
+    NodeId, RpcHandler, Vote,
 };
 use anyhow::bail;
 use aptos_consensus_types::common::Author;
@@ -79,9 +75,9 @@ impl DAGNetworkSender for TestDAGSender {
     async fn send_rpc(
         &self,
         receiver: Author,
-        message: ConsensusMsg,
+        message: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<ConsensusMsg> {
+    ) -> anyhow::Result<DAGMessage> {
         match self.failures.lock().entry(receiver) {
             Entry::Occupied(mut entry) => {
                 let count = entry.get_mut();
@@ -93,19 +89,18 @@ impl DAGNetworkSender for TestDAGSender {
             },
             Entry::Vacant(_) => (),
         };
-        let message: TestMessage = (TConsensusMsg::from_network_message(message)
-            as anyhow::Result<DAGMessage>)?
-            .try_into()?;
+        let message: TestMessage = message.try_into()?;
         self.received.lock().insert(receiver, message.clone());
-        Ok(DAGMessage::from(TestAck(message.0)).into_network_message())
+        Ok(TestAck(message.0).into())
     }
 
     async fn send_rpc_with_fallbacks(
         &self,
         _responders: Vec<Author>,
-        _message: ConsensusMsg,
-        _timeout: Duration,
-    ) -> anyhow::Result<ConsensusMsg> {
+        _message: DAGMessage,
+        _retry_timeout: Duration,
+        _rpc_timeout: Duration,
+    ) -> RpcWithFallback {
         unimplemented!();
     }
 }

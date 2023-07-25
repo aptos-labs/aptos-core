@@ -682,6 +682,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-temppath",
+ "aptos-time-service",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-validator",
