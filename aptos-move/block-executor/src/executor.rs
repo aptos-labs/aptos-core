@@ -190,14 +190,6 @@ where
             return SchedulerTask::NoTask;
         }
 
-        // Currently we always pull back the validation index triggering a new wave if required
-        // after the first incarnation, and scheduler takes it into consideration to not create
-        // redundant validation tasks. This is because the first incarnation of the transaction
-        // does not have a prior write-set anyway, but the following line handles a case of an
-        // empty write-set (e.g. discarded transaction) so that the scheduler can always make the
-        // optimization under the assumption. TODO: have estimates for the first incarnation.
-        updates_outside |= incarnation == 0;
-
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 

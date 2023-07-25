@@ -39,7 +39,6 @@ pub(crate) struct BencherState<
     Vec<u8>: From<V>,
 {
     transactions: Vec<MockTransaction<KeyType<K>, ValueType<V>>>,
-    baseline_output: BaselineOutput<ValueType<V>>,
 }
 
 impl<K, V> Bencher<K, V>
@@ -66,7 +65,7 @@ where
                     self.transaction_gen_param,
                 )
             },
-            |state| state.run(),
+            |state| state.run(false),
             // The input here is the entire list of signed transactions, so it's pretty large.
             BatchSize::LargeInput,
         )
@@ -105,15 +104,10 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
-        let baseline_output = BaselineOutput::generate(&transactions, None);
-
-        Self {
-            transactions,
-            baseline_output,
-        }
+        Self { transactions }
     }
 
-    pub(crate) fn run(self) {
+    pub(crate) fn run(self, construct_baseline: bool) {
         let data_view = EmptyDataView::<KeyType<K>, ValueType<V>> {
             phantom: PhantomData,
         };
@@ -134,6 +128,9 @@ where
         >::new(num_cpus::get(), executor_thread_pool, None, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
-        self.baseline_output.assert_output(&output);
+        if construct_baseline {
+            let baseline_output = BaselineOutput::generate(&self.transactions, None);
+            baseline_output.assert_output(&output);
+        }
     }
 }

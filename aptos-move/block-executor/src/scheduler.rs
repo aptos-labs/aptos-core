@@ -240,6 +240,11 @@ pub struct Scheduler {
     /// monotonically increasing index stored in the first 32 bits.
     validation_idx: AtomicU64,
 
+    /// A mutex that protects updates to validation_idx, while reads are wait- (and thus lock-)free.
+    /// This is as opposed to RWLock because the read path is heavily contended.
+    /// TODO: reconsider padding of this and the above two members and access patterns.
+    validation_idx_write_mutex: Mutex<()>,
+
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: CachePadded<AtomicBool>,
 }
@@ -267,6 +272,7 @@ impl Scheduler {
             min_never_executed_idx: CachePadded::new(AtomicU32::new(0)),
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
+            validation_idx_write_mutex: Mutex::new(()),
             done_marker: CachePadded::new(AtomicBool::new(false)),
         }
     }
@@ -633,30 +639,29 @@ impl Scheduler {
             return None;
         }
 
-        if let Ok(prev_val_idx) =
-            self.validation_idx
-                .fetch_update(Ordering::Acquire, Ordering::SeqCst, |val_idx| {
-                    let (txn_idx, wave) = Self::unpack_validation_idx(val_idx);
-                    if txn_idx > target_idx {
-                        let mut validation_status = self.txn_status[target_idx as usize].1.write();
-                        // Update the minimum wave all the suffix txn needs to pass.
-                        // We set it to max for safety (to avoid overwriting with lower values
-                        // by a slower thread), but currently this isn't strictly required
-                        // as all callers of decrease_validation_idx hold a write lock on the
-                        // previous transaction's validation status.
-                        validation_status.max_triggered_wave =
-                            max(validation_status.max_triggered_wave, wave + 1);
+        let _m = self.validation_idx_write_mutex.lock();
 
-                        // Pack into validation index.
-                        Some((target_idx as u64) | ((wave as u64 + 1) << 32))
-                    } else {
-                        None
-                    }
-                })
-        {
-            let (_, wave) = Self::unpack_validation_idx(prev_val_idx);
-            // Note that 'wave' is the previous wave value, and we must update it to 'wave + 1'.
-            Some(wave + 1)
+        let cur_validation_idx = self.validation_idx.load(Ordering::Relaxed);
+        let (txn_idx, wave) = Self::unpack_validation_idx(cur_validation_idx);
+
+        if txn_idx > target_idx {
+            let new_wave = wave + 1;
+
+            let mut validation_status = self.txn_status[target_idx as usize].1.write();
+            // Update the minimum wave all the suffix txn needs to pass.
+            // We set it to max for safety (to avoid overwriting with lower values
+            // by a slower thread), but currently this isn't strictly required
+            // as all callers of decrease_validation_idx hold a write lock on the
+            // previous transaction's validation status.
+            validation_status.max_triggered_wave =
+                max(validation_status.max_triggered_wave, wave + 1);
+
+            // Pack into validation index.
+            self.validation_idx.store(
+                (target_idx as u64) | ((new_wave as u64) << 32),
+                Ordering::Relaxed,
+            );
+            Some(new_wave)
         } else {
             None
         }
@@ -705,7 +710,7 @@ impl Scheduler {
                     // Committed txns are also considered executed for dependency resolution purposes.
                     Some(incarnation)
                 } else {
-                    // Committed txns do not need to be scheduled for validation in try_validate_next_version.
+                    // Committed txns are not scheduled for validation in try_validate_next_version.
                     None
                 }
             },
@@ -713,27 +718,36 @@ impl Scheduler {
         }
     }
 
-    /// Grab an index to try and validate next (by fetch-and-incrementing validation_idx).
-    /// - If the index is out of bounds, return None (and invoke a check of whethre
-    /// all txns can be committed).
-    /// - If the transaction is ready for validation (EXECUTED state), return the version
-    /// to the caller.
+    /// Grab an index (and increment for the next caller) to try and validate next, as long as the index
+    /// is under min_never_executed_idx. This is because currently, the first incarnation finishing
+    /// would trigger a new validation wave due to non-existent prior estimates (write-set).
+    ///
+    /// - If the transaction is ready for validation (EXECUTED state), return the version to the caller.
     /// - Otherwise, return None.
     fn try_validate_next_version(&self) -> Option<(Version, Wave)> {
-        let (idx_to_validate, wave) =
-            Self::unpack_validation_idx(self.validation_idx.fetch_add(1, Ordering::SeqCst));
+        let to_validate = {
+            let _m = self.validation_idx_write_mutex.lock();
 
-        let min_never_executed = self.min_never_executed_idx.load(Ordering::Relaxed);
+            let cur_validation_idx = self.validation_idx.load(Ordering::Relaxed);
+            let min_never_executed = self.min_never_executed_idx.load(Ordering::Relaxed);
 
-        if idx_to_validate < min_never_executed {
-            // Once the transaction at min_never_executed finishes its first incarnation,
-            // it will pull back the validation index and start a new wave (no previous write-set),
-            // and thus we do not have to validate at the current wave.
-            return self
-                .is_executed(idx_to_validate, false)
-                .map(|incarnation| ((idx_to_validate, incarnation), wave));
-        }
-        None
+            let (txn_idx, wave) = Self::unpack_validation_idx(cur_validation_idx);
+            if txn_idx < min_never_executed {
+                self.validation_idx
+                    .store(cur_validation_idx + 1, Ordering::Relaxed);
+                Some((txn_idx, wave))
+            } else {
+                // Once the transaction at min_never_executed finishes its first incarnation,
+                // it will pull back the validation index and start a new wave (no previous write-set),
+                // and thus we do not have to validate at the current wave.
+                None
+            }
+        };
+
+        to_validate.and_then(|(txn_idx, wave)| {
+            self.is_executed(txn_idx, false)
+                .map(|incarnation| ((txn_idx, incarnation), wave))
+        })
     }
 
     /// Grab an index to try and execute next (by fetch-and-incrementing execution_idx).
@@ -825,7 +839,7 @@ impl Scheduler {
     fn update_never_executed(&self, mut next_idx: TxnIndex) {
         // CAS would be another way of implementing the update functionality, but here
         // we can keep incrementing next_idx and storing at the end.
-        while next_idx < self.num_txns() {
+        while next_idx < self.num_txns {
             if !matches!(
                 *self.txn_status[next_idx as usize].0.read(),
                 ExecutionStatus::Ready(0, _)
