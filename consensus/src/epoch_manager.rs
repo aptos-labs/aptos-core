@@ -32,7 +32,7 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{
-        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingRpcRequest,
+        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingRpcRequest, IncomingDKGRequest,
         NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
@@ -137,6 +137,8 @@ pub struct EpochManager {
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     batch_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
+    dkg_handler_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingDKGRequest>>,
     bounded_executor: BoundedExecutor,
     // recovery_mode is set to true when the recovery manager is spawned
     recovery_mode: bool,
@@ -184,6 +186,7 @@ impl EpochManager {
             quorum_store_coordinator_tx: None,
             quorum_store_storage,
             batch_retrieval_tx: None,
+            dkg_handler_tx: None,
             bounded_executor,
             recovery_mode: false,
         }
@@ -557,6 +560,7 @@ impl EpochManager {
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
         self.batch_retrieval_tx = None;
+        self.dkg_handler_tx = None;
 
         if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -768,6 +772,15 @@ impl EpochManager {
                     .with_label_values(&[&peer_id.to_string()])
                     .set(epoch_state.verifier.get_voting_power(&peer_id).unwrap_or(0) as i64)
             });
+
+        // // dkg todo: start the dkg manager
+        // let (dkg_request_tx, mut dkg_request_rx) = aptos_channel::new(
+        //     QueueStyle::FIFO,
+        //     100,
+        //     None,   // dkg todo: add counters
+        // );
+
+
 
         let mut round_manager = RoundManager::new(
             epoch_state,
@@ -1075,6 +1088,23 @@ impl EpochManager {
                     monitor!(
                         "process_different_epoch_dag_rpc",
                         self.process_different_epoch(dag_message.epoch, peer_id)
+                    )
+                }
+            },
+            IncomingRpcRequest::DKGRequest(request) => {
+                let dkg_message = request.req.clone();
+
+                if dkg_message.epoch == self.epoch() {
+                    // Send message to dkg manager
+                    if let Some(tx) = &self.dkg_handler_tx {
+                        tx.push(peer_id, request)
+                    } else {
+                        Err(anyhow::anyhow!("DKG manager not started"))
+                    }
+                } else {
+                    monitor!(
+                        "process_different_epoch_dkg_rpc",
+                        self.process_different_epoch(dkg_message.epoch, peer_id)
                     )
                 }
             },

@@ -9,7 +9,7 @@ mod dag_handler;
 mod dag_network;
 mod dag_store;
 mod order_rule;
-mod reliable_broadcast;
+pub(crate) mod reliable_broadcast;
 mod storage;
 #[cfg(test)]
 mod tests;

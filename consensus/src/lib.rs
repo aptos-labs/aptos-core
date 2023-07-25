@@ -18,6 +18,7 @@ extern crate core;
 mod block_storage;
 mod consensusdb;
 mod dag;
+mod dkg;
 mod epoch_manager;
 mod error;
 mod experimental;

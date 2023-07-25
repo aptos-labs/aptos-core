@@ -97,6 +97,7 @@ impl ProofWithData {
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
+    // dkg todo: add a new payload type for dkg
 }
 
 impl Payload {

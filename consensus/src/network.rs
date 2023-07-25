@@ -9,7 +9,7 @@ use crate::{
     logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
-    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    quorum_store::types::{Batch, BatchMsg, BatchRequest}, dkg::DKGNetworkMessage,
 };
 use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -52,16 +52,12 @@ pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
         match msg {
             ConsensusMsg::DAGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
+            ConsensusMsg::DKGMessage(msg) => Ok(bcs::from_bytes(&msg.data)?),
             _ => bail!("unexpected consensus message type {:?}", msg),
         }
     }
 
-    fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGMessage(DAGNetworkMessage {
-            epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
-        })
-    }
+    fn into_network_message(self) -> ConsensusMsg;
 }
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
@@ -89,10 +85,19 @@ pub struct IncomingDAGRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingDKGRequest {
+    pub req: DKGNetworkMessage,
+    pub sender: Author,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub enum IncomingRpcRequest {
     BlockRetrieval(IncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
     DAGRequest(IncomingDAGRequest),
+    DKGRequest(IncomingDKGRequest),
 }
 
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
@@ -589,6 +594,18 @@ impl NetworkTask {
                         let req_with_callback =
                             IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
                                 req: request,
+                                sender: peer_id,
+                                protocol,
+                                response_sender: callback,
+                            });
+                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
+                            warn!(error = ?e, "aptos channel closed");
+                        }
+                    },
+                    ConsensusMsg::DKGMessage(request) => {
+                        let req_with_callback =
+                            IncomingRpcRequest::DKGRequest(IncomingDKGRequest {
+                                req: *request,
                                 sender: peer_id,
                                 protocol,
                                 response_sender: callback,
