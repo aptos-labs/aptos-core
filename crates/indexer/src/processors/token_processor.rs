@@ -12,7 +12,9 @@ use crate::{
     models::{
         coin_models::{
             coin_activities::MAX_ENTRY_FUNCTION_LENGTH,
-            v2_fungible_asset_utils::{FungibleAssetMetadata, FungibleAssetSupply},
+            v2_fungible_asset_utils::{
+                FungibleAssetMetadata, FungibleAssetStore, FungibleAssetSupply,
+            },
         },
         token_models::{
             ans_lookup::{CurrentAnsLookup, CurrentAnsLookupPK},
@@ -1105,6 +1107,7 @@ fn parse_v2_token(
                                 token: None,
                                 fungible_asset_metadata: None,
                                 fungible_asset_supply: None,
+                                fungible_asset_store: None,
                             },
                         );
                     }
@@ -1150,6 +1153,11 @@ fn parse_v2_token(
                         {
                             aggregated_data.fungible_asset_supply = Some(fungible_asset_supply);
                         }
+                        if let Some(fungible_asset_store) =
+                            FungibleAssetStore::from_write_resource(wr, txn_version).unwrap()
+                        {
+                            aggregated_data.fungible_asset_store = Some(fungible_asset_store);
+                        }
                     }
                 }
             }
@@ -1187,14 +1195,28 @@ fn parse_v2_token(
                 {
                     token_activities_v2.push(event);
                 }
-                // handling all the token v2 events
-                if let Some(event) = TokenActivityV2::get_v2_nft_from_parsed_event(
+                // handling token v2 nft events
+                if let Some(event) = TokenActivityV2::get_nft_v2_from_parsed_event(
                     event,
                     txn_version,
                     txn_timestamp,
                     index as i64,
                     &entry_function_id_str,
                     &token_v2_metadata_helper,
+                )
+                .unwrap()
+                {
+                    token_activities_v2.push(event);
+                }
+                // handling token v2 fungible token events
+                if let Some(event) = TokenActivityV2::get_ft_v2_from_parsed_event(
+                    event,
+                    txn_version,
+                    txn_timestamp,
+                    index as i64,
+                    &entry_function_id_str,
+                    &token_v2_metadata_helper,
+                    conn,
                 )
                 .unwrap()
                 {

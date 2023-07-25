@@ -81,6 +81,11 @@ spec aptos_framework::reconfiguration {
         let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
             && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
         ensures success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch) + 1;
+        ensures !success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch);
+        ensures (success && event::counter<NewEpochEvent>(old(global<Configuration>(@aptos_framework)).events) <
+            MAX_U64) ==>
+            event::counter<NewEpochEvent>(global<Configuration>(@aptos_framework).events) ==
+                event::counter<NewEpochEvent>(old(global<Configuration>(@aptos_framework)).events) + 1;
     }
 
     spec reconfiguration_enabled {

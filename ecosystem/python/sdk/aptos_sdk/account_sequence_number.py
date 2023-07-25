@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import unittest
+import unittest.mock
 from typing import Callable, Optional
 
 from aptos_sdk.account_address import AccountAddress
@@ -53,8 +55,9 @@ class AccountSequenceNumber:
     _maximum_wait_time: int = 30
     _sleep_time: float = 0.01
 
-    _last_committed_number: Optional[int]
-    _current_number: Optional[int]
+    _last_committed_number: int = 0
+    _current_number: int = 0
+    _initialized = False
 
     def __init__(
         self,
@@ -66,9 +69,6 @@ class AccountSequenceNumber:
         self._account = account
         self._lock = asyncio.Lock()
 
-        self._last_uncommitted_number = None
-        self._current_number = None
-
         self._maximum_in_flight = config.maximum_in_flight
         self._maximum_wait_time = config.maximum_wait_time
         self._sleep_time = config.sleep_time
@@ -79,7 +79,7 @@ class AccountSequenceNumber:
         guarantee first-in, first-out ordering of requests.
         """
         async with self._lock:
-            if self._last_uncommitted_number is None or self._current_number is None:
+            if not self._initialized:
                 await self._initialize()
             # If there are more than self._maximum_in_flight in flight, wait for a slot.
             # Or at least check to see if there is a slot and exit if in non-blocking mode.
@@ -105,6 +105,7 @@ class AccountSequenceNumber:
 
     async def _initialize(self):
         """Optional initializer. called by next_sequence_number if not called prior."""
+        self._initialized = True
         self._current_number = await self._current_sequence_number()
         self._last_uncommitted_number = self._current_number
 
@@ -159,10 +160,6 @@ class AccountSequenceNumber:
 
     async def _current_sequence_number(self) -> int:
         return await self._client.account_sequence_number(self._account)
-
-
-import unittest
-import unittest.mock
 
 
 class Test(unittest.IsolatedAsyncioTestCase):

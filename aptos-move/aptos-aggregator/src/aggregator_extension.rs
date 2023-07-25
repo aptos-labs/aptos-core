@@ -54,10 +54,10 @@ impl AggregatorID {
         AggregatorID::Ephemeral(id)
     }
 
-    pub fn into_state_key(self) -> Option<StateKey> {
+    pub fn as_state_key(&self) -> Option<StateKey> {
         match self {
             AggregatorID::Legacy { handle, key } => {
-                Some(StateKey::table_item(handle.into(), key.0.to_vec()))
+                Some(StateKey::table_item((*handle).into(), key.0.to_vec()))
             },
             AggregatorID::Ephemeral(_) => None,
         }
@@ -146,6 +146,25 @@ impl Aggregator {
                 },
             }
         }
+    }
+
+    /// Validates if aggregator's history is correct when applied to
+    /// the `base_value`. For example, if history observed a delta of
+    /// +100, and the aggregator limit is 150, then the base value of
+    /// 60 will not pass validation (60 + 100 > 150), but the base value
+    /// of 30 will (30 + 100 < 150).
+    fn validate_history(&self, base_value: u128) -> PartialVMResult<()> {
+        let history = self
+            .history
+            .as_ref()
+            .expect("History should be set for validation");
+
+        // To validate the history of an aggregator, we want to ensure
+        // that there was no violation of postcondition (i.e. overflows or
+        // underflows). We can do it by emulating addition and subtraction.
+        addition(base_value, history.max_positive, self.limit)?;
+        subtraction(base_value, history.min_negative)?;
+        Ok(())
     }
 
     /// Implements logic for adding to an aggregator.
@@ -249,24 +268,12 @@ impl Aggregator {
         // In theory, any delta will be applied to existing value. However,
         // something may go wrong, so we guard by throwing an error in
         // extension.
-        let value_from_storage = resolver
-            .resolve_aggregator_value(id)
-            .map_err(|_| extension_error("could not find the value of the aggregator"))?;
+        let value_from_storage = resolver.resolve_aggregator_value(id).map_err(|e| {
+            extension_error(format!("Could not find the value of the aggregator: {}", e))
+        })?;
 
-        // Sanity checks.
-        debug_assert!(
-            self.history.is_some(),
-            "resolving aggregator with no history"
-        );
-        let history = self.history.as_ref().unwrap();
-
-        // Validate history of the aggregator, ensure that there
-        // was no violation of postcondition. We can do it by
-        // emulating addition and subtraction.
-        addition(value_from_storage, history.max_positive, self.limit)?;
-        subtraction(value_from_storage, history.min_negative)?;
-
-        // Validation succeeded, and now we can actually apply the delta.
+        // Validate history and apply the delta.
+        self.validate_history(value_from_storage)?;
         match self.state {
             AggregatorState::PositiveDelta => {
                 self.value = addition(value_from_storage, self.value, self.limit)?;
@@ -275,7 +282,7 @@ impl Aggregator {
                 self.value = subtraction(value_from_storage, self.value)?;
             },
             AggregatorState::Data => {
-                unreachable!("history is not tracked when aggregator knows its value")
+                unreachable!("Materialization only happens in Delta state")
             },
         }
 
@@ -625,5 +632,44 @@ mod test {
         assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 600);
         assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
         assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_history_validation_in_data_state() {
+        let mut aggregator_data = AggregatorData::default();
+
+        // Validation panics if history is not set. This is an invariant
+        // violation and should never happen.
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
+        let aggregator = aggregator_data
+            .get_aggregator(aggregator_id_for_test(200), 200, &*TEST_RESOLVER, true)
+            .expect("Getting an aggregator should succeed");
+        aggregator
+            .validate_history(0)
+            .expect("Should not be called because validation panics");
+    }
+
+    #[test]
+    fn test_history_validation_in_delta_state() {
+        let mut aggregator_data = AggregatorData::default();
+
+        // Some aggregator with a limit of 100 in a delta state.
+        let id = aggregator_id_for_test(100);
+        let aggregator = aggregator_data
+            .get_aggregator(id, 100, &*TEST_RESOLVER, true)
+            .expect("Getting an aggregator should succeed");
+
+        // Aggregator of +0 with minimum of -50 and maximum of +50.
+        aggregator.add(50).unwrap();
+        aggregator.sub(100).unwrap();
+        aggregator.add(50).unwrap();
+
+        // Valid history: 50+50-100+50.
+        assert_ok!(aggregator.validate_history(50));
+
+        // Underflow and overflow are unvalidated.
+        assert_err!(aggregator.validate_history(49));
+        assert_err!(aggregator.validate_history(51));
     }
 }

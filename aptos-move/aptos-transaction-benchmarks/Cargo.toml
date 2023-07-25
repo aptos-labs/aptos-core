@@ -25,6 +25,7 @@ aptos-metrics-core = { workspace = true }
 aptos-push-metrics =  { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-logging = { workspace = true }
 clap = { workspace = true }
 criterion = { workspace = true, features = ["html_reports"] }
 criterion-cpu-time = { workspace = true }

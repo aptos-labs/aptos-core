@@ -1,0 +1,15 @@
+// ---- Model Dump
+module 0x2::M {
+    struct S {
+        dummy_field: bool,
+    }
+    private fun foo<S>(s: S) {
+        {
+          let s: S = s;
+          {
+            let s: S = s;
+            s
+          }
+        }
+    }
+} // end 0x2::M

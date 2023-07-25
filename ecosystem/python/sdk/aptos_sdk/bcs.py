@@ -149,14 +149,14 @@ class Serializer:
         value_encoder: typing.Callable[[Serializer, typing.Any], bytes],
     ):
         encoded_values = []
-        for (key, value) in values.items():
+        for key, value in values.items():
             encoded_values.append(
                 (encoder(key, key_encoder), encoder(value, value_encoder))
             )
         encoded_values.sort(key=lambda item: item[0])
 
         self.uleb128(len(encoded_values))
-        for (key, value) in encoded_values:
+        for key, value in encoded_values:
             self.fixed_bytes(key)
             self.fixed_bytes(value)
 

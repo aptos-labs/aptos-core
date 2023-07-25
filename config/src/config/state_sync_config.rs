@@ -185,7 +185,7 @@ impl Default for StorageServiceConfig {
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
             request_moderator_refresh_interval_ms: 1000, // 1 second
-            storage_summary_refresh_interval_ms: 50,
+            storage_summary_refresh_interval_ms: 500,
         }
     }
 }

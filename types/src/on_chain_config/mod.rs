@@ -72,7 +72,13 @@ impl fmt::Display for ConfigID {
     }
 }
 
-/// State sync will panic if the value of any config in this registry is uninitialized
+/// This registry contains the list of on-chain configs that state sync
+/// uses to notify components (e.g., consensus, mempool and networking)
+/// on a reconfiguration event. New configs should be added here.
+///
+/// Note: if state sync is unable to find a config in storage (this is possible
+/// if a node only has old state), the notification will not contain the
+/// config value and the component will need to decide how to handle this.
 pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     ApprovedExecutionHashes::CONFIG_ID,
     ValidatorSet::CONFIG_ID,
