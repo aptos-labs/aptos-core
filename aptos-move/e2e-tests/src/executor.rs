@@ -687,7 +687,7 @@ impl FakeExecutor {
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
             let mut session =
-                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+                vm.new_session(0, &remote_view, SessionId::void(), self.aggregator_enabled);
             session
                 .execute_function_bypass_visibility(
                     module,
