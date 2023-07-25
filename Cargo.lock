@@ -1054,6 +1054,7 @@ dependencies = [
 name = "aptos-event-notifications"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-channels",
  "aptos-crypto",
  "aptos-db",
@@ -3754,6 +3755,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-db",
+ "aptos-event-notifications",
  "aptos-executor-test-helpers",
  "aptos-gas-meter",
  "aptos-gas-schedule",
