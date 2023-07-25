@@ -623,6 +623,13 @@ impl TConsensusMsg for DAGMessage {
             DAGMessage::TestAck(_) => 1,
         }
     }
+
+    fn into_network_message(self) -> ConsensusMsg {
+        ConsensusMsg::DAGMessage(DAGNetworkMessage {
+            epoch: self.epoch(),
+            data: bcs::to_bytes(&self).unwrap(),
+        })
+    }
 }
 
 impl TryFrom<DAGNetworkMessage> for DAGMessage {
