@@ -675,6 +675,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-network",
+ "aptos-reliable-broadcast",
  "aptos-runtimes",
  "aptos-safety-rules",
  "aptos-schemadb",
