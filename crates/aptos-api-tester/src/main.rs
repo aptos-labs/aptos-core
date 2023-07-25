@@ -107,6 +107,10 @@ async fn test_newaccount(
     let actual_account = response.inner();
 
     if &expected_account != actual_account {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_ACCOUNT_DATA, expected_account, actual_account
+        );
         return Err(TestFailure::Fail(FAIL_ACCOUNT_DATA));
     }
 
@@ -120,6 +124,10 @@ async fn test_newaccount(
         .value;
 
     if expected_balance != actual_balance {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_BALANCE, expected_balance, actual_balance
+        );
         return Err(TestFailure::Fail(FAIL_BALANCE));
     }
 
@@ -162,13 +170,20 @@ async fn test_cointransfer(
         .value;
 
     if expected_receiver_balance != actual_receiver_balance {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_BALANCE_AFTER_TRANSACTION, expected_receiver_balance, actual_receiver_balance
+        );
         return Err(TestFailure::Fail(FAIL_BALANCE_AFTER_TRANSACTION));
     }
 
     // check account balance with a lower version number
     let version = match response.inner().version() {
         Some(version) => version,
-        _ => return Err(TestFailure::Error(anyhow!(ERROR_NO_VERSION))),
+        _ => {
+            info!("error: {}", ERROR_MODULE_INTERACTION);
+            return Err(TestFailure::Error(anyhow!(ERROR_NO_VERSION)));
+        },
     };
 
     let expected_balance_at_version = U64(starting_receiver_balance);
@@ -180,6 +195,10 @@ async fn test_cointransfer(
         .value;
 
     if expected_balance_at_version != actual_balance_at_version {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_BALANCE_BEFORE_TRANSACTION, expected_balance_at_version, actual_balance_at_version
+        );
         return Err(TestFailure::Fail(FAIL_BALANCE_BEFORE_TRANSACTION));
     }
 
@@ -253,6 +272,10 @@ async fn test_mintnft(
         .await?;
 
     if expected_collection_data != actual_collection_data {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_COLLECTION_DATA, expected_collection_data, actual_collection_data
+        );
         return Err(TestFailure::Fail(FAIL_COLLECTION_DATA));
     }
 
@@ -282,6 +305,10 @@ async fn test_mintnft(
         .await?;
 
     if expected_token_data != actual_token_data {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_TOKEN_DATA, expected_token_data, actual_token_data
+        );
         return Err(TestFailure::Fail(FAIL_TOKEN_DATA));
     }
 
@@ -313,6 +340,10 @@ async fn test_mintnft(
         .amount;
 
     if expected_sender_token_balance != actual_sender_token_balance {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_TOKEN_BALANCE, expected_sender_token_balance, actual_sender_token_balance
+        );
         return Err(TestFailure::Fail(FAIL_TOKEN_BALANCE));
     }
 
@@ -327,6 +358,10 @@ async fn test_mintnft(
         .await
         .is_ok()
     {
+        info!(
+            "fail: {}, expected no token client resource for the receiver",
+            FAIL_TOKENS_BEFORE_CLAIM
+        );
         return Err(TestFailure::Fail(FAIL_TOKENS_BEFORE_CLAIM));
     }
 
@@ -357,6 +392,12 @@ async fn test_mintnft(
         .amount;
 
     if expected_receiver_token_balance != actual_receiver_token_balance {
+        info!(
+            "{}, expected {:?}, got {:?}",
+            FAIL_TOKEN_BALANCE_AFTER_TRANSACTION,
+            expected_receiver_token_balance,
+            actual_receiver_token_balance
+        );
         return Err(TestFailure::Fail(FAIL_TOKEN_BALANCE_AFTER_TRANSACTION));
     }
 
@@ -399,7 +440,10 @@ async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<H
 
     let blob = match blobs.get(0) {
         Some(bytecode) => bytecode.clone(),
-        None => return Err(anyhow!(ERROR_NO_BYTECODE)),
+        None => {
+            info!("error: {}", ERROR_NO_BYTECODE);
+            return Err(anyhow!(ERROR_NO_BYTECODE));
+        },
     };
 
     Ok(HexEncodedBytes::from(blob))
@@ -457,6 +501,10 @@ async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), 
     let actual_bytecode = &response.inner().bytecode;
 
     if expected_bytecode != actual_bytecode {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_BYTECODE, expected_bytecode, actual_bytecode
+        );
         return Err(TestFailure::Fail(FAIL_BYTECODE));
     }
 
@@ -468,10 +516,17 @@ async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), 
     let expected_message = message.to_string();
     let actual_message = match get_message(client, account.address()).await {
         Some(message) => message,
-        None => return Err(TestFailure::Error(anyhow!(ERROR_MODULE_INTERACTION,))),
+        None => {
+            info!("error: {}", ERROR_MODULE_INTERACTION);
+            return Err(TestFailure::Error(anyhow!(ERROR_MODULE_INTERACTION)));
+        },
     };
 
     if expected_message != actual_message {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_MODULE_INTERACTION, expected_message, actual_message
+        );
         return Err(TestFailure::Fail(FAIL_MODULE_INTERACTION));
     }
 
