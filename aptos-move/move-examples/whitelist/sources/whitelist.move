@@ -10,12 +10,11 @@ module whitelist_example::whitelist {
     use std::option::{Self, Option};
     use std::aptos_account;
     use std::aptos_coin::{AptosCoin};
-    use std::object::{Self, Object, DeleteRef};
+    use std::object::{Self, DeleteRef};
 
     /// Resource moved into the creator's account, used to find the object easily.
     /// Destroyed with the object when `destroy(...)` is called
     struct ObjectInfo has key {
-        whitelist_obj: Object<Whitelist>,
         whitelist_addr: address,
         delete_ref: DeleteRef,
     }
@@ -77,7 +76,6 @@ module whitelist_example::whitelist {
         move_to(
             creator,
             ObjectInfo {
-                whitelist_obj: object::object_from_constructor_ref(&constructor_ref),
                 whitelist_addr: signer::address_of(whitelist_obj_signer),
                 delete_ref,
             }
@@ -239,7 +237,6 @@ module whitelist_example::whitelist {
         let owner_addr = signer::address_of(owner);
         let whitelist_addr = get_whitelist_addr(owner_addr);
         let ObjectInfo {
-            whitelist_obj: _,
             whitelist_addr: _,
             delete_ref,
         } = move_from<ObjectInfo>(owner_addr);
