@@ -233,7 +233,7 @@ pub trait Signature:
     for<'a> TryFrom<&'a [u8], Error = CryptoMaterialError>
     + Sized
     + Debug
-    + Clone
+    //+ Clone
     + Eq
     + Hash
     + private::Sealed

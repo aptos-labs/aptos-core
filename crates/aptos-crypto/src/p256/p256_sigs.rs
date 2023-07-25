@@ -4,7 +4,7 @@
 //! This file implements traits for Ed25519 signatures.
 
 use crate::{
-    p256::{P256PrivateKey, P256PublicKey,L},
+    p256::{P256PrivateKey, P256PublicKey},
     hash::CryptoHash,
     traits::*,
 };
@@ -12,14 +12,20 @@ use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use core::convert::TryFrom;
 use serde::Serialize;
-use std::{cmp::Ordering, fmt};
+use std::fmt;
 
 use super::P256_SIGNATURE_LENGTH;
 use openssl::ecdsa::EcdsaSig;
 
 /// A P256 signature
-#[derive(DeserializeKey, Clone, SerializeKey)]
+#[derive(DeserializeKey, SerializeKey)]
 pub struct P256Signature(pub(crate) EcdsaSig);
+
+/*impl Clone for P256Signature {
+    fn clone(&self) -> Self {
+        *self
+    }
+}*/
 
 impl private::Sealed for P256Signature {}
 
@@ -29,7 +35,8 @@ impl P256Signature {
 
     /// Serialize an P256Signature.
     pub fn to_bytes(&self) -> [u8; P256_SIGNATURE_LENGTH] {
-        self.0.to_bytes()
+        // TODO: Error handling
+        self.0.to_der().unwrap().try_into().unwrap()
     }
 
     /// Deserialize an P256Signature without any validation checks (malleability)
@@ -37,7 +44,7 @@ impl P256Signature {
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256Signature, CryptoMaterialError> {
-        match p256::ecdsa::Signature::try_from(bytes) {
+        match EcdsaSig::from_der(bytes) {
             Ok(p256_signature) => Ok(P256Signature(p256_signature)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
@@ -134,11 +141,12 @@ impl Signature for P256Signature {
             .verify_strict(message, &self.0)
             .map_err(|e| anyhow!("{}", e))
             .and(Ok(()))*/
-        public_key.0.verify(message, &self.0).map_err(|e| anyhow!("{}", e)).and(Ok())
+        self.0.verify(message, &public_key.0).map_err(|e| anyhow!("{}", e)).and(Ok(()))
     }
 
     fn to_bytes(&self) -> Vec<u8> {
-        self.0.to_bytes().to_vec()
+        // TODO: Error handling
+        self.0.to_der().unwrap()
     }
 }
 
@@ -184,7 +192,8 @@ impl Eq for P256Signature {}
 
 impl fmt::Display for P256Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.0.to_bytes()[..]))
+        // TODO: Error handling
+        write!(f, "{}", hex::encode(&self.0.to_der().unwrap()[..]))
     }
 }
 

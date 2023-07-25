@@ -10,8 +10,6 @@ use crate::{
     hash::CryptoHash,
     traits::*,
 };
-use p256::{ecdsa::signature::Signer, elliptic_curve::sec1, NistP256};
-use p256;
 use openssl::{nid::Nid, ec::EcKey, ec::EcGroup, ecdsa::EcdsaSig, pkey::Private, pkey::Public};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
@@ -68,9 +66,7 @@ impl P256PrivateKey {
     /// Private function aimed at minimizing code duplication between sign
     /// methods of the SigningKey implementation. This should remain private.
     fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
-        let nid = Nid::X9_62_PRIME256V1; // NIST P-256 curve
         // TODO: Fix error handling
-        let group = EcGroup::from_curve_name(nid).unwrap();
         let secret_key = &self.0;
         // TODO: Fix error handling
         let sig = EcdsaSig::sign(message, &secret_key).unwrap();
@@ -131,7 +127,8 @@ impl SigningKey for P256PrivateKey {
 }
 
 impl Uniform for P256PrivateKey {
-    fn generate<R>(rng: &mut R) -> Self
+    // TODO: Remove rng
+    fn generate<R>(_rng: &mut R) -> Self
     where
         R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
@@ -236,7 +233,8 @@ impl VerifyingKey for P256PublicKey {
 
 impl fmt::Display for P256PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(self.0.as_bytes()))
+        // TODO: Error handling
+        write!(f, "{}", hex::encode(self.0.public_key_to_der().unwrap()))
     }
 }
 
