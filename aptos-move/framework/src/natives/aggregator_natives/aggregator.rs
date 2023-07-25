@@ -4,7 +4,7 @@
 use crate::{
     natives::{
         aggregator_natives::{
-            helpers::{aggregator_info, unpack_aggregator_struct},
+            helpers_v1::{aggregator_info, unpack_aggregator_struct},
             NativeAggregatorContext,
         },
         helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},

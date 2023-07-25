@@ -50,7 +50,11 @@ impl AggregatorID {
         AggregatorID::Legacy { handle, key }
     }
 
-    pub fn into_state_key(self) -> Option<StateKey> {
+    pub fn ephemeral(id: u64) -> Self {
+        AggregatorID::Ephemeral(id)
+    }
+
+    pub fn as_state_key(&self) -> Option<StateKey> {
         match self {
             AggregatorID::Legacy { handle, key } => {
                 Some(StateKey::table_item(handle.into(), key.0.to_vec()))
@@ -218,6 +222,14 @@ impl Aggregator {
         // Record side-effects of addition in history.
         self.record();
         Ok(())
+    }
+
+    pub fn try_add(&mut self, value: u128) -> PartialVMResult<()> {
+        self.add(value)
+    }
+
+    pub fn try_sub(&mut self, value: u128) -> PartialVMResult<()> {
+        self.sub(value)
     }
 
     /// Implements logic for reading the value of an aggregator. As a

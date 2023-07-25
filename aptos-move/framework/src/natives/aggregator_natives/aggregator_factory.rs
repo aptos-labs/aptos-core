@@ -3,7 +3,7 @@
 
 use crate::{
     natives::{
-        aggregator_natives::{helpers::get_handle, NativeAggregatorContext},
+        aggregator_natives::{helpers_v1::get_handle, NativeAggregatorContext},
         helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
     },
     safely_pop_arg,
