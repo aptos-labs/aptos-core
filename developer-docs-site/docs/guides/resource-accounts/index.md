@@ -2,7 +2,8 @@
 title: "Resource Accounts"
 ---
 
-# Examples of the various ways to use resource accounts
+# Resource Accounts
 
 - ### [Utilizing resource accounts](./utilizing-resource-accounts)
-- ### [Understanding resource accounts](./understanding-resource-accounts)
+- ### [Publishing an upgradeable module](./publishing-an-upgradeable-module)
+- ### [Common questions](./common-questions)

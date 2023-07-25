@@ -1,4 +1,4 @@
-module upgradeable_resource_contract::package_manager {
+module upgradeable_resource_account_package::package_manager {
     use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::resource_account;
     use aptos_std::smart_table::{Self, SmartTable};
@@ -6,6 +6,7 @@ module upgradeable_resource_contract::package_manager {
     use aptos_std::code;
     use std::error;
     use std::signer;
+    friend upgradeable_resource_account_package::basic_contract;
 
     /// The signer is not authorized to deploy this module.
     const ENOT_AUTHORIZED: u64 = 0;
@@ -39,27 +40,27 @@ module upgradeable_resource_contract::package_manager {
 
     /// Can be called by friended modules to obtain the resource account signer.
     public(friend) fun get_signer(): signer acquires PermissionConfig {
-        let signer_cap = &borrow_global<PermissionConfig>(@upgradeable_resource_contract).signer_cap;
+        let signer_cap = &borrow_global<PermissionConfig>(@upgradeable_resource_account_package).signer_cap;
         account::create_signer_with_capability(signer_cap)
     }
 
     /// Can be called by friended modules to keep track of a system address.
-    public(friend) fun add_address(name: String, object: address) acquires PermissionConfig {
-        let addresses = &mut borrow_global_mut<PermissionConfig>(@upgradeable_resource_contract).addresses;
+    public(friend) fun add_named_address(name: String, object: address) acquires PermissionConfig {
+        let addresses = &mut borrow_global_mut<PermissionConfig>(@upgradeable_resource_account_package).addresses;
         smart_table::add(addresses, name, object);
     }
 
-    public fun address_exists(name: String): bool acquires PermissionConfig {
+    public fun named_address_exists(name: String): bool acquires PermissionConfig {
         smart_table::contains(&safe_permission_config().addresses, name)
     }
 
-    public fun get_address(name: String): address acquires PermissionConfig {
-        let addresses = &borrow_global<PermissionConfig>(@upgradeable_resource_contract).addresses;
+    public fun get_named_address(name: String): address acquires PermissionConfig {
+        let addresses = &borrow_global<PermissionConfig>(@upgradeable_resource_account_package).addresses;
         *smart_table::borrow(addresses, name)
     }
 
     inline fun safe_permission_config(): &PermissionConfig acquires PermissionConfig {
-        borrow_global<PermissionConfig>(@upgradeable_resource_contract)
+        borrow_global<PermissionConfig>(@upgradeable_resource_account_package)
     }
 
     #[test_only]

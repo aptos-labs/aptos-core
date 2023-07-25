@@ -5,6 +5,13 @@ use crate::{assert_success, tests::common, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::{create_resource_address, AccountAddress};
 use aptos_framework::natives::code::{PackageMetadata, UpgradePolicy};
+use move_core_types::parser::parse_struct_tag;
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+struct SomeResource {
+    value: u64,
+}
 
 fn custom_build_helper(
     deployer_address: AccountAddress,
@@ -12,17 +19,17 @@ fn custom_build_helper(
     package_manager_code: &String,
     basic_contract_code: &String,
 ) -> (PackageMetadata, Vec<Vec<u8>>) {
-    // add the named addresses for `deployer` and `upgradeable_resource_contract`
+    // add the named addresses for `deployer` and `upgradeable_resource_account_package`
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
         .insert("deployer".to_string(), deployer_address);
     build_options
         .named_addresses
-        .insert("upgradeable_resource_contract".to_string(), resource_address);
+        .insert("upgradeable_resource_account_package".to_string(), resource_address);
 
     let mut package_builder =
-        PackageBuilder::new("Upgradeable Resource Account Contract")
+        PackageBuilder::new("Upgradeable Module With Resource Account")
             .with_policy(UpgradePolicy::compat());
     package_builder.add_source("package_manager", &package_manager_code);
     package_builder.add_source("basic_contract", &basic_contract_code);
@@ -49,23 +56,14 @@ fn code_upgrading_using_resource_account() {
     let deployer = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let resource_address = create_resource_address(*deployer.address(), &[]);
 
-    // add the named addresses for `deployer` and `upgradeable_resource_contract`
-    let mut build_options = aptos_framework::BuildOptions::default();
-    build_options
-        .named_addresses
-        .insert("deployer".to_string(), *deployer.address());
-    build_options
-        .named_addresses
-        .insert("upgradeable_resource_contract".to_string(), resource_address);
-
     // get contract code from file
     let package_manager_code =
         std::fs::read_to_string(
-        &common::test_dir_path("../../../move-examples/upgradeable_resource_contract/sources/package_manager.move")
+        &common::test_dir_path("../../../move-examples/upgradeable_resource_account_package/sources/package_manager.move")
         ).unwrap();
     let basic_contract_code =
         std::fs::read_to_string(
-        &common::test_dir_path("../../../move-examples/upgradeable_resource_contract/sources/basic_contract.move")
+        &common::test_dir_path("../../../move-examples/upgradeable_resource_account_package/sources/basic_contract.move")
         ).unwrap();
 
     let (metadata, code) = custom_build_helper(
@@ -132,4 +130,25 @@ fn code_upgrading_using_resource_account() {
     ).unwrap().pop().unwrap();
     let result = bcs::from_bytes::<u64>(&bcs_result).unwrap();
     assert_eq!(AFTER_VALUE, result, "assert view function result {} == {}", result, AFTER_VALUE);
+
+    // test the `move_to_rseource_account(...)` function by moving SomeResource into the resource
+    // account
+    assert_success!(h.run_entry_function(
+        &deployer,
+        str::parse(&format!(
+            "0x{}::basic_contract::move_to_resource_account",
+            resource_address
+        )).unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    let some_resource = parse_struct_tag(&format!(
+        "0x{}::basic_contract::SomeResource",
+        resource_address
+    )).unwrap();
+    let some_resource_value = h
+        .read_resource::<SomeResource>(&resource_address, some_resource)
+        .unwrap();
+    assert_eq!(some_resource_value.value, 42, "assert SomeResource.value == 42");
 }

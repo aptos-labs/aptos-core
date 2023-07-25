@@ -39,6 +39,6 @@ mod token_event_store;
 mod token_objects;
 mod transaction_fee;
 mod type_too_large;
-mod upgradeable_resource_contract;
+mod upgradeable_resource_account_package;
 mod vector_numeric_address;
 mod vote;

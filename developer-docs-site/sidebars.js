@@ -356,7 +356,8 @@ const sidebars = {
           collapsed: true,
           items: [
             "guides/resource-accounts/utilizing-resource-accounts",
-            "guides/resource-accounts/understanding-resource-accounts",
+            "guides/resource-accounts/publishing-an-upgradeable-module",
+            "guides/resource-accounts/common-questions",
           ],
         },
       ],

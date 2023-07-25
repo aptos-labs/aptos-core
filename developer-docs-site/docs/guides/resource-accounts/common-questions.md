@@ -1,12 +1,12 @@
 ---
-title: "Conceptual understanding"
-id: "understanding-resource-accounts"
+title: "Common questions"
+id: "common-questions"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Conceptual understanding
+# Common questions
 
 ## What is a resource account?
 
@@ -102,7 +102,7 @@ You might be wondering "*Why does this work? Isn't it dangerous to be able to cr
 Move's [privileged struct operations](../../move/book/structs-and-resources#privileged-struct-operations) require that creating structs and accessing their inner fields can only occur from within the module that defines the struct. This means that unless the developer provides a public accessor function to a stored `SignerCapability`, there is no way for another account to gain access to it.
 
 :::warning
-Be mindful of properly gating access to a function that uses a `SignerCapability` and be extra careful when returning it from a function, since this gives the caller unrestricted access to control the account.
+Be mindful of properly gating access to a function that uses a `SignerCapability` and be extra careful when returning a `signer` from a public function, since this gives the caller unrestricted access to control the account.
 :::
 
 A good rule of thumb is to by default set all functions that return a `SignerCapability` or a `signer` to internal private functions unless you've very carefully thought about the implications.
