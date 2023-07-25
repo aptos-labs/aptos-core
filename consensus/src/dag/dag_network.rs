@@ -65,7 +65,7 @@ impl Responders {
         }
         Some(
             self.peers
-                .split_off(self.peers.len().checked_sub(count as usize).unwrap_or(0)),
+                .split_off(self.peers.len().saturating_sub(count as usize)),
         )
     }
 }

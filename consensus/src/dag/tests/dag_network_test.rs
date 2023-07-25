@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::dag::{
     dag_network::{DAGNetworkSender, RpcWithFallback},
     types::{DAGMessage, TestAck, TestMessage},
@@ -44,11 +46,11 @@ impl DAGNetworkSender for MockDAGNetworkSender {
         match state {
             TestPeerState::Fast => Ok(TestAck(message.0).into()),
             TestPeerState::Slow(duration) => {
-                self.time_service.sleep(duration.clone()).await;
+                self.time_service.sleep(duration).await;
                 Ok(TestAck(message.0).into())
             },
             TestPeerState::FailSlow(duration) => {
-                self.time_service.sleep(duration.clone()).await;
+                self.time_service.sleep(duration).await;
                 bail!("failed to respond");
             },
         }

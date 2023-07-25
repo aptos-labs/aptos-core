@@ -68,11 +68,9 @@ impl ReliableBroadcast {
             while let Some((receiver, result)) = fut.next().await {
                 match result {
                     Ok(msg) => {
-                        if let Ok(dag_msg) = msg.try_into() {
-                            if let Ok(ack) = S::Ack::try_from(dag_msg) {
-                                if let Ok(Some(aggregated)) = aggregating.add(receiver, ack) {
-                                    return aggregated;
-                                }
+                        if let Ok(ack) = S::Ack::try_from(msg) {
+                            if let Ok(Some(aggregated)) = aggregating.add(receiver, ack) {
+                                return aggregated;
                             }
                         }
                     },
