@@ -48,6 +48,7 @@ from cases.node import test_node_show_validator_set
 from cases.stake import (
     test_stake_add_stake,
     test_stake_create_staking_contract,
+    test_stake_increase_lockup,
     test_stake_initialize_stake_owner,
     test_stake_set_operator,
     test_stake_set_voter,
@@ -147,6 +148,7 @@ def run_tests(run_helper):
     test_stake_set_operator(run_helper)
     test_stake_set_voter(run_helper)
     test_stake_create_staking_contract(run_helper)
+    test_stake_increase_lockup(run_helper)
 
     # Run node subcommand group tests.
     test_node_show_validator_set(run_helper)
