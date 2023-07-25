@@ -66,13 +66,8 @@ pub struct ModuleContext<'env> {
     pub targets: &'env FunctionTargetsHolder,
 }
 
-impl<'env> AsRef<GlobalEnv> for ModuleContext<'env> {
-    fn as_ref(&self) -> &GlobalEnv {
-        self.env
-    }
-}
-
 impl ModuleGenerator {
+    /// Runs generation of `CompiledModule`.
     pub fn run(ctx: &ModuleContext, module_env: &ModuleEnv) -> FF::CompiledModule {
         let module = move_binary_format::CompiledModule {
             version: file_format_common::VERSION_6,
@@ -98,7 +93,7 @@ impl ModuleGenerator {
         gen.module
     }
 
-    /// Generates a module, visiting all of it's members.
+    /// Generates a module, visiting all of its members.
     fn gen_module(&mut self, ctx: &ModuleContext, module_env: &ModuleEnv<'_>) {
         // Create the self module handle, at well known handle index 0
         let loc = &module_env.get_loc();
@@ -161,7 +156,7 @@ impl ModuleGenerator {
             "signature",
         ));
         self.module.signatures.push(FF::Signature(tokens));
-        self.types_to_signature.entry(tys).or_insert(idx);
+        self.types_to_signature.insert(tys, idx);
         idx
     }
 

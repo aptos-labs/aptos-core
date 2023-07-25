@@ -135,13 +135,11 @@ impl<'a> FunctionGenerator<'a> {
         // Walk the bytecode
         let bytecode = ctx.fun.get_bytecode();
         for i in 0..bytecode.len() {
-            let bc = &bytecode[i];
-            let next_bc = if i + 1 < bytecode.len() {
-                Some(&bytecode[i + 1])
+            if i + 1 < bytecode.len() {
+                self.gen_bytecode(ctx, &bytecode[i], Some(&bytecode[i + 1]))
             } else {
-                None
-            };
-            self.gen_bytecode(ctx, bc, next_bc);
+                self.gen_bytecode(ctx, &bytecode[i], None)
+            }
         }
 
         // At this point, all labels should be resolved, so link them.
@@ -567,14 +565,6 @@ impl<'a> FunctionGenerator<'a> {
     /// in order, to be consumed. Ideally those are already on the stack, but if they are not,
     /// they will be made available.
     fn abstract_push_args(&mut self, ctx: &FunctionContext, temps: impl AsRef<[TempIndex]>) {
-        /*
-        println!(
-            "enter: temps: {:?}\n  locations: {:?}\n  stack: {:?}",
-            temps.as_ref(),
-            self.location,
-            self.stack
-        );
-         */
         // Compute the maximal prefix of `temps` which are already on the stack.
         let temps = temps.as_ref();
         let mut temps_to_push = temps;
@@ -585,7 +575,6 @@ impl<'a> FunctionGenerator<'a> {
             }
             if self.stack.ends_with(&temps[0..end]) {
                 temps_to_push = &temps[end..temps.len()];
-                // println!("  temps_to_push: {:?}\n", temps_to_push);
                 break;
             }
         }
@@ -616,12 +605,6 @@ impl<'a> FunctionGenerator<'a> {
                 ctx.internal_error("unexpected undefined temporary (moved value?)");
             }
         }
-        /*
-        println!(
-            "exit: locations: {:?}\n  stack: {:?}",
-            self.location, self.stack
-        );
-         */
     }
 
     /// Flush the abstract stack, ensuring that all values on the stack are stored in locals.
