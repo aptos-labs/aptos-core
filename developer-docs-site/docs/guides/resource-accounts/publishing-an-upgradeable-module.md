@@ -26,24 +26,25 @@ Each of the following steps will be explained in detail in their corresponding s
 5. Run the `publish_package` function to upgrade the module
 6. Run the view function again to observe the new return value
 
-First make sure you have a `deployer` profile initialized to devnet.
-
-```shell
-aptos init --profile `deployer`
-```
-
-Choose `devnet` and leave the private key part empty so it will generate an account for you. When we write `deployer` in our commands, it will automatically use this profile.
-
+First navigate to the correct directory:
 ```shell title="Navigate to your local directory"
 cd ~/aptos-core/aptos-move/move-examples/upgradeable_resource_account_package
 ```
 
+Then create a `deployer` profile initialized to devnet:
+```shell
+aptos init --profile deployer
+```
+
+Enter devnet when prompted and leave the private key empty so it will generate an account for you. When we write `deployer` in our commands, it will automatically use this profile.
+
 ### 1. Publish the module
 
 ```shell
-aptos move create-resource-account-and-publish-package        \\
-           --address-name upgradeable_resource_account_package --seed '' \\
-           --named-addresses owner=deployer
+aptos move create-resource-account-and-publish-package                      \
+           --address-name upgradeable_resource_account_package --seed ''    \
+           --named-addresses deployer=deployer                              \
+           --profile deployer
 ```
 
 The `--address-name` flag marks the following string as named address the resource account's address will appear as in the contract.
@@ -65,7 +66,7 @@ Enter yes and copy that address down somewhere. That's our resource account addr
 Replace `RESOURCE_ACCOUNT_ADDRESS`` with the address you got from step #1 and run the following command:
 
 ```shell title="View the value returned from upgradeable_function()"
-aptos move view --function-id RESOURCE_ACCOUNT_ADDRESS::upgrader::upgradeable_function
+aptos move view --function-id RESOURCE_ACCOUNT_ADDRESS::basic_contract::upgradeable_function --profile deployer
 ```
 
 It should output:
@@ -91,17 +92,16 @@ Save that file, and then follow step #4 to get the package metadata and bytecode
 ### 4. Get the new bytecode for the module
 
 ```shell
-aptos move build-publish-payload --json-output-file upgrade_contract.json              \\
-  --named-addresses upgradeable_resource_account_package=RESOURCE_ACCOUNT_ADDRESS,owner=deployer
+aptos move build-publish-payload --json-output-file upgrade_contract.json --named-addresses upgradeable_resource_account_package=RESOURCE_ACCOUNT_ADDRESS,deployer=deployer
 ```
 
 Replace `RESOURCE_ACCOUNT_ADDRESS` with your resource account address and run the command. Once you do this, there will now be a `upgrade_contract.json` file with the bytecode output of the new, upgraded module in it.
 
 Since we made our own `upgrade_contract` function that wraps the `0x1::code::publish_package_txn`, we need to change the function call value to our publish package function.
 
-After editing the JSON output, your file should look something like below, except you'll have much longer expanded `value` fields (truncated here for simplicity's sake):
+After editing `upgrade_contract.json`, your `function_id` value should look something like below:
 
-```json
+```json title="Change the function_id value in upgrade_contract.json to call your resource account's publish package function"
 {
   "function_id": "RESOURCE_ACCOUNT_ADDRESS::package_manager::publish_package",
   "type_args": [],
@@ -125,7 +125,7 @@ Make sure to change the `RESOURCE_ACCOUNT_ADDRESS` to your specific resource acc
 ### 5. Run the upgrade_contract function
 
 ```shell
-aptos move run --json-file upgrade_contract.json
+aptos move run --json-file upgrade_contract.json --profile deployer
 ```
 
 Confirm yes to publish the upgraded module.
@@ -133,7 +133,7 @@ Confirm yes to publish the upgraded module.
 ### 6. Run the upgraded view function
 
 ```shell
-aptos move view --function-id RESOURCE_ACCOUNT_ADDRESS::basic_contract::upgradeable_function
+aptos move view --function-id RESOURCE_ACCOUNT_ADDRESS::basic_contract::upgradeable_function --profile deployer
 ```
 
 You should get:
