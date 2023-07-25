@@ -70,7 +70,7 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
                 .peer(&peer)
                 .error(&error)),
                 _ => {
-                    trace!("{:?}", err)
+                    debug!("{:?}", err)
                 },
             }
         }
