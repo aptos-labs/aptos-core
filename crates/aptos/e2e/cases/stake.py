@@ -108,3 +108,29 @@ def test_stake_set_voter(run_helper: RunHelper, test_name=None):
     result = json.loads(response.stdout)["Result"]
     if result[0].get("success") != True:
         raise TestError("Did not set delegated-voter successfully")
+
+
+@test_case
+def test_stake_create_staking_contract(run_helper: RunHelper, test_name=None):
+    # run the set-operator command
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "stake",
+            "create-staking-contract",
+            "--operator",
+            "operator",
+            "--voter",
+            "voter",
+            "--amount",
+            "1000000",
+            "--commission-percentage",
+            "1",
+            "--assume-yes",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    if result.get("success") != True:
+        raise TestError("Did not set create staking contract successfully")
