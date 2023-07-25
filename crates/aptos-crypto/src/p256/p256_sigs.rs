@@ -15,10 +15,11 @@ use serde::Serialize;
 use std::{cmp::Ordering, fmt};
 
 use super::P256_SIGNATURE_LENGTH;
+use openssl::ecdsa::EcdsaSig;
 
 /// A P256 signature
 #[derive(DeserializeKey, Clone, SerializeKey)]
-pub struct P256Signature(pub(crate) p256::ecdsa::Signature);
+pub struct P256Signature(pub(crate) EcdsaSig);
 
 impl private::Sealed for P256Signature {}
 

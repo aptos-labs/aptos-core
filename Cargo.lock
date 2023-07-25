@@ -791,6 +791,7 @@ dependencies = [
  "libsecp256k1",
  "more-asserts",
  "once_cell",
+ "openssl",
  "p256",
  "proptest",
  "proptest-derive",
