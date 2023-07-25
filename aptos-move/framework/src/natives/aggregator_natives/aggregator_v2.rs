@@ -8,15 +8,55 @@ use crate::{
     },
     safely_pop_arg,
 };
+use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    values::{StructRef, Value},
+    values::{Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, sync::Arc};
+
+
+/***************************************************************************************************
+ * native fun create_aggregator(limit: u128): Aggregator;
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct CreateAggregatorGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_create_aggregator(
+    gas_params: &CreateAggregatorGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 2);
+
+    context.charge(gas_params.base)?;
+
+    // Extract fields: `limit` of the new aggregator and a `phantom_handle` of
+    // the parent factory.
+    let limit = safely_pop_arg!(args, u128);
+
+    // Get the current aggregator data.
+    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+
+    let id = AggregatorID::ephemeral(aggregator_data.generate_id());
+    aggregator_data.create_new_aggregator(id, limit);
+
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        Value::u128(0),
+        Value::u128(limit),
+    ]))])
+}
 
 /***************************************************************************************************
  * native fun try_add(aggregator: &mut Aggregator, value: u128): bool;
@@ -172,6 +212,7 @@ fn native_destroy(
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct GasParameters {
+    pub create_aggregator: CreateAggregatorGasParameters,
     pub try_add: TryAddGasParameters,
     pub read: ReadGasParameters,
     pub try_sub: TrySubGasParameters,
@@ -184,6 +225,15 @@ pub fn make_all(
     features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
+        (
+            "create_aggregator",
+            make_safe_native(
+                gas_params.create_aggregator,
+                timed_features.clone(),
+                features.clone(),
+                native_create_aggregator,
+            ),
+        ),
         (
             "try_add",
             make_safe_native(

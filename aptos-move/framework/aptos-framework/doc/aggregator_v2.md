@@ -114,6 +114,7 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 
 ## Function `create_aggregator`
 
+Returns a new aggregator.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>(limit: u128): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>

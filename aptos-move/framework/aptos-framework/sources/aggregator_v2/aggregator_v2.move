@@ -18,6 +18,7 @@ module aptos_framework::aggregator_v2 {
         aggregator.limit
     }
 
+    /// Returns a new aggregator.
     public native fun create_aggregator(limit: u128): Aggregator;
 
     /// Adds `value` to aggregator.

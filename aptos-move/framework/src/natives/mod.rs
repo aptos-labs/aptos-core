@@ -267,6 +267,7 @@ impl GasParameters {
                 new_aggregator: aggregator_factory::NewAggregatorGasParameters { base: 0.into() },
             },
             aggregator_v2: aggregator_v2::GasParameters {
+                create_aggregator: aggregator_v2::CreateAggregatorGasParameters { base: 0.into() },
                 try_add: aggregator_v2::TryAddGasParameters { base: 0.into() },
                 try_sub: aggregator_v2::TrySubGasParameters { base: 0.into() },
                 read: aggregator_v2::ReadGasParameters { base: 0.into() },
