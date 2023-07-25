@@ -26,7 +26,7 @@ module 0x1::aggregator_v2_test {
         let addr = signer::address_of(account);
         let aggregators = &borrow_global<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow(aggregators, i);
-        let actual = aggregator::read(aggregator);
+        let actual = aggregator_v2::read(aggregator);
         assert!(actual == expected, ENOT_EQUAL)
     }
 
@@ -37,7 +37,7 @@ module 0x1::aggregator_v2_test {
     public entry fun new(account: &signer, i: u64, limit: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
-        let aggregator = aggregator::create_aggregator(limit);
+        let aggregator = aggregator_v2::create_aggregator(limit);
         table::add(aggregators, i, aggregator);
     }
 
@@ -45,22 +45,22 @@ module 0x1::aggregator_v2_test {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow_mut(aggregators, i);
-        aggregator::try_add(aggregator, value);
+        aggregator_v2::try_add(aggregator, value);
     }
 
     public entry fun try_sub(account: &signer, i: u64, value: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow_mut(aggregators, i);
-        aggregator::try_sub(aggregator, value);
+        aggregator_v2::try_sub(aggregator, value);
     }
 
     public entry fun try_sub_add(account: &signer, i: u64, a: u128, b: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow_mut(aggregators, i);
-        aggregator::try_sub(aggregator, a);
-        aggregator::try_add(aggregator, b);
+        aggregator_v2::try_sub(aggregator, a);
+        aggregator_v2::try_add(aggregator, b);
     }
 
     public entry fun destroy(account: &signer, i: u64) acquires AggregatorStore {
@@ -68,45 +68,45 @@ module 0x1::aggregator_v2_test {
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
 
         let aggregator = table::remove(aggregators, i);
-        aggregator::destroy(aggregator);
+        aggregator_v2::destroy(aggregator);
     }
 
     public entry fun materialize(account: &signer, i: u64) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &borrow_global<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow(aggregators, i);
-        aggregator::read(aggregator);
+        aggregator_v2::read(aggregator);
     }
 
     public entry fun materialize_and_try_add(account: &signer, i: u64, value: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow_mut(aggregators, i);
-        aggregator::read(aggregator);
-        aggregator::try_add(aggregator, value);
+        aggregator_v2::read(aggregator);
+        aggregator_v2::try_add(aggregator, value);
     }
 
     public entry fun materialize_and_try_sub(account: &signer, i: u64, value: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow_mut(aggregators, i);
-        aggregator::read(aggregator);
-        aggregator::try_sub(aggregator, value);
+        aggregator_v2::read(aggregator);
+        aggregator_v2::try_sub(aggregator, value);
     }
 
     public entry fun try_add_and_materialize(account: &signer, i: u64, value: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow_mut(aggregators, i);
-        aggregator::try_add(aggregator, value);
-        aggregator::read(aggregator);
+        aggregator_v2::try_add(aggregator, value);
+        aggregator_v2::read(aggregator);
     }
 
     public entry fun try_sub_and_materialize(account: &signer, i: u64, value: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow_mut(aggregators, i);
-        aggregator::try_sub(aggregator, value);
-        aggregator::read(aggregator);
+        aggregator_v2::try_sub(aggregator, value);
+        aggregator_v2::read(aggregator);
     }
 }

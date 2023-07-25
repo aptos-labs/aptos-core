@@ -1,6 +1,6 @@
 /// This module provides an interface for aggregators (version 2).
 module aptos_framework::aggregator_v2 {
-    use std::option::{Self, Option};
+    use std::option::Option;
 
     /// Represents an integer which supports parallel additions and subtractions
     /// across multiple transactions. See the module description for more details.
@@ -33,6 +33,9 @@ module aptos_framework::aggregator_v2 {
     public native fun read(aggregator: &Aggregator): u128;
 
     public native fun deferred_read(aggregator: &Aggregator): AggregatorSnapshot<u128>;
+
+    // Deletes the aggregator.
+    public native fun destroy(aggregator: Aggregator);
 
     // Do automatic conversion to u64, if all possible values of aggregator fit it (i.e. limit is <= u64::MAX)
     // If limit of the aggregator exceeds u64::MAX, this will return None)
