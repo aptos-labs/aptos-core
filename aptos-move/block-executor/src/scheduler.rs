@@ -381,11 +381,11 @@ impl Scheduler {
                     }
                     SchedulerTask::NoTask
                 };
-            } else {
-                debug_assert!(idx_to_validate < self.num_txns);
             }
 
             if should_validate {
+                debug_assert!(idx_to_validate < self.num_txns);
+
                 if let Some((version_to_validate, wave)) = self.try_validate_next_version() {
                     return SchedulerTask::ValidationTask(version_to_validate, wave);
                 }
@@ -725,7 +725,7 @@ impl Scheduler {
 
         let min_never_executed = self.min_never_executed_idx.load(Ordering::Relaxed);
 
-        if idx_to_validate >= min_never_executed {
+        if idx_to_validate < min_never_executed {
             // Once the transaction at min_never_executed finishes its first incarnation,
             // it will pull back the validation index and start a new wave (no previous write-set),
             // and thus we do not have to validate at the current wave.
@@ -797,15 +797,15 @@ impl Scheduler {
     /// Set status of the transaction to Executed(incarnation).
     fn set_executed_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
         {
-            let mut status = self.txn_status[txn_idx as usize].0.write();
+            let mut status_write_locked = self.txn_status[txn_idx as usize].0.write();
             // The execution is already halted.
-            if matches!(*status, ExecutionStatus::ExecutionHalted) {
+            if matches!(*status_write_locked, ExecutionStatus::ExecutionHalted) {
                 return;
             }
 
             // Only makes sense when the current status is 'Executing'.
-            debug_assert!(*status == ExecutionStatus::Executing(incarnation));
-            *status = ExecutionStatus::Executed(incarnation);
+            debug_assert!(*status_write_locked == ExecutionStatus::Executing(incarnation));
+            *status_write_locked = ExecutionStatus::Executed(incarnation);
         }
 
         if incarnation == 0 {
@@ -825,7 +825,7 @@ impl Scheduler {
     fn update_never_executed(&self, mut next_idx: TxnIndex) {
         // CAS would be another way of implementing the update functionality, but here
         // we can keep incrementing next_idx and storing at the end.
-        loop {
+        while next_idx < self.num_txns() {
             if !matches!(
                 *self.txn_status[next_idx as usize].0.read(),
                 ExecutionStatus::Ready(0, _)
@@ -839,6 +839,8 @@ impl Scheduler {
                 break;
             }
         }
+
+        // Race condition around here.
         self.min_never_executed_idx
             .store(next_idx, Ordering::Release);
     }
