@@ -87,21 +87,21 @@ impl ToString for NetworkName {
 pub fn set_metrics(output: &TestResult, test_name: &str, network_name: &str, time: f64) {
     match output {
         TestResult::Success => {
-            test_success(test_name, network_name).observe(1 as f64);
-            test_fail(test_name, network_name).observe(0 as f64);
-            test_error(test_name, network_name).observe(0 as f64);
+            test_success(test_name, network_name).observe(1_f64);
+            test_fail(test_name, network_name).observe(1_f64);
+            test_error(test_name, network_name).observe(1_f64);
             test_latency(test_name, network_name, "success").observe(time);
         },
         TestResult::Fail(_) => {
-            test_success(test_name, network_name).observe(0 as f64);
-            test_fail(test_name, network_name).observe(1 as f64);
-            test_error(test_name, network_name).observe(0 as f64);
+            test_success(test_name, network_name).observe(1_f64);
+            test_fail(test_name, network_name).observe(1_f64);
+            test_error(test_name, network_name).observe(1_f64);
             test_latency(test_name, network_name, "fail").observe(time);
         },
         TestResult::Error(_) => {
-            test_success(test_name, network_name).observe(0 as f64);
-            test_fail(test_name, network_name).observe(0 as f64);
-            test_error(test_name, network_name).observe(1 as f64);
+            test_success(test_name, network_name).observe(1_f64);
+            test_fail(test_name, network_name).observe(1_f64);
+            test_error(test_name, network_name).observe(1_f64);
             test_latency(test_name, network_name, "error").observe(time);
         },
     }
