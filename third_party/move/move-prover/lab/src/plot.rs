@@ -10,6 +10,7 @@ use crate::{
     benchmark::{Benchmark, BenchmarkData},
 };
 use anyhow::Context;
+use clap::ArgAction::Set;
 use clap::{Arg, Command};
 use itertools::Itertools;
 use plotters::{
@@ -37,50 +38,42 @@ pub fn plot_svg(args: &[String]) -> anyhow::Result<()> {
         .arg(
             Arg::new("out")
                 .long("out")
-                .takes_value(true)
+                .num_args(1)
                 .value_name("FILE")
                 .help("file where output will be written too"),
         )
         .arg(
             Arg::new("sort")
                 .long("sort")
+                .short('s')
+                .num_args(0)
+                .action(Set)
                 .help("whether to sort the benchmark data based on the first data file"),
         )
         .arg(
             Arg::new("top")
                 .long("top")
-                .takes_value(true)
+                .num_args(1)
                 .value_name("NUMBER")
-                .validator(is_number)
+                .value_parser(is_number)
                 .help("plot only the top N entries"),
         )
         .arg(
             Arg::new("data-files")
-                .multiple_occurrences(true)
                 .value_name("PATH_TO_BENCHMARK_DATA")
-                .min_values(1)
-                .default_value("")
-                .forbid_empty_values(true)
+                .num_args(1..)
                 .help("the benchmark data files to plot"),
         );
     let matches = cmd_line_parser.try_get_matches_from(args)?;
     let get_vec = |s: &str| -> Vec<String> {
-        match matches.values_of(s) {
-            Some(vs) => vs.map(|v| v.to_string()).collect(),
-            _ => vec![],
-        }
+        let vs = matches.get_many::<String>(s);
+        vs.map_or(vec![], |vs| vs.cloned().collect())
     };
-    let out_file = if matches.is_present("out") {
-        matches.value_of("out").unwrap().to_string()
-    } else {
-        "plot.svg".to_owned()
-    };
-    let sort = matches.is_present("sort");
-    let top = if matches.is_present("top") {
-        Some(matches.value_of("top").unwrap().parse::<usize>()?)
-    } else {
-        None
-    };
+    let out_file = matches
+        .get_one::<String>("out")
+        .map_or("plot.svg".to_owned(), |s| s.clone());
+    let sort = matches.contains_id("sort");
+    let top = matches.get_one::<usize>("top");
     let data_files = get_vec("data-files");
     let mut data = vec![];
     for file in data_files {
@@ -92,7 +85,7 @@ pub fn plot_svg(args: &[String]) -> anyhow::Result<()> {
     }
 
     if let Some(n) = top {
-        data[0].take(n)
+        data[0].take(*n)
     }
 
     println!("plotting to `{}`", out_file);
