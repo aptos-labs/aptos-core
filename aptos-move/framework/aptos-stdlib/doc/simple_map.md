@@ -1026,4 +1026,4 @@ Remove a key/value pair from the map. The key must exist.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

@@ -31,15 +31,21 @@ bcs = { workspace = true }
 better_any = { workspace = true }
 blake2-rfc = { workspace = true }
 blst = { workspace = true }
+bulletproofs = { workspace = true }
+byteorder = { workspace = true }
 clap = { workspace = true }
 codespan-reporting = { workspace = true }
-curve25519-dalek = { workspace = true }
+# We need `zkcrypto/curve25519-dalek-ng` here instead of the normal `dalek-cryptography/curve25519-dalek` package. This
+# is because the `dalek-cryptography/bulletproofs` works with version 2 of `dalek-cryptography/curve25519-dalek` and
+# we work with version 3. Instead, we use `zkcrypto/bulleproofs` which relies on `zkcrypto/curve25519-dalek-ng`.
+curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 flate2 = { workspace = true }
 hex = { workspace = true }
 include_dir = { workspace = true }
 itertools = { workspace = true }
 libsecp256k1 = { workspace = true }
 log = { workspace = true }
+merlin = { workspace = true }
 move-binary-format = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler = { workspace = true }
