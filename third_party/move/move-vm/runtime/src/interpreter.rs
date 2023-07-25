@@ -1052,14 +1052,12 @@ fn check_depth_of_type_impl(
         Type::Reference(ty) | Type::MutableReference(ty) | Type::Vector(ty) => {
             check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?
         },
-        Type::Struct { index: si, .. } => {
-            let formula = resolver.loader().calculate_depth_of_struct(*si)?;
+        Type::Struct { name, .. } => {
+            let formula = resolver.loader().calculate_depth_of_struct(name)?;
             check_depth!(formula.solve(&[]))
         },
         // NB: substitution must be performed before calling this function
-        Type::StructInstantiation {
-            index: si, ty_args, ..
-        } => {
+        Type::StructInstantiation { name, ty_args, .. } => {
             // Calculate depth of all type arguments, and make sure they themselves are not too deep.
             let ty_arg_depths = ty_args
                 .iter()
@@ -1068,7 +1066,7 @@ fn check_depth_of_type_impl(
                     check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(0))
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?;
-            let formula = resolver.loader().calculate_depth_of_struct(*si)?;
+            let formula = resolver.loader().calculate_depth_of_struct(name)?;
             check_depth!(formula.solve(&ty_arg_depths))
         },
         Type::TyParam(_) => {

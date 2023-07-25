@@ -2173,7 +2173,7 @@ impl Vector {
             | Type::Vector(_)
             | Type::Struct { .. }
             | Type::StructInstantiation {
-                index: _,
+                name: _,
                 ty_args: _,
                 ..
             } => Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(

@@ -49,9 +49,9 @@ where
                 *module.address_identifier_at(module_handle.address),
                 module.identifier_at(module_handle.name).to_owned(),
             );
-            let (def_idx, struct_) = resolver(struct_name, &module_id)?;
+            let (_, struct_) = resolver(struct_name, &module_id)?;
             Type::Struct {
-                index: def_idx,
+                name: struct_.name.clone(),
                 ability: struct_.abilities,
             }
         },
@@ -67,9 +67,9 @@ where
                 *module.address_identifier_at(module_handle.address),
                 module.identifier_at(module_handle.name).to_owned(),
             );
-            let (def_idx, struct_) = resolver(struct_name, &module_id)?;
+            let (_, struct_) = resolver(struct_name, &module_id)?;
             Type::StructInstantiation {
-                index: def_idx,
+                name: struct_.name.clone(),
                 base_ability_set: struct_.abilities,
                 ty_args: type_parameters,
                 phantom_ty_args_mask: struct_

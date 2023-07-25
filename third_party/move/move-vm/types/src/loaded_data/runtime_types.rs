@@ -12,7 +12,7 @@ use move_core_types::{
     gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
     vm_status::StatusCode,
 };
-use std::{cmp::max, collections::BTreeMap, fmt::Debug};
+use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -116,8 +116,7 @@ pub struct StructType {
     pub phantom_ty_args_mask: Vec<bool>,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub name: Identifier,
-    pub module: ModuleId,
+    pub name: Arc<StructName>,
     pub struct_def: StructDefinitionIndex,
 }
 
@@ -131,6 +130,12 @@ impl StructType {
 pub struct CachedStructIndex(pub usize);
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct StructName {
+    pub module: ModuleId,
+    pub name: Identifier,
+}
+
+#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Type {
     Bool,
     U8,
@@ -140,11 +145,11 @@ pub enum Type {
     Signer,
     Vector(Box<Type>),
     Struct {
-        index: CachedStructIndex,
+        name: Arc<StructName>,
         ability: AbilitySet,
     },
     StructInstantiation {
-        index: CachedStructIndex,
+        name: Arc<StructName>,
         ty_args: Vec<Type>,
         base_ability_set: AbilitySet,
         phantom_ty_args_mask: Vec<bool>,
@@ -189,14 +194,14 @@ impl Type {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
             },
             Type::Struct {
-                index: def_idx,
+                name,
                 ability,
             } => Type::Struct {
-                index: *def_idx,
+                name: name.clone(),
                 ability: *ability,
             },
             Type::StructInstantiation {
-                index: def_idx,
+                name,
                 ty_args: instantiation,
                 base_ability_set: base_ability,
                 phantom_ty_args_mask: is_phantom_params,
@@ -206,7 +211,7 @@ impl Type {
                     inst.push(ty.apply_subst(subst, depth + 1)?)
                 }
                 Type::StructInstantiation {
-                    index: *def_idx,
+                    name: name.clone(),
                     ty_args: inst,
                     base_ability_set: *base_ability,
                     phantom_ty_args_mask: is_phantom_params.clone(),
