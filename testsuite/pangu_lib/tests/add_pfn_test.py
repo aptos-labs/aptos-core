@@ -1,7 +1,7 @@
 from test_framework.kubernetes import SpyKubernetes
 from test_framework.filesystem import SpyFilesystem
 from test_framework.shell import SpyShell
-from pangu.pangu_lib.node_commands.add_pfn import *
+from pangu_lib.node_commands.add_pfn import *
 import unittest
 from kubernetes.client import ApiException  # type: ignore
 from typing import Dict
@@ -10,21 +10,19 @@ from typing import Dict
 class node_tests_add_pfn(unittest.TestCase):
     def test_add_pfn_dry(self) -> None:
         expected_reads: Dict[str, bytes] = {
-            "pfn-config-path": open(
-                "./pangu/pangu_lib/fixtures/pfn_1.yaml", "rb"
-            ).read(),
+            "pfn-config-path": open("./pangu_lib/fixtures/pfn_1.yaml", "rb").read(),
         }
         expected_writes: Dict[str, bytes] = {
             "workspace/pfn_dry_run": b"",
             "workspace/pfn_dry_run/pfn-name": b"",
             "workspace/pfn_dry_run/pfn-name/pfn_config_config_map.yaml": open(
-                "./pangu/pangu_lib/fixtures/pfn_1_config_config_map.yaml", "rb"
+                "./pangu_lib/fixtures/pfn_1_config_config_map.yaml", "rb"
             ).read(),
             "workspace/pfn_dry_run/pfn-name/pfn-service.yaml": open(
-                "./pangu/pangu_lib/fixtures/pfn_1-service.yaml", "rb"
+                "./pangu_lib/fixtures/pfn_1-service.yaml", "rb"
             ).read(),
             "workspace/pfn_dry_run/pfn-name/pfn-statefulset.yaml": open(
-                "./pangu/pangu_lib/fixtures/pfn_1-statefulset.yaml", "rb"
+                "./pangu_lib/fixtures/pfn_1-statefulset.yaml", "rb"
             ).read(),
         }
 
@@ -52,9 +50,7 @@ class node_tests_add_pfn(unittest.TestCase):
 
     def test_add_pfn_live(self) -> None:
         expected_reads: Dict[str, bytes] = {
-            "pfn-config-path": open(
-                "./pangu/pangu_lib/fixtures/pfn_1.yaml", "rb"
-            ).read(),
+            "pfn-config-path": open("./pangu_lib/fixtures/pfn_1.yaml", "rb").read(),
         }
 
         kubernetes: SpyKubernetes = SpyKubernetes()

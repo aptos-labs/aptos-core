@@ -1,6 +1,6 @@
 from test_framework.kubernetes import SpyKubernetes
 from kubernetes import client
-from pangu.pangu_lib.testnet_commands.get_testnet import get_testnet_main
+from pangu_lib.testnet_commands.get_testnet import get_testnet_main
 import unittest
 from kubernetes.client import ApiException  # type: ignore
 from datetime import datetime, timezone

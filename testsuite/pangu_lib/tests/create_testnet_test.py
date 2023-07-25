@@ -1,7 +1,7 @@
 from test_framework.shell import SpyShell, FakeCommand, RunResult, Shell
 from test_framework.filesystem import SpyFilesystem, Filesystem
 from test_framework.kubernetes import SpyKubernetes, Kubernetes
-from pangu.pangu_lib.testnet_commands.create_testnet import *
+from pangu_lib.testnet_commands.create_testnet import *
 import unittest
 import json
 import asyncio
@@ -27,10 +27,10 @@ class testnet_tests_create_testnet(unittest.TestCase):
         # Init expected filesystem reads/writes
         reads = {
             pangu_node_configs_path: open(
-                "pangu/pangu_lib/template_testnet_files/pangu_node_config.yaml", "rb"
+                "pangu_lib/template_testnet_files/pangu_node_config.yaml", "rb"
             ).read(),
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/layout.yaml": open(
-                "pangu/pangu_lib/template_testnet_files/layout.yaml", "rb"
+                "pangu_lib/template_testnet_files/layout.yaml", "rb"
             ).read(),
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/waypoint.txt": b"waypoint",
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/genesis.blob": b"genesis",
@@ -39,7 +39,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}": b"",
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}": b"",
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/layout.yaml": open(
-                "./pangu/pangu_lib/fixtures/layout_1.yaml", "rb"
+                "./pangu_lib/fixtures/layout_1.yaml", "rb"
             ).read(),
         }
         filesystem: Filesystem = SpyFilesystem(writes, reads)
@@ -98,10 +98,10 @@ class testnet_tests_create_testnet(unittest.TestCase):
         # Init expected filesystem reads/writes
         reads = {
             pangu_node_configs_path: open(
-                "pangu/pangu_lib/template_testnet_files/pangu_node_config.yaml", "rb"
+                "pangu_lib/template_testnet_files/pangu_node_config.yaml", "rb"
             ).read(),
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/layout.yaml": open(
-                "pangu/pangu_lib/template_testnet_files/layout.yaml", "rb"
+                "pangu_lib/template_testnet_files/layout.yaml", "rb"
             ).read(),
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/waypoint.txt": b"waypoint",
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/genesis.blob": b"genesis",
@@ -111,7 +111,7 @@ class testnet_tests_create_testnet(unittest.TestCase):
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}": b"",
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/dry_run": b"",
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/layout.yaml": open(
-                "./pangu/pangu_lib/fixtures/layout_1.yaml", "rb"
+                "./pangu_lib/fixtures/layout_1.yaml", "rb"
             ).read(),
             f"{workspace}/{util.PANGU_WORKSPACE_NAME}/{namespace}/dry_run/genesis_artifact_config_map.yaml": b"apiVersion: v1\nbinaryData:\n  genesis.blob: Z2VuZXNpcw==\ndata:\n  waypoint.txt: waypoint\nkind: ConfigMap\nmetadata:\n  name: genesis-artifiact-configmap-pangu\n",
         }
@@ -626,13 +626,13 @@ class testnet_tests_create_testnet(unittest.TestCase):
         # Init expected filesystem reads/writes
         writes = {
             "test_workspace/dry_run/test_username/test_username-validator-statefulset.yaml": open(
-                "./pangu/pangu_lib/fixtures/stateful_validator_1.yaml", "rb"
+                "./pangu_lib/fixtures/stateful_validator_1.yaml", "rb"
             ).read(),
             "test_workspace/dry_run/test_username/test_username-validator-service.yaml": open(
-                "./pangu/pangu_lib/fixtures/service_validator_1.yaml", "rb"
+                "./pangu_lib/fixtures/service_validator_1.yaml", "rb"
             ).read(),
             "test_workspace/dry_run/test_username/test_username-validator-pvc.yaml": open(
-                "./pangu/pangu_lib/fixtures/pvc_validator_1.yaml", "rb"
+                "./pangu_lib/fixtures/pvc_validator_1.yaml", "rb"
             ).read(),
         }
         filesystem: SpyFilesystem = SpyFilesystem(writes, {})
@@ -752,13 +752,13 @@ class testnet_tests_create_testnet(unittest.TestCase):
         # Init expected filesystem reads/writes
         writes = {
             "test_workspace/dry_run/test_username/test_username-vfn-statefulset.yaml": open(
-                "./pangu/pangu_lib/fixtures/stateful_vfn_1.yaml", "rb"
+                "./pangu_lib/fixtures/stateful_vfn_1.yaml", "rb"
             ).read(),
             "test_workspace/dry_run/test_username/test_username-vfn-service.yaml": open(
-                "./pangu/pangu_lib/fixtures/service_vfn_1.yaml", "rb"
+                "./pangu_lib/fixtures/service_vfn_1.yaml", "rb"
             ).read(),
             "test_workspace/dry_run/test_username/test_username-vfn-pvc.yaml": open(
-                "./pangu/pangu_lib/fixtures/pvc_vfn_1.yaml", "rb"
+                "./pangu_lib/fixtures/pvc_vfn_1.yaml", "rb"
             ).read(),
         }
         filesystem: SpyFilesystem = SpyFilesystem(writes, {})
@@ -803,10 +803,10 @@ class testnet_tests_create_testnet(unittest.TestCase):
         }
         reads = {
             "test_workspace/test_username/vfn.yaml": open(
-                "./pangu/pangu_lib/fixtures/vfn_1.yaml", "rb"
+                "./pangu_lib/fixtures/vfn_1.yaml", "rb"
             ).read(),
             f"{util.TEMPLATE_DIRECTORY}/vfn.yaml": open(
-                "./pangu/pangu_lib/template_testnet_files/vfn.yaml", "rb"
+                "./pangu_lib/template_testnet_files/vfn.yaml", "rb"
             ).read(),
             "test_node_config_path": b"",
             "test_userdir/validator-identity.yaml": b"",

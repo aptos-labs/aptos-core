@@ -1,7 +1,7 @@
 from test_framework.kubernetes import Kubernetes
 from test_framework.logging import log
-import pangu.pangu_lib.util as util
-from pangu.pangu_lib.node_commands import restart_node
+import pangu_lib.util as util
+from pangu_lib.node_commands import restart_node
 from os import path
 
 
