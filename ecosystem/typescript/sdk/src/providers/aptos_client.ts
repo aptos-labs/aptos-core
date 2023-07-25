@@ -13,6 +13,7 @@ import {
   Memoize,
   sleep,
   APTOS_COIN,
+  MemoizeExpiring,
 } from "../utils";
 import { AptosAccount } from "../account/aptos_account";
 import * as Gen from "../generated/index";
@@ -135,6 +136,7 @@ export class AptosClient {
    * which is JSON representation of a module
    */
   @parseApiError
+  @MemoizeExpiring(10 * 60 * 1000)
   async getAccountModules(
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: AnyNumber },
