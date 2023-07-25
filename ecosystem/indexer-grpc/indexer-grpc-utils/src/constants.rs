@@ -8,3 +8,5 @@ pub const GRPC_AUTH_TOKEN_HEADER: &str = "x-aptos-data-authorization";
 /// GRPC request metadata key for the request name. This is used to identify the
 /// data destination.
 pub const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
+// Limit the message size to 15MB. By default the downstream can receive up to 15MB.
+pub const MESSAGE_SIZE_LIMIT: usize = 1024 * 1024 * 15;
