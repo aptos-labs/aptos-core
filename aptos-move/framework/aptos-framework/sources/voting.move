@@ -165,6 +165,23 @@ module aptos_framework::voting {
         resolved_early: bool
     }
 
+    fun test_inconsistency<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ) acquires VotingForum {
+
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        *simple_map::borrow(&proposal.metadata, &utf8(b"a"));
+
+        let multi_step_in_execution_key = utf8(b"b");
+        simple_map::contains_key(&proposal.metadata, &multi_step_in_execution_key);
+
+        let multi_step_key = utf8(b"c");
+        simple_map::contains_key(&proposal.metadata, &multi_step_key);
+
+    }
+
     public fun register<ProposalType: store>(account: &signer) {
         let addr = signer::address_of(account);
         assert!(!exists<VotingForum<ProposalType>>(addr), error::already_exists(EVOTING_FORUM_ALREADY_REGISTERED));

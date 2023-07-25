@@ -1,7 +1,13 @@
 spec aptos_framework::voting {
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_strict;
+    }
+
+    spec test_inconsistency {
+        pragma verify = false;
+        aborts_if true;
+        ensures false;
     }
 
     spec register<ProposalType: store>(account: &signer) {
@@ -171,6 +177,7 @@ spec aptos_framework::voting {
         next_execution_hash: vector<u8>,
     ) {
         use aptos_framework::chain_status;
+        pragma verify = true;
         // Ensures existence of Timestamp
         requires chain_status::is_operating();
 
@@ -178,6 +185,7 @@ spec aptos_framework::voting {
         include AbortsIfNotContainProposalID<ProposalType>;
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
+        ensures false;
     }
 
     spec next_proposal_id<ProposalType: store>(voting_forum_address: address): u64 {

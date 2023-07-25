@@ -52,6 +52,11 @@ pub struct ProverOptions {
     #[clap(long)]
     pub check_inconsistency: bool,
 
+    /// Whether to treat abort as inconsistency when checking consistency.
+    /// Need to work together with check-inconsistency
+    #[clap(long)]
+    pub unconditional_abort_as_inconsistency: bool,
+
     /// Whether to keep loops as they are and pass them on to the underlying solver.
     #[clap(long)]
     pub keep_loops: bool,
@@ -85,6 +90,7 @@ impl Default for ProverOptions {
             proc_cores: 4,
             vc_timeout: 40,
             check_inconsistency: false,
+            unconditional_abort_as_inconsistency: false,
             keep_loops: false,
             loop_unroll: None,
             stable_test_output: false,
@@ -167,6 +173,7 @@ impl ProverOptions {
                 dump_bytecode: self.dump,
                 dump_cfg: false,
                 check_inconsistency: self.check_inconsistency,
+                unconditional_abort_as_inconsistency: self.unconditional_abort_as_inconsistency,
                 skip_loop_analysis: self.keep_loops,
                 ..Default::default()
             },

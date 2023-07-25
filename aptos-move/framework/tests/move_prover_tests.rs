@@ -4,6 +4,10 @@
 use aptos_framework::prover::ProverOptions;
 use std::{collections::BTreeMap, path::PathBuf};
 
+const ENV_TEST_INCONSISTENCY: &str = "MVP_TEST_INCONSISTENCY";
+const ENV_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY: &str =
+    "MVP_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY";
+
 // Note: to run these tests, use:
 //
 //   cargo test -- --include-ignored prover
@@ -23,7 +27,7 @@ pub fn read_env_var(v: &str) -> String {
 
 pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    let options = ProverOptions::default_for_test();
+    let mut options = ProverOptions::default_for_test();
     let no_tools = read_env_var("BOOGIE_EXE").is_empty()
         || !options.cvc5 && read_env_var("Z3_EXE").is_empty()
         || options.cvc5 && read_env_var("CVC5_EXE").is_empty();
@@ -35,6 +39,15 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
         use \"-- --skip prover\" to filter out the prover tests"
         );
     } else {
+        let inconsistency_flag = read_env_var(ENV_TEST_INCONSISTENCY) == "1";
+        let unconditional_abort_inconsistency_flag =
+            read_env_var(ENV_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY) == "1";
+        if inconsistency_flag {
+            options.check_inconsistency = true;
+            if unconditional_abort_inconsistency_flag {
+                options.unconditional_abort_as_inconsistency = true;
+            }
+        }
         options
             .prove(false, pkg_path.as_path(), BTreeMap::default(), None)
             .unwrap()

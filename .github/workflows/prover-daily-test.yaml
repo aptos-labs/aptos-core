@@ -40,3 +40,5 @@ jobs:
           echo "/home/runner/.dotnet/tools" | tee -a $GITHUB_PATH
       - run: MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-move-examples --release -- --include-ignored prover
       - run: MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-framework --release -- --include-ignored prover
+      - run: MVP_TEST_INCONSISTENCY=1 MVP_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY=1 cargo test -p aptos-move-examples --release -- --include-ignored prover
+      - run: MVP_TEST_INCONSISTENCY=1 MVP_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY=1 cargo test -p aptos-framework --release -- --include-ignored prover

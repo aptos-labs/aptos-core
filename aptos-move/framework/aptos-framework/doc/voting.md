@@ -34,6 +34,7 @@ the resolution process.
 -  [Struct `VoteEvent`](#0x1_voting_VoteEvent)
 -  [Struct `ResolveProposal`](#0x1_voting_ResolveProposal)
 -  [Constants](#@Constants_0)
+-  [Function `test_inconsistency`](#0x1_voting_test_inconsistency)
 -  [Function `register`](#0x1_voting_register)
 -  [Function `create_proposal`](#0x1_voting_create_proposal)
 -  [Function `create_proposal_v2`](#0x1_voting_create_proposal_v2)
@@ -55,6 +56,7 @@ the resolution process.
 -  [Function `is_multi_step_proposal_in_execution`](#0x1_voting_is_multi_step_proposal_in_execution)
 -  [Function `is_voting_period_over`](#0x1_voting_is_voting_period_over)
 -  [Specification](#@Specification_1)
+    -  [Function `test_inconsistency`](#@Specification_1_test_inconsistency)
     -  [Function `register`](#@Specification_1_register)
     -  [Function `create_proposal`](#@Specification_1_create_proposal)
     -  [Function `create_proposal_v2`](#@Specification_1_create_proposal_v2)
@@ -637,6 +639,43 @@ Key used to track the resolvable time in the proposal's metadata.
 </code></pre>
 
 
+
+<a name="0x1_voting_test_inconsistency"></a>
+
+## Function `test_inconsistency`
+
+
+
+<pre><code><b>fun</b> <a href="voting.md#0x1_voting_test_inconsistency">test_inconsistency</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="voting.md#0x1_voting_test_inconsistency">test_inconsistency</a>&lt;ProposalType: store&gt;(
+    voting_forum_address: <b>address</b>,
+    proposal_id: u64,
+) <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+
+    <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> voting_forum.proposals, proposal_id);
+    *<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(&proposal.metadata, &utf8(b"a"));
+
+    <b>let</b> multi_step_in_execution_key = utf8(b"b");
+    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&proposal.metadata, &multi_step_in_execution_key);
+
+    <b>let</b> multi_step_key = utf8(b"c");
+    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&proposal.metadata, &multi_step_key);
+
+}
+</code></pre>
+
+
+
+</details>
 
 <a name="0x1_voting_register"></a>
 
@@ -1511,8 +1550,26 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+<a name="@Specification_1_test_inconsistency"></a>
+
+### Function `test_inconsistency`
+
+
+<pre><code><b>fun</b> <a href="voting.md#0x1_voting_test_inconsistency">test_inconsistency</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> <b>true</b>;
+<b>ensures</b> <b>false</b>;
 </code></pre>
 
 
@@ -1704,11 +1761,13 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
+<b>ensures</b> <b>false</b>;
 </code></pre>
 
 
