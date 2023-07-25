@@ -119,7 +119,6 @@ pub struct StructType {
     pub name: Identifier,
     pub module: ModuleId,
     pub struct_def: StructDefinitionIndex,
-    pub depth: Option<DepthFormula>,
 }
 
 impl StructType {

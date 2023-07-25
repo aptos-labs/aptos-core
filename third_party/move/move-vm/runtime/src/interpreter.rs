@@ -1053,12 +1053,8 @@ fn check_depth_of_type_impl(
             check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?
         },
         Type::Struct { index: si, .. } => {
-            let struct_type = resolver.loader().get_struct_type(*si)?;
-            check_depth!(struct_type
-                .depth
-                .as_ref()
-                .ok_or_else(|| { PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED) })?
-                .solve(&[]))
+            let formula = resolver.loader().calculate_depth_of_struct(*si)?;
+            check_depth!(formula.solve(&[]))
         },
         // NB: substitution must be performed before calling this function
         Type::StructInstantiation {
@@ -1072,12 +1068,8 @@ fn check_depth_of_type_impl(
                     check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(0))
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?;
-            let struct_type = resolver.loader().get_struct_type(*si)?;
-            check_depth!(struct_type
-                .depth
-                .as_ref()
-                .ok_or_else(|| { PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED) })?
-                .solve(&ty_arg_depths))
+            let formula = resolver.loader().calculate_depth_of_struct(*si)?;
+            check_depth!(formula.solve(&ty_arg_depths))
         },
         Type::TyParam(_) => {
             return Err(

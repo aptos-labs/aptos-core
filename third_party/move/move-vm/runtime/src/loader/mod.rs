@@ -211,29 +211,6 @@ impl ModuleCache {
             err.finish(Location::Undefined)
         })?;
 
-        let struct_defs_len = module.struct_defs.len();
-
-        let mut depth_cache = BTreeMap::new();
-
-        for cached_idx in starting_idx..(starting_idx + struct_defs_len) {
-            self.calculate_depth_of_struct(CachedStructIndex(cached_idx), &mut depth_cache)
-                .map_err(|err| err.finish(Location::Undefined))?;
-        }
-        debug_assert!(depth_cache.len() == struct_defs_len);
-        for (cache_idx, depth) in depth_cache {
-            match Arc::get_mut(self.structs.get_mut(cache_idx.0).unwrap()) {
-                Some(struct_type) => struct_type.depth = Some(depth),
-                None => {
-                    // we have pending references to the `Arc` which is impossible,
-                    // given the code that adds the `Arc` is above and no reference to
-                    // it should exist.
-                    // So in the spirit of not crashing we just leave it as None and
-                    // log the issue.
-                    error!("Arc<StructType> cannot have any live reference while publishing");
-                },
-            }
-        }
-
         for (idx, func) in module.function_defs().iter().enumerate() {
             let findex = FunctionDefinitionIndex(idx as TableIndex);
             let mut function = Function::new(natives, findex, func, module);
@@ -294,7 +271,6 @@ impl ModuleCache {
             name,
             module,
             struct_def: idx,
-            depth: None,
         }
     }
 
@@ -432,87 +408,6 @@ impl ModuleCache {
                 )),
             ),
         }
-    }
-
-    fn calculate_depth_of_struct(
-        &self,
-        def_idx: CachedStructIndex,
-        depth_cache: &mut BTreeMap<CachedStructIndex, DepthFormula>,
-    ) -> PartialVMResult<DepthFormula> {
-        let struct_type = &self.struct_at(def_idx);
-
-        // If we've already computed this structs depth, no more work remains to be done.
-        if let Some(form) = &struct_type.depth {
-            return Ok(form.clone());
-        }
-        if let Some(form) = depth_cache.get(&def_idx) {
-            return Ok(form.clone());
-        }
-
-        let formulas = struct_type
-            .fields
-            .iter()
-            .map(|field_type| self.calculate_depth_of_type(field_type, depth_cache))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let formula = DepthFormula::normalize(formulas);
-        let prev = depth_cache.insert(def_idx, formula.clone());
-        if prev.is_some() {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Recursive type?".to_owned()),
-            );
-        }
-        Ok(formula)
-    }
-
-    fn calculate_depth_of_type(
-        &self,
-        ty: &Type,
-        depth_cache: &mut BTreeMap<CachedStructIndex, DepthFormula>,
-    ) -> PartialVMResult<DepthFormula> {
-        Ok(match ty {
-            Type::Bool
-            | Type::U8
-            | Type::U64
-            | Type::U128
-            | Type::Address
-            | Type::Signer
-            | Type::U16
-            | Type::U32
-            | Type::U256 => DepthFormula::constant(1),
-            Type::Vector(ty) | Type::Reference(ty) | Type::MutableReference(ty) => {
-                let mut inner = self.calculate_depth_of_type(ty, depth_cache)?;
-                inner.scale(1);
-                inner
-            },
-            Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
-            Type::Struct {
-                index: cache_idx, ..
-            } => {
-                let mut struct_formula = self.calculate_depth_of_struct(*cache_idx, depth_cache)?;
-                debug_assert!(struct_formula.terms.is_empty());
-                struct_formula.scale(1);
-                struct_formula
-            },
-            Type::StructInstantiation {
-                index: cache_idx,
-                ty_args,
-                ..
-            } => {
-                let ty_arg_map = ty_args
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, ty)| {
-                        let var = idx as TypeParameterIndex;
-                        Ok((var, self.calculate_depth_of_type(ty, depth_cache)?))
-                    })
-                    .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
-                let struct_formula = self.calculate_depth_of_struct(*cache_idx, depth_cache)?;
-                let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
-                subst_struct_formula.scale(1);
-                subst_struct_formula
-            },
-        })
     }
 }
 
@@ -2738,12 +2633,14 @@ impl StructInfo {
 #[derive(Clone)]
 pub(crate) struct TypeCache {
     structs: HashMap<CachedStructIndex, HashMap<Vec<Type>, StructInfo>>,
+    depth_formula: HashMap<CachedStructIndex, DepthFormula>,
 }
 
 impl TypeCache {
     fn new() -> Self {
         Self {
             structs: HashMap::new(),
+            depth_formula: HashMap::new(),
         }
     }
 }
@@ -3106,6 +3003,81 @@ impl Loader {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("no type layout for {:?}", ty)),
                 );
+            },
+        })
+    }
+
+    pub(crate) fn calculate_depth_of_struct(
+        &self,
+        def_idx: CachedStructIndex,
+    ) -> PartialVMResult<DepthFormula> {
+        if let Some(depth_formula) = self.type_cache.read().depth_formula.get(&def_idx) {
+            return Ok(depth_formula.clone())
+        }
+
+        let struct_type = self.get_struct_type(def_idx)?;
+
+        let formulas = struct_type
+            .fields
+            .iter()
+            .map(|field_type| self.calculate_depth_of_type(field_type))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        let formula = DepthFormula::normalize(formulas);
+        let prev = self.type_cache.write().depth_formula.insert(def_idx, formula.clone());
+        if prev.is_some() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Recursive type?".to_owned()),
+            );
+        }
+        Ok(formula)
+    }
+
+    fn calculate_depth_of_type(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<DepthFormula> {
+        Ok(match ty {
+            Type::Bool
+            | Type::U8
+            | Type::U64
+            | Type::U128
+            | Type::Address
+            | Type::Signer
+            | Type::U16
+            | Type::U32
+            | Type::U256 => DepthFormula::constant(1),
+            Type::Vector(ty) | Type::Reference(ty) | Type::MutableReference(ty) => {
+                let mut inner = self.calculate_depth_of_type(ty)?;
+                inner.scale(1);
+                inner
+            },
+            Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
+            Type::Struct {
+                index: cache_idx, ..
+            } => {
+                let mut struct_formula = self.calculate_depth_of_struct(*cache_idx)?;
+                debug_assert!(struct_formula.terms.is_empty());
+                struct_formula.scale(1);
+                struct_formula
+            },
+            Type::StructInstantiation {
+                index: cache_idx,
+                ty_args,
+                ..
+            } => {
+                let ty_arg_map = ty_args
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, ty)| {
+                        let var = idx as TypeParameterIndex;
+                        Ok((var, self.calculate_depth_of_type(ty)?))
+                    })
+                    .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
+                let struct_formula = self.calculate_depth_of_struct(*cache_idx)?;
+                let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
+                subst_struct_formula.scale(1);
+                subst_struct_formula
             },
         })
     }
