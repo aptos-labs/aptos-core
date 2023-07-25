@@ -44,6 +44,7 @@ from cases.move import (
     test_move_run,
     test_move_view,
 )
+from cases.node import test_node_show_validator_set
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -135,6 +136,9 @@ def run_tests(run_helper):
 
     # WARNING: This has to stay at the end, else key will get rotated
     test_account_rotate_key(run_helper)
+
+    # Run node subcommand group tests.
+    test_node_show_validator_set(run_helper)
 
 
 def main():

@@ -42,7 +42,6 @@ pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
     pub(crate) resolver: &'a dyn AggregatorResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
-    pub(crate) aggregator_enabled: bool,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
@@ -53,7 +52,6 @@ impl<'a> NativeAggregatorContext<'a> {
         session_type: u8,
         txn_hash: [u8; 32],
         resolver: &'a dyn AggregatorResolver,
-        aggregator_enabled: bool,
     ) -> Self {
         let mut id_counter = ((txn_idx + 1) as u64) << 32;
         id_counter += (session_type as u64) << 29;
@@ -61,7 +59,6 @@ impl<'a> NativeAggregatorContext<'a> {
             txn_hash,
             resolver,
             aggregator_data: RefCell::new(AggregatorData::new(id_counter)),
-            aggregator_enabled,
         }
     }
 
@@ -87,8 +84,6 @@ impl<'a> NativeAggregatorContext<'a> {
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
-                    // Aggregator state can be a delta only if aggregators are enabled.
-                    assert!(self.aggregator_enabled);
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op =
@@ -96,8 +91,6 @@ impl<'a> NativeAggregatorContext<'a> {
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
-                    // Aggregator state can be a delta only if aggregators are enabled.
-                    assert!(self.aggregator_enabled);
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
@@ -187,7 +180,7 @@ mod test {
     //     |  700  |               |           | yes |         |
     //     |  800  |               |           |     |   yes   |
     //     +-------+---------------+-----------+-----+---------+
-    fn test_set_up(context: &NativeAggregatorContext, aggregator_enabled: bool) {
+    fn test_set_up(context: &NativeAggregatorContext) {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
 
         aggregator_data.create_new_aggregator(aggregator_id_for_test(100), 100);
@@ -195,45 +188,20 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
 
-        assert_ok!(aggregator_data.get_aggregator(
-            aggregator_id_for_test(100),
-            100,
-            context.resolver,
-            aggregator_enabled,
-        ));
-        assert_ok!(aggregator_data.get_aggregator(
-            aggregator_id_for_test(200),
-            200,
-            context.resolver,
-            aggregator_enabled,
-        ));
+        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(100), 100));
+        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(200), 200));
         aggregator_data
-            .get_aggregator(
-                aggregator_id_for_test(500),
-                500,
-                context.resolver,
-                aggregator_enabled,
-            )
+            .get_aggregator(aggregator_id_for_test(500), 500)
             .unwrap()
             .add(150)
             .unwrap();
         aggregator_data
-            .get_aggregator(
-                aggregator_id_for_test(600),
-                600,
-                context.resolver,
-                aggregator_enabled,
-            )
+            .get_aggregator(aggregator_id_for_test(600), 600)
             .unwrap()
             .add(100)
             .unwrap();
         aggregator_data
-            .get_aggregator(
-                aggregator_id_for_test(700),
-                700,
-                context.resolver,
-                aggregator_enabled,
-            )
+            .get_aggregator(aggregator_id_for_test(700), 700)
             .unwrap()
             .add(200)
             .unwrap();
@@ -247,9 +215,10 @@ mod test {
     #[test]
     fn test_into_change_set() {
         let resolver = get_test_resolver();
-        let context = NativeAggregatorContext::new(30, 1, [0; 32], &resolver, true);
 
-        test_set_up(&context, true);
+        let context = NativeAggregatorContext::new(30, 1, [0; 32], &resolver);
+
+        test_set_up(&context);
         let AggregatorChangeSet { changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));
@@ -275,42 +244,6 @@ mod test {
         assert_eq!(
             *changes.get(&aggregator_id_for_test(700)).unwrap(),
             AggregatorChange::Merge(delta_200)
-        );
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(800)).unwrap(),
-            AggregatorChange::Delete
-        );
-    }
-
-    #[test]
-    fn test_into_change_set_aggregator_disabled() {
-        let resolver = get_test_resolver();
-        let context = NativeAggregatorContext::new(30, 1, [0; 32], &resolver, false);
-
-        test_set_up(&context, false);
-        let AggregatorChangeSet { changes } = context.into_change_set();
-
-        assert!(!changes.contains_key(&aggregator_id_for_test(100)));
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(200)).unwrap(),
-            AggregatorChange::Write(0)
-        );
-        assert!(!changes.contains_key(&aggregator_id_for_test(300)));
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(400)).unwrap(),
-            AggregatorChange::Write(0)
-        );
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(500)).unwrap(),
-            AggregatorChange::Delete
-        );
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(600)).unwrap(),
-            AggregatorChange::Write(200)
-        );
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(700)).unwrap(),
-            AggregatorChange::Write(400)
         );
         assert_matches!(
             changes.get(&aggregator_id_for_test(800)).unwrap(),

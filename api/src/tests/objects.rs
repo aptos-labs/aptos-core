@@ -25,7 +25,7 @@ async fn test_gen_object() {
     let user_addr = user.address();
 
     // Publish packages
-    let named_addresses = vec![("token_objects".to_string(), user_addr)];
+    let named_addresses = vec![("hero".to_string(), user_addr)];
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
             .join("../aptos-move/move-examples/token_objects/hero");

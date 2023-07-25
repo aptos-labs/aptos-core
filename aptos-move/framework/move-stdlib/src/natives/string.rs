@@ -6,17 +6,18 @@
 
 //! Implementation of native functions for utf8 strings.
 
-use crate::natives::helpers::make_module_natives;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use aptos_gas_schedule::gas_params::natives::move_stdlib::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
+};
+use move_core_types::gas_algebra::NumBytes;
+use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
-    pop_arg,
     values::{Value, VectorRef},
 };
-use std::{collections::VecDeque, sync::Arc};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
 
 // The implementation approach delegates all utf8 handling to Rust.
 // This is possible without copying of bytes because (a) we can
@@ -32,35 +33,24 @@ use std::{collections::VecDeque, sync::Arc};
  *   gas cost: base_cost + unit_cost * length_in_bytes
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct CheckUtf8GasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGasPerByte,
-}
-
 fn native_check_utf8(
-    gas_params: &CheckUtf8GasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 1);
-    let s_arg = pop_arg!(args, VectorRef);
+    let s_arg = safely_pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref();
+
+    context.charge(
+        STRING_CHECK_UTF8_BASE
+            + STRING_CHECK_UTF8_PER_BYTE * NumBytes::new(s_ref.as_slice().len() as u64),
+    )?;
+
     let ok = std::str::from_utf8(s_ref.as_slice()).is_ok();
     // TODO: extensible native cost tables
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(s_ref.as_slice().len() as u64);
-
-    NativeResult::map_partial_vm_result_one(cost, Ok(Value::bool(ok)))
-}
-
-pub fn make_native_check_utf8(gas_params: CheckUtf8GasParameters) -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_check_utf8(&gas_params, context, ty_args, args)
-        },
-    )
+    Ok(smallvec![Value::bool(ok)])
 }
 
 /***************************************************************************************************
@@ -69,34 +59,24 @@ pub fn make_native_check_utf8(gas_params: CheckUtf8GasParameters) -> NativeFunct
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct IsCharBoundaryGasParameters {
-    pub base: InternalGas,
-}
-
 fn native_is_char_boundary(
-    gas_params: &IsCharBoundaryGasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 2);
-    let i = pop_arg!(args, u64);
-    let s_arg = pop_arg!(args, VectorRef);
+
+    context.charge(STRING_IS_CHAR_BOUNDARY_BASE)?;
+
+    let i = safely_pop_arg!(args, u64);
+    let s_arg = safely_pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref();
     let ok = unsafe {
         // This is safe because we guarantee the bytes to be utf8.
         std::str::from_utf8_unchecked(s_ref.as_slice()).is_char_boundary(i as usize)
     };
-    NativeResult::map_partial_vm_result_one(gas_params.base, Ok(Value::bool(ok)))
-}
 
-pub fn make_native_is_char_boundary(gas_params: IsCharBoundaryGasParameters) -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_is_char_boundary(&gas_params, context, ty_args, args)
-        },
-    )
+    Ok(smallvec![Value::bool(ok)])
 }
 
 /***************************************************************************************************
@@ -105,28 +85,26 @@ pub fn make_native_is_char_boundary(gas_params: IsCharBoundaryGasParameters) -> 
  *   gas cost: base_cost + unit_cost * sub_string_length_in_bytes
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct SubStringGasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGasPerByte,
-}
-
 fn native_sub_string(
-    gas_params: &SubStringGasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 3);
-    let j = pop_arg!(args, u64) as usize;
-    let i = pop_arg!(args, u64) as usize;
+
+    context.charge(STRING_SUB_STRING_BASE)?;
+
+    let j = safely_pop_arg!(args, u64) as usize;
+    let i = safely_pop_arg!(args, u64) as usize;
 
     if j < i {
-        // TODO: what abort code should we use here?
-        return Ok(NativeResult::err(gas_params.base, 1));
+        // TODO: The abort code should follow the error convention.
+        return Err(aptos_native_interface::SafeNativeError::Abort { abort_code: 1 });
     }
 
-    let s_arg = pop_arg!(args, VectorRef);
+    context.charge(STRING_SUB_STRING_PER_BYTE * NumBytes::new((j - i) as u64))?;
+
+    let s_arg = safely_pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref();
     let s_str = unsafe {
         // This is safe because we guarantee the bytes to be utf8.
@@ -134,16 +112,7 @@ fn native_sub_string(
     };
     let v = Value::vector_u8(s_str[i..j].as_bytes().iter().cloned());
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new((j - i) as u64);
-    NativeResult::map_partial_vm_result_one(cost, Ok(v))
-}
-
-pub fn make_native_sub_string(gas_params: SubStringGasParameters) -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_sub_string(&gas_params, context, ty_args, args)
-        },
-    )
+    Ok(smallvec![v])
 }
 
 /***************************************************************************************************
@@ -152,76 +121,48 @@ pub fn make_native_sub_string(gas_params: SubStringGasParameters) -> NativeFunct
  *   gas cost: base_cost + unit_cost * bytes_searched
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct IndexOfGasParameters {
-    pub base: InternalGas,
-    pub per_byte_pattern: InternalGasPerByte,
-    pub per_byte_searched: InternalGasPerByte,
-}
-
 fn native_index_of(
-    gas_params: &IndexOfGasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 2);
-    let r_arg = pop_arg!(args, VectorRef);
+
+    context.charge(STRING_INDEX_OF_BASE)?;
+
+    let r_arg = safely_pop_arg!(args, VectorRef);
     let r_ref = r_arg.as_bytes_ref();
     let r_str = unsafe { std::str::from_utf8_unchecked(r_ref.as_slice()) };
-    let s_arg = pop_arg!(args, VectorRef);
+
+    context.charge(STRING_INDEX_OF_PER_BYTE_PATTERN * NumBytes::new(r_str.len() as u64))?;
+
+    let s_arg = safely_pop_arg!(args, VectorRef);
     let s_ref = s_arg.as_bytes_ref();
     let s_str = unsafe { std::str::from_utf8_unchecked(s_ref.as_slice()) };
     let pos = match s_str.find(r_str) {
         Some(size) => size,
         None => s_str.len(),
     };
+
     // TODO(Gas): What is the algorithm used for the search?
     //            Ideally it should be something like KMP with O(n) time complexity...
-    let cost = gas_params.base
-        + gas_params.per_byte_pattern * NumBytes::new(r_str.len() as u64)
-        + gas_params.per_byte_searched * NumBytes::new(pos as u64);
-    NativeResult::map_partial_vm_result_one(cost, Ok(Value::u64(pos as u64)))
-}
+    context.charge(STRING_INDEX_OF_PER_BYTE_SEARCHED * NumBytes::new(pos as u64))?;
 
-pub fn make_native_index_of(gas_params: IndexOfGasParameters) -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_index_of(&gas_params, context, ty_args, args)
-        },
-    )
+    Ok(smallvec![Value::u64(pos as u64)])
 }
 
 /***************************************************************************************************
  * module
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub check_utf8: CheckUtf8GasParameters,
-    pub is_char_boundary: IsCharBoundaryGasParameters,
-    pub sub_string: SubStringGasParameters,
-    pub index_of: IndexOfGasParameters,
-}
-
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        (
-            "internal_check_utf8",
-            make_native_check_utf8(gas_params.check_utf8),
-        ),
-        (
-            "internal_is_char_boundary",
-            make_native_is_char_boundary(gas_params.is_char_boundary),
-        ),
-        (
-            "internal_sub_string",
-            make_native_sub_string(gas_params.sub_string),
-        ),
-        (
-            "internal_index_of",
-            make_native_index_of(gas_params.index_of),
-        ),
+        ("internal_check_utf8", native_check_utf8 as RawSafeNative),
+        ("internal_is_char_boundary", native_is_char_boundary),
+        ("internal_sub_string", native_sub_string),
+        ("internal_index_of", native_index_of),
     ];
 
-    make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

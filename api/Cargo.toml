@@ -18,7 +18,7 @@ aptos-api-types = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-gas = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-mempool = { workspace = true }
 aptos-metrics-core = { workspace = true }
@@ -52,7 +52,7 @@ url = { workspace = true }
 aptos-api-test-context = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-framework = { workspace = true }
-aptos-gas = { workspace = true, features = ["testing"] }
+aptos-gas-meter = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-sdk = { workspace = true }
 move-package = { workspace = true }

@@ -7,10 +7,7 @@ use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::{
-    block_executor::partitioner::ExecutableBlock,
-    transaction::{Transaction, Version},
-};
+use aptos_types::{block_executor::partitioner::ExecutableBlock, transaction::Version};
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
@@ -56,7 +53,7 @@ where
         &mut self,
         current_block_start_time: Instant,
         partition_time: Duration,
-        executable_block: ExecutableBlock<Transaction>,
+        executable_block: ExecutableBlock,
     ) {
         let execution_start_time = Instant::now();
         if self.maybe_first_block_start_time.is_none() {

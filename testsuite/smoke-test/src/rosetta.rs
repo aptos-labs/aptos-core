@@ -15,7 +15,7 @@ use aptos_crypto::{
     HashValue, PrivateKey,
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
-use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_genesis::builder::InitConfigFn;
 use aptos_global_constants::GAS_UNIT_PRICE;
 use aptos_rest_client::{
@@ -728,7 +728,7 @@ async fn test_block() {
         feature_version,
     )
     .unwrap();
-    let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
+    let min_gas_price = u64::from(gas_params.vm.txn.min_price_per_gas_unit);
 
     let private_key_0 = cli.private_key(0);
     let private_key_1 = cli.private_key(1);
