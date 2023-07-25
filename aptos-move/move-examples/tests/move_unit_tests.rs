@@ -76,6 +76,15 @@ fn test_resource_account_common(pkg: &str) {
 }
 
 #[test]
+fn test_veiled_coin() {
+    let named_address = BTreeMap::from([(
+        String::from("veiled_coin"),
+        AccountAddress::from_hex_literal("0x1").unwrap(),
+    )]);
+    run_tests_for_pkg("veiled_coin", named_address);
+}
+
+#[test]
 fn test_common_account() {
     test_common("common_account");
 }

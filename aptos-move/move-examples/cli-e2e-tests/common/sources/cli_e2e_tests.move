@@ -257,6 +257,16 @@ module addr::cli_e2e_tests {
         }
     }
 
+    // The following functions are used to test input args
+    #[view]
+    public fun test_big_number(
+        num64: u64,
+        num128: u128,
+        num256: u256,
+    ): (u64, u128, u256) {
+        (num64, num128, num256)
+    }
+
     inline fun get_hero(creator: &address, collection: &String, name: &String): (Object<Hero>, &Hero) {
         let token_address = token::create_token_address(
             creator,
