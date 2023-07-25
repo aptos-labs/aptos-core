@@ -19,8 +19,9 @@ aptos-block-executor = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
-aptos-gas = { workspace = true, features = ["testing"] }
+aptos-gas-algebra = { workspace = true }
 aptos-gas-profiling = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
