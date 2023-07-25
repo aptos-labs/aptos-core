@@ -54,7 +54,7 @@ impl AggregatorID {
         AggregatorID::Ephemeral(id)
     }
 
-    pub fn into_state_key(&self) -> Option<StateKey> {
+    pub fn into_state_key(self) -> Option<StateKey> {
         match self {
             AggregatorID::Legacy { handle, key } => {
                 Some(StateKey::table_item(handle.into(), key.0.to_vec()))

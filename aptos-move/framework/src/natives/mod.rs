@@ -20,7 +20,7 @@ pub mod type_info;
 pub mod util;
 
 use crate::natives::cryptography::multi_ed25519;
-use aggregator_natives::{aggregator, aggregator_factory};
+use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};
 use aptos_gas_algebra_ext::AbstractValueSize;
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use cryptography::ed25519;
@@ -28,7 +28,6 @@ use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 use move_vm_types::values::Value;
 use std::sync::Arc;
-
 pub mod status {
     // Failure in parsing a struct type tag
     pub const NFE_EXPECTED_STRUCT_TYPE_TAG: u64 = 0x1;
@@ -54,6 +53,7 @@ pub struct GasParameters {
     pub state_storage: state_storage::GasParameters,
     pub aggregator: aggregator::GasParameters,
     pub aggregator_factory: aggregator_factory::GasParameters,
+    pub aggregator_v2: aggregator_v2::GasParameters,
     pub object: object::GasParameters,
     pub string_utils: string_utils::GasParameters,
 }
@@ -257,6 +257,12 @@ impl GasParameters {
             },
             aggregator_factory: aggregator_factory::GasParameters {
                 new_aggregator: aggregator_factory::NewAggregatorGasParameters { base: 0.into() },
+            },
+            aggregator_v2: aggregator_v2::GasParameters {
+                try_add: aggregator_v2::TryAddGasParameters { base: 0.into() },
+                try_sub: aggregator_v2::TrySubGasParameters { base: 0.into() },
+                read: aggregator_v2::ReadGasParameters { base: 0.into() },
+                destroy: aggregator_v2::DestroyGasParameters { base: 0.into() },
             },
             object: object::GasParameters {
                 exists_at: object::ExistsAtGasParameters {
