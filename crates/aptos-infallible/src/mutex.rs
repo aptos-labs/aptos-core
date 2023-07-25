@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::sync::Mutex as StdMutex;
-pub use std::sync::MutexGuard;
+pub use std::sync::{MutexGuard, TryLockResult};
 
 /// A simple wrapper around the lock() function of a std::sync::Mutex
 /// The only difference is that you don't need to call unwrap() on it.
@@ -21,6 +21,10 @@ impl<T> Mutex<T> {
         self.0
             .lock()
             .expect("Cannot currently handle a poisoned lock")
+    }
+
+    pub fn try_lock(&self) -> TryLockResult<MutexGuard<'_, T>> {
+        self.0.try_lock()
     }
 
     // consume the mutex

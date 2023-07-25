@@ -244,6 +244,7 @@ pub struct Scheduler {
     /// This is as opposed to RWLock because the read path is heavily contended.
     /// TODO: reconsider padding of this and the above two members and access patterns.
     validation_idx_write_mutex: Mutex<()>,
+    reducing_to_idx: AtomicU32,
 
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: CachePadded<AtomicBool>,
@@ -273,6 +274,7 @@ impl Scheduler {
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
             validation_idx_write_mutex: Mutex::new(()),
+            reducing_to_idx: AtomicU32::new(num_txns + 1),
             done_marker: CachePadded::new(AtomicBool::new(false)),
         }
     }
@@ -639,22 +641,26 @@ impl Scheduler {
             return None;
         }
 
-        let _m = self.validation_idx_write_mutex.lock();
+        let _m = loop {
+            match self.validation_idx_write_mutex.try_lock() {
+                Ok(m) => break m,
+                Err(_) => {
+                    if self.reducing_to_idx.load(Ordering::Relaxed) < target_idx {
+                        return None;
+                    }
+                },
+            }
+        };
+        self.reducing_to_idx.store(target_idx, Ordering::Relaxed);
 
         let cur_validation_idx = self.validation_idx.load(Ordering::Relaxed);
         let (txn_idx, wave) = Self::unpack_validation_idx(cur_validation_idx);
 
-        if txn_idx > target_idx {
+        let ret = if txn_idx > target_idx {
             let new_wave = wave + 1;
 
             let mut validation_status = self.txn_status[target_idx as usize].1.write();
-            // Update the minimum wave all the suffix txn needs to pass.
-            // We set it to max for safety (to avoid overwriting with lower values
-            // by a slower thread), but currently this isn't strictly required
-            // as all callers of decrease_validation_idx hold a write lock on the
-            // previous transaction's validation status.
-            validation_status.max_triggered_wave =
-                max(validation_status.max_triggered_wave, wave + 1);
+            validation_status.max_triggered_wave = new_wave;
 
             // Pack into validation index.
             self.validation_idx.store(
@@ -664,7 +670,12 @@ impl Scheduler {
             Some(new_wave)
         } else {
             None
-        }
+        };
+
+        self.reducing_to_idx
+            .store(self.num_txns + 1, Ordering::Relaxed);
+
+        ret
     }
 
     /// Try and incarnate a transaction. Only possible when the status is
