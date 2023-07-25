@@ -92,6 +92,7 @@ members = [
     "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
+    "crates/reliable-broadcast",
     "crates/short-hex-str",
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
@@ -356,6 +357,7 @@ aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
+aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
 aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }
 aptos-rest-client = { path = "crates/aptos-rest-client" }
 aptos-retrier = { path = "crates/aptos-retrier" }
