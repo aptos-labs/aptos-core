@@ -3,13 +3,19 @@
 
 #![forbid(unsafe_code)]
 
+mod counters;
 mod utils;
 
-use crate::utils::{TestFailure, TestLog, TestResult};
+use crate::utils::{
+    set_metrics, NetworkName, TestFailure, TestName, TestResult, DEVNET_FAUCET_URL,
+    DEVNET_NODE_URL, TESTNET_FAUCET_URL, TESTNET_NODE_URL,
+};
 use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
 use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_logger::{info, Level, Logger};
+use aptos_push_metrics::MetricsPusher;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::{
     bcs,
@@ -25,19 +31,7 @@ use aptos_types::{
     transaction::{EntryFunction, TransactionPayload},
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
-use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, future::Future, path::PathBuf, time::Instant};
-use url::Url;
-
-// network urls
-static DEVNET_NODE_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
-static DEVNET_FAUCET_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
-static TESTNET_NODE_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
-static TESTNET_FAUCET_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
 
 // fail messages
 static FAIL_ACCOUNT_DATA: &str = "wrong account data";
@@ -57,9 +51,10 @@ static ERROR_MODULE_INTERACTION: &str = "module interaction isn't reflected";
 
 // Processes a test result.
 async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
-    test_name: &str,
+    test_name: TestName,
+    network_type: NetworkName,
     fut: Fut,
-) -> Result<TestLog> {
+) -> Result<TestResult> {
     // start timer
     let start = Instant::now();
 
@@ -71,20 +66,25 @@ async fn handle_result<Fut: Future<Output = Result<(), TestFailure>>>(
 
     // process the result
     let output = match result {
-        Ok(_) => TestLog {
-            result: TestResult::Success,
-            time,
-        },
-        Err(failure) => TestLog {
-            result: TestResult::Fail(failure),
-            time,
-        },
+        Ok(_) => TestResult::Success,
+        Err(failure) => TestResult::from(failure),
     };
 
-    println!(
-        "{} result:{:?} in time:{:?}",
-        test_name, output.result, output.time
+    // set metrics and log
+    set_metrics(
+        &output,
+        &test_name.to_string(),
+        &network_type.to_string(),
+        time,
     );
+    info!(
+        "{} {} result:{:?} in time:{:?}",
+        network_type.to_string(),
+        test_name.to_string(),
+        output,
+        time,
+    );
+
     Ok(output)
 }
 
@@ -107,6 +107,10 @@ async fn test_newaccount(
     let actual_account = response.inner();
 
     if &expected_account != actual_account {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_ACCOUNT_DATA, expected_account, actual_account
+        );
         return Err(TestFailure::Fail(FAIL_ACCOUNT_DATA));
     }
 
@@ -120,6 +124,10 @@ async fn test_newaccount(
         .value;
 
     if expected_balance != actual_balance {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_BALANCE, expected_balance, actual_balance
+        );
         return Err(TestFailure::Fail(FAIL_BALANCE));
     }
 
@@ -162,13 +170,20 @@ async fn test_cointransfer(
         .value;
 
     if expected_receiver_balance != actual_receiver_balance {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_BALANCE_AFTER_TRANSACTION, expected_receiver_balance, actual_receiver_balance
+        );
         return Err(TestFailure::Fail(FAIL_BALANCE_AFTER_TRANSACTION));
     }
 
     // check account balance with a lower version number
     let version = match response.inner().version() {
         Some(version) => version,
-        _ => return Err(TestFailure::Error(anyhow!(ERROR_NO_VERSION))),
+        _ => {
+            info!("error: {}", ERROR_MODULE_INTERACTION);
+            return Err(TestFailure::Error(anyhow!(ERROR_NO_VERSION)));
+        },
     };
 
     let expected_balance_at_version = U64(starting_receiver_balance);
@@ -180,6 +195,10 @@ async fn test_cointransfer(
         .value;
 
     if expected_balance_at_version != actual_balance_at_version {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_BALANCE_BEFORE_TRANSACTION, expected_balance_at_version, actual_balance_at_version
+        );
         return Err(TestFailure::Fail(FAIL_BALANCE_BEFORE_TRANSACTION));
     }
 
@@ -253,6 +272,10 @@ async fn test_mintnft(
         .await?;
 
     if expected_collection_data != actual_collection_data {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_COLLECTION_DATA, expected_collection_data, actual_collection_data
+        );
         return Err(TestFailure::Fail(FAIL_COLLECTION_DATA));
     }
 
@@ -282,6 +305,10 @@ async fn test_mintnft(
         .await?;
 
     if expected_token_data != actual_token_data {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_TOKEN_DATA, expected_token_data, actual_token_data
+        );
         return Err(TestFailure::Fail(FAIL_TOKEN_DATA));
     }
 
@@ -313,6 +340,10 @@ async fn test_mintnft(
         .amount;
 
     if expected_sender_token_balance != actual_sender_token_balance {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_TOKEN_BALANCE, expected_sender_token_balance, actual_sender_token_balance
+        );
         return Err(TestFailure::Fail(FAIL_TOKEN_BALANCE));
     }
 
@@ -327,6 +358,10 @@ async fn test_mintnft(
         .await
         .is_ok()
     {
+        info!(
+            "fail: {}, expected no token client resource for the receiver",
+            FAIL_TOKENS_BEFORE_CLAIM
+        );
         return Err(TestFailure::Fail(FAIL_TOKENS_BEFORE_CLAIM));
     }
 
@@ -357,6 +392,12 @@ async fn test_mintnft(
         .amount;
 
     if expected_receiver_token_balance != actual_receiver_token_balance {
+        info!(
+            "{}, expected {:?}, got {:?}",
+            FAIL_TOKEN_BALANCE_AFTER_TRANSACTION,
+            expected_receiver_token_balance,
+            actual_receiver_token_balance
+        );
         return Err(TestFailure::Fail(FAIL_TOKEN_BALANCE_AFTER_TRANSACTION));
     }
 
@@ -399,7 +440,10 @@ async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<H
 
     let blob = match blobs.get(0) {
         Some(bytecode) => bytecode.clone(),
-        None => return Err(anyhow!(ERROR_NO_BYTECODE)),
+        None => {
+            info!("error: {}", ERROR_NO_BYTECODE);
+            return Err(anyhow!(ERROR_NO_BYTECODE));
+        },
     };
 
     Ok(HexEncodedBytes::from(blob))
@@ -457,6 +501,10 @@ async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), 
     let actual_bytecode = &response.inner().bytecode;
 
     if expected_bytecode != actual_bytecode {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_BYTECODE, expected_bytecode, actual_bytecode
+        );
         return Err(TestFailure::Fail(FAIL_BYTECODE));
     }
 
@@ -468,17 +516,30 @@ async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), 
     let expected_message = message.to_string();
     let actual_message = match get_message(client, account.address()).await {
         Some(message) => message,
-        None => return Err(TestFailure::Error(anyhow!(ERROR_MODULE_INTERACTION,))),
+        None => {
+            info!("error: {}", ERROR_MODULE_INTERACTION);
+            return Err(TestFailure::Error(anyhow!(ERROR_MODULE_INTERACTION)));
+        },
     };
 
     if expected_message != actual_message {
+        info!(
+            "fail: {}, expected {:?}, got {:?}",
+            FAIL_MODULE_INTERACTION, expected_message, actual_message
+        );
         return Err(TestFailure::Fail(FAIL_MODULE_INTERACTION));
     }
 
     Ok(())
 }
 
-async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
+async fn test_flows(
+    network_type: NetworkName,
+    client: Client,
+    faucet_client: FaucetClient,
+) -> Result<()> {
+    info!("testing {}", network_type.to_string());
+
     // create clients
     let coin_client = CoinClient::new(&client);
     let token_client = TokenClient::new(&client);
@@ -486,54 +547,69 @@ async fn test_flows(client: Client, faucet_client: FaucetClient) -> Result<()> {
     // create and fund account for tests
     let mut giray = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(giray.address(), 100_000_000).await?;
-    println!("{:?}", giray.address());
+    info!("{:?}", giray.address());
 
     let mut giray2 = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(giray2.address(), 100_000_000).await?;
-    println!("{:?}", giray2.address());
+    info!("{:?}", giray2.address());
 
     // Test new account creation and funding
     // this test is critical to pass for the next tests
-    if handle_result("new account", test_newaccount(&client, &giray, 100_000_000))
-        .await
-        .is_err()
+    match handle_result(
+        TestName::NewAccount,
+        network_type,
+        test_newaccount(&client, &giray, 100_000_000),
+    )
+    .await?
     {
-        return Err(anyhow!("returning early because new account test failed"));
+        TestResult::Success => {},
+        _ => return Err(anyhow!("returning early because new account test failed")),
     }
 
     // Flow 1: Coin transfer
     let _ = handle_result(
-        "coin transfer",
+        TestName::CoinTransfer,
+        network_type,
         test_cointransfer(&client, &coin_client, &mut giray, giray2.address(), 1_000),
     )
     .await;
 
     // Flow 2: NFT transfer
     let _ = handle_result(
-        "nft transfer",
+        TestName::NftTransfer,
+        network_type,
         test_mintnft(&client, &token_client, &mut giray, &mut giray2),
     )
     .await;
 
     // Flow 3: Publishing module
-    let _ = handle_result("publish module", test_module(&client, &mut giray)).await;
+    let _ = handle_result(
+        TestName::PublishModule,
+        network_type,
+        test_module(&client, &mut giray),
+    )
+    .await;
 
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // log metrics
+    Logger::builder().level(Level::Info).build();
+    let _mp = MetricsPusher::start_for_local_run("api-tester");
+
     // test flows on testnet
-    println!("testing testnet...");
     let _ = test_flows(
+        NetworkName::Testnet,
         Client::new(TESTNET_NODE_URL.clone()),
         FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone()),
     )
     .await;
 
     // test flows on devnet
-    println!("testing devnet...");
     let _ = test_flows(
+        NetworkName::Devnet,
         Client::new(DEVNET_NODE_URL.clone()),
         FaucetClient::new(DEVNET_FAUCET_URL.clone(), DEVNET_NODE_URL.clone()),
     )
