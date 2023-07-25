@@ -19,7 +19,6 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, sync::Arc};
 
-
 /***************************************************************************************************
  * native fun create_aggregator(limit: u128): Aggregator;
  *
