@@ -11,7 +11,7 @@ from test_results import test_case
 
 @test_case
 def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
-    amount_in_octa = 200000000000000
+    amount_in_octa = 100000000000
 
     # Fund the account.
     run_helper.run_command(
