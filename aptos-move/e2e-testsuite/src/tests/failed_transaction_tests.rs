@@ -2,9 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::{
-    AptosGasParameters, StandardGasMeter, StorageGasParameters, LATEST_GAS_FEATURE_VERSION,
-};
+use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
+use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
@@ -14,6 +13,7 @@ use aptos_types::{
 };
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::storage::StorageGasParameters;
 use move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
 
 #[test]
@@ -40,12 +40,12 @@ fn failed_transaction_cleanup_test() {
 
     let change_set_configs = storage_gas_params.change_set_configs.clone();
 
-    let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
+    let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
         LATEST_GAS_FEATURE_VERSION,
-        gas_params,
+        gas_params.vm,
         storage_gas_params,
         10_000,
-    ));
+    )));
 
     // TYPE_MISMATCH should be kept and charged.
     let out1 = aptos_vm.failed_transaction_cleanup(

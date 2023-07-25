@@ -4,7 +4,8 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
+use aptos_gas_algebra::Gas;
+use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
     compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,
@@ -19,6 +20,7 @@ use aptos_types::{
 };
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::{
+    gas_algebra::GasQuantity,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
@@ -289,7 +291,7 @@ fn verify_simple_payment() {
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
         .sequence_number(10)
-        .gas_unit_price((txn_gas_params.max_price_per_gas_unit + 1.into()).into())
+        .gas_unit_price((txn_gas_params.max_price_per_gas_unit + GasQuantity::one()).into())
         .max_gas_amount(1_000_000)
         .sign();
     assert_prologue_parity!(
@@ -300,7 +302,7 @@ fn verify_simple_payment() {
 
     // Test for a max_gas_amount that is insufficient to pay the minimum fee.
     // Find the minimum transaction gas units and subtract 1.
-    let mut gas_limit = txn_gas_params
+    let mut gas_limit: Gas = txn_gas_params
         .min_transaction_gas_units
         .to_unit_round_up_with_params(&txn_gas_params);
 
@@ -314,9 +316,10 @@ fn verify_simple_payment() {
         > u64::from(txn_gas_params.min_transaction_gas_units)
     {
         txn_gas_params.large_transaction_cutoff
-            + (u64::from(txn_gas_params.gas_unit_scaling_factor)
-                / u64::from(txn_gas_params.intrinsic_gas_per_byte))
-            .into()
+            + GasQuantity::from(
+                u64::from(txn_gas_params.gas_unit_scaling_factor)
+                    / u64::from(txn_gas_params.intrinsic_gas_per_byte),
+            )
     } else {
         0.into()
     };
@@ -343,7 +346,7 @@ fn verify_simple_payment() {
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
         .sequence_number(10)
-        .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + 1.into()).into())
+        .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + GasQuantity::one()).into())
         .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
         .sign();
     assert_prologue_parity!(
@@ -361,7 +364,7 @@ fn verify_simple_payment() {
             vec![TransactionArgument::U8(42); MAX_TRANSACTION_SIZE_IN_BYTES as usize],
         ))
         .sequence_number(10)
-        .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + 1.into()).into())
+        .max_gas_amount((txn_gas_params.maximum_number_of_gas_units + GasQuantity::one()).into())
         .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
         .sign();
     assert_prologue_parity!(

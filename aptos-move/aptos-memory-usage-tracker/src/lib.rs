@@ -1,10 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas::{
-    AbstractValueSize, AptosGasMeter, AptosGasParameters, Fee, FeePerGasUnit, Gas,
-    GasScalingFactor, InternalGas, NumArgs, NumBytes,
-};
+use aptos_gas_algebra::{AbstractValueSize, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
+use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
     state_store::state_key::StateKey, write_set::WriteOp,
@@ -35,7 +33,7 @@ where
     G: AptosGasMeter,
 {
     pub fn new(base: G) -> Self {
-        let memory_quota = base.gas_params().txn.memory_quota;
+        let memory_quota = base.vm_gas_params().txn.memory_quota;
 
         Self {
             base,
@@ -196,7 +194,7 @@ where
         if !self.should_leak_memory_for_native {
             self.release_heap_memory(args.clone().fold(AbstractValueSize::zero(), |acc, val| {
                 acc + self
-                    .gas_params()
+                    .vm_gas_params()
                     .misc
                     .abs_val
                     .abstract_heap_size(val, self.feature_version())
@@ -216,7 +214,7 @@ where
         if let Some(ret_vals) = ret_vals.clone() {
             self.use_heap_memory(ret_vals.fold(AbstractValueSize::zero(), |acc, val| {
                 acc + self
-                    .gas_params()
+                    .vm_gas_params()
                     .misc
                     .abs_val
                     .abstract_heap_size(val, self.feature_version())
@@ -232,13 +230,13 @@ where
         addr: move_core_types::account_address::AccountAddress,
         ty: impl TypeView,
         val: Option<impl ValueView>,
-        bytes_loaded: aptos_gas::NumBytes,
+        bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         if self.feature_version() != 0 {
             // TODO(Gas): Rewrite this in a better way.
             if let Some(val) = &val {
                 self.use_heap_memory(
-                    self.gas_params()
+                    self.vm_gas_params()
                         .misc
                         .abs_val
                         .abstract_heap_size(val, self.feature_version()),
@@ -252,7 +250,7 @@ where
     #[inline]
     fn charge_pop(&mut self, popped_val: impl ValueView) -> PartialVMResult<()> {
         self.release_heap_memory(
-            self.gas_params()
+            self.vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_heap_size(&popped_val, self.feature_version()),
@@ -267,7 +265,7 @@ where
         val: impl ValueView,
     ) -> PartialVMResult<()> {
         self.use_heap_memory(
-            self.gas_params()
+            self.vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_heap_size(&val, self.feature_version()),
@@ -279,7 +277,7 @@ where
     #[inline]
     fn charge_copy_loc(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         let heap_size = self
-            .gas_params()
+            .vm_gas_params()
             .misc
             .abs_val
             .abstract_heap_size(&val, self.feature_version());
@@ -297,7 +295,7 @@ where
     ) -> PartialVMResult<()> {
         self.use_heap_memory(args.clone().fold(AbstractValueSize::zero(), |acc, val| {
             acc + self
-                .gas_params()
+                .vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_stack_size(val, self.feature_version())
@@ -314,7 +312,7 @@ where
     ) -> PartialVMResult<()> {
         self.release_heap_memory(args.clone().fold(AbstractValueSize::zero(), |acc, val| {
             acc + self
-                .gas_params()
+                .vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_stack_size(val, self.feature_version())
@@ -326,7 +324,7 @@ where
     #[inline]
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         let heap_size = self
-            .gas_params()
+            .vm_gas_params()
             .misc
             .abs_val
             .abstract_heap_size(&val, self.feature_version());
@@ -343,7 +341,7 @@ where
         old_val: impl ValueView,
     ) -> PartialVMResult<()> {
         self.release_heap_memory(
-            self.gas_params()
+            self.vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_heap_size(&old_val, self.feature_version()),
@@ -355,13 +353,13 @@ where
     #[inline]
     fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
         self.release_heap_memory(
-            self.gas_params()
+            self.vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_heap_size(&lhs, self.feature_version()),
         );
         self.release_heap_memory(
-            self.gas_params()
+            self.vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_heap_size(&rhs, self.feature_version()),
@@ -373,13 +371,13 @@ where
     #[inline]
     fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
         self.release_heap_memory(
-            self.gas_params()
+            self.vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_heap_size(&lhs, self.feature_version()),
         );
         self.release_heap_memory(
-            self.gas_params()
+            self.vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_heap_size(&rhs, self.feature_version()),
@@ -395,7 +393,7 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
         self.use_heap_memory(args.clone().fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self.gas_params().misc.abs_val.abstract_packed_size(val)
+            acc + self.vm_gas_params().misc.abs_val.abstract_packed_size(val)
         }))?;
 
         self.base.charge_vec_pack(ty, args)
@@ -405,11 +403,11 @@ where
     fn charge_vec_unpack(
         &mut self,
         ty: impl TypeView,
-        expect_num_elements: aptos_gas::NumArgs,
+        expect_num_elements: NumArgs,
         elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
         self.release_heap_memory(elems.clone().fold(AbstractValueSize::zero(), |acc, val| {
-            acc + self.gas_params().misc.abs_val.abstract_packed_size(val)
+            acc + self.vm_gas_params().misc.abs_val.abstract_packed_size(val)
         }));
 
         self.base.charge_vec_unpack(ty, expect_num_elements, elems)
@@ -421,7 +419,7 @@ where
         ty: impl TypeView,
         val: impl ValueView,
     ) -> PartialVMResult<()> {
-        self.use_heap_memory(self.gas_params().misc.abs_val.abstract_packed_size(&val))?;
+        self.use_heap_memory(self.vm_gas_params().misc.abs_val.abstract_packed_size(&val))?;
 
         self.base.charge_vec_push_back(ty, val)
     }
@@ -433,7 +431,7 @@ where
         val: Option<impl ValueView>,
     ) -> PartialVMResult<()> {
         if let Some(val) = &val {
-            self.release_heap_memory(self.gas_params().misc.abs_val.abstract_packed_size(val));
+            self.release_heap_memory(self.vm_gas_params().misc.abs_val.abstract_packed_size(val));
         }
 
         self.base.charge_vec_pop_back(ty, val)
@@ -446,7 +444,7 @@ where
     ) -> PartialVMResult<()> {
         self.release_heap_memory(locals.clone().fold(AbstractValueSize::zero(), |acc, val| {
             acc + self
-                .gas_params()
+                .vm_gas_params()
                 .misc
                 .abs_val
                 .abstract_heap_size(val, self.feature_version())
@@ -460,16 +458,10 @@ impl<G> AptosGasMeter for MemoryTrackedGasMeter<G>
 where
     G: AptosGasMeter,
 {
+    type Algebra = G::Algebra;
+
     delegate! {
-        fn feature_version(&self) -> u64;
-
-        fn gas_params(&self) -> &AptosGasParameters;
-
-        fn balance(&self) -> Gas;
-
-        fn gas_unit_scaling_factor(&self) -> GasScalingFactor;
-
-        fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas;
+        fn algebra(&self) -> &Self::Algebra;
 
         fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
@@ -478,20 +470,12 @@ where
         fn storage_discount_for_events(&self, total_cost: Fee) -> Fee;
 
         fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee;
-
-        fn execution_gas_used(&self) -> Gas;
-
-        fn io_gas_used(&self) -> Gas;
-
-        fn storage_fee_used_in_gas_units(&self) -> Gas;
-
-        fn storage_fee_used(&self) -> Fee;
     }
 
     delegate_mut! {
-        fn charge_execution(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+        fn algebra_mut(&mut self) -> &mut Self::Algebra;
 
-        fn charge_io(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+        fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()>;
 
         fn charge_storage_fee(
             &mut self,
@@ -500,7 +484,5 @@ where
         ) -> PartialVMResult<()>;
 
         fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
-
-
     }
 }
