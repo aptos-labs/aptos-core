@@ -8,7 +8,7 @@ mod schema;
 
 use crate::{
     dag::{CertifiedNode, Node, NodeId, Vote},
-    error::DbError,
+    error::DbError, consensusdb::schema::dag::DAG_VOTE_CF_NAME,
 };
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
@@ -56,6 +56,7 @@ impl ConsensusDB {
             SINGLE_ENTRY_CF_NAME,
             NODE_CF_NAME,
             CERTIFIED_NODE_CF_NAME,
+            DAG_VOTE_CF_NAME
         ];
 
         let path = db_root_path.as_ref().join(CONSENSUS_DB_NAME);

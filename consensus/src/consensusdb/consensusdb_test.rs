@@ -7,6 +7,7 @@ use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Author, Payload},
 };
+use aptos_crypto::bls12381::Signature;
 use aptos_temppath::TempPath;
 use aptos_types::aggregate_signature::AggregateSignature;
 
@@ -85,7 +86,7 @@ fn test_dag() {
 
     db.save_node(&node).unwrap();
 
-    let certified_node = CertifiedNode::new(node, AggregateSignature::empty());
+    let certified_node = CertifiedNode::new(node.clone(), AggregateSignature::empty());
 
     db.save_certified_node(&certified_node).unwrap();
 
@@ -96,4 +97,22 @@ fn test_dag() {
     let certified_node_from_db = from_db.remove(certified_node.metadata().digest()).unwrap();
 
     assert_eq!(certified_node, certified_node_from_db);
+
+    let dag_vote = Vote::new(node.metadata().clone(), Signature::dummy_signature());
+
+    db.save_dag_vote(&node.id(), &dag_vote).unwrap();
+
+    let mut from_db = db.get_dag_votes().unwrap();
+
+    assert_eq!(from_db.len(), 1);
+
+    let dag_vote_from_db = from_db.remove(&node.id()).unwrap();
+
+    assert_eq!(dag_vote, dag_vote_from_db);
+
+    let _ = db.delete_dag_votes(vec![node.id()]).unwrap();
+
+    let from_db = db.get_dag_votes().unwrap();
+
+    assert_eq!(from_db.len(), 0);
 }
