@@ -6,7 +6,7 @@ use derivative::Derivative;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        AbilitySet, SignatureToken, StructDefinitionIndex, StructTypeParameter, TypeParameterIndex,
+        AbilitySet, SignatureToken, StructTypeParameter, TypeParameterIndex,
     },
 };
 use move_core_types::{
@@ -118,7 +118,6 @@ pub struct StructType {
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
     pub name: Arc<StructName>,
-    pub struct_def: StructDefinitionIndex,
 }
 
 impl StructType {

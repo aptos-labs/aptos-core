@@ -22,10 +22,10 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
+    loaded_data::runtime_types::Type,
     values::{GlobalValue, Value},
 };
-use std::{borrow::Borrow, sync::Arc};
+use std::borrow::Borrow;
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
@@ -398,12 +398,6 @@ impl<'r, 'l> Session<'r, 'l> {
             .loader()
             .type_to_type_tag(ty)
             .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    /// Fetch a struct type from cache, if the index is in bounds
-    /// Helpful when paired with load_type, or any other API that returns 'Type'
-    pub fn get_struct_type(&self, index: CachedStructIndex) -> Option<Arc<StructType>> {
-        self.move_vm.runtime.loader().get_struct_type(index).ok()
     }
 
     /// Gets the abilities for this type, at it's particular instantiation
