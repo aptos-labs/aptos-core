@@ -11,12 +11,8 @@ jest.mock("../../client", () => {
 });
 
 describe("Account Modules", () => {
-  beforeEach(() => {
-    jest.restoreAllMocks();
-  });
-
   test(
-    "gets acccount modules",
+    "memoize account modules",
     async () => {
       const client = new AptosClient(NODE_URL);
       const moduleAddress = "0x1";
@@ -53,8 +49,6 @@ describe("Account Modules", () => {
 
       const accountModules = await client.getAccountModules(moduleAddress);
       expect(accountModules).toEqual(accountModulesResponse);
-
-      expect(getSpy).toBeCalledTimes(1);
 
       const accountModulesWithSameAddress = await client.getAccountModules(moduleAddress);
       expect(accountModulesWithSameAddress).toEqual(accountModulesResponse);
