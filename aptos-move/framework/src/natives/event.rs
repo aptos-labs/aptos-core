@@ -37,8 +37,15 @@ fn native_write_to_event_store(
             + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
     )?;
 
-    if !context.save_event(guid, seq_num, ty, msg)? {
-        return Err(SafeNativeError::Abort { abort_code: 0 });
+    match context.save_event(guid, seq_num, ty, msg) {
+        Ok(success) => {
+            if !success {
+                panic!("SafeNativeError::Abort with abort_code: 0 happens");
+            }
+        },
+        Err(e) => {
+            panic!("InvariantViolation: {:?}", e);
+        },
     }
 
     Ok(smallvec![])

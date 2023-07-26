@@ -399,9 +399,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let events = events
             .into_iter()
             .map(|(guid, seq_num, ty_tag, blob)| {
-                let key = bcs::from_bytes(guid.as_slice())
-                    .map_err(|_| VMStatus::error(StatusCode::EVENT_KEY_MISMATCH, None))?;
-                Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
+                let key = bcs::from_bytes(guid.as_slice());
+                match key {
+                    Ok(key) => Ok(ContractEvent::new(key, seq_num, ty_tag, blob)),
+                    Err(_) => panic!("Event has incompatible error in replay"),
+                }
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
         VMChangeSet::new(write_set, delta_change_set, events, configs)
