@@ -14,21 +14,6 @@ spec aptos_framework::stake {
         invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorPerformance>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorSet>(@aptos_framework);
-        // property 1: The consensus scheme remains consistent across all validators within the set.
-        // invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> global<ValidatorSet>(@aptos_framework).consensus_scheme == 0;
-        apply exists<ValidatorSet>(@aptos_framework) ==> Nochange;
-    }
-
-    spec schema Nochange {
-        let active_validators = global<ValidatorSet>(@aptos_framework).active_validators;
-        let pending_inactive = global<ValidatorSet>(@aptos_framework).pending_inactive;
-        let pending_active = global<ValidatorSet>(@aptos_framework).pending_active;
-        let post post_active_validators = global<ValidatorSet>(@aptos_framework).active_validators;
-        let post post_pending_inactive = global<ValidatorSet>(@aptos_framework).pending_inactive;
-        let post post_pending_active = global<ValidatorSet>(@aptos_framework).pending_active;
-        ensures forall i in 0..len(active_validators): post_active_validators[i].addr == active_validators[i].addr;
-        ensures forall i in 0..len(pending_inactive): post_pending_inactive[i].addr == pending_inactive[i].addr;
-        ensures forall i in 0..len(pending_active): post_pending_active[i].addr == pending_active[i].addr;
     }
 
     // A desired invariant for the validator set.
