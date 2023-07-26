@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::types::{DagSnapshotBitmask, NodeMetadata};
 use crate::dag::{
     storage::DAGStorage,
-    types::{CertifiedNode, NodeCertificate, NodeMetadata},
+    types::{CertifiedNode, NodeCertificate},
 };
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
@@ -38,6 +39,7 @@ impl NodeStatus {
 }
 
 /// Data structure that stores the DAG representation, it maintains round based index.
+#[derive(Clone)]
 pub struct Dag {
     nodes_by_round: BTreeMap<Round, Vec<Option<NodeStatus>>>,
     /// Map between peer id to vector index
@@ -123,10 +125,15 @@ impl Dag {
         self.get_node_ref_by_metadata(metadata).is_some()
     }
 
-    pub fn all_exists(&self, nodes: &[NodeCertificate]) -> bool {
-        nodes
-            .iter()
-            .all(|certificate| self.exists(certificate.metadata()))
+    pub fn all_exists<'a>(&self, nodes: impl Iterator<Item = &'a NodeMetadata>) -> bool {
+        self.filter_missing(nodes).next().is_none()
+    }
+
+    pub fn filter_missing<'a, 'b>(
+        &'b self,
+        nodes: impl Iterator<Item = &'a NodeMetadata> + 'b,
+    ) -> impl Iterator<Item = &'a NodeMetadata> + 'b {
+        nodes.filter(|node_metadata| !self.exists(node_metadata))
     }
 
     fn get_node_ref_by_metadata(&self, metadata: &NodeMetadata) -> Option<&NodeStatus> {
@@ -176,13 +183,13 @@ impl Dag {
                             .any(|cert| cert.metadata() == metadata)
                     })
                     .map(|node_status| node_status.as_node().author());
-                validator_verifier.check_voting_power(votes).is_ok()
+                validator_verifier.check_voting_power(votes, false).is_ok()
             })
             .unwrap_or(false)
     }
 
-    fn reachable_filter(start: HashValue) -> impl FnMut(&Arc<CertifiedNode>) -> bool {
-        let mut reachable = HashSet::from([start]);
+    fn reachable_filter(start: Vec<HashValue>) -> impl FnMut(&Arc<CertifiedNode>) -> bool {
+        let mut reachable: HashSet<HashValue> = HashSet::from_iter(start.into_iter());
         move |node| {
             if reachable.contains(&node.digest()) {
                 for parent in node.parents() {
@@ -201,7 +208,7 @@ impl Dag {
         until: Option<Round>,
     ) -> impl Iterator<Item = &mut NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
-        let mut reachable_filter = Self::reachable_filter(from.digest());
+        let mut reachable_filter = Self::reachable_filter(vec![from.digest()]);
         self.nodes_by_round
             .range_mut(until..=from.round())
             .rev()
@@ -215,19 +222,23 @@ impl Dag {
 
     pub fn reachable(
         &self,
-        from: &Arc<CertifiedNode>,
+        targets: &[NodeMetadata],
         until: Option<Round>,
+        // TODO: replace filter with bool to filter unordered
+        filter: impl Fn(&NodeStatus) -> bool,
     ) -> impl Iterator<Item = &NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
-        let mut reachable_filter = Self::reachable_filter(from.digest());
+        let initial = targets.iter().map(|t| *t.digest()).collect();
+        let initial_round = targets[0].round();
+
+        let mut reachable_filter = Self::reachable_filter(initial);
         self.nodes_by_round
-            .range(until..=from.round())
+            .range(until..=initial_round)
             .rev()
             .flat_map(|(_, round_ref)| round_ref.iter())
             .flatten()
             .filter(move |node_status| {
-                matches!(node_status, NodeStatus::Unordered(_))
-                    && reachable_filter(node_status.as_node())
+                filter(node_status) && reachable_filter(node_status.as_node())
             })
     }
 
@@ -240,6 +251,7 @@ impl Dag {
             .check_voting_power(
                 self.get_round_iter(round)?
                     .map(|node_status| node_status.as_node().metadata().author()),
+                true,
             )
             .is_ok()
         {
@@ -253,8 +265,29 @@ impl Dag {
         }
     }
 
-    pub fn bitmask(&self) -> Vec<Vec<bool>> {
-        // TODO: extract local bitvec
-        todo!();
+    pub fn lowest_incomplete_round(&self) -> Option<Round> {
+        for (round, round_nodes) in &self.nodes_by_round {
+            if round_nodes.iter().any(|node| node.is_none()) {
+                return Some(*round);
+            }
+        }
+        None
+    }
+
+    pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
+        let lowest_round = match self.lowest_incomplete_round() {
+            Some(round) => round,
+            None => {
+                return DagSnapshotBitmask::new(self.highest_round() + 1, vec![]);
+            },
+        };
+
+        let bitmask = self
+            .nodes_by_round
+            .range(lowest_round..target_round)
+            .map(|(_, round_nodes)| round_nodes.iter().map(|node| node.is_some()).collect())
+            .collect();
+
+        DagSnapshotBitmask::new(lowest_round, bitmask)
     }
 }

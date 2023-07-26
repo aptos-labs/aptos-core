@@ -27,7 +27,7 @@ class Object:
     def parse(resource: dict[str, Any]) -> Object:
         return Object(
             resource["allow_ungated_transfer"],
-            AccountAddress.from_hex(resource["owner"]),
+            AccountAddress.from_str(resource["owner"]),
         )
 
     def __str__(self) -> str:
@@ -54,7 +54,7 @@ class Collection:
     @staticmethod
     def parse(resource: dict[str, Any]) -> Collection:
         return Collection(
-            AccountAddress.from_hex(resource["creator"]),
+            AccountAddress.from_str(resource["creator"]),
             resource["description"],
             resource["name"],
             resource["uri"],
@@ -81,7 +81,7 @@ class Royalty:
         return Royalty(
             resource["numerator"],
             resource["denominator"],
-            AccountAddress.from_hex(resource["payee_address"]),
+            AccountAddress.from_str(resource["payee_address"]),
         )
 
 
@@ -114,7 +114,7 @@ class Token:
     @staticmethod
     def parse(resource: dict[str, Any]):
         return Token(
-            AccountAddress.from_hex(resource["collection"]["inner"]),
+            AccountAddress.from_str(resource["collection"]["inner"]),
             int(resource["index"]),
             resource["description"],
             resource["name"],
@@ -618,5 +618,5 @@ class AptosTokenClient:
         for event in output["events"]:
             if event["type"] != "0x4::collection::MintEvent":
                 continue
-            mints.append(AccountAddress.from_hex(event["data"]["token"]))
+            mints.append(AccountAddress.from_str(event["data"]["token"]))
         return mints

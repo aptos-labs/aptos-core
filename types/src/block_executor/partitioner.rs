@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::transaction::{analyzed_transaction::StorageLocation, Transaction};
+use crate::transaction::{
+    analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+    Transaction,
+};
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -372,13 +375,13 @@ impl<T: Clone> TransactionWithDependencies<T> {
     }
 }
 
-pub struct ExecutableBlock<T> {
+pub struct ExecutableBlock {
     pub block_id: HashValue,
-    pub transactions: ExecutableTransactions<T>,
+    pub transactions: ExecutableTransactions,
 }
 
-impl<T: Clone> ExecutableBlock<T> {
-    pub fn new(block_id: HashValue, transactions: ExecutableTransactions<T>) -> Self {
+impl ExecutableBlock {
+    pub fn new(block_id: HashValue, transactions: ExecutableTransactions) -> Self {
         Self {
             block_id,
             transactions,
@@ -386,19 +389,19 @@ impl<T: Clone> ExecutableBlock<T> {
     }
 }
 
-impl<T: Clone> From<(HashValue, Vec<T>)> for ExecutableBlock<T> {
-    fn from((block_id, transactions): (HashValue, Vec<T>)) -> Self {
+impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
+    fn from((block_id, transactions): (HashValue, Vec<Transaction>)) -> Self {
         Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
     }
 }
 
 // Represents the transactions in a block that are ready to be executed.
-pub enum ExecutableTransactions<T> {
-    Unsharded(Vec<T>),
-    Sharded(Vec<SubBlocksForShard<T>>),
+pub enum ExecutableTransactions {
+    Unsharded(Vec<Transaction>),
+    Sharded(Vec<SubBlocksForShard<AnalyzedTransaction>>),
 }
 
-impl<T: Clone> ExecutableTransactions<T> {
+impl ExecutableTransactions {
     pub fn num_transactions(&self) -> usize {
         match self {
             ExecutableTransactions::Unsharded(transactions) => transactions.len(),
@@ -410,39 +413,8 @@ impl<T: Clone> ExecutableTransactions<T> {
     }
 }
 
-impl From<Vec<Transaction>> for ExecutableTransactions<Transaction> {
+impl From<Vec<Transaction>> for ExecutableTransactions {
     fn from(txns: Vec<Transaction>) -> Self {
         Self::Unsharded(txns)
-    }
-}
-
-// Represents the transactions that are executed on a particular block executor shard. Unsharded
-// transactions represents the entire block. Sharded transactions represents the transactions
-// that are assigned to this shard.
-pub enum BlockExecutorTransactions<T> {
-    Unsharded(Vec<T>),
-    Sharded(SubBlocksForShard<T>),
-}
-
-impl<T: Clone> BlockExecutorTransactions<T> {
-    pub fn num_txns(&self) -> usize {
-        match self {
-            BlockExecutorTransactions::Unsharded(transactions) => transactions.len(),
-            BlockExecutorTransactions::Sharded(sub_blocks) => sub_blocks.num_txns(),
-        }
-    }
-
-    pub fn get_unsharded_transactions(&self) -> Option<&Vec<T>> {
-        match self {
-            BlockExecutorTransactions::Unsharded(transactions) => Some(transactions),
-            BlockExecutorTransactions::Sharded(_) => None,
-        }
-    }
-
-    pub fn into_txns(self) -> Vec<T> {
-        match self {
-            BlockExecutorTransactions::Unsharded(transactions) => transactions,
-            BlockExecutorTransactions::Sharded(sub_blocks) => sub_blocks.into_txns(),
-        }
     }
 }

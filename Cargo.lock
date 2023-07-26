@@ -206,8 +206,8 @@ dependencies = [
  "aptos-debugger",
  "aptos-faucet-core",
  "aptos-framework",
- "aptos-gas",
  "aptos-gas-profiling",
+ "aptos-gas-schedule",
  "aptos-genesis",
  "aptos-github-client",
  "aptos-global-constants",
@@ -289,13 +289,13 @@ dependencies = [
  "aptos-crypto",
  "aptos-language-e2e-tests",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "bcs 0.1.4",
  "better_any",
  "claims",
  "move-binary-format",
  "move-core-types",
- "move-table-extension",
  "once_cell",
  "smallvec",
 ]
@@ -312,7 +312,8 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
@@ -522,6 +523,7 @@ dependencies = [
  "criterion",
  "crossbeam",
  "dashmap",
+ "itertools",
  "move-binary-format",
  "num_cpus",
  "once_cell",
@@ -680,6 +682,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-storage-interface",
  "aptos-temppath",
+ "aptos-time-service",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-validator",
@@ -780,15 +783,18 @@ dependencies = [
  "blake2",
  "blake2-rfc",
  "blst",
+ "bulletproofs",
  "byteorder",
  "bytes",
  "criterion",
  "curve25519-dalek",
+ "curve25519-dalek-ng",
  "digest 0.9.0",
  "ed25519-dalek",
  "hex",
  "hkdf 0.10.0",
  "libsecp256k1",
+ "merlin",
  "more-asserts",
  "once_cell",
  "proptest",
@@ -1006,13 +1012,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
- "aptos-gas",
+ "aptos-gas-meter",
  "aptos-gas-profiling",
+ "aptos-gas-schedule",
  "aptos-logger",
  "aptos-memory-usage-tracker",
  "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
@@ -1025,7 +1033,6 @@ dependencies = [
  "move-compiler",
  "move-core-types",
  "move-resource-viewer",
- "move-table-extension",
  "move-vm-runtime",
  "move-vm-test-utils",
  "regex",
@@ -1173,6 +1180,7 @@ name = "aptos-executor-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-partitioner",
  "aptos-config",
  "aptos-crypto",
  "aptos-executor-types",
@@ -1181,11 +1189,16 @@ dependencies = [
  "aptos-retrier",
  "aptos-secure-net",
  "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
  "clap 4.3.5",
+ "crossbeam-channel",
  "itertools",
+ "num_cpus",
+ "rand 0.7.3",
+ "rayon",
  "serde 1.0.149",
  "serde_json",
  "thiserror",
@@ -1417,12 +1430,15 @@ dependencies = [
  "anyhow",
  "aptos-aggregator",
  "aptos-crypto",
- "aptos-gas",
- "aptos-gas-algebra-ext",
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-move-stdlib",
+ "aptos-native-interface",
  "aptos-sdk-builder",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
  "ark-bls12-381",
@@ -1435,16 +1451,20 @@ dependencies = [
  "better_any",
  "blake2-rfc",
  "blst",
+ "bulletproofs",
+ "byteorder",
  "claims",
  "clap 4.3.5",
  "codespan-reporting",
- "curve25519-dalek",
+ "curve25519-dalek-ng",
+ "either",
  "flate2",
  "hex",
  "include_dir 0.7.2",
  "itertools",
  "libsecp256k1",
  "log",
+ "merlin",
  "move-binary-format",
  "move-cli",
  "move-command-line-common",
@@ -1456,7 +1476,6 @@ dependencies = [
  "move-prover",
  "move-prover-boogie-backend",
  "move-stackless-bytecode",
- "move-table-extension",
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-types",
@@ -1531,33 +1550,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-gas"
-version = "0.1.0"
+name = "aptos-gas-algebra"
+version = "0.0.1"
 dependencies = [
- "anyhow",
- "aptos-framework",
- "aptos-gas-algebra-ext",
- "aptos-global-constants",
- "aptos-logger",
- "aptos-move-stdlib",
- "aptos-package-builder",
- "aptos-types",
- "aptos-vm-types",
- "bcs 0.1.4",
- "clap 4.3.5",
- "move-binary-format",
+ "either",
  "move-core-types",
- "move-model",
- "move-table-extension",
- "move-vm-types",
- "tempfile",
 ]
 
 [[package]]
-name = "aptos-gas-algebra-ext"
-version = "0.0.1"
+name = "aptos-gas-meter"
+version = "0.1.0"
 dependencies = [
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
+ "aptos-logger",
+ "aptos-types",
+ "aptos-vm-types",
+ "move-binary-format",
  "move-core-types",
+ "move-vm-types",
 ]
 
 [[package]]
@@ -1566,7 +1577,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
  "aptos-package-builder",
  "aptos-types",
  "inferno",
@@ -1575,6 +1587,35 @@ dependencies = [
  "move-vm-types",
  "regex",
  "smallvec",
+]
+
+[[package]]
+name = "aptos-gas-schedule"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-algebra",
+ "aptos-global-constants",
+ "aptos-types",
+ "either",
+ "move-core-types",
+ "move-vm-types",
+ "paste",
+]
+
+[[package]]
+name = "aptos-gas-schedule-updator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-gas-schedule",
+ "aptos-package-builder",
+ "aptos-types",
+ "bcs 0.1.4",
+ "clap 4.3.5",
+ "move-core-types",
+ "move-model",
+ "tempfile",
 ]
 
 [[package]]
@@ -1760,6 +1801,7 @@ dependencies = [
  "aptos-framework",
  "aptos-genesis",
  "aptos-global-constants",
+ "aptos-indexer-grpc-utils",
  "aptos-logger",
  "aptos-mempool",
  "aptos-mempool-notifications",
@@ -2031,16 +2073,20 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
  "aptos-gas-profiling",
+ "aptos-gas-schedule",
  "aptos-keygen",
  "aptos-memory-usage-tracker",
  "aptos-proptest-helpers",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "goldenfile",
  "hex",
@@ -2048,7 +2094,6 @@ dependencies = [
  "move-command-line-common",
  "move-core-types",
  "move-ir-compiler",
- "move-table-extension",
  "move-vm-types",
  "num_cpus",
  "once_cell",
@@ -2110,7 +2155,8 @@ dependencies = [
 name = "aptos-memory-usage-tracker"
 version = "0.1.0"
 dependencies = [
- "aptos-gas",
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
  "aptos-types",
  "move-binary-format",
  "move-core-types",
@@ -2199,7 +2245,7 @@ dependencies = [
 name = "aptos-move-examples"
 version = "0.1.0"
 dependencies = [
- "aptos-gas",
+ "aptos-gas-schedule",
  "aptos-types",
  "aptos-vm",
  "clap 4.3.5",
@@ -2216,7 +2262,10 @@ name = "aptos-move-stdlib"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "aptos-gas-schedule",
+ "aptos-native-interface",
  "dir-diff",
+ "either",
  "file_diff",
  "hex",
  "log",
@@ -2262,6 +2311,20 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rayon",
+]
+
+[[package]]
+name = "aptos-native-interface"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
+ "aptos-types",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "smallvec",
 ]
 
 [[package]]
@@ -2700,7 +2763,7 @@ dependencies = [
  "aptos-build-info",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-schedule-updator",
  "aptos-genesis",
  "aptos-rest-client",
  "aptos-temppath",
@@ -2948,6 +3011,9 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-retrier",
+ "bcs 0.1.4",
+ "crossbeam-channel",
  "once_cell",
  "serde 1.0.149",
  "thiserror",
@@ -3138,9 +3204,11 @@ dependencies = [
  "aptos-storage-service-types",
  "aptos-time-service",
  "aptos-types",
+ "arc-swap",
  "bcs 0.1.4",
  "bytes",
  "claims",
+ "dashmap",
  "futures",
  "lru 0.7.8",
  "maplit",
@@ -3166,6 +3234,25 @@ dependencies = [
  "proptest",
  "serde 1.0.149",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-table-natives"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-gas-schedule",
+ "aptos-native-interface",
+ "aptos-types",
+ "better_any",
+ "move-binary-format",
+ "move-core-types",
+ "move-table-extension",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "sha3 0.9.1",
+ "smallvec",
 ]
 
 [[package]]
@@ -3311,7 +3398,7 @@ dependencies = [
  "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-executor-service",
- "aptos-gas",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-metrics-core",
@@ -3413,7 +3500,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-storage-interface",
@@ -3522,7 +3609,9 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-infallible",
  "aptos-language-e2e-tests",
  "aptos-logger",
@@ -3530,12 +3619,15 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-move-stdlib",
  "aptos-mvhashmap",
+ "aptos-native-interface",
  "aptos-state-view",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-utils",
  "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
+ "crossbeam-channel",
  "dashmap",
  "fail 0.5.0",
  "futures",
@@ -3543,7 +3635,6 @@ dependencies = [
  "move-bytecode-utils",
  "move-bytecode-verifier",
  "move-core-types",
- "move-table-extension",
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
@@ -3584,11 +3675,12 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-schedule",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "move-core-types",
  "move-vm-types",
@@ -3620,8 +3712,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-cached-packages",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-move-stdlib",
+ "aptos-native-interface",
+ "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
@@ -3631,7 +3726,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-ir-compiler",
- "move-table-extension",
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
@@ -3645,10 +3739,13 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-types",
  "claims",
+ "either",
  "move-binary-format",
  "move-core-types",
 ]
@@ -3662,7 +3759,8 @@ dependencies = [
  "aptos-crypto",
  "aptos-db",
  "aptos-executor-test-helpers",
- "aptos-gas",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-scratchpad",
  "aptos-state-view",
  "aptos-storage-interface",
@@ -3699,10 +3797,11 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-schedule",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "handlebars",
  "move-command-line-common",
@@ -4533,6 +4632,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bulletproofs"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40e698f1df446cc6246afd823afbe2d121134d089c9102c1dd26d1264991ba32"
+dependencies = [
+ "byteorder",
+ "clear_on_drop",
+ "curve25519-dalek-ng",
+ "digest 0.9.0",
+ "merlin",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "serde 1.0.149",
+ "serde_derive",
+ "sha3 0.9.1",
+ "subtle-ng",
+ "thiserror",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4863,6 +4982,15 @@ name = "clap_lex"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2da6da31387c7e4ef160ffab6d5e7f00c42626fe39aea70a7b0f1773f7dd6c1b"
+
+[[package]]
+name = "clear_on_drop"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38508a63f4979f0048febc9966fadbd48e5dab31fd0ec6a3f151bbf4a74f7423"
+dependencies = [
+ "cc",
+]
 
 [[package]]
 name = "cloud-storage"
@@ -5403,6 +5531,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "curve25519-dalek-ng"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c359b7249347e46fb28804470d071c921156ad62b3eef5d34e2ba867533dec8"
+dependencies = [
+ "byteorder",
+ "digest 0.9.0",
+ "rand_core 0.6.4",
+ "serde 1.0.149",
+ "subtle-ng",
+ "zeroize",
+]
+
+[[package]]
 name = "darling"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5751,8 +5893,9 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-algebra",
  "aptos-gas-profiling",
+ "aptos-gas-schedule",
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
@@ -7553,7 +7696,9 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
@@ -7563,6 +7708,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-genesis",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "aptos-writeset-generator",
  "bcs 0.1.4",
  "fail 0.5.0",
@@ -7995,6 +8141,17 @@ checksum = "34f79cf9964c5c9545493acda1263f1912f8d2c56c8a2ffee2606cb960acaacc"
 dependencies = [
  "libc",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "merlin"
+version = "3.0.0"
+source = "git+https://github.com/aptos-labs/merlin#3454ccc85e37355c729ba40e6dac6e867ddf59f5"
+dependencies = [
+ "byteorder",
+ "keccak",
+ "rand_core 0.6.4",
+ "zeroize",
 ]
 
 [[package]]
@@ -11636,7 +11793,8 @@ dependencies = [
  "aptos-faucet-core",
  "aptos-forge",
  "aptos-framework",
- "aptos-gas",
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
  "aptos-genesis",
  "aptos-global-constants",
  "aptos-indexer",
@@ -11826,6 +11984,12 @@ name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
+
+[[package]]
+name = "subtle-ng"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
 name = "syn"

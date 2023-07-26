@@ -17,10 +17,11 @@ anyhow = { workspace = true }
 aptos-cached-packages =  { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework =  { workspace = true }
-aptos-gas = { workspace = true }
+aptos-gas-schedule = { workspace = true } 
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }

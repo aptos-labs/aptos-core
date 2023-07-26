@@ -6,10 +6,7 @@ use aptos_types::{
         CrossShardDependencies, RoundId, ShardId, ShardedTxnIndex, SubBlock,
         TransactionWithDependencies, TxnIndex,
     },
-    transaction::{
-        analyzed_transaction::{AnalyzedTransaction, StorageLocation},
-        Transaction,
-    },
+    transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
 };
 use std::{
     collections::{hash_map::DefaultHasher, HashSet},
@@ -141,7 +138,7 @@ impl CrossShardConflictDetector {
         current_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         prev_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         index_offset: TxnIndex,
-    ) -> (SubBlock<Transaction>, Vec<CrossShardDependencies>) {
+    ) -> (SubBlock<AnalyzedTransaction>, Vec<CrossShardDependencies>) {
         let mut frozen_txns = Vec::new();
         let mut cross_shard_dependencies = Vec::new();
         for txn in txns.into_iter() {
@@ -151,7 +148,7 @@ impl CrossShardConflictDetector {
                 prev_round_rw_set_with_index.clone(),
             );
             cross_shard_dependencies.push(dependency.clone());
-            frozen_txns.push(TransactionWithDependencies::new(txn.into_txn(), dependency));
+            frozen_txns.push(TransactionWithDependencies::new(txn, dependency));
         }
         (
             SubBlock::new(index_offset, frozen_txns),

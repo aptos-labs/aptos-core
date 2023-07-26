@@ -1,0 +1,175 @@
+// ---- Model Dump
+module 0x42::loops {
+    private fun nested_loop(x: u64) {
+        loop {
+          if Gt(x, 0) {
+            loop {
+              if Gt(x, 10) {
+                x: u64 = Sub(x, 1);
+                break;
+                Tuple()
+              } else {
+                break
+              }
+            };
+            x: u64 = Sub(x, 1);
+            continue;
+            Tuple()
+          } else {
+            break
+          }
+        };
+        x
+    }
+    private fun while_loop(x: u64) {
+        loop {
+          if Gt(x, 0) {
+            x: u64 = Sub(x, 1);
+            Tuple()
+          } else {
+            break
+          }
+        };
+        x
+    }
+    private fun while_loop_with_break_and_continue(x: u64) {
+        loop {
+          if Gt(x, 0) {
+            if Eq<u64>(x, 42) {
+              break
+            } else {
+              Tuple()
+            };
+            if Eq<u64>(x, 21) {
+              continue
+            } else {
+              Tuple()
+            };
+            x: u64 = Sub(x, 1);
+            Tuple()
+          } else {
+            break
+          }
+        };
+        x
+    }
+} // end 0x42::loops
+
+============ initial bytecode ================
+
+[variant baseline]
+fun loops::nested_loop($t0: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: label L0
+  1: $t3 := 0
+  2: $t2 := >($t0, $t3)
+  3: if ($t2) goto 4 else goto 25
+  4: label L2
+  5: label L5
+  6: $t5 := 10
+  7: $t4 := >($t0, $t5)
+  8: if ($t4) goto 9 else goto 15
+  9: label L7
+ 10: $t7 := 1
+ 11: $t6 := -($t0, $t7)
+ 12: $t0 := move($t6)
+ 13: goto 19
+ 14: goto 17
+ 15: label L8
+ 16: goto 19
+ 17: label L9
+ 18: goto 5
+ 19: label L6
+ 20: $t9 := 1
+ 21: $t8 := -($t0, $t9)
+ 22: $t0 := move($t8)
+ 23: goto 0
+ 24: goto 27
+ 25: label L3
+ 26: goto 29
+ 27: label L4
+ 28: goto 0
+ 29: label L1
+ 30: $t1 := move($t0)
+ 31: return $t1
+}
+
+
+[variant baseline]
+fun loops::while_loop($t0: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: label L0
+  1: $t3 := 0
+  2: $t2 := >($t0, $t3)
+  3: if ($t2) goto 4 else goto 9
+  4: label L2
+  5: $t5 := 1
+  6: $t4 := -($t0, $t5)
+  7: $t0 := move($t4)
+  8: goto 11
+  9: label L3
+ 10: goto 13
+ 11: label L4
+ 12: goto 0
+ 13: label L1
+ 14: $t1 := move($t0)
+ 15: return $t1
+}
+
+
+[variant baseline]
+fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: label L0
+  1: $t3 := 0
+  2: $t2 := >($t0, $t3)
+  3: if ($t2) goto 4 else goto 25
+  4: label L2
+  5: $t5 := 42
+  6: $t4 := ==($t0, $t5)
+  7: if ($t4) goto 8 else goto 11
+  8: label L5
+  9: goto 29
+ 10: goto 12
+ 11: label L6
+ 12: label L7
+ 13: $t7 := 21
+ 14: $t6 := ==($t0, $t7)
+ 15: if ($t6) goto 16 else goto 19
+ 16: label L8
+ 17: goto 0
+ 18: goto 20
+ 19: label L9
+ 20: label L10
+ 21: $t9 := 1
+ 22: $t8 := -($t0, $t9)
+ 23: $t0 := move($t8)
+ 24: goto 27
+ 25: label L3
+ 26: goto 29
+ 27: label L4
+ 28: goto 0
+ 29: label L1
+ 30: $t1 := move($t0)
+ 31: return $t1
+}
