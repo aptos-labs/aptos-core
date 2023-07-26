@@ -46,11 +46,15 @@ impl P256PrivateKey {
     pub const LENGTH: usize = P256_PRIVATE_KEY_LENGTH;
 
     /// Serialize a P256PrivateKey.
-    pub fn to_bytes(&self) -> [u8; P256_PRIVATE_KEY_LENGTH] {
-        // TODO: Error handling
-        let test = self.0.private_key_to_der().unwrap();
-        // TODO: Error handling
-        test[..].try_into().unwrap()
+    pub fn to_bytes(&self) -> std::result::Result<[u8; P256_PRIVATE_KEY_LENGTH], CryptoMaterialError> {
+        let bytes = match self.0.private_key_to_der() {
+            Ok(bytes) => Ok(bytes),
+            Err(_) => Err(CryptoMaterialError::SerializationError),
+        };
+        match bytes?.try_into() {
+           Ok(res) => Ok(res),
+           Err(_) => Err(CryptoMaterialError::SerializationError),
+        }
     }
 
     /// Deserialize an P256PrivateKey without any validation checks apart from expected key size.
@@ -66,22 +70,28 @@ impl P256PrivateKey {
     /// Private function aimed at minimizing code duplication between sign
     /// methods of the SigningKey implementation. This should remain private.
     fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
-        // TODO: Fix error handling
         let secret_key = &self.0;
-        // TODO: Fix error handling
-        let sig = EcdsaSig::sign(message, &secret_key).unwrap();
-        P256Signature(sig)
+        // TODO: Hard panics okay?
+        P256Signature(EcdsaSig::sign(message, &secret_key).expect("signing failed"))
+        /*match EcdsaSig::sign(message, &secret_key) {
+            Ok(sig) => Ok(P256Signature(sig)),
+            Err(_) => Err(CryptoMaterialError::ValidationError),
+        }*/
     }
 }
 
 impl P256PublicKey {
     /// Serialize a P256PublicKey.
     // TODO: Better error handling here. Also should we compress?
-    pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
-        // TODO: Error handling
-        let bytes = self.0.public_key_to_der().unwrap();
-        // TODO: Error handling
-        bytes.try_into().unwrap()
+    pub fn to_bytes(&self) -> Result<[u8; P256_PUBLIC_KEY_LENGTH], CryptoMaterialError> {
+        let bytes = match self.0.public_key_to_der() {
+            Ok(bytes) => Ok(bytes),
+            Err(_) => Err(CryptoMaterialError::SerializationError),
+        };
+        match bytes?.try_into() {
+           Ok(res) => Ok(res),
+           Err(_) => Err(CryptoMaterialError::SerializationError),
+        }
     }
 
     /// Deserialize a P256PublicKey without any validation checks apart from expected key size
@@ -117,7 +127,7 @@ impl SigningKey for P256PrivateKey {
         Ok(P256PrivateKey::sign_arbitrary_message(
             self,
             signing_message(message)?.as_ref(),
-        ))
+        )?)
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
