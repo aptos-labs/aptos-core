@@ -8,8 +8,8 @@ from .add_pfn import add_pfn_main, AddPFNArgs
 from test_framework.kubernetes import LiveKubernetes
 from test_framework.filesystem import LocalFilesystem
 from test_framework.shell import LocalShell
-from pangu.pangu_lib.util import SystemContext
-import pangu.pangu_lib.util as util
+from pangu_lib.util import SystemContext
+import pangu_lib.util as util
 
 
 @click.command(help="Start a node by testnet and node name.")

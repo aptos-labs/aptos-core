@@ -1,13 +1,13 @@
 from test_framework.kubernetes import SpyKubernetes
 from test_framework.filesystem import SpyFilesystem, LocalFilesystem
 from test_framework.shell import SpyShell
-from pangu.pangu_lib.util import SystemContext
+from pangu_lib.util import SystemContext
 import unittest
 from kubernetes.client import ApiException  # type: ignore
-from pangu.pangu_lib.node_commands.restart_node import *
-from pangu.pangu_lib.node_commands.start_node import *
-from pangu.pangu_lib.node_commands.stop_node import *
-from pangu.pangu_lib.testnet_commands.update_nodes import *
+from pangu_lib.node_commands.restart_node import *
+from pangu_lib.node_commands.start_node import *
+from pangu_lib.node_commands.stop_node import *
+from pangu_lib.testnet_commands.update_nodes import *
 
 
 class testnet_update_nodes_test(unittest.TestCase):
@@ -69,11 +69,9 @@ class testnet_update_nodes_test(unittest.TestCase):
             "pangu_node_config.yaml": self.pangu_config_with_vfn,
             "/path/to/config.yaml": b"",
             f"{util.TEMPLATE_DIRECTORY}/vfn.yaml": LocalFilesystem().read(
-                "./pangu/pangu_lib/fixtures/vfn_1.yaml"
+                "./pangu_lib/fixtures/vfn_1.yaml"
             ),
-            "/tmp/vfn.yaml": LocalFilesystem().read(
-                "./pangu/pangu_lib/fixtures/vfn_1.yaml"
-            ),
+            "/tmp/vfn.yaml": LocalFilesystem().read("./pangu_lib/fixtures/vfn_1.yaml"),
         }
         expected_unlinks = ["/tmp/vfn.yaml"] * 10
         #

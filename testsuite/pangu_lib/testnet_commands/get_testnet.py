@@ -4,10 +4,10 @@ from typing import List, Any
 from kubernetes import client
 from tabulate import tabulate
 from datetime import datetime, timezone
-from pangu.pangu_lib.util import strfdelta
+from pangu_lib.util import strfdelta
 import json
 import sys
-from pangu.pangu_lib.util import NodeType
+from pangu_lib.util import NodeType
 
 
 class PanguTestnet:

@@ -2,7 +2,7 @@ from test_framework.kubernetes import Kubernetes, KubernetesResource
 from typing import List
 from test_framework.logging import log
 from .get_testnet import get_singular_testnet
-from pangu.pangu_lib.node_commands.restart_node import restart_node_main
+from pangu_lib.node_commands.restart_node import restart_node_main
 from concurrent import futures
 
 

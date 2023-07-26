@@ -1,7 +1,7 @@
 from test_framework.kubernetes import Kubernetes
 from test_framework.logging import log
-from pangu.pangu_lib.node_commands.start_node import start_node_main
-from pangu.pangu_lib.node_commands.stop_node import stop_node_main
+from pangu_lib.node_commands.start_node import start_node_main
+from pangu_lib.node_commands.stop_node import stop_node_main
 
 
 def restart_node_main(testnet_name: str, node_name: str, kubernetes: Kubernetes):
