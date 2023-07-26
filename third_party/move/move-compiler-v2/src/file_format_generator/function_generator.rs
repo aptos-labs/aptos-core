@@ -29,7 +29,7 @@ pub struct FunctionGenerator<'a> {
     gen: &'a mut ModuleGenerator,
     /// The set of temporaries which need to be pinned to locals because references are taken for
     /// them. (The Move bytecode does not allow references to stack locations.) The invariant holds
-    /// that `temp in pinned ==> allocation[temp] == Local(_)`.
+    /// that `temp in pinned ==> location.get(temp) == Local(_)`.
     pinned: BTreeSet<TempIndex>,
     /// A map from a temporary to the location where the value belonging to this temporary
     /// is stored. A temporary can be either located on the stack or in a local.
@@ -202,9 +202,12 @@ impl<'a> FunctionGenerator<'a> {
                 self.gen_operation(ctx, dest, oper, source)
             },
             Bytecode::Load(_, dest, cons) => {
-                let cons =
-                    self.gen
-                        .cons_index(&ctx.module, &ctx.loc, cons, ctx.fun.get_local_type(*dest));
+                let cons = self.gen.constant_index(
+                    &ctx.module,
+                    &ctx.loc,
+                    cons,
+                    ctx.fun.get_local_type(*dest),
+                );
                 self.emit(FF::Bytecode::LdConst(cons));
                 self.abstract_push_result(ctx, vec![*dest]);
             },
@@ -478,7 +481,9 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_push_result(ctx, dest);
     }
 
-    /// Generates for an operation which either takes a non-generic or generic struct index.
+    /// Generates code for an operation working on a structure. This can be a structure with or
+    /// without generics: the two passed functions allow the caller to determine which bytecode
+    /// to create for each case.
     fn gen_struct_oper(
         &mut self,
         ctx: &FunctionContext,

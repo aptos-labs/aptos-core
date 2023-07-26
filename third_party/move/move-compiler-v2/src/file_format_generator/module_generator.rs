@@ -533,7 +533,7 @@ impl ModuleGenerator {
     }
 
     /// Obtains or generates a constant index.
-    pub fn cons_index(
+    pub fn constant_index(
         &mut self,
         ctx: &ModuleContext,
         loc: &Loc,
