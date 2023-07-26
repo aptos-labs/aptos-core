@@ -164,7 +164,9 @@ impl Interpreter {
                     }
                 },
                 ExitCode::Call(fh_idx) => {
-                    let func = resolver.function_from_handle(fh_idx);
+                    let func = resolver
+                        .function_from_handle(fh_idx)
+                        .map_err(|e| self.set_location(e))?;
 
                     if self.paranoid_type_checks {
                         self.check_friend_or_private_call(&current_frame.function, &func)?;
@@ -218,7 +220,9 @@ impl Interpreter {
                     let ty_args = resolver
                         .instantiate_generic_function(idx, current_frame.ty_args())
                         .map_err(|e| set_err_info!(current_frame, e))?;
-                    let func = resolver.function_from_instantiation(idx);
+                    let func = resolver
+                        .function_from_instantiation(idx)
+                        .map_err(|e| self.set_location(e))?;
 
                     if self.paranoid_type_checks {
                         self.check_friend_or_private_call(&current_frame.function, &func)?;

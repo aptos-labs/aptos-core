@@ -157,11 +157,6 @@ impl ModuleCache {
         self.modules.get(id).map(Arc::clone)
     }
 
-    // Retrieve a function by index
-    fn function_at(&self, idx: usize) -> Arc<Function> {
-        Arc::clone(&self.functions[idx])
-    }
-
     // Retrieve a struct by index
     fn struct_at(&self, idx: CachedStructIndex) -> Arc<StructType> {
         Arc::clone(&self.structs[idx.0])
@@ -185,7 +180,7 @@ impl ModuleCache {
         // we need this operation to be transactional, if an error occurs we must
         // leave a clean state
         self.add_module(natives, &module)?;
-        match Module::new(module, self) {
+        match Module::new(natives, module, self) {
             Ok(module) => Ok(Arc::clone(self.modules.insert(id, module))),
             Err((err, module)) => {
                 // remove all structs and functions that have been pushed
@@ -393,13 +388,12 @@ impl ModuleCache {
         &self,
         func_name: &IdentStr,
         module_id: &ModuleId,
-    ) -> PartialVMResult<usize> {
-        match self
-            .modules
-            .get(module_id)
-            .and_then(|module| module.function_map.get(func_name))
-        {
-            Some(func_idx) => Ok(*func_idx),
+    ) -> PartialVMResult<Arc<Function>> {
+        match self.modules.get(module_id).and_then(|module| {
+            let idx = module.function_map.get(func_name)?;
+            module.function_defs.get(*idx)
+        }) {
+            Some(func) => Ok(func.clone()),
             None => Err(
                 PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
                     "Cannot find {:?}::{:?} in cache",
@@ -670,36 +664,15 @@ impl Loader {
         data_store: &TransactionDataCache,
     ) -> VMResult<(Arc<Module>, Arc<Function>, Vec<Type>, Vec<Type>)> {
         let module = self.load_module(module_id, data_store)?;
-        let idx = self
+        let func = self
             .module_cache
             .read()
             .resolve_function_by_name(function_name, module_id)
             .map_err(|err| err.finish(Location::Undefined))?;
-        let func = self.module_cache.read().function_at(idx);
 
-        let parameters = func
-            .parameters
-            .0
-            .iter()
-            .map(|tok| {
-                self.module_cache
-                    .read()
-                    .make_type(BinaryIndexedView::Module(module.module()), tok)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
+        let parameters = func.parameter_types.clone();
 
-        let return_ = func
-            .return_
-            .0
-            .iter()
-            .map(|tok| {
-                self.module_cache
-                    .read()
-                    .make_type(BinaryIndexedView::Module(module.module()), tok)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
+        let return_ = func.return_types.clone();
 
         Ok((module, func, parameters, return_))
     }
@@ -1443,8 +1416,22 @@ impl Loader {
     // Internal helpers
     //
 
-    fn function_at(&self, idx: usize) -> Arc<Function> {
-        self.module_cache.read().function_at(idx)
+    fn function_at(&self, handle: &FunctionHandle) -> PartialVMResult<Arc<Function>> {
+        match handle {
+            FunctionHandle::Local(func) => Ok(func.clone()),
+            FunctionHandle::Remote { module, name } => {
+                self.get_module(module)
+                    .and_then(|module| {
+                        let idx = module.function_map.get(name)?;
+                        module.function_defs.get(*idx).cloned()
+                    })
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(
+                            format!("Failed to resolve function: {:?}::{:?}", module, name),
+                        )
+                    })
+            },
+        }
     }
 
     pub(crate) fn get_module(&self, idx: &ModuleId) -> Option<Arc<Module>> {
@@ -1576,7 +1563,10 @@ impl<'a> Resolver<'a> {
     // Function resolution
     //
 
-    pub(crate) fn function_from_handle(&self, idx: FunctionHandleIndex) -> Arc<Function> {
+    pub(crate) fn function_from_handle(
+        &self,
+        idx: FunctionHandleIndex,
+    ) -> PartialVMResult<Arc<Function>> {
         let idx = match &self.binary {
             BinaryType::Module(module) => module.function_at(idx.0),
             BinaryType::Script(script) => script.function_at(idx.0),
@@ -1587,12 +1577,12 @@ impl<'a> Resolver<'a> {
     pub(crate) fn function_from_instantiation(
         &self,
         idx: FunctionInstantiationIndex,
-    ) -> Arc<Function> {
+    ) -> PartialVMResult<Arc<Function>> {
         let func_inst = match &self.binary {
             BinaryType::Module(module) => module.function_instantiation_at(idx.0),
             BinaryType::Script(script) => script.function_instantiation_at(idx.0),
         };
-        self.loader.function_at(func_inst.handle)
+        self.loader.function_at(&func_inst.handle)
     }
 
     pub(crate) fn instantiate_generic_function(
@@ -1852,6 +1842,12 @@ impl<'a> Resolver<'a> {
     }
 }
 
+#[derive(Clone, Debug)]
+enum FunctionHandle {
+    Local(Arc<Function>),
+    Remote { module: ModuleId, name: Identifier },
+}
+
 // A Module is very similar to a binary Module but data is "transformed" to a representation
 // more appropriate to execution.
 // When code executes indexes in instructions are resolved against those runtime structure
@@ -1882,7 +1878,8 @@ pub(crate) struct Module {
     // the instruction carries an index into this table which contains the index into the
     // glabal table of functions. No instantiation of generic functions is saved into
     // the global table.
-    function_refs: Vec<usize>,
+    function_refs: Vec<FunctionHandle>,
+    function_defs: Vec<Arc<Function>>,
     // materialized instantiations, whether partial or not
     function_instantiations: Vec<FunctionInstantiation>,
 
@@ -1907,6 +1904,7 @@ pub(crate) struct Module {
 
 impl Module {
     fn new(
+        natives: &NativeFunctions,
         module: CompiledModule,
         cache: &ModuleCache,
     ) -> Result<Self, (PartialVMError, CompiledModule)> {
@@ -1916,6 +1914,7 @@ impl Module {
         let mut structs = vec![];
         let mut struct_instantiations = vec![];
         let mut function_refs = vec![];
+        let mut function_defs = vec![];
         let mut function_instantiations = vec![];
         let mut field_handles = vec![];
         let mut field_instantiations: Vec<FieldInstantiation> = vec![];
@@ -1974,44 +1973,38 @@ impl Module {
                     instantiation.push(cache.make_type_while_loading(&module, ty)?);
                 }
                 struct_instantiations.push(StructInstantiation {
-                field_count,
+                    field_count,
                     instantiation,
                     definition_struct_type: struct_def.definition_struct_type.clone(),
                 });
             }
 
-            for func_handle in module.function_handles() {
-                let func_name = module.identifier_at(func_handle.name);
-                let module_handle = module.module_handle_at(func_handle.module);
-                let module_id = module.module_id_for_handle(module_handle);
-                if module_id == id {
-                    // module has not been published yet, loop through the functions
-                    for (idx, function) in cache.functions.iter().enumerate().rev() {
-                        if function.module_id() != Some(&module_id) {
-                            return Err(PartialVMError::new(
-                                StatusCode::FUNCTION_RESOLUTION_FAILURE,
-                            )
-                            .with_message(format!(
-                                "Cannot find {:?}::{:?} in publishing module",
-                                module_id, func_name
-                            )));
-                        }
-                        if function.name.as_ident_str() == func_name {
-                            function_refs.push(idx);
-                            break;
-                        }
-                    }
-                } else {
-                    function_refs.push(cache.resolve_function_by_name(func_name, &module_id)?);
-                }
-            }
+            for (idx, func) in module.function_defs().iter().enumerate() {
+                let findex = FunctionDefinitionIndex(idx as TableIndex);
+                let mut function = Function::new(natives, findex, func, &module);
+                function.return_types = function
+                    .return_
+                    .0
+                    .iter()
+                    .map(|tok| cache.make_type_while_loading(&module, tok))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                function.local_types = function
+                    .locals
+                    .0
+                    .iter()
+                    .map(|tok| cache.make_type_while_loading(&module, tok))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                function.parameter_types = function
+                    .parameters
+                    .0
+                    .iter()
+                    .map(|tok| cache.make_type_while_loading(&module, tok))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
 
-            for func_def in module.function_defs() {
-                let idx = function_refs[func_def.function.0 as usize];
-                let name = module.identifier_at(module.function_handle_at(func_def.function).name);
-                function_map.insert(name.to_owned(), idx);
+                function_map.insert(function.name.to_owned(), idx);
+                function_defs.push(Arc::new(function));
 
-                if let Some(code_unit) = &func_def.code {
+                if let Some(code_unit) = &func.code {
                     for bc in &code_unit.code {
                         match bc {
                             Bytecode::VecPack(si, _)
@@ -2046,8 +2039,30 @@ impl Module {
                 }
             }
 
+            for func_handle in module.function_handles() {
+                let func_name = module.identifier_at(func_handle.name);
+                let module_handle = module.module_handle_at(func_handle.module);
+                let module_id = module.module_id_for_handle(module_handle);
+                let func_handle = if module_id == id {
+                    FunctionHandle::Local(
+                        function_defs[*function_map.get(func_name).ok_or_else(|| {
+                            PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(
+                                "Cannot find function in publishing module".to_string(),
+                            )
+                        })?]
+                        .clone(),
+                    )
+                } else {
+                    FunctionHandle::Remote {
+                        module: module_id,
+                        name: func_name.to_owned(),
+                    }
+                };
+                function_refs.push(func_handle);
+            }
+
             for func_inst in module.function_instantiations() {
-                let handle = function_refs[func_inst.handle.0 as usize];
+                let handle = function_refs[func_inst.handle.0 as usize].clone();
                 let mut instantiation = vec![];
                 for ty in &module.signature_at(func_inst.type_parameters).0 {
                     instantiation.push(cache.make_type_while_loading(&module, ty)?);
@@ -2095,6 +2110,7 @@ impl Module {
                 structs,
                 struct_instantiations,
                 function_refs,
+                function_defs,
                 function_instantiations,
                 field_handles,
                 field_instantiations,
@@ -2114,8 +2130,8 @@ impl Module {
         &self.struct_instantiations[idx as usize]
     }
 
-    fn function_at(&self, idx: u16) -> usize {
-        self.function_refs[idx as usize]
+    fn function_at(&self, idx: u16) -> &FunctionHandle {
+        &self.function_refs[idx as usize]
     }
 
     fn function_instantiation_at(&self, idx: u16) -> &FunctionInstantiation {
@@ -2167,7 +2183,7 @@ struct Script {
     struct_refs: Vec<CachedStructIndex>,
 
     // functions as indexes into the Loader function list
-    function_refs: Vec<usize>,
+    function_refs: Vec<FunctionHandle>,
     // materialized instantiations, whether partial or not
     function_instantiations: Vec<FunctionInstantiation>,
 
@@ -2214,15 +2230,15 @@ impl Script {
                 *script.address_identifier_at(module_handle.address),
                 script.identifier_at(module_handle.name).to_owned(),
             );
-            let ref_idx = cache
-                .resolve_function_by_name(func_name, &module_id)
-                .map_err(|err| err.finish(Location::Undefined))?;
-            function_refs.push(ref_idx);
+            function_refs.push(FunctionHandle::Remote {
+                module: module_id,
+                name: func_name.to_owned(),
+            });
         }
 
         let mut function_instantiations = vec![];
         for func_inst in script.function_instantiations() {
-            let handle = function_refs[func_inst.handle.0 as usize];
+            let handle = function_refs[func_inst.handle.0 as usize].clone();
             let mut instantiation = vec![];
             for ty in &script.signature_at(func_inst.type_parameters).0 {
                 instantiation.push(
@@ -2345,8 +2361,8 @@ impl Script {
         self.main.clone()
     }
 
-    fn function_at(&self, idx: u16) -> usize {
-        self.function_refs[idx as usize]
+    fn function_at(&self, idx: u16) -> &FunctionHandle {
+        &self.function_refs[idx as usize]
     }
 
     fn function_instantiation_at(&self, idx: u16) -> &FunctionInstantiation {
@@ -2393,6 +2409,15 @@ pub(crate) struct Function {
 pub struct LoadedFunction {
     pub(crate) module: Arc<Module>,
     pub(crate) function: Arc<Function>,
+}
+
+impl std::fmt::Debug for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("Function")
+            .field("scope", &self.scope)
+            .field("name", &self.name)
+            .finish()
+    }
 }
 
 impl Function {
@@ -2566,7 +2591,7 @@ impl Function {
 #[derive(Debug, Clone)]
 struct FunctionInstantiation {
     // index to `ModuleCache::functions` global table
-    handle: usize,
+    handle: FunctionHandle,
     instantiation: Vec<Type>,
 }
 
@@ -2978,19 +3003,12 @@ impl Loader {
             Type::Vector(ty) => MoveTypeLayout::Vector(Box::new(
                 self.type_to_fully_annotated_layout_impl(ty, count, depth + 1)?,
             )),
-            Type::Struct { name, .. } => {
-                MoveTypeLayout::Struct(self.struct_name_to_fully_annotated_layout(
-                    name,
-                    &[],
-                    count,
-                    depth,
-                )?)
-            },
-            Type::StructInstantiation { name, ty_args, .. } => {
-                MoveTypeLayout::Struct(
-                    self.struct_name_to_fully_annotated_layout(name, ty_args, count, depth)?,
-                )
-            },
+            Type::Struct { name, .. } => MoveTypeLayout::Struct(
+                self.struct_name_to_fully_annotated_layout(name, &[], count, depth)?,
+            ),
+            Type::StructInstantiation { name, ty_args, .. } => MoveTypeLayout::Struct(
+                self.struct_name_to_fully_annotated_layout(name, ty_args, count, depth)?,
+            ),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
