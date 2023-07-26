@@ -1,0 +1,16 @@
+[package]
+name = "No Code Mint"
+version = "0.0.0"
+
+[addresses]
+deployer = "_"
+no_code_mint = "_"
+
+[dev-addresses]
+deployer = "0xb7c22590e1532069403c2a721bcf31d1a45fc3acd7c12903b3cf0fe23f486411"
+no_code_mint = "0x0d17edeafc6393d340df999ca4ca9b33bf35f19ad4d16fbf49e57eaa3da09421"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+AptosToken = { local = "../../framework/aptos-token" }
+AptosTokenObjects = { local = "../../framework/aptos-token-objects" }
