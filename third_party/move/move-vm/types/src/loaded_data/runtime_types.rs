@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use derivative::Derivative;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
@@ -135,7 +136,8 @@ pub struct StructName {
     pub name: Identifier,
 }
 
-#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Derivative, Ord, PartialOrd)]
+#[derivative(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum Type {
     Bool,
     U8,
@@ -146,12 +148,15 @@ pub enum Type {
     Vector(Box<Type>),
     Struct {
         name: Arc<StructName>,
+        #[derivative(PartialEq = "ignore", Hash = "ignore")]
         ability: AbilitySet,
     },
     StructInstantiation {
         name: Arc<StructName>,
         ty_args: Vec<Type>,
+        #[derivative(PartialEq = "ignore", Hash = "ignore")]
         base_ability_set: AbilitySet,
+        #[derivative(PartialEq = "ignore", Hash = "ignore")]
         phantom_ty_args_mask: Vec<bool>,
     },
     Reference(Box<Type>),
@@ -193,10 +198,7 @@ impl Type {
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
             },
-            Type::Struct {
-                name,
-                ability,
-            } => Type::Struct {
+            Type::Struct { name, ability } => Type::Struct {
                 name: name.clone(),
                 ability: *ability,
             },

@@ -281,9 +281,7 @@ impl ModuleCache {
 
     // `make_type` is the entry point to "translate" a `SignatureToken` to a `Type`
     fn make_type(&self, module: BinaryIndexedView, tok: &SignatureToken) -> PartialVMResult<Type> {
-        make_type_internal(module, tok, &|struct_name, module_id| {
-            self.resolve_struct_by_name(struct_name, module_id)
-        })
+        make_type_internal(module, tok)
     }
 
     // While in the process of loading, and before a `Module` is saved into the cache the loader
@@ -294,34 +292,7 @@ impl ModuleCache {
         module: &CompiledModule,
         tok: &SignatureToken,
     ) -> PartialVMResult<Type> {
-        let self_id = module.self_id();
-        make_type_internal(
-            BinaryIndexedView::Module(module),
-            tok,
-            &|struct_name, module_id| {
-                if module_id == &self_id {
-                    // module has not been published yet, loop through the types
-                    for (idx, struct_type) in self.structs.iter().enumerate().rev() {
-                        if &struct_type.name.module != module_id {
-                            break;
-                        }
-                        if struct_type.name.name.as_ident_str() == struct_name {
-                            return Ok((CachedStructIndex(idx), struct_type.clone()));
-                        }
-                    }
-                    Err(
-                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(
-                            format!(
-                                "Cannot find {:?}::{:?} in publishing module",
-                                module_id, struct_name
-                            ),
-                        ),
-                    )
-                } else {
-                    self.resolve_struct_by_name(struct_name, module_id)
-                }
-            },
-        )
+        make_type_internal(BinaryIndexedView::Module(module), tok)
     }
 
     // Given a module id, returns whether the module cache has the module or not
@@ -1919,6 +1890,30 @@ impl Module {
                 }
             }
 
+            // validate the correctness of struct handle references.
+            for struct_handle in module.struct_handles() {
+                let module_handle = module.module_handle_at(struct_handle.module);
+                if module_handle != module.self_handle() {
+                    let struct_name = module.identifier_at(struct_handle.name);
+                    let module_handle = module.module_handle_at(struct_handle.module);
+                    let module_id = module.module_id_for_handle(module_handle);
+                    let (_, struct_) = cache.resolve_struct_by_name(struct_name, &module_id)?;
+                    if !struct_handle.abilities.is_subset(struct_.abilities)
+                        || &struct_handle
+                            .type_parameters
+                            .iter()
+                            .map(|ty| ty.is_phantom)
+                            .collect::<Vec<_>>()
+                            != &struct_.phantom_ty_args_mask
+                    {
+                        return Err(PartialVMError::new(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        )
+                        .with_message("Ability definition of module mismatch".to_string()));
+                    }
+                }
+            }
+
             for struct_def in module.struct_defs() {
                 let idx = struct_refs[struct_def.struct_handle.0 as usize];
                 let field_count = cache.structs[idx.0].fields.len() as u16;
@@ -2187,6 +2182,29 @@ impl Script {
                     .map_err(|e| e.finish(Location::Script))?
                     .0,
             );
+        }
+
+        for struct_handle in script.struct_handles() {
+            let struct_name = script.identifier_at(struct_handle.name);
+            let module_handle = script.module_handle_at(struct_handle.module);
+            let module_id = script.module_id_for_handle(module_handle);
+            let (_, struct_) = cache
+                .resolve_struct_by_name(struct_name, &module_id)
+                .map_err(|err| err.finish(Location::Script))?;
+            if !struct_handle.abilities.is_subset(struct_.abilities)
+                || &struct_handle
+                    .type_parameters
+                    .iter()
+                    .map(|ty| ty.is_phantom)
+                    .collect::<Vec<_>>()
+                    != &struct_.phantom_ty_args_mask
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Ability definition of module mismatch".to_string())
+                        .finish(Location::Script),
+                );
+            }
         }
 
         let mut function_refs = vec![];
