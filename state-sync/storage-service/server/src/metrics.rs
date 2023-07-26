@@ -46,6 +46,16 @@ pub static NETWORK_FRAME_OVERFLOW: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for tracking the number of active optimistic fetches
+pub static OPTIMISTIC_FETCH_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_storage_service_server_optimistic_fetch_count",
+        "Gauge for tracking the number of active optimistic fetches",
+        &["network_id"]
+    )
+    .unwrap()
+});
+
 /// Counter for optimistic fetch request events
 pub static OPTIMISTIC_FETCH_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -56,7 +66,7 @@ pub static OPTIMISTIC_FETCH_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Time it takes to process a storage request
+/// Time it takes to process an optimistic fetch request
 pub static OPTIMISTIC_FETCH_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_storage_service_server_optimistic_fetch_latency",

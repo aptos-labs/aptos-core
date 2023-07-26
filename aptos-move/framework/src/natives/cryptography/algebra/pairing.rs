@@ -2,15 +2,17 @@
 
 use crate::{
     abort_unless_feature_flag_enabled,
-    natives::{
-        cryptography::algebra::{
-            abort_invariant_violated, gas::GasParameters, AlgebraContext, Structure,
-            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
-            MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        },
-        helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
+    natives::cryptography::algebra::{
+        abort_invariant_violated, AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED,
+        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING,
+        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
-    safe_borrow_element, safely_pop_arg, store_element, structure_from_ty_arg,
+    safe_borrow_element, store_element, structure_from_ty_arg,
+};
+use aptos_gas_algebra::{Arg, GasExpression};
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::{pairing::Pairing, CurveGroup};
@@ -40,7 +42,6 @@ macro_rules! abort_unless_pairing_enabled {
 }
 
 pub fn multi_pairing_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -62,7 +63,8 @@ pub fn multi_pairing_internal(
             }
 
             context.charge(
-                gas_params.ark_bls12_381_g1_proj_to_affine * NumArgs::from(num_entries as u64),
+                ALGEBRA_ARK_BLS12_381_G1_PROJ_TO_AFFINE.per::<Arg>()
+                    * NumArgs::from(num_entries as u64),
             )?;
             let mut g1_elements_affine = Vec::with_capacity(num_entries);
             for handle in g1_element_handles {
@@ -77,7 +79,8 @@ pub fn multi_pairing_internal(
             }
 
             context.charge(
-                gas_params.ark_bls12_381_g2_proj_to_affine * NumArgs::from(num_entries as u64),
+                ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE.per::<Arg>()
+                    * NumArgs::from(num_entries as u64),
             )?;
             let mut g2_elements_affine = Vec::with_capacity(num_entries);
             for handle in g2_element_handles {
@@ -92,8 +95,8 @@ pub fn multi_pairing_internal(
             }
 
             context.charge(
-                gas_params.ark_bls12_381_multi_pairing_base * NumArgs::one()
-                    + gas_params.ark_bls12_381_multi_pairing_per_pair
+                ALGEBRA_ARK_BLS12_381_MULTI_PAIRING_BASE
+                    + ALGEBRA_ARK_BLS12_381_MULTI_PAIRING_PER_PAIR
                         * NumArgs::from(num_entries as u64),
             )?;
             let new_element =
@@ -108,7 +111,6 @@ pub fn multi_pairing_internal(
 }
 
 pub fn pairing_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -129,7 +131,7 @@ pub fn pairing_internal(
                 g1_element_ptr,
                 g1_element
             );
-            context.charge(gas_params.ark_bls12_381_g1_proj_to_affine * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_G1_PROJ_TO_AFFINE)?;
             let g1_element_affine = g1_element.into_affine();
             safe_borrow_element!(
                 context,
@@ -138,9 +140,9 @@ pub fn pairing_internal(
                 g2_element_ptr,
                 g2_element
             );
-            context.charge(gas_params.ark_bls12_381_g2_proj_to_affine * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_G2_PROJ_TO_AFFINE)?;
             let g2_element_affine = g2_element.into_affine();
-            context.charge(gas_params.ark_bls12_381_pairing * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_PAIRING)?;
             let new_element =
                 ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine).0;
             let new_handle = store_element!(context, new_element)?;

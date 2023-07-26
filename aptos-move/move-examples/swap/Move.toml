@@ -1,5 +1,5 @@
 [package]
-name = "CoinWrapper"
+name = "swap"
 version = "0.0.0"
 
 [addresses]

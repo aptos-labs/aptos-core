@@ -6,14 +6,10 @@ use aptos_config::{
     config::StorageServiceConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_storage_service_types::{
-    requests::{DataRequest, NewTransactionOutputsWithProofRequest, StorageServiceRequest},
-    responses::DataResponse,
+use aptos_storage_service_types::requests::{
+    DataRequest, NewTransactionOutputsWithProofRequest, StorageServiceRequest,
 };
-use aptos_types::{
-    epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
-    transaction::TransactionOutputListWithProof, PeerId,
-};
+use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 use claims::assert_none;
 use futures::channel::oneshot::Receiver;
 
@@ -71,7 +67,7 @@ async fn test_get_new_transaction_outputs() {
         .await;
 
         // Verify a response is received and that it contains the correct data
-        verify_new_transaction_outputs_with_proof(
+        utils::verify_new_transaction_outputs_with_proof(
             &mut mock_client,
             response_receiver,
             output_list_with_proof,
@@ -166,14 +162,14 @@ async fn test_get_new_transaction_outputs_different_networks() {
         .await;
 
         // Verify a response is received and that it contains the correct data
-        verify_new_transaction_outputs_with_proof(
+        utils::verify_new_transaction_outputs_with_proof(
             &mut mock_client,
             response_receiver_1,
             output_list_with_proof_1,
             highest_ledger_info.clone(),
         )
         .await;
-        verify_new_transaction_outputs_with_proof(
+        utils::verify_new_transaction_outputs_with_proof(
             &mut mock_client,
             response_receiver_2,
             output_list_with_proof_2,
@@ -246,7 +242,7 @@ async fn test_get_new_transaction_outputs_epoch_change() {
     .await;
 
     // Verify a response is received and that it contains the correct data
-    verify_new_transaction_outputs_with_proof(
+    utils::verify_new_transaction_outputs_with_proof(
         &mut mock_client,
         response_receiver,
         output_list_with_proof,
@@ -305,7 +301,7 @@ async fn test_get_new_transaction_outputs_max_chunk() {
     .await;
 
     // Verify a response is received and that it contains the correct data
-    verify_new_transaction_outputs_with_proof(
+    utils::verify_new_transaction_outputs_with_proof(
         &mut mock_client,
         response_receiver,
         output_list_with_proof,
@@ -343,30 +339,4 @@ async fn get_new_outputs_with_proof_for_peer(
     mock_client
         .send_request(storage_request, peer_id, network_id)
         .await
-}
-
-/// Verifies that a new transaction outputs with proof response is received
-/// and that the response contains the correct data.
-async fn verify_new_transaction_outputs_with_proof(
-    mock_client: &mut MockClient,
-    receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
-    output_list_with_proof: TransactionOutputListWithProof,
-    expected_ledger_info: LedgerInfoWithSignatures,
-) {
-    match mock_client
-        .wait_for_response(receiver)
-        .await
-        .unwrap()
-        .get_data_response()
-        .unwrap()
-    {
-        DataResponse::NewTransactionOutputsWithProof((outputs_with_proof, ledger_info)) => {
-            assert_eq!(outputs_with_proof, output_list_with_proof);
-            assert_eq!(ledger_info, expected_ledger_info);
-        },
-        response => panic!(
-            "Expected new transaction outputs with proof but got: {:?}",
-            response
-        ),
-    };
 }

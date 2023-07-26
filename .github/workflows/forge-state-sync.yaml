@@ -50,7 +50,7 @@ jobs:
         id: determine-test-branch
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 6 */2 * *" ]]; then
+            if [[ "${{ github.event.schedule }}" == "0 6 */3 * *" ]]; then
               echo "Branch: main"
               echo "BRANCH=main" >> $GITHUB_OUTPUT
             else
