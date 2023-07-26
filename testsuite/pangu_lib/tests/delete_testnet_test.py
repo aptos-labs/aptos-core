@@ -1,6 +1,6 @@
 from test_framework.kubernetes import SpyKubernetes
 from kubernetes import client
-from pangu.pangu_lib.testnet_commands.delete_testnet import *
+from pangu_lib.testnet_commands.delete_testnet import *
 import unittest
 from kubernetes.client import ApiException  # type: ignore
 

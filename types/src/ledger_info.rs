@@ -283,6 +283,7 @@ impl LedgerInfoWithV0 {
         validator.check_voting_power(
             self.get_voters(&validator.get_ordered_account_addresses_iter().collect_vec())
                 .iter(),
+            true,
         )
     }
 

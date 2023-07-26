@@ -5,7 +5,7 @@ from test_framework.shell import Shell, RunResult
 from kubernetes import client
 import json
 from concurrent import futures
-import pangu.pangu_lib.util as util
+import pangu_lib.util as util
 from multiprocessing import Value
 from typing import Any  # , Callable
 import tabulate

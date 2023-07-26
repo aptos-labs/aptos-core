@@ -14,7 +14,7 @@ import string
 import os
 import pwd
 from test_framework.logging import log
-import pangu.pangu_lib.util as util
+import pangu_lib.util as util
 
 
 @click.command(help="Create a testnet.")

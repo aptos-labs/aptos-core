@@ -1,5 +1,5 @@
-from pangu.pangu_lib.testnet_commands import commands as testnet_commands
-from pangu.pangu_lib.node_commands import commands as node_commands
+from pangu_lib.testnet_commands import commands as testnet_commands
+from pangu_lib.node_commands import commands as node_commands
 import click
 from test_framework.logging import log, init_logging, logging
 from typing import Any

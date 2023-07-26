@@ -2,8 +2,8 @@ from test_framework.kubernetes import SpyKubernetes
 from kubernetes import client
 import unittest
 from kubernetes.client import ApiException  # type: ignore
-from pangu.pangu_lib.node_commands.wipe_node import *
-import pangu.pangu_lib.util as util
+from pangu_lib.node_commands.wipe_node import *
+import pangu_lib.util as util
 
 
 class node_wipe_node(unittest.TestCase):
