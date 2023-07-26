@@ -11,6 +11,7 @@ use crate::{
 use anyhow::Error;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
+use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
@@ -24,7 +25,6 @@ use move_core_types::{
     resolver::{resource_size, ModuleResolver, ResourceResolver},
     vm_status::StatusCode,
 };
-use move_table_extension::{TableHandle, TableResolver};
 use std::{cell::RefCell, collections::BTreeMap, ops::Deref};
 
 pub(crate) fn get_resource_group_from_metadata(

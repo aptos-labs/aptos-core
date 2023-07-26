@@ -269,7 +269,8 @@ impl TDAGMessage for Node {
                 .check_voting_power(
                     self.parents()
                         .iter()
-                        .map(|parent| parent.metadata().author())
+                        .map(|parent| parent.metadata().author()),
+                    true,
                 )
                 .is_ok(),
             "not enough parents to satisfy voting power"
@@ -426,7 +427,7 @@ impl BroadcastStatus for SignatureBuilder {
         Ok(self
             .epoch_state
             .verifier
-            .check_voting_power(self.partial_signatures.signatures().keys())
+            .check_voting_power(self.partial_signatures.signatures().keys(), true)
             .ok()
             .map(|_| {
                 let aggregated_signature = self
