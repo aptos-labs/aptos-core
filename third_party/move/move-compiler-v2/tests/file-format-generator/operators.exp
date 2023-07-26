@@ -1,202 +1,27 @@
-============ initial bytecode ================
 
-[variant baseline]
-fun operators::arithm($t0: u64, $t1: u64): u64 {
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-  0: $t6 := -($t0, $t1)
-  1: $t5 := /($t1, $t6)
-  2: $t4 := *($t5, $t1)
-  3: $t3 := %($t4, $t0)
-  4: $t2 := +($t0, $t3)
-  5: return $t2
-}
+Diagnostics:
+error: no matching declaration of `<<`
+  ┌─ tests/file-format-generator/operators.move:7:9
+  │
+7 │         x << y & x | y >> x ^ y
+  │         ^^^^^^
+  │
+  = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `u64` for argument 1)
+  = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `u64` for argument 1)
+  = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `u64` for argument 1)
+  = outruled candidate `<<(u64, u8): u64` (expected `u8` but found `u64` for argument 2)
+  = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `u64` for argument 1)
+  = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `u64` for argument 1)
 
-
-[variant baseline]
-fun operators::bits($t0: u64, $t1: u64): u64 {
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-  0: $t4 := <<($t0, $t1)
-  1: $t3 := &($t4, $t0)
-  2: $t6 := >>($t1, $t0)
-  3: $t5 := ^($t6, $t1)
-  4: $t2 := |($t3, $t5)
-  5: return $t2
-}
-
-
-[variant baseline]
-fun operators::bools($t0: bool, $t1: bool): bool {
-     var $t2: bool
-     var $t3: bool
-     var $t4: bool
-     var $t5: bool
-     var $t6: bool
-     var $t7: bool
-     var $t8: bool
-     var $t9: bool
-     var $t10: bool
-     var $t11: bool
-     var $t12: bool
-  0: $t5 := &&($t0, $t1)
-  1: $t7 := !($t1)
-  2: $t6 := &&($t0, $t7)
-  3: $t4 := ||($t5, $t6)
-  4: $t9 := !($t0)
-  5: $t8 := &&($t9, $t1)
-  6: $t3 := ||($t4, $t8)
-  7: $t11 := !($t0)
-  8: $t12 := !($t1)
-  9: $t10 := &&($t11, $t12)
- 10: $t2 := ||($t3, $t10)
- 11: return $t2
-}
-
-
-[variant baseline]
-fun operators::equality<#0>($t0: #0, $t1: #0): bool {
-     var $t2: bool
-  0: $t2 := ==($t0, $t1)
-  1: return $t2
-}
-
-
-[variant baseline]
-fun operators::inequality<#0>($t0: #0, $t1: #0): bool {
-     var $t2: bool
-  0: $t2 := !=($t0, $t1)
-  1: return $t2
-}
-
-
-[variant baseline]
-fun operators::order($t0: u64, $t1: u64): bool {
-     var $t2: bool
-     var $t3: bool
-     var $t4: bool
-     var $t5: bool
-     var $t6: bool
-     var $t7: bool
-     var $t8: bool
-     var $t9: bool
-     var $t10: bool
-  0: $t5 := <($t0, $t1)
-  1: $t6 := <=($t0, $t1)
-  2: $t4 := &&($t5, $t6)
-  3: $t8 := >($t0, $t1)
-  4: $t7 := !($t8)
-  5: $t3 := &&($t4, $t7)
-  6: $t10 := >=($t0, $t1)
-  7: $t9 := !($t10)
-  8: $t2 := &&($t3, $t9)
-  9: return $t2
-}
-
-
-============ disassembled file-format ==================
-// Move bytecode v6
-module 42.operators {
-
-
-arithm(Arg0: u64, Arg1: u64): u64 {
-B0:
-	0: CopyLoc[0](Arg0: u64)
-	1: CopyLoc[1](Arg1: u64)
-	2: Sub
-	3: StLoc[2](loc0: u64)
-	4: CopyLoc[1](Arg1: u64)
-	5: CopyLoc[2](loc0: u64)
-	6: Div
-	7: CopyLoc[1](Arg1: u64)
-	8: Mul
-	9: CopyLoc[0](Arg0: u64)
-	10: Mod
-	11: StLoc[3](loc1: u64)
-	12: CopyLoc[0](Arg0: u64)
-	13: CopyLoc[3](loc1: u64)
-	14: Add
-	15: Ret
-}
-bits(Arg0: u64, Arg1: u64): u64 {
-B0:
-	0: CopyLoc[0](Arg0: u64)
-	1: CopyLoc[1](Arg1: u64)
-	2: Shl
-	3: CopyLoc[0](Arg0: u64)
-	4: BitAnd
-	5: CopyLoc[1](Arg1: u64)
-	6: CopyLoc[0](Arg0: u64)
-	7: Shr
-	8: CopyLoc[1](Arg1: u64)
-	9: Xor
-	10: BitOr
-	11: Ret
-}
-bools(Arg0: bool, Arg1: bool): bool {
-B0:
-	0: CopyLoc[0](Arg0: bool)
-	1: CopyLoc[1](Arg1: bool)
-	2: And
-	3: CopyLoc[1](Arg1: bool)
-	4: Not
-	5: StLoc[2](loc0: bool)
-	6: CopyLoc[0](Arg0: bool)
-	7: CopyLoc[2](loc0: bool)
-	8: And
-	9: Or
-	10: CopyLoc[0](Arg0: bool)
-	11: Not
-	12: CopyLoc[1](Arg1: bool)
-	13: And
-	14: Or
-	15: CopyLoc[0](Arg0: bool)
-	16: Not
-	17: CopyLoc[1](Arg1: bool)
-	18: Not
-	19: And
-	20: Or
-	21: Ret
-}
-equality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool {
-B0:
-	0: MoveLoc[0](Arg0: Ty0)
-	1: MoveLoc[1](Arg1: Ty0)
-	2: Eq
-	3: Ret
-}
-inequality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool {
-B0:
-	0: MoveLoc[0](Arg0: Ty0)
-	1: MoveLoc[1](Arg1: Ty0)
-	2: Neq
-	3: Ret
-}
-order(Arg0: u64, Arg1: u64): bool {
-B0:
-	0: CopyLoc[0](Arg0: u64)
-	1: CopyLoc[1](Arg1: u64)
-	2: Lt
-	3: CopyLoc[0](Arg0: u64)
-	4: CopyLoc[1](Arg1: u64)
-	5: Le
-	6: And
-	7: CopyLoc[0](Arg0: u64)
-	8: CopyLoc[1](Arg1: u64)
-	9: Gt
-	10: Not
-	11: And
-	12: CopyLoc[0](Arg0: u64)
-	13: CopyLoc[1](Arg1: u64)
-	14: Ge
-	15: Not
-	16: And
-	17: Ret
-}
-}
+error: no matching declaration of `>>`
+  ┌─ tests/file-format-generator/operators.move:7:22
+  │
+7 │         x << y & x | y >> x ^ y
+  │                      ^^^^^^
+  │
+  = outruled candidate `>>(u8, u8): u8` (expected `u8` but found `u64` for argument 1)
+  = outruled candidate `>>(u16, u8): u16` (expected `u16` but found `u64` for argument 1)
+  = outruled candidate `>>(u32, u8): u32` (expected `u32` but found `u64` for argument 1)
+  = outruled candidate `>>(u64, u8): u64` (expected `u8` but found `u64` for argument 2)
+  = outruled candidate `>>(u128, u8): u128` (expected `u128` but found `u64` for argument 1)
+  = outruled candidate `>>(u256, u8): u256` (expected `u256` but found `u64` for argument 1)

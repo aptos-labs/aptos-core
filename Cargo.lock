@@ -8584,6 +8584,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-compiler-v2-transactional-tests"
+version = "0.1.0"
+dependencies = [
+ "datatest-stable",
+ "move-transactional-test-runner",
+]
+
+[[package]]
 name = "move-core-types"
 version = "0.0.4"
 dependencies = [
@@ -9078,6 +9086,7 @@ dependencies = [
  "move-cli",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-core-types",
  "move-disassembler",
  "move-ir-compiler",
@@ -9092,6 +9101,7 @@ dependencies = [
  "rayon",
  "regex",
  "tempfile",
+ "termcolor",
 ]
 
 [[package]]

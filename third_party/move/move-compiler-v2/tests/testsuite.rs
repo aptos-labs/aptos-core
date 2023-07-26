@@ -151,7 +151,7 @@ impl TestConfig {
                 );
                 let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
                 if ok && self.generate_file_format {
-                    let mods = run_file_format_gen(&env, &targets);
+                    let (mods, _) = run_file_format_gen(&env, &targets);
                     let out = &mut test_output.borrow_mut();
                     out.push_str("\n============ disassembled file-format ==================\n");
                     Self::check_diags(out, &env);

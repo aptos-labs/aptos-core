@@ -6,12 +6,7 @@ use crate::file_format_generator::{
     module_generator::{ModuleContext, ModuleGenerator},
     MAX_FUNCTION_DEF_COUNT, MAX_LOCAL_COUNT,
 };
-use move_binary_format::{
-    file_format as FF,
-    file_format::{
-        Ability, CodeOffset, LocalIndex, StructDefInstantiationIndex, StructDefinitionIndex,
-    },
-};
+use move_binary_format::file_format as FF;
 use move_model::{
     ast::TempIndex,
     model::{FunId, FunctionEnv, Loc, QualifiedId, StructId, TypeParameter},
@@ -28,13 +23,11 @@ pub struct FunctionGenerator<'a> {
     /// The underlying module generator.
     gen: &'a mut ModuleGenerator,
     /// The set of temporaries which need to be pinned to locals because references are taken for
-    /// them. (The Move bytecode does not allow references to stack locations.) The invariant holds
-    /// that `temp in pinned ==> location.get(temp) == Local(_)`.
+    /// them.
     pinned: BTreeSet<TempIndex>,
-    /// A map from a temporary to the location where the value belonging to this temporary
-    /// is stored. A temporary can be either located on the stack or in a local.
-    location: BTreeMap<TempIndex, TempLocation>,
-    /// The value stack, represented by the temporaries which are represented on it.
+    /// A map from a temporary to information associated with it.
+    temps: BTreeMap<TempIndex, TempInfo>,
+    /// The value stack, represented by the temporaries which are located on it.
     stack: Vec<TempIndex>,
     /// The locals which have been used so far. This contains the parameters of the function.
     locals: Vec<Type>,
@@ -59,12 +52,16 @@ pub struct FunctionContext<'env> {
 }
 
 #[derive(Debug, Copy, Clone)]
-/// Represents the current location of a temporary.
-enum TempLocation {
-    /// The temp is not stored in any local
-    None,
+/// Represents the location of a temporary if it is not only on the stack.
+struct TempInfo {
     /// The temp is stored in a local of given index.
-    Local(LocalIndex),
+    local: FF::LocalIndex,
+}
+
+impl TempInfo {
+    fn new(local: FF::LocalIndex) -> Self {
+        Self { local }
+    }
 }
 
 /// Represents information about a label.
@@ -72,9 +69,9 @@ enum TempLocation {
 struct LabelInfo {
     /// The references to this label, as seen so far, in terms of the code offset of the
     /// instruction. The instruction pointed to will be any of `Branch`, `BrTrue`, or `BrFalse`.
-    references: BTreeSet<CodeOffset>,
+    references: BTreeSet<FF::CodeOffset>,
     /// The resolution of linking the label to a code offset.
-    resolution: Option<CodeOffset>,
+    resolution: Option<FF::CodeOffset>,
 }
 
 impl<'a> FunctionGenerator<'a> {
@@ -88,7 +85,7 @@ impl<'a> FunctionGenerator<'a> {
             let mut fun_gen = Self {
                 gen,
                 pinned: Default::default(),
-                location: Default::default(),
+                temps: Default::default(),
                 stack: vec![],
                 locals: vec![],
                 label_info: Default::default(),
@@ -125,8 +122,8 @@ impl<'a> FunctionGenerator<'a> {
     fn gen_code(&mut self, ctx: &FunctionContext<'_>) -> FF::CodeUnit {
         // Initialize the abstract virtual machine
         self.pinned = Self::referenced_temps(ctx);
-        self.location = (0..ctx.fun.get_parameter_count())
-            .map(|temp| (temp, TempLocation::Local(self.temp_to_local(ctx, temp))))
+        self.temps = (0..ctx.fun.get_parameter_count())
+            .map(|temp| (temp, TempInfo::new(self.temp_to_local(ctx, temp))))
             .collect();
         self.locals = (0..ctx.fun.get_parameter_count())
             .map(|temp| ctx.temp_type(temp).to_owned())
@@ -136,7 +133,14 @@ impl<'a> FunctionGenerator<'a> {
         let bytecode = ctx.fun.get_bytecode();
         for i in 0..bytecode.len() {
             if i + 1 < bytecode.len() {
-                self.gen_bytecode(ctx, &bytecode[i], Some(&bytecode[i + 1]))
+                let bc = &bytecode[i];
+                let next_bc = &bytecode[i + 1];
+                self.gen_bytecode(ctx, &bytecode[i], Some(next_bc));
+                if !bc.is_branch() && matches!(next_bc, Bytecode::Label(..)) {
+                    // At block boundaries without a preceding branch, need to flush stack
+                    // TODO: to avoid this, we should use the CFG for code generation.
+                    self.abstract_flush_stack(ctx, 0);
+                }
             } else {
                 self.gen_bytecode(ctx, &bytecode[i], None)
             }
@@ -194,9 +198,9 @@ impl<'a> FunctionGenerator<'a> {
                 self.abstract_pop(ctx)
             },
             Bytecode::Ret(_, result) => {
-                self.abstract_push_args(ctx, result);
+                self.balance_stack_end_of_block(ctx, result);
                 self.emit(FF::Bytecode::Ret);
-                self.abstract_pop_n(ctx, result.len())
+                self.abstract_pop_n(ctx, result.len());
             },
             Bytecode::Call(_, dest, oper, source, None) => {
                 self.gen_operation(ctx, dest, oper, source)
@@ -213,7 +217,8 @@ impl<'a> FunctionGenerator<'a> {
             },
             Bytecode::Label(_, label) => self.define_label(*label),
             Bytecode::Branch(_, if_true, if_false, cond) => {
-                self.abstract_push_args(ctx, vec![*cond]);
+                // Ensure only `cond` is on the stack before branch.
+                self.balance_stack_end_of_block(ctx, vec![*cond]);
                 // Attempt to detect fallthrough, such that for
                 // ```
                 //   branch l1, l2, cond
@@ -238,19 +243,19 @@ impl<'a> FunctionGenerator<'a> {
                     self.add_label_reference(*if_false);
                     self.emit(FF::Bytecode::BrFalse(0));
                     self.add_label_reference(*if_true);
-                    self.emit(FF::Bytecode::BrTrue(0))
+                    self.emit(FF::Bytecode::Branch(0))
                 }
                 self.abstract_pop(ctx);
-                self.abstract_flush_stack(ctx, 0); // Empty stack on branch boundary
             },
             Bytecode::Jump(_, label) => {
+                self.abstract_flush_stack(ctx, 0);
                 self.add_label_reference(*label);
                 self.emit(FF::Bytecode::Branch(0));
-                self.abstract_flush_stack(ctx, 0); // Empty stack for branch boundary
             },
             Bytecode::Abort(_, temp) => {
-                self.abstract_push_args(ctx, vec![*temp]);
-                self.emit(FF::Bytecode::Abort)
+                self.balance_stack_end_of_block(ctx, &vec![*temp]);
+                self.emit(FF::Bytecode::Abort);
+                self.abstract_pop(ctx)
             },
             Bytecode::Nop(_) => {
                 // do nothing -- labels are relative
@@ -262,10 +267,30 @@ impl<'a> FunctionGenerator<'a> {
         }
     }
 
+    /// Balance the stack such that it exactly contains the `result` temps and nothing else. This
+    /// is used for instructions like `return` or `abort` which terminate a block und must leave
+    /// the stack empty at end.
+    fn balance_stack_end_of_block(
+        &mut self,
+        ctx: &FunctionContext,
+        result: impl AsRef<[TempIndex]>,
+    ) {
+        let result = result.as_ref();
+        // First ensure the arguments are on the stack.
+        self.abstract_push_args(ctx, result);
+        if self.stack.len() != result.len() {
+            // Unfortunately, there is more on the stack than needed.
+            // Need to flush and push again so the stack is empty after return.
+            self.abstract_flush_stack(ctx, 0);
+            self.abstract_push_args(ctx, result.as_ref());
+            assert_eq!(self.stack.len(), result.len())
+        }
+    }
+
     /// Adds a reference to a label to the LabelInfo. This is used to link the labels final
     /// value at the current code offset once it is resolved.
     fn add_label_reference(&mut self, label: Label) {
-        let offset = self.code.len() as CodeOffset;
+        let offset = self.code.len() as FF::CodeOffset;
         self.label_info
             .entry(label)
             .or_default()
@@ -275,7 +300,7 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Sets the resolution of a lable to the current code offset.
     fn define_label(&mut self, label: Label) {
-        let offset = self.code.len() as CodeOffset;
+        let offset = self.code.len() as FF::CodeOffset;
         self.label_info.entry(label).or_default().resolution = Some(offset)
     }
 
@@ -401,7 +426,11 @@ impl<'a> FunctionGenerator<'a> {
                 )
             },
             Operation::ReadRef => self.gen_builtin(ctx, dest, FF::Bytecode::ReadRef, source),
-            Operation::WriteRef => self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, source),
+            Operation::WriteRef => {
+                // TODO: WriteRef in FF bytecode and in stackless bytecode use different operand
+                // order, perhaps we should fix this.
+                self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
+            },
             Operation::FreezeRef => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
             Operation::CastU8 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU8, source),
             Operation::CastU16 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU16, source),
@@ -491,8 +520,8 @@ impl<'a> FunctionGenerator<'a> {
         id: QualifiedId<StructId>,
         inst: &[Type],
         source: &[TempIndex],
-        mk_simple: impl FnOnce(StructDefinitionIndex) -> FF::Bytecode,
-        mk_generic: impl FnOnce(StructDefInstantiationIndex) -> FF::Bytecode,
+        mk_simple: impl FnOnce(FF::StructDefinitionIndex) -> FF::Bytecode,
+        mk_generic: impl FnOnce(FF::StructDefInstantiationIndex) -> FF::Bytecode,
     ) {
         self.abstract_push_args(ctx, source);
         let struct_env = &ctx.module.env.get_struct(id);
@@ -575,7 +604,7 @@ impl<'a> FunctionGenerator<'a> {
         let mut temps_to_push = temps;
         for i in 0..temps.len() {
             let end = temps.len() - i;
-            if end > self.stack.len() {
+            if end > self.stack.len() || end == 0 {
                 continue;
             }
             if self.stack.ends_with(&temps[0..end]) {
@@ -598,17 +627,13 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_flush_stack(ctx, stack_to_flush);
         // Finally, push `temps_to_push` onto the stack.
         for temp in temps_to_push {
-            if let TempLocation::Local(local) = self.temp_location(*temp) {
-                if ctx.is_copyable(*temp) {
-                    self.emit(FF::Bytecode::CopyLoc(local))
-                } else {
-                    self.emit(FF::Bytecode::MoveLoc(local));
-                    self.set_temp_location(*temp, TempLocation::None);
-                }
-                self.stack.push(*temp)
+            let local = self.temp_to_local(ctx, *temp);
+            if ctx.is_copyable(*temp) {
+                self.emit(FF::Bytecode::CopyLoc(local))
             } else {
-                ctx.internal_error("unexpected undefined temporary (moved value?)");
+                self.emit(FF::Bytecode::MoveLoc(local));
             }
+            self.stack.push(*temp)
         }
     }
 
@@ -616,17 +641,23 @@ impl<'a> FunctionGenerator<'a> {
     fn abstract_flush_stack(&mut self, ctx: &FunctionContext, top: usize) {
         while self.stack.len() > top {
             let temp = self.stack.pop().unwrap();
-            let local = self.new_local(ctx, ctx.fun.get_local_type(temp).to_owned());
+            let local = self.temp_to_local(ctx, temp);
             self.emit(FF::Bytecode::StLoc(local));
-            self.set_temp_location(temp, TempLocation::Local(local));
         }
     }
 
     /// Push the result of an operation to the abstract stack.
-    fn abstract_push_result(&mut self, _ctx: &FunctionContext, result: impl AsRef<[TempIndex]>) {
+    fn abstract_push_result(&mut self, ctx: &FunctionContext, result: impl AsRef<[TempIndex]>) {
+        let mut flush_mark = usize::MAX;
         for temp in result.as_ref() {
+            if self.pinned.contains(temp) {
+                // need to flush this right away and maintain a local for it
+                flush_mark = flush_mark.min(self.stack.len())
+            }
             self.stack.push(*temp);
-            self.set_temp_location(*temp, TempLocation::None);
+        }
+        if flush_mark != usize::MAX {
+            self.abstract_flush_stack(ctx, flush_mark)
         }
     }
 
@@ -645,35 +676,22 @@ impl<'a> FunctionGenerator<'a> {
     }
 
     /// Creates a new local of type.
-    fn new_local(&mut self, ctx: &FunctionContext, ty: Type) -> LocalIndex {
+    fn new_local(&mut self, ctx: &FunctionContext, ty: Type) -> FF::LocalIndex {
         let local = ctx
             .module
             .checked_bound(&ctx.loc, self.locals.len(), MAX_LOCAL_COUNT, "local")
-            as LocalIndex;
+            as FF::LocalIndex;
         self.locals.push(ty);
         local
     }
 
-    /// Returns the current location of the temporary.
-    fn temp_location(&self, temp: TempIndex) -> TempLocation {
-        self.location
-            .get(&temp)
-            .cloned()
-            .unwrap_or(TempLocation::None)
-    }
-
-    /// Sets the location of the temporary.
-    fn set_temp_location(&mut self, temp: TempIndex, location: TempLocation) {
-        self.location.insert(temp, location);
-    }
-
     /// Allocates a local for the given temporary
-    fn temp_to_local(&mut self, ctx: &FunctionContext, temp: TempIndex) -> LocalIndex {
-        if let Some(TempLocation::Local(idx)) = self.location.get(&temp) {
-            *idx
+    fn temp_to_local(&mut self, ctx: &FunctionContext, temp: TempIndex) -> FF::LocalIndex {
+        if let Some(TempInfo { local }) = self.temps.get(&temp) {
+            *local
         } else {
             let idx = self.new_local(ctx, ctx.temp_type(temp).to_owned());
-            self.location.insert(temp, TempLocation::Local(idx));
+            self.temps.insert(temp, TempInfo::new(idx));
             idx
         }
     }
@@ -697,6 +715,6 @@ impl<'env> FunctionContext<'env> {
         self.module
             .env
             .type_abilities(self.temp_type(temp), &self.type_parameters)
-            .has_ability(Ability::Copy)
+            .has_ability(FF::Ability::Copy)
     }
 }

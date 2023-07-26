@@ -9,7 +9,11 @@ use crate::file_format_generator::{
     MAX_STRUCT_DEF_INST_COUNT,
 };
 use codespan_reporting::diagnostic::Severity;
-use move_binary_format::{file_format as FF, file_format_common};
+use move_binary_format::{
+    file_format as FF,
+    file_format::{FunctionHandle, ModuleHandle, TableIndex},
+    file_format_common,
+};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_model::{
     model::{
@@ -28,6 +32,7 @@ use std::collections::BTreeMap;
 #[derive(Debug)]
 pub struct ModuleGenerator {
     /// The module index for which we generate code.
+    #[allow(unused)]
     module_idx: FF::ModuleHandleIndex,
     /// A mapping from modules to indices.
     module_to_idx: BTreeMap<ModuleId, FF::ModuleHandleIndex>,
@@ -37,6 +42,12 @@ pub struct ModuleGenerator {
     address_to_idx: BTreeMap<AccountAddress, FF::AddressIdentifierIndex>,
     /// A mapping from functions to indices.
     fun_to_idx: BTreeMap<QualifiedId<FunId>, FF::FunctionHandleIndex>,
+    /// The special function handle of the `main` function of a script. This is not stored
+    /// in `module.function_handles` because the file format does not maintain a handle
+    /// for this function.
+    main_handle: Option<FunctionHandle>,
+    /// The special module handle for a script, see also `main_handle`.
+    script_handle: Option<ModuleHandle>,
     /// A mapping from function instantiations to indices.
     fun_inst_to_idx:
         BTreeMap<(QualifiedId<FunId>, FF::SignatureIndex), FF::FunctionInstantiationIndex>,
@@ -68,7 +79,10 @@ pub struct ModuleContext<'env> {
 
 impl ModuleGenerator {
     /// Runs generation of `CompiledModule`.
-    pub fn run(ctx: &ModuleContext, module_env: &ModuleEnv) -> FF::CompiledModule {
+    pub fn run(
+        ctx: &ModuleContext,
+        module_env: &ModuleEnv,
+    ) -> (FF::CompiledModule, Option<FF::FunctionHandle>) {
         let module = move_binary_format::CompiledModule {
             version: file_format_common::VERSION_6,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
@@ -87,17 +101,22 @@ impl ModuleGenerator {
             types_to_signature: Default::default(),
             cons_to_idx: Default::default(),
             fun_inst_to_idx: Default::default(),
+            main_handle: None,
+            script_handle: None,
             module,
         };
         gen.gen_module(ctx, module_env);
-        gen.module
+        (gen.module, gen.main_handle)
     }
 
     /// Generates a module, visiting all of its members.
     fn gen_module(&mut self, ctx: &ModuleContext, module_env: &ModuleEnv<'_>) {
-        // Create the self module handle, at well known handle index 0
-        let loc = &module_env.get_loc();
-        self.module_index(ctx, loc, module_env.get_id());
+        // Create the self module handle, at well known handle index 0, but only if this is not
+        // a script module.
+        if !module_env.is_script_module() {
+            let loc = &module_env.get_loc();
+            self.module_index(ctx, loc, module_env);
+        }
 
         for struct_env in module_env.get_structs() {
             self.gen_struct(ctx, &struct_env)
@@ -225,33 +244,6 @@ impl ModuleGenerator {
     }
 
     /// Obtains or generates an identifier index for the given symbol.
-    pub fn module_index(
-        &mut self,
-        ctx: &ModuleContext,
-        loc: &Loc,
-        mod_id: ModuleId,
-    ) -> FF::ModuleHandleIndex {
-        if let Some(idx) = self.module_to_idx.get(&mod_id) {
-            return *idx;
-        }
-        let idx = FF::ModuleHandleIndex(ctx.checked_bound(
-            loc,
-            self.module.address_identifiers.len(),
-            MAX_MODULE_COUNT,
-            "module",
-        ));
-        let mod_env = &ctx.env.get_module(mod_id);
-        let mod_name = mod_env.get_name();
-        let address = self.address_index(ctx, loc, mod_name.addr().expect_numerical());
-        let name = self.name_index(ctx, loc, mod_name.name());
-        self.module
-            .module_handles
-            .push(FF::ModuleHandle { address, name });
-        self.module_to_idx.insert(mod_id, idx);
-        idx
-    }
-
-    /// Obtains or generates an identifier index for the given symbol.
     pub fn name_index(
         &mut self,
         ctx: &ModuleContext,
@@ -303,16 +295,49 @@ impl ModuleGenerator {
         idx
     }
 
+    // Obtains or generates a module index.
+    pub fn module_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        module_env: &ModuleEnv,
+    ) -> FF::ModuleHandleIndex {
+        let id = module_env.get_id();
+        if let Some(idx) = self.module_to_idx.get(&id) {
+            return *idx;
+        }
+        let name = module_env.get_name();
+        let address = self.address_index(ctx, loc, name.addr().expect_numerical());
+        let name = self.name_index(ctx, loc, name.name());
+        let handle = FF::ModuleHandle { address, name };
+        let idx = if module_env.is_script_module() {
+            self.script_handle = Some(handle);
+            FF::ModuleHandleIndex(TableIndex::MAX)
+        } else {
+            let idx = FF::ModuleHandleIndex(ctx.checked_bound(
+                loc,
+                self.module.module_handles.len(),
+                MAX_MODULE_COUNT,
+                "used module",
+            ));
+            self.module.module_handles.push(handle);
+            idx
+        };
+        self.module_to_idx.insert(id, idx);
+        idx
+    }
+
     /// Obtains or generates a function index.
     pub fn function_index(
         &mut self,
         ctx: &ModuleContext,
         loc: &Loc,
-        fun_env: &FunctionEnv<'_>,
+        fun_env: &FunctionEnv,
     ) -> FF::FunctionHandleIndex {
         if let Some(idx) = self.fun_to_idx.get(&fun_env.get_qualified_id()) {
             return *idx;
         }
+        let module = self.module_index(ctx, loc, &fun_env.module_env);
         let name = self.name_index(ctx, loc, fun_env.get_name());
         let type_parameters = fun_env
             .get_type_parameters()
@@ -334,19 +359,25 @@ impl ModuleGenerator {
             fun_env.get_result_type().flatten().into_iter().collect(),
         );
         let handle = FF::FunctionHandle {
-            module: self.module_idx,
+            module,
             name,
             type_parameters,
             parameters,
             return_,
         };
-        let idx = FF::FunctionHandleIndex(ctx.checked_bound(
-            loc,
-            self.module.function_handles.len(),
-            MAX_FUNCTION_COUNT,
-            "used function",
-        ));
-        self.module.function_handles.push(handle);
+        let idx = if fun_env.module_env.is_script_module() {
+            self.main_handle = Some(handle);
+            FF::FunctionHandleIndex(TableIndex::MAX)
+        } else {
+            let idx = FF::FunctionHandleIndex(ctx.checked_bound(
+                loc,
+                self.module.function_handles.len(),
+                MAX_FUNCTION_COUNT,
+                "used function",
+            ));
+            self.module.function_handles.push(handle);
+            idx
+        };
         self.fun_to_idx.insert(fun_env.get_qualified_id(), idx);
         idx
     }
@@ -390,8 +421,9 @@ impl ModuleGenerator {
             return *idx;
         }
         let name = self.name_index(ctx, loc, struct_env.get_name());
+        let module = self.module_index(ctx, loc, &struct_env.module_env);
         let handle = FF::StructHandle {
-            module: self.module_idx,
+            module,
             name,
             abilities: struct_env.get_abilities(),
             type_parameters: struct_env
