@@ -848,8 +848,16 @@ impl Scheduler {
     /// Traverse the indices up and keep increasing min_never_executed_idx as long as the
     /// encountered transactions have each finished execution with incarnation 0.
     fn update_never_executed(&self, mut next_idx: TxnIndex) {
+        self.min_never_executed_idx
+            .store(next_idx, Ordering::Release);
+
         // CAS would be another way of implementing the update functionality, but here
-        // we can keep incrementing next_idx and storing at the end.
+        // we can keep incrementing next_idx and updating the index. We have to store
+        // every iteration as otherwise it is possible that the status will be updated
+        // to executed right after the check, but the thread updating the status will
+        // not observe that it is the min_never_executed index and call update.
+        // Alternative would be to write in the end but double check right after that
+        // the status is still never executed (or call update_never_executed again).
         while next_idx < self.num_txns {
             if !matches!(
                 *self.txn_status[next_idx as usize].0.read(),
@@ -860,14 +868,12 @@ impl Scheduler {
                 // Transaction with next index was executed with incarnation 0.
                 // Will update to consider next transaction in the next loop iteration.
                 next_idx += 1;
+                self.min_never_executed_idx
+                    .store(next_idx, Ordering::Release);
             } else {
                 break;
             }
         }
-
-        // Race condition around here.
-        self.min_never_executed_idx
-            .store(next_idx, Ordering::Release);
     }
 
     /// After a successful abort, mark the transaction as ready for re-execution with
