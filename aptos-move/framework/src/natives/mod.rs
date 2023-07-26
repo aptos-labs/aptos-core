@@ -76,6 +76,7 @@ pub fn all_natives(
     add_natives_from_module!("state_storage", state_storage::make_all(builder));
     add_natives_from_module!("aggregator", aggregator::make_all(builder));
     add_natives_from_module!("aggregator_factory", aggregator_factory::make_all(builder));
+    add_natives_from_module!("aggregator_v2", aggregator_v2::make_all(builder));
     add_natives_from_module!("object", object::make_all(builder));
     add_natives_from_module!("debug", debug::make_all(builder));
     add_natives_from_module!("string_utils", string_utils::make_all(builder));
