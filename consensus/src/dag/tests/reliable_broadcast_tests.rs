@@ -22,7 +22,8 @@ use aptos_types::{
 };
 use claims::{assert_ok, assert_ok_eq};
 use std::{
-    collections::{BTreeMap, HashMap}, sync::Arc,
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
 };
 
 #[tokio::test]

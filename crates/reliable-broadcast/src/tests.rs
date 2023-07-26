@@ -1,13 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{BroadcastStatus, RBMessage, RBNetworkSender, ReliableBroadcast};
 use anyhow::bail;
 use aptos_consensus_types::common::Author;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_infallible::Mutex;
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
-use futures::{stream::{AbortHandle, Abortable}, FutureExt};
+use futures::{
+    stream::{AbortHandle, Abortable},
+    FutureExt,
+};
 use futures_channel::oneshot;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
@@ -15,8 +19,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-
-use crate::{ReliableBroadcast, RBMessage, RBNetworkSender, BroadcastStatus};
 
 #[derive(Clone)]
 struct TestMessage(Vec<u8>);
