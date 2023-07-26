@@ -1594,7 +1594,7 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> PartialVMResult<Type> {
         let struct_def = match &self.binary {
-            BinaryType::Module(module) => self.loader.get_struct_type(module.struct_at(idx))?,
+            BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
         Ok(Type::Struct {
@@ -1672,11 +1672,10 @@ impl<'a> Resolver<'a> {
         &self,
         idx: StructDefinitionIndex,
     ) -> PartialVMResult<Arc<StructType>> {
-        let idx = match &self.binary {
-            BinaryType::Module(module) => module.struct_at(idx),
+        match &self.binary {
+            BinaryType::Module(module) => Ok(module.struct_at(idx)),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
-        };
-        self.loader.get_struct_type(idx)
+        }
     }
 
     pub(crate) fn instantiate_generic_struct_fields(
@@ -1925,7 +1924,6 @@ impl Module {
                 let field_count = cache.structs[idx.0].fields.len() as u16;
                 structs.push(StructDef {
                     field_count,
-                    idx,
                     definition_struct_type: cache.struct_at(idx),
                 });
                 let name =
@@ -2091,8 +2089,8 @@ impl Module {
         }
     }
 
-    fn struct_at(&self, idx: StructDefinitionIndex) -> CachedStructIndex {
-        self.structs[idx.0 as usize].idx
+    fn struct_at(&self, idx: StructDefinitionIndex) -> Arc<StructType> {
+        self.structs[idx.0 as usize].definition_struct_type.clone()
     }
 
     fn struct_instantiation_at(&self, idx: u16) -> &StructInstantiation {
@@ -2568,8 +2566,6 @@ struct FunctionInstantiation {
 struct StructDef {
     // struct field count
     field_count: u16,
-    // `ModuelCache::structs` global table index
-    idx: CachedStructIndex,
     definition_struct_type: Arc<StructType>,
 }
 
