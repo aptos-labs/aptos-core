@@ -4,10 +4,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
-- Add `getObjectResource` interface for `AptosClient` to get `Object<T>`
-
 ## 1.13.2 (2023-07-12)
-
 - Add support for `Option<T>` and `vector<Object<T>>` in the SDK
 
 ## 1.13.1 (2023-07-06)

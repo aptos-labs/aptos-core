@@ -231,7 +231,7 @@ export class AptosClient {
       overrides: { ...this.config },
     });
     return data;
-  } 
+  }
 
   /** Generates a signed transaction that can be submitted to the chain for execution. */
   static generateBCSTransaction(accountFrom: AptosAccount, rawTxn: TxnBuilderTypes.RawTransaction): Uint8Array {
