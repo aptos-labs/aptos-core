@@ -70,6 +70,8 @@ impl NetworkHandler {
     }
 
     async fn start(mut self) {
+        self.dag_driver.try_enter_new_round();        
+        
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         while let Some(msg) = self.dag_rpc_rx.next().await {
             if let Err(e) = self.process_rpc(msg).await {
