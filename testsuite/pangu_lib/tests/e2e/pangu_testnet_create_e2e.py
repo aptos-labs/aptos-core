@@ -18,7 +18,8 @@ init_logging(log, level=logging.INFO, print_metadata=True)
 
 #
 # TODO The e2e tests are currently not being triggered in the CI/CD pipeline
-# 
+#
+
 
 class e2e_create_testnet_tests(unittest.TestCase):
     def setUp(self):

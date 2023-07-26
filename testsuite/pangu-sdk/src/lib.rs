@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use std::collections::BTreeMap;
 use std::env;
 #[allow(unused_imports)]
