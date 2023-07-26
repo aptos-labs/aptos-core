@@ -135,7 +135,6 @@ impl ScriptCache {
 pub struct ModuleCache {
     modules: BinaryCache<ModuleId, Module>,
     structs: Vec<Arc<StructType>>,
-    functions: Vec<Arc<Function>>,
 }
 
 impl ModuleCache {
@@ -143,7 +142,6 @@ impl ModuleCache {
         Self {
             modules: BinaryCache::new(),
             structs: vec![],
-            functions: vec![],
         }
     }
 
@@ -179,22 +177,19 @@ impl ModuleCache {
 
         // we need this operation to be transactional, if an error occurs we must
         // leave a clean state
-        self.add_module(natives, &module)?;
+        self.add_module(&module)?;
         match Module::new(natives, module, self) {
             Ok(module) => Ok(Arc::clone(self.modules.insert(id, module))),
             Err((err, module)) => {
                 // remove all structs and functions that have been pushed
                 let strut_def_count = module.struct_defs().len();
                 self.structs.truncate(self.structs.len() - strut_def_count);
-                let function_count = module.function_defs().len();
-                self.functions
-                    .truncate(self.functions.len() - function_count);
                 Err(err.finish(Location::Undefined))
             },
         }
     }
 
-    fn add_module(&mut self, natives: &NativeFunctions, module: &CompiledModule) -> VMResult<()> {
+    fn add_module(&mut self, module: &CompiledModule) -> VMResult<()> {
         let starting_idx = self.structs.len();
         for (idx, struct_def) in module.struct_defs().iter().enumerate() {
             let st = self.make_struct_type(module, struct_def, StructDefinitionIndex(idx as u16));
@@ -206,32 +201,6 @@ impl ModuleCache {
             err.finish(Location::Undefined)
         })?;
 
-        for (idx, func) in module.function_defs().iter().enumerate() {
-            let findex = FunctionDefinitionIndex(idx as TableIndex);
-            let mut function = Function::new(natives, findex, func, module);
-            function.return_types = function
-                .return_
-                .0
-                .iter()
-                .map(|tok| self.make_type_while_loading(module, tok))
-                .collect::<PartialVMResult<Vec<_>>>()
-                .map_err(|err| err.finish(Location::Undefined))?;
-            function.local_types = function
-                .locals
-                .0
-                .iter()
-                .map(|tok| self.make_type_while_loading(module, tok))
-                .collect::<PartialVMResult<Vec<_>>>()
-                .map_err(|err| err.finish(Location::Undefined))?;
-            function.parameter_types = function
-                .parameters
-                .0
-                .iter()
-                .map(|tok| self.make_type_while_loading(module, tok))
-                .collect::<PartialVMResult<Vec<_>>>()
-                .map_err(|err| err.finish(Location::Undefined))?;
-            self.functions.push(Arc::new(function));
-        }
         Ok(())
     }
 
