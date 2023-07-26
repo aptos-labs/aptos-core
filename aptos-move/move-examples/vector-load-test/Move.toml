@@ -1,0 +1,10 @@
+[package]
+name = 'vector-load-test'
+version = '1.0.0'
+
+[addresses]
+addr = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+
