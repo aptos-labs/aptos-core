@@ -10,22 +10,14 @@ module whitelist_example::whitelist {
     use std::option::{Self, Option};
     use std::aptos_account;
     use std::aptos_coin::{AptosCoin};
-    use std::object::{Self, DeleteRef};
-
-    /// Resource moved into the creator's account, used to find the object easily.
-    /// Destroyed with the object when `destroy(...)` is called
-    struct ObjectInfo has key {
-        whitelist_addr: address,
-        delete_ref: DeleteRef,
-    }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents all the mint tiers available as a map<key: String, value: MintTier>
-    /// Used as an Object<Whitelist>
     /// The `sorted_tiers` field is a vector of the map `keys` sorted by
     /// the corresponding MintTier's start time, ascending.
     /// The mint price for a tier that comes after another must be higher; that is, both the
     /// times and the prices of the MintTiers are in ascending order.
+    /// This module is agnostic to whether or not the creator is an object or an account. It merely manages the whitelist.
     struct Whitelist has key {
         map: SimpleMap<String, MintTier>,
         sorted_tiers: vector<String>,
@@ -50,7 +42,7 @@ module whitelist_example::whitelist {
     const ENOT_ENOUGH_COINS: u64 = 2;
     /// The requested start time is not before the end time
     const ESTART_TIME_AFTER_END_TIME: u64 = 3;
-    /// There is no whitelist for the given account
+    /// There is no whitelist at the given address
     const EWHITELIST_NOT_FOUND: u64 = 4;
     /// The mint tiers must increase in price and time.
     const ETIERS_MUST_INCREASE_IN_PRICE_AND_TIME: u64 = 5;
@@ -60,25 +52,12 @@ module whitelist_example::whitelist {
     public entry fun init_whitelist(
         creator: &signer,
     ) {
-        coin::register<AptosCoin>(creator);
-        let constructor_ref = object::create_object_from_account(creator);
-        let whitelist_obj_signer = &object::generate_signer(&constructor_ref);
-        let delete_ref = object::generate_delete_ref(&constructor_ref);
-        // make whitelist object soulbound
-        object::disable_ungated_transfer(&object::generate_transfer_ref(&constructor_ref));
         move_to(
-            whitelist_obj_signer,
+            creator,
             Whitelist {
                 map: simple_map::create<String, MintTier>(),
                 sorted_tiers: vector<String> [],
             },
-        );
-        move_to(
-            creator,
-            ObjectInfo {
-                whitelist_addr: signer::address_of(whitelist_obj_signer),
-                delete_ref,
-            }
         );
     }
 
@@ -91,12 +70,12 @@ module whitelist_example::whitelist {
         start_time: u64,
         end_time: u64,
         per_user_limit: u64,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         assert!(per_user_limit > 0, error::invalid_argument(EINVALID_PER_USER_LIMIT));
         assert!(start_time < end_time, error::invalid_argument(ESTART_TIME_AFTER_END_TIME));
         let creator_addr = signer::address_of(creator);
 
-        if (!whitelist_exists(creator_addr)) {
+        if (!exists<Whitelist>(creator_addr)) {
             init_whitelist(creator);
         };
 
@@ -124,11 +103,11 @@ module whitelist_example::whitelist {
         sort_tiers(creator_addr);
     }
 
-    public entry fun add_addresses_to_tier(
+    public entry fun add_to_tier(
         creator: &signer,
         tier_name: String,
         addresses: vector<address>,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         let creator_addr = signer::address_of(creator);
         let map = borrow_mut_map(creator_addr);
         assert!(simple_map::contains_key(map, &tier_name), error::not_found(ETIER_NOT_FOUND));
@@ -139,11 +118,11 @@ module whitelist_example::whitelist {
         });
     }
 
-    public entry fun remove_addresses_from_tier(
+    public entry fun remove_from_tier(
         creator: &signer,
         tier_name: String,
         addresses: vector<address>,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         let creator_addr = signer::address_of(creator);
         let map = borrow_mut_map(creator_addr);
         assert!(simple_map::contains_key(map, &tier_name), error::not_found(ETIER_NOT_FOUND));
@@ -161,8 +140,8 @@ module whitelist_example::whitelist {
     public fun get_earliest_tier_available(
         creator_addr: address,
         minter_addr: address
-    ): Option<String> acquires Whitelist, ObjectInfo {
-        let keys = borrow_global<Whitelist>(get_whitelist_addr(creator_addr)).sorted_tiers;
+    ): Option<String> acquires Whitelist {
+        let keys = borrow_whitelist(creator_addr).sorted_tiers;
 
         // iterate over all mint tiers to see if any have a valid time and the minter_addr is eligible to mint from that tier
         let (any_valid_tiers, index) = vector::find(&keys, |k| {
@@ -207,7 +186,7 @@ module whitelist_example::whitelist {
     public fun increment(
         creator: &signer,
         minter: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         let creator_addr = signer::address_of(creator);
         let minter_addr = signer::address_of(minter);
 
@@ -227,26 +206,13 @@ module whitelist_example::whitelist {
         *count = *count + 1;
     }
 
-    /// destroys everything related to the contract:
-    /// 1. the ObjectInfo resource on the owner's account
-    /// 2. ObjectCore on the Object<Whitelist>
-    /// 3. Whitelist at the object's address
-    public entry fun destroy(
-        owner: &signer,
-    ) acquires ObjectInfo, Whitelist {
-        let owner_addr = signer::address_of(owner);
-        let whitelist_addr = get_whitelist_addr(owner_addr);
-        let ObjectInfo {
-            whitelist_addr: _,
-            delete_ref,
-        } = move_from<ObjectInfo>(owner_addr);
-
-        object::delete(delete_ref);
-
+    /// removes the whitelist resource from the creator
+    public entry fun destroy(creator: &signer) acquires Whitelist {
+        let creator_addr = signer::address_of(creator);
         let Whitelist {
             map,
             sorted_tiers: _,
-        } = move_from<Whitelist>(whitelist_addr);
+        } = move_from<Whitelist>(creator_addr);
 
         simple_map::destroy(map, |_k| { }, |v| {
             let MintTier {
@@ -261,20 +227,11 @@ module whitelist_example::whitelist {
         });
     }
 
-    /// Since the ObjectInfo will never exist without the Object, we only need to check if ObjectInfo exists
-    /// if in some edge case the object is somehow not found, it will still error, so this is mostly just an informative error message
-    /// init_whitelist(...) creates both, destroy(...) removes both, they never exist independently
-    inline fun whitelist_exists(
-        creator_addr: address,
-    ): bool {
-        exists<ObjectInfo>(creator_addr)
-    }
-
     /// Insertion sort, not intended to be used for more than a ~dozen tiers
     fun sort_tiers(
         creator_addr: address,
-    ) acquires Whitelist, ObjectInfo {
-        let sorted_keys = borrow_global<Whitelist>(get_whitelist_addr(creator_addr)).sorted_tiers;
+    ) acquires Whitelist {
+        let sorted_keys = borrow_whitelist(creator_addr).sorted_tiers;
         let keys = if (vector::length(&sorted_keys) != simple_map::length(borrow_map(creator_addr))) {
             // if the keys aren't sorted yet, use the simple map keys
             simple_map::keys(borrow_map(creator_addr))
@@ -308,33 +265,37 @@ module whitelist_example::whitelist {
         };
 
         // copy the sorted keys to sorted_tiers
-        *&mut borrow_global_mut<Whitelist>(get_whitelist_addr(creator_addr)).sorted_tiers = keys;
+        *&mut borrow_mut_whitelist(creator_addr).sorted_tiers = keys;
     }
 
-    inline fun borrow_map(creator_addr: address,): &SimpleMap<String, MintTier> acquires Whitelist, ObjectInfo {
-        &borrow_global<Whitelist>(get_whitelist_addr(creator_addr)).map
+    inline fun borrow_whitelist(creator_addr: address): &Whitelist acquires Whitelist {
+        assert!(exists<Whitelist>(creator_addr), error::not_found(EWHITELIST_NOT_FOUND));
+        borrow_global<Whitelist>(creator_addr)
     }
 
-    inline fun borrow_mut_map(creator_addr: address,): &mut SimpleMap<String, MintTier> acquires Whitelist, ObjectInfo {
-        &mut borrow_global_mut<Whitelist>(get_whitelist_addr(creator_addr)).map
+    inline fun borrow_mut_whitelist(creator_addr: address): &mut Whitelist acquires Whitelist {
+        assert!(exists<Whitelist>(creator_addr), error::not_found(EWHITELIST_NOT_FOUND));
+        borrow_global_mut<Whitelist>(creator_addr)
     }
 
-    inline fun borrow_tier(creator_addr: address, tier_name: String): &MintTier acquires Whitelist, ObjectInfo {
+    inline fun borrow_map(creator_addr: address,): &SimpleMap<String, MintTier> acquires Whitelist {
+        &borrow_whitelist(creator_addr).map
+    }
+
+    inline fun borrow_mut_map(creator_addr: address,): &mut SimpleMap<String, MintTier> acquires Whitelist {
+        &mut borrow_mut_whitelist(creator_addr).map
+    }
+
+    inline fun borrow_tier(creator_addr: address, tier_name: String): &MintTier acquires Whitelist {
         let map = borrow_map(creator_addr);
         assert!(simple_map::contains_key(map, &tier_name), error::not_found(ETIER_NOT_FOUND));
         simple_map::borrow(map, &tier_name)
     }
 
-    inline fun borrow_mut_tier(creator_addr: address, tier_name: String): &mut MintTier acquires Whitelist, ObjectInfo {
+    inline fun borrow_mut_tier(creator_addr: address, tier_name: String): &mut MintTier acquires Whitelist {
         let map = borrow_mut_map(creator_addr);
         assert!(simple_map::contains_key(map, &tier_name), error::not_found(ETIER_NOT_FOUND));
         simple_map::borrow_mut(map, &tier_name)
-    }
-
-    #[view]
-    public inline fun get_whitelist_addr(creator_addr: address,): address acquires ObjectInfo {
-        assert!(whitelist_exists(creator_addr), error::not_found(EWHITELIST_NOT_FOUND));
-        borrow_global<ObjectInfo>(creator_addr).whitelist_addr
     }
 
     #[view]
@@ -342,7 +303,7 @@ module whitelist_example::whitelist {
         creator_addr: address,
         account_addr: address,
         tier_name: String,
-    ): bool acquires Whitelist, ObjectInfo {
+    ): bool acquires Whitelist {
         let tier = borrow_tier(creator_addr, tier_name);
         smart_table::contains(&tier.addresses, account_addr)
     }
@@ -352,46 +313,49 @@ module whitelist_example::whitelist {
         creator_addr: address,
         account_addr: address,
         tier_name: String,
-    ): u64 acquires Whitelist, ObjectInfo {
+    ): u64 acquires Whitelist {
         assert!(address_in_tier(creator_addr, account_addr, tier_name), error::permission_denied(EACCOUNT_NOT_ELIGIBLE));
         let tier = borrow_tier(creator_addr, tier_name);
         *smart_table::borrow(&tier.addresses, account_addr)
     }
 
     #[view]
-    public fun open_to_public(creator_addr: address, tier_name: String): bool acquires Whitelist, ObjectInfo {
+    public fun open_to_public(creator_addr: address, tier_name: String): bool acquires Whitelist {
         borrow_tier(creator_addr, tier_name).open_to_public
     }
 
     #[view]
-    public fun price(creator_addr: address, tier_name: String): u64 acquires Whitelist, ObjectInfo {
+    public fun price(creator_addr: address, tier_name: String): u64 acquires Whitelist {
         borrow_tier(creator_addr, tier_name).price
     }
 
     #[view]
-    public fun start_time(creator_addr: address, tier_name: String): u64 acquires Whitelist, ObjectInfo {
+    public fun start_time(creator_addr: address, tier_name: String): u64 acquires Whitelist {
         borrow_tier(creator_addr, tier_name).start_time
     }
 
     #[view]
-    public fun end_time(creator_addr: address, tier_name: String): u64 acquires Whitelist, ObjectInfo {
+    public fun end_time(creator_addr: address, tier_name: String): u64 acquires Whitelist {
         borrow_tier(creator_addr, tier_name).end_time
     }
 
     #[view]
-    public fun per_user_limit(creator_addr: address, tier_name: String): u64 acquires Whitelist, ObjectInfo {
+    public fun per_user_limit(creator_addr: address, tier_name: String): u64 acquires Whitelist {
         borrow_tier(creator_addr, tier_name).per_user_limit
     }
 
     #[test_only]
+    use aptos_std::string_utils;
+
+    #[test_only]
     inline fun tier_n(i: u64): String {
-        std::string_utils::format1(&b"tier_{}", i)
+        string_utils::format1(&b"tier_{}", i)
     }
 
     #[test_only]
     /// assert that the tier times in the whitelist are increasing in price and time
-    inline fun assert_ascending_tiers(creator_addr: address) acquires Whitelist, ObjectInfo {
-        let keys = &borrow_global<Whitelist>(get_whitelist_addr(creator_addr)).sorted_tiers;
+    inline fun assert_ascending_tiers(creator_addr: address) acquires Whitelist {
+        let keys = &borrow_whitelist(creator_addr).sorted_tiers;
 
         let ascending = true;
         vector::enumerate_ref(keys, |i, k| {
@@ -465,7 +429,7 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
 
         // Initialize account a, b, c with 4, 3, and 2 APT each.
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
@@ -474,12 +438,8 @@ module whitelist_example::whitelist {
         let address_b = signer::address_of(account_b);
         let address_c = signer::address_of(account_c);
 
-        // Initialize whitelist object
+        // Initialize whitelist
         init_whitelist(creator);
-
-        let whitelist_addr = get_whitelist_addr(creator_addr);
-        let whitelist_obj = object::address_to_object<Whitelist>(whitelist_addr);
-        assert!(!object::ungated_transfer_allowed(whitelist_obj), 0);
 
         // tier1: 0 APT, whitelist, DEFAULT_START_TIME, DEFAULT_END_TIME, per_user_limit = 3
         // tier2: 1 APT, whitelist, DEFAULT_START_TIME, DEFAULT_END_TIME, per_user_limit = 2
@@ -491,10 +451,10 @@ module whitelist_example::whitelist {
         upsert_tier_config(creator, tier_n(2), !open_to_public, 1, DEFAULT_START_TIME, DEFAULT_END_TIME, 2);
         upsert_tier_config(creator, tier_n(3),  open_to_public, 2, DEFAULT_START_TIME, DEFAULT_END_TIME, 1);
 
-        add_addresses_to_tier(creator, tier_n(1), vector<address> [address_a, address_b]);
-        remove_addresses_from_tier(creator, tier_n(1), vector<address> [address_b]);
-        add_addresses_to_tier(creator, tier_n(2), vector<address> [address_a, address_b, address_c]);
-        remove_addresses_from_tier(creator, tier_n(2), vector<address> [address_c]);
+        add_to_tier(creator, tier_n(1), vector<address> [address_a, address_b]);
+        remove_from_tier(creator, tier_n(1), vector<address> [address_b]);
+        add_to_tier(creator, tier_n(2), vector<address> [address_a, address_b, address_c]);
+        remove_from_tier(creator, tier_n(2), vector<address> [address_c]);
 
         // ensure upsert works correctly with addresses added, update tier 1 and update it back to normal
         upsert_tier_config(creator, tier_n(1), !open_to_public, 1, DEFAULT_START_TIME, DEFAULT_END_TIME, 1);
@@ -549,9 +509,7 @@ module whitelist_example::whitelist {
         assert_ascending_tiers(creator_addr);
 
         destroy(creator);
-        assert!(!whitelist_exists(creator_addr), 8);
-        assert!(!exists<Whitelist>(whitelist_addr), 9);
-        assert!(!object::is_object(whitelist_addr), 10);
+        assert!(!exists<Whitelist>(creator_addr), 8);
     }
 
     #[test(creator = @0xAA, account_a = @0xFA, account_b = @0xFB, account_c = @0xFC, aptos_framework = @0x1)]
@@ -562,7 +520,7 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 5);
         let address_a = signer::address_of(account_a);
         let address_b = signer::address_of(account_b);
@@ -580,16 +538,17 @@ module whitelist_example::whitelist {
         upsert_tier_config(creator, tier_n(9), !open_to_public, 0, DEFAULT_START_TIME + 0, DEFAULT_END_TIME + 0, 1); // 0 APT, mint order: 0
         let order_idx = vector<u64> [9, 0, 1, 8, 7, 2, 3, 6, 5, 4];
         let order = vector::map(order_idx, |v| { tier_n(v) });
+        let creator_addr = signer::address_of(creator);
         // check sorted tier order
-        assert!(borrow_global<Whitelist>(get_whitelist_addr(signer::address_of(creator))).sorted_tiers == order, 0);
+        assert!(borrow_whitelist(creator_addr).sorted_tiers == order, 0);
         vector::for_each(order_idx, |v| {
-            add_addresses_to_tier(creator, tier_n(v), vector<address> [address_a]);
+            add_to_tier(creator, tier_n(v), vector<address> [address_a]);
         });
         vector::for_each(vector<u64> [9, 0, 8, 2, 6, 4], |v| {
-            add_addresses_to_tier(creator, tier_n(v), vector<address> [address_b]);
+            add_to_tier(creator, tier_n(v), vector<address> [address_b]);
         });
 
-        assert_ascending_tiers(signer::address_of(creator));
+        assert_ascending_tiers(creator_addr);
 
         // account a starts with 20 apt
         // account b starts with 20 apt
@@ -623,11 +582,11 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         let address_a = signer::address_of(account_a);
         init_whitelist(creator);
-        add_addresses_to_tier(creator, tier_n(1), vector<address> [address_a]);
+        add_to_tier(creator, tier_n(1), vector<address> [address_a]);
         assert_ascending_tiers(signer::address_of(creator));
     }
 
@@ -639,7 +598,7 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         init_whitelist(creator);
         let open_to_public = true;
@@ -656,7 +615,7 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         init_whitelist(creator);
         let open_to_public = true;
@@ -674,7 +633,7 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         init_whitelist(creator);
         let open_to_public = true;
@@ -693,7 +652,7 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         init_whitelist(creator);
         let open_to_public = true;
@@ -712,7 +671,7 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         init_whitelist(creator);
         let open_to_public = true;
@@ -729,7 +688,7 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         init_whitelist(creator);
         let open_to_public = true;
@@ -745,12 +704,12 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         init_whitelist(creator);
         assert_ascending_tiers(signer::address_of(creator));
         destroy(creator);
-        get_whitelist_addr(signer::address_of(creator));
+        borrow_whitelist(signer::address_of(creator));
     }
 
 
@@ -761,21 +720,18 @@ module whitelist_example::whitelist {
         account_b: &signer,
         account_c: &signer,
         aptos_framework: &signer,
-    ) acquires Whitelist, ObjectInfo {
+    ) acquires Whitelist {
         setup_test(creator, account_a, account_b, account_c, aptos_framework, DEFAULT_CURRENT_TIME, 1);
         let creator_addr = signer::address_of(creator);
         init_whitelist(creator);
-        let whitelist_addr = get_whitelist_addr(creator_addr);
         upsert_tier_config(creator, tier_n(1), false, 9001, 0, 1, 1337);
         upsert_tier_config(creator, tier_n(2), false, 9001, 0, 1, 1337);
-        add_addresses_to_tier(creator, tier_n(1), vector<address> [@0x0]);
-        add_addresses_to_tier(creator, tier_n(2), vector<address> [@0x0]);
+        add_to_tier(creator, tier_n(1), vector<address> [@0x0]);
+        add_to_tier(creator, tier_n(2), vector<address> [@0x0]);
         assert_ascending_tiers(creator_addr);
         destroy(creator);
         init_whitelist(creator);
         destroy(creator);
-        assert!(!whitelist_exists(creator_addr), 0);
-        assert!(!exists<Whitelist>(whitelist_addr), 1);
-        assert!(!object::is_object(whitelist_addr), 2);
+        assert!(!exists<Whitelist>(creator_addr), 0);
     }
 }

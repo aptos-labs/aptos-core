@@ -130,20 +130,20 @@ module whitelist_example::mint {
         string_utils::format1(string::bytes(&format_string), *current_supply + 1)
     }
 
-    public entry fun add_addresses_to_tier(
+    public entry fun add_to_tier(
         owner: &signer,
         tier_name: String,
         addresses: vector<address>,
     ) {
-        whitelist::add_addresses_to_tier(owner, tier_name, addresses);
+        whitelist::add_to_tier(owner, tier_name, addresses);
     }
 
-    public entry fun remove_addresses_from_tier(
+    public entry fun remove_from_tier(
         owner: &signer,
         tier_name: String,
         addresses: vector<address>,
     ) {
-        whitelist::remove_addresses_from_tier(owner, tier_name, addresses);
+        whitelist::remove_from_tier(owner, tier_name, addresses);
     }
 
     // dependencies only used in test, if we link without #[test_only], the compiler will warn us
@@ -209,19 +209,23 @@ module whitelist_example::mint {
         let nft_receiver2_addr = signer::address_of(nft_receiver2);
 
         // add both accounts to whitelist, then remove nft_receiver2
-        add_addresses_to_tier(owner, string::utf8(b"whitelist"), vector<address> [nft_receiver_addr, nft_receiver2_addr]);
-        remove_addresses_from_tier(owner, string::utf8(b"whitelist"), vector<address> [nft_receiver2_addr]);
+        add_to_tier(owner, string::utf8(b"whitelist"), vector<address> [nft_receiver_addr, nft_receiver2_addr]);
+        remove_from_tier(owner, string::utf8(b"whitelist"), vector<address> [nft_receiver2_addr]);
 
         // mint one token to nft_receiver through the whitelist
         let token_creation_num = account::get_guid_next_creation_num(@whitelist_example);
         mint(owner, nft_receiver); // whitelist
-        let token_object_addr = object::create_guid_object_address(@whitelist_example, token_creation_num);
+        // token_creation_num + 2
+        let token_object_addr = object::create_guid_object_address(@whitelist_example, token_creation_num + 2);
+        assert!(object::is_object(token_object_addr), 5);
         let token_object = object::address_to_object<AptosToken>(token_object_addr);
 
         // mint one token to nft_receiver2 through the public list
         let token_creation_num2 = account::get_guid_next_creation_num(@whitelist_example);
         mint(owner, nft_receiver2); // public
-        let token_object_addr2 = object::create_guid_object_address(@whitelist_example, token_creation_num2);
+        // token_creation_num + 0
+        let token_object_addr2 = object::create_guid_object_address(@whitelist_example, token_creation_num2 + 0);
+        assert!(object::is_object(token_object_addr2), 6);
         let token_object2 = object::address_to_object<AptosToken>(token_object_addr2);
 
         mint(owner, nft_receiver); // public
@@ -229,10 +233,10 @@ module whitelist_example::mint {
 
         mint(owner, nft_receiver2); // public
 
-        assert!(object::owner(token_object) == nft_receiver_addr, 5);
-        assert!(object::owner(token_object2) == nft_receiver2_addr, 6);
-        assert!(coin::balance<AptosCoin>(nft_receiver_addr) == 0, 7);
-        assert!(coin::balance<AptosCoin>(nft_receiver2_addr) == 0, 8);
-        assert!(coin::balance<AptosCoin>(@whitelist_example) == 4, 9);
+        assert!(object::owner(token_object) == nft_receiver_addr, 7);
+        assert!(object::owner(token_object2) == nft_receiver2_addr, 8);
+        assert!(coin::balance<AptosCoin>(nft_receiver_addr) == 0, 9);
+        assert!(coin::balance<AptosCoin>(nft_receiver2_addr) == 0, 10);
+        assert!(coin::balance<AptosCoin>(@whitelist_example) == 4, 11);
     }
 }
