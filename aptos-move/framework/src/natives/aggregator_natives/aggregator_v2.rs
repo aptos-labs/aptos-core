@@ -27,7 +27,7 @@ fn native_create_aggregator(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert_eq!(args.len(), 2);
+    debug_assert_eq!(args.len(), 1);
 
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
 
