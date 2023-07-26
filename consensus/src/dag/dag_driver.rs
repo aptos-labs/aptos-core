@@ -66,6 +66,12 @@ impl DagDriver {
         }
     }
 
+    pub fn try_enter_new_round(&mut self) {
+        if self.current_round == 0 {
+            self.enter_new_round(vec![]);
+        }
+    }
+
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let mut dag_writer = self.dag.write();
         let round = node.metadata().round();
