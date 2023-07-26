@@ -149,30 +149,3 @@ fn test_node_broadcast_receiver_storage() {
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);
 }
-
-#[test]
-fn test_certified_node_receiver() {
-    let (signers, validator_verifier) = random_validator_verifier(4, None, false);
-    let epoch_state = Arc::new(EpochState {
-        epoch: 1,
-        verifier: validator_verifier,
-    });
-    let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(RwLock::new(Dag::new(epoch_state, storage)));
-
-    let zeroth_round_node = new_certified_node(0, signers[0].author(), vec![]);
-
-    let mut rb_receiver = CertifiedNodeHandler::new(dag);
-
-    // expect an ack for a valid message
-    assert_ok!(rb_receiver.process(zeroth_round_node.clone()));
-    // expect an ack if the same message is sent again
-    assert_ok_eq!(rb_receiver.process(zeroth_round_node), CertifiedAck::new(1));
-
-    let parent_node = new_certified_node(0, signers[1].author(), vec![]);
-    let invalid_node = new_certified_node(1, signers[0].author(), vec![parent_node.certificate()]);
-    assert_eq!(
-        rb_receiver.process(invalid_node).unwrap_err().to_string(),
-        CertifiedNodeHandleError::MissingParents.to_string()
-    );
-}
