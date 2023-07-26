@@ -510,8 +510,6 @@ num-traits = "0.2.15"
 once_cell = "1.10.0"
 ouroboros = "0.15.6"
 owo-colors = "3.5.0"
-# TODO: Do we actually use serde?
-p256 = { version = "0.10.1", features = ["serde"] }
 openssl = "0.10"
 sec1 = "0.7.0"
 parking_lot = "0.12.0"

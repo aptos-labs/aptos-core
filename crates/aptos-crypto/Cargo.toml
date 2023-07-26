@@ -43,7 +43,6 @@ static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 x25519-dalek = { workspace = true }
-p256 = { workspace = true }
 openssl = { workspace = true }
 sec1 = {workspace = true }
 
