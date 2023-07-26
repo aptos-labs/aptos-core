@@ -20,11 +20,11 @@ pub mod test_utils {
         delta_change_set::{deserialize, serialize},
     };
     use aptos_state_view::TStateView;
+    use aptos_table_natives::TableHandle;
     use aptos_types::state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     };
     use move_core_types::account_address::AccountAddress;
-    use move_table_extension::TableHandle;
     use std::collections::HashMap;
 
     /// Generates a dummy id for aggregator based on the given key. Only used for testing.
