@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
 use super::{
-    dag_fetcher::FetchRequestHandler, reliable_broadcast::CertifiedNodeHandler,
-    storage::DAGStorage, types::TDAGMessage,
+    dag_driver::DagDriver, dag_fetcher::FetchRequestHandler, dag_network::DAGNetworkSender,
+    reliable_broadcast::ReliableBroadcast, storage::DAGStorage, types::TDAGMessage,
 };
 use crate::{
     dag::{
@@ -10,6 +10,7 @@ use crate::{
         types::DAGMessage,
     },
     network::{IncomingDAGRequest, TConsensusMsg},
+    state_replication::PayloadClient, util::time_service::TimeService,
 };
 use anyhow::bail;
 use aptos_channels::aptos_channel;
@@ -25,7 +26,7 @@ use std::sync::Arc;
 struct NetworkHandler {
     dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
     node_receiver: NodeBroadcastHandler,
-    certified_node_receiver: CertifiedNodeHandler,
+    dag_driver: DagDriver,
     fetch_receiver: FetchRequestHandler,
     epoch_state: Arc<EpochState>,
 }
@@ -37,16 +38,32 @@ impl NetworkHandler {
         signer: ValidatorSigner,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
+        payload_client: Arc<dyn PayloadClient>,
+        network_sender: Arc<dyn DAGNetworkSender>,
+        time_service: Arc<dyn TimeService>,
     ) -> Self {
+        let rb = Arc::new(ReliableBroadcast::new(
+            epoch_state.verifier.get_ordered_account_addresses().clone(),
+            network_sender,
+        ));
         Self {
             dag_rpc_rx,
             node_receiver: NodeBroadcastHandler::new(
                 dag.clone(),
-                signer,
+                signer.clone(),
                 epoch_state.clone(),
+                storage.clone(),
+            ),
+            dag_driver: DagDriver::new(
+                signer.author(),
+                epoch_state.clone(),
+                dag.clone(),
+                payload_client,
+                rb,
+                1,
+                time_service,
                 storage,
             ),
-            certified_node_receiver: CertifiedNodeHandler::new(dag.clone()),
             epoch_state: epoch_state.clone(),
             fetch_receiver: FetchRequestHandler::new(dag, epoch_state),
         }
@@ -78,7 +95,7 @@ impl NetworkHandler {
                 .map(|r| r.into()),
             DAGMessage::CertifiedNodeMsg(node) => node
                 .verify(&self.epoch_state.verifier)
-                .and_then(|_| self.certified_node_receiver.process(node))
+                .and_then(|_| self.dag_driver.process(node))
                 .map(|r| r.into()),
             DAGMessage::FetchRequest(request) => request
                 .verify(&self.epoch_state.verifier)

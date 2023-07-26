@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{storage::DAGStorage, types::DAGMessage};
+use super::{storage::DAGStorage, types::CertifiedAck, RpcHandler};
 use crate::{
     dag::{
         dag_store::Dag,
@@ -10,6 +10,7 @@ use crate::{
     state_replication::PayloadClient,
     util::time_service::TimeService,
 };
+use anyhow::bail;
 use aptos_consensus_types::common::{Author, Payload};
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::ReliableBroadcast;
@@ -20,6 +21,13 @@ use futures::{
 };
 use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
+use thiserror::Error as ThisError;
+
+#[derive(Debug, ThisError)]
+pub enum DagDriverError {
+    #[error("missing parents")]
+    MissingParents,
+}
 
 pub(crate) struct DagDriver {
     author: Author,
@@ -61,18 +69,21 @@ impl DagDriver {
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let mut dag_writer = self.dag.write();
         let round = node.metadata().round();
-        if dag_writer.all_exists(node.parents_metadata()) {
-            dag_writer.add_node(node)?;
-            if self.current_round == round {
-                let maybe_strong_links = dag_writer
-                    .get_strong_links_for_round(self.current_round, &self.epoch_state.verifier);
-                drop(dag_writer);
-                if let Some(strong_links) = maybe_strong_links {
-                    self.enter_new_round(strong_links);
-                }
+
+        if !dag_writer.all_exists(node.parents_metadata()) {
+            // TODO(ibalajiarun): implement fetching logic.
+            bail!(DagDriverError::MissingParents);
+        }
+
+        dag_writer.add_node(node)?;
+        if self.current_round == round {
+            let maybe_strong_links = dag_writer
+                .get_strong_links_for_round(self.current_round, &self.epoch_state.verifier);
+            drop(dag_writer);
+            if let Some(strong_links) = maybe_strong_links {
+                self.enter_new_round(strong_links);
             }
         }
-        // TODO: handle fetching missing dependencies
         Ok(())
     }
 
@@ -113,5 +124,24 @@ impl DagDriver {
         if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
             prev_handle.abort();
         }
+    }
+}
+
+impl RpcHandler for DagDriver {
+    type Request = CertifiedNode;
+    type Response = CertifiedAck;
+
+    fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+        let epoch = node.metadata().epoch();
+        {
+            let dag_reader = self.dag.read();
+            if dag_reader.exists(node.metadata()) {
+                return Ok(CertifiedAck::new(node.metadata().epoch()));
+            }
+        }
+
+        self.add_node(node)?;
+
+        Ok(CertifiedAck::new(epoch))
     }
 }
