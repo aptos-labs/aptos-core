@@ -21,7 +21,7 @@ on:
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
   schedule:
-    - cron: "0 8 */2 * *" # The main branch cadence. This runs every other day at 8am UTC.
+    - cron: "0 3 */2 * *" # The main branch cadence. This runs every other day at 3am UTC.
   pull_request:
     paths:
       - ".github/workflows/forge-pfn.yaml"
@@ -50,7 +50,7 @@ jobs:
         id: determine-test-branch
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 8 */2 * *" ]]; then
+            if [[ "${{ github.event.schedule }}" == "0 3 */2 * *" ]]; then
               echo "Branch: main"
               echo "BRANCH=main" >> $GITHUB_OUTPUT
             else
@@ -125,8 +125,8 @@ jobs:
 
   # Measures PFN latencies with a constant TPS (with network chaos)
   run-forge-pfn-const-tps-network-chaos:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-pfn-const-tps] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -138,8 +138,8 @@ jobs:
 
   # Measures PFN latencies with a constant TPS (with a realistic environment)
   run-forge-pfn-const-tps-realistic-env:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-pfn-const-tps-network-chaos] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -151,8 +151,8 @@ jobs:
 
   # Measures max PFN throughput and latencies under load
   run-forge-pfn-performance:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-pfn-const-tps-realistic-env] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -164,8 +164,8 @@ jobs:
 
   # Measures max PFN throughput and latencies under load (with network chaos)
   run-forge-pfn-performance-network-chaos:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-pfn-performance] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -177,8 +177,8 @@ jobs:
 
   # Measures max PFN throughput and latencies under load (with a realistic environment)
   run-forge-pfn-performance-realistic-env:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-pfn-performance-network-chaos] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:

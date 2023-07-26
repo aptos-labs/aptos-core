@@ -21,7 +21,7 @@ on:
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
   schedule:
-    - cron: "0 6 */3 * *" # The main branch cadence. This runs every three days at 6am UTC.
+    - cron: "0 14 */3 * *" # The main branch cadence. This runs every three days at 2pm UTC.
   pull_request:
     paths:
       - ".github/workflows/forge-state-sync.yaml"
@@ -50,7 +50,7 @@ jobs:
         id: determine-test-branch
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 6 */3 * *" ]]; then
+            if [[ "${{ github.event.schedule }}" == "0 14 */3 * *" ]]; then
               echo "Branch: main"
               echo "BRANCH=main" >> $GITHUB_OUTPUT
             else
@@ -125,8 +125,8 @@ jobs:
 
   # Measures state sync performance for validator fullnodes (execution syncing)
   run-forge-state-sync-perf-fullnode-execute-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-state-sync-perf-validator-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -138,8 +138,8 @@ jobs:
 
   # Measures state sync performance for validator fullnodes (fast syncing)
   run-forge-state-sync-perf-fullnode-fast-sync-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-state-sync-perf-fullnode-execute-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -151,8 +151,8 @@ jobs:
 
   # Measures state sync performance for validator fullnodes (output syncing)
   run-forge-state-sync-perf-fullnode-apply-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-state-sync-perf-fullnode-fast-sync-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
