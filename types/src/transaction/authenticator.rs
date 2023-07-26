@@ -9,6 +9,7 @@ use crate::{
 use anyhow::{ensure, Error, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
+    p256::{P256PublicKey, P256Signature},
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     traits::Signature,
@@ -47,10 +48,10 @@ pub enum TransactionAuthenticator {
         signature: Ed25519Signature,
     },
     /// Single signature
-    /*P256 {
+    P256 {
         public_key: P256PublicKey,
-        signature: P256PublicKey,
-    },*/
+        signature: P256Signature,
+    },
     /// K-of-N multisignature
     MultiEd25519 {
         public_key: MultiEd25519PublicKey,
@@ -76,6 +77,14 @@ impl TransactionAuthenticator {
     /// Create a single-signature ed25519 authenticator
     pub fn ed25519(public_key: Ed25519PublicKey, signature: Ed25519Signature) -> Self {
         Self::Ed25519 {
+            public_key,
+            signature,
+        }
+    }
+
+    /// Create a single-signature p256 authenticator
+    pub fn p256(public_key: P256PublicKey, signature: P256Signature) -> Self {
+        Self::P256 {
             public_key,
             signature,
         }
@@ -138,6 +147,10 @@ impl TransactionAuthenticator {
                 public_key,
                 signature,
             } => signature.verify(raw_txn, public_key),
+            Self::P256 {
+                public_key,
+                signature,
+            } => signature.verify(raw_txn, public_key), 
             Self::FeePayer {
                 sender,
                 secondary_signer_addresses,
@@ -190,6 +203,13 @@ impl TransactionAuthenticator {
                 public_key: public_key.clone(),
                 signature: signature.clone(),
             },
+            Self::P256 {
+                public_key,
+                signature,
+            } => AccountAuthenticator::P256 {
+                public_key: public_key.clone(),
+                signature: signature.clone(),
+            },
             Self::FeePayer { sender, .. } => sender.clone(),
             Self::MultiEd25519 {
                 public_key,
@@ -202,6 +222,7 @@ impl TransactionAuthenticator {
     pub fn secondary_signer_addreses(&self) -> Vec<AccountAddress> {
         match self {
             Self::Ed25519 { .. }
+            | Self::P256 { .. }
             | Self::MultiEd25519 {
                 public_key: _,
                 signature: _,
@@ -222,6 +243,7 @@ impl TransactionAuthenticator {
     pub fn secondary_signers(&self) -> Vec<AccountAuthenticator> {
         match self {
             Self::Ed25519 { .. }
+            | Self::P256 { .. } 
             | Self::MultiEd25519 {
                 public_key: _,
                 signature: _,
@@ -242,7 +264,7 @@ impl TransactionAuthenticator {
 
     pub fn fee_payer_address(&self) -> Option<AccountAddress> {
         match self {
-            Self::Ed25519 { .. } | Self::MultiEd25519 { .. } | Self::MultiAgent { .. } => None,
+            Self::Ed25519 { .. } | Self::P256 { .. } | Self::MultiEd25519 { .. } | Self::MultiAgent { .. } => None,
             Self::FeePayer {
                 sender: _,
                 secondary_signer_addresses: _,
@@ -255,7 +277,7 @@ impl TransactionAuthenticator {
 
     pub fn fee_payer_signer(&self) -> Option<AccountAuthenticator> {
         match self {
-            Self::Ed25519 { .. } | Self::MultiEd25519 { .. } | Self::MultiAgent { .. } => None,
+            Self::Ed25519 { .. } | Self::P256 { .. } | Self::MultiEd25519 { .. } | Self::MultiAgent { .. } => None,
             Self::FeePayer {
                 sender: _,
                 secondary_signer_addresses: _,
@@ -277,6 +299,16 @@ impl fmt::Display for TransactionAuthenticator {
                 write!(
                     f,
                     "TransactionAuthenticator[scheme: Ed25519, sender: {}]",
+                    self.sender()
+                )
+            },
+            Self::P256 {
+                public_key: _,
+                signature: _,
+            } => {
+                write!(
+                    f,
+                    "TransactionAuthenticator[scheme: P256, sender: {}]",
                     self.sender()
                 )
             },
@@ -357,6 +389,7 @@ impl fmt::Display for TransactionAuthenticator {
 pub enum Scheme {
     Ed25519 = 0,
     MultiEd25519 = 1,
+    P256 = 2,
     // ... add more schemes here
     /// Scheme identifier used to derive addresses (not the authentication key) of objects and
     /// resources accounts. This application serves to domain separate hashes. Without such
@@ -374,6 +407,7 @@ impl fmt::Display for Scheme {
         let display = match self {
             Scheme::Ed25519 => "Ed25519",
             Scheme::MultiEd25519 => "MultiEd25519",
+            Scheme::P256 => "P256",
             Scheme::DeriveAuid => "DeriveAuid",
             Scheme::DeriveObjectAddressFromObject => "DeriveObjectAddressFromObject",
             Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
@@ -386,7 +420,7 @@ impl fmt::Display for Scheme {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum AccountAuthenticator {
-    /// Single signature
+    /// Single Ed25519 signature
     Ed25519 {
         public_key: Ed25519PublicKey,
         signature: Ed25519Signature,
@@ -395,6 +429,11 @@ pub enum AccountAuthenticator {
     MultiEd25519 {
         public_key: MultiEd25519PublicKey,
         signature: MultiEd25519Signature,
+    },
+    /// Single P256 signature
+    P256 {
+        public_key: P256PublicKey,
+        signature: P256Signature,
     },
     // ... add more schemes here
 }
@@ -405,6 +444,7 @@ impl AccountAuthenticator {
         match self {
             Self::Ed25519 { .. } => Scheme::Ed25519,
             Self::MultiEd25519 { .. } => Scheme::MultiEd25519,
+            Self::P256 { .. } => Scheme::P256,
         }
     }
 
@@ -427,6 +467,14 @@ impl AccountAuthenticator {
         }
     }
 
+    /// Create a single-signature p256 authenticator
+    pub fn p256(public_key: P256PublicKey, signature: P256Signature) -> Self {
+        Self::P256 {
+            public_key,
+            signature,
+        }
+    }
+
     /// Return Ok if the authenticator's public key matches its signature, Err otherwise
     pub fn verify<T: Serialize + CryptoHash>(&self, message: &T) -> Result<()> {
         match self {
@@ -438,6 +486,10 @@ impl AccountAuthenticator {
                 public_key,
                 signature,
             } => signature.verify(message, public_key),
+            Self::P256 {
+                public_key,
+                signature,
+            } => signature.verify(message, public_key),
         }
     }
 
@@ -446,6 +498,7 @@ impl AccountAuthenticator {
         match self {
             Self::Ed25519 { public_key, .. } => public_key.to_bytes().to_vec(),
             Self::MultiEd25519 { public_key, .. } => public_key.to_bytes().to_vec(),
+            Self::P256 { public_key, .. } => public_key.to_bytes().to_vec(),
         }
     }
 
@@ -454,6 +507,7 @@ impl AccountAuthenticator {
         match self {
             Self::Ed25519 { signature, .. } => signature.to_bytes().to_vec(),
             Self::MultiEd25519 { signature, .. } => signature.to_bytes().to_vec(),
+            Self::P256 { signature, .. } => signature.to_bytes().to_vec(),
         }
     }
 
@@ -472,6 +526,7 @@ impl AccountAuthenticator {
         match self {
             Self::Ed25519 { .. } => 1,
             Self::MultiEd25519 { signature, .. } => signature.signatures().len(),
+            Self::P256 { .. } => 1,
         }
     }
 }
@@ -522,6 +577,11 @@ impl AuthenticationKey {
     /// Create an authentication key from a MultiEd25519 public key
     pub fn multi_ed25519(public_key: &MultiEd25519PublicKey) -> Self {
         Self::from_preimage(&AuthenticationKeyPreimage::multi_ed25519(public_key))
+    }
+
+    /// Create an authentication key from an P256 public key
+    pub fn p256(public_key: &P256PublicKey) -> AuthenticationKey {
+        Self::from_preimage(&AuthenticationKeyPreimage::p256(public_key))
     }
 
     /// Return an address derived from the last `AccountAddress::LENGTH` bytes of this
@@ -577,6 +637,11 @@ impl AuthenticationKeyPreimage {
     /// Construct a preimage from a MultiEd25519 public key
     pub fn multi_ed25519(public_key: &MultiEd25519PublicKey) -> AuthenticationKeyPreimage {
         Self::new(public_key.to_bytes(), Scheme::MultiEd25519)
+    }
+
+    /// Construct a preimage from a P256 public key
+    pub fn p256(public_key: &P256PublicKey) -> AuthenticationKeyPreimage {
+        Self::new(public_key.to_bytes().to_vec(), Scheme::P256)
     }
 
     /// Construct a preimage from a transaction-derived AUID as (txn_hash || auid_scheme_id)

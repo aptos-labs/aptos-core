@@ -21,11 +21,12 @@ use openssl::ecdsa::EcdsaSig;
 #[derive(DeserializeKey, SerializeKey)]
 pub struct P256Signature(pub(crate) EcdsaSig);
 
-/*impl Clone for P256Signature {
+impl Clone for P256Signature {
     fn clone(&self) -> Self {
-        *self
+        let serialized: &[u8] = &(self.to_bytes());
+        P256Signature::try_from(serialized).unwrap()
     }
-}*/
+}
 
 impl private::Sealed for P256Signature {}
 
