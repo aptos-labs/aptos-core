@@ -8,6 +8,7 @@ pub mod sharded_block_partitioner;
 pub mod simple_partitioner;
 pub mod beta;
 mod union_find;
+pub mod omega_partitioner;
 
 pub mod test_utils;
 
@@ -18,16 +19,19 @@ use aptos_types::{block_executor::partitioner::SubBlocksForShard, transaction::T
 use once_cell::sync::Lazy;
 use aptos_crypto::hash::CryptoHash;
 use aptos_logger::info;
-use aptos_types::block_executor::partitioner::{RoundId, ShardId};
+use aptos_types::block_executor::partitioner::{CrossShardDependencies, RoundId, ShardedTxnIndex, ShardId, SubBlock, TransactionWithDependencies};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use crate::sharded_block_partitioner::counters::ADD_EDGES_MISC_SECONDS;
 
 pub trait BlockPartitioner: Send {
     fn partition(
         &self,
         transactions: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
-    ) -> Vec<SubBlocksForShard<Transaction>>;
+    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>>;
 }
 
 /// An implementation of partitioner that splits the transactions into equal-sized chunks.
@@ -91,8 +95,80 @@ pub fn analyze_block(txns: Vec<Transaction>) -> Vec<AnalyzedTransaction> {
     txns.into_iter().map(|t| t.into()).collect()
 }
 
+pub fn add_edges(
+    num_shards: usize,
+    matrix: Vec<Vec<Vec<AnalyzedTransaction>>>,
+    num_keys: Option<usize>,
+) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
+    let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["main"]).start_timer();
+    let num_keys = num_keys.unwrap();
+    let mut ret: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..num_shards).map(|shard_id| SubBlocksForShard { shard_id, sub_blocks: vec![] }).collect();
+    let mut global_txn_counter: usize = 0;
+    let mut global_owners_by_loc_id: Vec<Option<ShardedTxnIndex>> = vec![None; num_keys];// HashMap<StateKey, ShardedDTxnIndex>;
+    for (round_id, row) in matrix.into_iter().enumerate() {
+        for (shard_id, txns) in row.into_iter().enumerate() {
+            let start_index_for_cur_sub_block = global_txn_counter;
+            let mut twds_for_cur_sub_block: Vec<TransactionWithDependencies<AnalyzedTransaction>> = Vec::with_capacity(txns.len());
+            let mut local_owners_by_loc_id: HashMap<usize, ShardedTxnIndex> = HashMap::new();
+            for txn in txns {
+                let cur_sharded_txn_idx = ShardedTxnIndex {
+                    txn_index: global_txn_counter,
+                    shard_id,
+                    round_id,
+                };
+                let mut cur_txn_csd = CrossShardDependencies::default();
+                for loc in txn.read_hints().iter() {
+                    match &global_owners_by_loc_id[*loc.maybe_id_in_partition_session.as_ref().unwrap()] {
+                        Some(owner) => {
+                            let loc_clone_1 = loc.clone();
+                            let loc_clone_2 = loc.clone();
+                            ret.get_mut(owner.shard_id).unwrap()
+                                .get_sub_block_mut(owner.round_id).unwrap()
+                                .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc_clone_1]);
+                            cur_txn_csd.add_required_edge(*owner, loc_clone_2);
+                        },
+                        None => {},
+                    }
+                }
 
-pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
+                for loc in txn.write_hints().iter() {
+                    let loc_id = *loc.maybe_id_in_partition_session.as_ref().unwrap();
+                    local_owners_by_loc_id.insert(loc_id, cur_sharded_txn_idx);
+                    match &global_owners_by_loc_id[loc_id] {
+                        Some(owner) => {
+                            let loc_clone_1 = loc.clone();
+                            let loc_clone_2 = loc.clone();
+                            ret.get_mut(owner.shard_id).unwrap()
+                                .get_sub_block_mut(owner.round_id).unwrap()
+                                .add_dependent_edge(owner.txn_index, cur_sharded_txn_idx, vec![loc_clone_1]);
+                            cur_txn_csd.add_required_edge(*owner, loc_clone_2);
+                        },
+                        None => {},
+                    }
+                }
+                let twd = TransactionWithDependencies::new(txn, cur_txn_csd);
+                twds_for_cur_sub_block.push(twd);
+                global_txn_counter += 1;
+            }
+
+            let cur_sub_block = SubBlock::new(start_index_for_cur_sub_block, twds_for_cur_sub_block);
+            ret.get_mut(shard_id).unwrap().add_sub_block(cur_sub_block);
+
+            for (key, owner) in local_owners_by_loc_id {
+                global_owners_by_loc_id[key] = Some(owner);
+            }
+        }
+    }
+    let duration = timer.stop_and_record();
+    println!("add_edges/main={duration:?}");
+    let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["drop"]).start_timer();
+    drop(global_owners_by_loc_id);
+    let duration = timer.stop_and_record();
+    println!("add_edges/drop_owner_table={duration:?}");
+    ret
+}
+
+pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<AnalyzedTransaction>>) {
     let mut total_comm_cost = 0;
     let num_rounds = matrix.first().unwrap().sub_blocks.len();
     for round_id in 0..num_rounds {
@@ -102,11 +178,16 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
             let mut cur_sub_block_connectivity_by_key_dst_pair: HashMap<(RoundId, ShardId, StateKey), u64> = HashMap::new();
             for (local_tid, td) in sub_block.transactions.iter().enumerate() {
                 let tid = sub_block.start_index + local_tid;
+                for loc in td.txn.write_hints.iter() {
+                    let key = loc.clone().into_state_key();
+                    let key_str = CryptoHash::hash(&key).to_hex();
+                    println!("MATRIX_REPORT - round={}, shard={}, tid={}, write_hint={}", round_id, shard_id, tid, key_str);
+                }
                 for (src_tid, locs) in td.cross_shard_dependencies.required_edges().iter() {
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
-                        // let key_str = key.hash().to_hex();
-                        // println!("MATRIX_REPORT - round={}, shard={}, tid={}, wait for key={} from round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
+                        let key_str = CryptoHash::hash(&key).to_hex();
+                        println!("MATRIX_REPORT - round={}, shard={}, tid={}, recv key={} from round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
                         let value = cur_sub_block_inbound_costs_by_key_src_pair.entry((src_tid.round_id, src_tid.shard_id, key)).or_insert_with(||0);
                         *value += 1;
 
@@ -115,8 +196,8 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
                 for (dst_tid, locs) in td.cross_shard_dependencies.dependent_edges().iter() {
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
-                        // let key_str = key.hash().to_hex();
-                        // println!("MATRIX_REPORT - round={}, shard={}, tid={}, unblock key={} for round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
+                        let key_str = CryptoHash::hash(&key).to_hex();
+                        println!("MATRIX_REPORT - round={}, shard={}, tid={}, send key={} to round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
                         let value = cur_sub_block_connectivity_by_key_dst_pair.entry((dst_tid.round_id, dst_tid.shard_id, key)).or_insert_with(||0);
                         *value += 1;
                     }
@@ -135,4 +216,10 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<Transaction>>) {
         }
     }
     println!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
+}
+
+fn get_anchor_shard_id(storage_location: &StorageLocation, num_shards: usize) -> ShardId {
+    let mut hasher = DefaultHasher::new();
+    storage_location.hash(&mut hasher);
+    (hasher.finish() % num_shards as u64) as usize
 }

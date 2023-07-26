@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use crate::{
     access_path::AccessPath,
     account_config::{AccountResource, CoinStoreResource},
@@ -16,6 +18,8 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
+use std::sync::{Arc, Mutex, RwLock};
+use crate::block_executor::partitioner::ShardedTxnIndex;
 
 #[derive(Clone, Debug)]
 pub struct AnalyzedTransaction {
@@ -49,12 +53,25 @@ pub enum StorageLocationInner {
     WildCardTable(TableHandle),
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, Serialize, Deserialize)]
 pub struct StorageLocation {
     inner: StorageLocationInner,
     #[serde(skip_serializing)]
     pub maybe_id_in_partition_session: Option<usize>,
 }
+
+impl Hash for StorageLocation {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.inner.hash(state);
+    }
+}
+
+impl PartialEq for StorageLocation {
+    fn eq(&self, other: &Self) -> bool {
+        self.eq(other)
+    }
+}
+
 impl StorageLocation {
     pub fn into_state_key(self) -> StateKey {
         match self.inner {
@@ -69,6 +86,67 @@ impl StorageLocation {
         }
     }
 }
+
+/// This structure holds IDs of txns who will access a certain state key.
+#[derive(Debug, Default, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct StorageLocationHelper {
+    pub anchor_shard_id: usize,
+    reads: BTreeSet<usize>,
+    writes: BTreeSet<usize>,
+    promoted_txn_ids: Vec<usize>,
+}
+
+impl StorageLocationHelper {
+    pub fn new(anchor_shard_id: usize) -> Self {
+        Self {
+            anchor_shard_id,
+            reads: Default::default(),
+            writes: Default::default(),
+            promoted_txn_ids: vec![],
+        }
+    }
+
+    pub fn add_candidate(&mut self, txn_id: usize, is_write: bool) {
+        if is_write {
+            self.writes.insert(txn_id);
+        } else {
+            self.reads.insert(txn_id);
+        }
+    }
+
+    pub fn promote_txn_id(&mut self, txn_id: usize) {
+        let exists = self.reads.remove(&txn_id) || self.writes.remove(&txn_id);
+        assert!(exists);
+        self.promoted_txn_ids.push(txn_id);
+    }
+
+    pub fn has_write_in_range(&self, start: usize, end: usize) -> bool {
+        if start <= end {
+            self.writes.range(start..end).next().is_some()
+        } else {
+            self.writes.range(start..).next().is_some() || self.writes.range(..end).next().is_some()
+        }
+    }
+}
+
+#[test]
+fn test_storage_location_helper() {
+    let mut helper = StorageLocationHelper::default();
+    assert!(!helper.has_write_in_range(5, 10));
+    helper.add_candidate(7, true);
+    assert!(helper.has_write_in_range(5, 10));
+    helper.add_candidate(8, false);
+    helper.add_candidate(9, true);
+    assert!(helper.has_write_in_range(5, 10));
+    helper.promote_txn_id(9);
+    assert!(helper.has_write_in_range(5, 10));
+    helper.promote_txn_id(7);
+    assert!(!helper.has_write_in_range(5, 10));
+    helper.add_candidate(4, true);
+    helper.add_candidate(10, true);
+    assert!(!helper.has_write_in_range(5, 10));
+}
+
 
 impl From<StorageLocationInner> for StorageLocation {
     fn from(inner: StorageLocationInner) -> Self {

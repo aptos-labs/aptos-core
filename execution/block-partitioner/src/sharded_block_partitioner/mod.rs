@@ -26,13 +26,19 @@ use std::{
     },
     thread,
 };
+use std::collections::{BTreeMap, BTreeSet};
 use std::env::VarError;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::RwLock;
 use std::time::Instant;
+use dashmap::DashMap;
+use rayon::prelude::IntoParallelIterator;
 use aptos_types::block_executor::partitioner::{CrossShardDependencies, ShardedTxnIndex, SubBlock, TransactionWithDependencies};
 use aptos_types::state_store::state_key::StateKey;
-use aptos_types::transaction::analyzed_transaction::StorageLocation;
+use aptos_types::transaction::analyzed_transaction::{StorageLocation, StorageLocationHelper};
 use crate::sharded_block_partitioner::counters::{ADD_EDGES_MISC_SECONDS, FLATTEN_TO_ROUNDS_MISC_SECONDS, SHARDED_PARTITIONER_MISC_SECONDS};
 use crate::simple_partitioner::SimplePartitioner;
+use rayon::iter::ParallelIterator;
 
 mod conflict_detector;
 pub mod counters;
@@ -270,7 +276,7 @@ impl ShardedBlockPartitioner {
         transactions: Vec<AnalyzedTransaction>,
         max_partitioning_rounds: RoundId,
         cross_shard_dep_avoid_threshold: f32,
-    ) -> Vec<SubBlocksForShard<Transaction>> {
+    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         let total_txns = transactions.len();
         assert!(
             max_partitioning_rounds >= 1,
@@ -348,16 +354,16 @@ impl ShardedBlockPartitioner {
         &self,
         matrix: Vec<Vec<Vec<AnalyzedTransaction>>>,
         num_keys: Option<usize>,
-    ) -> Vec<SubBlocksForShard<Transaction>> {
+    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         let timer = ADD_EDGES_MISC_SECONDS.with_label_values(&["main"]).start_timer();
         let num_keys = num_keys.unwrap();
-        let mut ret: Vec<SubBlocksForShard<Transaction>> = (0..self.num_shards).map(|shard_id| SubBlocksForShard { shard_id, sub_blocks: vec![] }).collect();
+        let mut ret: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..self.num_shards).map(|shard_id| SubBlocksForShard { shard_id, sub_blocks: vec![] }).collect();
         let mut global_txn_counter: usize = 0;
         let mut global_owners_by_loc_id: Vec<Option<ShardedTxnIndex>> = vec![None; num_keys];// HashMap<StateKey, ShardedDTxnIndex>;
         for (round_id, row) in matrix.into_iter().enumerate() {
             for (shard_id, txns) in row.into_iter().enumerate() {
                 let start_index_for_cur_sub_block = global_txn_counter;
-                let mut twds_for_cur_sub_block: Vec<TransactionWithDependencies<Transaction>> = Vec::with_capacity(txns.len());
+                let mut twds_for_cur_sub_block: Vec<TransactionWithDependencies<AnalyzedTransaction>> = Vec::with_capacity(txns.len());
                 let mut local_owners_by_loc_id: HashMap<usize, ShardedTxnIndex> = HashMap::new();
                 for txn in txns {
                     let cur_sharded_txn_idx = ShardedTxnIndex {
@@ -395,7 +401,7 @@ impl ShardedBlockPartitioner {
                             None => {},
                         }
                     }
-                    let twd = TransactionWithDependencies::new(txn.into_txn(), cur_txn_csd);
+                    let twd = TransactionWithDependencies::new(txn, cur_txn_csd);
                     twds_for_cur_sub_block.push(twd);
                     global_txn_counter += 1;
                 }
@@ -423,7 +429,7 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         &self,
         transactions: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
-    ) -> Vec<SubBlocksForShard<Transaction>> {
+    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         let timer = SHARDED_PARTITIONER_MISC_SECONDS.with_label_values(&["env_stuff"]).start_timer();
         assert_eq!(self.num_shards, num_executor_shards);
         let max_partitioning_rounds = std::env::var("SHARDED_PARTITIONER__MAX_ROUNDS").ok()
@@ -457,6 +463,7 @@ impl BlockPartitioner for ShardedBlockPartitioner {
         ret
     }
 }
+
 impl Drop for ShardedBlockPartitioner {
     /// Best effort stops all the executor shards and waits for the thread to finish.
     fn drop(&mut self) {
@@ -512,7 +519,7 @@ mod tests {
     use rand::{rngs::OsRng, Rng};
     use std::{collections::HashMap, sync::Mutex};
 
-    fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock<Transaction>>) {
+    fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock<AnalyzedTransaction>>) {
         for sub_blocks in sub_blocks_for_shards {
             for txn in sub_blocks.iter() {
                 assert_eq!(txn.cross_shard_dependencies().num_required_edges(), 0);
@@ -637,8 +644,8 @@ mod tests {
         );
     }
 
-    fn get_account_seq_number(txn: &Transaction) -> (AccountAddress, u64) {
-        match txn {
+    fn get_account_seq_number(txn: &AnalyzedTransaction) -> (AccountAddress, u64) {
+        match txn.transaction() {
             Transaction::UserTransaction(txn) => (txn.sender(), txn.sequence_number()),
             _ => unreachable!("Only user transaction can be executed in executor"),
         }
@@ -902,7 +909,7 @@ mod tests {
             for (shard_id, sub_blocks_for_shard) in partitioned_txns.iter().enumerate() {
                 let sub_block_for_round = sub_blocks_for_shard.get_sub_block(round).unwrap();
                 for txn in sub_block_for_round.iter() {
-                    let analyzed_txn = txns_by_hash.get(&txn.txn.hash()).unwrap();
+                    let analyzed_txn = txns_by_hash.get(&txn.txn.transaction().hash()).unwrap();
                     let storage_locations = analyzed_txn
                         .read_hints()
                         .iter()

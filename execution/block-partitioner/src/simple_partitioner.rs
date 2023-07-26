@@ -172,15 +172,15 @@ impl BlockPartitioner for SimplePartitioner {
         &self,
         txns: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
-    ) -> Vec<SubBlocksForShard<Transaction>> {
+    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         let (txns_by_shard_id, num_keys) = self.partition(txns, num_executor_shards);
         let _timer = SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_deps"]).start_timer();
-        let mut ret: Vec<SubBlocksForShard<Transaction>> = Vec::with_capacity(num_executor_shards);
+        let mut ret: Vec<SubBlocksForShard<AnalyzedTransaction>> = Vec::with_capacity(num_executor_shards);
         let mut global_txn_counter: usize = 0;
         let mut global_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
         for (shard_id, txns) in txns_by_shard_id.into_iter().enumerate() {
             let start_index_for_cur_sub_block = global_txn_counter;
-            let mut twds_for_cur_sub_block: Vec<TransactionWithDependencies<Transaction>> = Vec::with_capacity(txns.len());
+            let mut twds_for_cur_sub_block: Vec<TransactionWithDependencies<AnalyzedTransaction>> = Vec::with_capacity(txns.len());
             let mut local_owners_of_key: HashMap<StateKey, ShardedTxnIndex> = HashMap::new();
             for txn in txns {
                 let cur_sharded_txn_idx = ShardedTxnIndex {
@@ -216,7 +216,7 @@ impl BlockPartitioner for SimplePartitioner {
                     }
                 }
 
-                let twd = TransactionWithDependencies::new(txn.into(), cur_txn_csd);
+                let twd = TransactionWithDependencies::new(txn, cur_txn_csd);
                 twds_for_cur_sub_block.push(twd);
                 global_txn_counter += 1;
             }

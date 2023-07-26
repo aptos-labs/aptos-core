@@ -5,6 +5,7 @@ use clap::Parser;
 use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Mutex, time::Instant};
+use aptos_block_partitioner::omega_partitioner::OmegaPartitioner;
 use aptos_block_partitioner::sharded_block_partitioner::counters::SHARDED_PARTITIONER_MISC_SECONDS;
 use aptos_block_partitioner::simple_partitioner::{SIMPLE_PARTITIONER_MISC_TIMERS_SECONDS, SimplePartitioner};
 use aptos_logger::{error, info};
@@ -13,16 +14,16 @@ use aptos_types::transaction::Transaction;
 
 #[derive(Debug, Parser)]
 struct Args {
-    #[clap(long, default_value_t = 99000)]
+    #[clap(long, default_value_t = 10)]
     pub num_accounts: usize,
 
-    #[clap(long, default_value_t = 100000)]
+    #[clap(long, default_value_t = 10)]
     pub block_size: usize,
 
-    #[clap(long, default_value_t = 3)]
+    #[clap(long, default_value_t = 1)]
     pub num_blocks: usize,
 
-    #[clap(long, default_value_t = 112)]
+    #[clap(long, default_value_t = 3)]
     pub num_shards: usize,
 }
 
@@ -37,8 +38,9 @@ fn main() {
         .collect();
     println!("Created {} accounts", num_accounts);
 
-    // let partitioner = SimplePartitioner{};
-    let partitioner = ShardedBlockPartitioner::new(args.num_shards);
+    let partitioner = OmegaPartitioner::new(8);
+
+    // let partitioner = ShardedBlockPartitioner::new(args.num_shards);
     for _ in 0..args.num_blocks {
         println!("Creating {} transactions", args.block_size);
         let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
@@ -58,7 +60,7 @@ fn main() {
         let elapsed = now.elapsed();
 
         println!("Time taken to partition: {:?}", elapsed);
-        // report_sub_block_matrix(&result);
+        report_sub_block_matrix(&result);
     }
 }
 

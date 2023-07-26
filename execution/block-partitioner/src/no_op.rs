@@ -16,11 +16,11 @@ impl BlockPartitioner for NoOpPartitioner {
         &self,
         transactions: Vec<AnalyzedTransaction>,
         num_executor_shards: usize,
-    ) -> Vec<SubBlocksForShard<Transaction>> {
+    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         assert_eq!(1, num_executor_shards);
         let twds = transactions
             .into_iter()
-            .map(|t| TransactionWithDependencies::new(t.into_txn(), CrossShardDependencies::default()))
+            .map(|t| TransactionWithDependencies::new(t, CrossShardDependencies::default()))
             .collect();
         let sub_block = SubBlock::new(0, twds);
         let sub_block_list = SubBlocksForShard::new(0, vec![sub_block]);
