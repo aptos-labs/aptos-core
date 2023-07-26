@@ -1,18 +1,15 @@
 // Copyright © Aptos Foundation
 
-// Copyright © Aptos Foundation\
-
+use serde::{Deserialize, Serialize};
+use serde_yaml;
+use std::collections::BTreeMap;
+use std::env;
 #[allow(unused_imports)]
 use std::fs::File;
 #[allow(unused_imports)]
 use std::io::{Error, ErrorKind, Read, Write};
-use serde::{Deserialize, Serialize};
 use std::process::{Command, Stdio};
-use std::collections::BTreeMap;
 use tempfile::NamedTempFile;
-use serde_yaml;
-use std::env;
-
 
 //
 // Related to get_testnets()
@@ -107,11 +104,11 @@ struct BlueprintCollection {
     blueprints: BTreeMap<String, PanguNodeBlueprint>,
 }
 /////////////////////////////////////////
-///
+
 struct PanguSDK;
 impl PanguSDK {
     //
-    // This is a light Rust wrapper around the pangu CLI
+    // This is a light Rust wrapper around the Pangu CLI. It is not fully feature complete.
 
     #[allow(dead_code)]
     pub fn create_testnet(
@@ -127,15 +124,16 @@ impl PanguSDK {
     ) {
         let pangu_dir = Self::pangu_directory();
         let temp_file: NamedTempFile;
-        let pangu_node_configs_path_value: String = match (pangu_node_configs, pangu_node_configs_path) {
-            (Some(bp), None) => {
-                temp_file =
-                    Self::create_pangu_node_config(bp).expect("Failed to create temporary file");
-                temp_file.path().to_string_lossy().to_string()
-            },
-            (None, Some(path)) => path.to_string(),
-            _ => String::new(),
-        };
+        let pangu_node_configs_path_value: String =
+            match (pangu_node_configs, pangu_node_configs_path) {
+                (Some(bp), None) => {
+                    temp_file = Self::create_pangu_node_config(bp)
+                        .expect("Failed to create temporary file");
+                    temp_file.path().to_string_lossy().to_string()
+                },
+                (None, Some(path)) => path.to_string(),
+                _ => String::new(),
+            };
         let mut python_command = Command::new("poetry");
         python_command
             .arg("-C")
@@ -571,16 +569,26 @@ mod tests {
     fn test_create_testnet() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core-2-other/aptos-core/testsuite",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
-        PanguSDK::create_testnet(None, None, Some(3), None, None, None, None, None, Some("olsen"));
+        PanguSDK::create_testnet(
+            None,
+            None,
+            Some(3),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("olsen2"),
+        );
     }
 
     #[test]
     fn test_update_testnet() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         PanguSDK::update_testnet(
@@ -594,12 +602,12 @@ mod tests {
     fn test_add_pfn() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
         match PanguSDK::add_pfn(
             "pangu-olsen",
             "pfn-olsen",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu/pangu_lib/template_testnet_files/pfn.yaml",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu_lib/template_testnet_files/pfn.yaml",
             None,
             None,
             None,
@@ -671,7 +679,7 @@ mod tests {
     fn test_wipe_node() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core-2-other/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         match PanguSDK::wipe_node("pangu-olsen", "nodebp-node-1-validator") {
@@ -688,7 +696,7 @@ mod tests {
     fn test_restart_node() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         match PanguSDK::restart_node("pangu-olsen", "nodebp-node-1-validator") {
@@ -705,7 +713,7 @@ mod tests {
     fn test_stop_node() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         match PanguSDK::stop_node("pangu-olsen", "nodebp-node-1-validator") {
@@ -722,7 +730,7 @@ mod tests {
     fn test_start_node() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         match PanguSDK::start_node("pangu-olsen", "nodebp-node-1-validator") {
@@ -739,7 +747,7 @@ mod tests {
     fn test_restart_nodes_in_testnet() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         match PanguSDK::restart_nodes_in_testnet("pangu-olsen") {
@@ -756,7 +764,7 @@ mod tests {
     fn test_healthcheck_testnet() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         match PanguSDK::healthcheck_testnet("pangu-olsen", "ledger_info") {
@@ -764,7 +772,7 @@ mod tests {
                 println!("{:#?}", summary);
             },
             Err(err) => {
-                eprintln!("Failed to get testnets: {}", err);
+                eprintln!("Failed to healthcheck testnets: {}", err);
             },
         }
     }
@@ -773,7 +781,7 @@ mod tests {
     fn test_get_testnets() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         match PanguSDK::get_testnets() {
@@ -790,7 +798,7 @@ mod tests {
     fn test_get_testnet() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         match PanguSDK::get_testnet("pangu-olsen") {
@@ -807,7 +815,7 @@ mod tests {
     fn test_delete_testnet() {
         env::set_var(
             "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
         );
 
         match PanguSDK::delete_testnet("pangu-olsen", true) {

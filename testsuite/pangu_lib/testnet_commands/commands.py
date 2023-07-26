@@ -25,7 +25,8 @@ import pangu_lib.util as util
 @click.option("--layout-path", help="Pass the path to the layout file (yaml).")
 @click.option(
     "--framework-path",
-    default=f"{util.TEMPLATE_DIRECTORY}/framework.mrb",
+    # default=f"{util.TEMPLATE_DIRECTORY}/framework.mrb",
+    required=True,
     help="Pass in the path to the compiled move framework (head.mrb, or framework.mrb) file. Defaults to the default framework in the pangu_lib.",
 )
 @click.option(
