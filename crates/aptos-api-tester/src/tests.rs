@@ -161,7 +161,7 @@ pub async fn test_cointransfer(
 ///   - collection data exists
 ///   - token data exists
 ///   - token balance reflects transferred amount
-pub async fn test_mintnft(
+pub async fn test_nfttransfer(
     client: &Client,
     token_client: &TokenClient<'_>,
     account: &mut LocalAccount,
@@ -440,7 +440,10 @@ async fn get_message(client: &Client, address: AccountAddress) -> Option<String>
 ///   - module data exists
 ///   - can interact with module
 ///   - resources reflect interaction
-pub async fn test_module(client: &Client, account: &mut LocalAccount) -> Result<(), TestFailure> {
+pub async fn test_publishmodule(
+    client: &Client,
+    account: &mut LocalAccount,
+) -> Result<(), TestFailure> {
     // publish module
     let blob = publish_module(client, account).await?;
 
