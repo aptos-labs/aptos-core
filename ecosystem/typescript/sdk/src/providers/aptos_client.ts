@@ -231,23 +231,7 @@ export class AptosClient {
       overrides: { ...this.config },
     });
     return data;
-  }
-
-  /**
-   * Queries a 0x1::object::Object resource associated with given address by resource type
-   * @param address Hex-encoded 32 byte Aptos account address
-   * @param resourceType String representation of an on-chain Move struct type
-   * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
-   * @returns 0x1::object::Object resource
-   */
-    @parseApiError
-    async getObjectResource(
-      objectAddress: MaybeHexString,
-      resourceType: Gen.MoveStructTag,
-      query?: { ledgerVersion?: AnyNumber },
-    ): Promise<Gen.MoveResource> {
-      return await this.getAccountResource(objectAddress, resourceType, query);
-    }
+  } 
 
   /** Generates a signed transaction that can be submitted to the chain for execution. */
   static generateBCSTransaction(accountFrom: AptosAccount, rawTxn: TxnBuilderTypes.RawTransaction): Uint8Array {
