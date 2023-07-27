@@ -46,15 +46,9 @@ impl P256PrivateKey {
     pub const LENGTH: usize = P256_PRIVATE_KEY_LENGTH;
 
     /// Serialize a P256PrivateKey.
-    pub fn to_bytes(&self) -> std::result::Result<[u8; P256_PRIVATE_KEY_LENGTH], CryptoMaterialError> {
-        let bytes = match self.0.private_key_to_der() {
-            Ok(bytes) => Ok(bytes),
-            Err(_) => Err(CryptoMaterialError::SerializationError),
-        };
-        match bytes?.try_into() {
-           Ok(res) => Ok(res),
-           Err(_) => Err(CryptoMaterialError::SerializationError),
-        }
+    pub fn to_bytes(&self) -> [u8; P256_PRIVATE_KEY_LENGTH] {
+        let bytes = self.0.private_key_to_der().expect("openssl ffi failed P256 private key serialization"); 
+        bytes.try_into().expect("openssl ffi serialized P256 private key incorrectly")
     }
 
     /// Deserialize an P256PrivateKey without any validation checks apart from expected key size.
@@ -71,27 +65,15 @@ impl P256PrivateKey {
     /// methods of the SigningKey implementation. This should remain private.
     fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
         let secret_key = &self.0;
-        // TODO: Hard panics okay?
-        P256Signature(EcdsaSig::sign(message, &secret_key).expect("signing failed"))
-        /*match EcdsaSig::sign(message, &secret_key) {
-            Ok(sig) => Ok(P256Signature(sig)),
-            Err(_) => Err(CryptoMaterialError::ValidationError),
-        }*/
+        P256Signature(EcdsaSig::sign(message, &secret_key).expect("openssl ffi failed to sign with P256 key"))
     }
 }
 
 impl P256PublicKey {
     /// Serialize a P256PublicKey.
-    // TODO: Better error handling here. Also should we compress?
-    pub fn to_bytes(&self) -> Result<[u8; P256_PUBLIC_KEY_LENGTH], CryptoMaterialError> {
-        let bytes = match self.0.public_key_to_der() {
-            Ok(bytes) => Ok(bytes),
-            Err(_) => Err(CryptoMaterialError::SerializationError),
-        };
-        match bytes?.try_into() {
-           Ok(res) => Ok(res),
-           Err(_) => Err(CryptoMaterialError::SerializationError),
-        }
+    pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
+        let bytes = self.0.public_key_to_der().expect("openssl ffi failed to serialize P256 public key"); 
+        bytes.try_into().expect("openssl serialized P256 public key incorrectly") 
     }
 
     /// Deserialize a P256PublicKey without any validation checks apart from expected key size
@@ -127,7 +109,7 @@ impl SigningKey for P256PrivateKey {
         Ok(P256PrivateKey::sign_arbitrary_message(
             self,
             signing_message(message)?.as_ref(),
-        )?)
+        ))
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -204,11 +186,9 @@ impl Genesis for P256PrivateKey {
 impl From<&P256PrivateKey> for P256PublicKey {
     fn from(private_key: &P256PrivateKey) -> Self {
         let nid = Nid::X9_62_PRIME256V1; // NIST P-256 curve
-        // TODO: Fix error handling
-        let group = EcGroup::from_curve_name(nid).unwrap();
+        let group = EcGroup::from_curve_name(nid).expect("openssl ffi failed getting the P256 curve");
         let secret = &private_key.0;
-        // TODO: Fix error handling
-        let public = EcKey::from_public_key(&group, secret.public_key()).unwrap();
+        let public = EcKey::from_public_key(&group, secret.public_key()).expect("openssl ffi failed deriving a P256 public key from its secret key");
         P256PublicKey(public)
     }
 }
@@ -243,8 +223,7 @@ impl VerifyingKey for P256PublicKey {
 
 impl fmt::Display for P256PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO: Error handling
-        write!(f, "{}", hex::encode(self.0.public_key_to_der().unwrap()))
+        write!(f, "{}", hex::encode(self.0.public_key_to_der().expect("openssl ffi failed serializing P256 public key")))
     }
 }
 
@@ -274,8 +253,7 @@ impl Length for P256PublicKey {
 
 impl ValidCryptoMaterial for P256PublicKey {
     fn to_bytes(&self) -> Vec<u8> {
-        // TODO: Error handling
-        self.0.public_key_to_der().unwrap()
+        self.0.public_key_to_der().expect("openssl ffi failed serializing P256 public key")
     }
 }
 
