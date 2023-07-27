@@ -3,22 +3,13 @@
 
 use std::{collections::HashMap, sync::Arc, thread, time::Duration};
 use aptos_consensus_types::common::Author;
-use aptos_crypto::bls12381::Signature;
-use aptos_logger::info;
-use aptos_types::{transaction::SignedTransaction, validator_verifier::ValidatorVerifier, epoch_state::EpochState};
-use crate::dkg::types::{DKGNodeMetadata, DKGNode};
-use serde::Serialize;
-use tokio::{sync::{oneshot, mpsc}, time::Interval};
-use crate::{
-    quorum_store::batch_generator::BatchGeneratorCommand, block_storage::BlockReader,
-};
-use aptos_dkg::pvss::scrape::Transcript;
-use futures::{
-    future::{AbortHandle, Abortable},
-    FutureExt,
-};
+use aptos_types::epoch_state::EpochState;
+use crate::dkg::types::DKGNode;
+use tokio::sync::mpsc;
+use futures::future::{AbortHandle, Abortable};
+use aptos_reliable_broadcast::ReliableBroadcast;
 
-use super::{dkg_store::DKGStore, types::{DKGAggNode, DKGNodeAckState, DKGAggNodeAckState}, dkg_reliable_broadcast::ReliableBroadcast};
+use super::types::{DKGAggNode, DKGNodeAckState, DKGAggNodeAckState, DKGMessage};
 
 // the transcript size is 3.25MB
 const TRANSCRIPT_SIZE: usize = 3_250_000;
@@ -44,12 +35,12 @@ pub struct DKGManager {
     // dkg todo: send the aggregated dkg node to proposal generator
     // Channel to send the aggregated dkg node to proposal generator
     proposal_generator_tx: mpsc::Sender<DKGManagerMessage>,
-    reliable_broadcast: Arc<ReliableBroadcast>,
+    reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>,
     rb_abort_handle: Option<AbortHandle>,
 }
 
 impl DKGManager {
-    pub fn new(author: Author, epoch_state: Arc<EpochState>, proposal_generator_tx: mpsc::Sender<DKGManagerMessage>, reliable_broadcast: Arc<ReliableBroadcast>) -> Self {
+    pub fn new(author: Author, epoch_state: Arc<EpochState>, proposal_generator_tx: mpsc::Sender<DKGManagerMessage>, reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>) -> Self {
         Self {
             author,
             epoch_state,
@@ -59,7 +50,7 @@ impl DKGManager {
         }
     }
 
-    pub fn start_dkg(&mut self, stake_dis: StakeDis) {
+    pub fn start_dkg(&mut self, _stake_dis: StakeDis) {
         // dkg todo: compute pvss transcript and create a DKG node
         thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
         // self.broadcast_node(node);
@@ -70,7 +61,6 @@ impl DKGManager {
             // do not rebroadcast if there is an ongoing broadcast
             return;
         }
-        let rb = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let ack_set = DKGNodeAckState::new(self.epoch_state.verifier.len());
         let task = self
@@ -81,7 +71,6 @@ impl DKGManager {
     }
 
     pub(crate) fn broadcast_agg_node(&mut self, agg_node: DKGAggNode) {
-        let rb = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let ack_set = DKGAggNodeAckState::new(self.epoch_state.verifier.len());
         let task = self

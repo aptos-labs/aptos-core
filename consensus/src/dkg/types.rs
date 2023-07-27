@@ -5,27 +5,16 @@ use crate::{
     network::TConsensusMsg,
     network_interface::ConsensusMsg,
 };
-use anyhow::{bail, ensure};
+use anyhow::bail;
 use aptos_consensus_types::common::Author;
-use aptos_crypto::{
-    bls12381,
-    bls12381::Signature,
-    hash::{CryptoHash, CryptoHasher},
-    CryptoMaterialError, HashValue,
-};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
-use aptos_types::{
-    aggregate_signature::{AggregateSignature, PartialSignatures},
-    epoch_state::EpochState,
-    validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier,
-};
+use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, ops::Deref, sync::Arc};
+use std::collections::HashSet;
 use aptos_dkg::pvss::scrape::Transcript;
 
-use super::dkg_reliable_broadcast::DKGBroadcastStatus;
+use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 
 pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
     // dkg todo: pass in public keys for verification
@@ -123,7 +112,7 @@ impl DKGNode {
 
 impl TDKGMessage for DKGNode {
     // dkg todo: verification requires public keys
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         // dkg todo: verify pvss transcript
 
         Ok(())
@@ -155,7 +144,12 @@ impl DKGNodeAckState {
     }
 }
 
-impl DKGBroadcastStatus for DKGNodeAckState {
+impl<M> BroadcastStatus<M> for DKGNodeAckState
+where
+    M: RBMessage,
+    DKGNodeAck: TryFrom<M> + Into<M>,
+    DKGNode: TryFrom<M> + Into<M>,
+{
     type Ack = DKGNodeAck;
     type Aggregated = ();
     type Message = DKGNode;
@@ -248,7 +242,7 @@ impl DKGAggNode {
 
 impl TDKGMessage for DKGAggNode {
     // dkg todo: verification requires public keys
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         // TODO: move this check to rpc process logic to delay it as much as possible for performance
 
         // dkg todo: verify aggregated pvss transcript
@@ -282,7 +276,12 @@ impl DKGAggNodeAckState {
     }
 }
 
-impl DKGBroadcastStatus for DKGAggNodeAckState {
+impl<M> BroadcastStatus<M> for DKGAggNodeAckState
+where
+    M: RBMessage,
+    DKGAggNodeAck: TryFrom<M> + Into<M>,
+    DKGAggNode: TryFrom<M> + Into<M>,
+{
     type Ack = DKGAggNodeAck;
     type Aggregated = ();
     type Message = DKGAggNode;
@@ -341,6 +340,8 @@ impl DKGMessage {
         }
     }
 }
+
+impl RBMessage for DKGMessage {}
 
 impl TConsensusMsg for DKGMessage {
     fn epoch(&self) -> u64 {

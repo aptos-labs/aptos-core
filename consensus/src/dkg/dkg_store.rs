@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 use aptos_consensus_types::common::Author;
-use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
-use aptos_types::validator_verifier::{self, ValidatorVerifier};
+use aptos_types::validator_verifier::ValidatorVerifier;
 use dashmap::DashMap;
 use tokio::sync::OnceCell;
 
@@ -36,7 +35,8 @@ impl DKGStore {
         if node.verify(validator_verifier).is_ok() {
             self.nodes.insert(*node.author(), node);
             let authors: Vec<Author> = self.nodes.iter().map(|entry| entry.key().clone()).collect();
-            if validator_verifier.check_voting_power(authors.iter()).is_ok() {
+            // f+1 transcripts are sufficient to reconstruct the aggregated node
+            if validator_verifier.check_voting_power(authors.iter(), false).is_ok() {
                 // dkg todo: aggregate the transcripts and produced aggregated node
                 let node = self.nodes.iter().next().unwrap().clone();
                 let agg_node = DKGAggNode::new(node.epoch(), *node.author(), node.transcript().clone());
