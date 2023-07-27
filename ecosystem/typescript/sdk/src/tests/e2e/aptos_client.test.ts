@@ -54,20 +54,19 @@ test("gets object", async () => {
   const faucetClient = getFaucetClient();
   await faucetClient.fundAccount(alice.address(), 100000000);
 
-  const client = new AptosClient(NODE_URL);
   const provider = new Provider({
     fullnodeUrl: NODE_URL,
     indexerUrl: NODE_URL,
   });
   const aptosToken = new AptosToken(provider)
 
-  const txn = await client.waitForTransactionWithResult(
+  const txn = await provider.waitForTransactionWithResult(
     await aptosToken.createCollection(alice, "Alice's simple collection", "AliceCollection", "https://aptos.dev"),
     { checkSuccess: true },
   );
   const objectAddress = ((txn as Gen.UserTransaction).changes[0] as WriteSetChange_WriteResource).address // should be the new object address
   
-  const object = await client.getAccountResource(objectAddress, "0x4::aptos_token::AptosCollection");
+  const object = await provider.getAccountResource(objectAddress, "0x4::aptos_token::AptosCollection");
 
   expect(object.type).toBeDefined();
   expect(object.data).toBeDefined();
