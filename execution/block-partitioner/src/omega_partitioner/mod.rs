@@ -161,7 +161,7 @@ impl OmegaPartitioner {
         }).collect();
         let duration = timer.stop_and_record();
         println!("add_edges__return_obj={duration}");
-        self.thread_pool.install(move||{
+        self.thread_pool.spawn(move||{
             drop(sub_block_matrix);
             drop(start_index_matrix);
         });
@@ -240,7 +240,7 @@ impl OmegaPartitioner {
         let ret = (extract_and_sort(finally_accepted), extract_and_sort(discarded));
         let duration = timer.stop_and_record();
         println!("round_{}__return_obj={}", round_id, duration);
-        self.thread_pool.install(move||{
+        self.thread_pool.spawn(move||{
             drop(potentially_accepted);
             drop(min_discarded_seq_nums_by_sender_id);
 
@@ -342,7 +342,7 @@ impl BlockPartitioner for OmegaPartitioner {
         let ret = self.add_edges(&txns, &txn_id_matrix, &helpers_by_key_id);
         let duration = timer.stop_and_record();
         println!("add_edges={duration:?}");
-        self.thread_pool.install(move||{
+        self.thread_pool.spawn(move||{
             drop(sender_ids_by_sender);
             drop(key_ids_by_key);
             drop(helpers_by_key_id);
