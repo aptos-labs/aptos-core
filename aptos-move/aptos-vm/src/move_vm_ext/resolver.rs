@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::resolver::AggregatorResolver;
+use aptos_block_executor::view::GenID;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_table_natives::TableResolver;
@@ -20,6 +21,7 @@ pub trait MoveResolverExt:
     + StateStorageUsageResolver
     + ConfigStorage
     + StateView
+    + GenID
 {
     fn get_resource_group_data(
         &self,

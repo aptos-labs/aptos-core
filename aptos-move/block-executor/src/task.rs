@@ -12,6 +12,8 @@ use aptos_types::{
 };
 use std::{fmt::Debug, hash::Hash};
 
+use crate::view::GenID;
+
 /// The execution result of a transaction
 #[derive(Debug)]
 pub enum ExecutionStatus<T, E> {
@@ -60,7 +62,7 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &(impl TStateView<Key = <Self::Txn as Transaction>::Key> + GenID),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,

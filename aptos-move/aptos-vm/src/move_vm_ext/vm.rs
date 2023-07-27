@@ -102,6 +102,7 @@ impl MoveVmExt {
             SessionId::Epilogue { .. } => 5,
             SessionId::Void => 6,
         };
+        println!("New id is {}", remote.generate_id());
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());

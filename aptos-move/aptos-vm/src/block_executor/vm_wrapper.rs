@@ -7,7 +7,7 @@ use crate::{
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
 };
-use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
+use aptos_block_executor::{task::{ExecutionStatus, ExecutorTask}, view::GenID};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
@@ -23,7 +23,7 @@ pub(crate) struct AptosExecutorTask<'a, S> {
     base_view: &'a S,
 }
 
-impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
+impl<'a, S: 'a + StateView + GenID + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Argument = &'a S;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
@@ -56,7 +56,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &impl StateView,
+        view: &(impl StateView + GenID),
         txn: &PreprocessedTransaction,
         txn_idx: TxnIndex,
         materialize_deltas: bool,

@@ -11,6 +11,7 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     transaction_validation::APTOS_TRANSACTION_VALIDATION,
 };
+use aptos_block_executor::view::GenID;
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas_algebra::{Gas, GasExpression};
 use aptos_gas_schedule::{
@@ -80,7 +81,7 @@ pub fn gas_config(storage: &impl MoveResolverExt) -> (Result<AptosGasParameters,
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new(state: &impl StateView) -> Self {
+    pub fn new(state: &(impl StateView + GenID)) -> Self {
         let storage = StorageAdapter::new(state);
 
         // Get the gas parameters

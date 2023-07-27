@@ -21,7 +21,7 @@ use aptos_block_executor::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
-    txn_commit_hook::TransactionCommitHook,
+    txn_commit_hook::TransactionCommitHook, view::GenID,
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
@@ -151,7 +151,7 @@ impl BlockAptosVM {
     }
 
     pub fn execute_block<
-        S: StateView + Sync,
+        S: StateView + GenID + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
         executor_thread_pool: Arc<ThreadPool>,

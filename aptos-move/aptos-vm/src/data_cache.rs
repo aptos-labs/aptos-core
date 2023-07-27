@@ -12,6 +12,7 @@ use anyhow::{bail, Error};
 use aptos_aggregator::{
     aggregator_extension::AggregatorID, delta_change_set::deserialize, resolver::AggregatorResolver,
 };
+use aptos_block_executor::view::GenID;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_table_natives::{TableHandle, TableResolver};
@@ -51,7 +52,7 @@ pub struct StorageAdapter<'a, S> {
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
-impl<'a, S: StateView> StorageAdapter<'a, S> {
+impl<'a, S: StateView + GenID> StorageAdapter<'a, S> {
     pub fn new_with_cached_config(
         state_store: &'a S,
         gas_feature_version: u64,
@@ -137,7 +138,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
+impl<'a, S: StateView + GenID> MoveResolverExt for StorageAdapter<'a, S> {
     fn get_resource_group_data(
         &self,
         address: &AccountAddress,
@@ -165,7 +166,7 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView + GenID> ResourceResolver for StorageAdapter<'a, S> {
     fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
@@ -176,7 +177,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView + GenID> ModuleResolver for StorageAdapter<'a, S> {
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let module_bytes = match self.get_module(module_id) {
             Ok(Some(bytes)) => bytes,
@@ -199,7 +200,7 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView + GenID> TableResolver for StorageAdapter<'a, S> {
     fn resolve_table_entry(
         &self,
         handle: &TableHandle,
@@ -209,7 +210,7 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView + GenID> AggregatorResolver for StorageAdapter<'a, S> {
     fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<u128, Error> {
         match id {
             AggregatorID::Legacy { handle, key } => {
@@ -229,13 +230,19 @@ impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ConfigStorage for StorageAdapter<'a, S> {
+impl<'a, S:StateView + GenID> GenID for StorageAdapter<'a, S> {
+    fn generate_id(&mut self) -> u32 {
+        self.state_store.generate_id()
+    }
+}
+
+impl<'a, S: StateView + GenID> ConfigStorage for StorageAdapter<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.get(access_path).ok()?
     }
 }
 
-impl<'a, S: StateView> StateStorageUsageResolver for StorageAdapter<'a, S> {
+impl<'a, S: StateView + GenID> StateStorageUsageResolver for StorageAdapter<'a, S> {
     fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
         self.get_usage()
     }
@@ -253,7 +260,7 @@ pub trait AsMoveResolver<S> {
     fn as_move_resolver(&self) -> StorageAdapter<S>;
 }
 
-impl<S: StateView> AsMoveResolver<S> for S {
+impl<S: StateView + GenID> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         StorageAdapter::new(self)
     }

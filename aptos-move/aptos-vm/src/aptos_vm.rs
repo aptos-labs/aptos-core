@@ -19,7 +19,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{txn_commit_hook::NoOpTransactionCommitHook, view::GenID};
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::Gas;
@@ -120,11 +120,11 @@ macro_rules! unwrap_or_discard {
 }
 
 impl AptosVM {
-    pub fn new(state: &impl StateView) -> Self {
+    pub fn new(state: &(impl StateView + GenID)) -> Self {
         Self(AptosVMImpl::new(state))
     }
 
-    pub fn new_for_validation(state: &impl StateView) -> Self {
+    pub fn new_for_validation(state: &(impl StateView + GenID)) -> Self {
         info!(
             AdapterLogSchema::new(state.id(), 0),
             "Adapter created for Validation"
@@ -254,7 +254,7 @@ impl AptosVM {
         .1
     }
 
-    pub fn as_move_resolver<'a, S: StateView>(&self, state_view: &'a S) -> StorageAdapter<'a, S> {
+    pub fn as_move_resolver<'a, S: StateView + GenID>(&self, state_view: &'a S) -> StorageAdapter<'a, S> {
         StorageAdapter::new_with_cached_config(
             state_view,
             self.0.get_gas_feature_version(),
@@ -348,9 +348,9 @@ impl AptosVM {
         }
     }
 
-    fn success_transaction_cleanup(
+    fn success_transaction_cleanup<S: StateView + GenID>(
         &self,
-        mut respawned_session: RespawnedSession,
+        mut respawned_session: RespawnedSession<S>,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -494,7 +494,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
         txn_data: &TransactionMetadata,
-    ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
+    ) -> Result<RespawnedSession<'r, 'l, impl MoveResolverExt>, VMStatus> {
         let txn_idx = session.txn_idx;
         let change_set = session.finish(&mut (), change_set_configs)?;
 
@@ -674,7 +674,7 @@ impl AptosVM {
         Ok(())
     }
 
-    fn success_multisig_payload_cleanup<'r, 'l>(
+    fn success_multisig_payload_cleanup<'r, 'l, S: StateView + GenID>(
         &'l self,
         resolver: &'r impl MoveResolverExt,
         session: SessionExt,
@@ -682,7 +682,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         cleanup_args: Vec<Vec<u8>>,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
+    ) -> Result<RespawnedSession<'r, 'l, S>, VMStatus> {
         // Charge gas for writeset before we do cleanup. This ensures we don't charge gas for
         // cleanup writeset changes, which is consistent with outer-level success cleanup
         // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
@@ -705,14 +705,14 @@ impl AptosVM {
         Ok(respawned_session)
     }
 
-    fn failure_multisig_payload_cleanup<'r, 'l>(
+    fn failure_multisig_payload_cleanup<'r, 'l, S: StateView + GenID>(
         &'l self,
         txn_idx: TxnIndex,
         resolver: &'r impl MoveResolverExt,
         execution_error: VMStatus,
         txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
-    ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
+    ) -> Result<RespawnedSession<'r, 'l, S>, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
         let mut respawned_session = RespawnedSession::spawn(
@@ -1168,7 +1168,7 @@ impl AptosVM {
 
     pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
         txn_idx: TxnIndex,
-        state_view: &impl StateView,
+        state_view: &(impl StateView + GenID),
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
@@ -1372,7 +1372,7 @@ impl AptosVM {
     /// Executes a SignedTransaction without performing signature verification.
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
-        state_view: &impl StateView,
+        state_view: &(impl StateView + GenID),
     ) -> (VMStatus, TransactionOutput) {
         let vm = AptosVM::new(state_view);
         let simulation_vm = AptosSimulationVM(vm);
@@ -1392,7 +1392,7 @@ impl AptosVM {
     }
 
     pub fn execute_view_function(
-        state_view: &impl StateView,
+        state_view: &(impl StateView + GenID),
         module_id: ModuleId,
         func_name: Identifier,
         type_args: Vec<TypeTag>,
@@ -1496,7 +1496,7 @@ impl VMExecutor for AptosVM {
     /// transaction output.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &(impl StateView + Sync),
+        state_view: &(impl StateView + GenID + Sync),
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
@@ -1575,7 +1575,7 @@ impl VMValidator for AptosVM {
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,
-        state_view: &impl StateView,
+        state_view: &(impl StateView + GenID),
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);

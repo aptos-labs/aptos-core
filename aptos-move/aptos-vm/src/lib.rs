@@ -124,6 +124,7 @@ mod verifier;
 
 pub use crate::aptos_vm::AptosVM;
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
+use aptos_block_executor::view::GenID;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::SubBlocksForShard,
@@ -142,7 +143,7 @@ pub trait VMValidator {
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,
-        state_view: &impl StateView,
+        state_view: &(impl StateView + GenID),
     ) -> VMValidatorResult;
 }
 
@@ -156,7 +157,7 @@ pub trait VMExecutor: Send + Sync {
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &(impl StateView + Sync),
+        state_view: &(impl StateView + GenID + Sync),
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 
