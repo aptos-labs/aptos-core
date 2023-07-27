@@ -4,6 +4,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.14.0 (2023-07-20)
+
 - Introduce and use `@aptos-labs/aptos-client` package to manage and handle the client used in the SDK
 
 ## 1.13.3 (2023-07-19)

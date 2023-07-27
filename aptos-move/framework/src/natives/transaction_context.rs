@@ -1,17 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult};
-use aptos_types::{
-    on_chain_config::{Features, TimedFeatures},
-    transaction::authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
+use aptos_types::transaction::authenticator::{AuthenticationKey, AuthenticationKeyPreimage};
 use better_any::{Tid, TidAble};
-use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
+use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, fmt::Debug, sync::Arc};
+use std::collections::VecDeque;
 
 /// The native transaction context extension. This needs to be attached to the
 /// NativeContextExtensions value which is passed into session functions, so its accessible from
@@ -48,19 +48,12 @@ impl NativeTransactionContext {
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Clone, Debug)]
-pub struct GetTxnHashGasParameters {
-    pub base: InternalGas,
-}
-
 fn native_get_txn_hash(
-    gas_params: &GetTxnHashGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    context.charge(gas_params.base)?;
-
+    context.charge(TRANSACTION_CONTEXT_GET_TXN_HASH_BASE)?;
     let transaction_context = context.extensions().get::<NativeTransactionContext>();
 
     Ok(smallvec![Value::vector_u8(
@@ -74,20 +67,14 @@ fn native_get_txn_hash(
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Clone, Debug)]
-pub struct GenerateUniqueAddressGasParameters {
-    pub base: InternalGas,
-}
-
 fn native_generate_unique_address(
-    gas_params: &GenerateUniqueAddressGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    context.charge(gas_params.base)?;
+    context.charge(TRANSACTION_CONTEXT_GENERATE_UNIQUE_ADDRESS_BASE)?;
 
-    let mut transaction_context = context
+    let transaction_context = context
         .extensions_mut()
         .get_mut::<NativeTransactionContext>();
     transaction_context.auid_counter += 1;
@@ -110,18 +97,12 @@ fn native_generate_unique_address(
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Clone, Debug)]
-pub struct GetScriptHashGasParameters {
-    pub base: InternalGas,
-}
-
 fn native_get_script_hash(
-    gas_params: &GetScriptHashGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    context.charge(gas_params.base)?;
+    context.charge(TRANSACTION_CONTEXT_GET_SCRIPT_HASH_BASE)?;
 
     let transaction_context = context.extensions().get::<NativeTransactionContext>();
 
@@ -134,47 +115,14 @@ fn native_get_script_hash(
  * module
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub get_txn_hash: GetTxnHashGasParameters,
-    pub get_script_hash: GetScriptHashGasParameters,
-    pub generate_unique_address: GenerateUniqueAddressGasParameters,
-}
-
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        (
-            "get_script_hash",
-            make_safe_native(
-                gas_params.get_script_hash,
-                timed_features.clone(),
-                features.clone(),
-                native_get_script_hash,
-            ),
-        ),
-        (
-            "generate_unique_address",
-            make_safe_native(
-                gas_params.generate_unique_address,
-                timed_features.clone(),
-                features.clone(),
-                native_generate_unique_address,
-            ),
-        ),
-        (
-            "get_txn_hash",
-            make_safe_native(
-                gas_params.get_txn_hash,
-                timed_features,
-                features,
-                native_get_txn_hash,
-            ),
-        ),
+        ("get_script_hash", native_get_script_hash as RawSafeNative),
+        ("generate_unique_address", native_generate_unique_address),
+        ("get_txn_hash", native_get_txn_hash),
     ];
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

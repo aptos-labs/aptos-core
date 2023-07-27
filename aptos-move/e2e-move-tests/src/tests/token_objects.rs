@@ -37,7 +37,7 @@ fn test_basic_token() {
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
-        .insert("token_objects".to_string(), addr);
+        .insert("hero".to_string(), addr);
 
     let result = h.publish_package_with_options(
         &account,
