@@ -15,6 +15,7 @@ use walkdir::WalkDir;
 pub struct GasMeters {
     pub regular_meter: Vec<u128>,
     pub abstract_meter: Vec<Vec<DynamicExpression>>,
+    pub equation_names: Vec<String>,
 }
 
 /// Compile every Move sample and run each sample with two different measuring methods.
@@ -32,6 +33,7 @@ pub fn compile_and_run_samples() -> GasMeters {
     let mut gas_meter = GasMeters {
         regular_meter: Vec::new(),
         abstract_meter: Vec::new(),
+        equation_names: Vec::new(),
     };
 
     // Go over all Move projects
@@ -94,6 +96,7 @@ pub fn compile_and_run_samples_ir() -> GasMeters {
     let mut gas_meter = GasMeters {
         regular_meter: Vec::new(),
         abstract_meter: Vec::new(),
+        equation_names: Vec::new(),
     };
 
     // Walk through all subdirectories and files in the root directory
@@ -143,6 +146,11 @@ pub fn compile_and_run_samples_ir() -> GasMeters {
                     executor.add_module(&module_id, module_blob);
 
                     for func_identifier in func_identifiers {
+                        gas_meter.equation_names.push(String::from(format!(
+                            "{}::{}",
+                            &identifier, func_identifier
+                        )));
+
                         let elapsed =
                             executor.exec_module(&module_id, &func_identifier, vec![], vec![]);
                         gas_meter.regular_meter.push(elapsed);

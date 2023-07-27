@@ -5,7 +5,7 @@ use crate::math::{
     add_gas_formula_to_coefficient_matrix, add_running_time_to_constant_matrix,
     compute_least_square_solutions, find_free_variables, find_outliers,
 };
-use crate::math_interface::{convert_to_generic_map, generic_map};
+use crate::math_interface::generic_map;
 use nalgebra::DMatrix;
 use std::collections::BTreeMap;
 
@@ -50,19 +50,20 @@ pub fn solve(
     input: Vec<BTreeMap<String, u64>>,
     coeff_matrix: &mut DMatrix<f64>,
     const_matrix: &mut DMatrix<f64>,
+    equation_names: Vec<String>,
 ) {
     let lss = compute_least_square_solutions(coeff_matrix, const_matrix);
     if lss.is_ok() {
-        let x_hat = lss.unwrap();
+        let mut x_hat = lss.unwrap();
 
-        let map = generic_map(input);
+        let map = generic_map(input.clone());
         let keys: Vec<String> = map.keys().map(|key| key.to_string()).collect();
 
         let nrows = x_hat.nrows();
         let ncols = x_hat.ncols();
         let mut i = 0;
         let mut j = 0;
-        println!("x_hat solutions:\n");
+        println!("where the gas parameter values are:\n");
         while i < nrows {
             while j < ncols {
                 println!("{} {}", x_hat[(i, j)], keys[i]);
@@ -73,7 +74,7 @@ pub fn solve(
         }
 
         // TODO: error handling with division zero that bubbles up
-        // report_outliers(input, &mut x_hat, coeff_matrix, const_matrix);
+        report_outliers(&mut x_hat, coeff_matrix, const_matrix, equation_names);
     } else {
         report_undetermined_gas_params(input, coeff_matrix, const_matrix);
     }
@@ -88,20 +89,22 @@ pub fn solve(
 /// * `coeff_matrix` - Coefficient Matrix
 /// * `const_matrix` - Constant Matrix
 fn report_outliers(
-    input: Vec<BTreeMap<String, u64>>,
     x_hat: &mut DMatrix<f64>,
     coeff_matrix: &mut DMatrix<f64>,
     const_matrix: &mut DMatrix<f64>,
+    equation_names: Vec<String>,
 ) {
     let outliers = find_outliers(x_hat, coeff_matrix, const_matrix).expect("should unwrap");
 
-    let equations = convert_to_generic_map(input);
-
-    println!("outliers are:\n");
-    for (x, y) in outliers {
-        let equation = &equations[x];
-        let keys: Vec<String> = equation.keys().map(|key| key.to_string()).collect();
-        println!("- gas parameter: {} in equation {}\n", keys[y], x);
+    println!("\noutliers are (times are in microseconds):\n");
+    for (idx, cr, ar, err) in outliers {
+        println!(
+            "- {} | Computed {}ms vs. Actual {}ms | Error {}\n",
+            equation_names[idx],
+            cr,
+            format!("{:.3}", ar),
+            format!("{:.3}", err)
+        );
     }
 }
 

@@ -15,14 +15,17 @@ use std::collections::BTreeMap;
 
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
+    println!("Calibrating Gas Parameters ...\n");
 
     let samples = compile_and_run_samples();
     let samples_ir = compile_and_run_samples_ir();
-    // println!("\nrunning times (RHS): {:?}", samples_ir.regular_meter);
 
-    println!("\n\nabstract gas formulae (LHS): ");
+    let mut equation_names: Vec<String> = Vec::new();
+    equation_names.extend(samples.equation_names);
+    equation_names.extend(samples_ir.equation_names);
+
     let mut system_of_equations: Vec<Vec<DynamicExpression>> = Vec::new();
-    for formula in samples_ir.abstract_meter {
+    for formula in samples.abstract_meter {
         let mut terms: Vec<DynamicExpression> = Vec::new();
         for term in formula {
             let normal = normalize(term);
@@ -30,7 +33,7 @@ fn main() {
         }
         system_of_equations.push(terms);
     }
-    for formula in samples.abstract_meter {
+    for formula in samples_ir.abstract_meter {
         let mut terms: Vec<DynamicExpression> = Vec::new();
         for term in formula {
             let normal = normalize(term);
@@ -58,5 +61,10 @@ fn main() {
     let mut const_matrix = build_constant_matrix(samples_ir.regular_meter, nrows, vec_col);
 
     // Solve the system of linear equations
-    solve(mappings, &mut coeff_matrix, &mut const_matrix);
+    solve(
+        mappings,
+        &mut coeff_matrix,
+        &mut const_matrix,
+        equation_names,
+    );
 }
