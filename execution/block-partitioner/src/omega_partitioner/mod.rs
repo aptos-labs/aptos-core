@@ -42,6 +42,7 @@ pub struct OmegaPartitioner {
 impl OmegaPartitioner {
     pub fn new() -> Self {
         let num_threads = std::env::var("OMEGA_PARTITIOENR__NUM_THREADS").ok().map(|s|s.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
+        println!("num_threads={num_threads}");
         Self {
             thread_pool: ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap()
         }
@@ -168,7 +169,7 @@ impl OmegaPartitioner {
         let min_discarded_seq_nums_by_sender_id: DashMap<usize, AtomicUsize> = DashMap::new();
         let shard_id_and_txn_id_vec_pairs: Vec<(usize, Vec<usize>)> = txn_id_vecs.into_iter().enumerate().collect();
         let duration = timer.stop_and_record();
-        println!("found_{}_init={}", round_id, duration);
+        println!("round_{}_init={}", round_id, duration);
         let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_key").as_str()]).start_timer();
         self.thread_pool.install(|| {
             shard_id_and_txn_id_vec_pairs.into_par_iter().for_each(|(my_shard_id, txn_ids)| {
@@ -283,9 +284,10 @@ impl BlockPartitioner for OmegaPartitioner {
             let (accepted, discarded) = self.discarding_round(round_id, &txns, remaining_txns, &helpers_by_key_id, &start_txn_ids_by_shard_id);
             txn_id_matrix.push(accepted);
             remaining_txns = discarded;
+            let num_remaining_txns: usize = remaining_txns.iter().map(|ts|ts.len()).sum();
             let duration = timer.stop_and_record();
             println!("round_{round_id}={duration:?}");
-            if remaining_txns.len() < avoid_pct * num_txns / 100 {
+            if num_remaining_txns < avoid_pct * num_txns / 100 {
                 break;
             }
         }
