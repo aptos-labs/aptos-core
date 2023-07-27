@@ -15,7 +15,7 @@ use move_core_types::vm_status::VMStatus;
 ///
 /// **WARNING**: This type should only be used inside the VM. For storage backends,
 /// use `TransactionOutput`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMOutput {
     change_set: VMChangeSet,
     fee_statement: FeeStatement,

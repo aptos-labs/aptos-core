@@ -21,7 +21,7 @@ use std::collections::{
 ///
 /// **WARNING**: Just like VMOutput, this type should only be used inside the
 /// VM. For storage backends, use `ChangeSet`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
     resource_write_set: BTreeMap<StateKey, WriteOp>,
     module_write_set: BTreeMap<StateKey, WriteOp>,
