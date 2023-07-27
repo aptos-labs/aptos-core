@@ -1372,7 +1372,7 @@ impl AptosVM {
         // a delta led to integer overflow). It is important to catch the failing
         // case and re-simulate the transaction without an aggregator, in order to
         // obtain the precise location of abort and gas used.
-        match vm_output.into_transaction_output(state_view) {
+        match vm_output.try_into_transaction_output(state_view) {
             Ok(output) => (vm_status, output),
             Err(_) => {
                 // Conversion to TransactionOutput failed, re-simulate without aggregators.
@@ -1387,7 +1387,7 @@ impl AptosVM {
                 // never fails because delta change set is empty.
                 (
                     vm_status,
-                    vm_output.into_transaction_output(state_view).expect(
+                    vm_output.try_into_transaction_output(state_view).expect(
                         "Conversion to TransactionOutput without aggregator always succeeds.",
                     ),
                 )

@@ -19,8 +19,8 @@ use std::collections::{
 
 /// A change set produced by the VM.
 ///
-/// WARNING: Just like VMOutput, this type should only be used inside the VM.
-/// For storage backends, use `ChangeSet`.
+/// **WARNING**: Just like VMOutput, this type should only be used inside the
+/// VM. For storage backends, use `ChangeSet`.
 #[derive(Debug, Clone)]
 pub struct VMChangeSet {
     resource_write_set: BTreeMap<StateKey, WriteOp>,
@@ -30,20 +30,18 @@ pub struct VMChangeSet {
     events: Vec<ContractEvent>,
 }
 
-// Macro to squash a pair of write ops and ignore the result if
-// it is a no-op.
-macro_rules! squash_write_ops {
-    ($entry:ident, $next_write_op:ident) => {
+macro_rules! squash_writes_pair {
+    ($write_entry:ident, $additional_write:ident) => {
         // Squashing creation and deletion is a no-op. In that case, we
         // have to remove the old write op from the write set.
-        let noop = !WriteOp::squash($entry.get_mut(), $next_write_op).map_err(|e| {
+        let noop = !WriteOp::squash($write_entry.get_mut(), $additional_write).map_err(|e| {
             VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 err_msg(format!("Error while squashing two write ops: {}.", e)),
             )
         })?;
         if noop {
-            $entry.remove();
+            $write_entry.remove();
         }
     };
 }
@@ -75,16 +73,17 @@ impl VMChangeSet {
             events,
         };
 
-        // Check the newly-formed change set.
+        // Returns an error if structure of the change set is not valid,
+        // e.g. the size in bytes is too large.
         checker.check_change_set(&change_set)?;
         Ok(change_set)
     }
 
     /// Builds a new change set from the storage representation.
     ///
-    /// WARNING: Has complexity O(#write_ops) because we need to
-    /// iterate over blobs and split them into resources or modules.
-    /// Only used to support transactions with write-set payload.
+    /// **WARNING**: Has complexity O(#write_ops) because we need to iterate
+    /// over blobs and split them into resources or modules. Only used to
+    /// support transactions with write-set payload.
     pub fn try_from_storage_change_set(
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
@@ -96,7 +95,6 @@ impl VMChangeSet {
         let mut resource_write_set = BTreeMap::new();
         let mut module_write_set = BTreeMap::new();
 
-        // Go over write ops to split them into resources and modules.
         for (state_key, write_op) in write_set {
             if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
                 module_write_set.insert(state_key, write_op);
@@ -119,20 +117,31 @@ impl VMChangeSet {
         Ok(change_set)
     }
 
-    /// Converts VM-native change set into its storage representation with fully
-    /// serialized changes.
-    /// At this point, if deltas are not materialized the conversion fails.
-    pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
+    pub(crate) fn into_storage_change_set_unchecked(self) -> StorageChangeSet {
         let Self {
             resource_write_set,
             module_write_set,
             aggregator_write_set,
-            aggregator_delta_set,
+            aggregator_delta_set: _,
             events,
         } = self;
 
-        // Only change set without deltas can be converted.
-        if !aggregator_delta_set.is_empty() {
+        let mut write_set_mut = WriteSetMut::default();
+        write_set_mut.extend(resource_write_set);
+        write_set_mut.extend(module_write_set);
+        write_set_mut.extend(aggregator_write_set);
+
+        let write_set = write_set_mut
+            .freeze()
+            .expect("Freezing a WriteSet does not fail.");
+        StorageChangeSet::new(write_set, events)
+    }
+
+    /// Converts VM-native change set into its storage representation with fully
+    /// serialized changes.
+    /// If deltas are not materialized the conversion fails.
+    pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
+        if !self.aggregator_delta_set.is_empty() {
             return Err(VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg(
@@ -140,19 +149,7 @@ impl VMChangeSet {
                 ),
             ));
         }
-
-        let mut write_set_mut = WriteSetMut::default();
-        write_set_mut.extend(resource_write_set);
-        write_set_mut.extend(module_write_set);
-        write_set_mut.extend(aggregator_write_set);
-
-        let write_set = write_set_mut.freeze().map_err(|_| {
-            VMStatus::error(
-                StatusCode::DATA_FORMAT_ERROR,
-                err_msg("Failed to freeze write sets when converting VMChangeSet to ChangeSet."),
-            )
-        })?;
-        Ok(StorageChangeSet::new(write_set, events))
+        Ok(self.into_storage_change_set_unchecked())
     }
 
     pub fn write_set_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
@@ -170,6 +167,15 @@ impl VMChangeSet {
         &self.module_write_set
     }
 
+    // Called by `try_into_transaction_output_with_materialized_writes` only.
+    pub(crate) fn extend_aggregator_write_set(
+        &mut self,
+        additional_aggregator_writes: impl Iterator<Item = (StateKey, WriteOp)>,
+    ) {
+        self.aggregator_write_set
+            .extend(additional_aggregator_writes)
+    }
+
     pub fn aggregator_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
         &self.aggregator_write_set
     }
@@ -183,8 +189,7 @@ impl VMChangeSet {
     }
 
     /// Materializes this change set: all deltas are converted into writes and
-    /// are combined with existing write set. In case of materialization fails,
-    /// an error is returned.
+    /// are combined with existing aggregator writes.
     pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
@@ -275,7 +280,7 @@ impl VMChangeSet {
         for (key, additional_write_op) in additional_aggregator_write_set {
             match aggregator_write_set.entry(key) {
                 Occupied(mut entry) => {
-                    squash_write_ops!(entry, additional_write_op);
+                    squash_writes_pair!(entry, additional_write_op);
                 },
                 Vacant(entry) => {
                     // This is a new write op. It can overwrite a delta so we
@@ -306,7 +311,7 @@ impl VMChangeSet {
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut entry) => {
-                    squash_write_ops!(entry, additional_write_op);
+                    squash_writes_pair!(entry, additional_write_op);
                 },
                 Vacant(entry) => {
                     entry.insert(additional_write_op);

@@ -7,13 +7,13 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSetMut},
+    write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
 
 /// Output produced by the VM after executing a transaction.
 ///
-/// WARNING: This type should only be used inside the VM. For storage backends,
+/// **WARNING**: This type should only be used inside the VM. For storage backends,
 /// use `TransactionOutput`.
 #[derive(Debug, Clone)]
 pub struct VMOutput {
@@ -67,11 +67,9 @@ impl VMOutput {
         &self.status
     }
 
-    /// Materializes this transaction output by materializing the change set it
-    /// carries. Materialization can fail due to delta applications, in which
-    /// case an error is returned.
-    /// If the call succeeds (returns `Ok(..)`), the output is guaranteed to have
-    /// an empty delta change set.
+    /// Materializes delta sets.
+    /// Guarantees that if deltas are materialized successfully, the output
+    /// has an empty delta set.
     pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
@@ -80,7 +78,6 @@ impl VMOutput {
             return Ok(self);
         }
 
-        // Try to materialize deltas and add them to the write set.
         let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
         let materialized_change_set = change_set.try_materialize(state_view)?;
         Ok(VMOutput::new(
@@ -90,10 +87,8 @@ impl VMOutput {
         ))
     }
 
-    /// Converts VMOutput into TransactionOutput which can be used by storage
-    /// backends. During this conversion delta materialization can fail, in
-    /// which case an error is returned.
-    pub fn into_transaction_output(
+    /// Same as `try_materialize` but also constructs `TransactionOutput`.
+    pub fn try_into_transaction_output(
         self,
         state_view: &impl StateView,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
@@ -103,43 +98,37 @@ impl VMOutput {
                 .change_set()
                 .aggregator_delta_set()
                 .is_empty(),
-            "DeltaChangeSet must be empty after materialization."
+            "Aggregator deltas must be empty after materialization."
         );
-
-        let (change_set, gas_used, status) = materialized_output.unpack();
-        let (write_set, events) = change_set.try_into_storage_change_set()?.into_inner();
+        let (vm_change_set, gas_used, status) = materialized_output.unpack();
+        let (write_set, events) = vm_change_set.try_into_storage_change_set()?.into_inner();
         Ok(TransactionOutput::new(write_set, events, gas_used, status))
     }
 
-    /// Converts VM output into transaction output which storage or state sync
-    /// can understand. Extends writes with values from materialized deltas.
-    pub fn output_with_delta_writes(
-        self,
-        delta_writes: Vec<(StateKey, WriteOp)>,
+    /// Similar to `try_into_transaction_output` but deltas are materialized
+    /// externally by the caller beforehand.
+    pub fn into_transaction_output_with_materialized_deltas(
+        mut self,
+        materialized_deltas: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
-        let (change_set, gas_used, status) = self.unpack();
-
         // We should have a materialized delta for every delta in the output.
-        assert_eq!(delta_writes.len(), change_set.aggregator_delta_set().len());
-        debug_assert!(
-            delta_writes
-                .iter()
-                .all(|(k, _)| change_set.aggregator_delta_set().contains_key(k)),
-            "Delta writes contain a key which does not exist in DeltaChangeSet."
+        assert_eq!(
+            materialized_deltas.len(),
+            self.change_set().aggregator_delta_set().len()
         );
+        debug_assert!(
+            materialized_deltas
+                .iter()
+                .all(|(k, _)| self.change_set().aggregator_delta_set().contains_key(k)),
+            "Materialized aggregator writes contain a key which does not exist in delta set."
+        );
+        self.change_set
+            .extend_aggregator_write_set(materialized_deltas.into_iter());
 
-        // Add the delta writes to the write set of the transaction.
-        let mut write_set_mut = WriteSetMut::new(delta_writes);
-        let (write_set, events) = change_set
-            .try_into_storage_change_set()
-            .expect("Conversion to storage ChangeSet should succeed")
+        let (vm_change_set, gas_used, status) = self.unpack();
+        let (write_set, events) = vm_change_set
+            .into_storage_change_set_unchecked()
             .into_inner();
-        write_set_mut.extend(write_set);
-
-        // Construct the final transaction output.
-        let write_set = write_set_mut
-            .freeze()
-            .expect("Freezing the write set should not fail");
         TransactionOutput::new(write_set, events, gas_used, status)
     }
 }

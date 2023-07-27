@@ -533,7 +533,7 @@ impl FakeExecutor {
             )?;
 
         Ok((
-            output.into_transaction_output(self.get_state_view())?,
+            output.try_into_transaction_output(self.get_state_view())?,
             gas_profiler.finish(),
         ))
     }

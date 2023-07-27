@@ -71,7 +71,7 @@ impl AptosTransactionOutput {
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .output_with_delta_writes(vec![]),
+                .into_transaction_output_with_materialized_deltas(vec![]),
         }
     }
 }
@@ -150,7 +150,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         .lock()
                         .take()
                         .expect("Output must be set to combine with deltas")
-                        .output_with_delta_writes(delta_writes),
+                        .into_transaction_output_with_materialized_deltas(delta_writes),
                 )
                 .is_ok(),
             "Could not combine VMOutput with deltas"

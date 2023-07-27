@@ -28,8 +28,10 @@ fn test_ok_output_equality_no_deltas() {
     // Because there are no deltas, we should not see any difference in write sets and
     // also all calls must succeed.
     let vm_output = assert_ok!(output.clone().try_materialize(&state_view));
-    let txn_output_1 = assert_ok!(output.clone().into_transaction_output(&state_view));
-    let txn_output_2 = output.clone().output_with_delta_writes(vec![]);
+    let txn_output_1 = assert_ok!(output.clone().try_into_transaction_output(&state_view));
+    let txn_output_2 = output
+        .clone()
+        .into_transaction_output_with_materialized_deltas(vec![]);
 
     // Check the output of `try_materialize`.
     assert!(vm_output.change_set().aggregator_delta_set().is_empty());
@@ -86,10 +88,10 @@ fn test_ok_output_equality_with_deltas() {
     // Again, we test three different ways to materialize deltas. Here, we
     // has a single delta which when materialized turns into 30 + 20 = 50.
     let vm_output = assert_ok!(output.clone().try_materialize(&state_view));
-    let txn_output_1 = assert_ok!(output.clone().into_transaction_output(&state_view));
+    let txn_output_1 = assert_ok!(output.clone().try_into_transaction_output(&state_view));
     let txn_output_2 = output
         .clone()
-        .output_with_delta_writes(vec![(key(1), modify(50))]);
+        .into_transaction_output_with_materialized_deltas(vec![(key(1), modify(50))]);
 
     // Due to materialization, the write set should become:
     // This transaction has the following write set:
@@ -140,7 +142,7 @@ fn test_err_output_equality_with_deltas() {
     // Testing `output_with_delta_writes` doesn't make sense here because
     // when delta writes are constructed the error is caught.
     let vm_status_1 = assert_err!(output.clone().try_materialize(&state_view));
-    let vm_status_2 = assert_err!(output.into_transaction_output(&state_view));
+    let vm_status_2 = assert_err!(output.try_into_transaction_output(&state_view));
 
     // Error should be consistent.
     assert_eq!(vm_status_1, vm_status_2);
