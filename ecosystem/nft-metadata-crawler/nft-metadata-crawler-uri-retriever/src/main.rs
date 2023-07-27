@@ -97,7 +97,7 @@ impl RunnableConfig for URIRetrieverConfig {
     }
 
     fn get_server_name(&self) -> String {
-        "uri-retriever".to_string()
+        "uriretriever".to_string()
     }
 }
 
