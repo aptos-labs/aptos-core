@@ -554,7 +554,7 @@ mod tests {
         // Verify that the transactions are in the same order as the original transactions and cross shard
         // dependencies are empty.
         for (i, txn) in sub_blocks[0].iter().enumerate() {
-            assert_eq!(txn.txn(), transactions[i].transaction());
+            assert_eq!(txn.txn().transaction(), transactions[i].transaction());
             assert_eq!(txn.cross_shard_dependencies().num_required_edges(), 0);
         }
     }
@@ -580,7 +580,7 @@ mod tests {
         for sub_blocks_for_shard in partitioned_txns.into_iter() {
             assert_eq!(sub_blocks_for_shard.num_txns(), num_txns / num_shards);
             for txn in sub_blocks_for_shard.iter() {
-                assert_eq!(txn.txn(), transactions[current_index].transaction());
+                assert_eq!(txn.txn().transaction(), transactions[current_index].transaction());
                 assert_eq!(txn.cross_shard_dependencies().num_required_edges(), 0);
                 current_index += 1;
             }
@@ -633,7 +633,7 @@ mod tests {
 
         // verify that all transactions from the sender end up in shard 0
         for (txn_from_sender, txn) in txns_from_sender.iter().zip(sub_blocks[0].iter().skip(1)) {
-            assert_eq!(txn.txn(), txn_from_sender);
+            assert_eq!(txn.txn().transaction(), txn_from_sender);
         }
         verify_no_cross_shard_dependency(
             sub_blocks
@@ -762,7 +762,7 @@ mod tests {
                 .get_sub_block(0)
                 .unwrap()
                 .iter()
-                .map(|x| x.txn.clone())
+                .map(|x| x.txn.clone().into())
                 .collect::<Vec<Transaction>>(),
             vec![txn0, txn1, txn2]
         );
@@ -771,7 +771,7 @@ mod tests {
                 .get_sub_block(0)
                 .unwrap()
                 .iter()
-                .map(|x| x.txn.clone())
+                .map(|x| x.txn.clone().into())
                 .collect::<Vec<Transaction>>(),
             vec![
                 txn3,
@@ -809,7 +809,7 @@ mod tests {
                 .get_sub_block(1)
                 .unwrap()
                 .iter()
-                .map(|x| x.txn.clone())
+                .map(|x| x.txn.clone().into())
                 .collect::<Vec<Transaction>>(),
             vec![txn6, txn7]
         );

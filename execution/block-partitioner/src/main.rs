@@ -14,16 +14,16 @@ use aptos_types::transaction::Transaction;
 
 #[derive(Debug, Parser)]
 struct Args {
-    #[clap(long, default_value_t = 10)]
+    #[clap(long, default_value_t = 1000000)]
     pub num_accounts: usize,
 
-    #[clap(long, default_value_t = 10)]
+    #[clap(long, default_value_t = 100000)]
     pub block_size: usize,
 
-    #[clap(long, default_value_t = 1)]
+    #[clap(long, default_value_t = 3)]
     pub num_blocks: usize,
 
-    #[clap(long, default_value_t = 3)]
+    #[clap(long, default_value_t = 112)]
     pub num_shards: usize,
 }
 

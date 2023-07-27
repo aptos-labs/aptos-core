@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
-use std::collections::BTreeSet;
+#![feature(is_sorted)]
+
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::iter::Chain;
 use std::slice::Iter;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -10,7 +12,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator};
 use aptos_metrics_core::{HistogramVec, register_histogram_vec};
-use aptos_types::block_executor::partitioner::{CrossShardDependencies, ShardedTxnIndex, SubBlock, SubBlocksForShard, TransactionWithDependencies};
+use aptos_types::block_executor::partitioner::{CrossShardDependencies, RoundId, ShardedTxnIndex, ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
 use aptos_types::transaction::Transaction;
@@ -21,9 +23,13 @@ use rayon::iter::ParallelIterator;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::cmp;
 use std::ops::Deref;
+use rand::rngs::OsRng;
+use rand::thread_rng;
 use aptos_crypto::hash::CryptoHash;
+use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
 use storage_location_helper::StorageLocationHelper;
+use crate::test_utils::P2pBlockGenerator;
 
 type Sender = Option<AccountAddress>;
 
@@ -147,9 +153,8 @@ impl OmegaPartitioner {
         loc_helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
         start_txn_id_by_shard_id: &Vec<usize>,
     ) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
-        println!("round_id={round_id}, txn_id_vecs={txn_id_vecs:?}");
+        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__init").as_str()]).start_timer();
         let num_shards = txn_id_vecs.len();
-
         let mut discarded: Vec<RwLock<Vec<usize>>> = Vec::with_capacity(num_shards);
         let mut potentially_accepted: Vec<RwLock<Vec<usize>>> = Vec::with_capacity(num_shards);
         let mut finally_accepted: Vec<RwLock<Vec<usize>>> = Vec::with_capacity(num_shards);
@@ -161,8 +166,10 @@ impl OmegaPartitioner {
 
         let min_discarded_seq_nums_by_sender_id: DashMap<usize, AtomicUsize> = DashMap::new();
         let shard_id_and_txn_id_vec_pairs: Vec<(usize, Vec<usize>)> = txn_id_vecs.into_iter().enumerate().collect();
-
-        self.thread_pool.install(||{
+        let duration = timer.stop_and_record();
+        println!("found_{}_init={}", round_id, duration);
+        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_key").as_str()]).start_timer();
+        self.thread_pool.install(|| {
             shard_id_and_txn_id_vec_pairs.into_par_iter().for_each(|(my_shard_id, txn_ids)| {
                 txn_ids.into_par_iter().for_each(|txn_id| {
                     let txn = txns.get(txn_id).unwrap();
@@ -182,7 +189,11 @@ impl OmegaPartitioner {
                     }
                 });
             });
-
+        });
+        let duration = timer.stop_and_record();
+        println!("round_{}_discard_by_key={}", round_id, duration);
+        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_sender").as_str()]).start_timer();
+        self.thread_pool.install(||{
             (0..num_shards).into_par_iter().for_each(|shard_id|{
                 potentially_accepted[shard_id].read().unwrap().par_iter().for_each(|txn_id|{
                     let txn = txns.get(*txn_id).unwrap();
@@ -200,8 +211,13 @@ impl OmegaPartitioner {
                 });
             });
         });
-
-        (extract_and_sort(finally_accepted), extract_and_sort(discarded))
+        let duration = timer.stop_and_record();
+        println!("round_{}_discard_by_sender={}", round_id, duration);
+        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__return_obj").as_str()]).start_timer();
+        let ret = (extract_and_sort(finally_accepted), extract_and_sort(discarded));
+        let duration = timer.stop_and_record();
+        println!("round_{}_return_obj={}", round_id, duration);
+        ret
     }
 
 }
@@ -244,9 +260,9 @@ impl BlockPartitioner for OmegaPartitioner {
             }
         });
         let duration = timer.stop_and_record();
-        println!("omega_par/preprocess={duration:?}");
+        println!("preprocess={duration:?}");
 
-        print_storage_location_helper_summary(&key_ids_by_key, &helpers_by_key_id);
+        // print_storage_location_helper_summary(&key_ids_by_key, &helpers_by_key_id);
 
         let mut remaining_txns = uniform_partition(num_txns, num_executor_shards);
         let mut start_txn_ids_by_shard_id = vec![0; num_executor_shards];
@@ -256,23 +272,18 @@ impl BlockPartitioner for OmegaPartitioner {
             }
         }
 
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["multi_rounds"]).start_timer();
         let num_rounds: usize = 2;
         let mut txn_id_matrix: Vec<Vec<Vec<usize>>> = Vec::new();
         for round_id in 0..(num_rounds - 1) {
-            let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["multi_rounds"]).start_timer();
+            let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
             let (accepted, discarded) = self.discarding_round(round_id, &txns, remaining_txns, &helpers_by_key_id, &start_txn_ids_by_shard_id);
             txn_id_matrix.push(accepted);
             remaining_txns = discarded;
             let duration = timer.stop_and_record();
-            println!("omega_par/multi_rounds/round_{round_id}={duration:?}");
+            println!("round_{round_id}={duration:?}");
         }
 
-        for (round_id, row) in txn_id_matrix.iter().enumerate() {
-            println!("RAW_MATRIX - round_id={round_id}, row={row:?}");
-        }
-        println!("RAW_MATRIX - last_round, row={remaining_txns:?}");
-
+        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["last_round"]).start_timer();
         let last_round_txns: Vec<usize> = remaining_txns.into_iter().flatten().collect();
         for txn_id in last_round_txns.iter() {
             let txn = &txns[*txn_id];
@@ -288,15 +299,15 @@ impl BlockPartitioner for OmegaPartitioner {
         txn_id_matrix.push(remaining_txns);
         let num_actual_rounds = txn_id_matrix.len();
         let duration = timer.stop_and_record();
-        println!("omega_par/multi_rounds={duration:?}");
+        println!("last_round={duration:?}");
 
-        print_storage_location_helper_summary(&key_ids_by_key, &helpers_by_key_id);
+        // print_storage_location_helper_summary(&key_ids_by_key, &helpers_by_key_id);
 
         let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
         let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|t|Mutex::new(Some(t))).collect();
         let ret = self.add_edges(&txns, &txn_id_matrix, &helpers_by_key_id);
         let duration = timer.stop_and_record();
-        println!("omega_par/add_edges={duration:?}");
+        println!("add_edges={duration:?}");
 
         ret
     }
@@ -310,6 +321,100 @@ fn print_storage_location_helper_summary(key_ids_by_key: &DashMap<StateKey, usiz
         println!("HELPER CHECK - key_id={}, key={}, helper={}", key_id, key.hash().to_hex(), helper.read().unwrap().brief());
     }
 }
+
+#[test]
+fn test_omega_partitioner() {
+    let block_generator = P2pBlockGenerator::new(100);
+    let partitioner = OmegaPartitioner::new(8);
+    let mut rng = thread_rng();
+    let num_shards = 10;
+    for _ in 0..100 {
+        let block = block_generator.rand_block(&mut rng, 10);
+        let block_clone = block.clone();
+        let partitioned = partitioner.partition(block, num_shards);
+        assertions(&block_clone, &partitioned);
+    }
+
+}
+
+pub fn assertions(before_partition: &Vec<AnalyzedTransaction>, after_partition: &Vec<SubBlocksForShard<AnalyzedTransaction>>) {
+    let mut total_comm_cost = 0;
+    let num_txns = before_partition.len();
+    let num_rounds = after_partition.first().unwrap().sub_blocks.len();
+    let num_shards = after_partition.len();
+    let mut old_tids_by_sender: HashMap<Sender, Vec<usize>> = HashMap::new();
+    let mut old_tids_seen: HashSet<usize> = HashSet::new();
+    let mut edge_set_from_src_view: HashSet<(usize, usize, usize, HashValue, usize, usize, usize)> = HashSet::new();
+    let mut edge_set_from_dst_view: HashSet<(usize, usize, usize, HashValue, usize, usize, usize)> = HashSet::new();
+    for round_id in 0..num_rounds {
+        for (shard_id, sub_block_list) in after_partition.iter().enumerate() {
+            let sub_block = sub_block_list.get_sub_block(round_id).unwrap();
+            let mut cur_sub_block_inbound_costs_by_key_src_pair: HashMap<(RoundId, ShardId, StateKey), u64> = HashMap::new();
+            let mut cur_sub_block_connectivity_by_key_dst_pair: HashMap<(RoundId, ShardId, StateKey), u64> = HashMap::new();
+            for (local_tid, td) in sub_block.transactions.iter().enumerate() {
+                let sender = td.txn.sender();
+                let old_tid = *td.txn.maybe_txn_id_in_partition_session.as_ref().unwrap();
+                old_tids_seen.insert(old_tid);
+                old_tids_by_sender.entry(sender).or_insert_with(Vec::new).push(old_tid);
+                let tid = sub_block.start_index + local_tid;
+                for loc in td.txn.write_hints.iter() {
+                    let key = loc.clone().into_state_key();
+                    let key_str = CryptoHash::hash(&key).to_hex();
+                    // println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, write_hint={}", round_id, shard_id, old_tid, tid, key_str);
+                }
+                for (src_tid, locs) in td.cross_shard_dependencies.required_edges().iter() {
+                    for loc in locs.iter() {
+                        let key = loc.clone().into_state_key();
+                        let key_str = CryptoHash::hash(&key).to_hex();
+                        // println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, recv key={} from round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
+                        if (round_id != num_rounds - 1) {
+                            assert_ne!(src_tid.round_id, round_id);
+                        }
+                        assert!((src_tid.round_id, src_tid.shard_id) < (round_id, shard_id));
+                        edge_set_from_dst_view.insert((src_tid.round_id, src_tid.shard_id, src_tid.txn_index, key.hash(), round_id, shard_id, tid));
+                        let value = cur_sub_block_inbound_costs_by_key_src_pair.entry((src_tid.round_id, src_tid.shard_id, key)).or_insert_with(||0);
+                        *value += 1;
+                    }
+                }
+                for (dst_tid, locs) in td.cross_shard_dependencies.dependent_edges().iter() {
+                    for loc in locs.iter() {
+                        let key = loc.clone().into_state_key();
+                        let key_str = CryptoHash::hash(&key).to_hex();
+                        // println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, send key={} to round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
+                        if (round_id != num_rounds - 1) {
+                            assert_ne!(dst_tid.round_id, round_id);
+                        }
+                        assert!((round_id, shard_id) < (dst_tid.round_id, dst_tid.shard_id));
+                        edge_set_from_src_view.insert((round_id, shard_id, tid, key.hash(), dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index));
+                        let value = cur_sub_block_connectivity_by_key_dst_pair.entry((dst_tid.round_id, dst_tid.shard_id, key)).or_insert_with(||0);
+                        *value += 1;
+                    }
+                }
+            }
+            let inbound_cost: u64 = cur_sub_block_inbound_costs_by_key_src_pair.iter().map(|(_,b)| *b).sum();
+            let outbound_cost: u64 = cur_sub_block_connectivity_by_key_dst_pair.iter().map(|(_,b)| *b).sum();
+            if round_id == 0 {
+                assert_eq!(0, inbound_cost);
+            }
+            if round_id == num_rounds - 1 && round_id >= 1 && shard_id < num_shards - 1 {
+                assert_eq!(0, sub_block.num_txns());
+            }
+            // println!("MATRIX_REPORT: round={}, shard={}, sub_block_size={}, inbound_cost={}, outbound_cost={}", round_id, shard_id, sub_block.num_txns(), inbound_cost, outbound_cost);
+            total_comm_cost += inbound_cost + outbound_cost;
+        }
+    }
+    assert_eq!(0, total_comm_cost % 2);
+    assert_eq!(HashSet::from_iter(0..num_txns), old_tids_seen);
+    assert_eq!(edge_set_from_dst_view, edge_set_from_dst_view);
+    for (sender, old_tids) in old_tids_by_sender {
+        let num = old_tids.len();
+        for i in 1..num {
+            assert!(old_tids[i-1] < old_tids[i]);
+        }
+    }
+    // println!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
+}
+
 
 /// 18,5 -> [4,4,4,3,3]
 fn uniform_partition(num_items: usize, num_chunks: usize) -> Vec<Vec<usize>> {
