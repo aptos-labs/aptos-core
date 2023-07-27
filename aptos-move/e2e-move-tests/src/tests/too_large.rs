@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{tests::common, MoveHarness};
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use move_core_types::account_address::AccountAddress;
