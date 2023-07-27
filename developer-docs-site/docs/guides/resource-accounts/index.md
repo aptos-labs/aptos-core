@@ -4,6 +4,7 @@ title: "Resource Accounts"
 
 # Resource Accounts
 
-- ### [Utilizing resource accounts](./utilizing-resource-accounts)
+- ### [Overview](./overview)
+- ### [Managing resource accounts](./managing-resource-accounts)
 - ### [Publishing an upgradeable module](./publishing-an-upgradeable-module)
 - ### [Common questions](./common-questions)

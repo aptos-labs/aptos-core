@@ -7,16 +7,11 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Common questions
-
-## What is a resource account?
-
-A [resource account](../../move/move-on-aptos/resource-accounts.md) is an [Account](../../concepts/accounts/) that's used to store and manage resources independent of a user. It can be used as a simple storage account or it can be utilized to programmatically manage resources from within a smart contract. 
-
 ## How are resource accounts created?
 
 Let's review the two functions used to create resource accounts and what they return.
 
-First off, note that both creation functions allow for the input of a `seed` byte vector for the [ensuing hash used to compute the resource address](#how-is-the-address-for-a-resource-account-derived).
+First off, note that both creation functions allow for the input of a [**seed**](./common-questions.md#whats-a-seed) byte vector for the [ensuing hash used to compute the resource address](#how-is-the-address-for-a-resource-account-derived).
 
 <Tabs groupId="creation">
   <TabItem value="account.move" label="account.move">
@@ -65,11 +60,21 @@ public entry fun create_resource_account(
 ```
 The resource account created from this is functionally very similar to a user account that has had its authentication key rotated (see: [Rotating an authentication key](../account-management/key-rotation.md)), because it cannot yet be controlled programmatically and can still be controlled by a private key.
 
-However, there does exist a SignerCapability for the resource account, it just isn't being used yet. To enable programmatic control, you would need to [retrieve the SignerCapability.](./utilizing-resource-accounts#retrieving-a-signercapability)
+However, there does exist a SignerCapability for the resource account, it just isn't being used yet. To enable programmatic control, you would need to [retrieve the SignerCapability.](./managing-resource-accounts#retrieving-a-signercapability)
 
 The end result of a creating a resource account with `create_resource_account(...)` in `resource_account.move` and then retrieving the SignerCapability is the same as creating the resource account with `create_resource_account(...)` in `account.move`.
   </TabItem>
 </Tabs>
+
+## What's a seed?
+
+A seed is an optional user-specified byte vector that is input during the creation of a resource account. The seed is used to ensure that the resulting resource account's address is unique.
+
+Since the hash function used to derive the resource account's address is deterministic, providing the same seed and source address will always result in the same resource account address.
+
+This also means that without a seed, if you were to try to generate multiple resource accounts from a single source account, you would end up with the same address each time due to a collision in the hashing computation.
+
+Thus, the `seed: vector<u8>` argument facilitates the creation of multiple resource accounts from a single source account and also allows for deterministically deriving a resource account address given an address and a seed byte vector.
 
 ## What's a SignerCapability?
 
@@ -124,7 +129,7 @@ fun internal_get_signer(): signer {
 
 ## How is the address for a resource account derived?
 
-When a resource account is created, the address is derived from a SHA3-256 hash of the requesting account's address, a byte scheme to identify it as a resource account, and an optional user-specified byte vector `seed`. Here is the implementation of `create_resource_address` function in `account.move`:
+When a resource account is created, the address is derived from a SHA3-256 hash of the requesting account's address, a byte scheme to identify it as a resource account, and an optional user-specified byte vector [**seed**](./common-questions.md#whats-a-seed). Here is the implementation of `create_resource_address` function in `account.move`:
 ```rust
 /// This is a helper function to compute resource addresses. Computation of the address
 /// involves the use of a cryptographic hash operation and should be use thoughtfully.
@@ -135,3 +140,11 @@ public fun create_resource_address(source: &address, seed: vector<u8>): address 
     from_bcs::to_address(hash::sha3_256(bytes))
 }
 ```
+
+## Why am I getting the `EACCOUNT_ALREADY_EXISTS` error?
+
+If you're getting this error while trying to create a resource account, it's because you have already created a resource account with that specific [**seed**](./common-questions.md#whats-a-seed).
+
+This error occurs because there's a collision in the output of the hashing function used to derive a resource account's address.
+
+To fix it, you need to change the seed or the function you're calling will continue to unsuccessfully attempt to create an account at an address that already exists.

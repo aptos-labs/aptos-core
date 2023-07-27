@@ -47,6 +47,10 @@ aptos move create-resource-account-and-publish-package                      \
            --profile deployer
 ```
 
+:::info
+Read more about the [**seed**](./common-questions.md#whats-a-seed) argument here.
+:::
+
 The `--address-name` flag marks the following string as named address the resource account's address will appear as in the contract.
 
 That is, the resource account created from this command will correspond to the `@upgradeable_resource_account_package` address in our module.

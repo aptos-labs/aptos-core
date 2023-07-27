@@ -1,14 +1,14 @@
 ---
-title: "Utilizing resource accounts"
-id: "utilizing-resource-accounts"
+title: "Managing resource accounts"
+id: "managing-resource-accounts"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# General usage
+# Managing resource accounts
 
-In this section we're going to explain the mechanisms behind general usage of resource accounts and how we can use them to automate smart contracts and manage resources programmatically.
+In this section we're going to explore the various mechanisms underlying resource accounts and how to utilize them to manage resources programmatically.
 
 There are two distinct ways to manage a resource account:
 
@@ -84,6 +84,10 @@ Without access to a `SignerCapability`, there is no way to generate a signature 
 :::
 
 ## Publishing modules with resource accounts
+
+Publishing modules with resource account gives developers the ability to separate the logic and resources of their smart contracts from their normal user accounts. It also offers them the ability to publish immutable, open source contracts that other developers can use without fear of the contract being altered.
+
+Below we detail the various ways to publish a module to a resource account.
 
 ### Publishing an immutable module with a resource account
 

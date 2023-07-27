@@ -159,8 +159,8 @@ const config = {
               to: "/category/nft",
             },
             {
-              label: "Examples",
-              to: "/category/examples",
+              label: "Guides",
+              to: "/category/guides",
             },
             {
               label: "Build E2E Dapp on Aptos",

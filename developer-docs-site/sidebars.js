@@ -336,15 +336,15 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "Examples",
+      label: "Guides",
       collapsible: true,
       collapsed: true,
       link: {
         type: "generated-index",
-        title: "Examples",
-        description: "Examples for all the various concepts and tooling used to build on Aptos.",
-        slug: "/category/examples",
-        keywords: ["examples"],
+        title: "Guides",
+        description: "Guides for all the various concepts and tooling used to build on Aptos.",
+        slug: "/category/guides",
+        keywords: ["guides"],
       },
       items: [
         "guides/account-management/key-rotation",
@@ -355,7 +355,8 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
-            "guides/resource-accounts/utilizing-resource-accounts",
+            "guides/resource-accounts/overview",
+            "guides/resource-accounts/managing-resource-accounts",
             "guides/resource-accounts/publishing-an-upgradeable-module",
             "guides/resource-accounts/common-questions",
           ],
