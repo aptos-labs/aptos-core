@@ -8,7 +8,6 @@ use crate::dag::{
     types::{CertifiedNode, DagSnapshotBitmask, Node},
     NodeId, Vote,
 };
-use anyhow::Ok;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -49,8 +48,8 @@ impl DAGStorage for MockStorage {
         Ok(())
     }
 
-    fn get_votes(&self) -> anyhow::Result<HashMap<NodeId, Vote>> {
-        Ok(self.vote_data.lock().clone())
+    fn get_votes(&self) -> anyhow::Result<Vec<(NodeId, Vote)>> {
+        Ok(self.vote_data.lock().clone().into_iter().collect())
     }
 
     fn delete_votes(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
@@ -67,8 +66,13 @@ impl DAGStorage for MockStorage {
         Ok(())
     }
 
-    fn get_certified_nodes(&self) -> anyhow::Result<HashMap<HashValue, CertifiedNode>> {
-        Ok(self.certified_node_data.lock().clone())
+    fn get_certified_nodes(&self) -> anyhow::Result<Vec<(HashValue, CertifiedNode)>> {
+        Ok(self
+            .certified_node_data
+            .lock()
+            .clone()
+            .into_iter()
+            .collect())
     }
 
     fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> anyhow::Result<()> {
@@ -76,6 +80,18 @@ impl DAGStorage for MockStorage {
             self.certified_node_data.lock().remove(&digest);
         }
         Ok(())
+    }
+
+    fn save_ordered_anchor_id(&self, _node_id: &NodeId) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
+        todo!()
+    }
+
+    fn delete_ordered_anchor_ids(&self, _node_ids: Vec<NodeId>) -> anyhow::Result<()> {
+        todo!()
     }
 }
 
