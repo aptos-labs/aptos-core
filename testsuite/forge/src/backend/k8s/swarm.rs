@@ -181,6 +181,7 @@ impl K8sSwarm {
                 .clone(),
             self.kube_namespace.clone(),
             self.use_port_forward,
+            self.fullnodes.len(),
         )
         .await?;
         k8snode.start().await?; // actually start the node. if port-forward is enabled, this is when it gets its ephemeral port
