@@ -141,7 +141,7 @@ impl MockAptosDataClient {
         thread::sleep(Duration::from_millis(create_range_random_u64(10, 50)));
     }
 
-    fn emulate_subscription_expiration(&self) -> aptos_data_client::error::Error {
+    fn emulate_optimistic_fetch_expiration(&self) -> aptos_data_client::error::Error {
         thread::sleep(Duration::from_secs(MAX_NOTIFICATION_TIMEOUT_SECS));
         aptos_data_client::error::Error::TimeoutWaitingForResponse("RPC timed out!".into())
     }
@@ -164,7 +164,7 @@ impl MockAptosDataClient {
     fn verify_request_timeout(
         &self,
         request_timeout_ms: u64,
-        is_subscription_request: bool,
+        is_optimistic_fetch_request: bool,
         data_request: DataRequest,
     ) {
         if self.skip_timeout_verification {
@@ -172,8 +172,8 @@ impl MockAptosDataClient {
         }
 
         // Verify the given timeout for the request
-        let expected_timeout = if is_subscription_request {
-            self.aptos_data_client_config.subscription_timeout_ms
+        let expected_timeout = if is_optimistic_fetch_request {
+            self.aptos_data_client_config.optimistic_fetch_timeout_ms
         } else {
             let min_timeout = self.aptos_data_client_config.response_timeout_ms;
             let max_timeout = self.aptos_data_client_config.max_response_timeout_ms;
@@ -371,7 +371,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
                 target_ledger_info,
             )))
         } else {
-            Err(self.emulate_subscription_expiration())
+            Err(self.emulate_optimistic_fetch_expiration())
         }
     }
 
@@ -434,7 +434,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
                 target_ledger_info,
             )))
         } else {
-            Err(self.emulate_subscription_expiration())
+            Err(self.emulate_optimistic_fetch_expiration())
         }
     }
 
