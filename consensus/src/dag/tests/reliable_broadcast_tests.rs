@@ -21,10 +21,7 @@ use aptos_types::{
     validator_verifier::random_validator_verifier,
 };
 use claims::{assert_ok, assert_ok_eq};
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 #[tokio::test]
 async fn test_node_broadcast_receiver_succeed() {
