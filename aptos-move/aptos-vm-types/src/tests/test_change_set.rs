@@ -7,8 +7,19 @@ use crate::{
         build_change_set, mock_add, mock_create, mock_delete, mock_modify, MockChangeSetChecker,
     },
 };
+use aptos_types::{
+    access_path::AccessPath,
+    state_store::state_key::StateKey,
+    transaction::ChangeSet as StorageChangeSet,
+    write_set::{WriteOp, WriteSetMut},
+};
 use claims::{assert_matches, assert_ok};
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::{ModuleId, StructTag},
+    vm_status::{StatusCode, VMStatus},
+};
 use std::collections::BTreeMap;
 
 /// Testcases:
@@ -267,6 +278,57 @@ fn test_unsuccessful_squash_delta_create() {
         res,
         Err(VMStatus::Error {
             status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            sub_status: None,
+            message: Some(_),
+        })
+    );
+}
+
+#[test]
+fn test_roundtrip_to_storage_change_set() {
+    let test_struct_tag = StructTag {
+        address: AccountAddress::ONE,
+        module: ident_str!("foo").into(),
+        name: ident_str!("Foo").into(),
+        type_params: vec![],
+    };
+    let test_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("bar").into());
+
+    let resource_key = StateKey::access_path(
+        AccessPath::resource_access_path(AccountAddress::ONE, test_struct_tag).unwrap(),
+    );
+    let module_key = StateKey::access_path(AccessPath::code_access_path(test_module_id));
+    let write_set = WriteSetMut::new(vec![
+        (resource_key, WriteOp::Deletion),
+        (module_key, WriteOp::Deletion),
+    ])
+    .freeze()
+    .unwrap();
+
+    let storage_change_set_before = StorageChangeSet::new(write_set, vec![]);
+    let change_set = assert_ok!(VMChangeSet::try_from_storage_change_set(
+        storage_change_set_before.clone(),
+        &MockChangeSetChecker
+    ));
+    let storage_change_set_after = assert_ok!(change_set.try_into_storage_change_set());
+    assert_eq!(storage_change_set_before, storage_change_set_after)
+}
+
+#[test]
+fn test_failed_conversion_to_change_set() {
+    let resource_write_set = vec![mock_delete("a")];
+    let aggregator_delta_set = vec![mock_add("b", 100)];
+    let change_set = build_change_set(resource_write_set, vec![], vec![], aggregator_delta_set);
+
+    // Unchecked conversion ignores deltas.
+    let storage_change_set = change_set.clone().into_storage_change_set_unchecked();
+    assert_eq!(storage_change_set.write_set().clone().into_mut().len(), 1);
+
+    let vm_status = change_set.try_into_storage_change_set();
+    assert_matches!(
+        vm_status,
+        Err(VMStatus::Error {
+            status_code: StatusCode::DATA_FORMAT_ERROR,
             sub_status: None,
             message: Some(_),
         })
