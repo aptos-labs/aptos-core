@@ -1,11 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    change_set::{StateChange, VMChangeSet},
-    check_change_set::CheckChangeSet,
-    output::VMOutput,
-};
+use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet, output::VMOutput};
 use aptos_aggregator::delta_change_set::{serialize, DeltaChangeSet, DeltaOp};
 use aptos_types::{
     fee_statement::FeeStatement,
@@ -14,6 +10,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
+use std::collections::BTreeMap;
 
 /// A mock for testing. Always succeeds on checking a change set.
 pub(crate) struct NoOpChangeSetChecker;
@@ -79,11 +76,11 @@ pub(crate) fn build_change_set(
     delta_change_set: DeltaChangeSet,
 ) -> VMChangeSet {
     VMChangeSet::new(
-        StateChange::empty(),
-        StateChange::empty(),
+        BTreeMap::new(),
+        BTreeMap::new(),
         // TODO: This tests only aggregator flow, let's make sure
         // other writes are tested.
-        StateChange::new(write_set),
+        BTreeMap::from_iter(write_set),
         delta_change_set,
         vec![],
         &NoOpChangeSetChecker,

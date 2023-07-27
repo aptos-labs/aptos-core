@@ -152,7 +152,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
     publish_framework(&mut session, framework);
     let cs2 = session.finish(&mut (), &configs).unwrap();
-    let change_set = cs1.squash(cs2, &configs).unwrap();
+    let change_set = cs1.squash_additional_change_set(cs2, &configs).unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
@@ -260,7 +260,7 @@ pub fn encode_genesis_change_set(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
     publish_framework(&mut session, framework);
     let cs2 = session.finish(&mut (), &configs).unwrap();
-    let change_set = cs1.squash(cs2, &configs).unwrap();
+    let change_set = cs1.squash_additional_change_set(cs2, &configs).unwrap();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not

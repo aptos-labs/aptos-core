@@ -15,11 +15,8 @@ use move_core_types::vm_status::VMStatus;
 /// it must be converted to TransactionOutput.
 #[derive(Debug, Clone)]
 pub struct VMOutput {
-    // All changes to the state, including data, code, events.
     change_set: VMChangeSet,
-    // Encapsulates all gas charges, e.g. execution, I/), storage, etc.
     fee_statement: FeeStatement,
-    // Status of the executed transaction.
     status: TransactionStatus,
 }
 

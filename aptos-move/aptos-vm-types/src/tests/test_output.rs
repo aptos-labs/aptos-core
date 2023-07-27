@@ -1,15 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    change_set::StateChange,
-    tests::utils::{build_vm_output, create, key, modify},
-};
+use crate::tests::utils::{build_vm_output, create, key, modify};
 use aptos_aggregator::delta_change_set::{delta_add, serialize, DeltaChangeSet};
 use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_types::write_set::WriteSetMut;
 use claims::{assert_err, assert_matches, assert_ok};
 use move_core_types::vm_status::{AbortLocation, VMStatus};
+use std::collections::BTreeMap;
 
 #[test]
 fn test_ok_output_equality_no_deltas() {
@@ -106,7 +104,7 @@ fn test_ok_output_equality_with_deltas() {
     assert!(vm_output.change_set().delta_change_set().is_empty());
     assert_eq!(
         vm_output.change_set().aggregator_write_set(),
-        &StateChange::new(expected_changes)
+        &BTreeMap::from_iter(expected_changes)
     );
     assert_eq!(vm_output.gas_used(), output.gas_used());
     assert_eq!(vm_output.status(), output.status());

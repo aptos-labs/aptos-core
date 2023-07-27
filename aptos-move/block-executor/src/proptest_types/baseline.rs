@@ -227,7 +227,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                         .as_ref()
                         .expect("Aggregator failures not yet tested")
                         .iter()
-                        .zip(output.4.iter())
+                        .zip(output.read_results.iter())
                         .for_each(|(baseline_read, result_read)| {
                             baseline_read.assert_read_result(result_read)
                         });
@@ -236,7 +236,13 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                         .as_ref()
                         .expect("Aggregator failures not yet tested")
                         .iter()
-                        .zip(output.5.get().expect("Delta writes must be set").iter())
+                        .zip(
+                            output
+                                .materialized_delta_writes
+                                .get()
+                                .expect("Delta writes must be set")
+                                .iter(),
+                        )
                         .for_each(|(baseline_delta_write, (_, result_delta_write))| {
                             assert_eq!(
                                 *baseline_delta_write,
@@ -249,16 +255,16 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
 
                 results.iter().skip(committed).for_each(|output| {
                     // Ensure the transaction is skipped based on the output.
-                    assert_eq!(output.0.len(), 0);
-                    assert_eq!(output.1.len(), 0);
-                    assert_eq!(output.2.len(), 0);
-                    assert_eq!(output.3.len(), 0);
-                    assert_eq!(output.4.len(), 0);
-                    assert_eq!(output.6, 0);
+                    assert!(output.resource_writes.is_empty());
+                    assert!(output.module_writes.is_empty());
+                    assert!(output.aggregator_writes.is_empty());
+                    assert!(output.deltas.is_empty());
+                    assert!(output.read_results.is_empty());
+                    assert_eq!(output.total_gas, 0);
 
                     // Implies that materialize_delta_writes was never called, as should
                     // be for skipped transactions.
-                    assert_none!(output.5.get());
+                    assert_none!(output.materialized_delta_writes.get());
                 });
             },
             Err(BlockExecutorError::UserError(idx)) => {

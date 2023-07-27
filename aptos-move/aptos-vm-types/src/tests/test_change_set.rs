@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    change_set::{StateChange, VMChangeSet},
+    change_set::VMChangeSet,
     tests::utils::{
         build_change_set, contains_delta_op, contains_write_op, create, delete, get_delta_op,
         get_write_op, key, modify, NoOpChangeSetChecker,
@@ -11,6 +11,7 @@ use crate::{
 use aptos_aggregator::delta_change_set::{delta_add, DeltaChangeSet};
 use claims::{assert_matches, assert_ok};
 use move_core_types::vm_status::{StatusCode, VMStatus};
+use std::collections::BTreeMap;
 
 macro_rules! add {
     ($v:expr) => {
@@ -55,8 +56,8 @@ macro_rules! add {
 /// ```
 fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     // Create write sets and delta change sets.
-    let mut write_set_1 = StateChange::empty();
-    let mut write_set_2 = StateChange::empty();
+    let mut write_set_1 = BTreeMap::new();
+    let mut write_set_2 = BTreeMap::new();
     let mut delta_change_set_1 = DeltaChangeSet::empty();
     let mut delta_change_set_2 = DeltaChangeSet::empty();
 
@@ -106,7 +107,7 @@ fn test_successful_squash() {
     let (change_set_1, change_set_2) = build_change_sets_for_test();
 
     // Check squash is indeed successful.
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
+    let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     let change_set = assert_ok!(res);
 
     // create 0 + ___ = create 0
@@ -190,7 +191,7 @@ fn test_unsuccessful_squash_1() {
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
+    let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {
@@ -209,7 +210,7 @@ fn test_unsuccessful_squash_modify_create() {
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
+    let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {
@@ -228,7 +229,7 @@ fn test_unsuccessful_squash_delete_modify() {
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
+    let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {
@@ -247,7 +248,7 @@ fn test_unsuccessful_squash_delete_delete() {
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
+    let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {
@@ -267,7 +268,7 @@ fn test_unsuccessful_squash_delete_delta() {
 
     let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
     let change_set_2 = build_change_set(vec![], delta_change_set_2);
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
+    let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {
@@ -287,7 +288,7 @@ fn test_unsuccessful_squash_delta_create() {
 
     let change_set_1 = build_change_set(vec![], delta_change_set_1);
     let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
+    let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {

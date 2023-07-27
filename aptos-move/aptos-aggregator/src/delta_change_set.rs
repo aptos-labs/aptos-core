@@ -21,6 +21,17 @@ const EADD_OVERFLOW: u64 = 0x02_0001;
 /// When `Subtraction` operation goes below zero.
 const ESUB_UNDERFLOW: u64 = 0x02_0002;
 
+/// Represents a single aggregator change.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum AggregatorChange {
+    // A value should be written to storage.
+    Write(u128),
+    // A delta should be merged with the value from storage.
+    Merge(DeltaOp),
+    // A value should be deleted from the storage.
+    Delete,
+}
+
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct DeltaOp {

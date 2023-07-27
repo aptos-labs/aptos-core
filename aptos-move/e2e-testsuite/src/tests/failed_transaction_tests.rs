@@ -8,11 +8,11 @@ use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
 use aptos_types::{
+    state_store::state_key::StateKey,
     transaction::ExecutionStatus,
     vm_status::{StatusCode, VMStatus},
+    write_set::WriteOp,
 };
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::write_set::WriteOp;
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::storage::StorageGasParameters;

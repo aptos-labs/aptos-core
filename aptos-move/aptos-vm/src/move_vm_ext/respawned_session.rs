@@ -70,7 +70,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         })?;
         let change_set = self.into_heads().state_view.change_set;
         change_set
-            .squash(new_change_set, change_set_configs)
+            .squash_additional_change_set(new_change_set, change_set_configs)
             .map_err(|_err| {
                 VMStatus::error(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -144,8 +144,9 @@ mod test {
     use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{state_store::table::TableHandle, write_set::WriteOp};
-    use aptos_vm_types::{change_set::StateChange, check_change_set::CheckChangeSet};
+    use aptos_vm_types::check_change_set::CheckChangeSet;
     use move_core_types::account_address::AccountAddress;
+    use std::collections::BTreeMap;
 
     /// A mock for testing. Always succeeds on checking a change set.
     struct NoOpChangeSetChecker;
@@ -179,10 +180,10 @@ mod test {
 
         let write_set = vec![(key2.clone(), WriteOp::Modification(serialize(&400)))];
         let change_set = VMChangeSet::new(
-            StateChange::empty(),
-            StateChange::empty(),
+            BTreeMap::new(),
+            BTreeMap::new(),
             // TODO: Test beyond deltas & aggregators.
-            StateChange::new(write_set),
+            BTreeMap::from_iter(write_set),
             delta_change_set,
             vec![],
             &NoOpChangeSetChecker,
