@@ -5,14 +5,11 @@ use crate::{
     access_path_cache::AccessPathCache, data_cache::get_resource_group_from_metadata,
     move_vm_ext::MoveResolverExt, transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
-    delta_change_set::{serialize, AggregatorChange, DeltaChangeSet},
-};
+use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::serialize};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
-    aggregator_natives::{AggregatorChangeSet, NativeAggregatorContext},
+    aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
@@ -320,11 +317,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let mut resource_write_set = BTreeMap::new();
-        let mut module_write_set = BTreeMap::new();
-        let mut aggregator_write_set = BTreeMap::new();
-        let mut delta_change_set = DeltaChangeSet::empty();
-
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
         if is_storage_slot_metadata_enabled {
             if let Some(payer) = new_slot_payer {
@@ -337,6 +329,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             remote,
             new_slot_metadata,
         };
+
+        let mut resource_write_set = BTreeMap::new();
+        let mut module_write_set = BTreeMap::new();
+        let mut aggregator_write_set = BTreeMap::new();
+        let mut aggregator_delta_set = BTreeMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
@@ -387,7 +384,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     let write_op = woc.convert_aggregator_mod(&state_key, value)?;
                     aggregator_write_set.insert(state_key, write_op);
                 },
-                AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
+                AggregatorChange::Merge(delta_op) => {
+                    aggregator_delta_set.insert(state_key, delta_op);
+                },
                 AggregatorChange::Delete => {
                     let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
                     aggregator_write_set.insert(state_key, write_op);
@@ -407,7 +406,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             resource_write_set,
             module_write_set,
             aggregator_write_set,
-            delta_change_set,
+            aggregator_delta_set,
             events,
             configs,
         )

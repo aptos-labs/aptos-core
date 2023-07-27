@@ -3,7 +3,7 @@
 
 use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
-    delta_change_set::{AggregatorChange, DeltaOp, DeltaUpdate},
+    delta_change_set::{DeltaOp, DeltaUpdate},
 };
 use aptos_table_natives::TableResolver;
 use aptos_types::vm_status::VMStatus;
@@ -13,6 +13,17 @@ use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},
 };
+
+/// Represents a single aggregator change.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum AggregatorChange {
+    // A value should be written to storage.
+    Write(u128),
+    // A delta should be merged with the value from storage.
+    Merge(DeltaOp),
+    // A value should be deleted from the storage.
+    Delete,
+}
 
 /// Represents changes made by all aggregators during this context. This change
 /// set can be converted into appropriate `WriteSet` and `DeltaChangeSet` by the

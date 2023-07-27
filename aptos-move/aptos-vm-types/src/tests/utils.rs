@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet, output::VMOutput};
-use aptos_aggregator::delta_change_set::{serialize, DeltaChangeSet, DeltaOp};
+use aptos_aggregator::delta_change_set::{serialize, DeltaOp};
 use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
@@ -61,19 +61,19 @@ pub(crate) fn contains_write_op(change_set: &VMChangeSet, id: u128) -> bool {
 /// Returns a delta op from the change set stored at state key corresponding
 /// to an id.
 pub(crate) fn get_delta_op(change_set: &VMChangeSet, id: u128) -> DeltaOp {
-    *change_set.delta_change_set().get(&key(id)).unwrap()
+    *change_set.aggregator_delta_set().get(&key(id)).unwrap()
 }
 
 /// Returns true if there is a delta op in the change set for the state key
 /// corresponding to an id.
 pub(crate) fn contains_delta_op(change_set: &VMChangeSet, id: u128) -> bool {
-    change_set.delta_change_set().get(&key(id)).is_some()
+    change_set.aggregator_delta_set().get(&key(id)).is_some()
 }
 
 /// Returns a new change set built from writes and deltas.
 pub(crate) fn build_change_set(
     write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    delta_change_set: DeltaChangeSet,
+    delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
 ) -> VMChangeSet {
     VMChangeSet::new(
         BTreeMap::new(),
@@ -81,7 +81,7 @@ pub(crate) fn build_change_set(
         // TODO: This tests only aggregator flow, let's make sure
         // other writes are tested.
         BTreeMap::from_iter(write_set),
-        delta_change_set,
+        BTreeMap::from_iter(delta_set),
         vec![],
         &NoOpChangeSetChecker,
     )
@@ -93,12 +93,12 @@ pub(crate) fn build_change_set(
 /// for testing purposes).
 pub(crate) fn build_vm_output(
     write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    delta_change_set: DeltaChangeSet,
+    delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
 ) -> VMOutput {
     const GAS_USED: u64 = 100;
     const STATUS: TransactionStatus = TransactionStatus::Keep(ExecutionStatus::Success);
     VMOutput::new(
-        build_change_set(write_set, delta_change_set),
+        build_change_set(write_set, delta_set),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
     )

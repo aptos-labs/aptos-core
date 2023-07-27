@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::utils::{build_vm_output, create, key, modify};
-use aptos_aggregator::delta_change_set::{delta_add, serialize, DeltaChangeSet};
+use aptos_aggregator::delta_change_set::{delta_add, serialize};
 use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_types::write_set::WriteSetMut;
 use claims::{assert_err, assert_matches, assert_ok};
@@ -19,7 +19,7 @@ fn test_ok_output_equality_no_deltas() {
     // and has no deltas.
     // Then construct the VMOutput.
     let write_set = vec![(key(0), create(0)), (key(1), modify(1))];
-    let output = build_vm_output(write_set, DeltaChangeSet::empty());
+    let output = build_vm_output(write_set, vec![]);
 
     // Different ways to materialize deltas:
     //   1. `try_materialize` preserves the type and returns a result.
@@ -32,7 +32,7 @@ fn test_ok_output_equality_no_deltas() {
     let txn_output_2 = output.clone().output_with_delta_writes(vec![]);
 
     // Check the output of `try_materialize`.
-    assert!(vm_output.change_set().delta_change_set().is_empty());
+    assert!(vm_output.change_set().aggregator_delta_set().is_empty());
     assert_eq!(
         vm_output.change_set().aggregator_write_set(),
         output.change_set().aggregator_write_set()
@@ -78,11 +78,10 @@ fn test_ok_output_equality_with_deltas() {
     // and the following delta set:
     //   add 20
     let write_set = vec![(key(0), create(0))];
-    let mut delta_change_set = DeltaChangeSet::empty();
-    delta_change_set.insert((key(1), delta_add(20, 100)));
+    let delta_set = vec![(key(1), delta_add(20, 100))];
 
     // Construct the VMOutput.
-    let output = build_vm_output(write_set, delta_change_set);
+    let output = build_vm_output(write_set, delta_set);
 
     // Again, we test three different ways to materialize deltas. Here, we
     // has a single delta which when materialized turns into 30 + 20 = 50.
@@ -101,7 +100,7 @@ fn test_ok_output_equality_with_deltas() {
 
     // Check the output of `try_materialize`. Note that all deltas have to
     // be removed.
-    assert!(vm_output.change_set().delta_change_set().is_empty());
+    assert!(vm_output.change_set().aggregator_delta_set().is_empty());
     assert_eq!(
         vm_output.change_set().aggregator_write_set(),
         &BTreeMap::from_iter(expected_changes)
@@ -133,11 +132,10 @@ fn test_err_output_equality_with_deltas() {
     //   add 20
     // Note that the last delta overflows when added to 90.
     let write_set = vec![(key(0), create(0))];
-    let mut delta_change_set = DeltaChangeSet::empty();
-    delta_change_set.insert((key(1), delta_add(20, 100)));
+    let delta_set = vec![(key(1), delta_add(20, 100))];
 
     // Construct the VMOutput.
-    let output = build_vm_output(write_set, delta_change_set);
+    let output = build_vm_output(write_set, delta_set);
 
     // Testing `output_with_delta_writes` doesn't make sense here because
     // when delta writes are constructed the error is caught.

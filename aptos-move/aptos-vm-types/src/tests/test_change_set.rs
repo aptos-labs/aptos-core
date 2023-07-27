@@ -8,7 +8,7 @@ use crate::{
         get_write_op, key, modify, NoOpChangeSetChecker,
     },
 };
-use aptos_aggregator::delta_change_set::{delta_add, DeltaChangeSet};
+use aptos_aggregator::delta_change_set::delta_add;
 use claims::{assert_matches, assert_ok};
 use move_core_types::vm_status::{StatusCode, VMStatus};
 use std::collections::BTreeMap;
@@ -58,8 +58,8 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     // Create write sets and delta change sets.
     let mut write_set_1 = BTreeMap::new();
     let mut write_set_2 = BTreeMap::new();
-    let mut delta_change_set_1 = DeltaChangeSet::empty();
-    let mut delta_change_set_2 = DeltaChangeSet::empty();
+    let mut delta_set_1 = BTreeMap::new();
+    let mut delta_set_2 = BTreeMap::new();
 
     // Populate sets according to the spec. Skip keys which lead to
     // errors because we test them separately.
@@ -82,23 +82,23 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     write_set_1.insert(key(12), delete());
     write_set_2.insert(key(12), create(112));
 
-    delta_change_set_1.insert((key(15), add!(15)));
-    delta_change_set_2.insert((key(16), add!(116)));
-    delta_change_set_1.insert((key(17), add!(17)));
-    delta_change_set_2.insert((key(17), add!(117)));
+    delta_set_1.insert(key(15), add!(15));
+    delta_set_2.insert(key(16), add!(116));
+    delta_set_1.insert(key(17), add!(17));
+    delta_set_2.insert(key(17), add!(117));
     write_set_1.insert(key(18), create(18));
-    delta_change_set_2.insert((key(18), add!(118)));
+    delta_set_2.insert(key(18), add!(118));
     write_set_1.insert(key(19), modify(19));
-    delta_change_set_2.insert((key(19), add!(119)));
+    delta_set_2.insert(key(19), add!(119));
 
-    delta_change_set_1.insert((key(22), add!(22)));
+    delta_set_1.insert(key(22), add!(22));
     write_set_2.insert(key(22), modify(122));
-    delta_change_set_1.insert((key(23), add!(23)));
+    delta_set_1.insert(key(23), add!(23));
     write_set_2.insert(key(23), delete());
 
     (
-        build_change_set(write_set_1, delta_change_set_1),
-        build_change_set(write_set_2, delta_change_set_2),
+        build_change_set(write_set_1, delta_set_1),
+        build_change_set(write_set_2, delta_set_2),
     )
 }
 
@@ -189,8 +189,8 @@ fn test_unsuccessful_squash_1() {
     let write_set_1 = vec![(key(6), create(6))];
     let write_set_2 = vec![(key(6), create(106))];
 
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
+    let change_set_1 = build_change_set(write_set_1, vec![]);
+    let change_set_2 = build_change_set(write_set_2, vec![]);
     let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
@@ -208,8 +208,8 @@ fn test_unsuccessful_squash_modify_create() {
     let write_set_1 = vec![(key(9), modify(9))];
     let write_set_2 = vec![(key(9), create(109))];
 
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
+    let change_set_1 = build_change_set(write_set_1, vec![]);
+    let change_set_2 = build_change_set(write_set_2, vec![]);
     let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
@@ -227,8 +227,8 @@ fn test_unsuccessful_squash_delete_modify() {
     let write_set_1 = vec![(key(13), delete())];
     let write_set_2 = vec![(key(13), modify(113))];
 
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
+    let change_set_1 = build_change_set(write_set_1, vec![]);
+    let change_set_2 = build_change_set(write_set_2, vec![]);
     let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
@@ -246,8 +246,8 @@ fn test_unsuccessful_squash_delete_delete() {
     let write_set_1 = vec![(key(14), delete())];
     let write_set_2 = vec![(key(14), delete())];
 
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
+    let change_set_1 = build_change_set(write_set_1, vec![]);
+    let change_set_2 = build_change_set(write_set_2, vec![]);
     let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
@@ -263,11 +263,10 @@ fn test_unsuccessful_squash_delete_delete() {
 fn test_unsuccessful_squash_delete_delta() {
     // delete + +120 throws an error
     let write_set_1 = vec![(key(20), delete())];
-    let mut delta_change_set_2 = DeltaChangeSet::empty();
-    delta_change_set_2.insert((key(20), add!(120)));
+    let delta_set_2 = vec![(key(20), add!(120))];
 
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(vec![], delta_change_set_2);
+    let change_set_1 = build_change_set(write_set_1, vec![]);
+    let change_set_2 = build_change_set(vec![], delta_set_2);
     let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,
@@ -282,12 +281,11 @@ fn test_unsuccessful_squash_delete_delta() {
 #[test]
 fn test_unsuccessful_squash_delta_create() {
     // +21 + create 122 throws an error
-    let mut delta_change_set_1 = DeltaChangeSet::empty();
-    delta_change_set_1.insert((key(21), add!(21)));
+    let delta_set_1 = vec![(key(21), add!(21))];
     let write_set_2 = vec![(key(21), create(121))];
 
-    let change_set_1 = build_change_set(vec![], delta_change_set_1);
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
+    let change_set_1 = build_change_set(vec![], delta_set_1);
+    let change_set_2 = build_change_set(write_set_2, vec![]);
     let res = change_set_1.squash_additional_change_set(change_set_2, &NoOpChangeSetChecker);
     assert_matches!(
         res,

@@ -141,7 +141,7 @@ where
     };
 
     // Genesis never produces the delta change set.
-    assert!(change_set.delta_change_set().is_empty());
+    assert!(change_set.aggregator_delta_set().is_empty());
     change_set
         .try_into_storage_change_set()
         .expect("Conversion from VMChangeSet into ChangeSet should always succeed")

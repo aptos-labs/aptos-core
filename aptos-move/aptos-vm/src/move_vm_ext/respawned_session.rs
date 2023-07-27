@@ -110,7 +110,7 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
             };
         }
 
-        match self.change_set.delta_change_set().get(state_key) {
+        match self.change_set.aggregator_delta_set().get(state_key) {
             // The value to resolve delta has to come from `base`.
             Some(delta_op) => Ok(delta_op
                 .try_into_write_op(self.base, state_key)?
@@ -141,7 +141,7 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet};
+    use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{state_store::table::TableHandle, write_set::WriteOp};
     use aptos_vm_types::check_change_set::CheckChangeSet;
@@ -174,17 +174,15 @@ mod test {
         base_view.set_legacy(key2.clone(), serialize(&300));
         base_view.set_legacy(key3.clone(), serialize(&500));
 
-        let delta_op = delta_add(5, 500);
-        let mut delta_change_set = DeltaChangeSet::empty();
-        delta_change_set.insert((key1.clone(), delta_op));
-
         let write_set = vec![(key2.clone(), WriteOp::Modification(serialize(&400)))];
+        let delta_set = vec![(key1.clone(), delta_add(5, 500))];
+
         let change_set = VMChangeSet::new(
             BTreeMap::new(),
             BTreeMap::new(),
             // TODO: Test beyond deltas & aggregators.
             BTreeMap::from_iter(write_set),
-            delta_change_set,
+            BTreeMap::from_iter(delta_set),
             vec![],
             &NoOpChangeSetChecker,
         )

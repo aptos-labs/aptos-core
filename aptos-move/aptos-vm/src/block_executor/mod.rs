@@ -134,7 +134,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .as_ref()
             .expect("Output to be set to get deltas")
             .change_set()
-            .delta_change_set()
+            .aggregator_delta_set()
             .iter()
             .map(|(key, op)| (key.clone(), *op))
             .collect()

@@ -11,8 +11,10 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 
-/// Output produced by the VM. Before VMOutput is passed to storage backends,
-/// it must be converted to TransactionOutput.
+/// Output produced by the VM after executing a transaction.
+///
+/// WARNING: This type should only be used inside the VM. For storage backends,
+/// use `TransactionOutput`.
 #[derive(Debug, Clone)]
 pub struct VMOutput {
     change_set: VMChangeSet,
@@ -21,7 +23,6 @@ pub struct VMOutput {
 }
 
 impl VMOutput {
-    /// Creates a new instance of VM-specific output.
     pub fn new(
         change_set: VMChangeSet,
         fee_statement: FeeStatement,
@@ -34,8 +35,6 @@ impl VMOutput {
         }
     }
 
-    /// Returns an empty transaction output. Useful for handling discards or
-    /// system transactions which do not contain any state changes.
     pub fn empty_with_status(status: TransactionStatus) -> Self {
         Self {
             change_set: VMChangeSet::empty(),
@@ -52,22 +51,18 @@ impl VMOutput {
         (self.change_set, self.fee_statement, self.status)
     }
 
-    /// Returns the changes the transaction wants to apply to the state.
     pub fn change_set(&self) -> &VMChangeSet {
         &self.change_set
     }
 
-    /// Returns the total gas used by transaction which produced this output.
     pub fn gas_used(&self) -> u64 {
         self.fee_statement.gas_used()
     }
 
-    /// Returns the fees for executing a transaction which produced this output.
     pub fn fee_statement(&self) -> &FeeStatement {
         &self.fee_statement
     }
 
-    /// Returns the the execution status of the transaction which produced this output.
     pub fn status(&self) -> &TransactionStatus {
         &self.status
     }
@@ -81,7 +76,7 @@ impl VMOutput {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
-        if self.status().is_discarded() || self.change_set().delta_change_set().is_empty() {
+        if self.status().is_discarded() || self.change_set().aggregator_delta_set().is_empty() {
             return Ok(self);
         }
 
@@ -106,7 +101,7 @@ impl VMOutput {
         debug_assert!(
             materialized_output
                 .change_set()
-                .delta_change_set()
+                .aggregator_delta_set()
                 .is_empty(),
             "DeltaChangeSet must be empty after materialization."
         );
@@ -125,11 +120,11 @@ impl VMOutput {
         let (change_set, gas_used, status) = self.unpack();
 
         // We should have a materialized delta for every delta in the output.
-        assert_eq!(delta_writes.len(), change_set.delta_change_set().len());
+        assert_eq!(delta_writes.len(), change_set.aggregator_delta_set().len());
         debug_assert!(
             delta_writes
                 .iter()
-                .all(|(k, _)| change_set.delta_change_set().contains(k)),
+                .all(|(k, _)| change_set.aggregator_delta_set().contains_key(k)),
             "Delta writes contain a key which does not exist in DeltaChangeSet."
         );
 

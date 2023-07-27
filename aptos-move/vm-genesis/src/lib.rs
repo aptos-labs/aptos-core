@@ -158,7 +158,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        change_set.delta_change_set().is_empty(),
+        change_set.aggregator_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
     assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
@@ -266,7 +266,7 @@ pub fn encode_genesis_change_set(
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        change_set.delta_change_set().is_empty(),
+        change_set.aggregator_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
 
