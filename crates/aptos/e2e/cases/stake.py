@@ -97,9 +97,9 @@ def test_stake_withdraw_stake_before_unlock(run_helper: RunHelper, test_name=Non
 
     result = json.loads(response.stdout)["Result"]
     if result[0].get("success") != True:
-        raise TestError("Did not execute [add-stake] successfully")
+        raise TestError("Did not execute [withdraw-stake] successfully")
 
-    # verify that the stake was added
+    # Get the current stake amount again
     response = run_helper.run_command(
         test_name,
         [
@@ -111,6 +111,7 @@ def test_stake_withdraw_stake_before_unlock(run_helper: RunHelper, test_name=Non
         ],
     )
 
+    # Total stake should not have change because the stake is still locked
     result = json.loads(response.stdout)["Result"]
     if result[0].get("total_stake") != current_stake:
         raise TestError(
@@ -254,17 +255,86 @@ def test_stake_increase_lockup(run_helper: RunHelper, test_name=None):
 
 @test_case
 def test_stake_unlock_stake(run_helper: RunHelper, test_name=None):
-    # run the set-operator command
+    # run the unlock-stake command
+    response = run_helper.run_command(
+        test_name,
+        ["aptos", "stake", "unlock-stake", "--amount", "1000000", "--assume-yes"],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    if result[0].get("success") != True:
+        raise TestError("Did not unlock stake successfully")
+
+
+@test_case
+def test_stake_withdraw_stake_after_unlock(run_helper: RunHelper, test_name=None):
+    # get the current stake amount
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "get-stake-pool",
+            "--owner-address",
+            "default",
+        ],
+    )
+    result = json.loads(response.stdout)["Result"]
+    current_stake = result[0].get("total_stake")
+
+    # run the unlock-stake command
+    amount_to_withdraw = 1000000
     response = run_helper.run_command(
         test_name,
         [
             "aptos",
             "stake",
-            "increase-lockup",
+            "unlock-stake",
+            "--amount",
+            f"{amount_to_withdraw}",
+            "--profile",
+            "default",
             "--assume-yes",
         ],
     )
 
     result = json.loads(response.stdout)["Result"]
     if result[0].get("success") != True:
-        raise TestError("Did not increase lockup successfully")
+        raise TestError("Did not unlock stake successfully")
+
+    # run the withdraw-stake command
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "stake",
+            "withdraw-stake",
+            "--amount",
+            f"{amount_to_withdraw}",
+            "--profile",
+            "default",
+            "--assume-yes",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    if result[0].get("success") != True:
+        raise TestError("Did not execute [withdraw-stake] successfully")
+
+    # verify that the stake was withdrawed
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "get-stake-pool",
+            "--owner-address",
+            "default",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    if result[0].get("total_stake") != current_stake - amount_to_withdraw:
+        raise TestError(
+            f"The stake should be decreased by {amount_to_withdraw}. Expected {current_stake - amount_to_withdraw}, got {result[0].get('total_stake')}"
+        )
