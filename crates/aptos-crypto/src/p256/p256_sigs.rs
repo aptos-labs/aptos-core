@@ -36,8 +36,8 @@ impl P256Signature {
 
     /// Serialize an P256Signature.
     pub fn to_bytes(&self) -> [u8; P256_SIGNATURE_LENGTH] {
-        // TODO: Error handling
-        self.0.to_der().unwrap().try_into().unwrap()
+        let bytes = self.0.to_der().expect("openssl ffi failed to serialize P256 signature"); 
+        bytes.try_into().expect("openssl ffi serialized P256 signature incorrectly")
     }
 
     /// Deserialize an P256Signature without any validation checks (malleability)
@@ -146,8 +146,7 @@ impl Signature for P256Signature {
     }
 
     fn to_bytes(&self) -> Vec<u8> {
-        // TODO: Error handling
-        self.0.to_der().unwrap()
+        self.0.to_der().expect("openssl ffi failed to serialize P256 signature")
     }
 }
 
@@ -193,8 +192,7 @@ impl Eq for P256Signature {}
 
 impl fmt::Display for P256Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO: Error handling
-        write!(f, "{}", hex::encode(&self.0.to_der().unwrap()[..]))
+        write!(f, "{}", hex::encode(&self.0.to_der().expect("openssl ffi failed to serialize P256 signature")[..]))
     }
 }
 
