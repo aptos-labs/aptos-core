@@ -137,6 +137,7 @@ where
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
             // TODO: This may seem like code duplication, but we will have three
+            // MVHashMaps anyway soon.
 
             // First, apply data writes.
             let write_version = (idx_to_execute, incarnation);
