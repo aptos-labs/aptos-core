@@ -26,10 +26,7 @@ describe("token objects", () => {
     "create collection",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.createCollection(alice, "Alice's simple collection", collectionName, "https://aptos.dev", 5, {
-          royaltyNumerator: 10,
-          royaltyDenominator: 10,
-        }),
+        await aptosToken.createCollection(alice, "Alice's simple collection", collectionName, "https://aptos.dev", 5),
         { checkSuccess: true },
       );
     },
