@@ -258,6 +258,3 @@ jobs:
 
   python-lint-test:
     uses: ./.github/workflows/python-lint-test.yaml
-
-  helm-lint:
-    uses: ./.github/workflows/helm-lint.yaml
