@@ -226,6 +226,9 @@ impl OmegaPartitioner {
 impl BlockPartitioner for OmegaPartitioner {
     fn partition(&self, mut txns: Vec<AnalyzedTransaction>, num_executor_shards: usize) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
+        let num_rounds_limit: usize = std::env::var("OMEGA_PARTITIONER__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
+        let avoid_pct: usize = std::env::var("OMEGA_PARTITIONER__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<usize>().ok().unwrap_or(10)).unwrap_or(10);
+        println!("partitioning with num_rounds_limit={}, avoid_pct={}", num_rounds_limit, avoid_pct);
         let num_txns = txns.len();
         let mut num_senders = AtomicUsize::new(0);
         let mut num_keys = AtomicUsize::new(0);
@@ -274,17 +277,15 @@ impl BlockPartitioner for OmegaPartitioner {
         let duration = timer.stop_and_record();
         println!("pre_partition_uniform={duration:?}");
 
-        let num_rounds: usize = std::env::var("OMEGA_PARTITIONER__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
-        let pct: usize = std::env::var("OMEGA_PARTITIONER__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<usize>().ok().unwrap_or(10)).unwrap_or(10);
         let mut txn_id_matrix: Vec<Vec<Vec<usize>>> = Vec::new();
-        for round_id in 0..(num_rounds - 1) {
+        for round_id in 0..(num_rounds_limit - 1) {
             let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
             let (accepted, discarded) = self.discarding_round(round_id, &txns, remaining_txns, &helpers_by_key_id, &start_txn_ids_by_shard_id);
             txn_id_matrix.push(accepted);
             remaining_txns = discarded;
             let duration = timer.stop_and_record();
             println!("round_{round_id}={duration:?}");
-            if remaining_txns.len() < pct * num_txns / 100 {
+            if remaining_txns.len() < avoid_pct * num_txns / 100 {
                 break;
             }
         }
@@ -297,7 +298,7 @@ impl BlockPartitioner for OmegaPartitioner {
                 for loc in txn.read_hints.iter().chain(txn.write_hints.iter()) {
                     let loc_id = *loc.maybe_id_in_partition_session.as_ref().unwrap();
                     let helper = helpers_by_key_id.get(&loc_id).unwrap();
-                    helper.write().unwrap().promote_txn_id(*txn_id, num_rounds - 1, num_executor_shards - 1);
+                    helper.write().unwrap().promote_txn_id(*txn_id, num_rounds_limit - 1, num_executor_shards - 1);
                 }
             }
 
