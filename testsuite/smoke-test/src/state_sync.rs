@@ -352,6 +352,10 @@ async fn test_validator_bootstrap_state_snapshot() {
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
+            config
+                .state_sync
+                .state_sync_driver
+                .fast_sync_wait_for_epoch_change = false;
             config.state_sync.storage_service.max_state_chunk_size = 1;
         }))
         .build()
@@ -417,6 +421,10 @@ async fn test_validator_bootstrap_state_snapshot_no_compression() {
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
+            config
+                .state_sync
+                .state_sync_driver
+                .fast_sync_wait_for_epoch_change = false;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ApplyTransactionOutputs;
             config.state_sync.aptos_data_client.use_compression = false;
@@ -437,6 +445,10 @@ async fn test_validator_bootstrap_state_snapshot_network_limit() {
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
+            config
+                .state_sync
+                .state_sync_driver
+                .fast_sync_wait_for_epoch_change = false;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ExecuteTransactions;
             config.state_sync.storage_service.max_network_chunk_bytes = 200 * 1024;
@@ -458,6 +470,10 @@ async fn test_validator_bootstrap_state_snapshot_network_limit_tiny() {
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
+            config
+                .state_sync
+                .state_sync_driver
+                .fast_sync_wait_for_epoch_change = false;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ExecuteTransactions;
             config.state_sync.storage_service.max_network_chunk_bytes = 1;
@@ -477,6 +493,10 @@ async fn test_validator_bootstrap_state_snapshot_exponential_backoff() {
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
+            config
+                .state_sync
+                .state_sync_driver
+                .fast_sync_wait_for_epoch_change = false;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ApplyTransactionOutputs;
             config.state_sync.aptos_data_client.use_compression = false;
@@ -650,6 +670,10 @@ async fn test_validator_failure_bootstrap_outputs() {
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
+            config
+                .state_sync
+                .state_sync_driver
+                .fast_sync_wait_for_epoch_change = false;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ApplyTransactionOutputs;
         }))
@@ -671,6 +695,10 @@ async fn test_validator_failure_bootstrap_execution() {
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
+            config
+                .state_sync
+                .state_sync_driver
+                .fast_sync_wait_for_epoch_change = false;
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ExecuteTransactions;
         }))

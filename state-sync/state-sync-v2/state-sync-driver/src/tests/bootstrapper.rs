@@ -139,6 +139,76 @@ async fn test_bootstrap_no_notification() {
 }
 
 #[tokio::test]
+#[should_panic(expected = "MockStreamingClient::get_all_transaction_outputs")]
+async fn test_bootstrap_fast_sync_wait_epoch_change() {
+    // Create a driver configuration with a genesis waypoint and fast sync enabled
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    // Create the mock streaming client
+    let mock_streaming_client = create_mock_streaming_client();
+
+    // Create the bootstrapper
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
+
+    // Create a global data summary where only epoch 0 has ended
+    let global_data_summary = create_global_summary(0);
+
+    // Drive progress a few times
+    for _ in 0..1000 {
+        drive_progress(&mut bootstrapper, &global_data_summary, false)
+            .await
+            .unwrap();
+    }
+
+    // Verify the bootstrapper is not yet bootstrapped
+    assert!(!bootstrapper.is_bootstrapped());
+
+    // Create a global data summary where epoch 1 has ended (unblocking fast sync)
+    let global_data_summary = create_global_summary(1);
+
+    // Insert an epoch ending ledger info into the verified states of the bootstrapper
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(100));
+
+    // Drive progress a few times. This should cause the test to panic
+    // because fast sync is now unblocked and should start to request
+    // data from the mock client (which hasn't been configured to respond).
+    for _ in 0..1000 {
+        drive_progress(&mut bootstrapper, &global_data_summary, false)
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_bootstrap_fast_sync_wait_epoch_change_blocked() {
+    // Create a driver configuration with a genesis waypoint and fast sync enabled
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    // Create the mock streaming client
+    let mock_streaming_client = create_mock_streaming_client();
+
+    // Create the bootstrapper
+    let (mut bootstrapper, _) =
+        create_bootstrapper(driver_configuration, mock_streaming_client, None, true);
+
+    // Create a global data summary where only epoch 0 has ended
+    let global_data_summary = create_global_summary(0);
+
+    // Drive progress a few times
+    for _ in 0..1000 {
+        drive_progress(&mut bootstrapper, &global_data_summary, false)
+            .await
+            .unwrap();
+    }
+
+    // Verify the bootstrapper is not yet bootstrapped
+    assert!(!bootstrapper.is_bootstrapped());
+}
+
+#[tokio::test]
 async fn test_critical_timeout() {
     // Create a driver configuration with a genesis waypoint and a stream timeout of 1 second
     let mut driver_configuration = create_full_node_driver_configuration();

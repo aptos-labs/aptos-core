@@ -463,6 +463,21 @@ impl<
         let highest_known_ledger_info = self.get_highest_known_ledger_info()?;
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
+        // If the node is fast syncing for the first time we
+        // need to wait until an epoch change is advertised.
+        let state_sync_driver_config = self.driver_configuration.config;
+        if self.get_bootstrapping_mode().is_fast_sync()
+            && state_sync_driver_config.fast_sync_wait_for_epoch_change
+            && highest_synced_version == GENESIS_TRANSACTION_VERSION
+            && highest_known_ledger_version == GENESIS_TRANSACTION_VERSION
+        {
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                "Waiting for an epoch change to be advertised! Highest synced and advertised version is {}.",
+                highest_synced_version
+            )));
+            return Ok(());
+        }
+
         // If we've already synced to the highest known version, there's nothing to do
         if highest_synced_version >= highest_known_ledger_version {
             info!(LogSchema::new(LogEntry::Bootstrapper)
@@ -476,22 +491,16 @@ impl<
             highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode())));
 
         // Bootstrap according to the mode
-        match self.get_bootstrapping_mode() {
-            BootstrappingMode::DownloadLatestStates => {
-                self.fetch_missing_state_snapshot_data(
-                    highest_synced_version,
-                    highest_known_ledger_info,
-                )
+        if self.get_bootstrapping_mode().is_fast_sync() {
+            self.fetch_missing_state_snapshot_data(
+                highest_synced_version,
+                highest_known_ledger_info,
+            )
+            .await
+        } else {
+            // We're either transaction or output syncing
+            self.fetch_missing_transaction_data(highest_synced_version, highest_known_ledger_info)
                 .await
-            },
-            _ => {
-                // We're either transaction or output syncing
-                self.fetch_missing_transaction_data(
-                    highest_synced_version,
-                    highest_known_ledger_info,
-                )
-                .await
-            },
         }
     }
 
@@ -927,9 +936,7 @@ impl<
     ) -> Result<(), Error> {
         // Verify that we're expecting state value payloads
         let bootstrapping_mode = self.get_bootstrapping_mode();
-        if self.should_fetch_epoch_ending_ledger_infos()
-            || !matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
-        {
+        if self.should_fetch_epoch_ending_ledger_infos() || !bootstrapping_mode.is_fast_sync() {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
                 notification_id,
                 NotificationFeedback::InvalidPayloadData,
@@ -1078,7 +1085,7 @@ impl<
         // Verify that we're expecting transaction or output payloads
         let bootstrapping_mode = self.get_bootstrapping_mode();
         if self.should_fetch_epoch_ending_ledger_infos()
-            || (matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates)
+            || (bootstrapping_mode.is_fast_sync()
                 && self.state_value_syncer.transaction_output_to_sync.is_some())
         {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
@@ -1091,8 +1098,8 @@ impl<
             ));
         }
 
-        // If we're state syncing, we expect a single transaction info
-        if matches!(bootstrapping_mode, BootstrappingMode::DownloadLatestStates) {
+        // If we're fast syncing, we expect a single transaction info
+        if bootstrapping_mode.is_fast_sync() {
             return self
                 .verify_transaction_info_to_sync(
                     notification_id,

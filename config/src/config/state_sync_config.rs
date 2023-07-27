@@ -59,6 +59,11 @@ impl BootstrappingMode {
             BootstrappingMode::ExecuteOrApplyFromGenesis => "execute_or_apply_from_genesis",
         }
     }
+
+    /// Returns true iff the bootstrapping mode is fast sync
+    pub fn is_fast_sync(&self) -> bool {
+        *self == BootstrappingMode::DownloadLatestStates
+    }
 }
 
 /// The continuous syncing mode determines how the node will stay up-to-date
@@ -99,6 +104,8 @@ pub struct StateSyncDriverConfig {
     pub enable_auto_bootstrapping: bool,
     /// The interval (ms) to refresh the storage summary
     pub fallback_to_output_syncing_secs: u64,
+    /// Whether or not to wait for an epoch change when fast syncing
+    pub fast_sync_wait_for_epoch_change: bool,
     /// The interval (ms) at which to check state sync progress
     pub progress_check_interval_ms: u64,
     /// The maximum time (secs) to wait for connections from peers before auto-bootstrapping
@@ -126,7 +133,8 @@ impl Default for StateSyncDriverConfig {
             commit_notification_timeout_ms: 5000,
             continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs,
             enable_auto_bootstrapping: false,
-            fallback_to_output_syncing_secs: 180, // 3 minutes
+            fallback_to_output_syncing_secs: 180,  // 3 minutes
+            fast_sync_wait_for_epoch_change: true, // This is required for genesis-less storage startup in fast sync
             progress_check_interval_ms: 50,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
@@ -289,10 +297,47 @@ impl Default for AptosDataClientConfig {
 
 impl ConfigSanitizer for StateSyncConfig {
     fn sanitize(
-        _node_config: &mut NodeConfig,
-        _node_type: NodeType,
-        _chain_id: ChainId,
+        node_config: &mut NodeConfig,
+        node_type: NodeType,
+        chain_id: ChainId,
     ) -> Result<(), Error> {
+        // Sanitize the state sync driver config
+        StateSyncDriverConfig::sanitize(node_config, node_type, chain_id)
+    }
+}
+
+impl ConfigSanitizer for StateSyncDriverConfig {
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_type: NodeType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let state_sync_driver_config = &mut node_config.state_sync.state_sync_driver;
+
+        // Verify that auto-bootstrapping is not enabled for
+        // nodes that are fast syncing.
+        let fast_sync_enabled = state_sync_driver_config.bootstrapping_mode.is_fast_sync();
+        if state_sync_driver_config.enable_auto_bootstrapping && fast_sync_enabled {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Auto-bootstrapping should not be enabled for nodes that are fast syncing!"
+                    .to_string(),
+            ));
+        }
+
+        // Verify that fast sync will wait for an
+        // epoch change in testnet and mainnet.
+        if (chain_id.is_testnet() || chain_id.is_mainnet())
+            && fast_sync_enabled
+            && !state_sync_driver_config.fast_sync_wait_for_epoch_change
+        {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Fast sync must wait for an epoch change in testnet and mainnet!".to_string(),
+            ));
+        }
+
         Ok(())
     }
 }
@@ -416,10 +461,8 @@ mod tests {
         assert!(modified_config);
 
         // Verify that the bootstrapping mode is now set to fast sync
-        assert_eq!(
-            node_config.state_sync.state_sync_driver.bootstrapping_mode,
-            BootstrappingMode::DownloadLatestStates
-        );
+        let state_sync_driver_config = node_config.state_sync.state_sync_driver;
+        assert!(state_sync_driver_config.bootstrapping_mode.is_fast_sync());
     }
 
     #[test]
@@ -438,10 +481,8 @@ mod tests {
         assert!(modified_config);
 
         // Verify that the bootstrapping mode is now set to fast sync
-        assert_eq!(
-            node_config.state_sync.state_sync_driver.bootstrapping_mode,
-            BootstrappingMode::DownloadLatestStates
-        );
+        let state_sync_driver_config = node_config.state_sync.state_sync_driver;
+        assert!(state_sync_driver_config.bootstrapping_mode.is_fast_sync());
     }
 
     #[test]
@@ -574,6 +615,69 @@ mod tests {
             data_streaming_service_config.max_concurrent_state_requests,
             100
         );
+    }
+
+    #[test]
+    fn test_sanitize_auto_bootstrapping_fast_sync() {
+        // Create a node config with fast sync and
+        // auto bootstrapping enabled.
+        let mut node_config = NodeConfig {
+            state_sync: StateSyncConfig {
+                state_sync_driver: StateSyncDriverConfig {
+                    bootstrapping_mode: BootstrappingMode::DownloadLatestStates,
+                    enable_auto_bootstrapping: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that sanitization fails
+        let error =
+            StateSyncConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::testnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_fast_sync_wait_for_epoch_change() {
+        // Create a node config with fast sync enabled
+        // that will not wait for an epoch change.
+        let mut node_config = NodeConfig {
+            state_sync: StateSyncConfig {
+                state_sync_driver: StateSyncDriverConfig {
+                    bootstrapping_mode: BootstrappingMode::DownloadLatestStates,
+                    fast_sync_wait_for_epoch_change: false,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that sanitization fails on testnet
+        let error = StateSyncConfig::sanitize(
+            &mut node_config,
+            NodeType::ValidatorFullnode,
+            ChainId::testnet(),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+
+        // Verify that sanitization fails on mainnet
+        let error =
+            StateSyncConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+
+        // Verify that sanitization succeeds on a test network
+        StateSyncConfig::sanitize(
+            &mut node_config,
+            NodeType::ValidatorFullnode,
+            ChainId::test(),
+        )
+        .unwrap();
     }
 
     /// Creates and returns a node config with the syncing modes set to execution
