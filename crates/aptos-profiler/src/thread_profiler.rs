@@ -4,10 +4,7 @@
 use anyhow::Result;
 use crate::{Profiler, ThreadProfilerConfig};
 use crate::utils::convert_svg_to_string;
-use std::process::Command;
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
+use std::{process::Command, fs::File, io::Write, path::PathBuf};
 
 //TODO: add other config fields
 pub struct ThreadProfiler {
@@ -28,14 +25,14 @@ impl Profiler for ThreadProfiler {
             Command::new("cargo")
                 .arg("run")
                 .arg("-p")
-                .arg("aptos-iuchild")
+                .arg("aptos-profiler")
                 .arg("--release"),
         )
             .unwrap();
-
+        
         // Open a file for writing
         let mut file = File::create(self.thread_profiling_data_file.as_path()).unwrap();
-
+        
         // Write the trace information to the file
         write!(file, "{:#?}", trace).unwrap();
         Ok(())
@@ -44,8 +41,11 @@ impl Profiler for ThreadProfiler {
     fn end_profiling(&self) -> Result<()> {
         unimplemented!()
     }
-
-    fn expose_results(&self) -> Result<String> {
-        convert_svg_to_string(self.thread_profiling_data_file.as_path())
+    fn expose_svg_results(&self) -> Result<String> {
+        unimplemented!()
+    }
+    fn expose_text_results(&self) -> Result<String> {
+        let content = convert_svg_to_string(self.thread_profiling_data_file.join("/thread_dump.txt").as_path());
+        return Ok(content.unwrap());
     }
 }

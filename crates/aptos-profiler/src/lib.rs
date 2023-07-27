@@ -35,15 +35,15 @@ impl ProfilerConfig {
 
 #[derive(Debug, Clone)]
 struct CpuProfilerConfig {
-    sleep_duration: u64,
-    frequency: u64,
+    duration: u64,
+    frequency: i32,
     cpu_profiling_data_files_dir: PathBuf,
 }
 
 impl CpuProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
-            sleep_duration: 1,
+            duration: 5,
             frequency: 100,
             cpu_profiling_data_files_dir: PathBuf::from("./cpu_profiling_data_files"),
         })
@@ -52,16 +52,14 @@ impl CpuProfilerConfig {
 
 #[derive(Debug, Clone)]
 struct MemProfilerConfig {
-    sleep_duration: u64,
-    frequency: u64,
+    duration: u64,
     mem_profiling_data_files_dir: PathBuf,
-}
+} 
 
 impl MemProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
-            sleep_duration: 1,
-            frequency: 100,
+            duration: 60,
             mem_profiling_data_files_dir: PathBuf::from("./mem_profiling_data_files"),
         })
     }
@@ -89,7 +87,10 @@ pub trait Profiler {
     // End profiling
     fn end_profiling(&self) -> Result<()>;
     // Expose the results as a JSON string for visualization
-    fn expose_results(&self) -> Result<String>;
+    fn expose_text_results(&self) -> Result<String>;
+    // Expose the results as a JSON string for visualization
+    fn expose_svg_results(&self) -> Result<String>;
+
 }
 
 
@@ -104,6 +105,7 @@ impl ProfilerHandler {
             config
         }
     }
+    
 
     pub fn get_thread_profiler(&self) -> Box<dyn Profiler> {
         Box::new(ThreadProfiler::new(self.config.thread_profiler_config.as_ref().expect("Thread profiler config is not set")))
