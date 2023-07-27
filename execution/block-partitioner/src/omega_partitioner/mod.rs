@@ -40,7 +40,8 @@ pub struct OmegaPartitioner {
 }
 
 impl OmegaPartitioner {
-    pub fn new(num_threads: usize) -> Self {
+    pub fn new() -> Self {
+        let num_threads = std::env::var("OMEGA_PARTITIOENR__NUM_THREADS").ok().map(|s|s.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
         Self {
             thread_pool: ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap()
         }
@@ -230,7 +231,6 @@ impl BlockPartitioner for OmegaPartitioner {
         let mut num_keys = AtomicUsize::new(0);
         let shard_amount = std::env::var("OMEGA_PARTITIONER__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
         let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(shard_amount);
-        let mut txn_counts_by_sender_id: DashMap<usize, AtomicUsize> = DashMap::with_shard_amount(shard_amount);
         let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(shard_amount);
         let mut helpers_by_key_id: DashMap<usize, RwLock<StorageLocationHelper>> = DashMap::with_shard_amount(shard_amount);
         for (txn_id, txn) in txns.iter_mut().enumerate() {
@@ -242,7 +242,6 @@ impl BlockPartitioner for OmegaPartitioner {
             let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
                 num_senders.fetch_add(1, Ordering::SeqCst)
             });
-            txn_counts_by_sender_id.entry(sender_id).or_insert_with(|| AtomicUsize::new(0)).fetch_add(1, Ordering::SeqCst);
             txn.maybe_sender_id_in_partition_session = Some(sender_id);
             let num_writes = txn.write_hints.len();
             for (i, storage_location) in txn.write_hints.iter_mut().chain(txn.read_hints.iter_mut()).enumerate() {
@@ -325,7 +324,7 @@ fn print_storage_location_helper_summary(key_ids_by_key: &DashMap<StateKey, usiz
 #[test]
 fn test_omega_partitioner() {
     let block_generator = P2pBlockGenerator::new(100);
-    let partitioner = OmegaPartitioner::new(8);
+    let partitioner = OmegaPartitioner::new();
     let mut rng = thread_rng();
     let num_shards = 10;
     for _ in 0..100 {

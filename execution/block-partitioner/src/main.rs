@@ -38,8 +38,7 @@ fn main() {
         .collect();
     println!("Created {} accounts", num_accounts);
 
-    let partitioner = OmegaPartitioner::new(8);
-
+    let partitioner = OmegaPartitioner::new();
     // let partitioner = ShardedBlockPartitioner::new(args.num_shards);
     for _ in 0..args.num_blocks {
         println!("Creating {} transactions", args.block_size);
@@ -60,7 +59,7 @@ fn main() {
         let elapsed = now.elapsed();
 
         println!("Time taken to partition: {:?}", elapsed);
-        report_sub_block_matrix(&result);
+        // report_sub_block_matrix(&result);
     }
 }
 
