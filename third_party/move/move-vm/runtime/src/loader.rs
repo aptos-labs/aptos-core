@@ -747,6 +747,7 @@ impl Loader {
         script: &[u8],
         data_store: &TransactionDataCache,
     ) -> VMResult<CompiledScript> {
+        let script_size = script.len();
         let script = match CompiledScript::deserialize_with_max_version(
             script,
             self.vm_config.max_binary_format_version,
@@ -760,7 +761,7 @@ impl Loader {
             },
         };
 
-        match self.verify_script(&script) {
+        match self.verify_script(&script, script_size) {
             Ok(_) => {
                 // verify dependencies
                 let loaded_deps = script
@@ -777,10 +778,14 @@ impl Loader {
 
     // Script verification steps.
     // See `verify_module()` for module verification steps.
-    fn verify_script(&self, script: &CompiledScript) -> VMResult<()> {
+    fn verify_script(&self, script: &CompiledScript, script_size: usize) -> VMResult<()> {
         fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
 
-        move_bytecode_verifier::verify_script_with_config(&self.vm_config.verifier, script)
+        move_bytecode_verifier::verify_script_with_config(
+            &self.vm_config.verifier,
+            script,
+            Some(script_size),
+        )
     }
 
     fn verify_script_dependencies(
@@ -1014,19 +1019,20 @@ impl Loader {
     // verification steps to load these modules without actually loading them into the code cache.
     pub(crate) fn verify_module_bundle_for_publication(
         &self,
-        modules: &[CompiledModule],
+        modules: &[(CompiledModule, usize)],
         data_store: &mut TransactionDataCache,
     ) -> VMResult<()> {
         fail::fail_point!("verifier-failpoint-1", |_| { Ok(()) });
 
-        let mut bundle_unverified: BTreeSet<_> = modules.iter().map(|m| m.self_id()).collect();
+        let mut bundle_unverified: BTreeSet<_> = modules.iter().map(|(m, _)| m.self_id()).collect();
         let mut bundle_verified = BTreeMap::new();
-        for module in modules {
+        for (module, module_size) in modules {
             let module_id = module.self_id();
             bundle_unverified.remove(&module_id);
 
             self.verify_module_for_publication(
                 module,
+                *module_size,
                 &bundle_verified,
                 &bundle_unverified,
                 data_store,
@@ -1050,6 +1056,7 @@ impl Loader {
     fn verify_module_for_publication(
         &self,
         module: &CompiledModule,
+        module_size: usize,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &TransactionDataCache,
@@ -1058,7 +1065,11 @@ impl Loader {
         // module will NOT show up in `module_cache`. In the module republishing case, it means
         // that the old module is still in the `module_cache`, unless a new Loader is created,
         // which means that a new MoveVM instance needs to be created.
-        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, module)?;
+        move_bytecode_verifier::verify_module_with_config(
+            &self.vm_config.verifier,
+            module,
+            Some(module_size),
+        )?;
         self.check_natives(module)?;
 
         let mut visited = BTreeSet::new();
@@ -1278,8 +1289,12 @@ impl Loader {
         }
 
         // bytecode verifier checks that can be performed with the module itself
-        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, &module)
-            .map_err(expect_no_verification_errors)?;
+        move_bytecode_verifier::verify_module_with_config(
+            &self.vm_config.verifier,
+            &module,
+            Some(bytes.len()),
+        )
+        .map_err(expect_no_verification_errors)?;
         self.check_natives(&module)
             .map_err(expect_no_verification_errors)?;
         Ok(module)

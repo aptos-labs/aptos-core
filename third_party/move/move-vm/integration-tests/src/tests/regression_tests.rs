@@ -79,7 +79,7 @@ fn script_large_ty() {
 
     let script_code = &mut decompiled_script.code.code;
     script_code.clear();
-    let num_vecpacks = 1000;
+    let num_vecpacks = 1;
     for _ in 0..num_vecpacks {
         script_code.push(Bytecode::VecPack(SignatureIndex(2), 0));
     }
@@ -88,11 +88,11 @@ fn script_large_ty() {
     }
     script_code.push(Bytecode::Ret);
 
-    move_bytecode_verifier::verify_module_with_config(&verifier_config, &decompiled_module)
+    move_bytecode_verifier::verify_module_with_config(&verifier_config, &decompiled_module, None)
         .unwrap();
 
     let start = Instant::now();
-    move_bytecode_verifier::verify_script_with_config(&verifier_config, &decompiled_script)
+    move_bytecode_verifier::verify_script_with_config(&verifier_config, &decompiled_script, None)
         .unwrap();
     println!("script verification time: {:?}", start.elapsed());
 

@@ -65,6 +65,7 @@ impl VMRuntime {
                     blob,
                     self.loader.vm_config().max_binary_format_version,
                 )
+                .map(|module| (module, blob.len()))
             })
             .collect::<PartialVMResult<Vec<_>>>()
         {
@@ -82,7 +83,7 @@ impl VMRuntime {
         // Make sure all modules' self addresses matches the transaction sender. The self address is
         // where the module will actually be published. If we did not check this, the sender could
         // publish a module under anyone's account.
-        for module in &compiled_modules {
+        for (module, _) in &compiled_modules {
             if module.address() != &sender {
                 return Err(verification_error(
                     StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
@@ -101,7 +102,7 @@ impl VMRuntime {
         //
         // TODO: in the future, we may want to add restrictions on module republishing, possibly by
         // changing the bytecode format to include an `is_upgradable` flag in the CompiledModule.
-        for module in &compiled_modules {
+        for (module, _) in &compiled_modules {
             let module_id = module.self_id();
 
             if data_store.exists_module(&module_id)? && compat.need_check_compat() {
@@ -177,7 +178,7 @@ impl VMRuntime {
         // none of the module can be published/updated.
 
         // All modules verified, publish them to data cache
-        for (module, blob) in compiled_modules.into_iter().zip(modules.into_iter()) {
+        for ((module, _), blob) in compiled_modules.into_iter().zip(modules.into_iter()) {
             let is_republishing = data_store.exists_module(&module.self_id())?;
             if is_republishing {
                 // This is an upgrade, so invalidate the loader cache, which still contains the

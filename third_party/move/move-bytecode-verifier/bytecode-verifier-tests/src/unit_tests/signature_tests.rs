@@ -7,12 +7,14 @@ use move_binary_format::file_format::{
     Bytecode::*, CompiledModule, SignatureToken::*, Visibility::Public, *,
 };
 use move_bytecode_verifier::{
-    verify_module, verify_module_with_config_for_test, SignatureChecker, VerifierConfig,
+    signature_v2, verify_module, verify_module_with_config_for_test, SignatureChecker,
+    VerifierConfig,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
 };
 use proptest::{collection::vec, prelude::*, sample::Index as PropIndex};
+use std::time::Instant;
 
 #[test]
 fn test_reference_of_reference() {
@@ -221,4 +223,92 @@ fn big_signature_test() {
     )
     .unwrap_err();
     assert_eq!(res.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+}
+
+#[test]
+pub fn many_function_instantiations() {
+    let mut m = empty_module();
+
+    let module_self = m.self_module_handle_idx;
+
+    let ident_foo = IdentifierIndex(m.identifiers.len() as u16);
+    m.identifiers.push(Identifier::new("Foo").unwrap());
+
+    let struct_foo = StructHandleIndex(m.struct_handles.len() as u16);
+    m.struct_handles.push(StructHandle {
+        module: module_self,
+        name: ident_foo,
+        abilities: AbilitySet::singleton(Ability::Copy),
+        type_parameters: std::iter::repeat_with(|| StructTypeParameter {
+            constraints: AbilitySet::singleton(Ability::Copy),
+            is_phantom: true,
+        })
+        .take(32)
+        .collect(),
+    });
+
+    m.struct_defs.push(StructDefinition {
+        struct_handle: struct_foo,
+        field_information: StructFieldInformation::Native,
+    });
+
+    let sig_empty = SignatureIndex::new(m.signatures.len() as u16);
+    m.signatures.push(Signature(vec![]));
+
+    let n_sigs = 150;
+    let n_funcs = 1400;
+
+    let sig_start = m.signatures.len();
+    for _i in 0..n_sigs {
+        m.signatures.push(Signature(
+            std::iter::repeat_with(|| {
+                SignatureToken::StructInstantiation(
+                    struct_foo,
+                    (0..32).map(SignatureToken::TypeParameter).collect(),
+                )
+            })
+            .take(32)
+            .collect(),
+        ));
+    }
+
+    let func_start = m.function_handles.len();
+    for i in 0..n_funcs {
+        let ident_f = IdentifierIndex(m.identifiers.len() as u16);
+        m.identifiers
+            .push(Identifier::new(format!("f{}", i)).unwrap());
+
+        m.function_handles.push(FunctionHandle {
+            module: module_self,
+            name: ident_f,
+            parameters: sig_empty,
+            return_: sig_empty,
+            type_parameters: std::iter::repeat_with(|| AbilitySet::singleton(Ability::Copy))
+                .take(32)
+                .collect(),
+        });
+    }
+
+    for i in 0..n_sigs {
+        for j in 0..n_funcs {
+            m.function_instantiations.push(FunctionInstantiation {
+                handle: FunctionHandleIndex((func_start + j) as u16),
+                type_parameters: SignatureIndex((sig_start + i) as u16),
+            })
+        }
+    }
+
+    let mut blob = vec![];
+    m.serialize(&mut blob).unwrap();
+    println!("len: {} KB", blob.len() / 1024);
+
+    let t1 = Instant::now();
+    let res = signature_v2::verify_module(&VerifierConfig::production(), &m, Some(blob.len()));
+    let t2 = Instant::now();
+    println!("{} ms", (t2 - t1).as_millis());
+
+    assert_eq!(
+        res.unwrap_err().major_status(),
+        StatusCode::PROGRAM_TOO_COMPLEX
+    );
 }
