@@ -41,7 +41,7 @@ pub struct OmegaPartitioner {
 
 impl OmegaPartitioner {
     pub fn new() -> Self {
-        let num_threads = std::env::var("OMEGA_PARTITIOENR__NUM_THREADS").ok().map(|s|s.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
+        let num_threads = std::env::var("OMEGA_PARTITIONER__NUM_THREADS").ok().map(|s|s.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
         println!("num_threads={num_threads}");
         Self {
             thread_pool: ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap()
@@ -246,14 +246,14 @@ impl BlockPartitioner for OmegaPartitioner {
         let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
         let num_rounds_limit: usize = std::env::var("OMEGA_PARTITIONER__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
         let avoid_pct: usize = std::env::var("OMEGA_PARTITIONER__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<usize>().ok().unwrap_or(10)).unwrap_or(10);
-        println!("partitioning with num_rounds_limit={}, avoid_pct={}", num_rounds_limit, avoid_pct);
+        let dashmap_num_shards = std::env::var("OMEGA_PARTITIONER__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
+        println!("partitioning with num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}", num_rounds_limit, avoid_pct, dashmap_num_shards);
         let num_txns = txns.len();
         let mut num_senders = AtomicUsize::new(0);
         let mut num_keys = AtomicUsize::new(0);
-        let shard_amount = std::env::var("OMEGA_PARTITIONER__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
-        let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(shard_amount);
-        let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(shard_amount);
-        let mut helpers_by_key_id: DashMap<usize, RwLock<StorageLocationHelper>> = DashMap::with_shard_amount(shard_amount);
+        let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(dashmap_num_shards);
+        let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(dashmap_num_shards);
+        let mut helpers_by_key_id: DashMap<usize, RwLock<StorageLocationHelper>> = DashMap::with_shard_amount(dashmap_num_shards);
         for (txn_id, txn) in txns.iter_mut().enumerate() {
             txn.maybe_txn_id_in_partition_session = Some(txn_id);
         }
