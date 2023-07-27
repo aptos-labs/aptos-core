@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    dag::reliable_broadcast::BroadcastStatus, network::TConsensusMsg,
-    network_interface::ConsensusMsg,
-};
+use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
@@ -15,6 +12,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
+use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
     epoch_state::EpochState,
@@ -416,7 +414,12 @@ impl SignatureBuilder {
     }
 }
 
-impl BroadcastStatus for SignatureBuilder {
+impl<M> BroadcastStatus<M> for SignatureBuilder
+where
+    M: RBMessage,
+    Vote: TryFrom<M> + Into<M>,
+    Node: TryFrom<M> + Into<M>,
+{
     type Ack = Vote;
     type Aggregated = NodeCertificate;
     type Message = Node;
@@ -465,7 +468,12 @@ impl CertifiedAck {
     }
 }
 
-impl BroadcastStatus for CertificateAckState {
+impl<M> BroadcastStatus<M> for CertificateAckState
+where
+    M: RBMessage,
+    CertifiedAck: TryFrom<M> + Into<M>,
+    CertifiedNode: TryFrom<M> + Into<M>,
+{
     type Ack = CertifiedAck;
     type Aggregated = ();
     type Message = CertifiedNode;
@@ -609,6 +617,8 @@ impl DAGMessage {
     }
 }
 
+impl RBMessage for DAGMessage {}
+
 impl TConsensusMsg for DAGMessage {
     fn epoch(&self) -> u64 {
         match self {
@@ -623,6 +633,13 @@ impl TConsensusMsg for DAGMessage {
             #[cfg(test)]
             DAGMessage::TestAck(_) => 1,
         }
+    }
+
+    fn into_network_message(self) -> ConsensusMsg {
+        ConsensusMsg::DAGMessage(DAGNetworkMessage {
+            epoch: self.epoch(),
+            data: bcs::to_bytes(&self).unwrap(),
+        })
     }
 }
 
