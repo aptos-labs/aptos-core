@@ -2,20 +2,20 @@
 
 use crate::{
     abort_unless_feature_flag_enabled,
-    natives::{
-        cryptography::algebra::{
-            gas::HashToGasParameters, AlgebraContext, HashToStructureSuite, Structure,
-            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        },
-        helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
+    natives::cryptography::algebra::{
+        AlgebraContext, HashToStructureSuite, Structure, E_TOO_MUCH_MEMORY_USED,
+        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
-    safely_pop_arg, store_element, structure_from_ty_arg,
+    store_element, structure_from_ty_arg,
+};
+use aptos_gas_schedule::gas_params::natives::{aptos_framework::*, move_stdlib::*};
+use aptos_native_interface::{
+    safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::hashing::HashToCurve;
-use move_core_types::gas_algebra::{
-    InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
-};
+use either::Either;
+use move_core_types::gas_algebra::{InternalGas, NumBytes};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Value, VectorRef},
@@ -50,30 +50,34 @@ macro_rules! suite_from_ty_arg {
     }};
 }
 
-fn hash_to_bls12381gx_cost(
-    dst_len: usize,
-    msg_len: usize,
-    dst_shortening_base: InternalGas,
-    dst_shortening_per_byte: InternalGasPerByte,
-    mapping_base: InternalGasPerArg,
-    mapping_per_byte: InternalGasPerArg,
-) -> InternalGas {
-    // DST shortening as defined in https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-using-dsts-longer-than-255-.
-    let dst_shortening_cost = if dst_len <= 255 {
-        InternalGas::zero()
-    } else {
-        dst_shortening_base + dst_shortening_per_byte * NumBytes::from((17 + dst_len) as u64)
-    };
+macro_rules! hash_to_bls12381gx_cost {
+    (
+        $dst_len: expr,
+        $msg_len: expr,
+        $dst_shortening_base: expr,
+        $dst_shortening_per_byte: expr,
+        $mapping_base: expr,
+        $mapping_per_byte: expr
+        $(,)?
+    ) => {{
+        let dst_len: usize = $dst_len;
 
-    // Mapping cost. The gas formula is simplified by assuming the DST length is fixed at 256.
-    let mapping_cost =
-        mapping_base * NumArgs::one() + mapping_per_byte * NumArgs::from(msg_len as u64);
+        // DST shortening as defined in https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-using-dsts-longer-than-255-.
+        let dst_shortening_cost = if dst_len <= 255 {
+            Either::Left(InternalGas::zero())
+        } else {
+            Either::Right($dst_shortening_base + $dst_shortening_per_byte * NumBytes::from((17 + dst_len) as u64))
+        };
 
-    dst_shortening_cost + mapping_cost
+        // Mapping cost. The gas formula is simplified by assuming the DST length is fixed at 256.
+        let mapping_cost =
+            $mapping_base + $mapping_per_byte * NumBytes::from($msg_len as u64);
+
+        mapping_cost + dst_shortening_cost
+    }};
 }
 
 pub fn hash_to_internal(
-    gas_params: &HashToGasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -90,15 +94,13 @@ pub fn hash_to_internal(
     let dst = bytes_ref.as_slice();
     match (structure_opt, suite_opt) {
         (Some(Structure::BLS12381G1), Some(HashToStructureSuite::Bls12381g1XmdSha256SswuRo)) => {
-            context.charge(hash_to_bls12381gx_cost(
+            context.charge(hash_to_bls12381gx_cost!(
                 dst.len(),
                 msg.len(),
-                gas_params.sha2.base,
-                gas_params.sha2.per_byte,
-                gas_params.algebra.ark_h2c_bls12381g1_xmd_sha256_sswu_base,
-                gas_params
-                    .algebra
-                    .ark_h2c_bls12381g1_xmd_sha256_sswu_per_msg_byte,
+                HASH_SHA2_256_BASE,
+                HASH_SHA2_256_PER_BYTE,
+                ALGEBRA_ARK_H2C_BLS12381G1_XMD_SHA256_SSWU_BASE,
+                ALGEBRA_ARK_H2C_BLS12381G1_XMD_SHA256_SSWU_PER_MSG_BYTE,
             ))?;
             let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
                 ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g1::Config>,
@@ -111,15 +113,13 @@ pub fn hash_to_internal(
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         (Some(Structure::BLS12381G2), Some(HashToStructureSuite::Bls12381g2XmdSha256SswuRo)) => {
-            context.charge(hash_to_bls12381gx_cost(
+            context.charge(hash_to_bls12381gx_cost!(
                 dst.len(),
                 msg.len(),
-                gas_params.sha2.base,
-                gas_params.sha2.per_byte,
-                gas_params.algebra.ark_h2c_bls12381g2_xmd_sha256_sswu_base,
-                gas_params
-                    .algebra
-                    .ark_h2c_bls12381g2_xmd_sha256_sswu_per_msg_byte,
+                HASH_SHA2_256_BASE,
+                HASH_SHA2_256_PER_BYTE,
+                ALGEBRA_ARK_H2C_BLS12381G2_XMD_SHA256_SSWU_BASE,
+                ALGEBRA_ARK_H2C_BLS12381G2_XMD_SHA256_SSWU_PER_MSG_BYTE,
             ))?;
             let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
                 ark_ec::models::short_weierstrass::Projective<ark_bls12_381::g2::Config>,

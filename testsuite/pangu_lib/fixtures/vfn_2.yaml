@@ -1,0 +1,26 @@
+api:
+  address: 0.0.0.0:8080
+  enabled: true
+base:
+  role: full_node
+  waypoint:
+    from_file: /opt/aptos/genesis/waypoint.txt
+execution:
+  genesis_file_location: /opt/aptos/genesis/genesis.blob
+full_node_networks:
+- discovery_method: onchain
+  identity:
+    path: /opt/aptos/identites/validator-full-node-identity.yaml
+    type: from_file
+  listen_address: /ip4/0.0.0.0/tcp/6182
+  network_id: public
+- listen_address: /ip4/0.0.0.0/tcp/6181
+  network_id:
+    private: vfn
+  seeds:
+    00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
+      addresses:
+      - /dns4/nodebp-node-10-validator/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0
+      role: Validator
+storage:
+  backup_service_address: 0.0.0.0:6186

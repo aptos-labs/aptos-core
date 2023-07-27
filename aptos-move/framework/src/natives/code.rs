@@ -1,25 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::{
-        any::Any,
-        helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
-    },
-    safely_pop_arg,
-};
+use crate::natives::any::Any;
 use anyhow::bail;
-use aptos_types::{
-    on_chain_config::{Features, TimedFeatures},
-    transaction::ModuleBundle,
-    vm_status::StatusCode,
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
+use aptos_types::{transaction::ModuleBundle, vm_status::StatusCode};
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{
-    account_address::AccountAddress,
-    gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
-};
+use move_core_types::{account_address::AccountAddress, gas_algebra::NumBytes};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -31,7 +23,6 @@ use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     fmt,
     str::FromStr,
-    sync::Arc,
 };
 
 /// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
@@ -215,14 +206,7 @@ fn unpack_allowed_dep(v: Value) -> PartialVMResult<(AccountAddress, String)> {
  *   gas cost: base_cost + unit_cost * bytes_len
  *
  **************************************************************************************************/
-#[derive(Clone, Debug)]
-pub struct RequestPublishGasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGasPerByte,
-}
-
 fn native_request_publish(
-    gas_params: &RequestPublishGasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -230,14 +214,14 @@ fn native_request_publish(
     debug_assert!(matches!(args.len(), 4 | 5));
     let with_allowed_deps = args.len() == 5;
 
-    context.charge(gas_params.base)?;
+    context.charge(CODE_REQUEST_PUBLISH_BASE)?;
 
     let policy = safely_pop_arg!(args, u8);
     let mut code = vec![];
     for module in safely_pop_arg!(args, Vec<Value>) {
         let module_code = module.value_as::<Vec<u8>>()?;
 
-        context.charge(gas_params.per_byte * NumBytes::new(module_code.len() as u64))?;
+        context.charge(CODE_REQUEST_PUBLISH_PER_BYTE * NumBytes::new(module_code.len() as u64))?;
         code.push(module_code);
     }
 
@@ -251,10 +235,11 @@ fn native_request_publish(
 
             if let Entry::Vacant(_) = &entry {
                 // TODO: Is the 32 here supposed to indicate the length of an account address in bytes?
-                context.charge(gas_params.per_byte * NumBytes::new(32))?;
+                context.charge(CODE_REQUEST_PUBLISH_PER_BYTE * NumBytes::new(32))?;
             }
 
-            context.charge(gas_params.per_byte * NumBytes::new(module_name.len() as u64))?;
+            context
+                .charge(CODE_REQUEST_PUBLISH_PER_BYTE * NumBytes::new(module_name.len() as u64))?;
             entry.or_default().insert(module_name);
         }
 
@@ -268,7 +253,7 @@ fn native_request_publish(
         let str = get_move_string(name)?;
 
         // TODO(Gas): fine tune the gas formula
-        context.charge(gas_params.per_byte * NumBytes::new(str.len() as u64))?;
+        context.charge(CODE_REQUEST_PUBLISH_PER_BYTE * NumBytes::new(str.len() as u64))?;
         expected_modules.insert(str);
     }
 
@@ -305,36 +290,13 @@ fn native_request_publish(
  * module
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub request_publish: RequestPublishGasParameters,
-}
-
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        (
-            "request_publish",
-            make_safe_native(
-                gas_params.request_publish.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_request_publish,
-            ),
-        ),
-        (
-            "request_publish_with_allowed_deps",
-            make_safe_native(
-                gas_params.request_publish,
-                timed_features,
-                features,
-                native_request_publish,
-            ),
-        ),
+        ("request_publish", native_request_publish as RawSafeNative),
+        ("request_publish_with_allowed_deps", native_request_publish),
     ];
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

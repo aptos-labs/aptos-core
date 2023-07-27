@@ -3,13 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_framework::path_in_crate;
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use std::sync::Arc;
 use tempfile::tempdir;
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
@@ -39,11 +38,11 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
     natives::configure_for_unit_test();
     // move_stdlib has the testing feature enabled to include debug native functions
     natives::aptos_natives(
-        NativeGasParameters::zeros(),
-        AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
+        NativeGasParameters::zeros(),
+        MiscGasParameters::zeros(),
         TimedFeatures::enable_all(),
-        Arc::new(Features::default()),
+        Features::default(),
     )
 }
 

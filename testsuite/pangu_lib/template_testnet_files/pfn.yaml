@@ -1,0 +1,19 @@
+base:
+  role: "full_node"
+  waypoint:
+    from_file: "/opt/aptos/genesis/waypoint.txt"
+
+execution:
+  genesis_file_location: "/opt/aptos/genesis/genesis.blob"
+
+full_node_networks:
+- network_id: "public"
+  discovery_method: "onchain"
+  listen_address: "/ip4/0.0.0.0/tcp/6182"
+
+storage:
+  backup_service_address: "0.0.0.0:6186"
+
+api:
+  enabled: true
+  address: "0.0.0.0:8080"

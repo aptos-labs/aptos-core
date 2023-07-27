@@ -1,20 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{types::NodeMetadata, RpcHandler};
-use crate::{
-    dag::{
-        dag_network::DAGNetworkSender,
-        dag_store::Dag,
-        types::{CertifiedNode, DAGMessage, FetchResponse, Node, RemoteFetchRequest},
-    },
-    network::TConsensusMsg,
+use super::{dag_network::RpcWithFallback, types::NodeMetadata, RpcHandler};
+use crate::dag::{
+    dag_network::DAGNetworkSender,
+    dag_store::Dag,
+    types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
+use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
+use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use thiserror::Error as ThisError;
 use tokio::sync::{
@@ -61,6 +60,7 @@ struct DagFetcher {
     network: Arc<dyn DAGNetworkSender>,
     dag: Arc<RwLock<Dag>>,
     request_rx: Receiver<LocalFetchRequest>,
+    time_service: TimeService,
 }
 
 impl DagFetcher {
@@ -68,6 +68,7 @@ impl DagFetcher {
         epoch_state: Arc<EpochState>,
         network: Arc<dyn DAGNetworkSender>,
         dag: Arc<RwLock<Dag>>,
+        time_service: TimeService,
     ) -> (Self, Sender<LocalFetchRequest>) {
         let (request_tx, request_rx) = tokio::sync::mpsc::channel(16);
         (
@@ -76,6 +77,7 @@ impl DagFetcher {
                 network,
                 dag,
                 request_rx,
+                time_service,
             },
             request_tx,
         )
@@ -105,36 +107,45 @@ impl DagFetcher {
                     dag_reader.bitmask(local_request.node().round()),
                 )
             };
-            let network_request = DAGMessage::from(remote_request.clone()).into_network_message();
-            if let Ok(response) = self
-                .network
-                .send_rpc_with_fallbacks(responders, network_request, Duration::from_secs(1))
-                .await
-                .and_then(DAGMessage::try_from)
-                .and_then(FetchResponse::try_from)
-                .and_then(|response| response.verify(&remote_request, &self.epoch_state.verifier))
-            {
-                let ceritified_nodes = response.certified_nodes();
-                // TODO: support chunk response or fallback to state sync
+
+            let mut rpc = RpcWithFallback::new(
+                responders,
+                remote_request.clone().into(),
+                Duration::from_millis(500),
+                Duration::from_secs(1),
+                self.network.clone(),
+                self.time_service.clone(),
+            );
+            while let Some(response) = rpc.next().await {
+                if let Ok(response) =
+                    response
+                        .and_then(FetchResponse::try_from)
+                        .and_then(|response| {
+                            response.verify(&remote_request, &self.epoch_state.verifier)
+                        })
                 {
-                    let mut dag_writer = self.dag.write();
-                    for node in ceritified_nodes {
-                        if let Err(e) = dag_writer.add_node(node) {
-                            error!("Failed to add node {}", e);
+                    let certified_nodes = response.certified_nodes();
+                    // TODO: support chunk response or fallback to state sync
+                    {
+                        let mut dag_writer = self.dag.write();
+                        for node in certified_nodes {
+                            if let Err(e) = dag_writer.add_node(node) {
+                                error!("Failed to add node {}", e);
+                            }
                         }
                     }
-                }
 
-                if self
-                    .dag
-                    .read()
-                    .all_exists(local_request.node().parents_metadata())
-                {
-                    local_request.notify();
-                } else {
-                    // TODO: implement retry logic
+                    if self
+                        .dag
+                        .read()
+                        .all_exists(local_request.node().parents_metadata())
+                    {
+                        local_request.notify();
+                        break;
+                    }
                 }
             }
+            // TODO retry
         }
     }
 }

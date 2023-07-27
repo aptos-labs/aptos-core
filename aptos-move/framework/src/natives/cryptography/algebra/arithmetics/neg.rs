@@ -3,24 +3,22 @@
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
     ark_unary_op_internal,
-    natives::{
-        cryptography::algebra::{
-            abort_invariant_violated, feature_flag_from_structure, gas::GasParameters,
-            AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
-            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        },
-        helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
+    natives::cryptography::algebra::{
+        abort_invariant_violated, feature_flag_from_structure, AlgebraContext, Structure,
+        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
-    safe_borrow_element, safely_pop_arg, store_element, structure_from_ty_arg,
+    safe_borrow_element, store_element, structure_from_ty_arg,
+};
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use ark_ff::Field;
-use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Neg, rc::Rc};
 
 pub fn neg_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -34,33 +32,33 @@ pub fn neg_internal(
             args,
             ark_bls12_381::Fr,
             neg,
-            gas_params.ark_bls12_381_fr_neg * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FR_NEG
         ),
         Some(Structure::BLS12381Fq12) => ark_unary_op_internal!(
             context,
             args,
             ark_bls12_381::Fq12,
             neg,
-            gas_params.ark_bls12_381_fq12_neg * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FQ12_NEG
         ),
         Some(Structure::BLS12381G1) => ark_unary_op_internal!(
             context,
             args,
             ark_bls12_381::G1Projective,
             neg,
-            gas_params.ark_bls12_381_g1_proj_neg * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_G1_PROJ_NEG
         ),
         Some(Structure::BLS12381G2) => ark_unary_op_internal!(
             context,
             args,
             ark_bls12_381::G2Projective,
             neg,
-            gas_params.ark_bls12_381_g2_proj_neg * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_G2_PROJ_NEG
         ),
         Some(Structure::BLS12381Gt) => {
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
-            context.charge(gas_params.ark_bls12_381_fq12_inv * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_INV)?;
             let new_element = element.inverse().ok_or_else(abort_invariant_violated)?;
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])

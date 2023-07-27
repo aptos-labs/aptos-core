@@ -7,7 +7,7 @@ use crate::{
         dag_store::Dag,
         order_rule::OrderRule,
         tests::{dag_test::MockStorage, helpers::new_certified_node},
-        types::NodeCertificate,
+        types::{NodeCertificate, NodeMetadata},
         CertifiedNode,
     },
     test_utils::placeholder_ledger_info,
@@ -100,7 +100,7 @@ fn generate_dag_nodes(
                     })
                     .collect();
                 if round > 1 {
-                    assert_eq!(parents.len(), NUM_VALIDATORS * 2 / 3 + 1);
+                    assert_eq!(parents.len(), validators.len() * 2 / 3 + 1);
                 }
                 nodes_at_round.push(Some(new_certified_node(
                     (round + 1) as u64,
@@ -133,13 +133,13 @@ fn create_order_rule(
 }
 
 const NUM_HOLES: usize = 1;
-const NUM_VALIDATORS: usize = 4;
+const NUM_VALIDATORS: usize = 5;
 const NUM_ROUNDS: u64 = 50;
 const NUM_PERMUTATION: usize = 100;
 
 proptest! {
     #[test]
-    fn test_order_rule(
+    fn test_order_rule_safety(
         mut dag_with_holes in generate_virtual_dag(NUM_VALIDATORS, NUM_HOLES, NUM_ROUNDS),
         mut dag in generate_virtual_dag(NUM_VALIDATORS, 0, NUM_ROUNDS),
         sequences in generate_permutations(NUM_PERMUTATION, (NUM_VALIDATORS - NUM_HOLES) * NUM_ROUNDS as usize)
@@ -185,5 +185,85 @@ proptest! {
             let a: Vec<_> = ordered.iter().map(display).collect();
             assert_eq!(a, longest[..a.len()]);
         }
+    }
+}
+
+#[test]
+fn test_order_rule_basic() {
+    let dag = vec![
+        vec![Some(vec![]), Some(vec![]), Some(vec![]), Some(vec![])],
+        vec![
+            Some(vec![false, true, true, true]),
+            Some(vec![true, true, true, false]),
+            Some(vec![false, true, true, true]),
+            None,
+        ],
+        vec![
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+        ],
+        vec![
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, false, true, true]),
+            None,
+        ],
+        vec![
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            None,
+        ],
+        vec![
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            Some(vec![true, true, true, false]),
+            None,
+        ],
+    ];
+    let (_, validator_verifier) = random_validator_verifier(4, None, false);
+    let validators = validator_verifier.get_ordered_account_addresses();
+    let author_indexes = validator_verifier.address_to_validator_index().clone();
+    let nodes = generate_dag_nodes(&dag, &validators);
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier,
+    });
+    let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()));
+    for round_nodes in &nodes {
+        for node in round_nodes.iter().flatten() {
+            dag.add_node(node.clone()).unwrap();
+        }
+    }
+    let display = |node: &NodeMetadata| (node.round(), *author_indexes.get(node.author()).unwrap());
+    let dag = Arc::new(RwLock::new(dag.clone()));
+    let (mut order_rule, mut receiver) = create_order_rule(epoch_state, dag);
+    for node in nodes.iter().flatten().flatten() {
+        order_rule.process_new_node(node);
+    }
+    let expected_order = vec![
+        // anchor (1, 0) has 1 votes, anchor (3, 1) has 2 votes and a path to (1, 0)
+        vec![(1, 0)],
+        // anchor (2, 1) has 3 votes
+        vec![(1, 2), (1, 1), (2, 1)],
+        // anchor (3, 1) has 2 votes
+        vec![(1, 3), (2, 2), (2, 0), (3, 1)],
+        // anchor (4, 2) has 3 votes
+        vec![(3, 3), (3, 2), (3, 0), (4, 2)],
+        // anchor (5, 2) has 3 votes
+        vec![(4, 1), (4, 0), (5, 2)],
+    ];
+    let mut batch = 0;
+    while let Ok(Some(ordered_nodes)) = receiver.try_next() {
+        assert_eq!(
+            ordered_nodes
+                .iter()
+                .map(|node| display(node.metadata()))
+                .collect::<Vec<_>>(),
+            expected_order[batch]
+        );
+        batch += 1;
     }
 }

@@ -1,19 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::helpers::{
-        make_module_natives, make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult,
-    },
-    safely_pop_arg,
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
-use aptos_gas_algebra_ext::{AbstractValueSize, InternalGasPerAbstractValueUnit};
-use aptos_types::on_chain_config::{Features, TimedFeatures};
-use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native fun write_to_event_store
@@ -21,16 +17,8 @@ use std::{collections::VecDeque, sync::Arc};
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct WriteToEventStoreGasParameters {
-    pub base: InternalGas,
-    pub per_abstract_value_unit: InternalGasPerAbstractValueUnit,
-}
-
 #[inline]
 fn native_write_to_event_store(
-    gas_params: &WriteToEventStoreGasParameters,
-    calc_abstract_val_size: impl FnOnce(&Value) -> AbstractValueSize,
     context: &mut SafeNativeContext,
     mut ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -45,7 +33,8 @@ fn native_write_to_event_store(
 
     // TODO(Gas): Get rid of abstract memory size
     context.charge(
-        gas_params.base + gas_params.per_abstract_value_unit * calc_abstract_val_size(&msg),
+        EVENT_WRITE_TO_EVENT_STORE_BASE
+            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
     )?;
 
     if !context.save_event(guid, seq_num, ty, msg)? {
@@ -55,22 +44,8 @@ fn native_write_to_event_store(
     Ok(smallvec![])
 }
 
-pub fn make_native_write_to_event_store(
-    calc_abstract_val_size: impl Fn(&Value) -> AbstractValueSize + Send + Sync + 'static,
-) -> impl Fn(
-    &WriteToEventStoreGasParameters,
-    &mut SafeNativeContext,
-    Vec<Type>,
-    VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    move |gas_params, context, ty_args, args| -> SafeNativeResult<SmallVec<[Value; 1]>> {
-        native_write_to_event_store(gas_params, &calc_abstract_val_size, context, ty_args, args)
-    }
-}
-
 #[cfg(feature = "testing")]
 fn native_emitted_events_internal(
-    _: &(),
     context: &mut SafeNativeContext,
     mut ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -89,41 +64,21 @@ fn native_emitted_events_internal(
  * module
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub write_to_event_store: WriteToEventStoreGasParameters,
-}
-
-#[allow(clippy::vec_init_then_push)]
 pub fn make_all(
-    gas_params: GasParameters,
-    calc_abstract_val_size: impl Fn(&Value) -> AbstractValueSize + Send + Sync + 'static,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let mut natives = vec![];
 
-    // Test-only natives
     #[cfg(feature = "testing")]
-    natives.push((
+    natives.extend([(
         "emitted_events_internal",
-        make_safe_native(
-            (),
-            timed_features.clone(),
-            features.clone(),
-            native_emitted_events_internal,
-        ),
-    ));
+        native_emitted_events_internal as RawSafeNative,
+    )]);
 
-    natives.push((
+    natives.extend([(
         "write_to_event_store",
-        make_safe_native(
-            gas_params.write_to_event_store,
-            timed_features,
-            features,
-            make_native_write_to_event_store(calc_abstract_val_size),
-        ),
-    ));
+        native_write_to_event_store as RawSafeNative,
+    )]);
 
-    make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

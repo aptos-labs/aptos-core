@@ -5,7 +5,8 @@ use crate::log::{
     CallFrame, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, FrameName, StorageFees,
     TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
-use aptos_gas::{AptosGasMeter, AptosGasParameters, Fee, Gas, GasScalingFactor};
+use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
+use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
@@ -16,7 +17,6 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{InternalGas, NumArgs, NumBytes},
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
@@ -474,16 +474,10 @@ impl<G> AptosGasMeter for GasProfiler<G>
 where
     G: AptosGasMeter,
 {
+    type Algebra = G::Algebra;
+
     delegate! {
-        fn feature_version(&self) -> u64;
-
-        fn gas_params(&self) -> &AptosGasParameters;
-
-        fn balance(&self) -> Gas;
-
-        fn gas_unit_scaling_factor(&self) -> GasScalingFactor;
-
-        fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas;
+        fn algebra(&self) -> &Self::Algebra;
 
         fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
@@ -492,44 +486,29 @@ where
         fn storage_discount_for_events(&self, total_cost: Fee) -> Fee;
 
         fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee;
-
-        fn execution_gas_used(&self) -> Gas;
-
-        fn io_gas_used(&self) -> Gas;
-
-        fn storage_fee_used_in_gas_units(&self) -> Gas;
-
-        fn storage_fee_used(&self) -> Fee;
     }
 
     delegate_mut! {
-        fn charge_execution(&mut self, amount: InternalGas) -> PartialVMResult<()>;
-
-        fn charge_io(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+        fn algebra_mut(&mut self) -> &mut Self::Algebra;
 
         fn charge_storage_fee(
             &mut self,
-            amount: aptos_gas::Fee,
-            gas_unit_price: aptos_gas::FeePerGasUnit,
+            amount: Fee,
+            gas_unit_price: FeePerGasUnit,
         ) -> PartialVMResult<()>;
     }
 
-    fn charge_io_gas_for_write_set<'a>(
-        &mut self,
-        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-    ) -> VMResult<()> {
-        for (key, op) in ops {
-            let cost = self.io_gas_per_write(key, op);
-            self.total_exec_io += cost;
-            self.write_set_transient.push(WriteTransient {
-                key: key.clone(),
-                cost,
-                op_type: write_op_type(op),
-            });
-            self.charge_io(cost)
-                .map_err(|e| e.finish(Location::Undefined))?;
-        }
-        Ok(())
+    fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| base.charge_io_gas_for_write(key, op));
+
+        self.total_exec_io += cost;
+        self.write_set_transient.push(WriteTransient {
+            key: key.clone(),
+            cost,
+            op_type: write_op_type(op),
+        });
+
+        res
     }
 
     fn charge_storage_fee_for_all<'a>(
@@ -537,7 +516,7 @@ where
         write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
         events: impl IntoIterator<Item = &'a ContractEvent>,
         txn_size: NumBytes,
-        gas_unit_price: aptos_gas::FeePerGasUnit,
+        gas_unit_price: FeePerGasUnit,
     ) -> VMResult<()> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {

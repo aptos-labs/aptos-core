@@ -18,7 +18,8 @@ regex = { workspace = true }
 smallvec = { workspace = true }
 
 aptos-framework = { workspace = true }
-aptos-gas = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-meter = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
 

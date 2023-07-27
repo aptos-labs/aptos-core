@@ -1998,7 +1998,7 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 
 impl VectorRef {
     pub fn len(&self, type_param: &Type) -> PartialVMResult<Value> {
-        let c = self.0.container();
+        let c: &Container = self.0.container();
         check_elem_layout(type_param, c)?;
 
         let len = match c {

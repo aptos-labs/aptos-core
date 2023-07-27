@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    type: vfn
+  name: test_username-vfn
+spec:
+  ports:
+  - name: validator
+    port: 6180
+    protocol: TCP
+    targetPort: 6180
+  - name: api
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  - name: vfn
+    port: 6181
+    protocol: TCP
+    targetPort: 6181
+  - name: metrics
+    port: 9101
+    protocol: TCP
+    targetPort: 9101
+  - name: pfn
+    port: 6182
+    protocol: TCP
+    targetPort: 6182
+  selector:
+    app.kubernetes.io/instance: test_username-vfn
+    app.kubernetes.io/name: test_username
+    managed-by: pangu
+    type: vfn

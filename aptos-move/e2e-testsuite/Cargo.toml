@@ -17,7 +17,9 @@ aptos-block-executor = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
-aptos-gas = { workspace = true, features = ["testing"] }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-meter = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
@@ -27,6 +29,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ['failpoints'] }
 aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
+aptos-vm-types = { workspace = true }
 aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 fail = { workspace = true, features = ['failpoints'] }

@@ -1,0 +1,15 @@
+allow_new_validators: false
+chain_id: 4
+epoch_duration_secs: 7200
+is_test: true
+max_stake: 100000000000000000
+min_price_per_gas_unit: 1
+min_stake: 100000000000000
+min_voting_threshold: 100000000000000
+recurring_lockup_duration_secs: 86400
+required_proposer_stake: 1000000
+rewards_apy_percentage: 10
+root_key: D04470F43AB6AEAA4EB616B72128881EEF77346F2075FFE68E14BA7DEBD8095E
+users: []
+voting_duration_secs: 43200
+voting_power_increase_limit: 20

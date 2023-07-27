@@ -5,7 +5,7 @@ use crate::{
     aggregate::AggregatedExecutionGasEvents,
     erased::{Node, TypeErasedExecutionAndIoCosts, TypeErasedGasLog, TypeErasedStorageFees},
 };
-use aptos_gas::{GasQuantity, InternalGas};
+use aptos_gas_algebra::{GasQuantity, InternalGas};
 use std::fmt::{self, Write};
 
 fn indent(output: &mut impl Write, count: usize) -> fmt::Result {

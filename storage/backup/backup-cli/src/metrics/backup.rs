@@ -36,3 +36,11 @@ pub static TRANSACTION_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static COMPACTED_TXN_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_db_backup_coordinator_compacted_version",
+        "Version of the latest transaction metadata compacted."
+    )
+    .unwrap()
+});

@@ -462,6 +462,7 @@ impl BackupCompactor {
         self.storage
             .save_metadata_line(&metadata.name(), &metadata.to_text_line()?)
             .await?;
+
         Ok(())
     }
 }

@@ -1,18 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
-    safely_assert_eq, safely_pop_arg,
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
+    SafeNativeResult,
 };
-use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use ripemd::Digest as OtherDigest;
 use sha2::Digest;
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, hash::Hasher, sync::Arc};
+use std::{collections::VecDeque, hash::Hasher};
 use tiny_keccak::{Hasher as KeccakHasher, Keccak};
 
 /***************************************************************************************************
@@ -21,14 +21,7 @@ use tiny_keccak::{Hasher as KeccakHasher, Keccak};
  *   gas cost: base_cost + unit_cost * data_length
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct SipHashGasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGasPerByte,
-}
-
 fn native_sip_hash(
-    gas_params: &SipHashGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -38,7 +31,7 @@ fn native_sip_hash(
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+    let cost = HASH_SIP_HASH_BASE + HASH_SIP_HASH_PER_BYTE * NumBytes::new(bytes.len() as u64);
     context.charge(cost)?;
 
     // SipHash of the serialized bytes
@@ -49,14 +42,7 @@ fn native_sip_hash(
     Ok(smallvec![Value::u64(hash)])
 }
 
-#[derive(Debug, Clone)]
-pub struct Keccak256HashGasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGasPerByte,
-}
-
 fn native_keccak256(
-    gas_params: &Keccak256HashGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -66,7 +52,7 @@ fn native_keccak256(
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+    let cost = HASH_KECCAK256_BASE + HASH_KECCAK256_PER_BYTE * NumBytes::new(bytes.len() as u64);
     context.charge(cost)?;
 
     let mut hasher = Keccak::v256();
@@ -77,14 +63,7 @@ fn native_keccak256(
     Ok(smallvec![Value::vector_u8(output)])
 }
 
-#[derive(Debug, Clone)]
-pub struct Sha2_512HashGasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGasPerByte,
-}
-
 fn native_sha2_512(
-    gas_params: &Sha2_512HashGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -94,7 +73,7 @@ fn native_sha2_512(
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+    let cost = HASH_SHA2_512_BASE + HASH_SHA2_512_PER_BYTE * NumBytes::new(bytes.len() as u64);
     context.charge(cost)?;
 
     let mut hasher = sha2::Sha512::new();
@@ -104,14 +83,7 @@ fn native_sha2_512(
     Ok(smallvec![Value::vector_u8(output)])
 }
 
-#[derive(Debug, Clone)]
-pub struct Sha3_512HashGasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGasPerByte,
-}
-
 fn native_sha3_512(
-    gas_params: &Sha3_512HashGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -121,7 +93,7 @@ fn native_sha3_512(
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+    let cost = HASH_SHA3_512_BASE + HASH_SHA3_512_PER_BYTE * NumBytes::new(bytes.len() as u64);
     context.charge(cost)?;
 
     let mut hasher = sha3::Sha3_512::new();
@@ -138,7 +110,6 @@ pub struct Blake2B256HashGasParameters {
 }
 
 fn native_blake2b_256(
-    gas_params: &Blake2B256HashGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -148,7 +119,9 @@ fn native_blake2b_256(
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
 
-    context.charge(gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64))?;
+    context.charge(
+        HASH_BLAKE2B_256_BASE + HASH_BLAKE2B_256_PER_BYTE * NumBytes::new(bytes.len() as u64),
+    )?;
 
     let output = blake2_rfc::blake2b::blake2b(32, &[], &bytes)
         .as_bytes()
@@ -164,7 +137,6 @@ pub struct Ripemd160HashGasParameters {
 }
 
 fn native_ripemd160(
-    gas_params: &Ripemd160HashGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -174,7 +146,7 @@ fn native_ripemd160(
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
 
-    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
+    let cost = HASH_RIPEMD160_BASE + HASH_RIPEMD160_PER_BYTE * NumBytes::new(bytes.len() as u64);
     context.charge(cost)?;
 
     let mut hasher = ripemd::Ripemd160::new();
@@ -188,77 +160,17 @@ fn native_ripemd160(
  * module
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub sip_hash: SipHashGasParameters,
-    pub keccak256: Keccak256HashGasParameters,
-    pub sha2_512: Sha2_512HashGasParameters,
-    pub sha3_512: Sha3_512HashGasParameters,
-    pub ripemd160: Ripemd160HashGasParameters,
-    pub blake2b_256: Blake2B256HashGasParameters,
-}
-
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        (
-            "sip_hash",
-            make_safe_native(
-                gas_params.sip_hash,
-                timed_features.clone(),
-                features.clone(),
-                native_sip_hash,
-            ),
-        ),
-        (
-            "keccak256",
-            make_safe_native(
-                gas_params.keccak256,
-                timed_features.clone(),
-                features.clone(),
-                native_keccak256,
-            ),
-        ),
-        (
-            "sha2_512_internal",
-            make_safe_native(
-                gas_params.sha2_512,
-                timed_features.clone(),
-                features.clone(),
-                native_sha2_512,
-            ),
-        ),
-        (
-            "sha3_512_internal",
-            make_safe_native(
-                gas_params.sha3_512,
-                timed_features.clone(),
-                features.clone(),
-                native_sha3_512,
-            ),
-        ),
-        (
-            "ripemd160_internal",
-            make_safe_native(
-                gas_params.ripemd160,
-                timed_features.clone(),
-                features.clone(),
-                native_ripemd160,
-            ),
-        ),
-        (
-            "blake2b_256_internal",
-            make_safe_native(
-                gas_params.blake2b_256,
-                timed_features,
-                features,
-                native_blake2b_256,
-            ),
-        ),
+        ("sip_hash", native_sip_hash as RawSafeNative),
+        ("keccak256", native_keccak256),
+        ("sha2_512_internal", native_sha2_512),
+        ("sha3_512_internal", native_sha3_512),
+        ("ripemd160_internal", native_ripemd160),
+        ("blake2b_256_internal", native_blake2b_256),
     ];
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

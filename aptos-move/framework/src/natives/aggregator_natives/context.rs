@@ -5,10 +5,10 @@ use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
     delta_change_set::{DeltaOp, DeltaUpdate},
 };
+use aptos_table_natives::TableResolver;
 use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::Location;
-use move_table_extension::TableResolver;
 use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},
@@ -40,22 +40,16 @@ pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
     pub(crate) resolver: &'a dyn TableResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
-    pub(crate) aggregator_enabled: bool,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
-    pub fn new(
-        txn_hash: [u8; 32],
-        resolver: &'a dyn TableResolver,
-        aggregator_enabled: bool,
-    ) -> Self {
+    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
         Self {
             txn_hash,
             resolver,
             aggregator_data: Default::default(),
-            aggregator_enabled,
         }
     }
 
@@ -81,8 +75,6 @@ impl<'a> NativeAggregatorContext<'a> {
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
-                    // Aggregator state can be a delta only if aggregators are enabled.
-                    assert!(self.aggregator_enabled);
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op =
@@ -90,8 +82,6 @@ impl<'a> NativeAggregatorContext<'a> {
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
-                    // Aggregator state can be a delta only if aggregators are enabled.
-                    assert!(self.aggregator_enabled);
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
@@ -155,44 +145,9 @@ impl AggregatorChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::{
-        aggregator_extension::aggregator_id_for_test, delta_change_set::serialize,
-    };
+    use aptos_aggregator::aggregator_extension::aggregator_id_for_test;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::state_store::state_key::StateKey;
     use claims::{assert_matches, assert_ok};
-
-    fn get_test_resolver() -> FakeDataStore {
-        #[allow(clippy::redundant_closure)]
-        let mut state_view = FakeDataStore::default();
-
-        let AggregatorID {
-            handle: handle_500,
-            key: key_500,
-        } = aggregator_id_for_test(500);
-        let AggregatorID {
-            handle: handle_600,
-            key: key_600,
-        } = aggregator_id_for_test(600);
-        let AggregatorID {
-            handle: handle_700,
-            key: key_700,
-        } = aggregator_id_for_test(700);
-
-        state_view.set_legacy(
-            StateKey::table_item(handle_500.into(), key_500.0.to_vec()),
-            serialize(&150),
-        );
-        state_view.set_legacy(
-            StateKey::table_item(handle_600.into(), key_600.0.to_vec()),
-            serialize(&100),
-        );
-        state_view.set_legacy(
-            StateKey::table_item(handle_700.into(), key_700.0.to_vec()),
-            serialize(&200),
-        );
-        state_view
-    }
 
     // All aggregators are initialized deterministically based on their ID,
     // with the following spec.
@@ -209,7 +164,7 @@ mod test {
     //     |  700  |               |           | yes |         |
     //     |  800  |               |           |     |   yes   |
     //     +-------+---------------+-----------+-----+---------+
-    fn test_set_up(context: &NativeAggregatorContext, aggregator_enabled: bool) {
+    fn test_set_up(context: &NativeAggregatorContext) {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
 
         aggregator_data.create_new_aggregator(aggregator_id_for_test(100), 100);
@@ -217,45 +172,20 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
 
-        assert_ok!(aggregator_data.get_aggregator(
-            aggregator_id_for_test(100),
-            100,
-            context.resolver,
-            aggregator_enabled,
-        ));
-        assert_ok!(aggregator_data.get_aggregator(
-            aggregator_id_for_test(200),
-            200,
-            context.resolver,
-            aggregator_enabled,
-        ));
+        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(100), 100));
+        assert_ok!(aggregator_data.get_aggregator(aggregator_id_for_test(200), 200));
         aggregator_data
-            .get_aggregator(
-                aggregator_id_for_test(500),
-                500,
-                context.resolver,
-                aggregator_enabled,
-            )
+            .get_aggregator(aggregator_id_for_test(500), 500)
             .unwrap()
             .add(150)
             .unwrap();
         aggregator_data
-            .get_aggregator(
-                aggregator_id_for_test(600),
-                600,
-                context.resolver,
-                aggregator_enabled,
-            )
+            .get_aggregator(aggregator_id_for_test(600), 600)
             .unwrap()
             .add(100)
             .unwrap();
         aggregator_data
-            .get_aggregator(
-                aggregator_id_for_test(700),
-                700,
-                context.resolver,
-                aggregator_enabled,
-            )
+            .get_aggregator(aggregator_id_for_test(700), 700)
             .unwrap()
             .add(200)
             .unwrap();
@@ -268,10 +198,11 @@ mod test {
 
     #[test]
     fn test_into_change_set() {
-        let resolver = get_test_resolver();
-        let context = NativeAggregatorContext::new([0; 32], &resolver, true);
+        let resolver = FakeDataStore::default();
 
-        test_set_up(&context, true);
+        let context = NativeAggregatorContext::new([0; 32], &resolver);
+
+        test_set_up(&context);
         let AggregatorChangeSet { changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));
@@ -297,42 +228,6 @@ mod test {
         assert_eq!(
             *changes.get(&aggregator_id_for_test(700)).unwrap(),
             AggregatorChange::Merge(delta_200)
-        );
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(800)).unwrap(),
-            AggregatorChange::Delete
-        );
-    }
-
-    #[test]
-    fn test_into_change_set_aggregator_disabled() {
-        let resolver = get_test_resolver();
-        let context = NativeAggregatorContext::new([0; 32], &resolver, false);
-
-        test_set_up(&context, false);
-        let AggregatorChangeSet { changes } = context.into_change_set();
-
-        assert!(!changes.contains_key(&aggregator_id_for_test(100)));
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(200)).unwrap(),
-            AggregatorChange::Write(0)
-        );
-        assert!(!changes.contains_key(&aggregator_id_for_test(300)));
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(400)).unwrap(),
-            AggregatorChange::Write(0)
-        );
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(500)).unwrap(),
-            AggregatorChange::Delete
-        );
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(600)).unwrap(),
-            AggregatorChange::Write(200)
-        );
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(700)).unwrap(),
-            AggregatorChange::Write(400)
         );
         assert_matches!(
             changes.get(&aggregator_id_for_test(800)).unwrap(),

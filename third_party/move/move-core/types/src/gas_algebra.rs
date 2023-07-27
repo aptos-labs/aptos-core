@@ -78,6 +78,18 @@ pub type InternalGasPerAbstractMemoryUnit =
 pub type InternalGasPerArg = GasQuantity<UnitDiv<InternalGasUnit, Arg>>;
 
 /***************************************************************************************************
+ * Get Unit
+ *
+ **************************************************************************************************/
+pub trait GasQuantityGetUnit {
+    type Unit;
+}
+
+impl<U> GasQuantityGetUnit for GasQuantity<U> {
+    type Unit = U;
+}
+
+/***************************************************************************************************
  * Constructors
  *
  **************************************************************************************************/
@@ -331,33 +343,11 @@ impl ToUnit<MebiByte> for GibiByte {
     const MULTIPLIER: u64 = 1024;
 }
 
-impl ToUnitFractional<KibiByte> for Byte {
-    const DENOMINATOR: u64 = 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<MebiByte> for KibiByte {
-    const DENOMINATOR: u64 = 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<MebiByte> for Byte {
-    const DENOMINATOR: u64 = 1024 * 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<GibiByte> for MebiByte {
-    const DENOMINATOR: u64 = 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<GibiByte> for KibiByte {
-    const DENOMINATOR: u64 = 1024 * 1024;
-    const NOMINATOR: u64 = 1;
-}
-
-impl ToUnitFractional<GibiByte> for Byte {
-    const DENOMINATOR: u64 = 1024 * 1024 * 1024;
+impl<U, T> ToUnitFractional<U> for T
+where
+    U: ToUnit<T>,
+{
+    const DENOMINATOR: u64 = U::MULTIPLIER;
     const NOMINATOR: u64 = 1;
 }
 
@@ -367,58 +357,63 @@ impl ToUnitFractional<GibiByte> for Byte {
  **************************************************************************************************/
 /// Trait that defines a conversion from one unit to another, with an integral conversion rate
 /// determined from the parameters dynamically.
-pub trait ToUnitWithParams<U> {
-    type Params;
-
-    fn multiplier(params: &Self::Params) -> u64;
+pub trait ToUnitWithParams<P, U> {
+    fn multiplier(params: &P) -> u64;
 }
 
 /// Trait that defines a conversion from one unit to another, with a fractional conversion rate
 /// determined from the parameters dynamically.
-pub trait ToUnitFractionalWithParams<U> {
-    type Params;
+pub trait ToUnitFractionalWithParams<P, U> {
+    fn ratio(params: &P) -> (u64, u64);
+}
 
-    fn ratio(params: &Self::Params) -> (u64, u64);
+impl<P, U, T> ToUnitFractionalWithParams<P, U> for T
+where
+    U: ToUnitWithParams<P, T>,
+{
+    fn ratio(params: &P) -> (u64, u64) {
+        (1, <U as ToUnitWithParams<P, T>>::multiplier(params))
+    }
 }
 
 impl<U> GasQuantity<U> {
     /// Convert the quantity to another unit.
     /// An integral multiplier must have been defined via the `ToUnitWithParams` trait.
-    pub fn to_unit_with_params<T>(
-        self,
-        params: &<U as ToUnitWithParams<T>>::Params,
-    ) -> GasQuantity<T>
+    pub fn to_unit_with_params<P, T>(self, params: &P) -> GasQuantity<T>
     where
-        U: ToUnitWithParams<T>,
+        U: ToUnitWithParams<P, T>,
     {
-        let multiplier = <U as ToUnitWithParams<T>>::multiplier(params);
+        let multiplier = <U as ToUnitWithParams<P, T>>::multiplier(params);
         assert_ne!(multiplier, 0);
         GasQuantity::new(self.val.saturating_mul(multiplier))
     }
 
     /// Convert the quantity to another unit, with the resulting scalar value being rounded down.
     /// A ratio must have been defined via the `ToUnitFractionalWithParams` trait.
-    pub fn to_unit_round_down_with_params<T>(
-        self,
-        params: &<U as ToUnitFractionalWithParams<T>>::Params,
-    ) -> GasQuantity<T>
+    pub fn to_unit_round_down_with_params<P, T>(self, params: &P) -> GasQuantity<T>
     where
-        U: ToUnitFractionalWithParams<T>,
+        U: ToUnitFractionalWithParams<P, T>,
     {
-        let (n, d) = <U as ToUnitFractionalWithParams<T>>::ratio(params);
+        let (n, d) = <U as ToUnitFractionalWithParams<P, T>>::ratio(params);
         GasQuantity::new(apply_ratio_round_down(self.val, n, d))
     }
 
     /// Convert the quantity to another unit, with the resulting scalar value being rounded up.
     /// A ratio must have been defined via the `ToUnitFractionalWithParams` trait.
-    pub fn to_unit_round_up_with_params<T>(
-        self,
-        params: &<U as ToUnitFractionalWithParams<T>>::Params,
-    ) -> GasQuantity<T>
+    pub fn to_unit_round_up_with_params<P, T>(self, params: &P) -> GasQuantity<T>
     where
-        U: ToUnitFractionalWithParams<T>,
+        U: ToUnitFractionalWithParams<P, T>,
     {
-        let (n, d) = <U as ToUnitFractionalWithParams<T>>::ratio(params);
+        let (n, d) = <U as ToUnitFractionalWithParams<P, T>>::ratio(params);
         GasQuantity::new(apply_ratio_round_up(self.val, n, d))
+    }
+}
+/***************************************************************************************************
+ * Per Unit
+ *
+ **************************************************************************************************/
+impl<U1> GasQuantity<U1> {
+    pub fn per<U2>(self) -> GasQuantity<UnitDiv<U1, U2>> {
+        GasQuantity::new(self.into())
     }
 }

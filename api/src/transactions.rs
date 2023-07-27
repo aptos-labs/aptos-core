@@ -452,9 +452,9 @@ impl TransactionsApi {
         let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
             // Retrieve max possible gas units
             let (_, gas_params) = self.context.get_gas_schedule(&ledger_info)?;
-            let min_number_of_gas_units = u64::from(gas_params.txn.min_transaction_gas_units)
-                / u64::from(gas_params.txn.gas_unit_scaling_factor);
-            let max_number_of_gas_units = u64::from(gas_params.txn.maximum_number_of_gas_units);
+            let min_number_of_gas_units = u64::from(gas_params.vm.txn.min_transaction_gas_units)
+                / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
+            let max_number_of_gas_units = u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
             // Retrieve account balance to determine max gas available
             let account_state = self

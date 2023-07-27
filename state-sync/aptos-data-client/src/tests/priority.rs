@@ -6,15 +6,12 @@ use crate::{
     tests::{mock::MockNetwork, utils},
 };
 use aptos_config::{
-    config::{BaseConfig, RoleType},
+    config::{AptosDataClientConfig, BaseConfig, RoleType},
     network_id::NetworkId,
 };
-use aptos_storage_service_types::{
-    requests::{
-        DataRequest, NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StorageServiceRequest, TransactionOutputsWithProofRequest,
-    },
-    responses::OPTIMISTIC_FETCH_VERSION_DELTA,
+use aptos_storage_service_types::requests::{
+    DataRequest, NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
+    StorageServiceRequest, TransactionOutputsWithProofRequest,
 };
 use claims::assert_matches;
 
@@ -146,15 +143,22 @@ async fn prioritized_peer_request_selection() {
 }
 
 #[tokio::test]
-async fn prioritized_peer_subscription_selection() {
+async fn prioritized_peer_optimistic_fetch_selection() {
     ::aptos_logger::Logger::init_for_testing();
-    let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
+
+    // Create a data client with a max version lag of 100
+    let max_optimistic_fetch_version_lag = 100;
+    let data_client_config = AptosDataClientConfig {
+        max_optimistic_fetch_version_lag,
+        ..Default::default()
+    };
+    let (mut mock_network, _, client, _) = MockNetwork::new(None, Some(data_client_config), None);
 
     // Create test data
     let known_version = 10000000;
     let known_epoch = 10;
 
-    // Ensure the properties hold for both subscription requests
+    // Ensure the properties hold for both optimistic fetch requests
     let new_transactions_request =
         DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
             known_version,
@@ -209,7 +213,7 @@ async fn prioritized_peer_subscription_selection() {
         // Update the priority peer to be too far behind and verify it is not selected
         client.update_summary(
             priority_peer_1,
-            utils::create_storage_summary(known_version - OPTIMISTIC_FETCH_VERSION_DELTA),
+            utils::create_storage_summary(known_version - max_optimistic_fetch_version_lag),
         );
         assert_eq!(
             client.choose_peer_for_request(&storage_request),
@@ -219,7 +223,7 @@ async fn prioritized_peer_subscription_selection() {
         // Update the regular peer to be too far behind and verify neither is selected
         client.update_summary(
             regular_peer_1,
-            utils::create_storage_summary(known_version - (OPTIMISTIC_FETCH_VERSION_DELTA * 2)),
+            utils::create_storage_summary(known_version - (max_optimistic_fetch_version_lag * 2)),
         );
         assert_matches!(
             client.choose_peer_for_request(&storage_request),

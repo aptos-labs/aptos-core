@@ -2,19 +2,17 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::{
-        create_signer,
-        helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
-    },
-    safely_pop_arg,
+use crate::natives::create_signer;
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
-use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native fun create_address
@@ -28,7 +26,6 @@ pub struct CreateAddressGasParameters {
 }
 
 fn native_create_address(
-    gas_params: &CreateAddressGasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -36,7 +33,7 @@ fn native_create_address(
     debug_assert!(ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    context.charge(gas_params.base)?;
+    context.charge(ACCOUNT_CREATE_ADDRESS_BASE)?;
 
     let bytes = safely_pop_arg!(arguments, Vec<u8>);
     let address = AccountAddress::from_bytes(bytes);
@@ -53,39 +50,15 @@ fn native_create_address(
  * module
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub create_address: CreateAddressGasParameters,
-    pub create_signer: create_signer::CreateSignerGasParameters,
-}
-
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        (
-            "create_address",
-            make_safe_native(
-                gas_params.create_address,
-                timed_features.clone(),
-                features.clone(),
-                native_create_address,
-            ),
-        ),
+        ("create_address", native_create_address as RawSafeNative),
         // Despite that this is no longer present in account.move, we must keep this around for
         // replays.
-        (
-            "create_signer",
-            make_safe_native(
-                gas_params.create_signer,
-                timed_features,
-                features,
-                create_signer::native_create_signer,
-            ),
-        ),
+        ("create_signer", create_signer::native_create_signer),
     ];
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

@@ -1,0 +1,23 @@
+[package]
+name = "aptos-gas-meter"
+description = "Gas meter implementation for the Aptos blockchain"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-gas-algebra = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-types = { workspace = true }

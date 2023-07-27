@@ -1162,7 +1162,7 @@ impl GlobalEnv {
             let view = StructHandleView::new(&module, handle);
             let struct_id = StructId(self.symbol_pool.make(view.name().as_str()));
             let mod_data = &mut self.module_data[module_id.0 as usize];
-            if let Some(mut struct_data) = mod_data.struct_data.get_mut(&struct_id) {
+            if let Some(struct_data) = mod_data.struct_data.get_mut(&struct_id) {
                 struct_data.def_idx = Some(def_idx);
                 mod_data.struct_idx_to_id.insert(def_idx, struct_id);
             } else {
@@ -1201,7 +1201,7 @@ impl GlobalEnv {
             };
 
             let mod_data = &mut self.module_data[module_id.0 as usize];
-            if let Some(mut fun_data) = mod_data.function_data.get_mut(&fun_id) {
+            if let Some(fun_data) = mod_data.function_data.get_mut(&fun_id) {
                 fun_data.def_idx = Some(def_idx);
                 fun_data.handle_idx = Some(handle_idx);
                 mod_data.function_idx_to_id.insert(def_idx, fun_id);
@@ -1215,7 +1215,7 @@ impl GlobalEnv {
 
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
-        let mut mod_data = &mut self.module_data[module_id.0 as usize];
+        let mod_data = &mut self.module_data[module_id.0 as usize];
         mod_data.used_modules = used_modules;
         mod_data.friend_modules = friend_modules;
         mod_data.compiled_module = Some(module);

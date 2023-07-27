@@ -25,7 +25,6 @@ pub(crate) trait VMAdapter {
         &self,
         remote: &'r impl MoveResolverExt,
         session_id: SessionId,
-        aggregator_enabled: bool,
     ) -> SessionExt<'r, '_>;
 
     /// Checks the signature of the given signed transaction and returns

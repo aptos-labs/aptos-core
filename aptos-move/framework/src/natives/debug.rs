@@ -4,17 +4,11 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::{
-        helpers::{
-            make_module_natives, make_safe_native, SafeNativeContext, SafeNativeError,
-            SafeNativeResult,
-        },
-        string_utils::native_format_debug,
-    },
-    safely_pop_arg,
+use crate::natives::string_utils::native_format_debug;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
-use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_vm_runtime::native_functions::NativeFunction;
 #[allow(unused_imports)]
 use move_vm_types::{
@@ -23,7 +17,7 @@ use move_vm_types::{
     values::{Reference, Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native fun print
@@ -31,7 +25,6 @@ use std::{collections::VecDeque, sync::Arc};
  **************************************************************************************************/
 #[inline]
 fn native_print(
-    _: &(),
     _: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -59,7 +52,6 @@ fn native_print(
 #[allow(unused_variables)]
 #[inline]
 fn native_stack_trace(
-    _: &(),
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     args: VecDeque<Value>,
@@ -79,7 +71,6 @@ fn native_stack_trace(
 
 #[inline]
 fn native_old_debug_print(
-    _: &(),
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -98,7 +89,6 @@ fn native_old_debug_print(
 
 #[inline]
 fn native_old_print_stacktrace(
-    _: &(),
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     args: VecDeque<Value>,
@@ -118,38 +108,15 @@ fn native_old_print_stacktrace(
  * module
  **************************************************************************************************/
 pub fn make_all(
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        (
-            "native_print",
-            make_safe_native((), timed_features.clone(), features.clone(), native_print),
-        ),
-        (
-            "native_stack_trace",
-            make_safe_native(
-                (),
-                timed_features.clone(),
-                features.clone(),
-                native_stack_trace,
-            ),
-        ),
+        ("native_print", native_print as RawSafeNative),
+        ("native_stack_trace", native_stack_trace),
         // For re-playability on-chain we still implement the old versions of these functions
-        (
-            "print",
-            make_safe_native(
-                (),
-                timed_features.clone(),
-                features.clone(),
-                native_old_debug_print,
-            ),
-        ),
-        (
-            "print_stack_trace",
-            make_safe_native((), timed_features, features, native_old_print_stacktrace),
-        ),
+        ("print", native_old_debug_print),
+        ("print_stack_trace", native_old_print_stacktrace),
     ];
 
-    make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

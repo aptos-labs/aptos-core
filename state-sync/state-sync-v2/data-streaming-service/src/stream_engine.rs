@@ -79,16 +79,16 @@ pub trait DataStreamEngine {
     fn is_stream_complete(&self) -> bool;
 
     /// Notifies the data stream engine that a timeout was encountered when
-    /// trying to send the subscription request.
+    /// trying to send the optimistic fetch request.
     ///
     /// Note: Most engines shouldn't process these notifications, so a default
-    /// implementation that returns an error is provided. If a subscription request
-    /// does exist, there should only ever be a single request in-flight.
-    fn notify_subscription_timeout(
+    /// implementation that returns an error is provided. If an optimistic fetch
+    /// request does exist, there should only ever be a single request in-flight.
+    fn notify_optimistic_fetch_timeout(
         &mut self,
         client_request: &DataClientRequest,
     ) -> Result<(), Error> {
-        Err(Error::UnexpectedErrorEncountered(format!("Received a subscription request timeout but no subscription request was sent! Reported request: {:?}", client_request)))
+        Err(Error::UnexpectedErrorEncountered(format!("Received an optimistic fetch request timeout but no request was sent! Reported request: {:?}", client_request)))
     }
 
     /// Transforms a given data client response (for the previously sent
@@ -347,8 +347,8 @@ pub struct ContinuousTransactionStreamEngine {
     // True iff a request has been created to fetch an epoch ending ledger info
     pub end_of_epoch_requested: bool,
 
-    // True iff a request has been created to subscribe to data,
-    pub subscription_requested: bool,
+    // True iff a request has been created to optimistically fetch data
+    pub optimistic_fetch_requested: bool,
 
     // The next version and epoch that we're waiting to send to the
     // client along the stream. All versions before this have been sent.
@@ -382,7 +382,7 @@ impl ContinuousTransactionStreamEngine {
             request: stream_request.clone(),
             current_target_ledger_info: None,
             end_of_epoch_requested: false,
-            subscription_requested: false,
+            optimistic_fetch_requested: false,
             next_stream_version_and_epoch: (next_version, next_epoch),
             next_request_version_and_epoch: (next_version, next_epoch),
             stream_is_complete: false,
@@ -465,7 +465,7 @@ impl ContinuousTransactionStreamEngine {
         Ok(data_notification)
     }
 
-    fn create_notification_for_subscription_data(
+    fn create_notification_for_optimistic_fetch_data(
         &mut self,
         known_version: Version,
         client_response_payload: ResponsePayload,
@@ -524,7 +524,7 @@ impl ContinuousTransactionStreamEngine {
         Ok(data_notification)
     }
 
-    fn create_subscription_request(&mut self) -> Result<DataClientRequest, Error> {
+    fn create_optimistic_fetch_request(&mut self) -> Result<DataClientRequest, Error> {
         let (next_request_version, known_epoch) = self.next_request_version_and_epoch;
         let known_version = next_request_version
             .checked_sub(1)
@@ -737,7 +737,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         max_number_of_requests: u64,
         global_data_summary: &GlobalDataSummary,
     ) -> Result<Vec<DataClientRequest>, Error> {
-        if self.end_of_epoch_requested || self.subscription_requested {
+        if self.end_of_epoch_requested || self.optimistic_fetch_requested {
             return Ok(vec![]); // We are waiting for a blocking response type
         }
 
@@ -817,10 +817,10 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             self.update_request_tracking(&client_requests, &target_ledger_info)?;
             client_requests
         } else {
-            // We don't have a target, send a single subscription request
-            let subscription_request = self.create_subscription_request()?;
-            self.subscription_requested = true;
-            vec![subscription_request]
+            // We don't have a target, send a single optimistic fetch request
+            let optimistic_fetch_request = self.create_optimistic_fetch_request()?;
+            self.optimistic_fetch_requested = true;
+            vec![optimistic_fetch_request]
         };
 
         Ok(client_requests)
@@ -851,19 +851,19 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         self.stream_is_complete
     }
 
-    fn notify_subscription_timeout(
+    fn notify_optimistic_fetch_timeout(
         &mut self,
         client_request: &DataClientRequest,
     ) -> Result<(), Error> {
-        if !self.subscription_requested {
+        if !self.optimistic_fetch_requested {
             return Err(Error::UnexpectedErrorEncountered(format!(
-                "Received a subscription timeout but no request is in-flight! Request: {:?}",
+                "Received an optimistic fetch timeout but no request is in-flight! Request: {:?}",
                 client_request
             )));
         }
 
-        // Reset the subscription request and handle the timeout
-        self.subscription_requested = false;
+        // Reset the optimistic fetch request and handle the timeout
+        self.optimistic_fetch_requested = false;
         if matches!(
             self.request,
             StreamRequest::ContinuouslyStreamTransactions(_)
@@ -873,7 +873,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         ) {
             info!(
                 (LogSchema::new(LogEntry::RequestTimeout)
-                    .message("Subscription request for new transactions timed out!"))
+                    .message("Optimistic fetch request for new transactions timed out!"))
             );
         } else if matches!(
             self.request,
@@ -884,7 +884,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         ) {
             info!(
                 (LogSchema::new(LogEntry::RequestTimeout)
-                    .message("Subscription request for new transaction outputs timed out!"))
+                    .message("Optimistic fetch request for new transaction outputs timed out!"))
             );
         } else if matches!(
             self.request,
@@ -894,11 +894,12 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             DataClientRequest::NewTransactionsOrOutputsWithProof(_)
         ) {
             info!(
-                (LogSchema::new(LogEntry::RequestTimeout)
-                    .message("Subscription request for new transactions or outputs timed out!"))
+                (LogSchema::new(LogEntry::RequestTimeout).message(
+                    "Optimistic fetch request for new transactions or outputs timed out!"
+                ))
             );
         } else {
-            return Err(Error::UnexpectedErrorEncountered(format!("Received a subscription request timeout but the request did not match the expected type for the stream! Request: {:?}, Stream: {:?}", client_request, self.request)));
+            return Err(Error::UnexpectedErrorEncountered(format!("Received an optimistic fetch request timeout but the request did not match the expected type for the stream! Request: {:?}, Stream: {:?}", client_request, self.request)));
         }
 
         Ok(())
@@ -913,8 +914,8 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         // We reset the pending requests to prevent malicious responses from blocking the streams
         if self.end_of_epoch_requested {
             self.end_of_epoch_requested = false;
-        } else if self.subscription_requested {
-            self.subscription_requested = false;
+        } else if self.optimistic_fetch_requested {
+            self.optimistic_fetch_requested = false;
         }
 
         // Handle and transform the response
@@ -925,7 +926,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             },
             NewTransactionsWithProof(request) => match &self.request {
                 StreamRequest::ContinuouslyStreamTransactions(_) => {
-                    let data_notification = self.create_notification_for_subscription_data(
+                    let data_notification = self.create_notification_for_optimistic_fetch_data(
                         request.known_version,
                         client_response_payload,
                         notification_id_generator,
@@ -936,7 +937,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             },
             NewTransactionOutputsWithProof(request) => match &self.request {
                 StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
-                    let data_notification = self.create_notification_for_subscription_data(
+                    let data_notification = self.create_notification_for_optimistic_fetch_data(
                         request.known_version,
                         client_response_payload,
                         notification_id_generator,
@@ -947,7 +948,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             },
             NewTransactionsOrOutputsWithProof(request) => match &self.request {
                 StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => {
-                    let data_notification = self.create_notification_for_subscription_data(
+                    let data_notification = self.create_notification_for_optimistic_fetch_data(
                         request.known_version,
                         client_response_payload,
                         notification_id_generator,

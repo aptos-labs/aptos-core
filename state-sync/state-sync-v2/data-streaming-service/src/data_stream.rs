@@ -283,8 +283,8 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 
         // Calculate the request timeout to use, based on the
         // request type and the number of previous failures.
-        let request_timeout_ms = if is_subscription_request(&data_client_request) {
-            self.data_client_config.subscription_timeout_ms
+        let request_timeout_ms = if is_optimistic_fetch_request(&data_client_request) {
+            self.data_client_config.optimistic_fetch_timeout_ms
         } else if !request_retry {
             self.data_client_config.response_timeout_ms
         } else {
@@ -414,15 +414,15 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                         }
                     },
                     Err(error) => {
-                        // If the error was a timeout and the request was a subscription request
+                        // If the error was a timeout and the request was an optimistic fetch
                         // we need to notify the stream engine and not retry the request.
                         if matches!(
                             error,
                             aptos_data_client::error::Error::TimeoutWaitingForResponse(_)
-                        ) && is_subscription_request(client_request)
+                        ) && is_optimistic_fetch_request(client_request)
                         {
                             self.stream_engine
-                                .notify_subscription_timeout(client_request)?;
+                                .notify_optimistic_fetch_timeout(client_request)?;
                         } else {
                             self.handle_data_client_error(client_request, &error)?;
                         };
@@ -1029,8 +1029,8 @@ async fn get_transactions_or_outputs_with_proof<
     Ok(Response::new(context, ResponsePayload::try_from(payload)?))
 }
 
-/// Returns true iff the given request is a subscription request
-fn is_subscription_request(request: &DataClientRequest) -> bool {
+/// Returns true iff the given request is an optimistic fetch request
+fn is_optimistic_fetch_request(request: &DataClientRequest) -> bool {
     matches!(request, DataClientRequest::NewTransactionsWithProof(_))
         || matches!(
             request,

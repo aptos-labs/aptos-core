@@ -15,7 +15,7 @@ use aptos_framework::natives::{
     aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
 };
-use aptos_gas::ChangeSetConfigs;
+use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
@@ -24,7 +24,7 @@ use aptos_types::{
     transaction::SignatureCheckedTransaction,
     write_set::{WriteOp, WriteSetMut},
 };
-use aptos_vm_types::change_set::VMChangeSet;
+use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -34,7 +34,6 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{

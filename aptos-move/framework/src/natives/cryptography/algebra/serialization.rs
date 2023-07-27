@@ -2,21 +2,21 @@
 
 use crate::{
     abort_unless_feature_flag_enabled,
-    natives::{
-        cryptography::algebra::{
-            abort_invariant_violated, gas::GasParameters, AlgebraContext, SerializationFormat,
-            Structure, BLS12381_R_SCALAR, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
-            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        },
-        helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
+    natives::cryptography::algebra::{
+        abort_invariant_violated, AlgebraContext, SerializationFormat, Structure,
+        BLS12381_R_SCALAR, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
+        MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
-    safe_borrow_element, safely_pop_arg, store_element, structure_from_ty_arg,
+    safe_borrow_element, store_element, structure_from_ty_arg,
+};
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::CurveGroup;
 use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use move_core_types::gas_algebra::NumArgs;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Value, VectorRef},
@@ -56,7 +56,6 @@ macro_rules! format_from_ty_arg {
 }
 
 pub fn serialize_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -70,7 +69,7 @@ pub fn serialize_internal(
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bls12_381::Fr, element_ptr, element);
             let mut buf = vec![];
-            context.charge(gas_params.ark_bls12_381_fr_serialize * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_FR_SERIALIZE)?;
             element
                 .serialize_uncompressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
@@ -80,7 +79,7 @@ pub fn serialize_internal(
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bls12_381::Fr, element_ptr, element);
             let mut buf = vec![];
-            context.charge(gas_params.ark_bls12_381_fr_serialize * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_FR_SERIALIZE)?;
             element
                 .serialize_uncompressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
@@ -91,7 +90,7 @@ pub fn serialize_internal(
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
             let mut buf = vec![];
-            context.charge(gas_params.ark_bls12_381_fq12_serialize * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_SERIALIZE)?;
             element
                 .serialize_uncompressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
@@ -108,7 +107,7 @@ pub fn serialize_internal(
             );
             let element_affine = element.into_affine();
             let mut buf = Vec::new();
-            context.charge(gas_params.ark_bls12_381_g1_affine_serialize_uncomp * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_G1_AFFINE_SERIALIZE_UNCOMP)?;
             element_affine
                 .serialize_uncompressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
@@ -125,7 +124,7 @@ pub fn serialize_internal(
             );
             let element_affine = element.into_affine();
             let mut buf = Vec::new();
-            context.charge(gas_params.ark_bls12_381_g1_affine_serialize_comp * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_G1_AFFINE_SERIALIZE_COMP)?;
             element_affine
                 .serialize_compressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
@@ -142,7 +141,7 @@ pub fn serialize_internal(
             );
             let element_affine = element.into_affine();
             let mut buf = Vec::new();
-            context.charge(gas_params.ark_bls12_381_g2_affine_serialize_uncomp * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_G2_AFFINE_SERIALIZE_UNCOMP)?;
             element_affine
                 .serialize_uncompressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
@@ -159,7 +158,7 @@ pub fn serialize_internal(
             );
             let element_affine = element.into_affine();
             let mut buf = Vec::new();
-            context.charge(gas_params.ark_bls12_381_g2_affine_serialize_comp * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_G2_AFFINE_SERIALIZE_COMP)?;
             element_affine
                 .serialize_compressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
@@ -169,7 +168,7 @@ pub fn serialize_internal(
             let handle = safely_pop_arg!(args, u64) as usize;
             safe_borrow_element!(context, handle, ark_bls12_381::Fq12, element_ptr, element);
             let mut buf = vec![];
-            context.charge(gas_params.ark_bls12_381_fq12_serialize * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_SERIALIZE)?;
             element
                 .serialize_uncompressed(&mut buf)
                 .map_err(|_e| abort_invariant_violated())?;
@@ -222,7 +221,6 @@ macro_rules! ark_ec_point_deserialize_internal {
 }
 
 pub fn deserialize_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -247,7 +245,7 @@ pub fn deserialize_internal(
                 bytes,
                 ark_bls12_381::Fr,
                 deserialize_uncompressed,
-                gas_params.ark_bls12_381_fr_deser * NumArgs::one()
+                ALGEBRA_ARK_BLS12_381_FR_DESER
             )
         },
         (Some(Structure::BLS12381Fr), Some(SerializationFormat::BLS12381FrMsb)) => {
@@ -263,7 +261,7 @@ pub fn deserialize_internal(
                 bytes,
                 ark_bls12_381::Fr,
                 deserialize_uncompressed,
-                gas_params.ark_bls12_381_fr_deser * NumArgs::one()
+                ALGEBRA_ARK_BLS12_381_FR_DESER
             )
         },
         (Some(Structure::BLS12381Fq12), Some(SerializationFormat::BLS12381Fq12LscLsb)) => {
@@ -276,7 +274,7 @@ pub fn deserialize_internal(
                 bytes,
                 ark_bls12_381::Fq12,
                 deserialize_uncompressed,
-                gas_params.ark_bls12_381_fq12_deser * NumArgs::one()
+                ALGEBRA_ARK_BLS12_381_FQ12_DESER
             )
         },
         (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Uncompressed)) => {
@@ -289,7 +287,7 @@ pub fn deserialize_internal(
                 bytes,
                 ark_bls12_381::G1Affine,
                 deserialize_uncompressed,
-                gas_params.ark_bls12_381_g1_affine_deser_uncomp * NumArgs::one()
+                ALGEBRA_ARK_BLS12_381_G1_AFFINE_DESER_UNCOMP
             )
         },
         (Some(Structure::BLS12381G1), Some(SerializationFormat::BLS12381G1Compressed)) => {
@@ -302,7 +300,7 @@ pub fn deserialize_internal(
                 bytes,
                 ark_bls12_381::G1Affine,
                 deserialize_compressed,
-                gas_params.ark_bls12_381_g1_affine_deser_comp * NumArgs::one()
+                ALGEBRA_ARK_BLS12_381_G1_AFFINE_DESER_COMP
             )
         },
         (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Uncompressed)) => {
@@ -315,7 +313,7 @@ pub fn deserialize_internal(
                 bytes,
                 ark_bls12_381::G2Affine,
                 deserialize_uncompressed,
-                gas_params.ark_bls12_381_g2_affine_deser_uncomp * NumArgs::one()
+                ALGEBRA_ARK_BLS12_381_G2_AFFINE_DESER_UNCOMP
             )
         },
         (Some(Structure::BLS12381G2), Some(SerializationFormat::BLS12381G2Compressed)) => {
@@ -328,7 +326,7 @@ pub fn deserialize_internal(
                 bytes,
                 ark_bls12_381::G2Affine,
                 deserialize_compressed,
-                gas_params.ark_bls12_381_g2_affine_deser_comp * NumArgs::one()
+                ALGEBRA_ARK_BLS12_381_G2_AFFINE_DESER_COMP
             )
         },
         (Some(Structure::BLS12381Gt), Some(SerializationFormat::BLS12381Gt)) => {
@@ -336,12 +334,11 @@ pub fn deserialize_internal(
             if bytes.len() != 576 {
                 return Ok(smallvec![Value::bool(false), Value::u64(0)]);
             }
-            context.charge(gas_params.ark_bls12_381_fq12_deser * NumArgs::one())?;
+            context.charge(ALGEBRA_ARK_BLS12_381_FQ12_DESER)?;
             match <ark_bls12_381::Fq12>::deserialize_uncompressed(bytes) {
                 Ok(element) => {
                     context.charge(
-                        (gas_params.ark_bls12_381_fq12_pow_u256 + gas_params.ark_bls12_381_fq12_eq)
-                            * NumArgs::one(),
+                        ALGEBRA_ARK_BLS12_381_FQ12_POW_U256 + ALGEBRA_ARK_BLS12_381_FQ12_EQ,
                     )?;
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
                         let handle = store_element!(context, element)?;

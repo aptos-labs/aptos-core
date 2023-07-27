@@ -7,6 +7,7 @@ use crate::{
         CompactionTimestampsMeta, EpochEndingBackupMeta, IdentityMeta, Metadata,
         StateSnapshotBackupMeta, TransactionBackupMeta,
     },
+    metrics::backup::COMPACTED_TXN_VERSION,
     storage::FileHandle,
 };
 use anyhow::{anyhow, ensure, Result};
@@ -219,6 +220,11 @@ impl MetadataView {
         &mut self,
         compaction_cnt: usize,
     ) -> Result<Vec<&[TransactionBackupMeta]>> {
+        COMPACTED_TXN_VERSION.set(
+            self.transaction_backups
+                .last()
+                .map_or(0, |e| e.first_version) as i64,
+        );
         Self::compact_backups(&self.transaction_backups, compaction_cnt)
     }
 

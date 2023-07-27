@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/instance: test_username-validator-pvc
+    app.kubernetes.io/name: test_username
+    managed-by: pangu
+    type: validator
+  name: test_username-validator-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

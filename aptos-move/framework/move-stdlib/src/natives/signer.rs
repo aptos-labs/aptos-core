@@ -4,18 +4,17 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::helpers::make_module_natives;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::InternalGas;
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use aptos_gas_schedule::gas_params::natives::move_stdlib::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
+};
+use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
-    pop_arg,
     values::{values_impl::SignerRef, Value},
 };
-use smallvec::smallvec;
-use std::{collections::VecDeque, sync::Arc};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native fun borrow_address
@@ -23,49 +22,28 @@ use std::{collections::VecDeque, sync::Arc};
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct BorrowAddressGasParameters {
-    pub base: InternalGas,
-}
-
 #[inline]
 fn native_borrow_address(
-    gas_params: &BorrowAddressGasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let signer_reference = pop_arg!(arguments, SignerRef);
+    let signer_reference = safely_pop_arg!(arguments, SignerRef);
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![
-        signer_reference.borrow_signer()?
-    ]))
-}
+    context.charge(SIGNER_BORROW_ADDRESS_BASE)?;
 
-pub fn make_native_borrow_address(gas_params: BorrowAddressGasParameters) -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_borrow_address(&gas_params, context, ty_args, args)
-        },
-    )
+    Ok(smallvec![signer_reference.borrow_signer()?])
 }
 
 /***************************************************************************************************
  * module
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub borrow_address: BorrowAddressGasParameters,
-}
-
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [(
-        "borrow_address",
-        make_native_borrow_address(gas_params.borrow_address),
-    )];
-
-    make_module_natives(natives)
+pub fn make_all(
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
+    let natives = [("borrow_address", native_borrow_address as RawSafeNative)];
+    builder.make_named_natives(natives)
 }

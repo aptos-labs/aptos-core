@@ -19,7 +19,7 @@ pub struct ApiConfig {
     /// Enables the REST API endpoint
     #[serde(default = "default_enabled")]
     pub enabled: bool,
-    /// Address for the REST API to listen on. Set to 0.0.0.0:<port> to allow all inbound connections.
+    /// Address for the REST API to listen on. Set to 0.0.0.0:port to allow all inbound connections.
     pub address: SocketAddr,
     /// Path to a local TLS certificate to enable HTTPS
     #[serde(default, skip_serializing_if = "Option::is_none")]

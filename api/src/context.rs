@@ -17,7 +17,7 @@ use aptos_api_types::{
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
-use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::TStateView;
@@ -1092,7 +1092,7 @@ impl Context {
 
     fn min_gas_unit_price<E: InternalError>(&self, ledger_info: &LedgerInfo) -> Result<u64, E> {
         let (_, gas_schedule) = self.get_gas_schedule(ledger_info)?;
-        Ok(gas_schedule.txn.min_price_per_gas_unit.into())
+        Ok(gas_schedule.vm.txn.min_price_per_gas_unit.into())
     }
 
     pub fn get_gas_schedule<E: InternalError>(

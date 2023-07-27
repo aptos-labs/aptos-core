@@ -15,8 +15,11 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 

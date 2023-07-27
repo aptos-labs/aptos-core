@@ -12,7 +12,6 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::StorageServiceConfig;
-use aptos_infallible::RwLock;
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_storage_service_types::{
     requests::DataRequest,
@@ -23,8 +22,9 @@ use aptos_storage_service_types::{
     StorageServiceError,
 };
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use arc_swap::ArcSwap;
 use futures::StreamExt;
-use std::{sync::Arc, time::Duration};
+use std::{ops::Deref, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 // The maximum number of seconds to wait for a cache update notification
@@ -50,7 +50,8 @@ async fn test_refresh_cached_storage_summary() {
     let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
 
     // Create the storage summary cache
-    let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
+    let cached_storage_server_summary =
+        Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
 
     // Create the cached summary update notifier
     let (cached_summary_update_notifier, mut cached_summary_update_listener) =
@@ -90,10 +91,11 @@ async fn test_refresh_cached_storage_summary() {
 
     // Manually modify the protocol metadata to ensure that
     // the next refresh will trigger a notification.
-    cached_storage_server_summary
-        .write()
+    let mut storage_server_summary = cached_storage_server_summary.load().clone().deref().clone();
+    storage_server_summary
         .protocol_metadata
         .max_transaction_output_chunk_size = 123;
+    cached_storage_server_summary.store(Arc::new(storage_server_summary));
 
     // Refresh the storage summary cache
     refresh_cached_storage_summary(
@@ -117,10 +119,10 @@ async fn test_refresh_cached_storage_summary() {
 
     // Manually modify the data summary to ensure that
     // the next refresh will trigger a notification.
-    cached_storage_server_summary
-        .write()
-        .data_summary
-        .transactions = Some(CompleteDataRange::new(10, 11).unwrap());
+    let mut storage_server_summary = cached_storage_server_summary.load().clone().deref().clone();
+    storage_server_summary.data_summary.transactions =
+        Some(CompleteDataRange::new(10, 11).unwrap());
+    cached_storage_server_summary.store(Arc::new(storage_server_summary));
 
     // Refresh the storage summary cache
     refresh_cached_storage_summary(
@@ -197,7 +199,7 @@ async fn test_get_storage_server_summary_advance_time() {
         );
 
         // Manually overwrite the storage summary cache
-        *storage_summary_cache.write() = StorageServerSummary::default();
+        storage_summary_cache.store(Arc::new(StorageServerSummary::default()));
     }
 }
 
@@ -256,7 +258,7 @@ async fn test_get_storage_server_summary_notification() {
         );
 
         // Manually overwrite the storage summary cache
-        *storage_summary_cache.write() = StorageServerSummary::default();
+        storage_summary_cache.store(Arc::new(StorageServerSummary::default()));
     }
 }
 

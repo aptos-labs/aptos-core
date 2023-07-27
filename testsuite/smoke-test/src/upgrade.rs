@@ -7,7 +7,8 @@ use crate::{
 };
 use aptos_crypto::ValidCryptoMaterialStringExt;
 use aptos_forge::Swarm;
-use aptos_gas::{AptosGasParameters, GasQuantity, InitialGasSchedule, ToOnChainGasSchedule};
+use aptos_gas_algebra::GasQuantity;
+use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
 use aptos_release_builder::{
     components::{
         feature_flags::{FeatureFlag, Features},
@@ -49,11 +50,12 @@ async fn test_upgrade_flow() {
     // Bump the limit in gas schedule
     // TODO: Replace this logic with aptos-gas
     let mut gas_parameters = AptosGasParameters::initial();
-    gas_parameters.txn.max_transaction_size_in_bytes = GasQuantity::new(100_000_000);
+    gas_parameters.vm.txn.max_transaction_size_in_bytes = GasQuantity::new(100_000_000);
 
     let gas_schedule = aptos_types::on_chain_config::GasScheduleV2 {
-        feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
-        entries: gas_parameters.to_on_chain_gas_schedule(aptos_gas::LATEST_GAS_FEATURE_VERSION),
+        feature_version: aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION,
+        entries: gas_parameters
+            .to_on_chain_gas_schedule(aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION),
     };
 
     let (_, update_gas_script) =

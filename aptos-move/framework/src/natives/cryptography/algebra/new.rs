@@ -2,16 +2,16 @@
 
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,
-    natives::{
-        cryptography::algebra::{
-            feature_flag_from_structure, gas::GasParameters, AlgebraContext, Structure,
-            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
-        },
-        helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
+    natives::cryptography::algebra::{
+        feature_flag_from_structure, AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED,
+        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
-    safely_pop_arg, store_element, structure_from_ty_arg,
+    store_element, structure_from_ty_arg,
 };
-use move_core_types::gas_algebra::NumArgs;
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
+};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
@@ -27,7 +27,6 @@ macro_rules! from_u64_internal {
 }
 
 pub fn from_u64_internal(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -40,13 +39,13 @@ pub fn from_u64_internal(
             context,
             args,
             ark_bls12_381::Fr,
-            gas_params.ark_bls12_381_fr_from_u64 * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FR_FROM_U64
         ),
         Some(Structure::BLS12381Fq12) => from_u64_internal!(
             context,
             args,
             ark_bls12_381::Fq12,
-            gas_params.ark_bls12_381_fq12_from_u64 * NumArgs::one()
+            ALGEBRA_ARK_BLS12_381_FQ12_FROM_U64
         ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,

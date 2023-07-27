@@ -109,6 +109,10 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 .map_err(|e| anyhow::anyhow!(e))?
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("Failed to parse grpc address"))?;
+            tracing::info!(
+                grpc_address = grpc_address.to_string().as_str(),
+                "[Data Service] Starting gRPC server with non-TLS."
+            );
             tasks.push(tokio::spawn(async move {
                 Server::builder()
                     .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
@@ -132,6 +136,10 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             let cert = tokio::fs::read(config.cert_path.clone()).await?;
             let key = tokio::fs::read(config.key_path.clone()).await?;
             let identity = tonic::transport::Identity::from_pem(cert, key);
+            tracing::info!(
+                grpc_address = grpc_address.to_string().as_str(),
+                "[Data Service] Starting gRPC server with TLS."
+            );
             tasks.push(tokio::spawn(async move {
                 Server::builder()
                     .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
