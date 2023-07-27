@@ -10,7 +10,10 @@ use crate::{
     tests::{mock, utils},
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
+use aptos_config::{
+    config::{AptosDataClientConfig, StorageServiceConfig},
+    network_id::PeerNetworkId,
+};
 use aptos_infallible::Mutex;
 use aptos_storage_service_types::{
     requests::{
@@ -27,7 +30,7 @@ use dashmap::DashMap;
 use futures::channel::oneshot;
 use lru::LruCache;
 use rand::{rngs::OsRng, Rng};
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use tokio::runtime::Handle;
 
 #[tokio::test]
@@ -69,6 +72,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let lru_response_cache = Arc::new(Mutex::new(LruCache::new(0)));
     let request_moderator = Arc::new(RequestModerator::new(
+        AptosDataClientConfig::default(),
         cached_storage_server_summary.clone(),
         mock::create_peers_and_metadata(vec![]),
         storage_service_config,
@@ -144,9 +148,9 @@ async fn test_peers_with_ready_optimistic_fetches() {
 #[tokio::test]
 async fn test_remove_expired_optimistic_fetches() {
     // Create a storage service config
-    let max_optimistic_fetch_period = 100;
+    let max_optimistic_fetch_period_ms = 100;
     let storage_service_config = StorageServiceConfig {
-        max_optimistic_fetch_period,
+        max_optimistic_fetch_period_ms,
         ..Default::default()
     };
 
@@ -161,6 +165,7 @@ async fn test_remove_expired_optimistic_fetches() {
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
     let lru_response_cache = Arc::new(Mutex::new(LruCache::new(0)));
     let request_moderator = Arc::new(RequestModerator::new(
+        AptosDataClientConfig::default(),
         cached_storage_server_summary.clone(),
         mock::create_peers_and_metadata(vec![]),
         storage_service_config,
@@ -180,11 +185,7 @@ async fn test_remove_expired_optimistic_fetches() {
     assert_eq!(optimistic_fetches.len(), num_optimistic_fetches_in_batch);
 
     // Elapse a small amount of time (not enough to expire the optimistic fetches)
-    time_service
-        .clone()
-        .into_mock()
-        .advance_async(Duration::from_millis(max_optimistic_fetch_period / 2))
-        .await;
+    utils::elapse_time(max_optimistic_fetch_period_ms / 2, &time_service).await;
 
     // Update the storage server summary so that there is new data
     let _ = update_storage_server_summary(cached_storage_server_summary.clone(), 1, 1);
@@ -220,11 +221,7 @@ async fn test_remove_expired_optimistic_fetches() {
     );
 
     // Elapse enough time to expire the first batch of optimistic fetches
-    time_service
-        .clone()
-        .into_mock()
-        .advance_async(Duration::from_millis(max_optimistic_fetch_period))
-        .await;
+    utils::elapse_time(max_optimistic_fetch_period_ms, &time_service).await;
 
     // Remove the expired optimistic fetches and verify the first batch was removed
     let peers_with_ready_optimistic_fetches =
@@ -244,11 +241,7 @@ async fn test_remove_expired_optimistic_fetches() {
     assert_eq!(optimistic_fetches.len(), num_optimistic_fetches_in_batch);
 
     // Elapse enough time to expire the second batch of optimistic fetches
-    time_service
-        .clone()
-        .into_mock()
-        .advance_async(Duration::from_millis(max_optimistic_fetch_period + 1))
-        .await;
+    utils::elapse_time(max_optimistic_fetch_period_ms + 1, &time_service).await;
 
     // Remove the expired optimistic fetches and verify the second batch was removed
     let peers_with_ready_optimistic_fetches =
