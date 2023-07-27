@@ -17,6 +17,7 @@ use crate::{
 use anyhow::Result;
 use aptos_logger::{info, Level, Logger};
 use aptos_push_metrics::MetricsPusher;
+use futures::future::join_all;
 use std::{future::Future, time::{Instant, SystemTime, UNIX_EPOCH}};
 
 // Processes a test result.
@@ -108,10 +109,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
     )
     .await;
 
-    handle_newaccount.await?;
-    handle_cointransfer.await?;
-    handle_nfttransfer.await?;
-
+    join_all(vec![handle_newaccount, handle_cointransfer, handle_nfttransfer]).await;
     Ok(())
 }
 
