@@ -86,25 +86,25 @@ impl ToString for NetworkName {
 }
 
 // Set metrics based on the result.
-pub fn set_metrics(output: &TestResult, test_name: &str, network_name: &str, time: f64) {
+pub fn set_metrics(output: &TestResult, test_name: &str, network_name: &str, start_time: &str, time: f64) {
     match output {
         TestResult::Success => {
-            test_success(test_name, network_name).observe(1_f64);
-            test_fail(test_name, network_name).observe(0_f64);
-            test_error(test_name, network_name).observe(0_f64);
-            test_latency(test_name, network_name, "success").observe(time);
+            test_success(test_name, network_name, start_time).observe(1_f64);
+            test_fail(test_name, network_name, start_time).observe(0_f64);
+            test_error(test_name, network_name, start_time).observe(0_f64);
+            test_latency(test_name, network_name, start_time, "success").observe(time);
         },
         TestResult::Fail(_) => {
-            test_success(test_name, network_name).observe(0_f64);
-            test_fail(test_name, network_name).observe(1_f64);
-            test_error(test_name, network_name).observe(0_f64);
-            test_latency(test_name, network_name, "fail").observe(time);
+            test_success(test_name, network_name, start_time).observe(0_f64);
+            test_fail(test_name, network_name, start_time).observe(1_f64);
+            test_error(test_name, network_name, start_time).observe(0_f64);
+            test_latency(test_name, network_name, start_time, "fail").observe(time);
         },
         TestResult::Error(_) => {
-            test_success(test_name, network_name).observe(0_f64);
-            test_fail(test_name, network_name).observe(0_f64);
-            test_error(test_name, network_name).observe(1_f64);
-            test_latency(test_name, network_name, "error").observe(time);
+            test_success(test_name, network_name, start_time).observe(0_f64);
+            test_fail(test_name, network_name, start_time).observe(0_f64);
+            test_error(test_name, network_name, start_time).observe(1_f64);
+            test_latency(test_name, network_name, start_time, "error").observe(time);
         },
     }
 }
