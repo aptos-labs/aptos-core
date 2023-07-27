@@ -67,12 +67,12 @@ pub trait GasExpression<Env> {
     }
 
     fn to_dynamic(&self) -> DynamicExpression {
-        pub struct Visitor {
+        pub struct DynamicExpressionBuilder {
             //// Holds the AST
             pub node: Vec<DynamicExpression>,
         }
 
-        impl GasExpressionVisitor for Visitor {
+        impl GasExpressionVisitor for DynamicExpressionBuilder {
             fn add(&mut self) {
                 let expr = DynamicExpression::Add {
                     left: (Box::new(self.node.pop().unwrap())),
@@ -109,7 +109,7 @@ pub trait GasExpression<Env> {
             }
         }
 
-        let mut visitor = Visitor { node: Vec::new() };
+        let mut visitor = DynamicExpressionBuilder { node: Vec::new() };
         self.visit(&mut visitor);
         visitor
             .node

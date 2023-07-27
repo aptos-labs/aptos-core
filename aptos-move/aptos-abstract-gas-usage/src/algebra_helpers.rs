@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas_algebra::DynamicExpression;
-use std::collections::BTreeMap;
+use std::collections::{
+    btree_map::Entry::{Occupied, Vacant},
+    BTreeMap,
+};
 
 /// expand out the AST and collect only terms
 ///
@@ -74,24 +77,27 @@ pub fn normalize(expr: DynamicExpression) -> Vec<DynamicExpression> {
 /// ### Example
 ///
 /// (A + A) * (5 + 5) => 5A + 5A + 5A + 5A => 20A
-pub fn collect_terms(terms: Vec<DynamicExpression>) -> BTreeMap<String, u64> {
+pub fn collect_terms(terms: Vec<DynamicExpression>) -> Result<BTreeMap<String, u64>, String> {
     let mut map: BTreeMap<String, u64> = BTreeMap::new();
     for term in terms {
         match term {
             DynamicExpression::GasValue { value } => {
-                let key: String = value.to_string();
-                if !map.contains_key(&key) {
-                    map.insert(key, value);
-                } else {
-                    map.entry(key).and_modify(|v| *v += value);
+                // seeing a concrete quantity means that the user
+                // isn't providing expressions in the GasExpression.
+                // this makes calibration impossible and we should error
+                if value != 0 {
+                    return Err(String::from(
+                        "Concrete quantity provided. Should be GasExpression.",
+                    ));
                 }
             },
-            DynamicExpression::GasParam { name } => {
-                if !map.contains_key(&name) {
-                    map.insert(name, 1);
-                } else {
-                    map.entry(name).and_modify(|v| *v += 1);
-                }
+            DynamicExpression::GasParam { name } => match map.entry(name) {
+                Occupied(mut entry) => {
+                    *entry.get_mut() += 1;
+                },
+                Vacant(entry) => {
+                    entry.insert(1);
+                },
             },
             DynamicExpression::Mul { left, right } => {
                 let mut key: String = String::new();
@@ -120,5 +126,5 @@ pub fn collect_terms(terms: Vec<DynamicExpression>) -> BTreeMap<String, u64> {
             _ => {},
         }
     }
-    map
+    Ok(map)
 }

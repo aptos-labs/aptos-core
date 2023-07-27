@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::visitor::CalibrationVisitor;
 use aptos_gas_algebra::{
     DynamicExpression, Fee, FeePerGasUnit, GasExpression, InternalGas, InternalGasUnit, Octa,
 };
@@ -55,9 +54,9 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         &mut self,
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit>,
     ) -> PartialVMResult<()> {
-        //// TODO
-        let mut visitor = CalibrationVisitor { node: Vec::new() };
-        abstract_amount.visit(&mut visitor);
+        let node = abstract_amount.to_dynamic();
+        self.shared_buffer.lock().unwrap().push(node);
+
         let amount =
             abstract_amount.evaluate(self.base.feature_version(), &self.base.vm_gas_params());
         self.base.charge_execution(amount)?;
