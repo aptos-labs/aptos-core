@@ -2077,7 +2077,7 @@ Staking_contract exists the stacker/operator pair.
 Staking_contract exists the stacker/operator pair.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 1000;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> staking_contracts = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
 <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(staking_contracts, operator);
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a>;
@@ -2142,7 +2142,7 @@ Staking_contract exists the stacker/operator pair.
 Account is not frozen and sufficient to withdraw.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 1000;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_PreconditionsInCreateContract">PreconditionsInCreateContract</a>;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;AptosCoin&gt; {<a href="account.md#0x1_account">account</a>: staker};
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_Create_Staking_Contract_With_Coins_Abortsif">Create_Staking_Contract_With_Coins_Abortsif</a>;
@@ -2164,7 +2164,7 @@ Initialize Store resource if this is the first time the staker has delegated to 
 Cannot create the staking contract if it already exists.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 1000;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_PreconditionsInCreateContract">PreconditionsInCreateContract</a>;
 <b>let</b> amount = coins.value;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_Create_Staking_Contract_With_Coins_Abortsif">Create_Staking_Contract_With_Coins_Abortsif</a> { amount };
@@ -2185,7 +2185,7 @@ Account is not frozen and sufficient to withdraw.
 Staking_contract exists the stacker/operator pair.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 1000;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
 <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a> { staker: staker_address };
