@@ -15,7 +15,10 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
-    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction, TransactionOutput,
+        TransactionStatus,
+    },
     vm_status::VMStatus,
 };
 use aptos_vm::{
@@ -153,17 +156,15 @@ where
         } else {
             AccountPickStyle::Unlimited
         };
-
-        let mut state = TransactionBenchState::with_size(
-            &self.strategy,
-            num_accounts,
-            num_txn,
-            num_executor_shards,
-            remote_executor_addresses,
-            account_pick_style,
-        );
-
         for i in 0..total_runs {
+            let mut state = TransactionBenchState::with_size(
+                &self.strategy,
+                num_accounts,
+                num_txn,
+                num_executor_shards,
+                remote_executor_addresses.clone(),
+                account_pick_style.clone(),
+            );
             if i < num_warmups {
                 println!("WARMUP - ignore results");
                 state.execute_blockstm_benchmark(
@@ -335,10 +336,10 @@ where
         &self,
         transactions: Vec<Transaction>,
         maybe_block_gas_limit: Option<u64>,
-    ) -> usize {
+    ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
         let timer = Instant::now();
-        BlockAptosVM::execute_block::<
+        let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
@@ -352,7 +353,7 @@ where
         .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
 
-        block_size * 1000 / exec_time as usize
+        (output, block_size * 1000 / exec_time as usize)
     }
 
     fn execute_benchmark_parallel(
@@ -360,10 +361,10 @@ where
         transactions: Vec<Transaction>,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) -> usize {
+    ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
         let timer = Instant::now();
-        if let Some(parallel_block_executor) = self.parallel_block_executor.as_ref() {
+        let output = if let Some(parallel_block_executor) = self.parallel_block_executor.as_ref() {
             // TODO(skedia) partition in a pipelined way and evaluate how expensive it is to
             // parse the txns in a single thread.
             let partitioned_block = self.block_partitioner.as_ref().unwrap().partition(
@@ -381,7 +382,7 @@ where
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 )
-                .expect("VM should not fail to start");
+                .expect("VM should not fail to start")
         } else {
             BlockAptosVM::execute_block::<
                 _,
@@ -394,11 +395,11 @@ where
                 maybe_block_gas_limit,
                 None,
             )
-            .expect("VM should not fail to start");
-        }
+            .expect("VM should not fail to start")
+        };
         let exec_time = timer.elapsed().as_millis();
 
-        block_size * 1000 / exec_time as usize
+        (output, block_size * 1000 / exec_time as usize)
     }
 
     fn execute_blockstm_benchmark(
@@ -410,26 +411,39 @@ where
         maybe_block_gas_limit: Option<u64>,
     ) -> (usize, usize) {
         let transactions = self.gen_transaction(no_conflict_txns);
-        let par_tps = if run_par {
+        let (output, par_tps) = if run_par {
             println!("Parallel execution starts...");
-            let tps = self.execute_benchmark_parallel(
+            let (output, tps) = self.execute_benchmark_parallel(
                 transactions.clone(),
                 conurrency_level_per_shard,
                 maybe_block_gas_limit,
             );
             println!("Parallel execution finishes, TPS = {}", tps);
-            tps
+            (output, tps)
         } else {
-            0
+            (vec![], 0)
         };
-        let seq_tps = if run_seq {
+        output.iter().for_each(|txn_output| {
+            assert_eq!(
+                txn_output.status(),
+                &TransactionStatus::Keep(ExecutionStatus::Success)
+            );
+        });
+        let (output, seq_tps) = if run_seq {
             println!("Sequential execution starts...");
-            let tps = self.execute_benchmark_sequential(transactions, maybe_block_gas_limit);
+            let (output, tps) =
+                self.execute_benchmark_sequential(transactions, maybe_block_gas_limit);
             println!("Sequential execution finishes, TPS = {}", tps);
-            tps
+            (output, tps)
         } else {
-            0
+            (vec![], 0)
         };
+        output.iter().for_each(|txn_output| {
+            assert_eq!(
+                txn_output.status(),
+                &TransactionStatus::Keep(ExecutionStatus::Success)
+            );
+        });
         (par_tps, seq_tps)
     }
 }

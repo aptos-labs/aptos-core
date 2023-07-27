@@ -66,7 +66,7 @@ pub static OPTIMISTIC_FETCH_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Time it takes to process a storage request
+/// Time it takes to process an optimistic fetch request
 pub static OPTIMISTIC_FETCH_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_storage_service_server_optimistic_fetch_latency",

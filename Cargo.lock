@@ -2462,7 +2462,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-node"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "aptos-api",
@@ -3249,6 +3249,7 @@ dependencies = [
  "claims",
  "num-traits 0.2.15",
  "proptest",
+ "rand 0.7.3",
  "serde 1.0.149",
  "thiserror",
 ]

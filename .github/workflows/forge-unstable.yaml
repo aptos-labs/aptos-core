@@ -21,7 +21,7 @@ on:
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
   schedule:
-    - cron: "0 15 * * *" # the main branch cadence
+    - cron: "0 12 * * *" # The main branch cadence. This runs every day at 12pm UTC.
   pull_request:
     paths:
       - ".github/workflows/forge-unstable.yaml"
@@ -46,7 +46,7 @@ jobs:
         id: determine-test-branch
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 15 * * *" ]]; then
+            if [[ "${{ github.event.schedule }}" == "0 12 * * *" ]]; then
               echo "Branch: main"
               echo "BRANCH=main" >> $GITHUB_OUTPUT
             else
@@ -115,8 +115,8 @@ jobs:
       FORGE_TEST_SUITE: continuous
 
   run-forge-state-sync-slow-processing-catching-up-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, forge-continuous] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -124,14 +124,14 @@ jobs:
       # GCP cluster
       FORGE_CLUSTER_NAME: aptos-forge-1
       FORGE_NAMESPACE: forge-state-sync-slow-processing-catching-up-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
       FORGE_TEST_SUITE: state_sync_slow_processing_catching_up
       POST_TO_SLACK: true
       FORGE_ENABLE_FAILPOINTS: true
 
   run-forge-twin-validator-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-state-sync-slow-processing-catching-up-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -139,13 +139,13 @@ jobs:
       # GCP cluster
       FORGE_CLUSTER_NAME: aptos-forge-1
       FORGE_NAMESPACE: forge-twin-validator-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
       FORGE_TEST_SUITE: twin_validator_test
       POST_TO_SLACK: true
 
   run-forge-state-sync-failures-catching-up-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-twin-validator-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -153,14 +153,14 @@ jobs:
       FORGE_NAMESPACE: forge-state-sync-failures-catching-up-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       # GCP cluster
       FORGE_CLUSTER_NAME: aptos-forge-1
-      FORGE_RUNNER_DURATION_SECS: 900
+      FORGE_RUNNER_DURATION_SECS: 900 # Run for 15 minutes
       FORGE_TEST_SUITE: state_sync_failures_catching_up
       FORGE_ENABLE_FAILPOINTS: true
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
   run-forge-validator-reboot-stress-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-state-sync-failures-catching-up-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -168,7 +168,6 @@ jobs:
       # GCP cluster
       FORGE_CLUSTER_NAME: aptos-forge-1
       FORGE_NAMESPACE: forge-validator-reboot-stress-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      # Run for 40 minutes
-      FORGE_RUNNER_DURATION_SECS: 2400
+      FORGE_RUNNER_DURATION_SECS: 2400 # Run for 40 minutes
       FORGE_TEST_SUITE: validator_reboot_stress_test
       POST_TO_SLACK: true
