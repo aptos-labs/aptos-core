@@ -715,6 +715,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-metrics",
+ "tokio-retry",
 ]
 
 [[package]]

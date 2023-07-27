@@ -18,6 +18,7 @@ use futures::{
     future::{AbortHandle, Abortable},
     FutureExt,
 };
+use tokio_retry::strategy::ExponentialBackoff;
 use std::sync::Arc;
 
 pub(crate) struct DagDriver {
@@ -25,7 +26,7 @@ pub(crate) struct DagDriver {
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
     payload_client: Arc<dyn PayloadClient>,
-    reliable_broadcast: Arc<ReliableBroadcast<DAGMessage>>,
+    reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
     current_round: Round,
     time_service: Arc<dyn TimeService>,
     rb_abort_handle: Option<AbortHandle>,
@@ -38,7 +39,7 @@ impl DagDriver {
         epoch_state: Arc<EpochState>,
         dag: Arc<RwLock<Dag>>,
         payload_client: Arc<dyn PayloadClient>,
-        reliable_broadcast: Arc<ReliableBroadcast<DAGMessage>>,
+        reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
         current_round: Round,
         time_service: Arc<dyn TimeService>,
         storage: Arc<dyn DAGStorage>,
