@@ -231,6 +231,19 @@ impl<T: Clone> SubBlock<T> {
         source_txn.add_dependent_edge(txn_idx, storage_locations);
     }
 
+    pub fn add_required_edge(
+        &mut self,
+        dst_index: TxnIndex,
+        src_txn_idx: ShardedTxnIndex,
+        storage_location: StorageLocation,
+    ) {
+        let txn = self
+            .transactions
+            .get_mut(dst_index - self.start_index)
+            .unwrap();
+        txn.add_required_edge(src_txn_idx, storage_location);
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &TransactionWithDependencies<T>> {
         self.transactions.iter()
     }
@@ -369,6 +382,15 @@ impl<T: Clone> TransactionWithDependencies<T> {
     ) {
         self.cross_shard_dependencies
             .add_dependent_edge(txn_idx, storage_locations);
+    }
+
+    pub fn add_required_edge(
+        &mut self,
+        txn_idx: ShardedTxnIndex,
+        storage_location: StorageLocation,
+    ) {
+        self.cross_shard_dependencies
+            .add_required_edge(txn_idx, storage_location);
     }
 }
 

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{sharded_block_partitioner::{
+use crate::{BlockPartitioner, sharded_block_partitioner::{
     cross_shard_messages::CrossShardMsg,
     dependency_analysis::WriteSetWithTxnIndex,
     messages::{
@@ -10,7 +10,7 @@ use crate::{sharded_block_partitioner::{
         DiscardCrossShardDep, PartitioningResp,
     },
     partitioning_shard::PartitioningShard,
-}, BlockPartitioner};
+}};
 use aptos_logger::{error, info};
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId, SubBlocksForShard, TxnIndex},
@@ -21,8 +21,8 @@ use itertools::Itertools;
 use std::{
     collections::HashMap,
     sync::{
-        mpsc::{Receiver, Sender},
         Arc,
+        mpsc::{Receiver, Sender},
     },
     thread,
 };
@@ -35,7 +35,7 @@ use dashmap::DashMap;
 use rayon::prelude::IntoParallelIterator;
 use aptos_types::block_executor::partitioner::{CrossShardDependencies, ShardedTxnIndex, SubBlock, TransactionWithDependencies};
 use aptos_types::state_store::state_key::StateKey;
-use aptos_types::transaction::analyzed_transaction::{StorageLocation, StorageLocationHelper};
+use aptos_types::transaction::analyzed_transaction::StorageLocation;
 use crate::sharded_block_partitioner::counters::{ADD_EDGES_MISC_SECONDS, FLATTEN_TO_ROUNDS_MISC_SECONDS, SHARDED_PARTITIONER_MISC_SECONDS};
 use crate::simple_partitioner::SimplePartitioner;
 use rayon::iter::ParallelIterator;
@@ -516,7 +516,7 @@ mod tests {
         transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
     };
     use move_core_types::account_address::AccountAddress;
-    use rand::{rngs::OsRng, Rng};
+    use rand::{Rng, rngs::OsRng};
     use std::{collections::HashMap, sync::Mutex};
 
     fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock<AnalyzedTransaction>>) {

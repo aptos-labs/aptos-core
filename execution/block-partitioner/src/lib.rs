@@ -177,17 +177,18 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<AnalyzedTransactio
             let mut cur_sub_block_inbound_costs_by_key_src_pair: HashMap<(RoundId, ShardId, StateKey), u64> = HashMap::new();
             let mut cur_sub_block_connectivity_by_key_dst_pair: HashMap<(RoundId, ShardId, StateKey), u64> = HashMap::new();
             for (local_tid, td) in sub_block.transactions.iter().enumerate() {
+                let old_tid = td.txn.maybe_txn_id_in_partition_session.as_ref().unwrap();
                 let tid = sub_block.start_index + local_tid;
                 for loc in td.txn.write_hints.iter() {
                     let key = loc.clone().into_state_key();
                     let key_str = CryptoHash::hash(&key).to_hex();
-                    println!("MATRIX_REPORT - round={}, shard={}, tid={}, write_hint={}", round_id, shard_id, tid, key_str);
+                    println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, write_hint={}", round_id, shard_id, old_tid, tid, key_str);
                 }
                 for (src_tid, locs) in td.cross_shard_dependencies.required_edges().iter() {
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
                         let key_str = CryptoHash::hash(&key).to_hex();
-                        println!("MATRIX_REPORT - round={}, shard={}, tid={}, recv key={} from round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
+                        println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, recv key={} from round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
                         let value = cur_sub_block_inbound_costs_by_key_src_pair.entry((src_tid.round_id, src_tid.shard_id, key)).or_insert_with(||0);
                         *value += 1;
 
@@ -197,7 +198,7 @@ pub fn report_sub_block_matrix(matrix: &Vec<SubBlocksForShard<AnalyzedTransactio
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
                         let key_str = CryptoHash::hash(&key).to_hex();
-                        println!("MATRIX_REPORT - round={}, shard={}, tid={}, send key={} to round={}, shard={}, tid={}", round_id, shard_id, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
+                        println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, send key={} to round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
                         let value = cur_sub_block_connectivity_by_key_dst_pair.entry((dst_tid.round_id, dst_tid.shard_id, key)).or_insert_with(||0);
                         *value += 1;
                     }
