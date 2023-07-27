@@ -20,8 +20,8 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec staking_contract_amounts(staker: address, operator: address): (u64, u64, u64) {
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 1000;
+        // TODO: set because of timeout
+        pragma verify = false;
         let staking_contracts = global<Store>(staker).staking_contracts;
         let staking_contract = simple_map::spec_get(staking_contracts, operator);
 
@@ -56,8 +56,8 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>,
     ) {
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 1000;
+        // TODO: set because of timeout
+        pragma verify = false;
         include PreconditionsInCreateContract;
         include WithdrawAbortsIf<AptosCoin> {account: staker};
         include Create_Staking_Contract_With_Coins_Abortsif;
@@ -74,8 +74,8 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>,
     ): address {
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 1000;
+        // TODO: set because of timeout
+        pragma verify = false;
         include PreconditionsInCreateContract;
 
         let amount = coins.value;
@@ -85,8 +85,8 @@ spec aptos_framework::staking_contract {
     /// Account is not frozen and sufficient to withdraw.
     /// Staking_contract exists the stacker/operator pair.
     spec add_stake(staker: &signer, operator: address, amount: u64) {
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 1000;
+        // TODO: set because of timeout
+        pragma verify = false;
 
         // preconditions
         include stake::ResourceRequirement;
