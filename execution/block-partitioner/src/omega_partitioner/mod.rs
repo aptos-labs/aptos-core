@@ -152,6 +152,10 @@ impl OmegaPartitioner {
         }).collect();
         let duration = timer.stop_and_record();
         println!("add_edges__return_obj={duration}");
+        self.thread_pool.install(move||{
+            drop(sub_block_matrix);
+            drop(start_index_matrix);
+        });
         ret
     }
 
@@ -177,7 +181,7 @@ impl OmegaPartitioner {
         let min_discarded_seq_nums_by_sender_id: DashMap<usize, AtomicUsize> = DashMap::new();
         let shard_id_and_txn_id_vec_pairs: Vec<(usize, Vec<usize>)> = txn_id_vecs.into_iter().enumerate().collect();
         let duration = timer.stop_and_record();
-        println!("round_{}_init={}", round_id, duration);
+        println!("round_{}__init={}", round_id, duration);
         let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_key").as_str()]).start_timer();
         self.thread_pool.install(|| {
             shard_id_and_txn_id_vec_pairs.into_par_iter().for_each(|(my_shard_id, txn_ids)| {
@@ -201,7 +205,7 @@ impl OmegaPartitioner {
             });
         });
         let duration = timer.stop_and_record();
-        println!("round_{}_discard_by_key={}", round_id, duration);
+        println!("round_{}__discard_by_key={}", round_id, duration);
         let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_sender").as_str()]).start_timer();
         self.thread_pool.install(||{
             (0..num_shards).into_par_iter().for_each(|shard_id|{
@@ -222,11 +226,16 @@ impl OmegaPartitioner {
             });
         });
         let duration = timer.stop_and_record();
-        println!("round_{}_discard_by_sender={}", round_id, duration);
+        println!("round_{}__discard_by_sender={}", round_id, duration);
         let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__return_obj").as_str()]).start_timer();
         let ret = (extract_and_sort(finally_accepted), extract_and_sort(discarded));
         let duration = timer.stop_and_record();
-        println!("round_{}_return_obj={}", round_id, duration);
+        println!("round_{}__return_obj={}", round_id, duration);
+        self.thread_pool.install(move||{
+            drop(potentially_accepted);
+            drop(min_discarded_seq_nums_by_sender_id);
+
+        });
         ret
     }
 
@@ -248,27 +257,29 @@ impl BlockPartitioner for OmegaPartitioner {
         for (txn_id, txn) in txns.iter_mut().enumerate() {
             txn.maybe_txn_id_in_partition_session = Some(txn_id);
         }
-        txns.par_iter_mut().for_each(|mut txn| {
-            let txn_id = *txn.maybe_txn_id_in_partition_session.as_ref().unwrap();
-            let sender = txn.sender();
-            let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
-                num_senders.fetch_add(1, Ordering::SeqCst)
-            });
-            txn.maybe_sender_id_in_partition_session = Some(sender_id);
-            let num_writes = txn.write_hints.len();
-            for (i, storage_location) in txn.write_hints.iter_mut().chain(txn.read_hints.iter_mut()).enumerate() {
-                let key = storage_location.maybe_state_key().unwrap().clone();
-                let key_id = *key_ids_by_key.entry(key).or_insert_with(|| {
-                    num_keys.fetch_add(1, Ordering::SeqCst)
+        self.thread_pool.install(||{
+            txns.par_iter_mut().for_each(|mut txn| {
+                let txn_id = *txn.maybe_txn_id_in_partition_session.as_ref().unwrap();
+                let sender = txn.sender();
+                let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
+                    num_senders.fetch_add(1, Ordering::SeqCst)
                 });
-                storage_location.maybe_id_in_partition_session = Some(key_id);
-                let is_write = i < num_writes;
-                helpers_by_key_id.entry(key_id).or_insert_with(|| {
-                    let anchor_shard_id = get_anchor_shard_id(storage_location, num_executor_shards);
-                    RwLock::new(StorageLocationHelper::new(anchor_shard_id))
-                }).write().unwrap().add_candidate(txn_id, is_write);
+                txn.maybe_sender_id_in_partition_session = Some(sender_id);
+                let num_writes = txn.write_hints.len();
+                for (i, storage_location) in txn.write_hints.iter_mut().chain(txn.read_hints.iter_mut()).enumerate() {
+                    let key = storage_location.maybe_state_key().unwrap().clone();
+                    let key_id = *key_ids_by_key.entry(key).or_insert_with(|| {
+                        num_keys.fetch_add(1, Ordering::SeqCst)
+                    });
+                    storage_location.maybe_id_in_partition_session = Some(key_id);
+                    let is_write = i < num_writes;
+                    helpers_by_key_id.entry(key_id).or_insert_with(|| {
+                        let anchor_shard_id = get_anchor_shard_id(storage_location, num_executor_shards);
+                        RwLock::new(StorageLocationHelper::new(anchor_shard_id))
+                    }).write().unwrap().add_candidate(txn_id, is_write);
 
-            }
+                }
+            });
         });
         let duration = timer.stop_and_record();
         println!("preprocess={duration:?}");
@@ -326,7 +337,14 @@ impl BlockPartitioner for OmegaPartitioner {
         let ret = self.add_edges(&txns, &txn_id_matrix, &helpers_by_key_id);
         let duration = timer.stop_and_record();
         println!("add_edges={duration:?}");
-
+        self.thread_pool.install(move||{
+            drop(sender_ids_by_sender);
+            drop(key_ids_by_key);
+            drop(helpers_by_key_id);
+            drop(start_txn_ids_by_shard_id);
+            drop(txn_id_matrix);
+            drop(txns);
+        });
         ret
     }
 }
