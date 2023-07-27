@@ -416,6 +416,7 @@ dependencies = [
  "move-resource-viewer",
  "poem",
  "poem-openapi",
+ "poem-openapi-derive",
  "serde 1.0.149",
  "serde_json",
 ]
