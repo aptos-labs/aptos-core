@@ -93,6 +93,11 @@ impl TimeService {
     }
 
     #[cfg(any(test, feature = "testing"))]
+    pub fn from_mock(mock: MockTimeService) -> Self {
+        Self::MockTimeService(mock)
+    }
+
+    #[cfg(any(test, feature = "testing"))]
     pub fn into_mock(self) -> MockTimeService {
         match self {
             TimeService::MockTimeService(inner) => inner,

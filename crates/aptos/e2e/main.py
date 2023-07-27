@@ -33,6 +33,7 @@ from cases.account import (
     test_account_create,
     test_account_fund_with_faucet,
     test_account_lookup_address,
+    test_account_rotate_key,
 )
 from cases.config import test_config_show_profiles
 from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
@@ -43,6 +44,7 @@ from cases.move import (
     test_move_run,
     test_move_view,
 )
+from cases.node import test_node_show_validator_set
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -126,11 +128,17 @@ def run_tests(run_helper):
     test_aptos_header_included(run_helper)
 
     # Run move subcommand group tests.
-    test_move_view(run_helper)
     test_move_compile(run_helper)
     test_move_compile_script(run_helper)
     test_move_publish(run_helper)
     test_move_run(run_helper)
+    test_move_view(run_helper)
+
+    # WARNING: This has to stay at the end, else key will get rotated
+    test_account_rotate_key(run_helper)
+
+    # Run node subcommand group tests.
+    test_node_show_validator_set(run_helper)
 
 
 def main():

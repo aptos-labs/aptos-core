@@ -246,7 +246,7 @@ Destroy a unique handle.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
-<b>ensures</b> handle_ref.<a href="event.md#0x1_event_counter">counter</a> &lt; MAX_U64 ==&gt; handle_ref.counter == <b>old</b>(handle_ref.counter) + 1;
+<b>ensures</b> [concrete] handle_ref.counter == <b>old</b>(handle_ref.counter) + 1;
 </code></pre>
 
 
@@ -315,4 +315,4 @@ Native function use opaque.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

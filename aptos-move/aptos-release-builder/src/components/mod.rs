@@ -122,7 +122,7 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::DefaultGas => {
-                let gas_schedule = aptos_gas::gen::current_gas_schedule();
+                let gas_schedule = aptos_gas_schedule_updator::current_gas_schedule();
                 if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
                         &gas_schedule,
@@ -259,7 +259,10 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::DefaultGas => {
-                if !fetch_and_equals(client_opt, &aptos_gas::gen::current_gas_schedule())? {
+                if !fetch_and_equals(
+                    client_opt,
+                    &aptos_gas_schedule_updator::current_gas_schedule(),
+                )? {
                     bail!("Gas schedule config mismatch: Expected Default");
                 }
             },
@@ -506,7 +509,8 @@ impl Default for ReleaseConfig {
                         }),
                         ReleaseEntry::Consensus(OnChainConsensusConfig::default()),
                         ReleaseEntry::Execution(OnChainExecutionConfig::V1(ExecutionConfigV1 {
-                            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+                            transaction_shuffler_type:
+                                TransactionShufflerType::DeprecatedSenderAwareV1(32),
                         })),
                         ReleaseEntry::RawScript(PathBuf::from(
                             "data/proposals/empty_multi_step.move",

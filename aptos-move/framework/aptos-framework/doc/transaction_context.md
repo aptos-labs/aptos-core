@@ -327,4 +327,4 @@ the generated unique address wrapped in the AUID class.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY
