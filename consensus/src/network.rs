@@ -29,6 +29,7 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
+use aptos_reliable_broadcast::{RBNetworkSender, RBMessage};
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
@@ -43,7 +44,7 @@ use futures::{
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     mem::{discriminant, Discriminant},
-    time::Duration,
+    time::Duration, marker::PhantomData,
 };
 
 pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
@@ -354,6 +355,14 @@ impl NetworkSender {
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
         self.broadcast(msg).await
     }
+
+    pub async fn send_rpc(&self, receiver: Author, message: ConsensusMsg, timeout: Duration) -> anyhow::Result<ConsensusMsg> {
+        let response = self
+            .consensus_network_client
+            .send_rpc(receiver, message, timeout)
+            .await?;
+        Ok(response)
+    }
 }
 
 #[async_trait::async_trait]
@@ -411,6 +420,39 @@ impl QuorumStoreSender for NetworkSender {
         fail_point!("consensus::send::proof_of_store", |_| ());
         let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
         self.broadcast(msg).await
+    }
+}
+
+pub struct NetworkSenderWrapper<M> {
+    network_sender: NetworkSender,
+    _marker: PhantomData<M>,
+}
+
+impl<M> NetworkSenderWrapper<M>
+where
+    M: Send + Sync,
+{
+    pub fn new(network_sender: NetworkSender) -> Self {
+        Self {
+            network_sender,
+            _marker: PhantomData,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<M> RBNetworkSender<M> for NetworkSenderWrapper<M>
+where
+    M: RBMessage + TConsensusMsg,
+{
+    async fn send_rpc(
+        &self,
+        receiver: Author,
+        message: M,
+        timeout: Duration,
+    ) -> anyhow::Result<M> {
+        let response = self.network_sender.send_rpc(receiver, message.into_network_message(), timeout).await?;
+        TConsensusMsg::from_network_message(response)
     }
 }
 

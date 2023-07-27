@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{collections::HashMap, sync::Arc, thread, time::Duration};
+use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_types::epoch_state::EpochState;
 use crate::dkg::types::DKGNode;
-use tokio::sync::mpsc;
 use futures::future::{AbortHandle, Abortable};
 use aptos_reliable_broadcast::ReliableBroadcast;
 
@@ -34,17 +34,17 @@ pub struct DKGManager {
     epoch_state: Arc<EpochState>,
     // dkg todo: send the aggregated dkg node to proposal generator
     // Channel to send the aggregated dkg node to proposal generator
-    proposal_generator_tx: mpsc::Sender<DKGManagerMessage>,
+    proposal_tx: aptos_channel::Sender<Author, DKGManagerMessage>,
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>,
     rb_abort_handle: Option<AbortHandle>,
 }
 
 impl DKGManager {
-    pub fn new(author: Author, epoch_state: Arc<EpochState>, proposal_generator_tx: mpsc::Sender<DKGManagerMessage>, reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>) -> Self {
+    pub fn new(author: Author, epoch_state: Arc<EpochState>, proposal_tx: aptos_channel::Sender<Author, DKGManagerMessage>, reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>) -> Self {
         Self {
             author,
             epoch_state,
-            proposal_generator_tx,
+            proposal_tx,
             reliable_broadcast,
             rb_abort_handle: None,
         }

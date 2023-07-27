@@ -33,7 +33,7 @@ use crate::{
     monitor,
     network::{
         IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingRpcRequest, IncomingDKGRequest,
-        NetworkReceivers, NetworkSender,
+        NetworkReceivers, NetworkSender, NetworkSenderWrapper,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
@@ -48,7 +48,7 @@ use crate::{
     state_replication::StateComputer,
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
-    util::time_service::TimeService,
+    util::time_service::TimeService, dkg::{DKGMessage, dkg_handler::DKGNetworkHandler},
 };
 use anyhow::{bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
@@ -63,6 +63,7 @@ use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_safety_rules::SafetyRulesManager;
 use aptos_types::{
     account_address::AccountAddress,
@@ -773,14 +774,25 @@ impl EpochManager {
                     .set(epoch_state.verifier.get_voting_power(&peer_id).unwrap_or(0) as i64)
             });
 
-        // // dkg todo: start the dkg manager
-        // let (dkg_request_tx, mut dkg_request_rx) = aptos_channel::new(
-        //     QueueStyle::FIFO,
-        //     100,
-        //     None,   // dkg todo: add counters
-        // );
-
-
+        // dkg stuff
+        // dkg todo: connect the dkg_handler channel
+        let (dkg_handler_tx, mut dkg_handler_rx) = aptos_channel::new(
+            QueueStyle::FIFO,
+            100,
+            None,   // dkg todo: add counters
+        );
+        self.dkg_handler_tx = Some(dkg_handler_tx.clone());
+        // dkg todo: connect the dkg_proposal channel to proposal generator
+        let (dkg_proposal_tx, mut dkg_proposal_rx) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1,
+            None,   // dkg todo: add counters
+        );
+        let dkg_network_sender = NetworkSenderWrapper::<DKGMessage>::new(network_sender.clone());
+        let dkg_reliable_broadcast = Arc::new(ReliableBroadcast::new(epoch_state.verifier.get_ordered_account_addresses(), Arc::new(dkg_network_sender)));
+        let dkg_handler: DKGNetworkHandler = DKGNetworkHandler::new(self.author, dkg_handler_rx, Arc::new(epoch_state.clone()), dkg_proposal_tx, dkg_reliable_broadcast);
+        // start the dkg handler
+        tokio::spawn(dkg_handler.start());
 
         let mut round_manager = RoundManager::new(
             epoch_state,

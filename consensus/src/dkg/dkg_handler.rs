@@ -4,18 +4,20 @@ use anyhow::bail;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
-use aptos_logger::{error, warn};
+use aptos_logger::{error, warn, info};
 use aptos_network::protocols::network::RpcError;
+use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::epoch_state::EpochState;
 use bytes::Bytes;
-use futures::StreamExt;
+use futures::{StreamExt, FutureExt};
+use tokio::sync::oneshot;
 use std::sync::Arc;
 
 use crate::network::{IncomingDKGRequest, TConsensusMsg};
 
-use super::{dkg_reliable_broadcast::{DKGNodeHandler, DKGAggNodeHandler}, dkg_store::DKGStore, types::{DKGMessage, TDKGMessage}, dkg_network::DKGRpcHandler, dkg_manager::DKGManager};
+use super::{dkg_reliable_broadcast::{DKGNodeHandler, DKGAggNodeHandler}, dkg_store::DKGStore, types::{DKGMessage, TDKGMessage}, dkg_network::DKGRpcHandler, dkg_manager::{DKGManager, DKGManagerMessage}};
 
-struct DKGNetworkHandler {
+pub struct DKGNetworkHandler {
     dkg_rpc_rx: aptos_channel::Receiver<Author, IncomingDKGRequest>,
     node_receiver: DKGNodeHandler,
     agg_node_receiver: DKGAggNodeHandler,
@@ -23,12 +25,15 @@ struct DKGNetworkHandler {
 }
 
 impl DKGNetworkHandler {
-    fn new(
+    pub fn new(
+        author: Author,
         dkg_rpc_rx: aptos_channel::Receiver<Author, IncomingDKGRequest>,
         epoch_state: Arc<EpochState>,
-        dkg_store: Arc<DKGStore>,
-        dkg_manager: Arc<Mutex<DKGManager>>,
+        proposal_tx: aptos_channel::Sender<Author, DKGManagerMessage>,
+        reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>,
     ) -> Self {
+        let dkg_store = Arc::new(DKGStore::new());
+        let dkg_manager = Arc::new(Mutex::new(DKGManager::new(author, epoch_state.clone(), proposal_tx, reliable_broadcast)));
         Self {
             dkg_rpc_rx,
             node_receiver: DKGNodeHandler::new(
@@ -45,12 +50,14 @@ impl DKGNetworkHandler {
         }
     }
 
-    async fn start(mut self) {
+    pub async fn start(mut self) {
+        info!(epoch = self.epoch_state.epoch, "[DKG] DKGHandler started");
         while let Some(msg) = self.dkg_rpc_rx.next().await {
             if let Err(e) = self.process_rpc(msg).await {
                 warn!(error = ?e, "[DKG] error processing rpc");
             }
         }
+        info!(epoch = self.epoch_state.epoch, "[DKG] DKGHandler stopped");
     }
 
     async fn process_rpc(&mut self, rpc_request: IncomingDKGRequest) -> anyhow::Result<()> {
