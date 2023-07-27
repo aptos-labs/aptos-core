@@ -21,8 +21,10 @@ COPY --link --from=tools-builder /aptos/dist/aptos-indexer-grpc-post-processor /
 
 # The health check port
 EXPOSE 8080
-# The gRPC port
+# The gRPC non-TLS port
 EXPOSE 50051
+# The gRPC TLS port
+EXPOSE 50052
 
 ENV RUST_LOG_FORMAT=json
 
