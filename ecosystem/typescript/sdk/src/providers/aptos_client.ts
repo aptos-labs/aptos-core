@@ -133,7 +133,8 @@ export class AptosClient {
    * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Account modules array for a specific ledger version.
    * Module is represented by MoveModule interface. It contains module `bytecode` and `abi`,
-   * which is JSON representation of a module
+   * which is JSON representation of a module. Account modules are cached by account address for 10 minutes
+   * to prevent unnecessary API calls when fetching the same account modules
    */
   @parseApiError
   @MemoizeExpiring(10 * 60 * 1000)
