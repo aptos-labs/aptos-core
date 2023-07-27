@@ -26,6 +26,7 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
+use aptos_block_partitioner::omega_partitioner::OmegaPartitioner;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 #[derive(Clone, Debug)]
@@ -33,6 +34,7 @@ pub enum PartitionerImpl {
     NoOp,
     Simple,
     Sharded(usize),
+    Omega,
 }
 
 #[derive(Clone, Debug)]
@@ -122,6 +124,9 @@ where
                         PartitionerImpl::Sharded(concurrency_level) => {
                             Arc::new(ShardedBlockPartitioner::new(concurrency_level))
                         },
+                        PartitionerImpl::Omega => {
+                            Arc::new(OmegaPartitioner::new())
+                        }
                     };
                     let mut partitioning_stage =
                         BlockPartitioningStage::new(config.num_executor_shards, partitioner);

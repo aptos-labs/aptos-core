@@ -116,6 +116,7 @@ impl PipelineOpt {
                 0 => PartitionerImpl::NoOp,
                 1 => PartitionerImpl::Simple,
                 2 => PartitionerImpl::Sharded(self.num_executor_shards),
+                3 => PartitionerImpl::Omega,
                 _ => unreachable!(),
             },
             async_partitioning: self.async_partitioning,
