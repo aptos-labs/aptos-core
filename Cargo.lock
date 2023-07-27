@@ -675,6 +675,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-network",
+ "aptos-reliable-broadcast",
  "aptos-runtimes",
  "aptos-safety-rules",
  "aptos-schemadb",
@@ -2786,6 +2787,22 @@ dependencies = [
  "tokio",
  "url",
  "walkdir",
+]
+
+[[package]]
+name = "aptos-reliable-broadcast"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-consensus-types",
+ "aptos-enum-conversion-derive",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-types",
+ "async-trait",
+ "futures",
+ "futures-channel",
+ "tokio",
 ]
 
 [[package]]
