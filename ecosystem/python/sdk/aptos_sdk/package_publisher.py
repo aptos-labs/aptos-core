@@ -13,7 +13,7 @@ from .transactions import EntryFunction, TransactionArgument, TransactionPayload
 MAX_TRANSACTION_SIZE: int = 62000
 
 # The location of the large package publisher
-MODULE_ADDRESS: AccountAddress = AccountAddress.from_hex(
+MODULE_ADDRESS: AccountAddress = AccountAddress.from_str(
     "0xd20f305e3090a24c00524604dc2a42925a75c67aa6020d33033d516cf0878c4a"
 )
 

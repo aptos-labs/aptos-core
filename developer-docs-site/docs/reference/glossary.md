@@ -112,7 +112,7 @@ An **Aptos node** is a peer entity of the Aptos network that tracks the state of
 
 ### CLI
 
-- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md). 
+- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md). 
 
 ### Client
 
@@ -181,7 +181,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Faucet** is a service that mints APT on devnet and testnet. APT on these networks has no real world value, it is only for development purposes.
 - You can use the faucet in a few different ways:
-  - With the [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md#fund-an-account-with-the-faucet).
+  - With the [Aptos CLI](../tools/aptos-cli/use-cli/use-aptos-cli.md#fund-an-account-with-the-faucet).
   - Through a wallet, such as Petra, Martian, or Pontem. You can find a full list [here](https://github.com/aptos-foundation/ecosystem-projects#wallets).
   - Using an SDK, for example by using the `FaucetClient` in the TypeScript SDK.
   - With a direct HTTP request. Learn how to do this [here](guides/system-integrators-guide.md#calling-the-faucet-other-languages).

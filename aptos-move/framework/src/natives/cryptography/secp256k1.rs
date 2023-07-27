@@ -1,22 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-/***************************************************************************************************
- * native fun secp256k1_recover
- *
- *   gas cost: base_cost +? ecdsa_recover
- *
- **************************************************************************************************/
-use crate::{
-    natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
-    safely_pop_arg,
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
-use aptos_types::on_chain_config::{Features, TimedFeatures};
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, NumArgs};
+use move_core_types::gas_algebra::NumArgs;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
 
 /// Abort code when deserialization fails (0x01 == INVALID_ARGUMENT)
 /// NOTE: This must match the code in the Move implementation
@@ -24,8 +18,13 @@ pub mod abort_codes {
     pub const NFE_DESERIALIZE: u64 = 0x01_0001;
 }
 
+/***************************************************************************************************
+ * native fun secp256k1_recover
+ *
+ *   gas cost: base_cost +? ecdsa_recover
+ *
+ **************************************************************************************************/
 fn native_ecdsa_recover(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -37,7 +36,7 @@ fn native_ecdsa_recover(
     let recovery_id = safely_pop_arg!(arguments, u8);
     let msg = safely_pop_arg!(arguments, Vec<u8>);
 
-    context.charge(gas_params.base)?;
+    context.charge(SECP256K1_BASE)?;
 
     // NOTE(Gas): O(1) cost
     // (In reality, O(|msg|) deserialization cost, with |msg| < libsecp256k1_core::util::MESSAGE_SIZE
@@ -72,7 +71,7 @@ fn native_ecdsa_recover(
         },
     };
 
-    context.charge(gas_params.ecdsa_recover * NumArgs::one())?;
+    context.charge(SECP256K1_ECDSA_RECOVER * NumArgs::one())?;
 
     // NOTE(Gas): O(1) cost: a size-2 multi-scalar multiplication
     match libsecp256k1::recover(&msg, &sig, &rid) {
@@ -88,21 +87,13 @@ fn native_ecdsa_recover(
  * module
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub base: InternalGas,
-    pub ecdsa_recover: InternalGasPerArg,
-}
-
 pub fn make_all(
-    gas_params: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [(
         "ecdsa_recover_internal",
-        make_safe_native(gas_params, timed_features, features, native_ecdsa_recover),
+        native_ecdsa_recover as RawSafeNative,
     )];
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

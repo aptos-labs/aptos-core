@@ -10,7 +10,7 @@ This is a step-by-step guide to install an Aptos node using source code. Follow 
 ## Before you proceed
 
 Make sure the following are installed on your local computer:
-   - **Aptos CLI**: https://aptos.dev/tools/install-cli/index
+   - **Aptos CLI**: https://aptos.dev/tools/aptos-cli/install-cli/index
 
 ## Install
 

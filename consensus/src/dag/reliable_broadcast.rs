@@ -6,86 +6,18 @@ use super::{
     types::{CertifiedAck, CertifiedNode},
     NodeId,
 };
-use crate::{
-    dag::{
-        dag_network::{DAGNetworkSender, RpcHandler},
-        dag_store::Dag,
-        types::{Node, NodeCertificate, TDAGMessage, Vote},
-    },
-    network::TConsensusMsg,
+use crate::dag::{
+    dag_network::RpcHandler,
+    dag_store::Dag,
+    types::{Node, NodeCertificate, Vote},
 };
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
-use futures::{stream::FuturesUnordered, StreamExt};
-use std::{collections::BTreeMap, future::Future, mem, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, mem, sync::Arc};
 use thiserror::Error as ThisError;
-
-pub trait BroadcastStatus {
-    type Ack: TDAGMessage;
-    type Aggregated;
-    type Message: TDAGMessage;
-
-    fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>>;
-}
-
-pub struct ReliableBroadcast {
-    validators: Vec<Author>,
-    network_sender: Arc<dyn DAGNetworkSender>,
-}
-
-impl ReliableBroadcast {
-    pub fn new(validators: Vec<Author>, network_sender: Arc<dyn DAGNetworkSender>) -> Self {
-        Self {
-            validators,
-            network_sender,
-        }
-    }
-
-    pub fn broadcast<S: BroadcastStatus>(
-        &self,
-        message: S::Message,
-        mut aggregating: S,
-    ) -> impl Future<Output = S::Aggregated> {
-        let receivers: Vec<_> = self.validators.clone();
-        let network_sender = self.network_sender.clone();
-        async move {
-            let mut fut = FuturesUnordered::new();
-            let send_message = |receiver, message| {
-                let network_sender = network_sender.clone();
-                async move {
-                    (
-                        receiver,
-                        network_sender
-                            .send_rpc(receiver, message, Duration::from_millis(500))
-                            .await,
-                    )
-                }
-            };
-            let network_message = message.into().into_network_message();
-            for receiver in receivers {
-                fut.push(send_message(receiver, network_message.clone()));
-            }
-            while let Some((receiver, result)) = fut.next().await {
-                match result {
-                    Ok(msg) => {
-                        if let Ok(dag_msg) = msg.try_into() {
-                            if let Ok(ack) = S::Ack::try_from(dag_msg) {
-                                if let Ok(Some(aggregated)) = aggregating.add(receiver, ack) {
-                                    return aggregated;
-                                }
-                            }
-                        }
-                    },
-                    Err(_) => fut.push(send_message(receiver, network_message.clone())),
-                }
-            }
-            unreachable!("Should aggregate with all responses");
-        }
-    }
-}
 
 #[derive(ThisError, Debug)]
 pub enum NodeBroadcastHandleError {
@@ -260,7 +192,7 @@ impl RpcHandler for CertifiedNodeHandler {
                 return Ok(CertifiedAck::new(node.metadata().epoch()));
             }
 
-            if !dag_reader.all_exists(node.parents()) {
+            if !dag_reader.all_exists(node.parents_metadata()) {
                 // TODO(ibalajiarun): implement fetching logic.
                 bail!(CertifiedNodeHandleError::MissingParents);
             }

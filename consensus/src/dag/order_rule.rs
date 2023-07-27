@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    dag::{anchor_election::AnchorElection, dag_store::Dag, types::NodeMetadata, CertifiedNode},
-    experimental::buffer_manager::OrderedBlocks,
+use super::dag_store::NodeStatus;
+use crate::dag::{
+    anchor_election::AnchorElection, dag_store::Dag, types::NodeMetadata, CertifiedNode,
 };
 use aptos_consensus_types::common::Round;
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
+use aptos_logger::error;
+use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfo};
 use futures_channel::mpsc::UnboundedSender;
 use std::sync::Arc;
 
@@ -18,16 +19,16 @@ pub struct OrderRule {
     lowest_unordered_anchor_round: Round,
     dag: Arc<RwLock<Dag>>,
     anchor_election: Box<dyn AnchorElection>,
-    ordered_blocks_sender: UnboundedSender<OrderedBlocks>,
+    ordered_nodes_sender: UnboundedSender<Vec<Arc<CertifiedNode>>>,
 }
 
 impl OrderRule {
     pub fn new(
         epoch_state: Arc<EpochState>,
-        latest_ledger_info: LedgerInfoWithSignatures,
+        latest_ledger_info: LedgerInfo,
         dag: Arc<RwLock<Dag>>,
         anchor_election: Box<dyn AnchorElection>,
-        ordered_blocks_sender: UnboundedSender<OrderedBlocks>,
+        ordered_nodes_sender: UnboundedSender<Vec<Arc<CertifiedNode>>>,
     ) -> Self {
         // TODO: we need to initialize the anchor election based on the dag
         Self {
@@ -36,7 +37,7 @@ impl OrderRule {
             lowest_unordered_anchor_round: latest_ledger_info.commit_info().round() + 1,
             dag,
             anchor_election,
-            ordered_blocks_sender,
+            ordered_nodes_sender,
         }
     }
 
@@ -48,7 +49,9 @@ impl OrderRule {
     pub fn process_new_node(&mut self, node: &CertifiedNode) {
         let round = node.round();
         // If the node comes from the proposal round in the current instance, it can't trigger any ordering
-        if Self::check_parity(round, self.lowest_unordered_anchor_round) {
+        if round <= self.lowest_unordered_anchor_round
+            || Self::check_parity(round, self.lowest_unordered_anchor_round)
+        {
             return;
         }
         // This node's votes can trigger an anchor from previous round to be ordered.
@@ -104,7 +107,13 @@ impl OrderRule {
                 && *metadata.author() == self.anchor_election.get_anchor(metadata.round())
         };
         while let Some(prev_anchor) = dag_reader
-            .reachable(&current_anchor, Some(self.lowest_unordered_anchor_round))
+            .reachable(
+                &[current_anchor.metadata().clone()],
+                Some(self.lowest_unordered_anchor_round),
+                |node_status| matches!(node_status, NodeStatus::Unordered(_)),
+            )
+            // skip the current anchor itself
+            .skip(1)
             .map(|node_status| node_status.as_node())
             .find(|node| is_anchor(node.metadata()))
         {
@@ -126,12 +135,16 @@ impl OrderRule {
         self.lowest_unordered_anchor_round = anchor.round() + 1;
 
         let mut dag_writer = self.dag.write();
-        let _ordered_nodes: Vec<_> = dag_writer
+        let mut ordered_nodes: Vec<_> = dag_writer
             .reachable_mut(&anchor, None)
             .map(|node_status| {
                 node_status.mark_as_ordered();
-                node_status.as_node()
+                node_status.as_node().clone()
             })
             .collect();
+        ordered_nodes.reverse();
+        if let Err(e) = self.ordered_nodes_sender.unbounded_send(ordered_nodes) {
+            error!("Failed to send ordered nodes {:?}", e);
+        }
     }
 }
