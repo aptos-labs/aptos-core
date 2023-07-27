@@ -108,7 +108,7 @@ impl Default for InterRegionNetEmConfig {
         Self {
             delay_jitter_ms: 20,
             delay_correlation_percentage: 50,
-            loss_percentage: 3,
+            loss_percentage: 0,
             loss_correlation_percentage: 50,
         }
     }
@@ -163,7 +163,7 @@ impl Default for IntraRegionNetEmConfig {
             delay_latency_ms: 50,
             delay_jitter_ms: 5,
             delay_correlation_percentage: 50,
-            loss_percentage: 1,
+            loss_percentage: 0,
             loss_correlation_percentage: 50,
         }
     }
@@ -349,7 +349,7 @@ mod tests {
             delay_latency_ms: 50,
             delay_jitter_ms: 5,
             delay_correlation_percentage: 50,
-            loss_percentage: 1,
+            loss_percentage: 0,
             loss_correlation_percentage: 50
         })
     }
