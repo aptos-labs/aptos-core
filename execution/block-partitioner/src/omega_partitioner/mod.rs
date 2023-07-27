@@ -37,14 +37,23 @@ mod storage_location_helper;
 
 pub struct OmegaPartitioner {
     thread_pool: ThreadPool,
+    num_rounds_limit: usize,
+    avoid_pct: u64,
+    dashmap_num_shards: usize,
 }
 
 impl OmegaPartitioner {
     pub fn new() -> Self {
         let num_threads = std::env::var("OMEGA_PARTITIONER__NUM_THREADS").ok().map(|s|s.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
-        println!("num_threads={num_threads}");
+        let num_rounds_limit: usize = std::env::var("OMEGA_PARTITIONER__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
+        let avoid_pct: u64 = std::env::var("OMEGA_PARTITIONER__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<u64>().ok().unwrap_or(10)).unwrap_or(10);
+        let dashmap_num_shards = std::env::var("OMEGA_PARTITIONER__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
+        println!("OmegaPartitioner with num_threads={}, num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}", num_threads, num_rounds_limit, avoid_pct, dashmap_num_shards);
         Self {
-            thread_pool: ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap()
+            thread_pool: ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap(),
+            num_rounds_limit,
+            avoid_pct,
+            dashmap_num_shards,
         }
     }
 
@@ -244,16 +253,12 @@ impl OmegaPartitioner {
 impl BlockPartitioner for OmegaPartitioner {
     fn partition(&self, mut txns: Vec<AnalyzedTransaction>, num_executor_shards: usize) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
-        let num_rounds_limit: usize = std::env::var("OMEGA_PARTITIONER__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
-        let avoid_pct: usize = std::env::var("OMEGA_PARTITIONER__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<usize>().ok().unwrap_or(10)).unwrap_or(10);
-        let dashmap_num_shards = std::env::var("OMEGA_PARTITIONER__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
-        println!("partitioning with num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}", num_rounds_limit, avoid_pct, dashmap_num_shards);
         let num_txns = txns.len();
         let mut num_senders = AtomicUsize::new(0);
         let mut num_keys = AtomicUsize::new(0);
-        let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(dashmap_num_shards);
-        let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(dashmap_num_shards);
-        let mut helpers_by_key_id: DashMap<usize, RwLock<StorageLocationHelper>> = DashMap::with_shard_amount(dashmap_num_shards);
+        let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(self.dashmap_num_shards);
+        let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(self.dashmap_num_shards);
+        let mut helpers_by_key_id: DashMap<usize, RwLock<StorageLocationHelper>> = DashMap::with_shard_amount(self.dashmap_num_shards);
         for (txn_id, txn) in txns.iter_mut().enumerate() {
             txn.maybe_txn_id_in_partition_session = Some(txn_id);
         }
@@ -298,7 +303,7 @@ impl BlockPartitioner for OmegaPartitioner {
         println!("pre_partition_uniform={duration:?}");
 
         let mut txn_id_matrix: Vec<Vec<Vec<usize>>> = Vec::new();
-        for round_id in 0..(num_rounds_limit - 1) {
+        for round_id in 0..(self.num_rounds_limit - 1) {
             let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
             let (accepted, discarded) = self.discarding_round(round_id, &txns, remaining_txns, &helpers_by_key_id, &start_txn_ids_by_shard_id);
             txn_id_matrix.push(accepted);
@@ -306,7 +311,7 @@ impl BlockPartitioner for OmegaPartitioner {
             let num_remaining_txns: usize = remaining_txns.iter().map(|ts|ts.len()).sum();
             let duration = timer.stop_and_record();
             println!("round_{round_id}={duration:?}");
-            if num_remaining_txns < avoid_pct * num_txns / 100 {
+            if num_remaining_txns < self.avoid_pct as usize * num_txns / 100 {
                 break;
             }
         }
@@ -319,7 +324,7 @@ impl BlockPartitioner for OmegaPartitioner {
                 for loc in txn.read_hints.iter().chain(txn.write_hints.iter()) {
                     let loc_id = *loc.maybe_id_in_partition_session.as_ref().unwrap();
                     let helper = helpers_by_key_id.get(&loc_id).unwrap();
-                    helper.write().unwrap().promote_txn_id(*txn_id, num_rounds_limit - 1, num_executor_shards - 1);
+                    helper.write().unwrap().promote_txn_id(*txn_id, self.num_rounds_limit - 1, num_executor_shards - 1);
                 }
             }
 
