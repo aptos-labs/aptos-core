@@ -45,7 +45,8 @@ fn main() {
     // Collect like terms
     let mut mappings: Vec<BTreeMap<String, u64>> = Vec::new();
     for equation in system_of_equations {
-        let map = collect_terms(equation);
+        let map = collect_terms(equation)
+            .expect("Failed: Should not have concrete quantities in gas formulae.");
         mappings.push(map);
     }
 
