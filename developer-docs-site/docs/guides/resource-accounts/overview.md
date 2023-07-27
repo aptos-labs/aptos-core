@@ -47,7 +47,7 @@ The general process for this is:
 
 The two active parties here are the trustee and the beneficiary. Conceptually, we can think of these two parties as two separate accounts on-chain. Managing an account's resources requires the signed approval of the account, meaning a smart contract that facilitates periodically releasing vested funds would require the approval of both the sender and the receiver accounts whenever funds are to be dispersed. 
 
-Requiring multiple signers to call an [entry function](../../move/book/functions/#entry-modifier) is logistically complex not only for a developer but for the two users as well. Both of the users would need to sign off on the transfer transaction every vesting period. Since these would be asynchronous, manual approvals, one user calling the function will always be waiting on the other.
+Requiring multiple signers to call an [entry function](../../move/book/functions/#entry-modifier) is logistically complex not only for the developer but for the end users as well. Both of the users would need to sign off on the transfer transaction every vesting period. Since these would be asynchronous, manual approvals, one user calling the function will always be waiting on the other.
 
 However, with resource accounts, we can integrate programmatic control of these funds, gating access to the funds with the smart contract's internal logic. Whenever the receiver requests to receive funds, the smart contract evaluates if there are any funds to disperse based on time and the amount of funds left. If there are funds ready to be dispersed, the contract internally generates a signer for the resource account holding the funds in order to withdraw them from it.
 
