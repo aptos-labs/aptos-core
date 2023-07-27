@@ -6,7 +6,7 @@ use float_cmp::approx_eq;
 use nalgebra::{self, DMatrix};
 use std::ops::{Div, Mul};
 
-const MARGIN_OF_ERROR: f64 = 0.05;
+const MARGIN_OF_ERROR: f64 = 0.2;
 
 /// Add a gas formula to the coefficient matrix
 ///
@@ -119,7 +119,6 @@ pub fn find_free_variables(A: &mut DMatrix<f64>, b: &mut DMatrix<f64>) -> Vec<us
     let mut aug_matrix = DMatrix::<f64>::zeros(nrows_a_ta, ncols_a_ta + 1);
     create_augmented_matrix(&mut aug_matrix, &mut A_TA, &mut A_Tb);
     rref(&mut aug_matrix);
-    println!("RREF'd matrix: {}", aug_matrix);
 
     let pivot_columns = find_pivot_columns(&mut aug_matrix);
     pivot_columns
@@ -138,7 +137,7 @@ pub fn find_outliers(
     x_hat: &mut DMatrix<f64>,
     coefficient_matrix: &mut DMatrix<f64>,
     constant_matrix: &mut DMatrix<f64>,
-) -> Result<Vec<(usize, usize)>, String> {
+) -> Result<Vec<(usize, f64, f64, f64)>, String> {
     let mut i = 0;
     let mut j = 0;
 
@@ -161,7 +160,7 @@ pub fn find_outliers(
     i = 0;
 
     // compare w/ margin of error
-    let mut outliers: Vec<(usize, usize)> = Vec::new();
+    let mut outliers: Vec<(usize, f64, f64, f64)> = Vec::new();
     let const_row = constant_matrix.nrows();
     while i < const_row {
         let a_ij = constant_matrix[(i, 0)];
@@ -173,13 +172,8 @@ pub fn find_outliers(
         } else {
             let diff = numerator.div(denominator);
             if diff > MARGIN_OF_ERROR {
-                // append all gas parameters indices corresponding
-                // to that equation as a cause to the outlier
-                let mut k = 0;
-                while k < coeff_col {
-                    outliers.push((i, k));
-                    k = k + 1;
-                }
+                // append equation that is an outlier
+                outliers.push((i, a_ij, computed_running_time[i], diff));
             }
         }
         i = i + 1;

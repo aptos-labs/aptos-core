@@ -112,6 +112,7 @@ pub fn record_gas_meter(
     let mut gas_meter = GasMeters {
         regular_meter: Vec::new(),
         abstract_meter: Vec::new(),
+        equation_names: Vec::new(),
     };
 
     // iterate over all the functions that satisfied the requirements above
@@ -122,6 +123,10 @@ pub fn record_gas_meter(
             identifier,
             func_identifier.clone(),
         );
+        gas_meter.equation_names.push(String::from(format!(
+            "{}::{}",
+            &identifier, &func_identifier
+        )));
 
         // publish package similar to create_publish_package in harness.rs
         println!("Signing txn for module... ");
