@@ -54,6 +54,8 @@ impl OmegaPartitioner {
         txn_id_matrix: &Vec<Vec<Vec<usize>>>,
         helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
     ) -> Vec<SubBlocksForShard<AnalyzedTransaction>>{
+        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_edges__init"]).start_timer();
+
         let num_txns = txns.len();
         let num_rounds = txn_id_matrix.len();
         let num_shards = txn_id_matrix.first().unwrap().len();
@@ -82,7 +84,9 @@ impl OmegaPartitioner {
             }
             sub_block_matrix.push(row);
         }
-
+        let duration = timer.stop_and_record();
+        println!("add_edges__init={duration}");
+        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_edges__main"]).start_timer();
         self.thread_pool.install(||{
             (0..num_rounds).into_par_iter().for_each(|round_id| {
                 (0..num_shards).into_par_iter().for_each(|shard_id| {
@@ -136,14 +140,18 @@ impl OmegaPartitioner {
                 });
             });
         });
+        let duration = timer.stop_and_record();
+        println!("add_edges__main={duration}");
 
+        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_edges__return_obj"]).start_timer();
         let ret: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..num_shards).map(|shard_id|{
             let sub_blocks: Vec<SubBlock<AnalyzedTransaction>> = (0..num_rounds).map(|round_id|{
                 sub_block_matrix[round_id][shard_id].lock().unwrap().take().unwrap()
             }).collect();
             SubBlocksForShard::new(shard_id, sub_blocks)
         }).collect();
-
+        let duration = timer.stop_and_record();
+        println!("add_edges__return_obj={duration}");
         ret
     }
 
