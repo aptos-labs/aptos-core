@@ -60,8 +60,6 @@ impl TimedFeatureFlag {
         match (self, chain_id) {
             (DisableInvariantViolationCheckInSwapLoc, TESTNET) => NOT_YET_SPECIFIED,
             (DisableInvariantViolationCheckInSwapLoc, MAINNET) => NOT_YET_SPECIFIED,
-            (LimitTypeTagSize, TESTNET) => 1689966000000,
-            (LimitTypeTagSize, MAINNET) => 1690480800000,
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
