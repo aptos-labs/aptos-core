@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::{
-    sharded_block_partitioner::ShardedBlockPartitioner,
-    test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount},
-};
+use aptos_block_partitioner::{build_partitioner, sharded_block_partitioner::ShardedBlockPartitioner, test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount}};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use clap::Parser;
 use rand::rngs::OsRng;
@@ -48,12 +45,12 @@ fn main() {
         })
         .collect();
 
-    let partitioner = ShardedBlockPartitioner::new(args.num_shards);
+    let partitioner = build_partitioner(Some(args.num_shards));
     for _ in 0..args.num_blocks {
         let transactions = transactions.clone();
         println!("Starting to partition");
         let now = Instant::now();
-        partitioner.partition(transactions, 2, 0.9);
+        partitioner.partition(transactions, args.num_shards);
         let elapsed = now.elapsed();
         println!("Time taken to partition: {:?}", elapsed);
     }
