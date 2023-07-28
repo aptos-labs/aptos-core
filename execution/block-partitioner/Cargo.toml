@@ -27,6 +27,7 @@ move-core-types = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+serde = { workspace = true }
 
 [features]
 default = []

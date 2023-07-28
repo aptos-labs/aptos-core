@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::{Arc, Mutex};
+use rand::Rng;
+use rayon::prelude::IntoParallelIterator;
 use aptos_crypto::{ed25519::ed25519_keys::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
 use aptos_types::{
     chain_id::ChainId,
@@ -13,6 +16,7 @@ use aptos_types::{
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
 };
+use rayon::iter::ParallelIterator;
 
 #[derive(Debug)]
 pub struct TestAccount {
@@ -78,4 +82,33 @@ pub fn create_signed_p2p_transaction(
         transactions.push(txn.into())
     }
     transactions
+}
+
+pub struct P2pBlockGenerator {
+    accounts: Arc<Vec<Mutex<TestAccount>>>,
+}
+
+impl P2pBlockGenerator {
+    pub fn new(num_accounts: usize) -> Self {
+        let accounts = (0..num_accounts)
+            .into_par_iter()
+            .map(|_i| Mutex::new(generate_test_account()))
+            .collect();
+        Self {
+            accounts: Arc::new(accounts)
+        }
+    }
+
+    pub fn rand_block<R>(&self, rng: &mut R, block_size: usize) -> Vec<AnalyzedTransaction>
+        where R: Rng
+    {
+        (0..block_size)
+            .map(|_| {
+                let indices = rand::seq::index::sample(rng, self.accounts.len(), 2);
+                let receiver = self.accounts[indices.index(1)].lock().unwrap();
+                let mut sender = self.accounts[indices.index(0)].lock().unwrap();
+                create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0).into()
+            })
+            .collect()
+    }
 }
