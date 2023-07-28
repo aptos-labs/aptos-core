@@ -285,7 +285,6 @@ impl BlockPartitioner for V2Partitioner {
             wsets_by_txn_id.push(RwLock::new(HashSet::new()));
             rsets_by_txn_id.push(RwLock::new(HashSet::new()));
         }
-        let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__main"]).start_timer();
         self.thread_pool.install(||{
             (0..num_txns).into_par_iter().for_each(|txn_id| {
                 let txn = &txns[txn_id];
@@ -314,8 +313,7 @@ impl BlockPartitioner for V2Partitioner {
                 }
             });
         });
-        let duration = timer_1.stop_and_record();
-        info!("preprocess__main={duration}");
+        let duration = timer.stop_and_record();
         info!("preprocess={duration}");
 
 
