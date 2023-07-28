@@ -58,14 +58,14 @@ test("gets object", async () => {
     fullnodeUrl: NODE_URL,
     indexerUrl: NODE_URL,
   });
-  const aptosToken = new AptosToken(provider)
+  const aptosToken = new AptosToken(provider);
 
   const txn = await provider.waitForTransactionWithResult(
     await aptosToken.createCollection(alice, "Alice's simple collection", "AliceCollection", "https://aptos.dev"),
     { checkSuccess: true },
   );
-  const objectAddress = ((txn as Gen.UserTransaction).changes[0] as WriteSetChange_WriteResource).address // should be the new object address
-  
+  const objectAddress = ((txn as Gen.UserTransaction).changes[0] as WriteSetChange_WriteResource).address; // should be the new object address
+
   const object = await provider.getAccountResource(objectAddress, "0x4::aptos_token::AptosCollection");
 
   expect(object.type).toBeDefined();
