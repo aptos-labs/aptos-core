@@ -192,7 +192,7 @@ impl V2Partitioner {
             sub_block_matrix.push(row);
         }
         let duration = timer.stop_and_record();
-        println!("add_edges__init={duration}");
+        info!("add_edges__init={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges__main"]).start_timer();
         self.thread_pool.install(||{
@@ -247,7 +247,7 @@ impl V2Partitioner {
             });
         });
         let duration = timer.stop_and_record();
-        println!("add_edges__main={duration}");
+        info!("add_edges__main={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges__return_obj"]).start_timer();
         let ret: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..num_shards).map(|shard_id|{
@@ -257,7 +257,7 @@ impl V2Partitioner {
             SubBlocksForShard::new(shard_id, sub_blocks)
         }).collect();
         let duration = timer.stop_and_record();
-        println!("add_edges__return_obj={duration}");
+        info!("add_edges__return_obj={duration}");
 
         self.thread_pool.spawn(move||{
             drop(sub_block_matrix);
@@ -315,8 +315,8 @@ impl BlockPartitioner for V2Partitioner {
             });
         });
         let duration = timer_1.stop_and_record();
-        println!("preprocess__main={duration}");
-        println!("preprocess={duration}");
+        info!("preprocess__main={duration}");
+        info!("preprocess={duration}");
 
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["pre_partition_uniform"]).start_timer();
@@ -326,7 +326,7 @@ impl BlockPartitioner for V2Partitioner {
             start_txn_ids_by_shard_id[shard_id] = start_txn_ids_by_shard_id[shard_id - 1] + remaining_txn_ids[shard_id - 1].len();
         }
         let duration = timer.stop_and_record();
-        println!("pre_partition_uniform={duration}");
+        info!("pre_partition_uniform={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("multi_rounds").as_str()]).start_timer();
         let mut txn_id_matrix: Vec<Vec<Vec<usize>>> = Vec::new();
@@ -338,7 +338,7 @@ impl BlockPartitioner for V2Partitioner {
             remaining_txn_ids = discarded;
             num_remaining_txns = remaining_txn_ids.iter().map(|ts|ts.len()).sum();
             let duration = timer.stop_and_record();
-            println!("round_{round_id}={duration}");
+            info!("round_{round_id}={duration}");
 
             if num_remaining_txns < self.avoid_pct as usize * num_txns / 100 {
                 break;
@@ -361,16 +361,16 @@ impl BlockPartitioner for V2Partitioner {
             remaining_txn_ids[num_executor_shards - 1] = last_round_txns;
             txn_id_matrix.push(remaining_txn_ids);
             let duration = timer.stop_and_record();
-            println!("last_round={duration}");
+            info!("last_round={duration}");
         }
         let duration = timer.stop_and_record();
-        println!("multi_rounds={duration}");
+        info!("multi_rounds={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
         let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|t|Mutex::new(Some(t))).collect();
         let ret = self.add_edges(&txns, &rsets_by_txn_id,&wsets_by_txn_id, &txn_id_matrix, &helpers_by_key_id);
         let duration = timer.stop_and_record();
-        println!("add_edges={duration}");
+        info!("add_edges={duration}");
         self.thread_pool.spawn(move||{
             drop(sender_ids_by_sender);
             drop(wsets_by_txn_id);
@@ -426,13 +426,13 @@ pub fn assertions(before_partition: &Vec<AnalyzedTransaction>, after_partition: 
                 for loc in td.txn.write_hints().iter() {
                     let key = loc.clone().into_state_key();
                     let key_str = CryptoHash::hash(&key).to_hex();
-                    println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, write_hint={}", round_id, shard_id, old_tid, tid, key_str);
+                    info!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, write_hint={}", round_id, shard_id, old_tid, tid, key_str);
                 }
                 for (src_tid, locs) in td.cross_shard_dependencies.required_edges().iter() {
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
                         let key_str = CryptoHash::hash(&key).to_hex();
-                        println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, recv key={} from round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
+                        info!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, recv key={} from round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
                         if (round_id != num_rounds - 1) {
                             assert_ne!(src_tid.round_id, round_id);
                         }
@@ -446,7 +446,7 @@ pub fn assertions(before_partition: &Vec<AnalyzedTransaction>, after_partition: 
                     for loc in locs.iter() {
                         let key = loc.clone().into_state_key();
                         let key_str = CryptoHash::hash(&key).to_hex();
-                        println!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, send key={} to round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
+                        info!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, send key={} to round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
                         if (round_id != num_rounds - 1) {
                             assert_ne!(dst_tid.round_id, round_id);
                         }
@@ -459,7 +459,7 @@ pub fn assertions(before_partition: &Vec<AnalyzedTransaction>, after_partition: 
             }
             let inbound_cost: u64 = cur_sub_block_inbound_costs_by_key_src_pair.iter().map(|(_,b)| *b).sum();
             let outbound_cost: u64 = cur_sub_block_connectivity_by_key_dst_pair.iter().map(|(_,b)| *b).sum();
-            println!("MATRIX_REPORT: round={}, shard={}, sub_block_size={}, inbound_cost={}, outbound_cost={}", round_id, shard_id, sub_block.num_txns(), inbound_cost, outbound_cost);
+            info!("MATRIX_REPORT: round={}, shard={}, sub_block_size={}, inbound_cost={}, outbound_cost={}", round_id, shard_id, sub_block.num_txns(), inbound_cost, outbound_cost);
             if round_id == 0 {
                 assert_eq!(0, inbound_cost);
             }
@@ -474,7 +474,7 @@ pub fn assertions(before_partition: &Vec<AnalyzedTransaction>, after_partition: 
             assert!(old_tids[i-1] < old_tids[i]);
         }
     }
-    println!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
+    info!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
     assert_eq!(0, total_comm_cost % 2);
 }
 
