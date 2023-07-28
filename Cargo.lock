@@ -3511,6 +3511,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-transaction-orderer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-block-executor",
+ "aptos-block-partitioner",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-types",
+ "bcs 0.1.4",
+ "clap 4.3.5",
+ "dashmap",
+ "itertools",
+ "move-core-types",
+ "once_cell",
+ "rand 0.7.3",
+ "rayon",
+]
+
+[[package]]
 name = "aptos-transactional-test-harness"
 version = "0.1.0"
 dependencies = [
