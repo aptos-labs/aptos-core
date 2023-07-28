@@ -370,6 +370,14 @@ impl StateComputeResult {
     pub fn reconfig_events(&self) -> &[ContractEvent] {
         &self.reconfig_events
     }
+
+    pub fn has_dkg_event(&self) -> bool {
+        !self.dkg_events.is_empty()
+    }
+
+    pub fn dkg_events(&self) -> &[ContractEvent] {
+        &self.dkg_events
+    }
 }
 
 pub struct ProofReader {

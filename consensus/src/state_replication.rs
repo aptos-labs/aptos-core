@@ -6,7 +6,7 @@ use crate::{
     error::{QuorumStoreError, StateSyncError},
     payload_manager::PayloadManager,
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    transaction_shuffler::TransactionShuffler, dkg::dkg_manager::DKGManagerWrapper,
 };
 use anyhow::Result;
 use aptos_consensus_types::{
@@ -80,6 +80,7 @@ pub trait StateComputer: Send + Sync {
         &self,
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
+        dkg_manager: Arc<DKGManagerWrapper>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_gas_limit: Option<u64>,
         transaction_deduper: Arc<dyn TransactionDeduper>,

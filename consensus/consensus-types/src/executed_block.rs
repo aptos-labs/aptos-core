@@ -172,6 +172,10 @@ impl ExecutedBlock {
         self.state_compute_result.reconfig_events().to_vec()
     }
 
+    pub fn dkg_events(&self) -> Vec<ContractEvent> {
+        self.state_compute_result.dkg_events().to_vec()
+    }
+
     /// The block is suffix of a reconfiguration block if the state result carries over the epoch state
     /// from parent but has no transaction.
     pub fn is_reconfiguration_suffix(&self) -> bool {

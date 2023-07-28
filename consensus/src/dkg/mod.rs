@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod dkg_manager;
+pub mod dkg_manager;
 mod dkg_store;
 pub mod dkg_handler;
 mod dkg_network;

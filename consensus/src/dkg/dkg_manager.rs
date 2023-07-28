@@ -4,10 +4,12 @@
 use std::{collections::HashMap, sync::Arc, thread, time::Duration};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
+use aptos_infallible::Mutex;
 use aptos_types::epoch_state::EpochState;
 use crate::dkg::types::DKGNode;
 use futures::future::{AbortHandle, Abortable};
 use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_logger::error;
 
 use super::types::{DKGAggNode, DKGNodeAckState, DKGAggNodeAckState, DKGMessage};
 
@@ -28,6 +30,24 @@ pub enum DKGManagerMessage {
     DKGReady(DKGAggNode),
 }
 
+pub enum DKGManagerWrapper {
+    NoDKG,
+    WithDKG(DKGManager),
+}
+
+impl DKGManagerWrapper {
+    pub async fn start_dkg(&self, _stake_dis: Option<StakeDis>) {
+        match self {
+            DKGManagerWrapper::NoDKG => {
+                error!("[DKG] No DKG manager!");
+            }
+            DKGManagerWrapper::WithDKG(dkg_manager) => {
+                dkg_manager.start_dkg(_stake_dis).await;
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct DKGManager {
     author: Author,
@@ -36,7 +56,7 @@ pub struct DKGManager {
     // Channel to send the aggregated dkg node to proposal generator
     proposal_tx: aptos_channel::Sender<Author, DKGManagerMessage>,
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>,
-    rb_abort_handle: Option<AbortHandle>,
+    rb_abort_handle: Arc<Mutex<Option<AbortHandle>>>,
 }
 
 impl DKGManager {
@@ -46,18 +66,18 @@ impl DKGManager {
             epoch_state,
             proposal_tx,
             reliable_broadcast,
-            rb_abort_handle: None,
+            rb_abort_handle: Arc::new(Mutex::new(None)),
         }
     }
 
-    pub fn start_dkg(&mut self, _stake_dis: StakeDis) {
+    pub async fn start_dkg(&self, _stake_dis: Option<StakeDis>) {
         // dkg todo: compute pvss transcript and create a DKG node
         thread::sleep(Duration::from_millis(TRANSCRIPT_COMPUTE_TIME_MS));
         // self.broadcast_node(node);
     }
 
-    fn broadcast_node(&mut self, node: DKGNode) {
-        if self.rb_abort_handle.is_some() {
+    fn broadcast_node(&self, node: DKGNode) {
+        if self.rb_abort_handle.lock().is_some() {
             // do not rebroadcast if there is an ongoing broadcast
             return;
         }
@@ -67,10 +87,10 @@ impl DKGManager {
             .reliable_broadcast
             .broadcast(node.clone(), ack_set);
         tokio::spawn(Abortable::new(task, abort_registration));
-        self.rb_abort_handle.replace(abort_handle);
+        self.rb_abort_handle.lock().replace(abort_handle);
     }
 
-    pub(crate) fn broadcast_agg_node(&mut self, agg_node: DKGAggNode) {
+    pub(crate) fn broadcast_agg_node(&self, agg_node: DKGAggNode) {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let ack_set = DKGAggNodeAckState::new(self.epoch_state.verifier.len());
         let task = self
@@ -79,7 +99,7 @@ impl DKGManager {
         tokio::spawn(Abortable::new(task, abort_registration));
         // abort the current node broadcast
         // no concurrent agg_node broadcast guaranteed by OnceCell
-        if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
+        if let Some(prev_handle) = self.rb_abort_handle.lock().replace(abort_handle) {
             prev_handle.abort();
         }
         // dkg todo: abort the broadcast when DKG is done

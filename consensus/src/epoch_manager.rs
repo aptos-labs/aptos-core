@@ -48,7 +48,7 @@ use crate::{
     state_replication::StateComputer,
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
-    util::time_service::TimeService, dkg::{DKGMessage, dkg_handler::DKGNetworkHandler},
+    util::time_service::TimeService, dkg::{DKGMessage, dkg_handler::DKGNetworkHandler, dkg_manager::{DKGManager, DKGManagerWrapper}},
 };
 use anyhow::{bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
@@ -697,9 +697,35 @@ impl EpochManager {
             self.config.wait_for_full_blocks_above_recent_fill_threshold,
             self.config.wait_for_full_blocks_above_pending_blocks,
         );
+
+
+        // dkg stuff
+        // dkg todo: connect the dkg_handler channel
+        let (dkg_handler_tx, dkg_handler_rx) = aptos_channel::new(
+            QueueStyle::FIFO,
+            100,
+            None,   // dkg todo: add counters
+        );
+        self.dkg_handler_tx = Some(dkg_handler_tx.clone());
+        // dkg todo: connect the dkg_proposal channel to proposal generator
+        let (dkg_proposal_tx, mut dkg_proposal_rx) = aptos_channel::new(
+            QueueStyle::LIFO,
+            1,
+            None,   // dkg todo: add counters
+        );
+        let dkg_network_sender = NetworkSenderWrapper::<DKGMessage>::new(network_sender.clone());
+        let dkg_reliable_broadcast = Arc::new(ReliableBroadcast::new(epoch_state.verifier.get_ordered_account_addresses(), Arc::new(dkg_network_sender)));
+        let dkg_manager = DKGManager::new(self.author, Arc::new(epoch_state.clone()), dkg_proposal_tx, dkg_reliable_broadcast);
+        let dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
+        let dkg_handler: DKGNetworkHandler = DKGNetworkHandler::new(self.author, dkg_handler_rx, Arc::new(epoch_state.clone()), dkg_manager);
+        // start the dkg handler
+        tokio::spawn(dkg_handler.start());
+
+
         self.commit_state_computer.new_epoch(
             &epoch_state,
             payload_manager.clone(),
+            dkg_manager_wrapper,
             transaction_shuffler,
             block_gas_limit,
             transaction_deduper,
@@ -773,26 +799,6 @@ impl EpochManager {
                     .with_label_values(&[&peer_id.to_string()])
                     .set(epoch_state.verifier.get_voting_power(&peer_id).unwrap_or(0) as i64)
             });
-
-        // dkg stuff
-        // dkg todo: connect the dkg_handler channel
-        let (dkg_handler_tx, mut dkg_handler_rx) = aptos_channel::new(
-            QueueStyle::FIFO,
-            100,
-            None,   // dkg todo: add counters
-        );
-        self.dkg_handler_tx = Some(dkg_handler_tx.clone());
-        // dkg todo: connect the dkg_proposal channel to proposal generator
-        let (dkg_proposal_tx, mut dkg_proposal_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
-            1,
-            None,   // dkg todo: add counters
-        );
-        let dkg_network_sender = NetworkSenderWrapper::<DKGMessage>::new(network_sender.clone());
-        let dkg_reliable_broadcast = Arc::new(ReliableBroadcast::new(epoch_state.verifier.get_ordered_account_addresses(), Arc::new(dkg_network_sender)));
-        let dkg_handler: DKGNetworkHandler = DKGNetworkHandler::new(self.author, dkg_handler_rx, Arc::new(epoch_state.clone()), dkg_proposal_tx, dkg_reliable_broadcast);
-        // start the dkg handler
-        tokio::spawn(dkg_handler.start());
 
         let mut round_manager = RoundManager::new(
             epoch_state,

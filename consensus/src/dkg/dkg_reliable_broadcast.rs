@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_infallible::Mutex;
 use aptos_logger::error;
 use aptos_types::epoch_state::EpochState;
 use std::sync::Arc;
@@ -18,14 +17,14 @@ pub enum DKGNodeHandleError {
 pub struct DKGNodeHandler {
     dkg_store: Arc<DKGStore>,
     epoch_state: Arc<EpochState>,
-    dkg_manager: Arc<Mutex<DKGManager>>,
+    dkg_manager: DKGManager,
 }
 
 impl DKGNodeHandler {
     pub fn new(
         dkg_store: Arc<DKGStore>,
         epoch_state: Arc<EpochState>,
-        dkg_manager: Arc<Mutex<DKGManager>>,
+        dkg_manager: DKGManager,
     ) -> Self {
         Self {
             dkg_store,
@@ -56,11 +55,11 @@ pub enum DKGAggNodeHandleError {
 pub struct DKGAggNodeHandler {
     dkg_store: Arc<DKGStore>,
     epoch_state: Arc<EpochState>,
-    dkg_manager: Arc<Mutex<DKGManager>>,
+    dkg_manager: DKGManager,
 }
 
 impl DKGAggNodeHandler {
-    pub fn new(dkg_store: Arc<DKGStore>, epoch_state: Arc<EpochState>, dkg_manager: Arc<Mutex<DKGManager>>) -> Self {
+    pub fn new(dkg_store: Arc<DKGStore>, epoch_state: Arc<EpochState>, dkg_manager: DKGManager) -> Self {
         Self {
             dkg_store,
             epoch_state,

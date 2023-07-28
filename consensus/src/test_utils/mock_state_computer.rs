@@ -9,7 +9,7 @@ use crate::{
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    transaction_shuffler::TransactionShuffler, dkg::dkg_manager::DKGManagerWrapper,
 };
 use anyhow::{format_err, Result};
 use aptos_consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
@@ -140,6 +140,7 @@ impl StateComputer for MockStateComputer {
         &self,
         _: &EpochState,
         _: Arc<PayloadManager>,
+        _: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
         _: Arc<dyn TransactionDeduper>,
@@ -179,6 +180,7 @@ impl StateComputer for EmptyStateComputer {
         &self,
         _: &EpochState,
         _: Arc<PayloadManager>,
+        _: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
         _: Arc<dyn TransactionDeduper>,
@@ -242,6 +244,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         &self,
         _: &EpochState,
         _: Arc<PayloadManager>,
+        _: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
         _: Arc<dyn TransactionDeduper>,

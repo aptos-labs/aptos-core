@@ -11,7 +11,7 @@ use crate::{
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    transaction_shuffler::TransactionShuffler, dkg::dkg_manager::DKGManagerWrapper,
 };
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
@@ -131,6 +131,7 @@ impl StateComputer for OrderingStateComputer {
         &self,
         _: &EpochState,
         _payload_manager: Arc<PayloadManager>,
+        _dkg_manager_wrapper: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
         _: Arc<dyn TransactionDeduper>,
