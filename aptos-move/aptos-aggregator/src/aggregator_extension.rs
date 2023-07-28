@@ -110,12 +110,20 @@ impl History {
         }
     }
 
-    fn record_positive(&mut self, value: u128) {
+    fn record_success_positive(&mut self, value: u128) {
         self.max_achieved_positive = u128::max(self.max_achieved_positive, value);
     }
 
-    fn record_negative(&mut self, value: u128) {
+    fn record_success_negative(&mut self, value: u128) {
         self.min_achieved_negative = u128::max(self.min_achieved_negative, value);
+    }
+
+    fn record_overflow_positive(&mut self, value: u128) {
+        self.min_overflow_positive = u128::max(self.min_overflow_positive, value);
+    }
+
+    fn record_underflow_negative(&mut self, value: u128) {
+        self.max_underflow_negative = u128::max(self.max_underflow_negative, value);
     }
 }
 
@@ -138,13 +146,45 @@ pub struct Aggregator {
 }
 
 impl Aggregator {
-    /// Records observed delta in history. Should be called after an operation
-    /// to record its side-effects.
-    fn record(&mut self) {
+    /// Records observed delta in history. Should be called after an operation (addition/subtraction)
+    /// is successful to record its side-effects.
+    fn record_success(&mut self) {
         if let Some(history) = self.history.as_mut() {
             match self.state {
-                AggregatorState::PositiveDelta => history.record_positive(self.value),
-                AggregatorState::NegativeDelta => history.record_negative(self.value),
+                AggregatorState::PositiveDelta => history.record_success_positive(self.value),
+                AggregatorState::NegativeDelta => history.record_success_negative(self.value),
+                AggregatorState::Data => {
+                    unreachable!("history is not tracked when aggregator knows its value")
+                },
+            }
+        }
+    }
+
+    /// Records overflows in history. Should be called after an addition is unsuccessful
+    /// to record its side-effects.
+    fn record_overflow(&mut self) {
+        if let Some(history) = self.history.as_mut() {
+            match self.state {
+                AggregatorState::PositiveDelta => history.record_overflow_positive(self.value),
+                AggregatorState::NegativeDelta => {
+                    unreachable!("overflow cannot occur when applying negative delta")
+                },
+                AggregatorState::Data => {
+                    unreachable!("history is not tracked when aggregator knows its value")
+                },
+            }
+        }
+    }
+
+    /// Records underflows in history. Should be called after a subtraction is unsuccessful
+    /// to record its side-effects.
+    fn record_underflow(&mut self) {
+        if let Some(history) = self.history.as_mut() {
+            match self.state {
+                AggregatorState::PositiveDelta => {
+                    unreachable!("underflow cannot occur when applying positive delta")
+                },
+                AggregatorState::NegativeDelta => history.record_underflow_negative(self.value),
                 AggregatorState::Data => {
                     unreachable!("history is not tracked when aggregator knows its value")
                 },
@@ -172,7 +212,7 @@ impl Aggregator {
     }
 
     /// Implements logic for adding to an aggregator.
-    pub fn try_add(&mut self, value: u128) -> PartialVMResult<()> {
+    fn try_add_without_recording_history(&mut self, value: u128) -> PartialVMResult<()> {
         match self.state {
             AggregatorState::Data => {
                 // If aggregator knows the value, add directly and keep the state.
@@ -198,14 +238,20 @@ impl Aggregator {
                 }
             },
         }
-
-        // Record side-effects of addition in history.
-        self.record();
         Ok(())
     }
 
+    pub fn try_add(&mut self, value: u128) -> PartialVMResult<()> {
+        let result = self.try_add_without_recording_history(value);
+        match result {
+            Ok(()) => self.record_success(),
+            Err(_) => self.record_overflow(),
+        }
+        result
+    }
+
     /// Implements logic for subtracting from an aggregator.
-    pub fn try_sub(&mut self, value: u128) -> PartialVMResult<()> {
+    fn try_sub_without_recording_history(&mut self, value: u128) -> PartialVMResult<()> {
         match self.state {
             AggregatorState::Data => {
                 // Aggregator knows the value, therefore we can subtract
@@ -241,10 +287,16 @@ impl Aggregator {
                 self.value = addition(self.value, value, self.limit)?;
             },
         }
-
-        // Record side-effects of addition in history.
-        self.record();
         Ok(())
+    }
+
+    pub fn try_sub(&mut self, value: u128) -> PartialVMResult<()> {
+        let result = self.try_sub_without_recording_history(value);
+        match result {
+            Ok(()) => self.record_success(),
+            Err(_) => self.record_underflow(),
+        }
+        result
     }
 
     /// Implements logic for reading the value of an aggregator. As a
