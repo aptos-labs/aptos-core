@@ -348,9 +348,9 @@ impl AptosVM {
         }
     }
 
-    fn success_transaction_cleanup<S: StateView + GenID>(
+    fn success_transaction_cleanup(
         &self,
-        mut respawned_session: RespawnedSession<S>,
+        mut respawned_session: RespawnedSession,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -494,7 +494,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
         txn_data: &TransactionMetadata,
-    ) -> Result<RespawnedSession<'r, 'l, impl MoveResolverExt>, VMStatus> {
+    ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         let txn_idx = session.txn_idx;
         let change_set = session.finish(&mut (), change_set_configs)?;
 
@@ -674,15 +674,15 @@ impl AptosVM {
         Ok(())
     }
 
-    fn success_multisig_payload_cleanup<'r, 'l, S: StateView + GenID>(
+    fn success_multisig_payload_cleanup<'r, 'l, 't>(
         &'l self,
         resolver: &'r impl MoveResolverExt,
         session: SessionExt,
-        gas_meter: &mut impl AptosGasMeter,
+        gas_meter: &'t mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         cleanup_args: Vec<Vec<u8>>,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<RespawnedSession<'r, 'l, S>, VMStatus> {
+    ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         // Charge gas for writeset before we do cleanup. This ensures we don't charge gas for
         // cleanup writeset changes, which is consistent with outer-level success cleanup
         // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
@@ -705,14 +705,14 @@ impl AptosVM {
         Ok(respawned_session)
     }
 
-    fn failure_multisig_payload_cleanup<'r, 'l, S: StateView + GenID>(
+    fn failure_multisig_payload_cleanup<'r, 'l>(
         &'l self,
         txn_idx: TxnIndex,
         resolver: &'r impl MoveResolverExt,
         execution_error: VMStatus,
         txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
-    ) -> Result<RespawnedSession<'r, 'l, S>, VMStatus> {
+    ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
         let mut respawned_session = RespawnedSession::spawn(

@@ -19,28 +19,30 @@ use aptos_types::{
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
+use super::MoveResolverExt;
+
 pub trait NewTrait: StateView + GenID {}
 /// We finish the session after the user transaction is done running to get the change set and
 /// charge gas and storage fee based on it before running storage refunds and the transaction
 /// epilogue. The latter needs to see the state view as if the change set is applied on top of
 /// the base state view, and this struct implements that.
 #[ouroboros::self_referencing]
-pub struct RespawnedSession<'r, 'l, S: StateView + GenID> {
-    state_view: ChangeSetStateView<'r, S>,
+pub struct RespawnedSession<'r, 'l> {
+    state_view: ChangeSetStateView<'r>,
     #[borrows(state_view)]
     #[covariant]
-    resolver: StorageAdapter<'this, ChangeSetStateView<'r, S>>,
+    resolver: StorageAdapter<'this, ChangeSetStateView<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
     session: Option<SessionExt<'this, 'l>>,
 }
 
-impl<'r, 'l, S: StateView + GenID> RespawnedSession<'r, 'l, S> {
+impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn spawn(
         txn_idx: TxnIndex,
         vm: &'l AptosVMImpl,
         session_id: SessionId,
-        base_state_view: &'r S,
+        base_state_view: &'r dyn MoveResolverExt,
         previous_session_change_set: VMChangeSet,
     ) -> Result<Self, VMStatus>
     {
@@ -84,18 +86,24 @@ impl<'r, 'l, S: StateView + GenID> RespawnedSession<'r, 'l, S> {
 }
 
 /// A state view as if a change set is applied on top of the base state view.
-struct ChangeSetStateView<'r, S: StateView + GenID> {
-    base: &'r S,
+struct ChangeSetStateView<'r> {
+    base: &'r dyn MoveResolverExt,
     change_set: VMChangeSet,
 }
 
-impl<'r, S: StateView + GenID> ChangeSetStateView<'r, S> {
-    pub fn new(base: &'r S, change_set: VMChangeSet) -> Result<Self, VMStatus> {
+impl<'r> ChangeSetStateView<'r> {
+    pub fn new(base: &'r dyn MoveResolverExt, change_set: VMChangeSet) -> Result<Self, VMStatus> {
         Ok(Self { base, change_set })
     }
 }
 
-impl<'r, S: StateView + GenID> TStateView for ChangeSetStateView<'r, S> {
+impl<'r> GenID for ChangeSetStateView<'r> {
+    fn generate_id(&mut self) -> u32 {
+        self.base.generate_id()
+    }
+}
+
+impl<'r> TStateView for ChangeSetStateView<'r> {
     type Key = StateKey;
 
     fn id(&self) -> StateViewId {

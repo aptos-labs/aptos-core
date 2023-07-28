@@ -11,6 +11,7 @@ use crate::{
         ExecutorShardCommand,
     },
 };
+use aptos_block_executor::view::GenID;
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -21,7 +22,7 @@ use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::{collections::HashSet, sync::Arc};
 
-pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
+pub struct ShardedExecutorService<S: StateView + GenID + Sync + Send + 'static> {
     shard_id: ShardId,
     num_shards: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
@@ -29,7 +30,7 @@ pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     cross_shard_client: Arc<dyn CrossShardClient>,
 }
 
-impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
+impl<S: StateView + GenID + Sync + Send + 'static> ShardedExecutorService<S> {
     pub fn new(
         shard_id: ShardId,
         num_shards: usize,
