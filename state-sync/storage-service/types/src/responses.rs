@@ -30,10 +30,10 @@ use std::{
 };
 use thiserror::Error;
 
-/// The version delta we'll tolerate when considering if a peer is eligible
+/// The version lag we'll tolerate when considering if a peer is eligible
 /// to handle an optimistic fetch for new data. This value is set assuming
-/// 5k TPS for a 5 second delay, which should be more than enough.
-pub const OPTIMISTIC_FETCH_VERSION_DELTA: u64 = 25000;
+/// 5k TPS for a 10 second delay, which should be more than enough.
+pub const OPTIMISTIC_FETCH_VERSION_LAG: u64 = 50_000;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
@@ -534,7 +534,7 @@ impl DataSummary {
     fn can_service_optimistic_request(&self, known_version: u64) -> bool {
         self.synced_ledger_info
             .as_ref()
-            .map(|li| (li.ledger_info().version() + OPTIMISTIC_FETCH_VERSION_DELTA) > known_version)
+            .map(|li| (li.ledger_info().version() + OPTIMISTIC_FETCH_VERSION_LAG) > known_version)
             .unwrap_or(false)
     }
 

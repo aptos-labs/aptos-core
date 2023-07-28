@@ -14,7 +14,7 @@ use aptos_storage_service_types::{
         DataRequest, NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
         StorageServiceRequest, TransactionOutputsWithProofRequest,
     },
-    responses::OPTIMISTIC_FETCH_VERSION_DELTA,
+    responses::OPTIMISTIC_FETCH_VERSION_LAG,
 };
 use claims::assert_matches;
 
@@ -209,7 +209,7 @@ async fn prioritized_peer_subscription_selection() {
         // Update the priority peer to be too far behind and verify it is not selected
         client.update_summary(
             priority_peer_1,
-            utils::create_storage_summary(known_version - OPTIMISTIC_FETCH_VERSION_DELTA),
+            utils::create_storage_summary(known_version - OPTIMISTIC_FETCH_VERSION_LAG),
         );
         assert_eq!(
             client.choose_peer_for_request(&storage_request),
@@ -219,7 +219,7 @@ async fn prioritized_peer_subscription_selection() {
         // Update the regular peer to be too far behind and verify neither is selected
         client.update_summary(
             regular_peer_1,
-            utils::create_storage_summary(known_version - (OPTIMISTIC_FETCH_VERSION_DELTA * 2)),
+            utils::create_storage_summary(known_version - (OPTIMISTIC_FETCH_VERSION_LAG * 2)),
         );
         assert_matches!(
             client.choose_peer_for_request(&storage_request),

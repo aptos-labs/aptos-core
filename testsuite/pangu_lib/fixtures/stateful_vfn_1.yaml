@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    type: vfn
+  name: test_username-vfn
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: test_username-vfn
+      app.kubernetes.io/name: test_username
+      managed-by: pangu
+      type: vfn
+  serviceName: test_username-vfn
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: test_username-vfn
+        app.kubernetes.io/name: test_username
+        managed-by: pangu
+        type: vfn
+    spec:
+      containers:
+      - command:
+        - /usr/local/bin/aptos-node
+        - -f
+        - /opt/aptos/etc/vfn.yaml
+        image: aptoslabs/validator:devnet@sha256:f0c62463b0e86acc9ad081c54be2d1823f143f780c73828b876caebc978c8947
+        name: test_username-vfn
+        ports:
+        - containerPort: 6180
+        - containerPort: 8080
+        - containerPort: 6181
+        - containerPort: 9101
+        volumeMounts:
+        - mountPath: /opt/aptos/etc
+          name: aptos-config
+        - mountPath: /opt/aptos/genesis
+          name: genesis-config
+        - mountPath: /opt/aptos/identites
+          name: aptos-secret
+        - mountPath: /opt/aptos/data
+          name: aptos-data
+      volumes:
+      - configMap:
+          name: test_username-vfn-configmap
+        name: aptos-config
+      - configMap:
+          name: genesis-artifiact-configmap-pangu
+        name: genesis-config
+      - name: aptos-secret
+        secret:
+          secretName: identity-secrets-test_username
+      - name: aptos-data
+        persistentVolumeClaim:
+          claimName: test_username-vfn-pvc
