@@ -94,24 +94,28 @@ impl AggregatorID {
 /// executor side because we don't know how to throw errors.
 #[derive(Debug)]
 pub struct History {
-    pub max_positive: u128,
-    pub min_negative: u128,
+    pub max_achieved_positive: u128,
+    pub min_achieved_negative: u128,
+    pub min_overflow_positive: u128,
+    pub max_underflow_negative: u128,
 }
 
 impl History {
     fn new() -> Self {
         History {
-            max_positive: 0,
-            min_negative: 0,
+            max_achieved_positive: 0,
+            min_achieved_negative: 0,
+            min_overflow_positive: 0,
+            max_underflow_negative: 0,
         }
     }
 
     fn record_positive(&mut self, value: u128) {
-        self.max_positive = u128::max(self.max_positive, value);
+        self.max_achieved_positive = u128::max(self.max_achieved_positive, value);
     }
 
     fn record_negative(&mut self, value: u128) {
-        self.min_negative = u128::max(self.min_negative, value);
+        self.min_achieved_negative = u128::max(self.min_achieved_negative, value);
     }
 }
 
@@ -162,8 +166,8 @@ impl Aggregator {
         // To validate the history of an aggregator, we want to ensure
         // that there was no violation of postcondition (i.e. overflows or
         // underflows). We can do it by emulating addition and subtraction.
-        addition(base_value, history.max_positive, self.limit)?;
-        subtraction(base_value, history.min_negative)?;
+        addition(base_value, history.max_achieved_positive, self.limit)?;
+        subtraction(base_value, history.min_achieved_negative)?;
         Ok(())
     }
 
@@ -531,8 +535,14 @@ mod test {
         assert_ok!(aggregator.try_sub(300));
 
         assert_eq!(aggregator.value, 100);
-        assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 200);
-        assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
+        assert_eq!(
+            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            200
+        );
+        assert_eq!(
+            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            100
+        );
         assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
 
         assert_ok!(aggregator.try_add(50));
@@ -540,16 +550,28 @@ mod test {
         assert_ok!(aggregator.try_sub(25));
 
         assert_eq!(aggregator.value, 225);
-        assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 250);
-        assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
+        assert_eq!(
+            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            250
+        );
+        assert_eq!(
+            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            100
+        );
         assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
 
         assert_ok!(aggregator.try_add(375));
         assert_ok!(aggregator.try_sub(600));
 
         assert_eq!(aggregator.value, 0);
-        assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 600);
-        assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
+        assert_eq!(
+            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            600
+        );
+        assert_eq!(
+            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            100
+        );
         assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
     }
 

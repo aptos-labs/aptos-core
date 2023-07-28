@@ -86,15 +86,27 @@ impl<'a> NativeAggregatorContext<'a> {
                 AggregatorState::PositiveDelta => {
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
-                    let delta_op =
-                        DeltaOp::new(plus, limit, history.max_positive, history.min_negative);
+                    let delta_op = DeltaOp::new(
+                        plus,
+                        limit,
+                        history.max_achieved_positive,
+                        history.min_achieved_negative,
+                        history.min_overflow_positive,
+                        history.max_underflow_negative,
+                    );
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
-                    let delta_op =
-                        DeltaOp::new(minus, limit, history.max_positive, history.min_negative);
+                    let delta_op = DeltaOp::new(
+                        minus,
+                        limit,
+                        history.max_achieved_positive,
+                        history.min_achieved_negative,
+                        history.min_overflow_positive,
+                        history.max_underflow_negative,
+                    );
                     AggregatorChange::Merge(delta_op)
                 },
             };
@@ -235,12 +247,12 @@ mod test {
             changes.get(&aggregator_id_for_test(500)).unwrap(),
             AggregatorChange::Delete
         );
-        let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0);
+        let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0, 0, 0);
         assert_eq!(
             *changes.get(&aggregator_id_for_test(600)).unwrap(),
             AggregatorChange::Merge(delta_100)
         );
-        let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0);
+        let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0, 0, 0);
         assert_eq!(
             *changes.get(&aggregator_id_for_test(700)).unwrap(),
             AggregatorChange::Merge(delta_200)
