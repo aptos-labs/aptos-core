@@ -42,7 +42,7 @@ fn native_add(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
 
-    aggregator.add(value)?;
+    aggregator.try_add(value)?;
 
     Ok(smallvec![])
 }
@@ -100,7 +100,7 @@ fn native_sub(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
 
-    aggregator.sub(value)?;
+    aggregator.try_sub(value)?;
 
     Ok(smallvec![])
 }

@@ -30,9 +30,6 @@ fn native_create_aggregator(
     debug_assert_eq!(args.len(), 1);
 
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
-
-    // Extract fields: `limit` of the new aggregator and a `phantom_handle` of
-    // the parent factory.
     let limit = safely_pop_arg!(args, u128);
 
     // Get the current aggregator data.

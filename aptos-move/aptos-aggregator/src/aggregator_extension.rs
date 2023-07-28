@@ -168,7 +168,7 @@ impl Aggregator {
     }
 
     /// Implements logic for adding to an aggregator.
-    pub fn add(&mut self, value: u128) -> PartialVMResult<()> {
+    pub fn try_add(&mut self, value: u128) -> PartialVMResult<()> {
         match self.state {
             AggregatorState::Data => {
                 // If aggregator knows the value, add directly and keep the state.
@@ -201,7 +201,7 @@ impl Aggregator {
     }
 
     /// Implements logic for subtracting from an aggregator.
-    pub fn sub(&mut self, value: u128) -> PartialVMResult<()> {
+    pub fn try_sub(&mut self, value: u128) -> PartialVMResult<()> {
         match self.state {
             AggregatorState::Data => {
                 // Aggregator knows the value, therefore we can subtract
@@ -241,14 +241,6 @@ impl Aggregator {
         // Record side-effects of addition in history.
         self.record();
         Ok(())
-    }
-
-    pub fn try_add(&mut self, value: u128) -> PartialVMResult<()> {
-        self.add(value)
-    }
-
-    pub fn try_sub(&mut self, value: u128) -> PartialVMResult<()> {
-        self.sub(value)
     }
 
     /// Implements logic for reading the value of an aggregator. As a
@@ -432,7 +424,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(200), 200)
             .expect("Get aggregator failed");
-        assert_ok!(aggregator.add(100));
+        assert_ok!(aggregator.try_add(100));
         assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(200)));
         assert_eq!(aggregator.value, 100);
     }
@@ -446,7 +438,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
-        assert_ok!(aggregator.add(400));
+        assert_ok!(aggregator.try_add(400));
         assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
@@ -458,7 +450,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
-        assert_ok!(aggregator.add(400));
+        assert_ok!(aggregator.try_add(400));
         assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
@@ -470,8 +462,8 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
-        assert_ok!(aggregator.add(400));
-        assert_ok!(aggregator.sub(300));
+        assert_ok!(aggregator.try_add(400));
+        assert_ok!(aggregator.try_sub(300));
         assert_eq!(aggregator.value, 100);
         assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
         assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
@@ -485,8 +477,8 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
-        assert_ok!(aggregator.sub(301));
-        assert_ok!(aggregator.add(1));
+        assert_ok!(aggregator.try_sub(301));
+        assert_ok!(aggregator.try_add(1));
         assert_eq!(aggregator.value, 300);
         assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
         assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
@@ -500,13 +492,13 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
-        assert_err!(aggregator.add(800));
+        assert_err!(aggregator.try_add(800));
 
         // 0 + 300 > 200!
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(200), 200)
             .expect("Get aggregator failed");
-        assert_err!(aggregator.add(300));
+        assert_err!(aggregator.try_add(300));
     }
 
     #[test]
@@ -518,13 +510,13 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
-        assert_err!(aggregator.sub(601));
+        assert_err!(aggregator.try_sub(601));
 
         // Similarly, we cannot subtract anything from 0...
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(200), 200)
             .expect("Get aggregator failed");
-        assert_err!(aggregator.sub(2));
+        assert_err!(aggregator.try_sub(2));
     }
 
     #[test]
@@ -535,25 +527,25 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(600), 600)
             .expect("Get aggregator failed");
-        assert_ok!(aggregator.add(200));
-        assert_ok!(aggregator.sub(300));
+        assert_ok!(aggregator.try_add(200));
+        assert_ok!(aggregator.try_sub(300));
 
         assert_eq!(aggregator.value, 100);
         assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 200);
         assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
         assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
 
-        assert_ok!(aggregator.add(50));
-        assert_ok!(aggregator.add(300));
-        assert_ok!(aggregator.sub(25));
+        assert_ok!(aggregator.try_add(50));
+        assert_ok!(aggregator.try_add(300));
+        assert_ok!(aggregator.try_sub(25));
 
         assert_eq!(aggregator.value, 225);
         assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 250);
         assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
         assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
 
-        assert_ok!(aggregator.add(375));
-        assert_ok!(aggregator.sub(600));
+        assert_ok!(aggregator.try_add(375));
+        assert_ok!(aggregator.try_sub(600));
 
         assert_eq!(aggregator.value, 0);
         assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 600);
@@ -588,9 +580,9 @@ mod test {
             .expect("Getting an aggregator should succeed");
 
         // Aggregator of +0 with minimum of -50 and maximum of +50.
-        aggregator.add(50).unwrap();
-        aggregator.sub(100).unwrap();
-        aggregator.add(50).unwrap();
+        aggregator.try_add(50).unwrap();
+        aggregator.try_sub(100).unwrap();
+        aggregator.try_add(50).unwrap();
 
         // Valid history: 50+50-100+50.
         assert_ok!(aggregator.validate_history(50));
