@@ -33,21 +33,20 @@ fn main() {
         .collect();
     println!("Created {} accounts", num_accounts);
     println!("Creating {} transactions", args.block_size);
-    let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
-        .map(|_| {
-            // randomly select a sender and receiver from accounts
-            let mut rng = OsRng;
-
-            let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
-            let receiver = accounts[indices.index(1)].lock().unwrap();
-            let mut sender = accounts[indices.index(0)].lock().unwrap();
-            create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
-        })
-        .collect();
-
     let partitioner = build_partitioner(Some(args.num_shards));
     for _ in 0..args.num_blocks {
-        let transactions = transactions.clone();
+        let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
+            .map(|_| {
+                // randomly select a sender and receiver from accounts
+                let mut rng = OsRng;
+
+                let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
+                let receiver = accounts[indices.index(1)].lock().unwrap();
+                let mut sender = accounts[indices.index(0)].lock().unwrap();
+                create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
+            })
+            .collect();
+
         println!("Starting to partition");
         let now = Instant::now();
         partitioner.partition(transactions, args.num_shards);
