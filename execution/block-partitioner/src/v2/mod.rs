@@ -96,7 +96,7 @@ impl V2Partitioner {
         let min_discarded_seq_nums_by_sender_id: DashMap<usize, AtomicUsize> = DashMap::new();
         let shard_id_and_txn_id_vec_pairs: Vec<(usize, Vec<usize>)> = txn_id_vecs.into_iter().enumerate().collect();
         let duration = timer.stop_and_record();
-        println!("round_{}__init={}", round_id, duration);
+        info!("round_{}__init={}", round_id, duration);
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_key").as_str()]).start_timer();
         self.thread_pool.install(|| {
@@ -119,7 +119,7 @@ impl V2Partitioner {
             });
         });
         let duration = timer.stop_and_record();
-        println!("round_{}__discard_by_key={}", round_id, duration);
+        info!("round_{}__discard_by_key={}", round_id, duration);
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_sender").as_str()]).start_timer();
         self.thread_pool.install(||{
@@ -139,12 +139,12 @@ impl V2Partitioner {
             });
         });
         let duration = timer.stop_and_record();
-        println!("round_{}__discard_by_sender={}", round_id, duration);
+        info!("round_{}__discard_by_sender={}", round_id, duration);
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__return_obj").as_str()]).start_timer();
         let ret = (extract_and_sort(finally_accepted), extract_and_sort(discarded));
         let duration = timer.stop_and_record();
-        println!("round_{}__return_obj={}", round_id, duration);
+        info!("round_{}__return_obj={}", round_id, duration);
         self.thread_pool.spawn(move||{
             drop(potentially_accepted);
             drop(min_discarded_seq_nums_by_sender_id);
