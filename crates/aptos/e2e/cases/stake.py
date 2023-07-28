@@ -27,6 +27,24 @@ def test_stake_initialize_stake_owner(run_helper: RunHelper, test_name=None):
     if result.get("success") != True:
         raise TestError("Did not initialize stake owner successfully")
 
+    # make sure the the stake pool initialized on chain
+    response = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "node",
+            "get-stake-pool",
+            "--profile",
+            "default",
+            "--owner-address",
+            "default",
+        ],
+    )
+
+    result = json.loads(response.stdout)["Result"]
+    if result[0] == None or result[0].get("total_stake") != 1000000:
+        raise TestError("Did not initialize stake owner successfully")
+
 
 @test_case
 def test_stake_add_stake(run_helper: RunHelper, test_name=None):
