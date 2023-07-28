@@ -6,6 +6,7 @@ use crate::{
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
+        database::upsert_uris,
         gcs::{write_image_to_gcs, write_json_to_gcs},
         image_optimizer::ImageOptimizer,
         json_parser::JSONParser,
@@ -130,7 +131,13 @@ impl Worker {
             }
 
             // Commit model to Postgres
-            self.commit_to_postgres().await;
+            if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+                error!(
+                    last_transaction_version = self.last_transaction_version,
+                    error = ?e,
+                    "[NFT Metadata Crawler] Commit to Postgres failed"
+                );
+            }
         }
 
         // Deduplicate raw_image_uri
@@ -174,7 +181,13 @@ impl Worker {
             }
 
             // Commit model to Postgres
-            self.commit_to_postgres().await;
+            if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+                error!(
+                    last_transaction_version = self.last_transaction_version,
+                    error = ?e,
+                    "[NFT Metadata Crawler] Commit to Postgres failed"
+                );
+            }
         }
 
         // Deduplicate raw_animation_uri
@@ -223,14 +236,15 @@ impl Worker {
             }
 
             // Commit model to Postgres
-            self.commit_to_postgres().await;
+            if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+                error!(
+                    last_transaction_version = self.last_transaction_version,
+                    error = ?e,
+                    "[NFT Metadata Crawler] Commit to Postgres failed"
+                );
+            }
         }
 
         Ok(())
-    }
-
-    /// Calls and handles error for upserting to Postgres
-    async fn commit_to_postgres(&mut self) {
-        todo!();
     }
 }
