@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
+    establish_connection_pool,
     models::{
         nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
@@ -14,13 +15,26 @@ use crate::{
     },
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
+use chrono::NaiveDateTime;
+use crossbeam_channel::{bounded, Receiver, Sender};
 use diesel::{
-    r2d2::{ConnectionManager, PooledConnection},
+    r2d2::{ConnectionManager, Pool, PooledConnection},
     PgConnection,
+};
+use futures::StreamExt;
+use google_cloud_pubsub::{
+    client::{Client, ClientConfig},
+    subscription::Subscription,
 };
 use image::ImageFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::{sync::Arc, time::Duration};
+use tokio::{
+    sync::{Mutex, Semaphore},
+    task::JoinHandle,
+    time::sleep,
+};
 use tracing::{error, info};
 
 /// Structs to hold config from YAML
@@ -37,11 +51,115 @@ pub struct ParserConfig {
     pub image_quality: u8, // Quality up to 100
 }
 
+/// Subscribes to PubSub and sends URIs to Channel
+/// - Creates an infinite loop that pulls `msgs_per_pull` entries from PubSub
+/// - Parses each entry into a `Worker` and sends to Channel
+async fn consume_pubsub_entries_to_channel_loop(
+    parser_config: ParserConfig,
+    sender: Sender<(Worker, String)>,
+    subscription: Subscription,
+    pool: Pool<ConnectionManager<PgConnection>>,
+) -> anyhow::Result<()> {
+    let mut stream = subscription.subscribe(None).await?;
+    while let Some(msg) = stream.next().await {
+        // Parse metadata from Pubsub message and create worker
+        let ack = msg.ack_id();
+        let entry_string = String::from_utf8(msg.message.clone().data)?;
+        let parts: Vec<&str> = entry_string.split(',').collect();
+        let entry = Worker::new(
+            parser_config.clone(),
+            pool.get()?,
+            parts[0].to_string(),
+            parts[1].to_string(),
+            parts[2].to_string().parse()?,
+            NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
+                NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")?,
+            ),
+            parts[4].parse::<bool>().unwrap_or(false),
+        );
+
+        // Send worker to channel
+        sender.send((entry, ack.to_string())).unwrap_or_else(|e| {
+            error!("Failed to send entry to channel: {:?}", e);
+        });
+    }
+
+    Ok(())
+}
+
+/// Repeatedly pulls workers from Channel and perform parsing operations
+async fn spawn_parser(
+    semaphore: Arc<Semaphore>,
+    receiver: Arc<Mutex<Receiver<(Worker, String)>>>,
+    subscription: Subscription,
+) -> anyhow::Result<()> {
+    loop {
+        let _ = semaphore.acquire().await?;
+
+        // Pulls worker from Channel
+        let (mut parser, ack) = receiver.lock().await.recv()?;
+        parser.parse().await?;
+
+        // Sends ack to PubSub
+        subscription.ack(vec![ack]).await?;
+
+        sleep(Duration::from_millis(500)).await;
+    }
+}
+
 #[async_trait::async_trait]
 impl RunnableConfig for ParserConfig {
     /// Main driver function that establishes a connection to Pubsub and parses the Pubsub entries in parallel
     async fn run(&self) -> anyhow::Result<()> {
-        todo!();
+        let pool = establish_connection_pool(self.database_url.clone());
+
+        std::env::set_var(
+            "GOOGLE_APPLICATION_CREDENTIALS",
+            self.google_application_credentials.clone(),
+        );
+
+        // Establish gRPC client
+        let config = ClientConfig::default().with_auth().await?;
+        let client = Client::new(config).await?;
+        let subscription = client.subscription(&self.subscription_name);
+
+        // Create workers
+        let (sender, receiver) = bounded::<(Worker, String)>(2 * self.num_parsers);
+        let receiver = Arc::new(Mutex::new(receiver));
+        let semaphore = Arc::new(Semaphore::new(self.num_parsers));
+
+        // Spawn producer
+        let producer = tokio::spawn(consume_pubsub_entries_to_channel_loop(
+            self.clone(),
+            sender,
+            subscription.clone(),
+            pool,
+        ));
+
+        // Spawns workers
+        let mut workers: Vec<JoinHandle<anyhow::Result<()>>> = Vec::new();
+        for _ in 0..self.num_parsers {
+            let worker = tokio::spawn(spawn_parser(
+                Arc::clone(&semaphore),
+                Arc::clone(&receiver),
+                subscription.clone(),
+            ));
+
+            workers.push(worker);
+        }
+
+        match producer.await {
+            Ok(_) => (),
+            Err(e) => error!("Producer error: {:?}", e),
+        }
+
+        for worker in workers {
+            match worker.await {
+                Ok(_) => (),
+                Err(e) => error!("Worker error: {:?}", e),
+            }
+        }
+        Ok(())
     }
 
     fn get_server_name(&self) -> String {
