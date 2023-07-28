@@ -252,8 +252,14 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(2100); // args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
+
+    let suite_name = if suite_name == "realistic_env_max_load" {
+        "realistic_env_workload_sweep"
+    } else {
+        panic!("")
+    };
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -526,6 +532,7 @@ fn single_test_suite(
         // Rest of the tests:
         "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
+        "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         "epoch_changer_performance" => epoch_changer_performance(),
@@ -796,34 +803,26 @@ fn consensus_stress_test() -> ForgeConfig {
     })
 }
 
-fn realistic_env_load_sweep_test() -> ForgeConfig {
+fn realistic_env_sweep_wrap(
+    num_validators: usize,
+    num_fullnodes: usize,
+    test: LoadVsPerfBenchmark,
+) -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
-        .add_network_test(wrap_with_realistic_env(LoadVsPerfBenchmark {
-            test: Box::new(PerformanceBenchmark),
-            workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
-            criteria: [
-                (9, 1.5, 3., 4.),
-                (95, 1.5, 3., 4.),
-                (950, 2., 3., 4.),
-                (2750, 2.5, 3.5, 4.5),
-                (4600, 3., 4., 5.),
-            ]
-            .into_iter()
-            .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
-                SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(0)
-                    .add_max_failed_submission_tps(0)
-                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
-                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
-                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
-            })
-            .collect(),
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_fullnodes)
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["execution"]
+                ["processed_transactions_detailed_counters"] = true.into();
         }))
+        .add_network_test(wrap_with_realistic_env(test))
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
         .with_emit_job(
-            EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 10000,
+                })
+                .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -838,6 +837,80 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
                     max_round_gap: 10,
                 }),
         )
+}
+
+fn realistic_env_load_sweep_test() -> ForgeConfig {
+    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
+        criteria: [
+            (9, 1.5, 3., 4.),
+            (95, 1.5, 3., 4.),
+            (950, 2., 3., 4.),
+            (2750, 2.5, 3.5, 4.5),
+            (4600, 3., 4., 5.),
+        ]
+        .into_iter()
+        .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
+            SuccessCriteria::new(min_tps)
+                .add_max_expired_tps(0)
+                .add_max_failed_submission_tps(0)
+                .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                .add_latency_threshold(max_lat_p99, LatencyType::P99)
+        })
+        .collect(),
+    })
+}
+
+fn realistic_env_workload_sweep_test() -> ForgeConfig {
+    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TRANSACTIONS(&[
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::CoinTransfer,
+                num_modules: 1,
+                unique_senders: false,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::NoOp,
+                num_modules: 100,
+                unique_senders: false,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::ModifyGlobalResource,
+                num_modules: 1,
+                unique_senders: true,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
+                num_modules: 1,
+                unique_senders: true,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::PublishPackage,
+                num_modules: 1,
+                unique_senders: true,
+            },
+        ]),
+        criteria: [
+            (1, 1.5, 3., 4.),
+            (1, 1.5, 3., 4.),
+            (1, 2., 3., 4.),
+            (1, 2.5, 3.5, 4.5),
+            (1, 3., 4., 5.),
+        ]
+        .into_iter()
+        .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
+            SuccessCriteria::new(min_tps)
+                .add_max_expired_tps(0)
+                .add_max_failed_submission_tps(0)
+                .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                .add_latency_threshold(max_lat_p99, LatencyType::P99)
+        })
+        .collect(),
+    })
 }
 
 fn load_vs_perf_benchmark() -> ForgeConfig {
