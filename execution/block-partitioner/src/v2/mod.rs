@@ -280,12 +280,19 @@ impl BlockPartitioner for V2Partitioner {
         let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(self.dashmap_num_shards);
         let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(self.dashmap_num_shards);
         let mut helpers_by_key_id: DashMap<usize, RwLock<StorageLocationHelper>> = DashMap::with_shard_amount(self.dashmap_num_shards);
+        let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__rw"]).start_timer();
         for _ in 0..num_txns {
             sender_ids_by_txn_id.push(RwLock::new(None));
             wsets_by_txn_id.push(RwLock::new(HashSet::new()));
             rsets_by_txn_id.push(RwLock::new(HashSet::new()));
         }
+        let duration = timer_1.stop_and_record();
+        println!("preprocess__rw={duration}");
+        let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__txns"]).start_timer();
         let txns: Vec<(usize, AnalyzedTransaction)> = txns.into_iter().enumerate().collect();
+        let duration = timer_1.stop_and_record();
+        println!("preprocess__txns={duration}");
+        let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__main"]).start_timer();
         self.thread_pool.install(||{
             txns.par_iter().for_each(|(txn_id_ref, txn)| {
                 let txn_id = *txn_id_ref;
@@ -314,17 +321,20 @@ impl BlockPartitioner for V2Partitioner {
                 }
             });
         });
-        let duration = timer.stop_and_record();
-        println!("preprocess={duration}");
+        let duration = timer_1.stop_and_record();
+        println!("preprocess__main={duration}");
 
-        let timer = MISC_TIMERS_SECONDS.with_label_values(&["storage_locations"]).start_timer();
+        let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__locs"]).start_timer();
         let num_keys = num_keys.load(Ordering::SeqCst);
         let mut storage_locations: Vec<Option<StorageLocation>> = vec![None; num_keys];
         for (key, key_id) in key_ids_by_key {
             storage_locations[key_id] = Some(StorageLocation::Specific(key))
         }
+        let duration = timer_1.stop_and_record();
+        println!("preprocess__locs={duration}");
         let duration = timer.stop_and_record();
-        println!("storage_locations={duration}");
+        println!("preprocess={duration}");
+
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["pre_partition_uniform"]).start_timer();
         let mut remaining_txn_ids = uniform_partition(num_txns, num_executor_shards);
