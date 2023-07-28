@@ -85,6 +85,10 @@ name = "hash"
 harness = false
 
 [[bench]]
+name = "multi_ed25519"
+harness = false
+
+[[bench]]
 name = "noise"
 harness = false
 

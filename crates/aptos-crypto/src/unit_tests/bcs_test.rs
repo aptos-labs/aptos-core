@@ -12,6 +12,7 @@ use crate::{
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::convert::TryFrom;
+use crate::multi_ed25519::{bitmap_from_4_bytes, BITMAP_NUM_OF_BYTES, THRESHOLD_NUM_BYTES};
 
 #[test]
 fn ed25519_bcs_material() {
@@ -73,7 +74,7 @@ fn multi_ed25519_bcs_material() {
     // + 1 byte for the threshold
     assert_eq!(
         serialized_multi_public_key.len(),
-        2 + num_of_keys * ED25519_PUBLIC_KEY_LENGTH + 1
+        2 + num_of_keys * ED25519_PUBLIC_KEY_LENGTH + THRESHOLD_NUM_BYTES
     );
 
     let deserialized_multi_public_key: MultiEd25519PublicKey =
@@ -94,16 +95,16 @@ fn multi_ed25519_bcs_material() {
     // + 4 bytes for the bitmap (the bitmap can hold up to 32 bits)
     assert_eq!(
         serialized_multi_signature.len(),
-        2 + threshold as usize * ED25519_SIGNATURE_LENGTH + 4
+        2 + threshold as usize * ED25519_SIGNATURE_LENGTH + BITMAP_NUM_OF_BYTES
     );
 
     // Verify bitmap
-    assert_eq!(multi_signature_7of10.bitmap(), &[
+    assert_eq!(multi_signature_7of10.bitmap(), &bitmap_from_4_bytes([
         0b1111_1110,
         0u8,
         0u8,
         0u8
-    ]);
+    ]));
 
     // Verify signature
     assert!(multi_signature_7of10

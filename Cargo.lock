@@ -796,7 +796,7 @@ dependencies = [
  "hex",
  "hkdf 0.10.0",
  "libsecp256k1",
- "merlin",
+ "merlin 3.0.0",
  "more-asserts",
  "once_cell",
  "proptest",
@@ -1466,7 +1466,7 @@ dependencies = [
  "itertools",
  "libsecp256k1",
  "log",
- "merlin",
+ "merlin 3.0.0",
  "move-binary-format",
  "move-cli",
  "move-command-line-common",
@@ -4661,7 +4661,7 @@ dependencies = [
  "clear_on_drop",
  "curve25519-dalek-ng",
  "digest 0.9.0",
- "merlin",
+ "merlin 3.0.0",
  "rand 0.8.5",
  "rand_core 0.6.4",
  "serde 1.0.149",
@@ -5959,7 +5959,9 @@ checksum = "c762bae6dcaf24c4c84667b8579785430908723d5c889f469d76a41d59cc7a9d"
 dependencies = [
  "curve25519-dalek",
  "ed25519",
+ "merlin 2.0.1",
  "rand 0.7.3",
+ "rand_core 0.5.1",
  "serde 1.0.149",
  "serde_bytes",
  "sha2 0.9.9",
@@ -8161,6 +8163,18 @@ checksum = "34f79cf9964c5c9545493acda1263f1912f8d2c56c8a2ffee2606cb960acaacc"
 dependencies = [
  "libc",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "merlin"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e261cf0f8b3c42ded9f7d2bb59dea03aa52bc8a1cbc7482f9fc3fd1229d3b42"
+dependencies = [
+ "byteorder",
+ "keccak",
+ "rand_core 0.5.1",
+ "zeroize",
 ]
 
 [[package]]
