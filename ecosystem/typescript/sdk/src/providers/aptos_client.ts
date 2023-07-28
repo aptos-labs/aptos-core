@@ -13,6 +13,7 @@ import {
   Memoize,
   sleep,
   APTOS_COIN,
+  MemoizeExpiring,
 } from "../utils";
 import { AptosAccount } from "../account/aptos_account";
 import * as Gen from "../generated/index";
@@ -41,6 +42,7 @@ export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
   gasUnitPrice?: Uint64;
   expireTimestamp?: Uint64;
+  providedSequenceNumber?: string | bigint;
 }
 
 interface PaginationArgs {
@@ -132,9 +134,11 @@ export class AptosClient {
    * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Account modules array for a specific ledger version.
    * Module is represented by MoveModule interface. It contains module `bytecode` and `abi`,
-   * which is JSON representation of a module
+   * which is JSON representation of a module. Account modules are cached by account address for 10 minutes
+   * to prevent unnecessary API calls when fetching the same account modules
    */
   @parseApiError
+  @MemoizeExpiring(10 * 60 * 1000)
   async getAccountModules(
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: AnyNumber },
@@ -755,7 +759,9 @@ export class AptosClient {
     extraArgs?: OptionalTransactionArgs,
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasEstimate }] = await Promise.all([
-      this.getAccount(accountFrom),
+      extraArgs?.providedSequenceNumber
+        ? Promise.resolve({ sequence_number: extraArgs.providedSequenceNumber })
+        : this.getAccount(accountFrom),
       this.getChainId(),
       extraArgs?.gasUnitPrice ? Promise.resolve({ gas_estimate: extraArgs.gasUnitPrice }) : this.estimateGasPrice(),
     ]);
