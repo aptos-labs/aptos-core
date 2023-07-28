@@ -124,7 +124,7 @@ impl RunnableConfig for ParserConfig {
         let subscription = client.subscription(&self.subscription_name);
 
         // Create workers
-        let (sender, receiver) = bounded::<(Worker, String)>(20);
+        let (sender, receiver) = bounded::<(Worker, String)>(2 * self.num_parsers);
         let receiver = Arc::new(Mutex::new(receiver));
         let semaphore = Arc::new(Semaphore::new(self.num_parsers));
 
