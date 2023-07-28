@@ -29,7 +29,7 @@ from test_framework.git import Git
 from test_framework.logging import log, init_logging
 from forge import image_exists
 
-APTOS_CORE_REPO = "https://github.com/aptos-labs/aptos-core.git"
+APTOS_CORE_REPO = "https://github.com/igor-aptos/aptos-core.git"
 DOCKER_RUST_BUILD_WORKFLOW_NAME = "workflow-run-docker-rust-build.yaml"
 FORGE_WORKFLOW_NAME = "adhoc-forge.yaml"
 EXP_GIT_BRANCH_PREFIX = "exp/"
@@ -100,7 +100,7 @@ def wait_for_workflow(shell: Shell, branch: str, workflow_name: str) -> bool:
         return False
     workflow_run_id = gh_run_list_cmd_ret.unwrap().decode().strip()
     log.info(
-        f"Workflow URL: https://github.com/aptos-labs/aptos-core/actions/runs/{workflow_run_id}"
+        f"Workflow URL: https://github.com/igor-aptos/aptos-core/actions/runs/{workflow_run_id}"
     )
 
     workflow_success = False
@@ -108,7 +108,7 @@ def wait_for_workflow(shell: Shell, branch: str, workflow_name: str) -> bool:
     for i in range(iterations):
         secs_remaining = (iterations - i) * WORKFLOW_WATCH_INTERVAL_SECS
         log.info(
-            f"Checking workflow status: https://github.com/aptos-labs/aptos-core/actions/runs/{workflow_run_id} ({secs_remaining}s remaining)"
+            f"Checking workflow status: https://github.com/igor-aptos/aptos-core/actions/runs/{workflow_run_id} ({secs_remaining}s remaining)"
         )
         gh_run_view_cmd = [
             "gh",
@@ -172,7 +172,7 @@ def workflow_dispatch_docker_build(
         return True
     gh_workflow_run_cmd_ret = shell.run(gh_workflow_run_cmd, stream_output=True)
     log.info(
-        f"All workflow runs: https://github.com/aptos-labs/aptos-core/actions/workflows/{DOCKER_RUST_BUILD_WORKFLOW_NAME}"
+        f"All workflow runs: https://github.com/igor-aptos/aptos-core/actions/workflows/{DOCKER_RUST_BUILD_WORKFLOW_NAME}"
     )
     # XXX: wait a while for GH API to update
     time.sleep(10)
@@ -225,7 +225,7 @@ def workflow_dispatch_forge(
         return True
     gh_workflow_run_cmd_ret = shell.run(gh_workflow_run_cmd, stream_output=True)
     log.info(
-        f"All workflow runs: https://github.com/aptos-labs/aptos-core/actions/workflows/{FORGE_WORKFLOW_NAME}"
+        f"All workflow runs: https://github.com/igor-aptos/aptos-core/actions/workflows/{FORGE_WORKFLOW_NAME}"
     )
     # XXX: wait a while for GH API to update
     time.sleep(10)
