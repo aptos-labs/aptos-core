@@ -123,6 +123,12 @@ struct Opt {
     #[clap(long, default_value_t = 5)]
     transactions_per_sender: usize,
 
+    /// 0 implies random TX generation; if non-zero, then 'transactions_per_sender is ignored
+    /// 'independent_tx_grps_in_a_block' should be less than 'block_size'
+    /// 'independent_tx_grps_in_a_block' should be less than 'num_main_signer_accounts / 2'
+    #[clap(long, default_value_t = 0)]
+    independent_tx_grps_in_a_block: usize,
+
     #[clap(long)]
     concurrency_level: Option<usize>,
 
@@ -281,6 +287,7 @@ where
                 blocks,
                 transaction_mix,
                 opt.transactions_per_sender,
+                opt.independent_tx_grps_in_a_block,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,

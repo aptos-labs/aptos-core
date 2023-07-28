@@ -1,8 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_sdk::{move_types::account_address::AccountAddress, types::LocalAccount};
-use rand::{rngs::StdRng, RngCore, SeedableRng};
+use aptos_sdk::{
+    move_types::account_address::AccountAddress, transaction_builder::TransactionFactory,
+    types::LocalAccount,
+};
+use aptos_types::transaction::Transaction;
+use rand::{rngs::StdRng, seq::SliceRandom, Rng, RngCore, SeedableRng};
 use std::{collections::VecDeque, sync::mpsc};
 
 type Seed = [u8; 32];
@@ -114,5 +118,54 @@ impl AccountCache {
             .collect();
         let sender = &mut self.accounts[sender_idx];
         (sender, receivers)
+    }
+
+    pub fn get_connected_random_transfers(
+        &mut self,
+        transaction_factory: &TransactionFactory,
+        batch_size: usize,
+        accounts_st_idx: usize,
+        accounts_end_idx: usize,
+    ) -> Vec<Transaction> {
+        let mut unused_indices: Vec<_> = (accounts_st_idx..=accounts_end_idx).collect();
+        unused_indices.shuffle(&mut self.rng);
+        let mut used_indices: Vec<_> =
+            vec![unused_indices.pop().unwrap(), unused_indices.pop().unwrap()];
+        let mut transfer_indices: Vec<(_, _)> = vec![(used_indices[0], used_indices[1])];
+
+        for _ in 1..batch_size {
+            // index1 is always from used_indices, so that all the txns are connected
+            let mut index1 = used_indices[self.rng.gen_range(0, used_indices.len())];
+
+            // index2 is either from used_indices or unused_indices
+            let mut index2;
+            let rnd = self
+                .rng
+                .gen_range(0, used_indices.len() + unused_indices.len());
+            if rnd < used_indices.len() {
+                index2 = used_indices[rnd];
+            } else {
+                // unused_indices is shuffled already, so last element is random
+                index2 = unused_indices.pop().unwrap();
+                used_indices.push(index2);
+            }
+
+            if self.rng.gen_range(0, 2) == 0 {
+                // with 50% probability, swap the indices of sender and receiver
+                (index1, index2) = (index2, index1);
+            }
+            transfer_indices.push((index1, index2));
+        }
+
+        transfer_indices
+            .iter()
+            .map(|transfer_idx| {
+                let receiver = self.accounts[transfer_idx.1].address();
+                let sender = &mut self.accounts[transfer_idx.0];
+                let txn =
+                    sender.sign_with_transaction_builder(transaction_factory.transfer(receiver, 1));
+                Transaction::UserTransaction(txn)
+            })
+            .collect()
     }
 }

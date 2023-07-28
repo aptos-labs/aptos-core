@@ -269,9 +269,15 @@ impl TransactionGenerator {
         block_size: usize,
         num_transfer_blocks: usize,
         transactions_per_sender: usize,
+        independent_tx_grps_in_a_block: usize,
     ) {
         assert!(self.block_sender.is_some());
-        self.gen_transfer_transactions(block_size, num_transfer_blocks, transactions_per_sender);
+        self.gen_transfer_transactions(
+            block_size,
+            num_transfer_blocks,
+            transactions_per_sender,
+            independent_tx_grps_in_a_block,
+        );
     }
 
     pub fn run_workload(
@@ -405,7 +411,7 @@ impl TransactionGenerator {
     }
 
     /// Generates transactions for random pairs of accounts.
-    pub fn gen_transfer_transactions(
+    pub fn gen_random_transfer_transactions(
         &mut self,
         block_size: usize,
         num_blocks: usize,
@@ -438,6 +444,63 @@ impl TransactionGenerator {
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
             }
+        }
+    }
+
+    /// Generates connected groups of transactions for random pairs of accounts.
+    pub fn gen_independent_grps_of_connected_random_transfer_transactions(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        independent_tx_grps_in_a_block: usize,
+    ) {
+        let num_accounts_per_grp = self.main_signer_accounts.as_ref().unwrap().accounts.len()
+            / independent_tx_grps_in_a_block;
+        // TODO: handle when block_size isn't divisible by independent_tx_grps_in_a_block; an easy
+        //       way to do this is to just generate a few more transactions in the last group
+        let num_txns_per_grp = block_size / independent_tx_grps_in_a_block;
+
+        if num_txns_per_grp >= num_accounts_per_grp {
+            panic!("For the desired workload we want num_accounts_per_grp ({}) > num_txns_per_grp ({})", num_accounts_per_grp, num_txns_per_grp);
+        }
+        for _ in 0..num_blocks {
+            let mut transactions: Vec<_> = (0..independent_tx_grps_in_a_block)
+                .flat_map(|grp_idx| {
+                    self.main_signer_accounts
+                        .as_mut()
+                        .unwrap()
+                        .get_connected_random_transfers(
+                            &self.transaction_factory,
+                            num_txns_per_grp,
+                            grp_idx * num_accounts_per_grp,
+                            (grp_idx + 1) * num_accounts_per_grp - 1,
+                        )
+                })
+                .collect();
+            transactions.push(Transaction::StateCheckpoint(HashValue::random()));
+            self.version += transactions.len() as Version;
+
+            if let Some(sender) = &self.block_sender {
+                sender.send(transactions).unwrap();
+            }
+        }
+    }
+
+    pub fn gen_transfer_transactions(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        transactions_per_sender: usize,
+        independent_tx_grps_in_a_block: usize,
+    ) {
+        if independent_tx_grps_in_a_block > 0 {
+            self.gen_independent_grps_of_connected_random_transfer_transactions(
+                block_size,
+                num_blocks,
+                independent_tx_grps_in_a_block,
+            );
+        } else {
+            self.gen_random_transfer_transactions(block_size, num_blocks, transactions_per_sender);
         }
     }
 
