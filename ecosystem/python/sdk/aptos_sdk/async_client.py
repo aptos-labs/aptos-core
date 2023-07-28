@@ -232,6 +232,7 @@ class RestClient:
         self,
         transaction: RawTransaction,
         sender: Account,
+        estimate_gas_usage: bool = False,
     ) -> Dict[str, Any]:
         # Note that simulated transactions are not signed and have all 0 signatures!
         authenticator = Authenticator(
@@ -243,43 +244,19 @@ class RestClient:
         signed_transaction = SignedTransaction(transaction, authenticator)
 
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        params = {}
+        if estimate_gas_usage:
+            params = {
+                "estimate_gas_unit_price": "true",
+                "estimate_max_gas_amount": "true",
+            }
+
         response = await self.client.post(
             f"{self.base_url}/transactions/simulate",
+            params=params,
             headers=headers,
             content=signed_transaction.bytes(),
         )
-        if response.status_code >= 400:
-            raise ApiError(response.text, response.status_code)
-
-        return response.json()
-
-    async def simulate_transaction_with_gas_estimate(
-        self,
-        transaction: RawTransaction,
-        sender: Account,
-    ) -> Dict[str, Any]:
-        authenticator = Authenticator(
-            Ed25519Authenticator(
-                sender.public_key(),
-                ed25519.Signature(b"\x00" * 64),
-            )
-        )
-        signed_transaction = SignedTransaction(transaction, authenticator)
-
-        params = {
-            'estimate_gas_unit_price': "true",
-            'estimate_max_gas_amount': "true",
-        }
-        headers = {
-            "Content-Type": "application/x.aptos.signed_transaction+bcs",
-        }
-        response = await self.client.post(
-            f"{self.base_url}/transactions/simulate",
-            headers=headers,
-            data=signed_transaction.bytes(),
-            params=params,
-        )
-
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
 
