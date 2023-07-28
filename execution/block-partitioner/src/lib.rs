@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod sharded_block_partitioner;
-pub mod omega_partitioner;
+pub mod v2;
 
 pub mod test_utils;
 
@@ -12,7 +12,7 @@ use std::hash::{Hash, Hasher};
 use aptos_types::block_executor::partitioner::{CrossShardDependencies, ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies};
 use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
 use aptos_types::transaction::Transaction;
-use crate::omega_partitioner::OmegaPartitioner;
+use crate::v2::V2Partitioner;
 use crate::sharded_block_partitioner::ShardedBlockPartitioner;
 
 pub trait BlockPartitioner: Send {
@@ -23,7 +23,7 @@ pub trait BlockPartitioner: Send {
 pub fn build_partitioner(maybe_num_shards: Option<usize>) -> Box<dyn BlockPartitioner> {
     match std::env::var("APTOS_BLOCK_PARTITIONER_IMPL").ok() {
         Some(v) if v.to_uppercase().as_str() == "V2" => {
-            Box::new(OmegaPartitioner::new())
+            Box::new(V2Partitioner::new())
         }
         _ => {
             Box::new(ShardedBlockPartitioner::new(maybe_num_shards.unwrap()))

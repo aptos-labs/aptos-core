@@ -16,8 +16,8 @@ use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, Storag
 use aptos_types::transaction::Transaction;
 use move_core_types::account_address::AccountAddress;
 use crate::{BlockPartitioner, get_anchor_shard_id};
-use crate::omega_partitioner::counters::OMEGA_PARTITIONER_MISC_TIMERS_SECONDS;
-use crate::omega_partitioner::storage_location_helper::StorageLocationHelper;
+use crate::v2::counters::MISC_TIMERS_SECONDS;
+use crate::v2::storage_location_helper::StorageLocationHelper;
 use rayon::iter::ParallelIterator;
 use aptos_crypto::hash::{CryptoHash, TestOnlyHash};
 use aptos_crypto::HashValue;
@@ -51,19 +51,19 @@ impl TxnFatId {
 mod counters;
 mod storage_location_helper;
 
-pub struct OmegaPartitioner {
+pub struct V2Partitioner {
     thread_pool: ThreadPool,
     num_rounds_limit: usize,
     avoid_pct: u64,
     dashmap_num_shards: usize,
 }
 
-impl OmegaPartitioner {
+impl V2Partitioner {
     pub fn new() -> Self {
-        let num_threads = std::env::var("OMEGA_PARTITIONER__NUM_THREADS").ok().map(|s|s.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
-        let num_rounds_limit: usize = std::env::var("OMEGA_PARTITIONER__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
-        let avoid_pct: u64 = std::env::var("OMEGA_PARTITIONER__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<u64>().ok().unwrap_or(10)).unwrap_or(10);
-        let dashmap_num_shards = std::env::var("OMEGA_PARTITIONER__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
+        let num_threads = std::env::var("APTOS_BLOCK_PARTITIONER_V2__NUM_THREADS").ok().map(|s|s.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
+        let num_rounds_limit: usize = std::env::var("APTOS_BLOCK_PARTITIONER_V2__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
+        let avoid_pct: u64 = std::env::var("APTOS_BLOCK_PARTITIONER_V2__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<u64>().ok().unwrap_or(10)).unwrap_or(10);
+        let dashmap_num_shards = std::env::var("APTOS_BLOCK_PARTITIONER_V2__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
         info!("Creating OmegaPartitioner with num_threads={}, num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}", num_threads, num_rounds_limit, avoid_pct, dashmap_num_shards);
         Self {
             thread_pool: ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap(),
@@ -82,7 +82,7 @@ impl OmegaPartitioner {
         start_txn_id_by_shard_id: &Vec<usize>,
         txn_id_vecs: Vec<Vec<usize>>,
     ) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__init").as_str()]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__init").as_str()]).start_timer();
         let num_shards = txn_id_vecs.len();
         let mut discarded: Vec<RwLock<Vec<usize>>> = Vec::with_capacity(num_shards);
         let mut potentially_accepted: Vec<RwLock<Vec<usize>>> = Vec::with_capacity(num_shards);
@@ -98,7 +98,7 @@ impl OmegaPartitioner {
         let duration = timer.stop_and_record();
         println!("round_{}__init={}", round_id, duration);
 
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_key").as_str()]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_key").as_str()]).start_timer();
         self.thread_pool.install(|| {
             shard_id_and_txn_id_vec_pairs.into_par_iter().for_each(|(my_shard_id, txn_ids)| {
                 txn_ids.into_par_iter().for_each(|txn_id| {
@@ -121,7 +121,7 @@ impl OmegaPartitioner {
         let duration = timer.stop_and_record();
         println!("round_{}__discard_by_key={}", round_id, duration);
 
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_sender").as_str()]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_sender").as_str()]).start_timer();
         self.thread_pool.install(||{
             (0..num_shards).into_par_iter().for_each(|shard_id|{
                 potentially_accepted[shard_id].read().unwrap().par_iter().for_each(|&txn_id|{
@@ -141,7 +141,7 @@ impl OmegaPartitioner {
         let duration = timer.stop_and_record();
         println!("round_{}__discard_by_sender={}", round_id, duration);
 
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__return_obj").as_str()]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__return_obj").as_str()]).start_timer();
         let ret = (extract_and_sort(finally_accepted), extract_and_sort(discarded));
         let duration = timer.stop_and_record();
         println!("round_{}__return_obj={}", round_id, duration);
@@ -162,7 +162,7 @@ impl OmegaPartitioner {
         txn_id_matrix: &Vec<Vec<Vec<usize>>>,
         helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
     ) -> Vec<SubBlocksForShard<AnalyzedTransaction>>{
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_edges__init"]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges__init"]).start_timer();
 
         let num_txns = txns.len();
         let num_rounds = txn_id_matrix.len();
@@ -195,7 +195,7 @@ impl OmegaPartitioner {
         let duration = timer.stop_and_record();
         println!("add_edges__init={duration}");
 
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_edges__main"]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges__main"]).start_timer();
         self.thread_pool.install(||{
             (0..num_rounds).into_par_iter().for_each(|round_id| {
                 (0..num_shards).into_par_iter().for_each(|shard_id| {
@@ -250,7 +250,7 @@ impl OmegaPartitioner {
         let duration = timer.stop_and_record();
         println!("add_edges__main={duration}");
 
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_edges__return_obj"]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges__return_obj"]).start_timer();
         let ret: Vec<SubBlocksForShard<AnalyzedTransaction>> = (0..num_shards).map(|shard_id|{
             let sub_blocks: Vec<SubBlock<AnalyzedTransaction>> = (0..num_rounds).map(|round_id|{
                 sub_block_matrix[round_id][shard_id].lock().unwrap().take().unwrap()
@@ -268,9 +268,9 @@ impl OmegaPartitioner {
     }
 }
 
-impl BlockPartitioner for OmegaPartitioner {
+impl BlockPartitioner for V2Partitioner {
     fn partition(&self, txns: Vec<AnalyzedTransaction>, num_executor_shards: usize) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
         let num_txns = txns.len();
         let mut num_senders = AtomicUsize::new(0);
         let mut num_keys = AtomicUsize::new(0);
@@ -322,7 +322,7 @@ impl BlockPartitioner for OmegaPartitioner {
         let duration = timer.stop_and_record();
         println!("preprocess={duration}");
 
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["pre_partition_uniform"]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["pre_partition_uniform"]).start_timer();
         let mut remaining_txn_ids = uniform_partition(num_txns, num_executor_shards);
         let mut start_txn_ids_by_shard_id = vec![0; num_executor_shards];
         for shard_id in 1..num_executor_shards {
@@ -334,7 +334,7 @@ impl BlockPartitioner for OmegaPartitioner {
         let mut txn_id_matrix: Vec<Vec<Vec<usize>>> = Vec::new();
         let mut num_remaining_txns = usize::MAX;
         for round_id in 0..(self.num_rounds_limit - 1) {
-            let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
+            let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
             let (accepted, discarded) = self.discarding_round(round_id, &rsets_by_txn_id, &wsets_by_txn_id, &sender_ids_by_txn_id, &helpers_by_key_id, &start_txn_ids_by_shard_id, remaining_txn_ids);
             txn_id_matrix.push(accepted);
             remaining_txn_ids = discarded;
@@ -348,7 +348,7 @@ impl BlockPartitioner for OmegaPartitioner {
         }
 
         if num_remaining_txns >= 1 {
-            let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["last_round"]).start_timer();
+            let timer = MISC_TIMERS_SECONDS.with_label_values(&["last_round"]).start_timer();
             let last_round_txns: Vec<usize> = remaining_txn_ids.into_iter().flatten().collect();
             last_round_txns.par_iter().for_each(|txn_id_ref|{
                 let txn_id = *txn_id_ref;
@@ -365,7 +365,7 @@ impl BlockPartitioner for OmegaPartitioner {
             let duration = timer.stop_and_record();
             println!("last_round={duration}");
         }
-        let timer = OMEGA_PARTITIONER_MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
         let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|(_tid, t)|Mutex::new(Some(t))).collect();
         let ret = self.add_edges(&txns, &storage_locations, &rsets_by_txn_id,&wsets_by_txn_id, &txn_id_matrix, &helpers_by_key_id);
         let duration = timer.stop_and_record();
@@ -384,7 +384,7 @@ impl BlockPartitioner for OmegaPartitioner {
 #[test]
 fn test_omega_partitioner() {
     let block_generator = P2pBlockGenerator::new(100);
-    let partitioner = OmegaPartitioner::new();
+    let partitioner = V2Partitioner::new();
     let mut rng = thread_rng();
     for run_id in 0..100 {
         let block_size = 10_u64.pow(rng.gen_range(0, 4)) as usize;

@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::omega_partitioner::TxnFatId;
+use crate::v2::TxnFatId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::collections::btree_set::BTreeSet;
