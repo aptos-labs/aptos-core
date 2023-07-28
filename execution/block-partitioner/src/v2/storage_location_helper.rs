@@ -6,10 +6,12 @@ use std::collections::HashSet;
 use std::collections::btree_set::BTreeSet;
 use std::fmt::{Display, Formatter};
 use itertools::Itertools;
+use aptos_types::transaction::analyzed_transaction::StorageLocation;
 
 /// This structure holds IDs of txns who will access a certain state key.
-#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StorageLocationHelper {
+    pub storage_location: StorageLocation,
     pub anchor_shard_id: usize,
     reads: BTreeSet<usize>,//Content are old txn ids.
     writes: BTreeSet<usize>,//Content are old txn ids.
@@ -19,8 +21,9 @@ pub struct StorageLocationHelper {
 }
 
 impl StorageLocationHelper {
-    pub fn new(anchor_shard_id: usize) -> Self {
+    pub fn new(storage_location: StorageLocation, anchor_shard_id: usize) -> Self {
         Self {
+            storage_location,
             anchor_shard_id,
             reads: Default::default(),
             writes: Default::default(),

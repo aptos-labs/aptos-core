@@ -156,7 +156,6 @@ impl V2Partitioner {
     fn add_edges(
         &self,
         txns: &Vec<Mutex<Option<AnalyzedTransaction>>>,
-        storage_locations: &Vec<Option<StorageLocation>>,
         rsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
         wsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
         txn_id_matrix: &Vec<Vec<Vec<usize>>>,
@@ -214,7 +213,7 @@ impl V2Partitioner {
                                     shard_id: fat_id.shard_id,
                                     round_id: fat_id.round_id,
                                 };
-                                deps.add_required_edge(src_txn_idx_fat, storage_locations[loc_id].as_ref().unwrap().clone());
+                                deps.add_required_edge(src_txn_idx_fat, helper.storage_location.clone());
                             }
                         }
                         for &loc_id in wsets_by_txn_id[txn_id].read().unwrap().iter() {
@@ -232,7 +231,7 @@ impl V2Partitioner {
                                         shard_id: follower_id.shard_id,
                                         round_id: follower_id.round_id,
                                     };
-                                    deps.add_dependent_edge(dst_txn_idx_fat, vec![storage_locations[loc_id].as_ref().unwrap().clone()]);
+                                    deps.add_dependent_edge(dst_txn_idx_fat, vec![helper.storage_location.clone()]);
                                     if helper.writer_set.contains(&follower_id.old_txn_idx) {
                                         end_id = TxnFatId::new(follower_id.round_id, follower_id.shard_id + 1, 0);
                                     }
@@ -291,7 +290,7 @@ impl BlockPartitioner for V2Partitioner {
         println!("preprocess__rw={duration}");
         let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__main"]).start_timer();
         self.thread_pool.install(||{
-            (0..num_txns).into_par_iter().for_each(|(txn_id)| {
+            (0..num_txns).into_par_iter().for_each(|txn_id| {
                 let txn = &txns[txn_id];
                 let sender = txn.sender();
                 let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
@@ -312,7 +311,7 @@ impl BlockPartitioner for V2Partitioner {
                     }
                     helpers_by_key_id.entry(key_id).or_insert_with(|| {
                         let anchor_shard_id = get_anchor_shard_id(storage_location, num_executor_shards);
-                        RwLock::new(StorageLocationHelper::new(anchor_shard_id))
+                        RwLock::new(StorageLocationHelper::new(storage_location.clone(), anchor_shard_id))
                     }).write().unwrap().add_candidate(txn_id, is_write);
 
                 }
@@ -320,16 +319,6 @@ impl BlockPartitioner for V2Partitioner {
         });
         let duration = timer_1.stop_and_record();
         println!("preprocess__main={duration}");
-
-        let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__locs"]).start_timer();
-        let num_keys = num_keys.load(Ordering::SeqCst);
-        let mut storage_locations: Vec<Option<StorageLocation>> = vec![None; num_keys];
-        for (key, key_id) in key_ids_by_key {
-            storage_locations[key_id] = Some(StorageLocation::Specific(key))
-        }
-        let duration = timer_1.stop_and_record();
-        println!("preprocess__locs={duration}");
-        let duration = timer.stop_and_record();
         println!("preprocess={duration}");
 
 
@@ -382,7 +371,7 @@ impl BlockPartitioner for V2Partitioner {
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
         let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|t|Mutex::new(Some(t))).collect();
-        let ret = self.add_edges(&txns, &storage_locations, &rsets_by_txn_id,&wsets_by_txn_id, &txn_id_matrix, &helpers_by_key_id);
+        let ret = self.add_edges(&txns, &rsets_by_txn_id,&wsets_by_txn_id, &txn_id_matrix, &helpers_by_key_id);
         let duration = timer.stop_and_record();
         println!("add_edges={duration}");
         self.thread_pool.spawn(move||{
@@ -393,7 +382,6 @@ impl BlockPartitioner for V2Partitioner {
             drop(start_txn_ids_by_shard_id);
             drop(txn_id_matrix);
             drop(txns);
-            drop(storage_locations);
         });
         ret
     }
