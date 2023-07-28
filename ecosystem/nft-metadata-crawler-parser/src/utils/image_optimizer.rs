@@ -53,7 +53,7 @@ impl ImageOptimizer {
                         let img = image::load_from_memory(&img_bytes)
                             .context("Failed to load image from memory")?;
                         let resized_image = resize(&img.to_rgb8(), 400, 400, FilterType::Gaussian);
-                        Ok((Self::to_bytes(resized_image)?, format))
+                        Ok((Self::to_json_bytes(resized_image)?, format))
                     },
                 }
             }
@@ -75,7 +75,7 @@ impl ImageOptimizer {
     }
 
     /// Converts image to JPEG bytes vector
-    fn to_bytes(image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    fn to_json_bytes(image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>) -> anyhow::Result<Vec<u8>> {
         let dynamic_image = DynamicImage::ImageRgb8(image_buffer);
         let mut byte_store = Cursor::new(Vec::new());
         match dynamic_image.write_to(&mut byte_store, ImageOutputFormat::Jpeg(50)) {
