@@ -75,7 +75,9 @@ impl ImageOptimizer {
     }
 
     /// Converts image to JPEG bytes vector
-    fn to_json_bytes(image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    fn to_json_bytes(
+        image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>,
+    ) -> anyhow::Result<Vec<u8>> {
         let dynamic_image = DynamicImage::ImageRgb8(image_buffer);
         let mut byte_store = Cursor::new(Vec::new());
         match dynamic_image.write_to(&mut byte_store, ImageOutputFormat::Jpeg(50)) {
