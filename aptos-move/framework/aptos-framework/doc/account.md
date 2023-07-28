@@ -2148,6 +2148,21 @@ The Account does not exist under the new address before creating the account.
 
 
 
+
+<a name="0x1_account_CreateAccountAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {
+    addr: <b>address</b>;
+    <b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(addr);
+    <b>aborts_if</b> len(authentication_key) != 32;
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+    <b>ensures</b> len(authentication_key) == 32;
+}
+</code></pre>
+
+
+
 <a name="@Specification_1_get_guid_next_creation_num"></a>
 
 ### Function `get_guid_next_creation_num`
