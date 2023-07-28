@@ -263,6 +263,7 @@ impl V2Partitioner {
         self.thread_pool.spawn(move||{
             drop(sub_block_matrix);
             drop(start_index_matrix);
+            drop(new_indices);
         });
         ret
     }
@@ -288,10 +289,6 @@ impl BlockPartitioner for V2Partitioner {
         }
         let duration = timer_1.stop_and_record();
         println!("preprocess__rw={duration}");
-        // let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__txns"]).start_timer();
-        // let txns: Vec<(usize, AnalyzedTransaction)> = txns.into_par_iter().collect();
-        // let duration = timer_1.stop_and_record();
-        println!("preprocess__txns={duration}");
         let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__main"]).start_timer();
         self.thread_pool.install(||{
             (0..num_txns).into_par_iter().for_each(|(txn_id)| {
