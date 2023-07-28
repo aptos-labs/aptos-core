@@ -314,13 +314,17 @@ impl BlockPartitioner for V2Partitioner {
                 }
             });
         });
+        let duration = timer.stop_and_record();
+        println!("preprocess={duration}");
+
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["storage_locations"]).start_timer();
         let num_keys = num_keys.load(Ordering::SeqCst);
         let mut storage_locations: Vec<Option<StorageLocation>> = vec![None; num_keys];
         for (key, key_id) in key_ids_by_key {
             storage_locations[key_id] = Some(StorageLocation::Specific(key))
         }
         let duration = timer.stop_and_record();
-        println!("preprocess={duration}");
+        println!("storage_locations={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["pre_partition_uniform"]).start_timer();
         let mut remaining_txn_ids = uniform_partition(num_txns, num_executor_shards);
