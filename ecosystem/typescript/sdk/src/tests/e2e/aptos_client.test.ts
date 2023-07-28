@@ -16,6 +16,7 @@ import { bcsSerializeUint64, bcsToBytes } from "../../bcs";
 import { AccountAddress, Ed25519PublicKey, stringStructTag, TypeTagStruct } from "../../aptos_types";
 import { Provider } from "../../providers";
 import { BCS } from "../..";
+import { WriteSetChange_WriteResource } from "../../generated/index";
 
 const account = "0x1::account::Account";
 
@@ -46,6 +47,29 @@ test("gets genesis resources", async () => {
   const resources = await client.getAccountResources("0x1");
   const accountResource = resources.find((r) => r.type === account);
   expect(accountResource).toBeDefined();
+});
+
+test("gets object", async () => {
+  const alice = new AptosAccount();
+  const faucetClient = getFaucetClient();
+  await faucetClient.fundAccount(alice.address(), 100000000);
+
+  const provider = new Provider({
+    fullnodeUrl: NODE_URL,
+    indexerUrl: NODE_URL,
+  });
+  const aptosToken = new AptosToken(provider);
+
+  const txn = await provider.waitForTransactionWithResult(
+    await aptosToken.createCollection(alice, "Alice's simple collection", "AliceCollection", "https://aptos.dev"),
+    { checkSuccess: true },
+  );
+  const objectAddress = ((txn as Gen.UserTransaction).changes[0] as WriteSetChange_WriteResource).address; // should be the new object address
+
+  const object = await provider.getAccountResource(objectAddress, "0x4::aptos_token::AptosCollection");
+
+  expect(object.type).toBeDefined();
+  expect(object.data).toBeDefined();
 });
 
 test("gets the Account resource", async () => {
