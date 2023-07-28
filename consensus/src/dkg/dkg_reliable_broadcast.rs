@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_logger::error;
-use aptos_types::epoch_state::EpochState;
-use std::sync::Arc;
 use thiserror::Error as ThisError;
 
-use super::{types::{DKGNodeAck, DKGAggNode, DKGAggNodeAck}, dkg_network::DKGRpcHandler, dkg_store::DKGStore, DKGNode, dkg_manager::DKGManager};
+use super::{types::{DKGNodeAck, DKGAggNode, DKGAggNodeAck}, dkg_network::DKGRpcHandler, DKGNode, dkg_manager::DKGManager};
 
 #[derive(ThisError, Debug)]
 pub enum DKGNodeHandleError {
@@ -15,20 +13,14 @@ pub enum DKGNodeHandleError {
 }
 
 pub struct DKGNodeHandler {
-    dkg_store: Arc<DKGStore>,
-    epoch_state: Arc<EpochState>,
     dkg_manager: DKGManager,
 }
 
 impl DKGNodeHandler {
     pub fn new(
-        dkg_store: Arc<DKGStore>,
-        epoch_state: Arc<EpochState>,
         dkg_manager: DKGManager,
     ) -> Self {
         Self {
-            dkg_store,
-            epoch_state,
             dkg_manager,
         }
     }
@@ -41,7 +33,7 @@ impl DKGRpcHandler for DKGNodeHandler {
     fn process(&mut self, node: Self::DKGRequest) -> anyhow::Result<Self::DKGResponse> {
         let epoch = node.epoch();
         // dkg todo: persist the dkg nodes
-        self.dkg_store.add_node(node, &self.epoch_state.verifier, self.dkg_manager.clone())?;
+        self.dkg_manager.add_node(node);
         Ok(DKGNodeAck::new(epoch))
     }
 }
@@ -53,16 +45,12 @@ pub enum DKGAggNodeHandleError {
 }
 
 pub struct DKGAggNodeHandler {
-    dkg_store: Arc<DKGStore>,
-    epoch_state: Arc<EpochState>,
     dkg_manager: DKGManager,
 }
 
 impl DKGAggNodeHandler {
-    pub fn new(dkg_store: Arc<DKGStore>, epoch_state: Arc<EpochState>, dkg_manager: DKGManager) -> Self {
+    pub fn new(dkg_manager: DKGManager) -> Self {
         Self {
-            dkg_store,
-            epoch_state,
             dkg_manager,
         }
     }
@@ -74,7 +62,7 @@ impl DKGRpcHandler for DKGAggNodeHandler {
 
     fn process(&mut self, agg_node: Self::DKGRequest) -> anyhow::Result<Self::DKGResponse> {
         let epoch = agg_node.epoch();
-        self.dkg_store.add_agg_nodes(agg_node, &self.epoch_state.verifier, self.dkg_manager.clone())?;
+        self.dkg_manager.add_agg_node(agg_node);
         Ok(DKGAggNodeAck::new(epoch))
     }
 }

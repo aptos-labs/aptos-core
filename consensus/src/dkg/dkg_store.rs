@@ -6,7 +6,7 @@ use aptos_types::validator_verifier::ValidatorVerifier;
 use dashmap::DashMap;
 use tokio::sync::OnceCell;
 
-use super::{DKGNode, types::{DKGAggNode, TDKGMessage}, dkg_manager::DKGManager};
+use super::{DKGNode, types::{DKGAggNode, TDKGMessage}};
 
 #[derive(Clone)]
 pub struct DKGStore {
@@ -24,7 +24,10 @@ impl DKGStore {
         }
     }
 
-    pub fn add_node(&self, node: DKGNode, validator_verifier: &ValidatorVerifier, dkg_manager: DKGManager) -> anyhow::Result<Option<DKGAggNode>> {
+    pub fn add_node(&self, node: DKGNode, validator_verifier: &ValidatorVerifier) -> anyhow::Result<Option<DKGAggNode>> {
+        if self.agg_node.get().is_some() {
+            return Ok(None);
+        }
         let author = node.author();
         if self.nodes.contains_key(node.author()) {
             return Err(anyhow::anyhow!("[DKG] Author {:?} sends multiple DKG nodes!", author));
@@ -37,8 +40,6 @@ impl DKGStore {
                 // dkg todo: aggregate the transcripts and produced aggregated node
                 let node = self.nodes.iter().next().unwrap().clone();
                 let agg_node = DKGAggNode::new(node.epoch(), *node.author(), node.transcript().clone());
-                self.add_agg_nodes(agg_node.clone(), validator_verifier, dkg_manager)?;
-
                 return Ok(Some(agg_node));
             }
             return Ok(None);
@@ -46,16 +47,16 @@ impl DKGStore {
         return Err(anyhow::anyhow!("[DKG] Author {:?} sends invalid DKG node!\n node: {:?} \n", node.author(), node));
     }
 
-    pub fn add_agg_nodes(&self, agg_node: DKGAggNode, validator_verifier: &ValidatorVerifier, dkg_manager: DKGManager) -> anyhow::Result<()> {
+    pub fn add_agg_node(&self, agg_node: DKGAggNode, validator_verifier: &ValidatorVerifier) -> anyhow::Result<Option<DKGAggNode>> {
         if self.agg_node.get().is_some() {
-            return Ok(());
+            return Ok(None);
         }
         if agg_node.verify(validator_verifier).is_ok() {
             if self.agg_node.set(agg_node.clone()).is_ok() {
                 // Broadcast the first aggregated dkg node
-                dkg_manager.broadcast_agg_node(agg_node);
+                return Ok(Some(agg_node));
             }
-            return Ok(());
+            return Ok(None);
         } else {
             return Err(anyhow::anyhow!("[DKG] Author {:?} sends invalid aggregated DKG node!\n node: {:?} \n", agg_node.author(), agg_node));
         }

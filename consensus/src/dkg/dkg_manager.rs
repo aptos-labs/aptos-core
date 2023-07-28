@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{collections::HashMap, sync::Arc, thread, time::Duration};
-use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_types::epoch_state::EpochState;
@@ -11,7 +10,7 @@ use futures::future::{AbortHandle, Abortable};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_logger::error;
 
-use super::types::{DKGAggNode, DKGNodeAckState, DKGAggNodeAckState, DKGMessage};
+use super::{types::{DKGAggNode, DKGNodeAckState, DKGAggNodeAckState, DKGMessage}, dkg_store::DKGStore};
 
 // the transcript size is 3.25MB
 const TRANSCRIPT_SIZE: usize = 3_250_000;
@@ -23,11 +22,6 @@ const TRANSCRIPT_AGGREGATE_TIME_MS: u64 = 21;
 #[derive(Debug)]
 pub struct StakeDis {
     pub distribution: HashMap<Author, u64>,
-}
-
-#[derive(Debug)]
-pub enum DKGManagerMessage {
-    DKGReady(DKGAggNode),
 }
 
 pub enum DKGManagerWrapper {
@@ -52,21 +46,19 @@ impl DKGManagerWrapper {
 pub struct DKGManager {
     author: Author,
     epoch_state: Arc<EpochState>,
-    // dkg todo: send the aggregated dkg node to proposal generator
-    // Channel to send the aggregated dkg node to proposal generator
-    proposal_tx: aptos_channel::Sender<Author, DKGManagerMessage>,
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>,
     rb_abort_handle: Arc<Mutex<Option<AbortHandle>>>,
+    dkg_store: Arc<DKGStore>,
 }
 
 impl DKGManager {
-    pub fn new(author: Author, epoch_state: Arc<EpochState>, proposal_tx: aptos_channel::Sender<Author, DKGManagerMessage>, reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>) -> Self {
+    pub fn new(author: Author, epoch_state: Arc<EpochState>, reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>) -> Self {
         Self {
             author,
             epoch_state,
-            proposal_tx,
             reliable_broadcast,
             rb_abort_handle: Arc::new(Mutex::new(None)),
+            dkg_store: Arc::new(DKGStore::new()),
         }
     }
 
@@ -103,5 +95,31 @@ impl DKGManager {
             prev_handle.abort();
         }
         // dkg todo: abort the broadcast when DKG is done
+    }
+
+    pub fn add_node(&self, node: DKGNode) {
+        match self.dkg_store.add_node(node, &self.epoch_state.verifier) {
+            Ok(agg_node) => {
+                if let Some(agg_node) = agg_node {
+                    self.add_agg_node(agg_node);
+                }
+            }
+            Err(e) => {
+                error!("[DKG] Failed to add DKG node: {:?}", e);
+            }
+        }
+    }
+
+    pub fn add_agg_node(&self, agg_node: DKGAggNode) {
+        match self.dkg_store.add_agg_node(agg_node, &self.epoch_state.verifier) {
+            Ok(agg_node) => {
+                if let Some(agg_node) = agg_node {
+                    self.broadcast_agg_node(agg_node);
+                }
+            }
+            Err(e) => {
+                error!("[DKG] Failed to add DKG aggregated node: {:?}", e);
+            }
+        }
     }
 }

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use crate::network::{IncomingDKGRequest, TConsensusMsg};
 
-use super::{dkg_reliable_broadcast::{DKGNodeHandler, DKGAggNodeHandler}, dkg_store::DKGStore, types::{DKGMessage, TDKGMessage}, dkg_network::DKGRpcHandler, dkg_manager::DKGManager};
+use super::{dkg_reliable_broadcast::{DKGNodeHandler, DKGAggNodeHandler}, types::{DKGMessage, TDKGMessage}, dkg_network::DKGRpcHandler, dkg_manager::DKGManager};
 
 pub struct DKGNetworkHandler {
     author: Author,
@@ -29,19 +29,13 @@ impl DKGNetworkHandler {
         epoch_state: Arc<EpochState>,
         dkg_manager: DKGManager,
     ) -> Self {
-        let dkg_store = Arc::new(DKGStore::new());
-
         Self {
             author,
             dkg_rpc_rx,
             node_receiver: DKGNodeHandler::new(
-                dkg_store.clone(),
-                epoch_state.clone(),
                 dkg_manager.clone(),
             ),
             agg_node_receiver: DKGAggNodeHandler::new(
-                dkg_store.clone(),
-                epoch_state.clone(),
                 dkg_manager.clone(),
             ),
             epoch_state: epoch_state.clone(),
