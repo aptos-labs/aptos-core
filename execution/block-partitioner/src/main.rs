@@ -23,6 +23,7 @@ struct Args {
 }
 
 fn main() {
+    aptos_logger::Logger::new().init();
     println!("Starting the block partitioning benchmark");
     let args = Args::parse();
     let num_accounts = args.num_accounts;
