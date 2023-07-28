@@ -6,12 +6,12 @@
 mod counters;
 mod tests;
 mod utils;
-mod wrappers;
+mod testsetups;
 
 use crate::{
     utils::{set_metrics, NetworkName, TestFailure, TestName, TestResult},
-    wrappers::{
-        wrapper_cointransfer, wrapper_newaccount, wrapper_nfttransfer, wrapper_publishmodule,
+    testsetups::{
+        setup_and_run_cointransfer, setup_and_run_newaccount, setup_and_run_nfttransfer, setup_and_run_publishmodule,
     },
 };
 use anyhow::Result;
@@ -70,7 +70,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
             TestName::NewAccount,
             network_name,
             &test_time,
-            wrapper_newaccount(network_name),
+            setup_and_run_newaccount(network_name),
         )
         .await;
     });
@@ -82,7 +82,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
             TestName::CoinTransfer,
             network_name,
             &test_time,
-            wrapper_cointransfer(network_name),
+            setup_and_run_cointransfer(network_name),
         )
         .await;
     });
@@ -94,7 +94,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
             TestName::NftTransfer,
             network_name,
             &test_time,
-            wrapper_nfttransfer(network_name),
+            setup_and_run_nfttransfer(network_name),
         )
         .await;
     });
@@ -105,7 +105,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
         TestName::PublishModule,
         network_name,
         &test_time,
-        wrapper_publishmodule(network_name),
+        setup_and_run_publishmodule(network_name),
     )
     .await;
 

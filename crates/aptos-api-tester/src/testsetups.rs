@@ -10,7 +10,7 @@ use crate::{
 use anyhow::Result;
 use aptos_sdk::{coin_client::CoinClient, token_client::TokenClient};
 
-pub async fn wrapper_newaccount(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn setup_and_run_newaccount(network_name: NetworkName) -> Result<(), TestFailure> {
     // spin up clients
     let client = get_client(network_name);
     let faucet_client = get_faucet_client(network_name);
@@ -22,7 +22,7 @@ pub async fn wrapper_newaccount(network_name: NetworkName) -> Result<(), TestFai
     test_newaccount(&client, &account, 100_000_000).await
 }
 
-pub async fn wrapper_cointransfer(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn setup_and_run_cointransfer(network_name: NetworkName) -> Result<(), TestFailure> {
     // spin up clients
     let client = get_client(network_name);
     let faucet_client = get_faucet_client(network_name);
@@ -43,7 +43,7 @@ pub async fn wrapper_cointransfer(network_name: NetworkName) -> Result<(), TestF
     .await
 }
 
-pub async fn wrapper_nfttransfer(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn setup_and_run_nfttransfer(network_name: NetworkName) -> Result<(), TestFailure> {
     // spin up clients
     let client = get_client(network_name);
     let faucet_client = get_faucet_client(network_name);
@@ -57,7 +57,7 @@ pub async fn wrapper_nfttransfer(network_name: NetworkName) -> Result<(), TestFa
     test_nfttransfer(&client, &token_client, &mut account, &mut receiver).await
 }
 
-pub async fn wrapper_publishmodule(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn setup_and_run_publishmodule(network_name: NetworkName) -> Result<(), TestFailure> {
     // spin up clients
     let client = get_client(network_name);
     let faucet_client = get_faucet_client(network_name);
