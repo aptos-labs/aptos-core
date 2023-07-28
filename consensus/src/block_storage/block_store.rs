@@ -217,6 +217,7 @@ impl BlockStore {
             vec![],                   /* compute_status */
             vec![],                   /* txn_infos */
             vec![],                   /* reconfig_events */
+            vec![],                   /* dkg_events */
         );
 
         let executed_root_block = ExecutedBlock::new(

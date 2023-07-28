@@ -12,11 +12,17 @@ use std::ops::Deref;
 pub struct ParsedTransactionOutput {
     output: TransactionOutput,
     reconfig_events: Vec<ContractEvent>,
+    dkg_events: Vec<ContractEvent>,
 }
 
 impl ParsedTransactionOutput {
     pub fn parse_reconfig_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
         events.iter().filter(|e| *e.key() == *NEW_EPOCH_EVENT_KEY)
+    }
+
+    pub fn parse_dkg_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
+        // dkg todo: using the new epoch event key for now, need to register for dkg event
+        events.iter().filter(|e: &&ContractEvent| *e.key() == *NEW_EPOCH_EVENT_KEY)
     }
 }
 
@@ -25,9 +31,13 @@ impl From<TransactionOutput> for ParsedTransactionOutput {
         let reconfig_events = Self::parse_reconfig_events(output.events())
             .cloned()
             .collect();
+        let dkg_events = Self::parse_dkg_events(output.events())
+            .cloned()
+            .collect();
         Self {
             output,
             reconfig_events,
+            dkg_events,
         }
     }
 }
@@ -51,15 +61,17 @@ impl ParsedTransactionOutput {
         WriteSet,
         Vec<ContractEvent>,
         Vec<ContractEvent>,
+        Vec<ContractEvent>,
         u64,
         TransactionStatus,
     ) {
         let Self {
             output,
             reconfig_events,
+            dkg_events,
         } = self;
         let (write_set, events, gas_used, status) = output.unpack();
 
-        (write_set, events, reconfig_events, gas_used, status)
+        (write_set, events, reconfig_events, dkg_events, gas_used, status)
     }
 }

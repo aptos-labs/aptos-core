@@ -818,6 +818,7 @@ impl EpochManager {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
+        // dkg todo: the new epoch validators read and decrypt their private keys from DKG
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");

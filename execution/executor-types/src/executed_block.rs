@@ -24,6 +24,7 @@ pub struct ExecutedBlock {
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
     pub reconfig_events: Vec<ContractEvent>,
+    pub dkg_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
     pub block_state_updates: ShardedStateUpdates,
     pub sharded_state_cache: ShardedStateCache,
@@ -86,6 +87,7 @@ impl ExecutedBlock {
             self.status.clone(),
             self.transaction_info_hashes.clone(),
             self.reconfig_events.clone(),
+            self.dkg_events.clone(),
         )
     }
 }

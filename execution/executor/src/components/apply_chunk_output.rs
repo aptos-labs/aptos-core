@@ -90,7 +90,7 @@ impl ApplyChunkOutput {
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
             .with_label_values(&["assemble_ledger_diff_for_block"])
             .start_timer();
-        let (to_commit, transaction_info_hashes, reconfig_events) =
+        let (to_commit, transaction_info_hashes, reconfig_events, dkg_events) =
             Self::assemble_ledger_diff_for_block(
                 to_keep,
                 state_updates_vec,
@@ -108,6 +108,7 @@ impl ApplyChunkOutput {
                 result_view,
                 next_epoch_state,
                 reconfig_events,
+                dkg_events,
                 transaction_info_hashes,
                 block_state_updates,
                 sharded_state_cache,
@@ -304,7 +305,7 @@ impl ApplyChunkOutput {
             state_updates_vec,
             hashes_vec
         ) {
-            let (write_set, events, reconfig_events, gas_used, status) = txn_output.unpack();
+            let (write_set, events, reconfig_events, _dkg_events, gas_used, status) = txn_output.unpack();
             let event_tree =
                 InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes);
 
@@ -347,6 +348,7 @@ impl ApplyChunkOutput {
         Vec<Arc<TransactionToCommit>>,
         Vec<HashValue>,
         Vec<ContractEvent>,
+        Vec<ContractEvent>,
     ) {
         // these are guaranteed by caller side logic
         assert_eq!(to_keep.len(), state_updates_vec.len());
@@ -368,6 +370,7 @@ impl ApplyChunkOutput {
             .collect();
 
         let mut all_reconfig_events = Vec::new();
+        let mut all_dkg_events = Vec::new();
         for (
             (txn, txn_output),
             state_checkpoint_hash,
@@ -379,7 +382,7 @@ impl ApplyChunkOutput {
             state_updates_vec,
             hashes_vec
         ) {
-            let (write_set, events, per_txn_reconfig_events, gas_used, status) =
+            let (write_set, events, per_txn_reconfig_events, per_txn_dkg_events, gas_used, status) =
                 txn_output.unpack();
 
             let txn_info = match &status {
@@ -404,9 +407,10 @@ impl ApplyChunkOutput {
                 !per_txn_reconfig_events.is_empty(),
             );
             all_reconfig_events.extend(per_txn_reconfig_events);
+            all_dkg_events.extend(per_txn_dkg_events);
             to_commit.push(Arc::new(txn_to_commit));
         }
-        (to_commit, txn_info_hashes, all_reconfig_events)
+        (to_commit, txn_info_hashes, all_reconfig_events, all_dkg_events)
     }
 
     fn calculate_events_and_writeset_hashes(
