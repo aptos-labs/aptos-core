@@ -288,14 +288,14 @@ impl BlockPartitioner for V2Partitioner {
         }
         let duration = timer_1.stop_and_record();
         println!("preprocess__rw={duration}");
-        let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__txns"]).start_timer();
-        let txns: Vec<(usize, AnalyzedTransaction)> = txns.into_iter().enumerate().collect();
-        let duration = timer_1.stop_and_record();
+        // let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__txns"]).start_timer();
+        // let txns: Vec<(usize, AnalyzedTransaction)> = txns.into_par_iter().collect();
+        // let duration = timer_1.stop_and_record();
         println!("preprocess__txns={duration}");
         let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__main"]).start_timer();
         self.thread_pool.install(||{
-            txns.par_iter().for_each(|(txn_id_ref, txn)| {
-                let txn_id = *txn_id_ref;
+            (0..num_txns).into_par_iter().for_each(|(txn_id)| {
+                let txn = &txns[txn_id];
                 let sender = txn.sender();
                 let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
                     num_senders.fetch_add(1, Ordering::SeqCst)
@@ -384,7 +384,7 @@ impl BlockPartitioner for V2Partitioner {
         println!("multi_rounds={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
-        let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|(_tid, t)|Mutex::new(Some(t))).collect();
+        let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|t|Mutex::new(Some(t))).collect();
         let ret = self.add_edges(&txns, &storage_locations, &rsets_by_txn_id,&wsets_by_txn_id, &txn_id_matrix, &helpers_by_key_id);
         let duration = timer.stop_and_record();
         println!("add_edges={duration}");
