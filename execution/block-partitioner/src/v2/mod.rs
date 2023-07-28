@@ -476,7 +476,7 @@ pub fn assertions(before_partition: &Vec<AnalyzedTransaction>, after_partition: 
     assert_eq!(0, total_comm_cost % 2);
 }
 
-/// 18,5 -> [4,4,4,3,3]
+/// Evenly divide 0..n-1. Example: uniform_partition(11,3) == [[0,1,2,3],[4,5,6,7],[8,9,10]]
 fn uniform_partition(num_items: usize, num_chunks: usize) -> Vec<Vec<usize>> {
     let num_big_chunks = num_items % num_chunks;
     let small_chunk_size = num_items / num_chunks;
