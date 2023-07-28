@@ -2459,7 +2459,7 @@ Staking_contract exists the stacker/operator pair.
 The StakePool exists under the pool_address of StakingContract.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 1000;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_GetStakingContractAmountsAbortsIf">GetStakingContractAmountsAbortsIf</a>;
 </code></pre>
 
@@ -2476,7 +2476,7 @@ The StakePool exists under the pool_address of StakingContract.
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify_duration_estimate = 1200;
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
 <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
 <b>let</b> seed_0 = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(staker_address);
