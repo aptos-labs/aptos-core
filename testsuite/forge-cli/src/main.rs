@@ -1891,7 +1891,7 @@ fn pfn_const_tps(
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-        .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -1934,7 +1934,7 @@ fn pfn_performance(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .add_network_test(PFNPerformance::new(add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
