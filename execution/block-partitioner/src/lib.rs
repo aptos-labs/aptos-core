@@ -15,21 +15,21 @@ use aptos_types::transaction::Transaction;
 use crate::omega_partitioner::OmegaPartitioner;
 use crate::sharded_block_partitioner::ShardedBlockPartitioner;
 
-pub trait BlockPartitioner: Send + Sync {
+pub trait BlockPartitioner: Send {
     fn partition(&self, transactions: Vec<AnalyzedTransaction>, num_shards: usize)
         -> Vec<SubBlocksForShard<AnalyzedTransaction>>;
 }
 
-// pub fn build_partitioner() -> Box<dyn BlockPartitioner> {
-//     match std::env::var("APTOS_PARTITIONER_IMPL").ok() {
-//         Some(v) if v.as_str() == "v2" => {
-//             Box::new(OmegaPartitioner::new())
-//         }
-//         _ => {
-//             ShardedBlockPartitioner::new()
-//         }
-//     }
-// }
+pub fn build_partitioner(maybe_num_shards: Option<usize>) -> Box<dyn BlockPartitioner> {
+    match std::env::var("APTOS_BLOCK_PARTITIONER_IMPL").ok() {
+        Some(v) if v.to_uppercase().as_str() == "V2" => {
+            Box::new(OmegaPartitioner::new())
+        }
+        _ => {
+            Box::new(ShardedBlockPartitioner::new(maybe_num_shards.unwrap()))
+        }
+    }
+}
 
 /// An implementation of partitioner that splits the transactions into equal-sized chunks.
 pub struct UniformPartitioner {}

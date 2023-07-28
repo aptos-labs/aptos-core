@@ -12,22 +12,24 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::time::Instant;
+use aptos_block_partitioner::{BlockPartitioner, build_partitioner};
 
 pub(crate) struct BlockPartitioningStage {
+    num_executor_shards: usize,
     num_blocks_processed: usize,
-    maybe_partitioner: Option<ShardedBlockPartitioner>,
+    maybe_partitioner: Option<Box<dyn BlockPartitioner>>,
 }
 
 impl BlockPartitioningStage {
-    pub fn new(num_shards: usize) -> Self {
-        let maybe_partitioner = if num_shards <= 1 {
+    pub fn new(num_executor_shards: usize) -> Self {
+        let maybe_partitioner = if num_executor_shards <= 1 {
             None
         } else {
-            let partitioner = ShardedBlockPartitioner::new(num_shards);
-            Some(partitioner)
+            Some(build_partitioner(Some(num_executor_shards)))
         };
 
         Self {
+            num_executor_shards,
             num_blocks_processed: 0,
             maybe_partitioner,
         }
@@ -47,7 +49,7 @@ impl BlockPartitioningStage {
                 let last_txn = txns.pop().unwrap();
                 assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
-                let mut sub_blocks = partitioner.partition(analyzed_transactions, 4, 0.95);
+                let mut sub_blocks = partitioner.partition(analyzed_transactions, self.num_executor_shards);
                 sub_blocks
                     .last_mut()
                     .unwrap()

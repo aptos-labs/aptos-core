@@ -27,6 +27,7 @@ use std::{
     },
     thread,
 };
+use crate::BlockPartitioner;
 
 mod conflict_detector;
 mod counters;
@@ -421,6 +422,13 @@ impl Drop for ShardedBlockPartitioner {
                 error!("Failed to join executor shard thread: {:?}", e);
             });
         }
+    }
+}
+
+impl BlockPartitioner for ShardedBlockPartitioner {
+    fn partition(&self, transactions: Vec<AnalyzedTransaction>, num_shards: usize) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
+        assert_eq!(self.num_shards, num_shards);
+        ShardedBlockPartitioner::partition(self, transactions, 4, 0.9)
     }
 }
 

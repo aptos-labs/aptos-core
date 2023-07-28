@@ -64,7 +64,7 @@ impl OmegaPartitioner {
         let num_rounds_limit: usize = std::env::var("OMEGA_PARTITIONER__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
         let avoid_pct: u64 = std::env::var("OMEGA_PARTITIONER__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<u64>().ok().unwrap_or(10)).unwrap_or(10);
         let dashmap_num_shards = std::env::var("OMEGA_PARTITIONER__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
-        info!("Creating a new OmegaPartitioner with num_threads={}, num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}", num_threads, num_rounds_limit, avoid_pct, dashmap_num_shards);
+        info!("Creating OmegaPartitioner with num_threads={}, num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}", num_threads, num_rounds_limit, avoid_pct, dashmap_num_shards);
         Self {
             thread_pool: ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap(),
             num_rounds_limit,
