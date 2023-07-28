@@ -5,20 +5,24 @@
 
 mod counters;
 mod tests;
-mod utils;
 mod testsetups;
+mod utils;
 
 use crate::{
-    utils::{set_metrics, NetworkName, TestFailure, TestName, TestResult},
     testsetups::{
-        setup_and_run_cointransfer, setup_and_run_newaccount, setup_and_run_nfttransfer, setup_and_run_publishmodule,
+        setup_and_run_cointransfer, setup_and_run_newaccount, setup_and_run_nfttransfer,
+        setup_and_run_publishmodule,
     },
+    utils::{set_metrics, NetworkName, TestFailure, TestName, TestResult},
 };
 use anyhow::Result;
 use aptos_logger::{info, Level, Logger};
 use aptos_push_metrics::MetricsPusher;
 use futures::future::join_all;
-use std::{future::Future, time::{Instant, SystemTime, UNIX_EPOCH}};
+use std::{
+    future::Future,
+    time::{Instant, SystemTime, UNIX_EPOCH},
+};
 
 // Processes a test result.
 async fn process_result<Fut: Future<Output = Result<(), TestFailure>>>(
@@ -60,7 +64,10 @@ async fn process_result<Fut: Future<Output = Result<(), TestFailure>>>(
 }
 
 async fn test_flows(network_name: NetworkName) -> Result<()> {
-    let start_time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().to_string();
+    let start_time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)?
+        .as_secs()
+        .to_string();
     info!("testing {} at {}", network_name.to_string(), start_time);
 
     // Test new account creation and funding
@@ -109,7 +116,12 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
     )
     .await;
 
-    join_all(vec![handle_newaccount, handle_cointransfer, handle_nfttransfer]).await;
+    join_all(vec![
+        handle_newaccount,
+        handle_cointransfer,
+        handle_nfttransfer,
+    ])
+    .await;
     Ok(())
 }
 

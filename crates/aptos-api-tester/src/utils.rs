@@ -86,7 +86,13 @@ impl ToString for NetworkName {
 }
 
 // Set metrics based on the result.
-pub fn set_metrics(output: &TestResult, test_name: &str, network_name: &str, start_time: &str, time: f64) {
+pub fn set_metrics(
+    output: &TestResult,
+    test_name: &str,
+    network_name: &str,
+    start_time: &str,
+    time: f64,
+) {
     match output {
         TestResult::Success => {
             test_success(test_name, network_name, start_time).observe(1_f64);

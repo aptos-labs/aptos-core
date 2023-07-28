@@ -33,8 +33,8 @@ pub static API_TEST_ERROR: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!("api_test_error", "Number of user flows which crashed", &[
         "test_name",
         "network_name",
-        "start_time",
-    ])
+        "start_time"
+    ],)
     .unwrap()
 });
 
@@ -51,6 +51,11 @@ pub static API_TEST_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub fn test_latency(test_name: &str, network_name: &str, start_time: &str, result: &str) -> Histogram {
+pub fn test_latency(
+    test_name: &str,
+    network_name: &str,
+    start_time: &str,
+    result: &str,
+) -> Histogram {
     API_TEST_LATENCY.with_label_values(&[test_name, network_name, start_time, result])
 }

@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use crate::utils::TestFailure;
 use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
@@ -21,8 +22,6 @@ use aptos_types::{
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
 use std::{collections::BTreeMap, path::PathBuf};
-
-use crate::utils::TestFailure;
 
 // fail messages
 static FAIL_ACCOUNT_DATA: &str = "wrong account data";
