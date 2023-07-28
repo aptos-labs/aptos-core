@@ -7,6 +7,7 @@ export * as BCS from "./bcs";
 export * from "./utils/hex_string";
 export * from "./plugins";
 export * from "./transaction_builder";
+export * from "./transactions";
 export * as TokenTypes from "./aptos_types/token_types";
 export * as Types from "./generated/index";
 export * from "./client";
