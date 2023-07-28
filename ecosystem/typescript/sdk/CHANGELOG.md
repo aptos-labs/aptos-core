@@ -4,7 +4,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.15.0 (2023-07-28)
+
 - Implementing `TransactionWorker` - a layer for managing and submitting as many transactions from a single account at once
+- Memoize account modules by adding `memoize` decorator to `getAccountModules`
 
 ## 1.14.0 (2023-07-20)
 
