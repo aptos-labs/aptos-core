@@ -10,6 +10,7 @@ pub const END_OF_TIME: u64 = 4102444799000; /* Thursday, December 31, 2099 11:59
 #[derive(Debug, Clone, Copy)]
 pub enum TimedFeatureFlag {
     DisableInvariantViolationCheckInSwapLoc,
+    LimitTypeTagSize,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -36,6 +37,7 @@ impl TimedFeatureOverride {
 
         Some(match self {
             Replay => match flag {
+                LimitTypeTagSize => true,
                 // Add overrides for replay here.
                 _ => return None,
             },

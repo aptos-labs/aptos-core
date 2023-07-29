@@ -299,7 +299,7 @@ pub(crate) fn native_format_debug(
     ty: &Type,
     v: Value,
 ) -> SafeNativeResult<String> {
-    let layout = context.deref().type_to_fully_annotated_layout(ty)?.unwrap();
+    let layout = context.deref().type_to_fully_annotated_layout(ty)?;
     let mut format_context = FormatContext {
         context,
         should_charge_gas: false,
@@ -323,8 +323,7 @@ fn native_format(
     debug_assert!(ty_args.len() == 1);
     let ty = context
         .deref()
-        .type_to_fully_annotated_layout(&ty_args[0])?
-        .unwrap();
+        .type_to_fully_annotated_layout(&ty_args[0])?;
     let include_int_type = safely_pop_arg!(arguments, bool);
     let single_line = safely_pop_arg!(arguments, bool);
     let canonicalize = safely_pop_arg!(arguments, bool);
@@ -413,9 +412,7 @@ fn native_format_list(
                 val = it.next().unwrap();
                 list_ty = &ty_args[1];
 
-                let ty = context
-                    .type_to_fully_annotated_layout(&ty_args[0])?
-                    .unwrap();
+                let ty = context.type_to_fully_annotated_layout(&ty_args[0])?;
                 let mut format_context = FormatContext {
                     context,
                     should_charge_gas: true,
