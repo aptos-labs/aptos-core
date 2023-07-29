@@ -3,7 +3,7 @@
 
 use crate::math::{
     add_gas_formula_to_coefficient_matrix, add_running_time_to_constant_matrix,
-    compute_least_square_solutions, find_free_variables, find_outliers,
+    compute_least_square_solutions, find_linearly_dependent_variables, find_outliers,
 };
 use crate::math_interface::generic_map;
 use nalgebra::DMatrix;
@@ -76,7 +76,7 @@ pub fn solve(
         // TODO: error handling with division zero that bubbles up
         report_outliers(&mut x_hat, coeff_matrix, const_matrix, equation_names);
     } else {
-        report_undetermined_gas_params(input, coeff_matrix, const_matrix);
+        report_undetermined_gas_params(input, coeff_matrix, const_matrix, equation_names);
     }
 }
 
@@ -120,15 +120,26 @@ fn report_undetermined_gas_params(
     input: Vec<BTreeMap<String, u64>>,
     coeff_matrix: &mut DMatrix<f64>,
     const_matrix: &mut DMatrix<f64>,
+    equation_names: Vec<String>,
 ) {
-    let free_variables = find_free_variables(coeff_matrix, const_matrix);
-
     let map = generic_map(input);
     let keys: Vec<String> = map.keys().map(|key| key.to_string()).collect();
 
-    println!("free variables are:\n");
-    for col in free_variables {
-        let gas_param = &keys[col];
-        println!("- gas parameter: {}\n", gas_param);
+    let result = find_linearly_dependent_variables(coeff_matrix, const_matrix);
+    if result.is_err() {
+        println!("free variables are:\n");
+        let pivot_columns = result.unwrap_err();
+        for col in pivot_columns {
+            let gas_param = &keys[col];
+            println!("- gas parameter: {}\n", gas_param);
+        }
+    } else {
+        println!("linearly dependent variables are:\n");
+        let linear_combos = result.unwrap();
+        for (eq, gas_param) in linear_combos {
+            let eq_name = &equation_names[eq];
+            let gas_param_name = &keys[gas_param];
+            println!("- {} | gas parameter: {}\n", eq_name, gas_param_name);
+        }
     }
 }

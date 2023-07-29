@@ -102,26 +102,28 @@ pub fn compute_least_square_solutions(
     Ok(x_hat)
 }
 
-/// Find all free variables which is the pivot columns
+/// Find all free variables / linear dependent combinations
 ///
 /// ### Arguments
 ///
 /// * `A` - Coefficient matrix
 /// * `b` - Constant matrix
 #[allow(non_snake_case)]
-pub fn find_free_variables(A: &mut DMatrix<f64>, b: &mut DMatrix<f64>) -> Vec<usize> {
-    let A_T = A.transpose();
-    let mut A_TA = A_T.clone().mul(A.clone());
-    let mut A_Tb = A_T.clone().mul(b.clone());
-
-    let nrows_a_ta = A_TA.nrows();
-    let ncols_a_ta = A_TA.ncols();
-    let mut aug_matrix = DMatrix::<f64>::zeros(nrows_a_ta, ncols_a_ta + 1);
-    create_augmented_matrix(&mut aug_matrix, &mut A_TA, &mut A_Tb);
+pub fn find_linearly_dependent_variables(
+    A: &mut DMatrix<f64>,
+    b: &mut DMatrix<f64>,
+) -> Result<Vec<(usize, usize)>, Vec<usize>> {
+    let mut aug_matrix = DMatrix::<f64>::zeros(A.nrows(), A.ncols() + 1);
+    create_augmented_matrix(&mut aug_matrix, A, b);
     rref(&mut aug_matrix);
 
-    let pivot_columns = find_pivot_columns(&mut aug_matrix);
-    pivot_columns
+    let is_ones = validate_rref_rows_are_one(&mut aug_matrix);
+    if is_ones {
+        return Err(find_pivot_columns(&mut aug_matrix));
+    }
+
+    let linear_combos = find_linear_dependent_combinations(&mut aug_matrix);
+    Ok(linear_combos)
 }
 
 /// We use the Least Squares solution to input into the LHS to get what we
@@ -257,4 +259,86 @@ fn rref(matrix: &mut DMatrix<f64>) {
 
         lead += 1;
     }
+}
+
+/// If the matrix is not invertible, we should check if every row
+/// has one approximate value of 1. If that is true, then there
+/// aren't linear combinations of variables that are dependent
+/// of each other, but instead, the entire system is not solvable.
+///
+/// ### Arguments
+///
+/// * `matrix` - Augmented matrix that has been RREF'd
+fn validate_rref_rows_are_one(matrix: &mut DMatrix<f64>) -> bool {
+    let mut i = 0;
+    let mut j = 0;
+
+    let mut is_all_one = true;
+    while i < matrix.nrows() {
+        let mut one_count = 0;
+
+        while j < matrix.ncols() - 1 {
+            let a_ij = matrix[(i, j)];
+            if approx_eq!(f64, a_ij, 1.0, ulps = 2) {
+                one_count += 1;
+            }
+            j += 1;
+        }
+
+        if one_count > 1 {
+            is_all_one = false;
+        }
+
+        i += 1;
+        j = 0;
+    }
+
+    is_all_one
+}
+
+/// If the matrix is not invertible, and there exists a row that has more than one
+/// approximate value of 1, then we should report all linear combinations that exist
+/// to the user by scanning each row and only reporting those rows.
+///
+/// ### Arguments
+///
+/// * `matrix` - Augmented matrix that has been RREF'd
+fn find_linear_dependent_combinations(matrix: &mut DMatrix<f64>) -> Vec<(usize, usize)> {
+    let mut i = 0;
+    let mut j = 0;
+
+    let mut linear_combos = Vec::new();
+    while i < matrix.nrows() {
+        let mut max_val: f64 = 0.0;
+        let mut k = 0;
+        while k < matrix.ncols() - 1 {
+            let a_ik = matrix[(i, k)];
+            if a_ik > max_val {
+                max_val = a_ik;
+            }
+            k += 1;
+        }
+
+        let mut independent_vars = Vec::new();
+        while j < matrix.ncols() - 1 {
+            let a_ij = matrix[(i, j)];
+            let ratio = max_val / a_ij;
+            if approx_eq!(f64, ratio, 1.0, ulps = 2) {
+                independent_vars.push((i, j));
+            }
+
+            j += 1;
+        }
+
+        if independent_vars.len() != 1 {
+            for (eq, gas_param) in independent_vars {
+                linear_combos.push((eq, gas_param));
+            }
+        }
+
+        i += 1;
+        j = 0;
+    }
+
+    linear_combos
 }
