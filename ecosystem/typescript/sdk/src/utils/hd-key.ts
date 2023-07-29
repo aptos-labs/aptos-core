@@ -2,7 +2,6 @@ import nacl from "tweetnacl";
 import { hmac } from "@noble/hashes/hmac";
 import { sha512 } from "@noble/hashes/sha512";
 import { hexToBytes } from "@noble/hashes/utils";
-import {HexString, MaybeHexString} from "./hex_string";
 
 export type Keys = {
   key: Uint8Array;

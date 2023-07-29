@@ -135,8 +135,8 @@ export class IndexerClient {
    * @returns GetAccountCurrentTokensQuery response type
    */
   async getAccountNFTs(
-      ownerAddress: MaybeHexString,
-      options?: IndexerPaginationArgs
+    ownerAddress: MaybeHexString,
+    options?: IndexerPaginationArgs,
   ): Promise<GetAccountCurrentTokensQuery> {
     const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);
@@ -169,8 +169,8 @@ export class IndexerClient {
    * @returns GetAccountCoinsDataQuery response type
    */
   async getAccountCoinsData(
-      ownerAddress: MaybeHexString,
-      options?: IndexerPaginationArgs
+    ownerAddress: MaybeHexString,
+    options?: IndexerPaginationArgs,
   ): Promise<GetAccountCoinsDataQuery> {
     const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);

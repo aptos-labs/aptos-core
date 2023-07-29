@@ -4,7 +4,7 @@ import * as Gen from "../generated/index";
 import { OptionalTransactionArgs, Provider } from "../providers";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 import { MaybeHexString, HexString } from "../utils";
-import {AnyNumber} from "../bcs";
+import { AnyNumber } from "../bcs";
 
 export class FungibleAssetClient {
   provider: Provider;

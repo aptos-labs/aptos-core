@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AccountAddress } from "./account_address";
-import {AnyNumber, Serializer} from "../bcs";
+import { AnyNumber, Serializer } from "../bcs";
 
 export class RotationProofChallenge {
   constructor(
