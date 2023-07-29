@@ -375,6 +375,7 @@ spec aptos_framework::vesting {
         admin: &signer,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability) {
+        pragma verify_duration_estimate = 300;
         let admin_addr = signer::address_of(admin);
         let admin_store = global<AdminStore>(admin_addr);
         let seed = bcs::to_bytes(admin_addr);
