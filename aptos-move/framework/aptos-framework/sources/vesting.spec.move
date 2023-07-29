@@ -45,7 +45,7 @@ spec aptos_framework::vesting {
     }
 
     spec total_accumulated_rewards(vesting_contract_address: address): u64 {
-        pragma verify_duration_estimate = 120;
+        pragma verify_duration_estimate = 300;
 
         include TotalAccumulatedRewardsAbortsIf;
     }
