@@ -44,7 +44,7 @@ impl StateKvDb {
             info!("State K/V DB is not enabled!");
             return Ok(Self {
                 state_kv_metadata_db: Arc::clone(&ledger_db),
-                state_kv_db_shards: arr![Arc::clone(&ledger_db); 16],
+                state_kv_db_shards: arr![Arc::clone(&ledger_db); 256],
                 enabled_sharding: false,
             });
         }
@@ -77,7 +77,7 @@ impl StateKvDb {
                 let db = Self::open_shard(db_root_path.as_ref(), shard_id as u8, &state_kv_db_config, readonly)?;
                 shard_id += 1;
                 Arc::new(db)
-            }; 16]
+            }; 256]
         };
 
         let state_kv_db = Self {

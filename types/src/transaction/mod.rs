@@ -1308,7 +1308,7 @@ impl Display for TransactionInfo {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransactionToCommit {
     transaction: Transaction,
     transaction_info: TransactionInfo,

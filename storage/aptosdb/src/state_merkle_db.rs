@@ -90,7 +90,7 @@ impl StateMerkleDb {
             )?);
             return Ok(Self {
                 state_merkle_metadata_db: Arc::clone(&db),
-                state_merkle_db_shards: arr![Arc::clone(&db); 16],
+                state_merkle_db_shards: arr![Arc::clone(&db); 256],
                 enable_sharding: false,
                 enable_cache,
                 version_caches,
@@ -370,7 +370,7 @@ impl StateMerkleDb {
             sharded_value_set[get_state_shard_id(k) as usize].push((k, v));
         });
 
-        let (shard_root_nodes, sharded_batches) = (0..16)
+        let (shard_root_nodes, sharded_batches) = (0..256)
             .map(|shard_id| {
                 self.merklize_value_set_for_shard(
                     shard_id,
@@ -462,7 +462,7 @@ impl StateMerkleDb {
         base_version: Option<Version>,
         previous_epoch_ending_version: Option<Version>,
     ) -> Result<(HashValue, SchemaBatch)> {
-        assert!(shard_root_nodes.len() == 16);
+        assert!(shard_root_nodes.len() == 256);
         let (root_hash, tree_update_batch) = JellyfishMerkleTree::new(self).put_top_levels_nodes(
             shard_root_nodes,
             base_version,
@@ -560,7 +560,7 @@ impl StateMerkleDb {
             let db = Self::open_shard(db_root_path.as_ref(), shard_id as u8, &state_merkle_db_config, readonly)?;
             shard_id += 1;
             Arc::new(db)
-        }; 16];
+        }; 256];
 
         let state_merkle_db = Self {
             state_merkle_metadata_db,

@@ -777,7 +777,7 @@ impl StateStore {
         let mut usage = self.get_usage(base_version)?;
         let base_version_usage = usage;
 
-        let mut state_cache_with_version = &arr![DashMap::new(); 16];
+        let mut state_cache_with_version = &arr![DashMap::new(); 256];
         if let Some(base_version) = base_version {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["put_stats_and_indices__total_get"])

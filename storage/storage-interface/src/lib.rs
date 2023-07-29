@@ -598,7 +598,7 @@ impl DbReaderWriter {
 }
 
 /// Network types for storage service
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
 pub enum StorageRequest {
     GetStateValueByVersionRequest(Box<GetStateValueByVersionRequest>),
     GetStartupInfoRequest,
@@ -621,7 +621,7 @@ impl GetStateValueByVersionRequest {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SaveTransactionsRequest {
     pub txns_to_commit: Vec<TransactionToCommit>,
     pub first_version: Version,

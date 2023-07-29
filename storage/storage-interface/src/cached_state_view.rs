@@ -24,6 +24,7 @@ use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Formatter},
+    ops::Deref,
     sync::Arc,
 };
 
@@ -39,7 +40,23 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 // version for the given StateKey, and the version is the maximum one which <= the base version. It
 // will be None if the value is None, or we found the value on the speculative tree (in that case
 // we don't know the maximum version).
-pub type ShardedStateCache = [DashMap<StateKey, (Option<Version>, Option<StateValue>)>; 16];
+pub type ShardedStateCacheInner = [DashMap<StateKey, (Option<Version>, Option<StateValue>)>; 256];
+
+#[derive(Debug)]
+pub struct ShardedStateCache(ShardedStateCacheInner);
+
+impl Default for ShardedStateCache {
+    fn default() -> Self {
+        ShardedStateCache(arr![DashMap::new(); 256])
+    }
+}
+
+impl Deref for ShardedStateCache {
+    type Target = ShardedStateCacheInner;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 /// `CachedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
@@ -125,7 +142,7 @@ impl CachedStateView {
             id,
             snapshot,
             speculative_state,
-            sharded_state_cache: arr![DashMap::new(); 16],
+            sharded_state_cache: Default::default(),
             proof_fetcher,
         })
     }

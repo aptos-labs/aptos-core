@@ -814,7 +814,7 @@ impl TransactionToCommitGen {
                     })
             })
             .unzip();
-        let mut sharded_state_updates = arr![HashMap::new(); 16];
+        let mut sharded_state_updates = arr![HashMap::new(); 256];
         state_updates.into_iter().for_each(|(k, v)| {
             sharded_state_updates[k.get_shard_id() as usize].insert(k, v);
         });
@@ -1136,7 +1136,7 @@ impl BlockGen {
                 Some(HashValue::random()),
                 ExecutionStatus::Success,
             ),
-            arr_macro::arr![HashMap::new(); 16],
+            arr_macro::arr![HashMap::new(); 256],
             WriteSet::default(),
             Vec::new(),
             false,

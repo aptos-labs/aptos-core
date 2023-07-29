@@ -91,7 +91,7 @@ impl StateSnapshotCommitter {
                             .unwrap();
 
                         THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
-                            (0..16)
+                            (0..=255)
                                 .into_par_iter()
                                 .map(|shard_id| {
                                     let node_hashes = delta_to_commit

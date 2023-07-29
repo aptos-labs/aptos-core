@@ -545,7 +545,7 @@ where
         // this point).
         // Otherwise, once we reach the 5th level (the level of the root of each shard), all nodes
         // at or below it belongs to the requested shard.
-        for i in (0..4).rev() {
+        for i in (0..8).rev() {
             if let Some(node) = subtree.get_node_if_in_mem(since_generation) {
                 match node.inner().borrow() {
                     NodeInner::Internal(internal_node) => {

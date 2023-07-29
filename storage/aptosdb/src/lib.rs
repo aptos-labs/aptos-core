@@ -139,7 +139,7 @@ pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 pub const STATE_KV_DB_NAME: &str = "state_kv_db";
 
-pub(crate) const NUM_STATE_SHARDS: usize = 16;
+pub(crate) const NUM_STATE_SHARDS: usize = 256;
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
@@ -187,7 +187,7 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
 type ShardedStateKvSchemaBatch = [SchemaBatch; NUM_STATE_SHARDS];
 
 pub(crate) fn new_sharded_kv_schema_batch() -> ShardedStateKvSchemaBatch {
-    arr![SchemaBatch::new(); 16]
+    arr![SchemaBatch::new(); 256]
 }
 
 fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {

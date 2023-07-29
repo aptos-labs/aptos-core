@@ -111,7 +111,7 @@ use thiserror::Error;
 const MAX_PARALLELIZABLE_DEPTH: usize = 2;
 
 // Assumes 16 shards here.
-const MIN_LEAF_DEPTH: usize = 1;
+const MIN_LEAF_DEPTH: usize = 2;
 
 #[derive(Error, Debug)]
 #[error("Missing state root node at version {version}, probably pruned.")]
@@ -373,7 +373,7 @@ where
         let deduped_and_sorted_kvs = value_set
             .into_iter()
             .map(|kv| {
-                assert!(kv.0.nibble(0) == shard_id);
+                assert!(kv.0.byte(0) == shard_id);
                 kv
             })
             .collect::<BTreeMap<_, _>>()
@@ -383,7 +383,7 @@ where
         // We currently assume 16 shards in total, therefore the nibble path for the shard root
         // contains exact 1 nibble which is the shard id. `shard_id << 4` here is to put the shard
         // id as the first nibble of the first byte.
-        let shard_root_nibble_path = NibblePath::new_odd(vec![shard_id << 4]);
+        let shard_root_nibble_path = NibblePath::new_even(vec![shard_id]);
         let shard_root_node_key = NodeKey::new(version, shard_root_nibble_path.clone());
 
         let mut shard_batch = TreeUpdateBatch::new();
@@ -419,34 +419,51 @@ where
         Ok((shard_root_node, shard_batch))
     }
 
-    /// Assumes 16 shards here, top levels only contain root node.
+    /// Assumes 256 shards here, top levels only contain root node.
     pub fn put_top_levels_nodes(
         &self,
         shard_root_nodes: Vec<Node<K>>,
         persisted_version: Option<Version>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
-        ensure!(shard_root_nodes.len() == 16);
+        ensure!(shard_root_nodes.len() == 256);
 
-        let children: Children = shard_root_nodes
+        let children: Vec<_> = shard_root_nodes
             .iter()
             .enumerate()
-            .filter_map(|(i, shard_root_node)| {
+            .map(|(i, shard_root_node)| {
                 let node_type = shard_root_node.node_type();
                 match node_type {
                     NodeType::Null => None,
-                    _ => Some((
-                        Nibble::from(i as u8),
-                        Child::new(shard_root_node.hash(), version, node_type),
-                    )),
+                    _ => Some(Child::new(shard_root_node.hash(), version, node_type)),
                 }
             })
             .collect();
-        let root_node = if children.is_empty() {
-            Node::Null
-        } else {
-            Node::Internal(InternalNode::new(children))
-        };
+        let first_level_nodes: Children = children
+            .chunks(16)
+            .enumerate()
+            .filter_map(|(i, chunk)| {
+                let children: Children = chunk
+                    .into_iter()
+                    .enumerate()
+                    .filter_map(|(j, child)| {
+                        child
+                            .as_ref()
+                            .map(|c| (Nibble::from((j & 0xF) as u8), c.clone()))
+                    })
+                    .collect();
+                if children.is_empty() {
+                    None
+                } else {
+                    let node = Node::<StateKey>::Internal(InternalNode::new(children));
+                    Some((
+                        Nibble::from((i & 0xF) as u8),
+                        Child::new(node.hash(), version, node.node_type()),
+                    ))
+                }
+            })
+            .collect();
+        let root_node = Node::Internal(InternalNode::new(first_level_nodes));
         APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
 
         let root_hash = root_node.hash();
@@ -465,17 +482,35 @@ where
     pub fn get_shard_persisted_versions(
         &self,
         root_persisted_version: Option<Version>,
-    ) -> Result<[Option<Version>; 16]> {
-        let mut shard_persisted_versions = arr![None; 16];
+    ) -> Result<[Option<Version>; 256]> {
+        let mut shard_persisted_versions = arr![None; 256];
         if let Some(root_persisted_version) = root_persisted_version {
             let root_node_key = NodeKey::new_empty_path(root_persisted_version);
             let root_node = self.reader.get_node_with_tag(&root_node_key, "commit")?;
             match root_node {
                 Node::Internal(root_node) => {
-                    for shard_id in 0..16 {
-                        if let Some(Child { version, .. }) = root_node.child(Nibble::from(shard_id))
+                    for shard_id in 0..=255 {
+                        if let Some(Child { version, .. }) =
+                            root_node.child(Nibble::from((shard_id & 0xF0) >> 4))
                         {
-                            shard_persisted_versions[shard_id as usize] = Some(*version);
+                            let node_key = NodeKey::new(
+                                version.clone(),
+                                NibblePath::new_odd(vec![shard_id & 0xF0]),
+                            );
+                            let node = self.reader.get_node_with_tag(&node_key, "commit")?;
+                            match node {
+                                Node::Internal(node) => {
+                                    if let Some(Child { version, .. }) =
+                                        node.child(Nibble::from(shard_id & 0xF))
+                                    {
+                                        shard_persisted_versions[shard_id as usize] =
+                                            Some(*version);
+                                    }
+                                },
+                                _ => {
+                                    unreachable!("Leaf at second level.")
+                                },
+                            }
                         }
                     }
                 },
@@ -671,8 +706,8 @@ where
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
         let mut tree_update_batch = TreeUpdateBatch::new();
-        let mut shard_root_nodes = Vec::with_capacity(16);
-        for shard_id in 0..16 {
+        let mut shard_root_nodes = Vec::with_capacity(256);
+        for shard_id in 0..=255 {
             let value_set_for_shard = value_set
                 .iter()
                 .filter(|(k, _v)| k.nibble(0) == shard_id)
@@ -1048,13 +1083,11 @@ trait NibbleExt {
 impl NibbleExt for HashValue {
     /// Returns the `index`-th nibble.
     fn get_nibble(&self, index: usize) -> Nibble {
-        Nibble::from(
-            if index % 2 == 0 {
-                self[index / 2] >> 4
-            } else {
-                self[index / 2] & 0x0F
-            },
-        )
+        Nibble::from(if index % 2 == 0 {
+            self[index / 2] >> 4
+        } else {
+            self[index / 2] & 0x0F
+        })
     }
 
     /// Returns the length of common prefix of `self` and `other` in nibbles.
