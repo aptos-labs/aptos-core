@@ -135,11 +135,11 @@ pub fn find_linearly_dependent_variables(
 /// * `x_hat` - Solutions to the Least Squares
 /// * `coefficient_matrix` - Matrix of linear equations
 /// * `constant_matrix` - Matrix of Actual Time
-pub fn find_outliers(
+pub fn get_computed_time_and_outliers(
     x_hat: &mut DMatrix<f64>,
     coefficient_matrix: &mut DMatrix<f64>,
     constant_matrix: &mut DMatrix<f64>,
-) -> Result<Vec<(usize, f64, f64, f64)>, String> {
+) -> Result<Vec<(usize, f64, f64, f64, bool)>, String> {
     let mut i = 0;
     let mut j = 0;
 
@@ -162,7 +162,7 @@ pub fn find_outliers(
     i = 0;
 
     // compare w/ margin of error
-    let mut outliers: Vec<(usize, f64, f64, f64)> = Vec::new();
+    let mut outliers: Vec<(usize, f64, f64, f64, bool)> = Vec::new();
     let const_row = constant_matrix.nrows();
     while i < const_row {
         let a_ij = constant_matrix[(i, 0)];
@@ -175,7 +175,11 @@ pub fn find_outliers(
             let diff = numerator.div(denominator);
             if diff > MARGIN_OF_ERROR {
                 // append equation that is an outlier
-                outliers.push((i, a_ij, computed_running_time[i], diff));
+                outliers.push((i, a_ij, computed_running_time[i], diff, true));
+            } else {
+                // not outlier, but still display to the user
+                // the running time of that Calibration Function
+                outliers.push((i, a_ij, computed_running_time[i], diff, false));
             }
         }
         i = i + 1;
@@ -299,6 +303,8 @@ fn validate_rref_rows_are_one(matrix: &mut DMatrix<f64>) -> bool {
 /// If the matrix is not invertible, and there exists a row that has more than one
 /// approximate value of 1, then we should report all linear combinations that exist
 /// to the user by scanning each row and only reporting those rows.
+///
+/// Source: https://stackoverflow.com/questions/43619121/how-to-find-partial-solutions-in-a-underdetermined-system-of-linear-equations
 ///
 /// ### Arguments
 ///

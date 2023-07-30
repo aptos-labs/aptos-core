@@ -3,7 +3,8 @@
 
 use crate::math::{
     add_gas_formula_to_coefficient_matrix, add_running_time_to_constant_matrix,
-    compute_least_square_solutions, find_linearly_dependent_variables, find_outliers,
+    compute_least_square_solutions, find_linearly_dependent_variables,
+    get_computed_time_and_outliers,
 };
 use crate::math_interface::generic_map;
 use nalgebra::DMatrix;
@@ -74,9 +75,42 @@ pub fn solve(
         }
 
         // TODO: error handling with division zero that bubbles up
-        report_outliers(&mut x_hat, coeff_matrix, const_matrix, equation_names);
+        let computed_time_and_outliers =
+            get_computed_time_and_outliers(&mut x_hat, coeff_matrix, const_matrix)
+                .expect("Failed: should unwrap, possibly division by zero");
+
+        report_computed_times(&equation_names, &computed_time_and_outliers);
+
+        report_outliers(&equation_names, &computed_time_and_outliers);
     } else {
         report_undetermined_gas_params(input, coeff_matrix, const_matrix, equation_names);
+    }
+}
+
+/// display the computed running times to the user after computing least squares
+///
+/// ### Arguments
+///
+/// * `input` - Collection of like-terms
+/// * `x_hat` - Least squares solution
+/// * `coeff_matrix` - Coefficient Matrix
+/// * `const_matrix` - Constant Matrix
+fn report_computed_times(
+    equation_names: &Vec<String>,
+    actual_times: &Vec<(usize, f64, f64, f64, bool)>,
+) {
+    println!("\nActual running times are:\n");
+    for (idx, cr, ar, err, is_outlier) in actual_times {
+        if *is_outlier {
+            continue;
+        };
+        println!(
+            "- {} | Computed {}µs vs. Actual {}µs | Error {}\n",
+            equation_names[*idx],
+            cr,
+            format!("{:.3}", ar),
+            format!("{:.3}", err)
+        );
     }
 }
 
@@ -88,19 +122,15 @@ pub fn solve(
 /// * `x_hat` - Least squares solution
 /// * `coeff_matrix` - Coefficient Matrix
 /// * `const_matrix` - Constant Matrix
-fn report_outliers(
-    x_hat: &mut DMatrix<f64>,
-    coeff_matrix: &mut DMatrix<f64>,
-    const_matrix: &mut DMatrix<f64>,
-    equation_names: Vec<String>,
-) {
-    let outliers = find_outliers(x_hat, coeff_matrix, const_matrix).expect("should unwrap");
-
-    println!("\noutliers are (times are in microseconds):\n");
-    for (idx, cr, ar, err) in outliers {
+fn report_outliers(equation_names: &Vec<String>, outliers: &Vec<(usize, f64, f64, f64, bool)>) {
+    println!("\nOutliers are:\n");
+    for (idx, cr, ar, err, is_outlier) in outliers {
+        if !is_outlier {
+            continue;
+        };
         println!(
-            "- {} | Computed {}ms vs. Actual {}ms | Error {}\n",
-            equation_names[idx],
+            "- {} | Computed {}µs vs. Actual {}µs | Error {}\n",
+            equation_names[*idx],
             cr,
             format!("{:.3}", ar),
             format!("{:.3}", err)
