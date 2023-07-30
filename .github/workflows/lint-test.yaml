@@ -24,6 +24,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # This job determines if only docs files were changed
+  docs_only_determinator:
+    continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
+    runs-on: ubuntu-latest
+    outputs:
+      only_docs_changed: ${{ steps.skip_check.outputs.should_skip }} # True iff only docs files were changed
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          paths_ignore: '["**/*.md", "developer-docs-site/**"]'
+          #paths_ignore: '["**/*.md", "developer-docs-site/**", "**/*.yaml"]' # TODO: Remove yaml support. This is for testing!
+
+  # Run all general lints (i.e., non-rust and docs lints). This will be a PR required job.
+  general-lints:
+    needs: docs_only_determinator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
+      - name: Run general lints
+        uses: ./.github/actions/general-lints # aptos-labs/aptos-core/.github/actions/general-lints@main
+        if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - run: echo "Skipping general lints! Unrelated changes detected."
+        if: needs.docs_only_determinator.outputs.only_docs_changed == 'true'
+
+  # TODO: remove this once the new jobs land
   scripts-lint:
     runs-on: ubuntu-latest
     steps:
@@ -31,6 +60,7 @@ jobs:
       - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
       - run: shellcheck scripts/dev_setup.sh
 
+  # TODO: remove this once the new jobs land
   ecosystem-lint:
     runs-on: ubuntu-latest
     steps:
@@ -49,6 +79,7 @@ jobs:
       - run: cd ./ecosystem/typescript/sdk && pnpm lint
       - run: cd ./ecosystem/typescript/sdk && pnpm fmt:check
 
+  # TODO: remove this once the new jobs land
   ecosystem-python-lint:
     runs-on: ubuntu-latest
     steps:
@@ -58,6 +89,7 @@ jobs:
           pyproject_directory: ecosystem/python/sdk
       - run: make -C ecosystem/python/sdk fmt && ./scripts/fail_if_modified_files.sh
 
+  # Run the docs linter. This is a PR required job.
   docs-lint:
     runs-on: ubuntu-latest
     steps:
@@ -66,15 +98,17 @@ jobs:
         with:
           node-version-file: .node-version
       - uses: pnpm/action-setup@v2
-
       - run: pnpm lint
         working-directory: developer-docs-site
       - run: sudo apt update -y && sudo apt install -y aspell aspell-en
       - run: pnpm spellcheck
         working-directory: developer-docs-site
 
+  # Run the crypto hasher domain separation checks
   rust-cryptohasher-domain-separation-check:
+    needs: docs_only_determinator
     runs-on: high-perf-docker
+    if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
@@ -83,6 +117,52 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: python3 scripts/check-cryptohasher-symbols.py
 
+  # Run all rust lints. This will be a PR required job.
+  rust-lints:
+    needs: docs_only_determinator
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
+      - name: Run rust lints
+        uses: ./.github/actions/rust-lints # aptos-labs/aptos-core/.github/actions/rust-lints@main
+        if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - run: echo "Skipping rust lints! Unrelated changes detected."
+        if: needs.docs_only_determinator.outputs.only_docs_changed == 'true'
+
+  # Run all rust smoke tests. This will be a PR required job.
+  rust-smoke-tests:
+    needs: docs_only_determinator
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
+      - name: Run rust smoke tests
+        uses: ./.github/actions/rust-smoke-tests # aptos-labs/aptos-core/.github/actions/rust-smoke-tests@main
+        if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - run: echo "Skipping rust smoke tests! Unrelated changes detected."
+        if: needs.docs_only_determinator.outputs.only_docs_changed == 'true'
+
+  # Run all rust unit tests. This will be a PR required job.
+  rust-unit-tests:
+    needs: docs_only_determinator
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
+      - name: Run rust unit tests
+        uses: ./.github/actions/rust-unit-tests # aptos-labs/aptos-core/.github/actions/rust-unit-tests@main
+        if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - run: echo "Skipping rust unit tests! Unrelated changes detected."
+        if: needs.docs_only_determinator.outputs.only_docs_changed == 'true'
+
+  # TODO: remove this once the new jobs land
   rust-lint:
     runs-on: high-perf-docker
     steps:
@@ -94,6 +174,7 @@ jobs:
       - run: cargo install cargo-sort
       - run: scripts/rust_lint.sh --check
 
+  # TODO: remove this once the new jobs land
   rust-doc-test:
     runs-on: high-perf-docker
     steps:
@@ -105,6 +186,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: cargo test --locked --doc --workspace --exclude aptos-node-checker
 
+  # TODO: remove this once the new jobs land
   rust-unit-test:
     runs-on: high-perf-docker
     steps:
@@ -130,10 +212,11 @@ jobs:
           DOTNET_ROOT: /home/runner/.dotnet
           BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
 
+  # Run the consensus only unit tests
   rust-consensus-only-unit-test:
+    needs: docs_only_determinator
     runs-on: high-perf-docker
-    if: |
-      contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
+    if: needs.docs_only_determinator.outputs.only_docs_changed != 'true' || contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
       - uses: actions/checkout@v3
         with:
@@ -148,8 +231,11 @@ jobs:
         env:
           RUST_MIN_STACK: 4297152
 
+  # Run the rust network performance unit tests
   rust-network-perf-unit-test:
+    needs: docs_only_determinator
     runs-on: high-perf-docker
+    if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
     steps:
       - uses: actions/checkout@v3
         with:
@@ -164,6 +250,7 @@ jobs:
           cargo nextest run --locked -p aptos-peer-monitoring-service-client --no-fail-fast -F network-perf-test
           cargo nextest run --locked -p aptos-peer-monitoring-service-server --no-fail-fast -F network-perf-test
 
+  # TODO: remove this once the new jobs land
   rust-smoke-test:
     runs-on: high-perf-docker
     steps:
@@ -194,9 +281,11 @@ jobs:
             !/tmp/.tmp*/**/db/
           retention-days: 14
 
+  # Run the consensus only smoke test
   rust-consensus-only-smoke-test:
+    needs: docs_only_determinator
     runs-on: high-perf-docker
-    if: ${{ !github.ref || github.ref != 'aptos-node-v1.2.0' }}
+    if: needs.docs_only_determinator.outputs.only_docs_changed != 'true' || contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -221,8 +310,11 @@ jobs:
             !/tmp/.tmp*/**/db/
           retention-days: 14
 
+  # Run the network performance smoke test
   rust-network-perf-smoke-test:
+    needs: docs_only_determinator
     runs-on: high-perf-docker
+    if: needs.docs_only_determinator.outputs.only_docs_changed != 'true'
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -247,6 +339,7 @@ jobs:
             !/tmp/.tmp*/**/db/
           retention-days: 14
 
+  # TODO: remove this once the new jobs land
   check-vm-features:
     runs-on: high-perf-docker
     steps:
@@ -256,5 +349,6 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: cargo test --locked --features check-vm-features -p aptos-node
 
+  # TODO: remove this once the new jobs land
   python-lint-test:
     uses: ./.github/workflows/python-lint-test.yaml
