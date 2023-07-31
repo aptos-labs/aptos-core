@@ -345,10 +345,10 @@ impl BlockPartitioner for V2Partitioner {
         let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(self.dashmap_num_shards);
         let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(self.dashmap_num_shards);
         let mut helpers_by_key_id: DashMap<usize, RwLock<StorageLocationHelper>> = DashMap::with_shard_amount(self.dashmap_num_shards);
-        for _ in 0..num_txns {
+        for txn in txns.iter() {
             sender_ids_by_txn_id.push(RwLock::new(None));
-            wsets_by_txn_id.push(RwLock::new(HashSet::new()));
-            rsets_by_txn_id.push(RwLock::new(HashSet::new()));
+            wsets_by_txn_id.push(RwLock::new(HashSet::with_capacity(txn.write_hints().len())));
+            rsets_by_txn_id.push(RwLock::new(HashSet::with_capacity(txn.read_hints().len())));
         }
         let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__main"]).start_timer();
         self.thread_pool.install(||{
