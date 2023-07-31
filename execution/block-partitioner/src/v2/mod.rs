@@ -159,31 +159,14 @@ impl V2Partitioner {
         rsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
         wsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
         txn_id_matrix: &Vec<Vec<Vec<usize>>>,
+        start_index_matrix: &Vec<Vec<usize>>,
+        new_indices: &Vec<RwLock<usize>>,
         helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
     ) -> Vec<SubBlocksForShard<AnalyzedTransaction>>{
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges__init"]).start_timer();
         let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|t|Mutex::new(Some(t))).collect();
-
-        let num_txns = txns.len();
         let num_rounds = txn_id_matrix.len();
         let num_shards = txn_id_matrix.first().unwrap().len();
-
-        let mut global_txn_counter: usize = 0;
-        let mut new_indices: Vec<usize> = vec![0; num_txns];
-
-        let mut start_index_matrix: Vec<Vec<usize>> = vec![vec![0; num_shards]; num_rounds];
-        for (round_id, row) in txn_id_matrix.iter().enumerate() {
-            for (shard_id, txn_ids) in row.iter().enumerate() {
-                let num_txns_in_cur_sub_block = txn_ids.len();
-                for (pos_inside_sub_block, txn_id) in txn_ids.iter().enumerate() {
-                    let new_index = global_txn_counter + pos_inside_sub_block;
-                    new_indices[*txn_id] = new_index;
-                }
-                start_index_matrix[round_id][shard_id] = global_txn_counter;
-                global_txn_counter += num_txns_in_cur_sub_block;
-            }
-        }
-
         let mut sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> = Vec::with_capacity(num_rounds);
         for _round_id in 0..num_rounds {
             let mut row = Vec::with_capacity(num_shards);
@@ -210,7 +193,7 @@ impl V2Partitioner {
                             let helper = helper_ref.read().unwrap();
                             if let Some(fat_id) = helper.promoted_writer_ids.range(..TxnFatId::new(round_id, shard_id, 0)).last() {
                                 let src_txn_idx_fat = ShardedTxnIndex {
-                                    txn_index: new_indices[fat_id.old_txn_idx],
+                                    txn_index: *new_indices[fat_id.old_txn_idx].read().unwrap(),
                                     shard_id: fat_id.shard_id,
                                     round_id: fat_id.round_id,
                                 };
@@ -228,7 +211,7 @@ impl V2Partitioner {
                                         break;
                                     }
                                     let dst_txn_idx_fat = ShardedTxnIndex {
-                                        txn_index: new_indices[follower_id.old_txn_idx],
+                                        txn_index: *new_indices[follower_id.old_txn_idx].read().unwrap(),
                                         shard_id: follower_id.shard_id,
                                         round_id: follower_id.round_id,
                                     };
@@ -262,8 +245,6 @@ impl V2Partitioner {
 
         self.thread_pool.spawn(move||{
             drop(sub_block_matrix);
-            drop(start_index_matrix);
-            drop(new_indices);
             drop(txns);
         });
         ret
@@ -279,7 +260,8 @@ impl V2Partitioner {
         helpers_by_key_id: &DashMap<usize, RwLock<StorageLocationHelper>>,
         start_txn_ids_by_shard_id: &Vec<usize>,
         mut remaining_txn_ids: Vec<Vec<usize>>
-    ) -> Vec<Vec<Vec<usize>>> {
+    ) -> (Vec<Vec<Vec<usize>>>, Vec<Vec<usize>>, Vec<RwLock<usize>>) {
+        let new_indices: Vec<RwLock<usize>>= (0..num_txns).map(|_tid|RwLock::new(0)).collect();
         let mut txn_id_matrix: Vec<Vec<Vec<usize>>> = Vec::new();
         let mut num_remaining_txns = usize::MAX;
         for round_id in 0..(self.num_rounds_limit - 1) {
@@ -315,7 +297,30 @@ impl V2Partitioner {
             info!("last_round={duration}");
         }
 
-        txn_id_matrix
+
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["new_tid_table"]).start_timer();
+        let num_rounds = txn_id_matrix.len();
+        let mut start_index_matrix: Vec<Vec<usize>> = vec![vec![0; num_executor_shards]; num_rounds];
+        let mut global_counter: usize = 0;
+        for (round_id, row) in txn_id_matrix.iter().enumerate() {
+            for (shard_id, txns) in row.iter().enumerate() {
+                start_index_matrix[round_id][shard_id] = global_counter;
+                global_counter += txn_id_matrix[round_id][shard_id].len();
+            }
+        }
+
+        (0..num_rounds).into_par_iter().for_each(|round_id| {
+            (0..num_executor_shards).into_par_iter().for_each(|shard_id| {
+                let sub_block_size = txn_id_matrix[round_id][shard_id].len();
+                (0..sub_block_size).into_par_iter().for_each(|new_id_in_sub_block|{
+                    let txn_id = txn_id_matrix[round_id][shard_id][new_id_in_sub_block];
+                    *new_indices[txn_id].write().unwrap() = start_index_matrix[round_id][shard_id] + new_id_in_sub_block;
+                });
+            });
+        });
+        let duration = timer.stop_and_record();
+        info!("new_tid_table={duration}");
+        (txn_id_matrix, start_index_matrix, new_indices)
     }
 }
 
@@ -378,12 +383,12 @@ impl BlockPartitioner for V2Partitioner {
         info!("pre_partition_uniform={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("multi_rounds").as_str()]).start_timer();
-        let txn_id_matrix = self.multi_rounds(num_txns, num_executor_shards, &rsets_by_txn_id, &wsets_by_txn_id, &sender_ids_by_txn_id, &helpers_by_key_id, &start_txn_ids_by_shard_id, remaining_txn_ids);
+        let (txn_id_matrix, start_index_matrix, new_indices) = self.multi_rounds(num_txns, num_executor_shards, &rsets_by_txn_id, &wsets_by_txn_id, &sender_ids_by_txn_id, &helpers_by_key_id, &start_txn_ids_by_shard_id, remaining_txn_ids);
         let duration = timer.stop_and_record();
         info!("multi_rounds={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
-        let ret = self.add_edges(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &helpers_by_key_id);
+        let ret = self.add_edges(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &start_index_matrix, &new_indices, &helpers_by_key_id);
         let duration = timer.stop_and_record();
         info!("add_edges={duration}");
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["drop"]).start_timer();
@@ -396,6 +401,8 @@ impl BlockPartitioner for V2Partitioner {
             drop(key_ids_by_key);
             drop(start_txn_ids_by_shard_id);
             drop(txn_id_matrix);
+            drop(start_index_matrix);
+            drop(new_indices);
         });
         let duration = timer.stop_and_record();
         info!("drop={duration}");
