@@ -22,7 +22,7 @@ struct Args {
     pattern: String,
 
     /// Number of iterations to run each Calibration Function
-    #[clap(short, long, default_value_t = 10)]
+    #[clap(short, long, default_value_t = 20)]
     iterations: u64,
 }
 
