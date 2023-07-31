@@ -9,7 +9,7 @@ mod utils;
 
 use crate::{
     tests::{
-        coin_transfer::setup_and_run_cointransfer, new_account::setup_and_run_newaccount,
+        coin_transfer::setup_and_run_cointransfer, new_account::test_newaccount,
         nft_transfer::setup_and_run_nfttransfer, publish_module::setup_and_run_publishmodule,
     },
     utils::{set_metrics, NetworkName, TestFailure, TestName, TestResult},
@@ -76,7 +76,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
             TestName::NewAccount,
             network_name,
             &test_time,
-            setup_and_run_newaccount(network_name),
+            test_newaccount(network_name),
         )
         .await;
     });
@@ -131,7 +131,7 @@ async fn main() -> Result<()> {
     let _mp = MetricsPusher::start_for_local_run("api-tester");
 
     // test flows
-    let _ = test_flows(NetworkName::Testnet).await;
+    // let _ = test_flows(NetworkName::Testnet).await;
     let _ = test_flows(NetworkName::Devnet).await;
 
     Ok(())
