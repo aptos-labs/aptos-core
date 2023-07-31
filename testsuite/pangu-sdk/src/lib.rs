@@ -1,13 +1,16 @@
 // Copyright © Aptos Foundation
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+#[allow(unused_imports)]
 use std::env;
 #[allow(unused_imports)]
 use std::fs::File;
 #[allow(unused_imports)]
 use std::io::{Error, ErrorKind, Read, Write};
-use std::process::{Command, Stdio};
+use std::{
+    collections::BTreeMap,
+    process::{Command, Stdio},
+};
 use tempfile::NamedTempFile;
 
 //

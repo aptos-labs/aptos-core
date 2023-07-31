@@ -152,7 +152,6 @@ members = [
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
-    "testsuite/pangu-sdk",
     "testsuite/dos/http_test",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
@@ -162,6 +161,7 @@ members = [
     "testsuite/fuzzer/fuzz",
     "testsuite/generate-format",
     "testsuite/module-publish",
+    "testsuite/pangu-sdk",
     "testsuite/smoke-test",
     "testsuite/testcases",
 
