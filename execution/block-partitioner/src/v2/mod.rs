@@ -155,13 +155,14 @@ impl V2Partitioner {
 
     fn add_edges(
         &self,
-        txns: &Vec<Mutex<Option<AnalyzedTransaction>>>,
+        txns: Vec<AnalyzedTransaction>,
         rsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
         wsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
         txn_id_matrix: &Vec<Vec<Vec<usize>>>,
         helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
     ) -> Vec<SubBlocksForShard<AnalyzedTransaction>>{
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges__init"]).start_timer();
+        let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|t|Mutex::new(Some(t))).collect();
 
         let num_txns = txns.len();
         let num_rounds = txn_id_matrix.len();
@@ -266,6 +267,55 @@ impl V2Partitioner {
         });
         ret
     }
+
+    fn multi_rounds(
+        &self,
+        num_txns: usize,
+        num_executor_shards: usize,
+        rsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
+        wsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
+        sender_ids_by_txn_id: &Vec<RwLock<Option<usize>>>,
+        helpers_by_key_id: &DashMap<usize, RwLock<StorageLocationHelper>>,
+        start_txn_ids_by_shard_id: &Vec<usize>,
+        mut remaining_txn_ids: Vec<Vec<usize>>
+    ) -> Vec<Vec<Vec<usize>>> {
+        let mut txn_id_matrix: Vec<Vec<Vec<usize>>> = Vec::new();
+        let mut num_remaining_txns = usize::MAX;
+        for round_id in 0..(self.num_rounds_limit - 1) {
+            let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
+            let (accepted, discarded) = self.discarding_round(round_id, &rsets_by_txn_id, &wsets_by_txn_id, &sender_ids_by_txn_id, &helpers_by_key_id, &start_txn_ids_by_shard_id, remaining_txn_ids);
+            txn_id_matrix.push(accepted);
+            remaining_txn_ids = discarded;
+            num_remaining_txns = remaining_txn_ids.iter().map(|ts|ts.len()).sum();
+            let duration = timer.stop_and_record();
+            info!("round_{round_id}={duration}");
+
+            if num_remaining_txns < self.avoid_pct as usize * num_txns / 100 {
+                break;
+            }
+        }
+
+        if num_remaining_txns >= 1 {
+            let timer = MISC_TIMERS_SECONDS.with_label_values(&["last_round"]).start_timer();
+            let last_round_txns: Vec<usize> = remaining_txn_ids.into_iter().flatten().collect();
+            last_round_txns.par_iter().for_each(|txn_id_ref|{
+                let txn_id = *txn_id_ref;
+                for loc_id_ref in rsets_by_txn_id[txn_id].read().unwrap().iter().chain(wsets_by_txn_id[txn_id].read().unwrap().iter()) {
+                    let loc_id = *loc_id_ref;
+                    let helper = helpers_by_key_id.get(&loc_id).unwrap();
+                    helper.write().unwrap().promote_txn_id(txn_id, self.num_rounds_limit - 1, num_executor_shards - 1);
+                }
+            });
+
+            remaining_txn_ids = vec![vec![]; num_executor_shards];
+            remaining_txn_ids[num_executor_shards - 1] = last_round_txns;
+            txn_id_matrix.push(remaining_txn_ids);
+            let duration = timer.stop_and_record();
+            info!("last_round={duration}");
+        }
+
+        txn_id_matrix
+    }
 }
 
 impl BlockPartitioner for V2Partitioner {
@@ -318,7 +368,7 @@ impl BlockPartitioner for V2Partitioner {
 
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["pre_partition_uniform"]).start_timer();
-        let mut remaining_txn_ids = uniform_partition(num_txns, num_executor_shards);
+        let remaining_txn_ids = uniform_partition(num_txns, num_executor_shards);
         let mut start_txn_ids_by_shard_id = vec![0; num_executor_shards];
         for shard_id in 1..num_executor_shards {
             start_txn_ids_by_shard_id[shard_id] = start_txn_ids_by_shard_id[shard_id - 1] + remaining_txn_ids[shard_id - 1].len();
@@ -327,56 +377,23 @@ impl BlockPartitioner for V2Partitioner {
         info!("pre_partition_uniform={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("multi_rounds").as_str()]).start_timer();
-        let mut txn_id_matrix: Vec<Vec<Vec<usize>>> = Vec::new();
-        let mut num_remaining_txns = usize::MAX;
-        for round_id in 0..(self.num_rounds_limit - 1) {
-            let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
-            let (accepted, discarded) = self.discarding_round(round_id, &rsets_by_txn_id, &wsets_by_txn_id, &sender_ids_by_txn_id, &helpers_by_key_id, &start_txn_ids_by_shard_id, remaining_txn_ids);
-            txn_id_matrix.push(accepted);
-            remaining_txn_ids = discarded;
-            num_remaining_txns = remaining_txn_ids.iter().map(|ts|ts.len()).sum();
-            let duration = timer.stop_and_record();
-            info!("round_{round_id}={duration}");
-
-            if num_remaining_txns < self.avoid_pct as usize * num_txns / 100 {
-                break;
-            }
-        }
-
-        if num_remaining_txns >= 1 {
-            let timer = MISC_TIMERS_SECONDS.with_label_values(&["last_round"]).start_timer();
-            let last_round_txns: Vec<usize> = remaining_txn_ids.into_iter().flatten().collect();
-            last_round_txns.par_iter().for_each(|txn_id_ref|{
-                let txn_id = *txn_id_ref;
-                for loc_id_ref in rsets_by_txn_id[txn_id].read().unwrap().iter().chain(wsets_by_txn_id[txn_id].read().unwrap().iter()) {
-                    let loc_id = *loc_id_ref;
-                    let helper = helpers_by_key_id.get(&loc_id).unwrap();
-                    helper.write().unwrap().promote_txn_id(txn_id, self.num_rounds_limit - 1, num_executor_shards - 1);
-                }
-            });
-
-            remaining_txn_ids = vec![vec![]; num_executor_shards];
-            remaining_txn_ids[num_executor_shards - 1] = last_round_txns;
-            txn_id_matrix.push(remaining_txn_ids);
-            let duration = timer.stop_and_record();
-            info!("last_round={duration}");
-        }
+        let txn_id_matrix = self.multi_rounds(num_txns, num_executor_shards, &rsets_by_txn_id, &wsets_by_txn_id, &sender_ids_by_txn_id, &helpers_by_key_id, &start_txn_ids_by_shard_id, remaining_txn_ids);
         let duration = timer.stop_and_record();
         info!("multi_rounds={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
-        let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|t|Mutex::new(Some(t))).collect();
-        let ret = self.add_edges(&txns, &rsets_by_txn_id,&wsets_by_txn_id, &txn_id_matrix, &helpers_by_key_id);
+        let ret = self.add_edges(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &helpers_by_key_id);
         let duration = timer.stop_and_record();
         info!("add_edges={duration}");
         self.thread_pool.spawn(move||{
             drop(sender_ids_by_sender);
+            drop(sender_ids_by_txn_id);
             drop(wsets_by_txn_id);
             drop(rsets_by_txn_id);
             drop(helpers_by_key_id);
+            drop(key_ids_by_key);
             drop(start_txn_ids_by_shard_id);
             drop(txn_id_matrix);
-            drop(txns);
         });
         ret
     }
