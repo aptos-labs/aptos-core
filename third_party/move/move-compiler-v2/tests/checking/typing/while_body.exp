@@ -25,7 +25,7 @@ module 0x8675309::M {
         loop {
           if cond {
             {
-              let x: () = 0;
+              let x: u64 = 0;
               x;
               Tuple()
             }
