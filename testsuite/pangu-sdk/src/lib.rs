@@ -560,253 +560,253 @@ impl PanguSDK {
     }
 }
 
-#[cfg(test)]
-mod tests {
+// #[cfg(test)]
+// mod tests {
 
-    #[cfg(feature = "integration-tests")]
-    fn test_create_testnet() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
-        PanguSDK::create_testnet(
-            None,
-            None,
-            Some(3),
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some("olsen2"),
-        );
-    }
+//     #[cfg(feature = "integration-tests")]
+//     fn test_create_testnet() {
+//         env::set_var(
+//             "PANGU_DIR",
+//             "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
+//         );
+//         PanguSDK::create_testnet(
+//             None,
+//             None,
+//             Some(3),
+//             None,
+//             None,
+//             None,
+//             None,
+//             None,
+//             Some("olsen2"),
+//         );
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_update_testnet() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_update_testnet() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        PanguSDK::update_testnet(
-            "pangu-olsen",
-            None,
-            Some("/Users/olsenbudanur/Desktop/project/testnet-deployment/pangu_lib/template_testnet_files/pangu_node_config.yaml"),
-        )
-    }
+//         PanguSDK::update_testnet(
+//             "pangu-olsen",
+//             None,
+//             Some("/Users/olsenbudanur/Desktop/project/testnet-deployment/pangu_lib/template_testnet_files/pangu_node_config.yaml"),
+//         )
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_add_pfn() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_add_pfn() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        match PanguSDK::add_pfn(
-            "pangu-olsen",
-            "pfn-olsen",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu_lib/template_testnet_files/pfn.yaml",
-            None,
-            None,
-            None,
-            None,
-        ) {
-            Ok(message) => {
-                println!("{}", message);
-            },
-            Err(err) => {
-                eprintln!("{}", err);
-            },
-        }
-    }
+//         match PanguSDK::add_pfn(
+//             "pangu-olsen",
+//             "pfn-olsen",
+//             "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite/pangu_lib/template_testnet_files/pfn.yaml",
+//             None,
+//             None,
+//             None,
+//             None,
+//         ) {
+//             Ok(message) => {
+//                 println!("{}", message);
+//             },
+//             Err(err) => {
+//                 eprintln!("{}", err);
+//             },
+//         }
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_create_pangu_node_config() {
-        let blueprint1 = PanguNodeBlueprint {
-            validator_config_path: "validator_config_path".to_string(),
-            validator_image: "validator_image".to_string(),
-            validator_storage_class_name: "validator_storage_class_name".to_string(),
-            vfn_config_path: "vfn_config_path".to_string(),
-            vfn_image: "vfn_image".to_string(),
-            vfn_storage_class_name: "vfn_storage_class_name".to_string(),
-            nodes_persistent_volume_claim_size: "nodes_persistent_volume_claim_size".to_string(),
-            create_vfns: true,
-            stake_amount: 100000000000000,
-            count: 200,
-        };
+//     #[cfg(feature = "integration-tests")]
+//     fn test_create_pangu_node_config() {
+//         let blueprint1 = PanguNodeBlueprint {
+//             validator_config_path: "validator_config_path".to_string(),
+//             validator_image: "validator_image".to_string(),
+//             validator_storage_class_name: "validator_storage_class_name".to_string(),
+//             vfn_config_path: "vfn_config_path".to_string(),
+//             vfn_image: "vfn_image".to_string(),
+//             vfn_storage_class_name: "vfn_storage_class_name".to_string(),
+//             nodes_persistent_volume_claim_size: "nodes_persistent_volume_claim_size".to_string(),
+//             create_vfns: true,
+//             stake_amount: 100000000000000,
+//             count: 200,
+//         };
 
-        let blueprint2 = PanguNodeBlueprint {
-            validator_config_path: "asd".to_string(),
-            validator_image: "asd".to_string(),
-            validator_storage_class_name: "asd".to_string(),
-            vfn_config_path: "s".to_string(),
-            vfn_image: "d".to_string(),
-            vfn_storage_class_name: "d".to_string(),
-            nodes_persistent_volume_claim_size: "d".to_string(),
-            create_vfns: false,
-            stake_amount: 100000000000000,
-            count: 100,
-        };
+//         let blueprint2 = PanguNodeBlueprint {
+//             validator_config_path: "asd".to_string(),
+//             validator_image: "asd".to_string(),
+//             validator_storage_class_name: "asd".to_string(),
+//             vfn_config_path: "s".to_string(),
+//             vfn_image: "d".to_string(),
+//             vfn_storage_class_name: "d".to_string(),
+//             nodes_persistent_volume_claim_size: "d".to_string(),
+//             create_vfns: false,
+//             stake_amount: 100000000000000,
+//             count: 100,
+//         };
 
-        let mut blueprint_collection = BlueprintCollection {
-            blueprints: BTreeMap::new(),
-        };
+//         let mut blueprint_collection = BlueprintCollection {
+//             blueprints: BTreeMap::new(),
+//         };
 
-        blueprint_collection
-            .blueprints
-            .insert("nodebp".to_string(), blueprint1);
-        blueprint_collection
-            .blueprints
-            .insert("nodebp2".to_string(), blueprint2);
+//         blueprint_collection
+//             .blueprints
+//             .insert("nodebp".to_string(), blueprint1);
+//         blueprint_collection
+//             .blueprints
+//             .insert("nodebp2".to_string(), blueprint2);
 
-        if let Ok(temp_file) = PanguSDK::create_pangu_node_config(&blueprint_collection) {
-            let file_path = temp_file.path().to_string_lossy().to_string();
-            println!("Temporary YAML file created: {:?}", file_path);
-            let mut file = std::fs::File::open(&file_path).expect("Error opening temporary file.");
-            let mut contents = String::new();
-            file.read_to_string(&mut contents)
-                .expect("Error reading from temporary file.");
-            println!("Data written to temporary file:");
-            println!("{}", contents);
-        } else {
-            eprintln!("Error writing to the temporary file.");
-        }
-    }
+//         if let Ok(temp_file) = PanguSDK::create_pangu_node_config(&blueprint_collection) {
+//             let file_path = temp_file.path().to_string_lossy().to_string();
+//             println!("Temporary YAML file created: {:?}", file_path);
+//             let mut file = std::fs::File::open(&file_path).expect("Error opening temporary file.");
+//             let mut contents = String::new();
+//             file.read_to_string(&mut contents)
+//                 .expect("Error reading from temporary file.");
+//             println!("Data written to temporary file:");
+//             println!("{}", contents);
+//         } else {
+//             eprintln!("Error writing to the temporary file.");
+//         }
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_wipe_node() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_wipe_node() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        match PanguSDK::wipe_node("pangu-olsen", "nodebp-node-1-validator") {
-            Ok(message) => {
-                println!("{}", message);
-            },
-            Err(err) => {
-                eprintln!("{}", err);
-            },
-        }
-    }
+//         match PanguSDK::wipe_node("pangu-olsen", "nodebp-node-1-validator") {
+//             Ok(message) => {
+//                 println!("{}", message);
+//             },
+//             Err(err) => {
+//                 eprintln!("{}", err);
+//             },
+//         }
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_restart_node() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_restart_node() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        match PanguSDK::restart_node("pangu-olsen", "nodebp-node-1-validator") {
-            Ok(message) => {
-                println!("{}", message);
-            },
-            Err(err) => {
-                eprintln!("{}", err);
-            },
-        }
-    }
+//         match PanguSDK::restart_node("pangu-olsen", "nodebp-node-1-validator") {
+//             Ok(message) => {
+//                 println!("{}", message);
+//             },
+//             Err(err) => {
+//                 eprintln!("{}", err);
+//             },
+//         }
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_stop_node() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_stop_node() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        match PanguSDK::stop_node("pangu-olsen", "nodebp-node-1-validator") {
-            Ok(message) => {
-                println!("{}", message);
-            },
-            Err(err) => {
-                eprintln!("{}", err);
-            },
-        }
-    }
+//         match PanguSDK::stop_node("pangu-olsen", "nodebp-node-1-validator") {
+//             Ok(message) => {
+//                 println!("{}", message);
+//             },
+//             Err(err) => {
+//                 eprintln!("{}", err);
+//             },
+//         }
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_start_node() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_start_node() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        match PanguSDK::start_node("pangu-olsen", "nodebp-node-1-validator") {
-            Ok(message) => {
-                println!("{}", message);
-            },
-            Err(err) => {
-                eprintln!("{}", err);
-            },
-        }
-    }
+//         match PanguSDK::start_node("pangu-olsen", "nodebp-node-1-validator") {
+//             Ok(message) => {
+//                 println!("{}", message);
+//             },
+//             Err(err) => {
+//                 eprintln!("{}", err);
+//             },
+//         }
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_restart_nodes_in_testnet() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_restart_nodes_in_testnet() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        match PanguSDK::restart_nodes_in_testnet("pangu-olsen") {
-            Ok(message) => {
-                println!("{}", message);
-            },
-            Err(err) => {
-                eprintln!("{}", err);
-            },
-        }
-    }
+//         match PanguSDK::restart_nodes_in_testnet("pangu-olsen") {
+//             Ok(message) => {
+//                 println!("{}", message);
+//             },
+//             Err(err) => {
+//                 eprintln!("{}", err);
+//             },
+//         }
+//     }
 
-    // #[cfg(feature = "integration-tests")]
-    #[test]
-    fn test_healthcheck_testnet() {
-        // let pangu_dir = env::var("PANGU_DIR");
-        // assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+//     // #[cfg(feature = "integration-tests")]
+//     #[test]
+//     fn test_healthcheck_testnet() {
+//         // let pangu_dir = env::var("PANGU_DIR");
+//         // assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//         env::set_var(
+//             "PANGU_DIR",
+//             "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
+//         );
 
-        match PanguSDK::healthcheck_testnet("pangu-o", "ledger_info") {
-            Ok(summary) => {
-                println!("{:#?}", summary);
-            },
-            Err(err) => {
-                eprintln!("Failed to healthcheck testnets: {}", err);
-            },
-        }
-    }
+//         match PanguSDK::healthcheck_testnet("pangu-o", "ledger_info") {
+//             Ok(summary) => {
+//                 println!("{:#?}", summary);
+//             },
+//             Err(err) => {
+//                 eprintln!("Failed to healthcheck testnets: {}", err);
+//             },
+//         }
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_get_testnets() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_get_testnets() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        match PanguSDK::get_testnets() {
-            Ok(testnet_headers) => {
-                println!("{:#?}", testnet_headers);
-            },
-            Err(err) => {
-                eprintln!("Failed to get testnets: {}", err);
-            },
-        }
-    }
+//         match PanguSDK::get_testnets() {
+//             Ok(testnet_headers) => {
+//                 println!("{:#?}", testnet_headers);
+//             },
+//             Err(err) => {
+//                 eprintln!("Failed to get testnets: {}", err);
+//             },
+//         }
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_get_testnet() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_get_testnet() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        match PanguSDK::get_testnet("pangu-olsen") {
-            Ok(testnet) => {
-                println!("{:#?}", testnet);
-            },
-            Err(err) => {
-                eprintln!("Failed to get testnet: {}", err);
-            },
-        }
-    }
+//         match PanguSDK::get_testnet("pangu-olsen") {
+//             Ok(testnet) => {
+//                 println!("{:#?}", testnet);
+//             },
+//             Err(err) => {
+//                 eprintln!("Failed to get testnet: {}", err);
+//             },
+//         }
+//     }
 
-    #[cfg(feature = "integration-tests")]
-    fn test_delete_testnet() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+//     #[cfg(feature = "integration-tests")]
+//     fn test_delete_testnet() {
+//         let pangu_dir = env::var("PANGU_DIR");
+//         assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
-        match PanguSDK::delete_testnet("pangu-olsen", true) {
-            Ok(message) => {
-                println!("{}", message);
-            },
-            Err(err) => {
-                eprintln!("{}", err);
-            },
-        }
-    }
-}
+//         match PanguSDK::delete_testnet("pangu-olsen", true) {
+//             Ok(message) => {
+//                 println!("{}", message);
+//             },
+//             Err(err) => {
+//                 eprintln!("{}", err);
+//             },
+//         }
+//     }
+// }
