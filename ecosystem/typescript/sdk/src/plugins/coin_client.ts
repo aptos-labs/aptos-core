@@ -87,7 +87,12 @@ export class CoinClient {
 
     // If we should create the receiver account if it doesn't exist on-chain,
     // use the `0x1::aptos_account::transfer` function.
-    const func = extraArgs?.createReceiverIfMissing ? "0x1::aptos_account::transfer_coins" : "0x1::coin::transfer";
+    let func: string;
+    if (extraArgs?.createReceiverIfMissing === undefined) {
+      func = "0x1::aptos_account::transfer_coins";
+    } else {
+      func = extraArgs?.createReceiverIfMissing ? "0x1::aptos_account::transfer_coins" : "0x1::coin::transfer";
+    }
 
     // Get the receiver address from the AptosAccount or MaybeHexString.
     const toAddress = getAddressFromAccountOrAddress(to);
