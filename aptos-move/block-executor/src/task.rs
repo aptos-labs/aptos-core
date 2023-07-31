@@ -72,24 +72,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
-    /// Get the data writes of a transaction from its output.
-    fn get_resource_writes(
-        &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-    )>;
-
-    /// Get the code writes of a transaction from its output.
-    fn get_module_writes(
-        &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-    )>;
-
-    /// Get the aggregator writes of a transaction from its output.
-    fn get_aggregator_writes(
+    /// Get the writes of a transaction from its output.
+    fn get_writes(
         &self,
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,

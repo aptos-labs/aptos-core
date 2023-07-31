@@ -10,9 +10,7 @@ use anyhow::{bail, Result};
 use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_types::{
     state_store::{
-        state_key::{StateKey, StateKeyInner},
-        state_storage_usage::StateStorageUsage,
-        state_value::StateValue,
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     write_set::TransactionWrite,
 };
@@ -68,7 +66,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         let new_change_set = self.with_session_mut(|session| {
             session.take().unwrap().finish(&mut (), change_set_configs)
         })?;
-        let change_set = self.into_heads().state_view.change_set;
+        let mut change_set = self.into_heads().state_view.change_set;
         change_set
             .squash_additional_change_set(new_change_set, change_set_configs)
             .map_err(|_err| {
@@ -76,7 +74,8 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                     err_msg("Failed to squash VMChangeSet"),
                 )
-            })
+            })?;
+        Ok(change_set)
     }
 }
 
@@ -100,32 +99,15 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
     }
 
     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
-        // TODO: `get_state_value` should differentiate between different types
-        // of storage data.
-        if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
-            // We are fetching a module.
-            return match self.change_set.module_write_set().get(state_key) {
-                Some(write_op) => Ok(write_op.as_state_value()),
-                None => self.base.get_state_value(state_key),
-            };
-        }
-
-        match self.change_set.aggregator_delta_set().get(state_key) {
-            // The value to resolve delta has to come from `base`.
-            Some(delta_op) => Ok(delta_op
-                .try_into_write_op(self.base, state_key)?
-                .as_state_value()),
-            None => {
-                // Otherwise, this can be either a resource or an aggregator write.
-                match self.change_set.resource_write_set().get(state_key) {
-                    Some(write_op) => Ok(write_op.as_state_value()),
-                    // Can be aggregator or `base`.
-                    None => match self.change_set.aggregator_write_set().get(state_key) {
-                        Some(write_op) => Ok(write_op.as_state_value()),
-                        None => self.base.get_state_value(state_key),
-                    },
-                }
-            },
+        // TODO: `get_state_value` should differentiate between different write types.
+        let cached_value = self
+            .change_set
+            .write_set_iter()
+            .find(|(k, _)| *k == state_key)
+            .map(|(_, v)| v);
+        match cached_value {
+            Some(write_op) => Ok(write_op.as_state_value()),
+            None => self.base.get_state_value(state_key),
         }
     }
 

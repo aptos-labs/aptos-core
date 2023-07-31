@@ -136,33 +136,14 @@ where
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
-            // TODO: This may seem like code duplication, but we will have three
-            // MVHashMaps anyway soon.
-
-            // First, apply data writes.
             let write_version = (idx_to_execute, incarnation);
-            for (k, v) in output.get_resource_writes().into_iter() {
+            for (k, v) in output.get_writes().into_iter() {
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
                 versioned_cache.write(k, write_version, v);
             }
 
-            // Separately, record module writes.
-            for (k, v) in output.get_module_writes().into_iter() {
-                if !prev_modified_keys.remove(&k) {
-                    updates_outside = true;
-                }
-                versioned_cache.write(k, write_version, v);
-            }
-
-            // Aggregators also require special handling: both rites and deltas go to the same map.
-            for (k, v) in output.get_aggregator_writes().into_iter() {
-                if !prev_modified_keys.remove(&k) {
-                    updates_outside = true;
-                }
-                versioned_cache.write(k, write_version, v);
-            }
             for (k, d) in output.get_deltas().into_iter() {
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
@@ -640,13 +621,7 @@ where
                         "Sequential execution must materialize deltas"
                     );
                     // Apply the writes.
-                    for (ap, write_op) in output.get_resource_writes().into_iter() {
-                        data_map.write(ap, write_op);
-                    }
-                    for (ap, write_op) in output.get_module_writes().into_iter() {
-                        data_map.write(ap, write_op);
-                    }
-                    for (ap, write_op) in output.get_aggregator_writes().into_iter() {
+                    for (ap, write_op) in output.get_writes().into_iter() {
                         data_map.write(ap, write_op);
                     }
                     // Calculating the accumulated gas costs of the committed txns.

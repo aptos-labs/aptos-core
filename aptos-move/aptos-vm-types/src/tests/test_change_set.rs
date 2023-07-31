@@ -148,11 +148,10 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
 
 #[test]
 fn test_successful_squash() {
-    let (change_set_1, change_set_2) = build_change_sets_for_test();
-
-    // Check squash is indeed successful.
-    let res = change_set_1.squash_additional_change_set(change_set_2, &MockChangeSetChecker);
-    let change_set = assert_ok!(res);
+    let (mut change_set, additional_change_set) = build_change_sets_for_test();
+    assert_ok!(
+        change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker)
+    );
 
     let mut descriptor = "r";
     assert_eq!(
@@ -188,7 +187,7 @@ fn test_successful_squash() {
 
 macro_rules! assert_invariant_violation {
     ($w1:ident, $w2:ident) => {
-        let check = |res: anyhow::Result<VMChangeSet, VMStatus>| {
+        let check = |res: anyhow::Result<(), VMStatus>| {
             assert_matches!(
                 res,
                 Err(VMStatus::Error {
@@ -199,15 +198,15 @@ macro_rules! assert_invariant_violation {
             );
         };
 
-        let cs1 = build_change_set($w1.clone(), vec![], vec![], vec![]);
+        let mut cs1 = build_change_set($w1.clone(), vec![], vec![], vec![]);
         let cs2 = build_change_set($w2.clone(), vec![], vec![], vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-        let cs1 = build_change_set(vec![], $w1.clone(), vec![], vec![]);
+        let mut cs1 = build_change_set(vec![], $w1.clone(), vec![], vec![]);
         let cs2 = build_change_set(vec![], $w2.clone(), vec![], vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-        let cs1 = build_change_set(vec![], vec![], $w1.clone(), vec![]);
+        let mut cs1 = build_change_set(vec![], vec![], $w1.clone(), vec![]);
         let cs2 = build_change_set(vec![], vec![], $w2.clone(), vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
@@ -252,9 +251,9 @@ fn test_unsuccessful_squash_delete_delta() {
     let aggregator_write_set_1 = vec![mock_delete("20")];
     let aggregator_delta_set_2 = vec![mock_add("20", 120)];
 
-    let change_set_1 = build_change_set(vec![], vec![], aggregator_write_set_1, vec![]);
-    let change_set_2 = build_change_set(vec![], vec![], vec![], aggregator_delta_set_2);
-    let res = change_set_1.squash_additional_change_set(change_set_2, &MockChangeSetChecker);
+    let mut change_set = build_change_set(vec![], vec![], aggregator_write_set_1, vec![]);
+    let additional_change_set = build_change_set(vec![], vec![], vec![], aggregator_delta_set_2);
+    let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {
@@ -271,9 +270,9 @@ fn test_unsuccessful_squash_delta_create() {
     let aggregator_delta_set_1 = vec![mock_add("21", 21)];
     let aggregator_write_set_2 = vec![mock_create("21", 121)];
 
-    let change_set_1 = build_change_set(vec![], vec![], vec![], aggregator_delta_set_1);
-    let change_set_2 = build_change_set(vec![], vec![], aggregator_write_set_2, vec![]);
-    let res = change_set_1.squash_additional_change_set(change_set_2, &MockChangeSetChecker);
+    let mut change_set = build_change_set(vec![], vec![], vec![], aggregator_delta_set_1);
+    let additional_change_set = build_change_set(vec![], vec![], aggregator_write_set_2, vec![]);
+    let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {

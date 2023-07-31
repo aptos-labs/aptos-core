@@ -255,9 +255,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
 
                 results.iter().skip(committed).for_each(|output| {
                     // Ensure the transaction is skipped based on the output.
-                    assert!(output.resource_writes.is_empty());
-                    assert!(output.module_writes.is_empty());
-                    assert!(output.aggregator_writes.is_empty());
+                    assert!(output.writes.is_empty());
                     assert!(output.deltas.is_empty());
                     assert!(output.read_results.is_empty());
                     assert_eq!(output.total_gas, 0);

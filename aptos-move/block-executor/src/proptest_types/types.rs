@@ -527,10 +527,7 @@ where
                     }
                 }
                 ExecutionStatus::Success(MockOutput {
-                    // FIXME(george): behavior should split different kinds of writes as well!
-                    resource_writes: behavior.writes.clone(),
-                    module_writes: behavior.writes.clone(),
-                    aggregator_writes: behavior.writes.clone(),
+                    writes: behavior.writes.clone(),
                     deltas: behavior.deltas.clone(),
                     read_results: reads_result,
                     materialized_delta_writes: OnceCell::new(),
@@ -545,9 +542,8 @@ where
 
 #[derive(Debug)]
 pub(crate) struct MockOutput<K, V> {
-    pub(crate) resource_writes: Vec<(K, V)>,
-    pub(crate) module_writes: Vec<(K, V)>,
-    pub(crate) aggregator_writes: Vec<(K, V)>,
+    // TODO: Split writes into resources & modules.
+    pub(crate) writes: Vec<(K, V)>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     pub(crate) read_results: Vec<Option<Vec<u8>>>,
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
@@ -561,16 +557,8 @@ where
 {
     type Txn = MockTransaction<K, V>;
 
-    fn get_resource_writes(&self) -> Vec<(K, V)> {
-        self.resource_writes.clone()
-    }
-
-    fn get_module_writes(&self) -> Vec<(K, V)> {
-        self.module_writes.clone()
-    }
-
-    fn get_aggregator_writes(&self) -> Vec<(K, V)> {
-        self.aggregator_writes.clone()
+    fn get_writes(&self) -> Vec<(K, V)> {
+        self.writes.clone()
     }
 
     fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
@@ -579,9 +567,7 @@ where
 
     fn skip_output() -> Self {
         Self {
-            resource_writes: vec![],
-            module_writes: vec![],
-            aggregator_writes: vec![],
+            writes: vec![],
             deltas: vec![],
             read_results: vec![],
             materialized_delta_writes: OnceCell::new(),

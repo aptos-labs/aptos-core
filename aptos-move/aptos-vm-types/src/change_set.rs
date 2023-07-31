@@ -322,12 +322,10 @@ impl VMChangeSet {
     }
 
     pub fn squash_additional_change_set(
-        self,
+        &mut self,
         additional_change_set: Self,
         checker: &dyn CheckChangeSet,
-    ) -> anyhow::Result<Self, VMStatus> {
-        // First, obtain write sets, delta change sets and events of this and
-        // additional change sets.
+    ) -> anyhow::Result<(), VMStatus> {
         let Self {
             resource_write_set: additional_resource_write_set,
             module_write_set: additional_module_write_set,
@@ -335,31 +333,20 @@ impl VMChangeSet {
             aggregator_delta_set: additional_aggregator_delta_set,
             events: additional_events,
         } = additional_change_set;
-        let Self {
-            mut resource_write_set,
-            mut module_write_set,
-            mut aggregator_write_set,
-            mut aggregator_delta_set,
-            mut events,
-        } = self;
 
         Self::squash_additional_aggregator_changes(
-            &mut aggregator_write_set,
-            &mut aggregator_delta_set,
+            &mut self.aggregator_write_set,
+            &mut self.aggregator_delta_set,
             additional_aggregator_write_set,
             additional_aggregator_delta_set,
         )?;
-        Self::squash_additional_writes(&mut resource_write_set, additional_resource_write_set)?;
-        Self::squash_additional_writes(&mut module_write_set, additional_module_write_set)?;
-        events.extend(additional_events);
+        Self::squash_additional_writes(
+            &mut self.resource_write_set,
+            additional_resource_write_set,
+        )?;
+        Self::squash_additional_writes(&mut self.module_write_set, additional_module_write_set)?;
+        self.events.extend(additional_events);
 
-        Self::new(
-            resource_write_set,
-            module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set,
-            events,
-            checker,
-        )
+        checker.check_change_set(self)
     }
 }
