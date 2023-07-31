@@ -21,7 +21,7 @@ pub struct GasMeters {
 /// Compile every Move sample and run each sample with two different measuring methods.
 /// The first is with the Regular Gas Meter (used in production) to record the running time.
 /// The second is with the Abstract Algebra Gas Meter to record abstract gas usage.
-pub fn compile_and_run_samples() -> GasMeters {
+pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeters {
     // Discover all top-level packages in samples directory
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples");
     let dirs = read_dir(path.as_path()).unwrap();
@@ -60,9 +60,12 @@ pub fn compile_and_run_samples() -> GasMeters {
             let address = module_id.address();
 
             // get all benchmark tagged functions
-            // TODO: change pattern
-            let func_identifiers =
-                get_functional_identifiers(compiled_module, identifier, *address, String::new());
+            let func_identifiers = get_functional_identifiers(
+                compiled_module,
+                identifier,
+                *address,
+                pattern.to_string(),
+            );
 
             let meter_results = record_gas_meter(
                 &package,
@@ -70,6 +73,7 @@ pub fn compile_and_run_samples() -> GasMeters {
                 func_identifiers,
                 *address,
                 identifier,
+                iterations,
             );
 
             // record with regular gas meter
@@ -87,7 +91,7 @@ pub fn compile_and_run_samples() -> GasMeters {
 /// Compile every MVIR and run each sample with two different measuring methods.
 /// The first is with the Regular Gas Meter (used in production) to record the running time.
 /// The second is with the Abstract Algebra Gas Meter to record abstract gas usage.
-pub fn compile_and_run_samples_ir() -> GasMeters {
+pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeters {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples_ir");
 
     let executor = FakeExecutor::from_head_genesis();
@@ -131,7 +135,7 @@ pub fn compile_and_run_samples_ir() -> GasMeters {
                         module.clone(),
                         identifier,
                         *address,
-                        String::new(),
+                        pattern.to_string(),
                     );
 
                     // build .mv of module
@@ -151,8 +155,13 @@ pub fn compile_and_run_samples_ir() -> GasMeters {
                             &identifier, func_identifier
                         )));
 
-                        let elapsed =
-                            executor.exec_module(&module_id, &func_identifier, vec![], vec![]);
+                        let elapsed = executor.exec_module(
+                            &module_id,
+                            &func_identifier,
+                            vec![],
+                            vec![],
+                            iterations,
+                        );
                         gas_meter.regular_meter.push(elapsed);
 
                         // record with abstract gas meter

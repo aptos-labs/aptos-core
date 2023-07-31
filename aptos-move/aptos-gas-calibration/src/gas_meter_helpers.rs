@@ -83,8 +83,9 @@ pub fn sign_user_txn(
     executor: &mut FakeExecutor,
     module_name: &ModuleId,
     function_name: &str,
+    iterations: u64,
 ) -> u128 {
-    let elapsed = executor.exec_module(module_name, function_name, vec![], vec![]);
+    let elapsed = executor.exec_module(module_name, function_name, vec![], vec![], iterations);
     println!("running time (microseconds): {}", elapsed);
     elapsed
 }
@@ -105,6 +106,7 @@ pub fn record_gas_meter(
     func_identifiers: Vec<String>,
     address: AccountAddress,
     identifier: &String,
+    iterations: u64,
 ) -> GasMeters {
     // publish test-package under module address
     let creator = executor.new_account_at(address);
@@ -137,7 +139,7 @@ pub fn record_gas_meter(
         // send a txn that invokes the entry function 0x{address}::{name}::benchmark
         println!("Signing and running user txn for Regular Meter... ");
         let module_name = get_module_name(address, identifier, &func_identifier);
-        let duration = sign_user_txn(executor, &module_name, &func_identifier);
+        let duration = sign_user_txn(executor, &module_name, &func_identifier, iterations);
         gas_meter.regular_meter.push(duration);
 
         println!("Signing and running user txn for Abstract Meter... ");
