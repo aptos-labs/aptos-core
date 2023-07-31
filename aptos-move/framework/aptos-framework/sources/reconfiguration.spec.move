@@ -23,6 +23,7 @@ spec aptos_framework::reconfiguration {
     spec initialize(aptos_framework: &signer) {
         use std::signer;
         use aptos_framework::account::{Account};
+        use aptos_framework::guid;
 
         include AbortsIfNotAptosFramework;
         let addr = signer::address_of(aptos_framework);
@@ -30,12 +31,23 @@ spec aptos_framework::reconfiguration {
         requires exists<Account>(addr);
         aborts_if !(global<Account>(addr).guid_creation_num == 2);
         aborts_if exists<Configuration>(@aptos_framework);
+        // property 1: During the module's initialization, it guarantees that the Configuration resource will move under the Aptos framework account with initial values.
         ensures exists<Configuration>(@aptos_framework);
         ensures config.epoch == 0 && config.last_reconfiguration_time == 0;
+        ensures config.events == event::EventHandle<NewEpochEvent> {
+            counter: 0,
+            guid: guid::GUID {
+                id: guid::ID {
+                    creation_num: 2,
+                    addr: @aptos_framework
+                }
+            }
+        };
     }
 
     spec current_epoch(): u64 {
         aborts_if !exists<Configuration>(@aptos_framework);
+        ensures result == global<Configuration>(@aptos_framework).epoch;
     }
 
     spec disable_reconfiguration(aptos_framework: &signer) {
@@ -60,11 +72,12 @@ spec aptos_framework::reconfiguration {
         aborts_if !exists<Configuration>(@aptos_framework);
         let config_ref = global<Configuration>(@aptos_framework);
         aborts_if !(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0);
-        ensures config_ref.epoch == 1;
+        ensures global<Configuration>(@aptos_framework).epoch == 1;
     }
 
     spec last_reconfiguration_time {
         aborts_if !exists<Configuration>(@aptos_framework);
+        ensures result == global<Configuration>(@aptos_framework).last_reconfiguration_time;
     }
 
     spec reconfigure {
@@ -83,15 +96,22 @@ spec aptos_framework::reconfiguration {
         aborts_if false;
         let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
             && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
+        // property 3: Synchronization of NewEpochEvent counter with configuration epoch.
         ensures success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch) + 1;
-        ensures !success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch);
         ensures (success && event::counter<NewEpochEvent>(old(global<Configuration>(@aptos_framework)).events) <
             MAX_U64) ==>
             event::counter<NewEpochEvent>(global<Configuration>(@aptos_framework).events) ==
                 event::counter<NewEpochEvent>(old(global<Configuration>(@aptos_framework)).events) + 1;
+        ensures success ==> global<Configuration>(@aptos_framework).last_reconfiguration_time == timestamp::spec_now_microseconds();
+        // property 4: Only performs reconfiguration if genesis has started and reconfiguration is enabled.
+        // Also, the last reconfiguration must not be the current time, returning early without further actions otherwise.
+        // property 5: Consecutive reconfigurations without the passage of time are not permitted.
+        ensures !success ==> global<Configuration>(@aptos_framework).epoch == old(global<Configuration>(@aptos_framework).epoch);
     }
 
     spec reconfiguration_enabled {
+        // property 2: The reconfiguration status may be determined at any time without causing an abort, indicating whether or not the system allows reconfiguration.
         aborts_if false;
+        ensures result == !exists<DisableReconfiguration>(@aptos_framework);
     }
 }
