@@ -220,6 +220,9 @@ module std::features {
         is_enabled(BULLETPROOFS_NATIVES)
     }
 
+    public fun dkg_enabled(): bool {
+        true //TODO
+    }
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -31,6 +31,7 @@ This module defines a struct storing the metadata of the block and new block eve
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
+<b>use</b> <a href="dkg.md#0x1_dkg">0x1::dkg</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
@@ -411,7 +412,23 @@ The runtime always runs this before executing the transactions in a block.
     <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(<a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>());
 
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= block_metadata_ref.epoch_interval) {
-        <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+        <b>if</b> (dkg_enabled()) {
+            <b>let</b> dkg_state = <a href="dkg.md#0x1_dkg_get_state">dkg::get_state</a>();
+            <b>if</b> (dkg_state == <a href="dkg.md#0x1_dkg_state_not_started">dkg::state_not_started</a>()) {
+                <b>let</b> validator_set_and_stake_dist = <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfiguration::reconfigure_a</a>();
+                <a href="dkg.md#0x1_dkg_start">dkg::start</a>(validator_set_and_stake_dist);
+            } <b>else</b> <b>if</b> (dkg_state == <a href="dkg.md#0x1_dkg_state_started">dkg::state_started</a>()) {
+                <b>let</b> valid_aggregated_pvss_transcript_is_available = <b>true</b>; //TODO...
+                <b>if</b> (valid_aggregated_pvss_transcript_is_available) {
+                    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfiguration::reconfigure_b</a>();
+                    <a href="dkg.md#0x1_dkg_finish">dkg::finish</a>();
+                }
+            } <b>else</b> {
+                <b>abort</b>(1);
+            }
+        } <b>else</b> {
+            <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+        }
     };
 }
 </code></pre>

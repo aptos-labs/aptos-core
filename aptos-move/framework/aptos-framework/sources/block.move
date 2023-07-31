@@ -2,10 +2,12 @@
 module aptos_framework::block {
     use std::error;
     use std::features;
+    use std::features::dkg_enabled;
     use std::vector;
     use std::option;
 
     use aptos_framework::account;
+    use aptos_framework::dkg;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
@@ -152,7 +154,23 @@ module aptos_framework::block {
         state_storage::on_new_block(reconfiguration::current_epoch());
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
-            reconfiguration::reconfigure();
+            if (dkg_enabled()) {
+                let dkg_state = dkg::get_state();
+                if (dkg_state == dkg::state_not_started()) {
+                    let validator_set_and_stake_dist = reconfiguration::reconfigure_a();
+                    dkg::start(validator_set_and_stake_dist);
+                } else if (dkg_state == dkg::state_started()) {
+                    let valid_aggregated_pvss_transcript_is_available = true; //TODO...
+                    if (valid_aggregated_pvss_transcript_is_available) {
+                        reconfiguration::reconfigure_b();
+                        dkg::finish();
+                    }
+                } else {
+                    abort(1);
+                }
+            } else {
+                reconfiguration::reconfigure();
+            }
         };
     }
 

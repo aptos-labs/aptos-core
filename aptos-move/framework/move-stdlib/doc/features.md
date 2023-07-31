@@ -66,6 +66,7 @@ return true.
 -  [Function `auids_enabled`](#0x1_features_auids_enabled)
 -  [Function `get_bulletproofs_feature`](#0x1_features_get_bulletproofs_feature)
 -  [Function `bulletproofs_enabled`](#0x1_features_bulletproofs_enabled)
+-  [Function `dkg_enabled`](#0x1_features_dkg_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -1181,6 +1182,30 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_enabled">bulletproofs_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_dkg_enabled"></a>
+
+## Function `dkg_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_dkg_enabled">dkg_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_dkg_enabled">dkg_enabled</a>(): bool {
+    <b>true</b> //TODO
 }
 </code></pre>
 
