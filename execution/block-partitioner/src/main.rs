@@ -6,6 +6,7 @@ use clap::Parser;
 use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Mutex, time::Instant};
+use aptos_logger::info;
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -24,16 +25,16 @@ struct Args {
 
 fn main() {
     aptos_logger::Logger::new().init();
-    println!("Starting the block partitioning benchmark");
+    info!("Starting the block partitioning benchmark");
     let args = Args::parse();
     let num_accounts = args.num_accounts;
-    println!("Creating {} accounts", num_accounts);
+    info!("Creating {} accounts", num_accounts);
     let accounts: Vec<Mutex<TestAccount>> = (0..num_accounts)
         .into_par_iter()
         .map(|_i| Mutex::new(generate_test_account()))
         .collect();
-    println!("Created {} accounts", num_accounts);
-    println!("Creating {} transactions", args.block_size);
+    info!("Created {} accounts", num_accounts);
+    info!("Creating {} transactions", args.block_size);
     let partitioner = build_partitioner(Some(args.num_shards));
     for _ in 0..args.num_blocks {
         let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
@@ -48,11 +49,11 @@ fn main() {
             })
             .collect();
 
-        println!("Starting to partition");
+        info!("Starting to partition");
         let now = Instant::now();
         partitioner.partition(transactions, args.num_shards);
         let elapsed = now.elapsed();
-        println!("Time taken to partition: {:?}", elapsed);
+        info!("Time taken to partition: {:?}", elapsed);
     }
 }
 
