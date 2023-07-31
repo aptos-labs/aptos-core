@@ -13,9 +13,9 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_framework::{ReleaseBundle, ReleasePackage};
-use aptos_gas::{
-    AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, InitialGasSchedule,
-    NativeGasParameters, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+use aptos_gas_schedule::{
+    AptosGasParameters, InitialGasSchedule, MiscGasParameters, NativeGasParameters,
+    ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
@@ -31,6 +31,7 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
+use aptos_vm_types::storage::ChangeSetConfigs;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -81,7 +82,7 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
 // Cannot be impl Default in GasScheduleV2, due to circular dependencies.
 pub fn default_gas_schedule() -> GasScheduleV2 {
     GasScheduleV2 {
-        feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
+        feature_version: LATEST_GAS_FEATURE_VERSION,
         entries: AptosGasParameters::initial().to_on_chain_gas_schedule(LATEST_GAS_FEATURE_VERSION),
     }
 }
@@ -105,7 +106,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
-        AbstractValueSizeGasParameters::zeros(),
+        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
@@ -113,7 +114,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     )
     .unwrap();
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), true);
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::default();
@@ -148,7 +149,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
     let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
     let cs2 = session.finish(&mut (), &configs).unwrap();
     let change_set = cs1.squash(cs2, &configs).unwrap();
@@ -211,7 +212,7 @@ pub fn encode_genesis_change_set(
     let data_cache = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
-        AbstractValueSizeGasParameters::zeros(),
+        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
@@ -219,7 +220,7 @@ pub fn encode_genesis_change_set(
     )
     .unwrap();
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), true);
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
     // On-chain genesis process.
     initialize(
@@ -256,7 +257,7 @@ pub fn encode_genesis_change_set(
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
     let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
     let cs2 = session.finish(&mut (), &configs).unwrap();
     let change_set = cs1.squash(cs2, &configs).unwrap();
@@ -412,6 +413,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::CHARGE_INVARIANT_VIOLATION,
         FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
         FeatureFlag::GAS_PAYER_ENABLED,
+        FeatureFlag::BULLETPROOFS_NATIVES,
     ]
 }
 
@@ -877,7 +879,7 @@ pub fn test_genesis_module_publishing() {
 
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
-        AbstractValueSizeGasParameters::zeros(),
+        MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
@@ -885,7 +887,7 @@ pub fn test_genesis_module_publishing() {
     )
     .unwrap();
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), true);
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
     publish_framework(&mut session, aptos_cached_packages::head_release_bundle());
 }
 

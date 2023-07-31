@@ -94,6 +94,9 @@ spec aptos_framework::reconfiguration {
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
         aborts_if false;
+
+        // The ensure conditions of the reconfigure function are not fully written, because there is a new cycle in it, 
+        // but its existing ensure conditions satisfy hp.
         let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
             && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
         // property 3: Synchronization of NewEpochEvent counter with configuration epoch.

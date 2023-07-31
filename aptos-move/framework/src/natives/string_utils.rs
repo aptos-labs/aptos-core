@@ -1,15 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
-    safely_pop_arg,
+use aptos_gas_algebra::NumBytes;
+use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
-use aptos_types::on_chain_config::{Features, TimedFeatures};
 use ark_std::iterable::Iterable;
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{GasQuantity, InternalGas},
     language_storage::TypeTag,
     u256,
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
@@ -20,12 +20,11 @@ use move_vm_types::{
     values::{Reference, Struct, Value, Vector, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, fmt::Write, ops::Deref, sync::Arc};
+use std::{collections::VecDeque, fmt::Write, ops::Deref};
 
 struct FormatContext<'a, 'b, 'c, 'd, 'e> {
     context: &'d mut SafeNativeContext<'a, 'b, 'c, 'e>,
-    base_gas: InternalGas,
-    per_byte_gas: InternalGas,
+    should_charge_gas: bool,
     max_depth: usize,
     max_len: usize,
     type_tag: bool,
@@ -127,7 +126,9 @@ fn native_format_impl(
     depth: usize,
     out: &mut String,
 ) -> SafeNativeResult<()> {
-    context.context.charge(context.base_gas)?;
+    if context.should_charge_gas {
+        context.context.charge(STRING_UTILS_BASE)?;
+    }
     let mut suffix = "";
     match layout {
         MoveTypeLayout::Bool => {
@@ -207,9 +208,11 @@ fn native_format_impl(
                 && type_.address == AccountAddress::ONE
             {
                 let v = strct.unpack()?.next().unwrap().value_as::<Vec<u8>>()?;
-                context
-                    .context
-                    .charge(GasQuantity::from(v.len() as u64) * context.per_byte_gas)?;
+                if context.should_charge_gas {
+                    context
+                        .context
+                        .charge(STRING_UTILS_PER_BYTE * NumBytes::new(v.len() as u64))?;
+                }
                 write!(
                     out,
                     "\"{}\"",
@@ -296,11 +299,10 @@ pub(crate) fn native_format_debug(
     ty: &Type,
     v: Value,
 ) -> SafeNativeResult<String> {
-    let layout = context.deref().type_to_fully_annotated_layout(ty)?.unwrap();
+    let layout = context.deref().type_to_fully_annotated_layout(ty)?;
     let mut format_context = FormatContext {
         context,
-        base_gas: 0.into(),
-        per_byte_gas: 0.into(),
+        should_charge_gas: false,
         max_depth: usize::MAX,
         max_len: usize::MAX,
         type_tag: true,
@@ -314,7 +316,6 @@ pub(crate) fn native_format_debug(
 }
 
 fn native_format(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -322,8 +323,7 @@ fn native_format(
     debug_assert!(ty_args.len() == 1);
     let ty = context
         .deref()
-        .type_to_fully_annotated_layout(&ty_args[0])?
-        .unwrap();
+        .type_to_fully_annotated_layout(&ty_args[0])?;
     let include_int_type = safely_pop_arg!(arguments, bool);
     let single_line = safely_pop_arg!(arguments, bool);
     let canonicalize = safely_pop_arg!(arguments, bool);
@@ -333,8 +333,7 @@ fn native_format(
     let mut out = String::new();
     let mut format_context = FormatContext {
         context,
-        base_gas: gas_params.base,
-        per_byte_gas: gas_params.per_byte,
+        should_charge_gas: true,
         max_depth: usize::MAX,
         max_len: usize::MAX,
         type_tag,
@@ -348,7 +347,6 @@ fn native_format(
 }
 
 fn native_format_list(
-    gas_params: &GasParameters,
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -371,7 +369,7 @@ fn native_format_list(
         abort_code: invalid_fmt,
     })?;
 
-    context.charge(gas_params.per_byte * GasQuantity::from(fmt.len() as u64))?;
+    context.charge(STRING_UTILS_PER_BYTE * NumBytes::new(fmt.len() as u64))?;
 
     let match_list_ty = |context: &mut SafeNativeContext, list_ty, name| {
         if let TypeTag::Struct(struct_tag) = context
@@ -414,13 +412,10 @@ fn native_format_list(
                 val = it.next().unwrap();
                 list_ty = &ty_args[1];
 
-                let ty = context
-                    .type_to_fully_annotated_layout(&ty_args[0])?
-                    .unwrap();
+                let ty = context.type_to_fully_annotated_layout(&ty_args[0])?;
                 let mut format_context = FormatContext {
                     context,
-                    base_gas: gas_params.base,
-                    per_byte_gas: gas_params.per_byte,
+                    should_charge_gas: true,
                     max_depth: usize::MAX,
                     max_len: usize::MAX,
                     type_tag: true,
@@ -462,32 +457,13 @@ fn native_format_list(
     Ok(smallvec![move_str])
 }
 
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGas,
-}
-
 pub fn make_all(
-    gas_param: GasParameters,
-    timed_features: TimedFeatures,
-    features: Arc<Features>,
-) -> impl Iterator<Item = (String, NativeFunction)> {
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        (
-            "native_format",
-            make_safe_native(
-                gas_param.clone(),
-                timed_features.clone(),
-                features.clone(),
-                native_format,
-            ),
-        ),
-        (
-            "native_format_list",
-            make_safe_native(gas_param, timed_features, features, native_format_list),
-        ),
+        ("native_format", native_format as RawSafeNative),
+        ("native_format_list", native_format_list),
     ];
 
-    crate::natives::helpers::make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

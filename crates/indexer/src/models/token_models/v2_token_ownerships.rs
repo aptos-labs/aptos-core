@@ -164,6 +164,10 @@ impl TokenOwnershipV2 {
 
         // check if token was transferred
         if let Some((event_index, transfer_event)) = &metadata.transfer_event {
+            // If it's a self transfer then skip
+            if transfer_event.get_to_address() == transfer_event.get_from_address() {
+                return Ok(Some((ownership, current_ownership, None, None)));
+            }
             Ok(Some((
                 ownership,
                 current_ownership,
@@ -284,7 +288,20 @@ impl TokenOwnershipV2 {
             {
                 Some(inner) => inner.clone(),
                 None => {
-                    CurrentTokenOwnershipV2Query::get_nft_by_token_data_id(conn, token_address)?
+                    match CurrentTokenOwnershipV2Query::get_nft_by_token_data_id(
+                        conn,
+                        token_address,
+                    ) {
+                        Ok(nft) => nft,
+                        Err(_) => {
+                            aptos_logger::error!(
+                                transaction_version = txn_version,
+                                lookup_key = &token_address,
+                                "Failed to find NFT for burned token. You probably should backfill db."
+                            );
+                            return Ok(None);
+                        },
+                    }
                 },
             };
 

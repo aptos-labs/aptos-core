@@ -7,7 +7,7 @@ module aptos_framework::aggregator_factory {
     use std::error;
 
     use aptos_framework::system_addresses;
-    use aptos_std::aggregator::Aggregator;
+    use aptos_framework::aggregator::Aggregator;
     use aptos_std::table::{Self, Table};
 
     friend aptos_framework::genesis;

@@ -1032,4 +1032,4 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY
