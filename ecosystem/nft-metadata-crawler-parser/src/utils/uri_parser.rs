@@ -46,20 +46,20 @@ mod tests {
     fn test_parse_ipfs_uri() {
         let test_ipfs_prefix = "https://testipfsprefix.com/ipfs".to_string();
 
-        let test_ipfs_uri = "ipfs://testcid/testpath".to_string();
+        let cid = "testcid".to_string();
+        let path = "testpath".to_string();
+
+        let test_ipfs_uri = format!("ipfs://{}/{}", cid, path);
         let parsed_uri = URIParser::parse(test_ipfs_prefix.clone(), test_ipfs_uri).unwrap();
-        assert_eq!(
-            parsed_uri,
-            "https://testipfsprefix.com/ipfs/testcid/testpath"
-        );
+        assert_eq!(parsed_uri, format!("{test_ipfs_prefix}/{cid}/{path}"));
 
         // Path is optional for IPFS URIs
-        let test_ipfs_uri_no_path = "ipfs://testcidnopath".to_string();
+        let test_ipfs_uri_no_path = format!("ipfs://{}/{}", cid, "");
         let parsed_uri = URIParser::parse(test_ipfs_prefix.clone(), test_ipfs_uri_no_path).unwrap();
-        assert_eq!(parsed_uri, "https://testipfsprefix.com/ipfs/testcidnopath");
+        assert_eq!(parsed_uri, format!("{}/{}/{}", test_ipfs_prefix, cid, ""));
 
         // IPFS URIs must contain a CID, expect error here
-        let test_ipfs_uri_no_cid = "ipfs:///testpath".to_string();
+        let test_ipfs_uri_no_cid = format!("ipfs://{}/{}", "", path);
         let parsed_uri = URIParser::parse(test_ipfs_prefix.clone(), test_ipfs_uri_no_cid);
         assert!(parsed_uri.is_err());
     }
@@ -68,22 +68,22 @@ mod tests {
     fn test_parse_public_gateway_uri() {
         let test_ipfs_prefix = "https://testipfsprefix.com/ipfs".to_string();
 
-        let test_public_gateway_uri = "https://ipfs.io/ipfs/testcid/testpath".to_string();
+        let cid = "testcid".to_string();
+        let path = "testpath".to_string();
+
+        let test_public_gateway_uri = format!("https://ipfs.io/ipfs/{}/{}", cid, path);
         let parsed_uri =
             URIParser::parse(test_ipfs_prefix.clone(), test_public_gateway_uri).unwrap();
-        assert_eq!(
-            parsed_uri,
-            "https://testipfsprefix.com/ipfs/testcid/testpath"
-        );
+        assert_eq!(parsed_uri, format!("{test_ipfs_prefix}/{cid}/{path}",));
 
         // Path is optional for public gateway URIs
-        let test_public_gateway_uri_no_path = "https://ipfs.io/ipfs/testcidnopath".to_string();
+        let test_public_gateway_uri_no_path = format!("https://ipfs.io/ipfs/{}/{}", cid, "");
         let parsed_uri =
             URIParser::parse(test_ipfs_prefix.clone(), test_public_gateway_uri_no_path).unwrap();
-        assert_eq!(parsed_uri, "https://testipfsprefix.com/ipfs/testcidnopath");
+        assert_eq!(parsed_uri, format!("{}/{}/{}", test_ipfs_prefix, cid, ""));
 
         // Public gateway URIs must contain a CID, expect error here
-        let test_public_gateway_uri_no_cid = "https://ipfs.io/ipfs//testpath".to_string();
+        let test_public_gateway_uri_no_cid = format!("https://ipfs.io/ipfs/{}/{}", "", path);
         let parsed_uri = URIParser::parse(test_ipfs_prefix.clone(), test_public_gateway_uri_no_cid);
         assert!(parsed_uri.is_err());
     }
