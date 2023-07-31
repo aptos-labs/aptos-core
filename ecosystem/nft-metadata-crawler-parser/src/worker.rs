@@ -76,6 +76,7 @@ async fn consume_pubsub_entries_to_channel_loop(
                 NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")?,
             ),
             parts[4].parse::<bool>().unwrap_or(false),
+            parser_config.image_quality,
         );
 
         // Send worker to channel
@@ -178,6 +179,7 @@ pub struct Worker {
     last_transaction_version: i32,
     last_transaction_timestamp: chrono::NaiveDateTime,
     force: bool,
+    image_quality: u8,
 }
 
 impl Worker {
@@ -189,6 +191,7 @@ impl Worker {
         last_transaction_version: i32,
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
+        image_quality: u8,
     ) -> Self {
         Self {
             config,
@@ -199,6 +202,7 @@ impl Worker {
             last_transaction_version,
             last_transaction_timestamp,
             force,
+            image_quality,
         }
     }
 
@@ -274,16 +278,18 @@ impl Worker {
             let img_uri = URIParser::parse(raw_image_uri).unwrap_or(self.model.get_token_uri());
 
             // Resize and optimize image and animation
-            let (image, format) = ImageOptimizer::optimize(img_uri).await.unwrap_or_else(|e| {
-                // Increment retry count if image is None
-                error!(
-                    last_transaction_version = self.last_transaction_version,
-                    error = ?e,
-                    "[NFT Metadata Crawler] Image optimization failed"
-                );
-                self.model.increment_image_optimizer_retry_count();
-                (vec![], ImageFormat::Png)
-            });
+            let (image, format) = ImageOptimizer::optimize(img_uri, self.image_quality)
+                .await
+                .unwrap_or_else(|e| {
+                    // Increment retry count if image is None
+                    error!(
+                        last_transaction_version = self.last_transaction_version,
+                        error = ?e,
+                        "[NFT Metadata Crawler] Image optimization failed"
+                    );
+                    self.model.increment_image_optimizer_retry_count();
+                    (vec![], ImageFormat::Png)
+                });
 
             if !image.is_empty() {
                 // Save resized and optimized image to GCS
@@ -327,7 +333,7 @@ impl Worker {
                 URIParser::parse(raw_animation_uri.clone()).unwrap_or(raw_animation_uri);
 
             // Resize and optimize animation
-            let (animation, format) = ImageOptimizer::optimize(animation_uri)
+            let (animation, format) = ImageOptimizer::optimize(animation_uri, self.image_quality)
                 .await
                 .unwrap_or_else(|e| {
                     // Increment retry count if animation is None

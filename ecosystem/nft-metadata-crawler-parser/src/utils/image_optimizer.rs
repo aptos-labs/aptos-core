@@ -20,7 +20,10 @@ pub struct ImageOptimizer;
 impl ImageOptimizer {
     /// Resizes and optimizes image from input URI.
     /// Returns new image as a byte array and its format.
-    pub async fn optimize(uri: String) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
+    pub async fn optimize(
+        uri: String,
+        image_quality: u8,
+    ) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
         let (_, size) = get_uri_metadata(uri.clone()).await?;
         if size > MAX_FILE_SIZE_BYTES {
             return Err(anyhow::anyhow!("File too large, skipping"));
@@ -53,7 +56,7 @@ impl ImageOptimizer {
                         let img = image::load_from_memory(&img_bytes)
                             .context("Failed to load image from memory")?;
                         let resized_image = resize(&img.to_rgb8(), 400, 400, FilterType::Gaussian);
-                        Ok((Self::to_json_bytes(resized_image)?, format))
+                        Ok((Self::to_json_bytes(resized_image, image_quality)?, format))
                     },
                 }
             }
@@ -77,10 +80,11 @@ impl ImageOptimizer {
     /// Converts image to JPEG bytes vector
     fn to_json_bytes(
         image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>,
+        image_quality: u8,
     ) -> anyhow::Result<Vec<u8>> {
         let dynamic_image = DynamicImage::ImageRgb8(image_buffer);
         let mut byte_store = Cursor::new(Vec::new());
-        match dynamic_image.write_to(&mut byte_store, ImageOutputFormat::Jpeg(50)) {
+        match dynamic_image.write_to(&mut byte_store, ImageOutputFormat::Jpeg(image_quality)) {
             Ok(_) => Ok(byte_store.into_inner()),
             Err(_) => Err(anyhow::anyhow!("Error converting image to bytes")),
         }
