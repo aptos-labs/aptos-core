@@ -42,6 +42,7 @@ export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
   gasUnitPrice?: Uint64;
   expireTimestamp?: Uint64;
+  providedSequenceNumber?: string | bigint;
 }
 
 interface PaginationArgs {
@@ -758,7 +759,9 @@ export class AptosClient {
     extraArgs?: OptionalTransactionArgs,
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasEstimate }] = await Promise.all([
-      this.getAccount(accountFrom),
+      extraArgs?.providedSequenceNumber
+        ? Promise.resolve({ sequence_number: extraArgs.providedSequenceNumber })
+        : this.getAccount(accountFrom),
       this.getChainId(),
       extraArgs?.gasUnitPrice ? Promise.resolve({ gas_estimate: extraArgs.gasUnitPrice }) : this.estimateGasPrice(),
     ]);
