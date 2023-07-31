@@ -63,12 +63,12 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         mut self,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let new_change_set = self.with_session_mut(|session| {
+        let additional_change_set = self.with_session_mut(|session| {
             session.take().unwrap().finish(&mut (), change_set_configs)
         })?;
         let mut change_set = self.into_heads().state_view.change_set;
         change_set
-            .squash_additional_change_set(new_change_set, change_set_configs)
+            .squash_additional_change_set(additional_change_set, change_set_configs)
             .map_err(|_err| {
                 VMStatus::error(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,

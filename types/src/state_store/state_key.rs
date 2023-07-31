@@ -23,8 +23,8 @@ pub struct StateKey {
     inner: StateKeyInner,
     #[derivative(
         Hash = "ignore",
-        PartialEq = "ignore",
         Ord = "ignore",
+        PartialEq = "ignore",
         PartialOrd = "ignore"
     )]
     #[cfg_attr(any(test, feature = "fuzzing"), proptest(value = "OnceCell::new()"))]

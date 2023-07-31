@@ -90,7 +90,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get resource writes")
+            .expect("Output to be set to get writes")
             .change_set()
             .write_set_iter()
             .map(|(key, op)| (key.clone(), op.clone()))

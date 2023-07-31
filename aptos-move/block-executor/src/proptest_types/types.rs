@@ -278,6 +278,7 @@ impl Default for TransactionGenParams {
 // and may force more testing (since we check read results).
 impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> TransactionGen<V> {
     fn writes_and_deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
+        // TODO: disentangle writes and deltas.
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
         module_write_fn: &dyn Fn(usize) -> bool,

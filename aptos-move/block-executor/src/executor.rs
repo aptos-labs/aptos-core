@@ -136,6 +136,7 @@ where
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
+            // First, apply writes.
             let write_version = (idx_to_execute, incarnation);
             for (k, v) in output.get_writes().into_iter() {
                 if !prev_modified_keys.remove(&k) {
@@ -144,6 +145,7 @@ where
                 versioned_cache.write(k, write_version, v);
             }
 
+            // Then, apply deltas.
             for (k, d) in output.get_deltas().into_iter() {
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
