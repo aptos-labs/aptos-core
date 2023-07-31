@@ -245,7 +245,7 @@ const aptosCoin = const aptosCoin = {
 - To help work with these different formats, functions for converting between them have been added to `utils`.
 - A new function, `waitForTransactionWithResult`, has been added to help wait for a transaction and then get access to the response from the server once the function exits.
 
-For help with migration, we recommend you see the updated examples under `examples/`, they demonstrate how to deal with some of these changes, such as the more structured responses. We are also available to assist in the [Aptos Discord](https://discord.com/invite/aptoslabs).
+For help with migration, we recommend you see the updated examples under `examples/`, they demonstrate how to deal with some of these changes, such as the more structured responses. We are also available to assist in the [Aptos Discord](https://discord.gg/aptosnetwork).
 
 **Deprecation Notice**: On September 1st we will remove the v0 API from the running nodes. As a user of the TS SDK, the best way you can migrate prior to this is by upgrading to version 1.3.2 or higher of the SDK. We will repeatedly remind developers of this upcoming deprecation as we approach that date.
 
