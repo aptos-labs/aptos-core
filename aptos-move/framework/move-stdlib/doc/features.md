@@ -1456,6 +1456,17 @@ Helper to check whether a feature flag is enabled.
 
 
 
+
+<a name="0x1_features_spec_collect_and_distribute_gas_fees_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_collect_and_distribute_gas_fees_enabled">spec_collect_and_distribute_gas_fees_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)
+}
+</code></pre>
+
+
+
 <a name="@Specification_1_set"></a>
 
 ### Function `set`

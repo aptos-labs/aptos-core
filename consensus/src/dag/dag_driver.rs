@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::storage::DAGStorage;
+use super::{storage::DAGStorage, types::DAGMessage};
 use crate::{
     dag::{
         dag_store::Dag,
-        reliable_broadcast::ReliableBroadcast,
         types::{CertificateAckState, CertifiedNode, Node, NodeCertificate, SignatureBuilder},
     },
     state_replication::PayloadClient,
@@ -13,6 +12,7 @@ use crate::{
 };
 use aptos_consensus_types::common::{Author, Payload};
 use aptos_infallible::RwLock;
+use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{
     future::{AbortHandle, Abortable},
@@ -25,7 +25,7 @@ pub(crate) struct DagDriver {
     epoch_state: Arc<EpochState>,
     dag: Arc<RwLock<Dag>>,
     payload_client: Arc<dyn PayloadClient>,
-    reliable_broadcast: Arc<ReliableBroadcast>,
+    reliable_broadcast: Arc<ReliableBroadcast<DAGMessage>>,
     current_round: Round,
     time_service: Arc<dyn TimeService>,
     rb_abort_handle: Option<AbortHandle>,
@@ -38,7 +38,7 @@ impl DagDriver {
         epoch_state: Arc<EpochState>,
         dag: Arc<RwLock<Dag>>,
         payload_client: Arc<dyn PayloadClient>,
-        reliable_broadcast: Arc<ReliableBroadcast>,
+        reliable_broadcast: Arc<ReliableBroadcast<DAGMessage>>,
         current_round: Round,
         time_service: Arc<dyn TimeService>,
         storage: Arc<dyn DAGStorage>,

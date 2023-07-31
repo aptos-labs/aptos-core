@@ -7,3 +7,13 @@ module 0x42::M {
         pack M::R(false)
     }
 } // end 0x42::M
+module <SELF> {
+    private fun test<Token>(account: signer) {
+        {
+          let r: M::R = M::new();
+          BorrowGlobal(Immutable)<M::R>(0x1);
+          MoveTo<M::R>(Borrow(Immutable)(account), r);
+          Tuple()
+        }
+    }
+} // end <SELF>
