@@ -264,6 +264,7 @@ impl V2Partitioner {
             drop(sub_block_matrix);
             drop(start_index_matrix);
             drop(new_indices);
+            drop(txns);
         });
         ret
     }
