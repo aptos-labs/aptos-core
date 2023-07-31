@@ -70,7 +70,10 @@ async fn setup(
     // create account
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
     if let Err(e) = faucet_client.create_account(account.address()).await {
-        info!("test: new_account part: setup ERROR: {}, with error {:?}", ERROR_COULD_NOT_CREATE_ACCOUNT, e);
+        info!(
+            "test: new_account part: setup ERROR: {}, with error {:?}",
+            ERROR_COULD_NOT_CREATE_ACCOUNT, e
+        );
         return Err(e.into());
     };
 

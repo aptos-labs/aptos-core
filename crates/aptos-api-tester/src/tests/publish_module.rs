@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::utils::{TestFailure, NetworkName, get_client, get_faucet_client, create_and_fund_account};
+use crate::utils::{
+    create_and_fund_account, get_client, get_faucet_client, NetworkName, TestFailure,
+};
 use anyhow::{anyhow, Result};
 use aptos_api_types::HexEncodedBytes;
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
@@ -48,7 +50,8 @@ async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<H
     // create payload
     let payload: aptos_types::transaction::TransactionPayload =
         EntryFunctionCall::CodePublishPackageTxn {
-            metadata_serialized: bcs::to_bytes(&metadata).expect("PackageMetadata should deserialize"),
+            metadata_serialized: bcs::to_bytes(&metadata)
+                .expect("PackageMetadata should deserialize"),
             code: blobs.clone(),
         }
         .encode();
