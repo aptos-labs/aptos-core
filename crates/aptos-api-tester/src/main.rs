@@ -5,13 +5,12 @@
 
 mod counters;
 mod tests;
-mod testsetups;
 mod utils;
 
 use crate::{
-    testsetups::{
-        setup_and_run_cointransfer, setup_and_run_newaccount, setup_and_run_nfttransfer,
-        setup_and_run_publishmodule,
+    tests::{
+        coin_transfer::setup_and_run_cointransfer, new_account::setup_and_run_newaccount,
+        nft_transfer::setup_and_run_nfttransfer, publish_module::setup_and_run_publishmodule,
     },
     utils::{set_metrics, NetworkName, TestFailure, TestName, TestResult},
 };
@@ -28,7 +27,7 @@ use std::{
 async fn process_result<Fut: Future<Output = Result<(), TestFailure>>>(
     test_name: TestName,
     network_name: NetworkName,
-    start_time: &str,
+    run_id: &str,
     fut: Fut,
 ) {
     // start timer
@@ -51,7 +50,7 @@ async fn process_result<Fut: Future<Output = Result<(), TestFailure>>>(
         &output,
         &test_name.to_string(),
         &network_name.to_string(),
-        start_time,
+        run_id,
         time,
     );
     info!(
@@ -64,14 +63,14 @@ async fn process_result<Fut: Future<Output = Result<(), TestFailure>>>(
 }
 
 async fn test_flows(network_name: NetworkName) -> Result<()> {
-    let start_time = SystemTime::now()
+    let run_id = SystemTime::now()
         .duration_since(UNIX_EPOCH)?
         .as_secs()
         .to_string();
-    info!("testing {} at {}", network_name.to_string(), start_time);
+    info!("testing {} at {}", network_name.to_string(), run_id);
 
     // Test new account creation and funding
-    let test_time = start_time.clone();
+    let test_time = run_id.clone();
     let handle_newaccount = tokio::spawn(async move {
         process_result(
             TestName::NewAccount,
@@ -83,7 +82,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
     });
 
     // Flow 1: Coin transfer
-    let test_time = start_time.clone();
+    let test_time = run_id.clone();
     let handle_cointransfer = tokio::spawn(async move {
         process_result(
             TestName::CoinTransfer,
@@ -95,7 +94,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
     });
 
     // Flow 2: NFT transfer
-    let test_time = start_time.clone();
+    let test_time = run_id.clone();
     let handle_nfttransfer = tokio::spawn(async move {
         process_result(
             TestName::NftTransfer,
@@ -107,7 +106,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
     });
 
     // Flow 3: Publishing module
-    let test_time = start_time.clone();
+    let test_time = run_id.clone();
     process_result(
         TestName::PublishModule,
         network_name,
