@@ -27,14 +27,19 @@ pub mod validator_reboot_stress_test;
 
 use anyhow::Context;
 use aptos_forge::{
+    success_criteria::{LatencyBreakdown, LatencyBreakdownSlice, LatencySamples},
     EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
     TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
+use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    collections::BTreeMap,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 use tokio::runtime::Runtime;
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
@@ -171,17 +176,26 @@ impl NetworkTest for dyn NetworkLoadTest {
         let emit_job_request = ctx.emit_job.clone();
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
-        let (txn_stat, actual_test_duration, _ledger_transactions, _stats_by_phase) = self
-            .network_load_test(
-                ctx,
-                emit_job_request,
-                duration,
-                WARMUP_DURATION_FRACTION,
-                COOLDOWN_DURATION_FRACTION,
-                rng,
-            )?;
-        ctx.report
-            .report_txn_stats(self.name().to_string(), &txn_stat);
+        let stats_by_phase = self.network_load_test(
+            ctx,
+            emit_job_request,
+            duration,
+            WARMUP_DURATION_FRACTION,
+            COOLDOWN_DURATION_FRACTION,
+            rng,
+        )?;
+
+        let phased = stats_by_phase.len() > 1;
+        for (phase, phase_stats) in stats_by_phase.iter().enumerate() {
+            ctx.report.report_txn_stats(
+                if phased {
+                    format!("{}_phase_{}", self.name(), phase)
+                } else {
+                    self.name().to_string()
+                },
+                &phase_stats.emitter_stats,
+            );
+        }
 
         let end_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -194,15 +208,18 @@ impl NetworkTest for dyn NetworkLoadTest {
         self.finish(ctx.swarm())
             .context("finish NetworkLoadTest ")?;
 
-        ctx.check_for_success(
-            &txn_stat,
-            actual_test_duration,
-            start_timestamp as i64,
-            end_timestamp as i64,
-            start_version,
-            end_version,
-        )
-        .context("check for success")?;
+        for (_phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
+            ctx.check_for_success(
+                &phase_stats.emitter_stats,
+                phase_stats.actual_duration,
+                &phase_stats.latency_breakdown,
+                start_timestamp as i64,
+                end_timestamp as i64,
+                start_version,
+                end_version,
+            )
+            .context("check for success")?;
+        }
 
         Ok(())
     }
@@ -217,7 +234,7 @@ impl dyn NetworkLoadTest {
         warmup_duration_fraction: f32,
         cooldown_duration_fraction: f32,
         rng: StdRng,
-    ) -> Result<(TxnStats, Duration, u64, Vec<(TxnStats, Duration)>)> {
+    ) -> Result<Vec<LoadTestPhaseStats>> {
         let destination = self.setup(ctx).context("setup NetworkLoadTest")?;
         let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm());
 
@@ -247,6 +264,8 @@ impl dyn NetworkLoadTest {
             ))
             .context("start emitter job")?;
 
+        let total_start = PhaseTimingStart::now();
+
         let warmup_duration = duration.mul_f32(warmup_duration_fraction);
         let cooldown_duration = duration.mul_f32(cooldown_duration_fraction);
         let test_duration = duration - warmup_duration - cooldown_duration;
@@ -255,19 +274,11 @@ impl dyn NetworkLoadTest {
         job = rt.block_on(job.periodic_stat_forward(warmup_duration, 60));
         info!("{}s warmup finished", warmup_duration.as_secs());
 
-        let max_start_ledger_transactions = rt
-            .block_on(join_all(
-                clients.iter().map(|client| client.get_ledger_information()),
-            ))
-            .into_iter()
-            .filter(|r| r.is_ok())
-            .map(|r| r.unwrap().into_inner())
-            .map(|s| s.version - 2 * s.block_height)
-            .max();
-
-        let mut actual_phase_durations = Vec::new();
+        let mut phase_timing = Vec::new();
+        let mut phase_start_network_state = Vec::new();
         let test_start = Instant::now();
         for i in 0..stats_tracking_phases - 2 {
+            phase_start_network_state.push(rt.block_on(NetworkState::new(&clients)));
             job.start_next_phase();
 
             if i > 0 {
@@ -277,13 +288,13 @@ impl dyn NetworkLoadTest {
                     stats_tracking_phases - 2,
                 );
             }
-            let phase_start = Instant::now();
+            let phase_start = PhaseTimingStart::now();
 
             let join_stats = rt.spawn(job.periodic_stat_forward(phase_duration, 60));
             self.test(ctx.swarm, ctx.report, phase_duration)
                 .context("test NetworkLoadTest")?;
             job = rt.block_on(join_stats).context("join stats")?;
-            actual_phase_durations.push(phase_start.elapsed());
+            phase_timing.push(phase_start.elapsed());
         }
         let actual_test_duration = test_start.elapsed();
         info!(
@@ -292,17 +303,9 @@ impl dyn NetworkLoadTest {
             actual_test_duration.as_secs()
         );
 
+        phase_start_network_state.push(rt.block_on(NetworkState::new(&clients)));
         job.start_next_phase();
         let cooldown_start = Instant::now();
-        let max_end_ledger_transactions = rt
-            .block_on(join_all(
-                clients.iter().map(|client| client.get_ledger_information()),
-            ))
-            .into_iter()
-            .filter(|r| r.is_ok())
-            .map(|r| r.unwrap().into_inner())
-            .map(|s| s.version - 2 * s.block_height)
-            .max();
 
         let cooldown_used = cooldown_start.elapsed();
         if cooldown_used < cooldown_duration {
@@ -310,9 +313,12 @@ impl dyn NetworkLoadTest {
         }
         info!("{}s cooldown finished", cooldown_duration.as_secs());
 
+        let total_timing = total_start.elapsed();
         info!(
-            "Emitting txns ran for {} secs, stopping job...",
-            duration.as_secs()
+            "Emitting txns ran for {} secs(from {} to {}), stopping job...",
+            duration.as_secs(),
+            total_timing.start_unixtime_s,
+            total_timing.end_unixtime_s,
         );
         let stats_by_phase = rt.block_on(job.stop_job());
 
@@ -320,36 +326,186 @@ impl dyn NetworkLoadTest {
         info!("Warmup stats: {}", stats_by_phase[0].rate());
 
         let mut stats: Option<TxnStats> = None;
-        let mut stats_and_duration_by_phase_filtered = Vec::new();
+        let mut stats_by_phase_filtered = Vec::new();
         for i in 0..stats_tracking_phases - 2 {
-            let cur = &stats_by_phase[1 + i];
+            let next_i = i + 1;
+            let cur = &stats_by_phase[next_i];
             info!("Test stats [test phase {}]: {}", i, cur.rate());
             stats = if let Some(previous) = stats {
                 Some(&previous + cur)
             } else {
                 Some(cur.clone())
             };
-            stats_and_duration_by_phase_filtered.push((cur.clone(), actual_phase_durations[i]));
+            let latency_breakdown = rt.block_on(fetch_latency_breakdown(
+                ctx.swarm(),
+                phase_timing[i].start_unixtime_s,
+                phase_timing[i].end_unixtime_s,
+            ))?;
+            info!(
+                "latency_breakdown: from {} to {}: {:?}",
+                phase_timing[i].start_unixtime_s, phase_timing[i].end_unixtime_s, latency_breakdown
+            );
+            stats_by_phase_filtered.push(LoadTestPhaseStats {
+                emitter_stats: cur.clone(),
+                actual_duration: phase_timing[i].duration,
+                phase_start_unixtime_s: phase_timing[i].start_unixtime_s,
+                phase_end_unixtime_s: phase_timing[i].end_unixtime_s,
+                ledger_transactions: NetworkState::ledger_transactions(
+                    &phase_start_network_state[i],
+                    &phase_start_network_state[next_i],
+                ),
+                latency_breakdown,
+            });
         }
         info!("Cooldown stats: {}", stats_by_phase.last().unwrap().rate());
 
-        let ledger_transactions = if let Some(end_t) = max_end_ledger_transactions {
-            if let Some(start_t) = max_start_ledger_transactions {
-                end_t - start_t
-            } else {
-                0
-            }
+        Ok(stats_by_phase_filtered)
+    }
+}
+
+struct PhaseTimingStart {
+    now: Instant,
+    unixtime_s: u64,
+}
+
+impl PhaseTimingStart {
+    fn now() -> PhaseTimingStart {
+        let now = Instant::now();
+        let unixtime_s = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        PhaseTimingStart { now, unixtime_s }
+    }
+
+    fn elapsed(&self) -> PhaseTiming {
+        PhaseTiming {
+            duration: self.now.elapsed(),
+            start_unixtime_s: self.unixtime_s,
+            end_unixtime_s: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs(),
+        }
+    }
+}
+
+struct PhaseTiming {
+    duration: Duration,
+    start_unixtime_s: u64,
+    end_unixtime_s: u64,
+}
+
+pub(crate) struct NetworkState {
+    max_version_and_height: Option<(u64, u64)>,
+}
+
+impl NetworkState {
+    pub async fn new(clients: &[RestClient]) -> NetworkState {
+        let max_version_and_height =
+            join_all(clients.iter().map(|client| client.get_ledger_information()))
+                .await
+                .into_iter()
+                .filter(|r| r.is_ok())
+                .map(|r| r.unwrap().into_inner())
+                .map(|s| (s.version, s.block_height))
+                .max();
+        NetworkState {
+            max_version_and_height,
+        }
+    }
+
+    pub fn ledger_transactions(start: &NetworkState, end: &NetworkState) -> u64 {
+        if let (Some((end_version, end_height)), Some((start_version, start_height))) =
+            (end.max_version_and_height, start.max_version_and_height)
+        {
+            (end_version - end_height * 2) - (start_version - start_height * 2)
         } else {
             0
-        };
-
-        Ok((
-            stats.unwrap(),
-            actual_test_duration,
-            ledger_transactions,
-            stats_and_duration_by_phase_filtered,
-        ))
+        }
     }
+}
+
+async fn fetch_latency_breakdown(
+    swarm: &dyn Swarm,
+    start_time: u64,
+    end_time: u64,
+) -> anyhow::Result<LatencyBreakdown> {
+    // Averaging over 1m, and skipping data points at the start that would take averages outside of the interval.
+    let start_time_adjusted = start_time + 60;
+    let consensus_proposal_to_ordered_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="ordered"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="ordered"}[1m]))"#;
+    let consensus_proposal_to_commit_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="committed"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="committed"}[1m]))"#;
+
+    let qs_batch_to_pos_query = r#"sum(rate(quorum_store_batch_to_PoS_duration_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_batch_to_PoS_duration_count{role=~"validator"}[1m]))"#;
+    let qs_pos_to_proposal_query = r#"sum(rate(quorum_store_pos_to_pull_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_pos_to_pull_count{role=~"validator"}[1m]))"#;
+
+    let consensus_proposal_to_ordered_samples = swarm
+        .query_range_metrics(
+            consensus_proposal_to_ordered_query,
+            start_time_adjusted as i64,
+            end_time as i64,
+            None,
+        )
+        .await?;
+
+    let consensus_ordered_to_commit_samples = swarm
+        .query_range_metrics(
+            &format!(
+                "{} - {}",
+                consensus_proposal_to_commit_query, consensus_proposal_to_ordered_query
+            ),
+            start_time_adjusted as i64,
+            end_time as i64,
+            None,
+        )
+        .await?;
+
+    let qs_batch_to_pos_samples = swarm
+        .query_range_metrics(
+            qs_batch_to_pos_query,
+            start_time_adjusted as i64,
+            end_time as i64,
+            None,
+        )
+        .await?;
+
+    let qs_pos_to_proposal_samples = swarm
+        .query_range_metrics(
+            qs_pos_to_proposal_query,
+            start_time_adjusted as i64,
+            end_time as i64,
+            None,
+        )
+        .await?;
+
+    let mut samples = BTreeMap::new();
+    samples.insert(
+        LatencyBreakdownSlice::QsBatchToPos,
+        LatencySamples::new(qs_batch_to_pos_samples),
+    );
+    samples.insert(
+        LatencyBreakdownSlice::QsPosToProposal,
+        LatencySamples::new(qs_pos_to_proposal_samples),
+    );
+    samples.insert(
+        LatencyBreakdownSlice::ConsensusProposalToOrdered,
+        LatencySamples::new(consensus_proposal_to_ordered_samples),
+    );
+    samples.insert(
+        LatencyBreakdownSlice::ConsensusOrderedToCommit,
+        LatencySamples::new(consensus_ordered_to_commit_samples),
+    );
+
+    Ok(LatencyBreakdown::new(samples))
+}
+
+pub struct LoadTestPhaseStats {
+    pub emitter_stats: TxnStats,
+    pub actual_duration: Duration,
+    pub phase_start_unixtime_s: u64,
+    pub phase_end_unixtime_s: u64,
+    pub ledger_transactions: u64,
+    pub latency_breakdown: LatencyBreakdown,
 }
 
 pub struct CompositeNetworkTest {

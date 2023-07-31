@@ -12,7 +12,7 @@ use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use futures::future::{join_all, try_join_all};
-use prometheus_http_query::response::PromqlResult;
+use prometheus_http_query::response::{PromqlResult, Sample};
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
@@ -99,6 +99,14 @@ pub trait Swarm: Sync {
         time: Option<i64>,
         timeout: Option<i64>,
     ) -> Result<PromqlResult>;
+
+    async fn query_range_metrics(
+        &self,
+        query: &str,
+        start_time: i64,
+        end_time: i64,
+        timeout: Option<i64>,
+    ) -> Result<Vec<Sample>>;
 
     fn aptos_public_info(&mut self) -> AptosPublicInfo<'_> {
         self.chain_info().into_aptos_public_info()
