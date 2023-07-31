@@ -562,6 +562,8 @@ impl PanguSDK {
 
 #[cfg(test)]
 mod tests {
+    #[warn(unused_imports)]
+    use super::*;
 
     #[cfg(feature = "integration-tests")]
     fn test_create_testnet() {
@@ -584,10 +586,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_update_testnet() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         PanguSDK::update_testnet(
             "pangu-olsen",
@@ -598,10 +598,9 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_add_pfn() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+
         match PanguSDK::add_pfn(
             "pangu-olsen",
             "pfn-olsen",
@@ -675,10 +674,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_wipe_node() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         match PanguSDK::wipe_node("pangu-olsen", "nodebp-node-1-validator") {
             Ok(message) => {
@@ -692,10 +689,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_restart_node() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         match PanguSDK::restart_node("pangu-olsen", "nodebp-node-1-validator") {
             Ok(message) => {
@@ -709,10 +704,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_stop_node() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         match PanguSDK::stop_node("pangu-olsen", "nodebp-node-1-validator") {
             Ok(message) => {
@@ -726,10 +719,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_start_node() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         match PanguSDK::start_node("pangu-olsen", "nodebp-node-1-validator") {
             Ok(message) => {
@@ -743,10 +734,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_restart_nodes_in_testnet() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         match PanguSDK::restart_nodes_in_testnet("pangu-olsen") {
             Ok(message) => {
@@ -760,10 +749,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_healthcheck_testnet() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         match PanguSDK::healthcheck_testnet("pangu-olsen", "ledger_info") {
             Ok(summary) => {
@@ -777,10 +764,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_get_testnets() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         match PanguSDK::get_testnets() {
             Ok(testnet_headers) => {
@@ -794,10 +779,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_get_testnet() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         match PanguSDK::get_testnet("pangu-olsen") {
             Ok(testnet) => {
@@ -811,10 +794,8 @@ mod tests {
 
     #[cfg(feature = "integration-tests")]
     fn test_delete_testnet() {
-        env::set_var(
-            "PANGU_DIR",
-            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
-        );
+        let pangu_dir = env::var("PANGU_DIR");
+        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
 
         match PanguSDK::delete_testnet("pangu-olsen", true) {
             Ok(message) => {
