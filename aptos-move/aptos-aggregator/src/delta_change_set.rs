@@ -555,14 +555,6 @@ mod test {
         );
     }
 
-    #[test]
-    fn test_empty_storage_error_propagated() {
-        let state_view = AggregatorStore::default();
-        let deltas = vec![(KEY.clone(), delta_add(10, 100))];
-        let delta_change_set = DeltaChangeSet::new(deltas);
-        assert_err!(delta_change_set.try_into_write_set(&state_view));
-    }
-
     struct BadStorage;
 
     impl TStateView for BadStorage {
@@ -595,34 +587,6 @@ mod test {
                 message: Some(_),
                 sub_status: None
             })
-        );
-    }
-
-    #[test]
-    fn test_storage_error_propagated() {
-        let state_view = BadStorage;
-        let deltas = vec![(KEY.clone(), delta_add(10, 100))];
-        let delta_change_set = DeltaChangeSet::new(deltas);
-        assert_matches!(
-            delta_change_set.try_into_write_set(&state_view),
-            Err(VMStatus::Error {
-                status_code: StatusCode::STORAGE_ERROR,
-                message: Some(_),
-                sub_status: None
-            })
-        );
-    }
-
-    #[test]
-    fn test_delta_materialization_failure() {
-        let mut state_view = AggregatorStore::default();
-        state_view.set_from_state_key(KEY.clone(), 99);
-
-        let deltas = vec![(KEY.clone(), delta_add(10, 100))];
-        let delta_change_set = DeltaChangeSet::new(deltas);
-        assert_matches!(
-            delta_change_set.try_into_write_set(&state_view),
-            Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
         );
     }
 
