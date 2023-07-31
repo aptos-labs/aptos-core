@@ -109,6 +109,7 @@ impl Block {
             Some(payload) => match payload {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
                 Payload::DirectMempool(txns) => txns.len(),
+                Payload::DKG(dkg_payload) => dkg_payload.len(),
             },
         }
     }

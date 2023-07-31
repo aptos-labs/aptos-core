@@ -1,20 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    network::TConsensusMsg,
-    network_interface::ConsensusMsg,
-};
 use anyhow::bail;
-use aptos_consensus_types::common::Author;
+pub use aptos_consensus_types::{common::Author, dkg_types::DKGAggNode};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
+use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use aptos_dkg::pvss::scrape::Transcript;
 
-use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
+use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
 
 pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
     // dkg todo: pass in public keys for verification
@@ -161,82 +158,6 @@ where
         } else {
             Ok(None)
         }
-    }
-}
-
-/// Represents the metadata about the node, without payload and parents from Node
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, CryptoHasher, BCSCryptoHash)]
-pub struct DKGAggNodeMetadata {
-    epoch: u64,
-    author: Author,
-}
-
-impl DKGAggNodeMetadata {
-    #[cfg(test)]
-    pub fn new_for_test(
-        epoch: u64,
-        author: Author,
-    ) -> Self {
-        Self {
-            epoch,
-            author,
-        }
-    }
-
-    pub fn author(&self) -> &Author {
-        &self.author
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
-}
-
-
-#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
-pub struct DKGAggNode {
-    metadata: DKGAggNodeMetadata,
-    // dkg todo: use aggregated transcript here
-    // I am assuming aggregated transcript contains the authors of individual transcript
-    agg_trx: Transcript,
-}
-
-impl DKGAggNode {
-    pub fn new(
-        epoch: u64,
-        author: Author,
-        agg_trx: Transcript,
-    ) -> Self {
-        Self {
-            metadata: DKGAggNodeMetadata {
-                epoch,
-                author,
-            },
-            agg_trx,
-        }
-    }
-
-    #[cfg(test)]
-    pub fn new_for_test(
-        metadata: DKGAggNodeMetadata,
-        agg_trx: Transcript,
-    ) -> Self {
-        Self {
-            metadata,
-            agg_trx,
-        }
-    }
-
-    pub fn metadata(&self) -> &DKGAggNodeMetadata {
-        &self.metadata
-    }
-
-    pub fn author(&self) -> &Author {
-        self.metadata.author()
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.metadata.epoch
     }
 }
 

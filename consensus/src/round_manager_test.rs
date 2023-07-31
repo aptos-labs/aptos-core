@@ -24,7 +24,7 @@ use crate::{
         consensus_runtime, timed_block_on, MockPayloadManager, MockStateComputer, MockStorage,
         TreeInserter,
     },
-    util::time_service::{ClockTimeService, TimeService},
+    util::time_service::{ClockTimeService, TimeService}, dkg::dkg_manager::DKGManagerWrapper,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
@@ -253,6 +253,7 @@ impl NodeSetup {
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
+            Arc::new(DKGManagerWrapper::NoDKG),
         );
 
         let round_state = Self::create_round_state(time_service);

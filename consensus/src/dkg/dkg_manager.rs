@@ -40,6 +40,13 @@ impl DKGManagerWrapper {
             }
         }
     }
+
+    pub fn take_agg_node(&self) -> Option<DKGAggNode> {
+        match self {
+            DKGManagerWrapper::NoDKG => None,
+            DKGManagerWrapper::WithDKG(dkg_manager) => dkg_manager.take_agg_node(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -48,7 +55,7 @@ pub struct DKGManager {
     epoch_state: Arc<EpochState>,
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>,
     rb_abort_handle: Arc<Mutex<Option<AbortHandle>>>,
-    dkg_store: Arc<DKGStore>,
+    dkg_store: Arc<Mutex<DKGStore>>,
 }
 
 impl DKGManager {
@@ -58,7 +65,7 @@ impl DKGManager {
             epoch_state,
             reliable_broadcast,
             rb_abort_handle: Arc::new(Mutex::new(None)),
-            dkg_store: Arc::new(DKGStore::new()),
+            dkg_store: Arc::new(Mutex::new(DKGStore::new())),
         }
     }
 
@@ -98,7 +105,7 @@ impl DKGManager {
     }
 
     pub fn add_node(&self, node: DKGNode) {
-        match self.dkg_store.add_node(node, &self.epoch_state.verifier) {
+        match self.dkg_store.lock().add_node(node, &self.epoch_state.verifier) {
             Ok(agg_node) => {
                 if let Some(agg_node) = agg_node {
                     self.add_agg_node(agg_node);
@@ -111,7 +118,7 @@ impl DKGManager {
     }
 
     pub fn add_agg_node(&self, agg_node: DKGAggNode) {
-        match self.dkg_store.add_agg_node(agg_node, &self.epoch_state.verifier) {
+        match self.dkg_store.lock().add_agg_node(agg_node, &self.epoch_state.verifier) {
             Ok(agg_node) => {
                 if let Some(agg_node) = agg_node {
                     self.broadcast_agg_node(agg_node);
@@ -121,5 +128,9 @@ impl DKGManager {
                 error!("[DKG] Failed to add DKG aggregated node: {:?}", e);
             }
         }
+    }
+
+    pub fn take_agg_node(&self) -> Option<DKGAggNode> {
+        self.dkg_store.lock().take_agg_node()
     }
 }

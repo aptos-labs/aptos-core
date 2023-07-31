@@ -7,4 +7,4 @@ pub mod dkg_handler;
 mod dkg_network;
 mod types;
 mod dkg_reliable_broadcast;
-pub use types::{DKGNetworkMessage, DKGNode, DKGMessage};
+pub use types::{DKGNetworkMessage, DKGNode, DKGAggNode, DKGMessage};

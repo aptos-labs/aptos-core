@@ -719,7 +719,7 @@ impl EpochManager {
         self.commit_state_computer.new_epoch(
             &epoch_state,
             payload_manager.clone(),
-            dkg_manager_wrapper,
+            dkg_manager_wrapper.clone(),
             transaction_shuffler,
             block_gas_limit,
             transaction_deduper,
@@ -768,6 +768,7 @@ impl EpochManager {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
+            dkg_manager_wrapper,
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(

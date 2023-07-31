@@ -13,14 +13,14 @@ use crate::{
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
     state_replication::PayloadClient,
-    util::time_service::TimeService,
+    util::time_service::TimeService, dkg::dkg_manager::DKGManagerWrapper,
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_config::config::{ChainHealthBackoffValues, PipelineBackpressureValues};
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockData,
-    common::{Author, Payload, PayloadFilter, Round},
+    common::{Author, Payload, PayloadFilter, Round, DKGPayload},
     quorum_cert::QuorumCert,
 };
 use aptos_logger::{error, sample, sample::SampleRate, warn};
@@ -168,6 +168,9 @@ pub struct ProposalGenerator {
     // Last round that a proposal was generated
     last_round_generated: Round,
     quorum_store_enabled: bool,
+
+    // Proposal generator will fetch the DKG aggregated node from the DKG manager
+    dkg_manager_wrapper: Arc<DKGManagerWrapper>,
 }
 
 impl ProposalGenerator {
@@ -183,6 +186,7 @@ impl ProposalGenerator {
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
+        dkg_manager_wrapper: Arc<DKGManagerWrapper>,
     ) -> Self {
         Self {
             author,
@@ -197,6 +201,7 @@ impl ProposalGenerator {
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
+            dkg_manager_wrapper,
         }
     }
 
@@ -252,6 +257,13 @@ impl ProposalGenerator {
                 Payload::empty(self.quorum_store_enabled),
                 hqc.certified_block().timestamp_usecs(),
             )
+        } else if let Some(dkg_agg_node) = self.dkg_manager_wrapper.take_agg_node() {
+            // generate DKG payload
+            // the block contains just one DKG aggregate node
+            // dkg todo: think the bad path where the submitted dkg payload does not get committed, we need to reset the aggregated node and retry
+            let payload = Payload::DKG(DKGPayload::new(dkg_agg_node));
+            let timestamp = self.time_service.get_current_timestamp();
+            (payload, timestamp.as_micros() as u64)
         } else {
             // One needs to hold the blocks with the references to the payloads while get_block is
             // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.
@@ -324,6 +336,7 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
+            // dkg todo: fetch dkg payload here
             (payload, timestamp.as_micros() as u64)
         };
 

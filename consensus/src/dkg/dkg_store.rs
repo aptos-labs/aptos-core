@@ -61,4 +61,8 @@ impl DKGStore {
             return Err(anyhow::anyhow!("[DKG] Author {:?} sends invalid aggregated DKG node!\n node: {:?} \n", agg_node.author(), agg_node));
         }
     }
+
+    pub fn take_agg_node(&mut self) -> Option<DKGAggNode> {
+        self.agg_node.take()
+    }
 }
