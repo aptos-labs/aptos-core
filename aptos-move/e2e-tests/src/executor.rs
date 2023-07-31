@@ -693,7 +693,6 @@ impl FakeExecutor {
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
-            // TODO: preload module
 
             // load function name into cache to ensure cache is hot
             let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
@@ -721,9 +720,16 @@ impl FakeExecutor {
                 times.push(elapsed.as_micros());
                 i += 1;
             }
-            // TODO: use median
-            let sum: u128 = times.iter().sum();
-            running_time = sum / iterations as u128;
+
+            // take median of all running time iterations as a more robust measurement
+            times.sort();
+            let length = times.len();
+            let mid = length / 2;
+            if length % 2 == 0 {
+                running_time = times[mid - 1] + times[mid] / 2;
+            } else {
+                running_time = times[mid];
+            }
 
             let change_set = session
                 .finish(
