@@ -76,6 +76,7 @@ async fn consume_pubsub_entries_to_channel_loop(
             NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
                 NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")?,
             ),
+            parser_config.ipfs_prefix.clone(),
             parts[4].parse::<bool>().unwrap_or(false),
             parser_config.max_file_size_bytes,
             parser_config.image_quality,
@@ -180,6 +181,7 @@ pub struct Worker {
     token_uri: String,
     last_transaction_version: i32,
     last_transaction_timestamp: chrono::NaiveDateTime,
+    ipfs_prefix: String,
     force: bool,
     max_file_size_bytes: u32,
     image_quality: u8,
@@ -193,6 +195,7 @@ impl Worker {
         token_uri: String,
         last_transaction_version: i32,
         last_transaction_timestamp: chrono::NaiveDateTime,
+        ipfs_prefix: String,
         force: bool,
         max_file_size_bytes: u32,
         image_quality: u8,
@@ -205,6 +208,7 @@ impl Worker {
             token_uri,
             last_transaction_version,
             last_transaction_timestamp,
+            ipfs_prefix,
             force,
             max_file_size_bytes,
             image_quality,
@@ -230,7 +234,8 @@ impl Worker {
             // Parse token_uri
             self.model.set_token_uri(self.token_uri.clone());
             let token_uri = self.model.get_token_uri();
-            let json_uri = URIParser::parse(token_uri.clone()).unwrap_or(token_uri);
+            let json_uri =
+                URIParser::parse(self.ipfs_prefix.clone(), token_uri.clone()).unwrap_or(token_uri);
 
             // Parse JSON for raw_image_uri and raw_animation_uri
             let (raw_image_uri, raw_animation_uri, json) =
@@ -282,7 +287,8 @@ impl Worker {
                 .model
                 .get_raw_image_uri()
                 .unwrap_or(self.model.get_token_uri());
-            let img_uri = URIParser::parse(raw_image_uri).unwrap_or(self.model.get_token_uri());
+            let img_uri = URIParser::parse(self.ipfs_prefix.clone(), raw_image_uri)
+                .unwrap_or(self.model.get_token_uri());
 
             // Resize and optimize image and animation
             let (image, format) =
@@ -338,7 +344,8 @@ impl Worker {
         // If raw_animation_uri_option is None, skip
         if let Some(raw_animation_uri) = raw_animation_uri_option {
             let animation_uri =
-                URIParser::parse(raw_animation_uri.clone()).unwrap_or(raw_animation_uri);
+                URIParser::parse(self.ipfs_prefix.clone(), raw_animation_uri.clone())
+                    .unwrap_or(raw_animation_uri);
 
             // Resize and optimize animation
             let (animation, format) = ImageOptimizer::optimize(
