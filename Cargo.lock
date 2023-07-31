@@ -424,6 +424,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-types",
+ "futures",
  "move-core-types",
  "once_cell",
  "prometheus",
