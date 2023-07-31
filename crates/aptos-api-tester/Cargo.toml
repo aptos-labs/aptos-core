@@ -23,6 +23,7 @@ aptos-push-metrics = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-types = { workspace = true }
+futures = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
