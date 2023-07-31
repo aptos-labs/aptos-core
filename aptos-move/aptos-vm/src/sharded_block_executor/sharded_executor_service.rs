@@ -20,6 +20,7 @@ use aptos_types::{
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::{collections::HashSet, sync::Arc};
+use aptos_vm_logging::disable_speculative_logging;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -78,6 +79,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        disable_speculative_logging();
         trace!(
             "executing sub block for shard {} and round {}",
             self.shard_id,

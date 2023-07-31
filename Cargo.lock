@@ -548,6 +548,7 @@ dependencies = [
  "clap 4.3.5",
  "dashmap",
  "itertools",
+ "jemallocator",
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
