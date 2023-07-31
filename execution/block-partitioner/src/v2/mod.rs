@@ -164,17 +164,26 @@ impl V2Partitioner {
         helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
     ) -> Vec<SubBlocksForShard<AnalyzedTransaction>>{
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges__init"]).start_timer();
-        let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = txns.into_iter().map(|t|Mutex::new(Some(t))).collect();
+        let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = self.thread_pool.install(||{
+            txns.into_par_iter().map(|t|Mutex::new(Some(t))).collect()
+        });
         let num_rounds = txn_id_matrix.len();
         let num_shards = txn_id_matrix.first().unwrap().len();
-        let mut sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> = Vec::with_capacity(num_rounds);
-        for _round_id in 0..num_rounds {
-            let mut row = Vec::with_capacity(num_shards);
-            for shard_id in 0..num_shards {
-                row.push(Mutex::new(None));
-            }
-            sub_block_matrix.push(row);
-        }
+        let mut sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> = self.thread_pool.install(||{
+            (0..num_rounds).into_par_iter().map(|round_id|{
+                (0..num_shards).into_par_iter().map(|shard_id|{
+                    Mutex::new(None)
+                }).collect()
+            }).collect()
+        });
+        // let mut sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> = Vec::with_capacity(num_rounds);
+        // for _round_id in 0..num_rounds {
+        //     let mut row = Vec::with_capacity(num_shards);
+        //     for shard_id in 0..num_shards {
+        //         row.push(Mutex::new(None));
+        //     }
+        //     sub_block_matrix.push(row);
+        // }
         let duration = timer.stop_and_record();
         info!("add_edges__init={duration}");
 
