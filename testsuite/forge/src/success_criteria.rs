@@ -1,12 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{system_metrics::SystemMetricsThreshold, Swarm, SwarmExt, TestReport};
+use crate::{
+    system_metrics::{ensure_metrics_threshold, MetricsThreshold, SystemMetricsThreshold},
+    Swarm, SwarmExt, TestReport,
+};
 use anyhow::{bail, Context};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
-use std::time::Duration;
+use prometheus_http_query::response::Sample;
+use std::{collections::BTreeMap, fmt, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
@@ -26,6 +30,7 @@ pub enum LatencyType {
 pub struct SuccessCriteria {
     pub min_avg_tps: usize,
     latency_thresholds: Vec<(Duration, LatencyType)>,
+    latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
     max_expired_tps: Option<usize>,
     max_failed_submission_tps: Option<usize>,
@@ -40,6 +45,7 @@ impl SuccessCriteria {
         Self {
             min_avg_tps,
             latency_thresholds: Vec::new(),
+            latency_breakdown_thresholds: None,
             check_no_restarts: false,
             max_expired_tps: None,
             max_failed_submission_tps: None,
@@ -84,6 +90,110 @@ impl SuccessCriteria {
             .push((Duration::from_secs_f32(threshold_s), latency_type));
         self
     }
+
+    pub fn add_latency_breakdown_threshold(mut self, threshold: LatencyBreakdownThreshold) -> Self {
+        self.latency_breakdown_thresholds = Some(threshold);
+        self
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+pub enum LatencyBreakdownSlice {
+    QsBatchToPos,
+    QsPosToProposal,
+    ConsensusProposalToOrdered,
+    ConsensusOrderedToCommit,
+}
+
+#[derive(Clone)]
+pub struct LatencySamples(Vec<Sample>);
+
+impl LatencySamples {
+    pub fn new(samples: Vec<Sample>) -> Self {
+        Self(samples)
+    }
+
+    pub fn max_sample(&self) -> f64 {
+        self.0
+            .iter()
+            .map(|s| s.value())
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or_default()
+    }
+
+    pub fn get(&self) -> &Vec<Sample> {
+        &self.0
+    }
+}
+
+impl fmt::Debug for LatencySamples {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{:?}",
+            self.0
+                .iter()
+                .map(|s| (s.value(), s.timestamp()))
+                .collect::<Vec<_>>()
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LatencyBreakdown(BTreeMap<LatencyBreakdownSlice, LatencySamples>);
+
+impl LatencyBreakdown {
+    pub fn new(latency: BTreeMap<LatencyBreakdownSlice, LatencySamples>) -> Self {
+        Self(latency)
+    }
+
+    pub fn get_samples(&self, slice: LatencyBreakdownSlice) -> &LatencySamples {
+        self.0.get(&slice).unwrap()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LatencyBreakdownThreshold {
+    pub thresholds: BTreeMap<LatencyBreakdownSlice, MetricsThreshold>,
+}
+
+impl LatencyBreakdownThreshold {
+    pub fn new_strict(
+        qs_batch_to_pos_threshold: f64,
+        qs_pos_to_proposal_threshold: f64,
+        consensus_proposal_to_ordered_threshold: f64,
+        consensus_ordered_to_commit_threshold: f64,
+    ) -> Self {
+        let mut thresholds = BTreeMap::new();
+        thresholds.insert(
+            LatencyBreakdownSlice::QsBatchToPos,
+            MetricsThreshold::new(qs_batch_to_pos_threshold, 0),
+        );
+        thresholds.insert(
+            LatencyBreakdownSlice::QsPosToProposal,
+            MetricsThreshold::new(qs_pos_to_proposal_threshold, 0),
+        );
+        thresholds.insert(
+            LatencyBreakdownSlice::ConsensusProposalToOrdered,
+            MetricsThreshold::new(consensus_proposal_to_ordered_threshold, 0),
+        );
+        thresholds.insert(
+            LatencyBreakdownSlice::ConsensusOrderedToCommit,
+            MetricsThreshold::new(consensus_ordered_to_commit_threshold, 0),
+        );
+        Self { thresholds }
+    }
+
+    pub fn ensure_threshold(&self, metrics: &LatencyBreakdown) -> anyhow::Result<()> {
+        for (slice, threshold) in &self.thresholds {
+            let samples = metrics
+                .0
+                .get(slice)
+                .ok_or_else(|| anyhow::anyhow!("Missing latency breakdown for {:?}", slice))?;
+            ensure_metrics_threshold(&format!("{:?}", slice), threshold, samples.get())?;
+        }
+        Ok(())
+    }
 }
 
 pub struct SuccessCriteriaChecker {}
@@ -93,6 +203,7 @@ impl SuccessCriteriaChecker {
         success_criteria: &SuccessCriteria,
         _report: &mut TestReport,
         stats_rate: &TxnStatsRate,
+        latency_breakdown: Option<&LatencyBreakdown>,
         traffic_name: Option<String>,
     ) -> anyhow::Result<()> {
         let traffic_name_addition = traffic_name
@@ -110,6 +221,9 @@ impl SuccessCriteriaChecker {
             stats_rate,
             &traffic_name_addition,
         )?;
+        if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
+            latency_breakdown_thresholds.ensure_threshold(latency_breakdown.unwrap())?;
+        }
         Ok(())
     }
 
@@ -119,6 +233,7 @@ impl SuccessCriteriaChecker {
         report: &mut TestReport,
         stats: &TxnStats,
         window: Duration,
+        latency_breakdown: &LatencyBreakdown,
         start_time: i64,
         end_time: i64,
         start_version: u64,
@@ -138,6 +253,16 @@ impl SuccessCriteriaChecker {
             &stats_rate,
             &"".to_string(),
         )?;
+
+        Self::check_latency(
+            &success_criteria.latency_thresholds,
+            &stats_rate,
+            &"".to_string(),
+        )?;
+
+        if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
+            latency_breakdown_thresholds.ensure_threshold(latency_breakdown)?;
+        }
 
         if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
             swarm

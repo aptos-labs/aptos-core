@@ -4,7 +4,7 @@
 
 use super::Test;
 use crate::{
-    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
+    success_criteria::{LatencyBreakdown, SuccessCriteria, SuccessCriteriaChecker},
     CoreContext, Result, Swarm, TestReport,
 };
 use aptos_transaction_emitter_lib::{EmitJobRequest, TxnStats};
@@ -61,6 +61,7 @@ impl<'t> NetworkContext<'t> {
         &mut self,
         stats: &TxnStats,
         window: Duration,
+        latency_breakdown: &LatencyBreakdown,
         start_time: i64,
         end_time: i64,
         start_version: u64,
@@ -73,6 +74,7 @@ impl<'t> NetworkContext<'t> {
                 self.report,
                 stats,
                 window,
+                latency_breakdown,
                 start_time,
                 end_time,
                 start_version,
