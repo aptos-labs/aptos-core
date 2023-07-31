@@ -27,8 +27,6 @@ mod network;
 #[cfg(test)]
 mod rest_api;
 #[cfg(test)]
-mod rosetta;
-#[cfg(test)]
 mod state_sync;
 #[cfg(test)]
 mod storage;

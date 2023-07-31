@@ -2860,55 +2860,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-rosetta"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "aptos-cached-packages",
- "aptos-config",
- "aptos-crypto",
- "aptos-global-constants",
- "aptos-logger",
- "aptos-node",
- "aptos-rest-client",
- "aptos-runtimes",
- "aptos-sdk",
- "aptos-types",
- "aptos-warp-webserver",
- "bcs 0.1.4",
- "clap 4.3.5",
- "futures",
- "hex",
- "itertools",
- "move-core-types",
- "once_cell",
- "percent-encoding",
- "reqwest",
- "serde 1.0.149",
- "serde_json",
- "serde_yaml 0.8.26",
- "tokio",
- "url",
- "warp",
-]
-
-[[package]]
-name = "aptos-rosetta-cli"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "aptos",
- "aptos-logger",
- "aptos-rosetta",
- "aptos-types",
- "clap 4.3.5",
- "serde 1.0.149",
- "serde_json",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "aptos-runtimes"
 version = "0.1.0"
 dependencies = [
@@ -12102,7 +12053,6 @@ dependencies = [
  "aptos-logger",
  "aptos-release-builder",
  "aptos-rest-client",
- "aptos-rosetta",
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-temppath",

@@ -55,10 +55,6 @@
 /crates/aptos-open-api @banool @gregnazario
 /crates/aptos-rest-client @banool @gregnazario
 
-# Owners for the `/aptos-rosetta` directory and related crates.
-/crates/aptos-rosetta @gregnazario
-/crates/aptos-rosetta-cli @gregnazario
-
 # Owners for the aptos-speculative-state-helper crate
 /crates/aptos-speculative-state-helper @gelash
 
