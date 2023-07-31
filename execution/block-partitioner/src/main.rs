@@ -8,6 +8,10 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Mutex, time::Instant};
 use aptos_logger::info;
 
+#[cfg(unix)]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 #[derive(Debug, Parser)]
 struct Args {
     #[clap(long, default_value_t = 2000000)]
