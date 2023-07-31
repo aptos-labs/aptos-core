@@ -18,7 +18,7 @@ pub async fn write_json_to_gcs(bucket: String, id: String, json: Value) -> anyho
 
     let upload_type = UploadType::Simple(Media {
         name: filename.clone().into(),
-        content_type: format!("application/json").into(),
+        content_type: "application/json".into(),
         content_length: Some(json_bytes.len() as u64),
     });
 
