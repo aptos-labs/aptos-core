@@ -16,7 +16,7 @@ pub async fn write_json_to_gcs(bucket: String, id: String, json: Value) -> anyho
     let res = client
         .post(url)
         .bearer_auth(get_gcp_auth_token().await?)
-        .header("Content-Type", "application/json")
+        .header(header::CONTENT_TYPE, "application/json")
         .body(json_string)
         .send()
         .await?;

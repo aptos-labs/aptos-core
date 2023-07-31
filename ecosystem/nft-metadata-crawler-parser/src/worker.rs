@@ -48,6 +48,7 @@ pub struct ParserConfig {
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
     pub num_parsers: usize,
+    pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
 }
 
@@ -76,6 +77,8 @@ async fn consume_pubsub_entries_to_channel_loop(
                 NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")?,
             ),
             parts[4].parse::<bool>().unwrap_or(false),
+            parser_config.max_file_size_bytes,
+            parser_config.image_quality,
         );
 
         // Send worker to channel
@@ -150,13 +153,13 @@ impl RunnableConfig for ParserConfig {
 
         match producer.await {
             Ok(_) => (),
-            Err(e) => error!("Producer error: {:?}", e),
+            Err(e) => error!("[NFT Metadata Crawler] Producer error: {:?}", e),
         }
 
         for worker in workers {
             match worker.await {
                 Ok(_) => (),
-                Err(e) => error!("Worker error: {:?}", e),
+                Err(e) => error!("[NFT Metadata Crawler] Worker error: {:?}", e),
             }
         }
         Ok(())
@@ -178,6 +181,8 @@ pub struct Worker {
     last_transaction_version: i32,
     last_transaction_timestamp: chrono::NaiveDateTime,
     force: bool,
+    max_file_size_bytes: u32,
+    image_quality: u8,
 }
 
 impl Worker {
@@ -189,6 +194,8 @@ impl Worker {
         last_transaction_version: i32,
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
+        max_file_size_bytes: u32,
+        image_quality: u8,
     ) -> Self {
         Self {
             config,
@@ -199,6 +206,8 @@ impl Worker {
             last_transaction_version,
             last_transaction_timestamp,
             force,
+            max_file_size_bytes,
+            image_quality,
         }
     }
 
@@ -225,16 +234,18 @@ impl Worker {
 
             // Parse JSON for raw_image_uri and raw_animation_uri
             let (raw_image_uri, raw_animation_uri, json) =
-                JSONParser::parse(json_uri).await.unwrap_or_else(|e| {
-                    // Increment retry count if JSON parsing fails
-                    error!(
-                        last_transaction_version = self.last_transaction_version,
-                        error = ?e,
-                        "[NFT Metadata Crawler] JSON parse failed",
-                    );
-                    self.model.increment_json_parser_retry_count();
-                    (None, None, Value::Null)
-                });
+                JSONParser::parse(json_uri, self.max_file_size_bytes)
+                    .await
+                    .unwrap_or_else(|e| {
+                        // Increment retry count if JSON parsing fails
+                        error!(
+                            last_transaction_version = self.last_transaction_version,
+                            error = ?e,
+                            "[NFT Metadata Crawler] JSON parse failed",
+                        );
+                        self.model.increment_json_parser_retry_count();
+                        (None, None, Value::Null)
+                    });
 
             self.model.set_raw_image_uri(raw_image_uri);
             self.model.set_raw_animation_uri(raw_animation_uri);
@@ -274,16 +285,19 @@ impl Worker {
             let img_uri = URIParser::parse(raw_image_uri).unwrap_or(self.model.get_token_uri());
 
             // Resize and optimize image and animation
-            let (image, format) = ImageOptimizer::optimize(img_uri).await.unwrap_or_else(|e| {
-                // Increment retry count if image is None
-                error!(
-                    last_transaction_version = self.last_transaction_version,
-                    error = ?e,
-                    "[NFT Metadata Crawler] Image optimization failed"
-                );
-                self.model.increment_image_optimizer_retry_count();
-                (vec![], ImageFormat::Png)
-            });
+            let (image, format) =
+                ImageOptimizer::optimize(img_uri, self.max_file_size_bytes, self.image_quality)
+                    .await
+                    .unwrap_or_else(|e| {
+                        // Increment retry count if image is None
+                        error!(
+                            last_transaction_version = self.last_transaction_version,
+                            error = ?e,
+                            "[NFT Metadata Crawler] Image optimization failed"
+                        );
+                        self.model.increment_image_optimizer_retry_count();
+                        (vec![], ImageFormat::Png)
+                    });
 
             if !image.is_empty() {
                 // Save resized and optimized image to GCS
@@ -327,18 +341,22 @@ impl Worker {
                 URIParser::parse(raw_animation_uri.clone()).unwrap_or(raw_animation_uri);
 
             // Resize and optimize animation
-            let (animation, format) = ImageOptimizer::optimize(animation_uri)
-                .await
-                .unwrap_or_else(|e| {
-                    // Increment retry count if animation is None
-                    error!(
-                        last_transaction_version = self.last_transaction_version,
-                        error = ?e,
-                        "[NFT Metadata Crawler] Animation optimization failed"
-                    );
-                    self.model.increment_animation_optimizer_retry_count();
-                    (vec![], ImageFormat::Png)
-                });
+            let (animation, format) = ImageOptimizer::optimize(
+                animation_uri,
+                self.max_file_size_bytes,
+                self.image_quality,
+            )
+            .await
+            .unwrap_or_else(|e| {
+                // Increment retry count if animation is None
+                error!(
+                    last_transaction_version = self.last_transaction_version,
+                    error = ?e,
+                    "[NFT Metadata Crawler] Animation optimization failed"
+                );
+                self.model.increment_animation_optimizer_retry_count();
+                (vec![], ImageFormat::Png)
+            });
 
             // Save resized and optimized animation to GCS
             if !animation.is_empty() {
