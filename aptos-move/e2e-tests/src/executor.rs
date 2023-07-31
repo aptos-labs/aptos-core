@@ -674,6 +674,7 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
+        iterations: u64,
     ) -> u128 {
         let running_time: u128;
         let write_set = {
@@ -699,7 +700,6 @@ impl FakeExecutor {
 
             // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
             let mut i = 0;
-            let iterations = 10; // TODO: change this to support CLI flag
             let mut times = Vec::new();
             while i < iterations {
                 let fun_name = Self::name(function_name);
@@ -723,7 +723,7 @@ impl FakeExecutor {
             }
             // TODO: use median
             let sum: u128 = times.iter().sum();
-            running_time = sum / iterations;
+            running_time = sum / iterations as u128;
 
             let change_set = session
                 .finish(

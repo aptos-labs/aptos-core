@@ -8,17 +8,41 @@ mod math_interface;
 mod solve;
 use aptos_abstract_gas_usage::{collect_terms, normalize};
 use aptos_gas_algebra::DynamicExpression;
+use clap::Parser;
 use gas_meter::{compile_and_run_samples, compile_and_run_samples_ir};
 use math_interface::{convert_to_matrix_format, total_num_of_cols, total_num_rows};
 use solve::{build_coefficient_matrix, build_constant_matrix, solve};
 use std::collections::BTreeMap;
 
+/// Automated Gas Calibration to calibrate Move bytecode and Native Functions
+#[derive(Parser, Debug)]
+struct Args {
+    /// Specific tests to run that match a pattern
+    #[clap(short, long, default_value = "")]
+    pattern: String,
+
+    /// Number of iterations to run each Calibration Function
+    #[clap(short, long, default_value_t = 10)]
+    iterations: u64,
+}
+
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
+
+    // Implement CLI
+    let args = Args::parse();
+    let pattern = &args.pattern;
+    let iterations = *&args.iterations;
+
+    println!(
+        "Running each Calibration Function for {} iterations\n",
+        iterations
+    );
+
     println!("Calibrating Gas Parameters ...\n");
 
-    let samples = compile_and_run_samples();
-    let samples_ir = compile_and_run_samples_ir();
+    let samples = compile_and_run_samples(iterations, pattern);
+    let samples_ir = compile_and_run_samples_ir(iterations, pattern);
 
     let mut equation_names: Vec<String> = Vec::new();
     equation_names.extend(samples.equation_names);
