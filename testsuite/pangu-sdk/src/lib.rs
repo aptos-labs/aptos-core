@@ -562,9 +562,8 @@ impl PanguSDK {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_create_testnet() {
         env::set_var(
             "PANGU_DIR",
@@ -583,7 +582,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_update_testnet() {
         env::set_var(
             "PANGU_DIR",
@@ -597,7 +596,7 @@ mod tests {
         )
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_add_pfn() {
         env::set_var(
             "PANGU_DIR",
@@ -621,7 +620,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_create_pangu_node_config() {
         let blueprint1 = PanguNodeBlueprint {
             validator_config_path: "validator_config_path".to_string(),
@@ -674,7 +673,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_wipe_node() {
         env::set_var(
             "PANGU_DIR",
@@ -691,7 +690,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_restart_node() {
         env::set_var(
             "PANGU_DIR",
@@ -708,7 +707,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_stop_node() {
         env::set_var(
             "PANGU_DIR",
@@ -725,7 +724,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_start_node() {
         env::set_var(
             "PANGU_DIR",
@@ -742,7 +741,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_restart_nodes_in_testnet() {
         env::set_var(
             "PANGU_DIR",
@@ -759,7 +758,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_healthcheck_testnet() {
         env::set_var(
             "PANGU_DIR",
@@ -776,7 +775,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_get_testnets() {
         env::set_var(
             "PANGU_DIR",
@@ -793,7 +792,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_get_testnet() {
         env::set_var(
             "PANGU_DIR",
@@ -810,7 +809,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[cfg(feature = "integration-tests")]
     fn test_delete_testnet() {
         env::set_var(
             "PANGU_DIR",
