@@ -52,7 +52,6 @@ fn main() {
         info!("Starting to partition");
         let now = Instant::now();
         partitioner.partition(transactions, args.num_shards);
-        info!("oops");
         let elapsed = now.elapsed();
         info!("Time taken to partition: {:?}", elapsed);
     }
