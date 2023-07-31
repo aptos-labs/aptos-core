@@ -1,12 +1,15 @@
 // Copyright © Aptos Foundation
 
+use crate::utils::{
+    create_account, create_and_fund_account, get_client, get_faucet_client, NetworkName,
+    TestFailure,
+};
 use anyhow::{anyhow, Result};
 use aptos_api_types::U64;
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_sdk::{coin_client::CoinClient, types::LocalAccount};
 use aptos_types::account_address::AccountAddress;
-use crate::utils::{TestFailure, NetworkName, get_client, get_faucet_client, create_and_fund_account, create_account};
 
 static FAIL_BALANCE_AFTER_TRANSACTION: &str = "wrong balance after transaction";
 static FAIL_BALANCE_BEFORE_TRANSACTION: &str = "wrong balance before transaction";

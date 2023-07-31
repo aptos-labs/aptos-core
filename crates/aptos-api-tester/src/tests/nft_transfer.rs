@@ -1,11 +1,18 @@
 // Copyright © Aptos Foundation
 
+use crate::utils::{
+    create_and_fund_account, get_client, get_faucet_client, NetworkName, TestFailure,
+};
 use aptos_api_types::U64;
 use aptos_logger::info;
 use aptos_rest_client::Client;
-use aptos_sdk::{token_client::{TokenClient, CollectionData, CollectionMutabilityConfig, TokenData, TokenMutabilityConfig, RoyaltyOptions}, types::LocalAccount};
-
-use crate::utils::{TestFailure, NetworkName, get_client, get_faucet_client, create_and_fund_account};
+use aptos_sdk::{
+    token_client::{
+        CollectionData, CollectionMutabilityConfig, RoyaltyOptions, TokenClient, TokenData,
+        TokenMutabilityConfig,
+    },
+    types::LocalAccount,
+};
 
 static FAIL_COLLECTION_DATA: &str = "wrong collection data";
 static FAIL_TOKEN_DATA: &str = "wrong token data";
