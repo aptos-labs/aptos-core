@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::counters::{test_error, test_fail, test_latency, test_success};
-use aptos_rest_client::error::RestError;
+use anyhow::Result;
+use aptos_logger::info;
+use aptos_rest_client::{error::RestError, Client, FaucetClient};
+use aptos_sdk::types::LocalAccount;
 use once_cell::sync::Lazy;
 use url::Url;
 
@@ -82,26 +85,70 @@ impl ToString for NetworkName {
     }
 }
 
-// Helper function to set metrics based on the result.
-pub fn set_metrics(output: &TestResult, test_name: &str, network_name: &str, time: f64) {
+// Set metrics based on the result.
+pub fn set_metrics(
+    output: &TestResult,
+    test_name: &str,
+    network_name: &str,
+    start_time: &str,
+    time: f64,
+) {
     match output {
         TestResult::Success => {
-            test_success(test_name, network_name).observe(1_f64);
-            test_fail(test_name, network_name).observe(0_f64);
-            test_error(test_name, network_name).observe(0_f64);
-            test_latency(test_name, network_name, "success").observe(time);
+            test_success(test_name, network_name, start_time).observe(1_f64);
+            test_fail(test_name, network_name, start_time).observe(0_f64);
+            test_error(test_name, network_name, start_time).observe(0_f64);
+            test_latency(test_name, network_name, start_time, "success").observe(time);
         },
         TestResult::Fail(_) => {
-            test_success(test_name, network_name).observe(0_f64);
-            test_fail(test_name, network_name).observe(1_f64);
-            test_error(test_name, network_name).observe(0_f64);
-            test_latency(test_name, network_name, "fail").observe(time);
+            test_success(test_name, network_name, start_time).observe(0_f64);
+            test_fail(test_name, network_name, start_time).observe(1_f64);
+            test_error(test_name, network_name, start_time).observe(0_f64);
+            test_latency(test_name, network_name, start_time, "fail").observe(time);
         },
         TestResult::Error(_) => {
-            test_success(test_name, network_name).observe(0_f64);
-            test_fail(test_name, network_name).observe(0_f64);
-            test_error(test_name, network_name).observe(1_f64);
-            test_latency(test_name, network_name, "error").observe(time);
+            test_success(test_name, network_name, start_time).observe(0_f64);
+            test_fail(test_name, network_name, start_time).observe(0_f64);
+            test_error(test_name, network_name, start_time).observe(1_f64);
+            test_latency(test_name, network_name, start_time, "error").observe(time);
         },
     }
+}
+
+// Create a REST client.
+pub fn get_client(network_name: NetworkName) -> Client {
+    match network_name {
+        NetworkName::Testnet => Client::new(TESTNET_NODE_URL.clone()),
+        NetworkName::Devnet => Client::new(DEVNET_NODE_URL.clone()),
+    }
+}
+
+// Create a faucet client.
+pub fn get_faucet_client(network_name: NetworkName) -> FaucetClient {
+    match network_name {
+        NetworkName::Testnet => {
+            FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone())
+        },
+        NetworkName::Devnet => {
+            FaucetClient::new(DEVNET_FAUCET_URL.clone(), DEVNET_NODE_URL.clone())
+        },
+    }
+}
+
+// Create an account with zero balance.
+pub async fn create_account(faucet_client: &FaucetClient) -> Result<LocalAccount> {
+    let account = LocalAccount::generate(&mut rand::rngs::OsRng);
+    faucet_client.create_account(account.address()).await?;
+    info!("{:?}", account.address());
+
+    Ok(account)
+}
+
+// Create an account with 100_000_000 balance.
+pub async fn create_and_fund_account(faucet_client: &FaucetClient) -> Result<LocalAccount> {
+    let account = LocalAccount::generate(&mut rand::rngs::OsRng);
+    faucet_client.fund(account.address(), 100_000_000).await?;
+    info!("{:?}", account.address());
+
+    Ok(account)
 }
