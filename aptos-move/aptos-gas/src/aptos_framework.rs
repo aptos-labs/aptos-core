@@ -149,16 +149,16 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.type_info.chain_id.base, { 4.. => "type_info.chain_id.base" }, 150 * MUL],
 
     // Reusing SHA2-512's cost from Ristretto
-    [.hash.sha2_512.base, { 4.. => "hash.sha2_512.base" }, 3_240],
-    [.hash.sha2_512.per_byte, { 4.. => "hash.sha2_512.per_byte" }, 60],
+    [.hash.sha2_512.base, { 4.. => "hash.sha2_512.base" }, 3_240 * MUL],
+    [.hash.sha2_512.per_byte, { 4.. => "hash.sha2_512.per_byte" }, 60 * MUL],
     // Back-of-the-envelop approximation from SHA3-256's (4000 base, 45 per-byte) costs
-    [.hash.sha3_512.base, { 4.. => "hash.sha3_512.base" }, 4_500],
-    [.hash.sha3_512.per_byte, { 4.. => "hash.sha3_512.per_byte" }, 50],
+    [.hash.sha3_512.base, { 4.. => "hash.sha3_512.base" }, 4_500 * MUL],
+    [.hash.sha3_512.per_byte, { 4.. => "hash.sha3_512.per_byte" }, 50 * MUL],
     // Using SHA2-256's cost
-    [.hash.ripemd160.base, { 4.. => "hash.ripemd160.base" }, 3000],
-    [.hash.ripemd160.per_byte, { 4.. => "hash.ripemd160.per_byte" }, 50],
-    [.hash.blake2b_256.base, { 6.. => "hash.blake2b_256.base" }, 1750],
-    [.hash.blake2b_256.per_byte, { 6.. => "hash.blake2b_256.per_byte" }, 15],
+    [.hash.ripemd160.base, { 4.. => "hash.ripemd160.base" }, 3000 * MUL],
+    [.hash.ripemd160.per_byte, { 4.. => "hash.ripemd160.per_byte" }, 50 * MUL],
+    [.hash.blake2b_256.base, { 6.. => "hash.blake2b_256.base" }, 1750 * MUL],
+    [.hash.blake2b_256.per_byte, { 6.. => "hash.blake2b_256.per_byte" }, 15 * MUL],
 
     [.util.from_bytes.base, "util.from_bytes.base", 300 * MUL],
     [.util.from_bytes.per_byte, "util.from_bytes.per_byte", 5 * MUL],
