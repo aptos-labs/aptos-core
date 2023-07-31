@@ -13,6 +13,7 @@ use aptos_types::{
 };
 use std::time::Instant;
 use aptos_block_partitioner::{BlockPartitioner, build_partitioner};
+use crate::metrics::TIMER;
 
 pub(crate) struct BlockPartitioningStage {
     num_executor_shards: usize,
@@ -49,7 +50,9 @@ impl BlockPartitioningStage {
                 let last_txn = txns.pop().unwrap();
                 assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
+                let timer = TIMER.with_label_values(&["partition"]).start_timer();
                 let mut sub_blocks = partitioner.partition(analyzed_transactions, self.num_executor_shards);
+                timer.stop_and_record();
                 sub_blocks
                     .last_mut()
                     .unwrap()
