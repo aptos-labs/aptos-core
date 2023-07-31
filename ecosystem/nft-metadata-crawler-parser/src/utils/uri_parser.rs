@@ -93,7 +93,7 @@ mod tests {
         let test_ipfs_prefix = "https://testipfsprefix.com/ipfs".to_string();
         let test_non_ipfs_uri = "https://tesetnotipfsuri.com/notipfspath.json".to_string();
 
-        // Expects an error if parsing a non-IPFS URI, expect error here
+        // Expects an error if parsing a non-IPFS URI
         let parsed_uri = URIParser::parse(test_ipfs_prefix.clone(), test_non_ipfs_uri);
         assert!(parsed_uri.is_err());
     }
