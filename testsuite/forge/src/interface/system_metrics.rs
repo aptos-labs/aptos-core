@@ -15,14 +15,9 @@ pub struct SystemMetrics {
     memory_bytes_metrics: Vec<Sample>,
 }
 
-// This retry policy is used for important client calls necessary for setting
-// up the test (e.g. account creation) and collecting its results (e.g. checking
-// account sequence numbers). If these fail, the whole test fails. We do not use
-// this for submitting transactions, as we have a way to handle when that fails.
-// This retry policy means an operation will take 8 seconds at most.
 static RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
     RetryPolicy::exponential(Duration::from_millis(125))
-        .with_max_retries(6)
+        .with_max_retries(3)
         .with_jitter(true)
 });
 
@@ -37,15 +32,22 @@ impl SystemMetrics {
 
 #[derive(Default, Clone, Debug, Serialize)]
 pub struct MetricsThreshold {
-    max: usize,
+    max: f64,
     // % of the data point that can breach the max threshold
     max_breach_pct: usize,
 }
 
 impl MetricsThreshold {
-    pub fn new(max: usize, max_breach_pct: usize) -> Self {
+    pub fn new(max: f64, max_breach_pct: usize) -> Self {
         Self {
             max,
+            max_breach_pct,
+        }
+    }
+
+    pub fn new_gb(max: f64, max_breach_pct: usize) -> Self {
+        Self {
+            max: max * 1024.0 * 1024.0 * 1024.0,
             max_breach_pct,
         }
     }
@@ -76,7 +78,7 @@ impl SystemMetricsThreshold {
     }
 }
 
-fn ensure_metrics_threshold(
+pub fn ensure_metrics_threshold(
     metrics_name: &str,
     threshold: &MetricsThreshold,
     metrics: &Vec<Sample>,
@@ -86,7 +88,7 @@ fn ensure_metrics_threshold(
     }
     let breach_count = metrics
         .iter()
-        .filter(|sample| sample.value() > threshold.max as f64)
+        .filter(|sample| sample.value() > threshold.max)
         .count();
     let breach_pct = (breach_count * 100) / metrics.len();
     if breach_pct > threshold.max_breach_pct {
@@ -136,7 +138,7 @@ async fn get_prometheus_range_metrics(
     labels_map.insert("namespace".to_string(), namespace.to_string());
     let response = client
         .query_range(
-            construct_query_with_extra_labels(query, labels_map),
+            construct_query_with_extra_labels(query, &labels_map),
             start_time,
             end_time,
             internal_secs,
@@ -191,8 +193,8 @@ mod tests {
     use super::*;
     #[tokio::test]
     async fn test_empty_metrics_threshold() {
-        let cpu_threshold = MetricsThreshold::new(10, 30);
-        let memory_threshold = MetricsThreshold::new(100, 40);
+        let cpu_threshold = MetricsThreshold::new(10.0, 30);
+        let memory_threshold = MetricsThreshold::new(100.0, 40);
         let threshold = SystemMetricsThreshold::new(cpu_threshold, memory_threshold);
         let metrics = SystemMetrics::new(vec![], vec![]);
         threshold.ensure_threshold(&metrics).unwrap_err();

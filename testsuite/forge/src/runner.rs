@@ -340,9 +340,9 @@ impl Default for ForgeConfig {
                 .add_no_restarts()
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
+                    MetricsThreshold::new(12.0, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                    MetricsThreshold::new_gb(10.0, 30),
                 ))
         };
         Self {

@@ -2,12 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{create_k8s_client, K8sApi, ReadWrite, Result};
-use anyhow::bail;
+use again::RetryPolicy;
+use anyhow::{anyhow, bail};
 use aptos_logger::info;
 use k8s_openapi::api::core::v1::Secret;
-use prometheus_http_query::{response::PromqlResult, Client as PrometheusClient};
+use once_cell::sync::Lazy;
+use prometheus_http_query::{
+    response::{PromqlResult, Sample},
+    Client as PrometheusClient,
+};
 use reqwest::{header, Client as HttpClient};
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
+
+static PROMETHEUS_RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
+    RetryPolicy::exponential(Duration::from_millis(125))
+        .with_max_retries(3)
+        .with_jitter(true)
+});
 
 pub async fn get_prometheus_client() -> Result<PrometheusClient> {
     // read from the environment
@@ -91,7 +102,7 @@ async fn create_prometheus_client_from_environment(
 
 pub fn construct_query_with_extra_labels(
     query: &str,
-    labels_map: BTreeMap<String, String>,
+    labels_map: &BTreeMap<String, String>,
 ) -> String {
     // edit the query string to insert swarm metadata
     let mut new_query = query.to_string();
@@ -123,13 +134,61 @@ pub async fn query_with_metadata(
     query: &str,
     time: Option<i64>,
     timeout: Option<i64>,
-    labels_map: BTreeMap<String, String>,
+    labels_map: &BTreeMap<String, String>,
 ) -> Result<PromqlResult> {
     let new_query = construct_query_with_extra_labels(query, labels_map);
-    match prom_client.query(&new_query, time, timeout).await {
-        Ok(r) => Ok(r),
-        Err(e) => bail!(e),
-    }
+    let new_query_ref = &new_query;
+    PROMETHEUS_RETRY_POLICY
+        .retry(move || prom_client.query(new_query_ref, time, timeout))
+        .await
+        .map_err(|e| anyhow!("Failed to query prometheus for {}: {}", query, e))
+}
+
+pub async fn query_range_with_metadata(
+    prom_client: &PrometheusClient,
+    query: &str,
+    start_time: i64,
+    end_time: i64,
+    internal_secs: f64,
+    timeout: Option<i64>,
+    labels_map: &BTreeMap<String, String>,
+) -> Result<Vec<Sample>> {
+    let new_query = construct_query_with_extra_labels(query, labels_map);
+    let new_query_ref = &new_query;
+    let r = PROMETHEUS_RETRY_POLICY
+        .retry(move || {
+            prom_client.query_range(new_query_ref, start_time, end_time, internal_secs, timeout)
+        })
+        .await
+        .map_err(|e| {
+            anyhow!(
+                "Failed to query prometheus {}. start={}, end={}, query={}",
+                e,
+                start_time,
+                end_time,
+                new_query
+            )
+        })?;
+    Ok(r.as_range()
+        .ok_or_else(|| {
+            anyhow!(
+                "Failed to get range from prometheus response. start={}, end={}, query={}",
+                start_time,
+                end_time,
+                new_query
+            )
+        })?
+        .first()
+        .ok_or_else(|| {
+            anyhow!(
+                "Empty range vector returned from prometheus. start={}, end={}, query={}",
+                start_time,
+                end_time,
+                new_query
+            )
+        })?
+        .samples()
+        .to_vec())
 }
 
 #[cfg(test)]
@@ -259,7 +318,7 @@ mod tests {
         labels_map.insert("a".to_string(), "a".to_string());
         labels_map.insert("some_label".to_string(), "blabla".to_string());
         let expected_query = r#"aptos_connections{a="a",some_label="blabla"}"#;
-        let new_query = construct_query_with_extra_labels(original_query, labels_map);
+        let new_query = construct_query_with_extra_labels(original_query, &labels_map);
         assert_eq!(expected_query, new_query);
 
         // test when existing labels
@@ -268,7 +327,7 @@ mod tests {
         labels_map.insert("a".to_string(), "a".to_string());
         labels_map.insert("some_label".to_string(), "blabla".to_string());
         let expected_query = r#"aptos_connections{a="a",some_label="blabla",abc="123",def="456"}"#;
-        let new_query = construct_query_with_extra_labels(original_query, labels_map);
+        let new_query = construct_query_with_extra_labels(original_query, &labels_map);
         assert_eq!(expected_query, new_query);
     }
 }

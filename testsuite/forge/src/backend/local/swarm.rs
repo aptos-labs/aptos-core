@@ -24,7 +24,7 @@ use aptos_sdk::{
         PeerId,
     },
 };
-use prometheus_http_query::response::PromqlResult;
+use prometheus_http_query::response::{PromqlResult, Sample};
 use std::{
     collections::HashMap,
     fs,
@@ -625,6 +625,16 @@ impl Swarm for LocalSwarm {
         _time: Option<i64>,
         _timeout: Option<i64>,
     ) -> Result<PromqlResult> {
+        todo!()
+    }
+
+    async fn query_range_metrics(
+        &self,
+        _query: &str,
+        _start_time: i64,
+        _end_time: i64,
+        _timeout: Option<i64>,
+    ) -> Result<Vec<Sample>> {
         todo!()
     }
 
