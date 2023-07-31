@@ -385,6 +385,7 @@ impl BlockPartitioner for V2Partitioner {
         let ret = self.add_edges(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &helpers_by_key_id);
         let duration = timer.stop_and_record();
         info!("add_edges={duration}");
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["drop"]).start_timer();
         self.thread_pool.spawn(move||{
             drop(sender_ids_by_sender);
             drop(sender_ids_by_txn_id);
@@ -395,6 +396,8 @@ impl BlockPartitioner for V2Partitioner {
             drop(start_txn_ids_by_shard_id);
             drop(txn_id_matrix);
         });
+        let duration = timer.stop_and_record();
+        info!("drop={duration}");
         ret
     }
 }
