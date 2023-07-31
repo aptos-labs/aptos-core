@@ -176,14 +176,6 @@ impl V2Partitioner {
                 }).collect()
             }).collect()
         });
-        // let mut sub_block_matrix: Vec<Vec<Mutex<Option<SubBlock<AnalyzedTransaction>>>>> = Vec::with_capacity(num_rounds);
-        // for _round_id in 0..num_rounds {
-        //     let mut row = Vec::with_capacity(num_shards);
-        //     for shard_id in 0..num_shards {
-        //         row.push(Mutex::new(None));
-        //     }
-        //     sub_block_matrix.push(row);
-        // }
         let duration = timer.stop_and_record();
         info!("add_edges__init={duration}");
 
@@ -505,17 +497,21 @@ pub fn assertions(before_partition: &Vec<AnalyzedTransaction>, after_partition: 
         }
     }
     assert_eq!(HashSet::from_iter(0..num_txns), old_tids_seen);
-    assert_eq!(edge_set_from_dst_view, edge_set_from_dst_view);
+    assert_eq!(edge_set_from_src_view, edge_set_from_dst_view);
     for (sender, old_tids) in old_tids_by_sender {
-        let num = old_tids.len();
-        for i in 1..num {
-            assert!(old_tids[i-1] < old_tids[i]);
-        }
+        assert!(is_sorted(&old_tids));
     }
     info!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
     assert_eq!(0, total_comm_cost % 2);
 }
 
+fn is_sorted(arr: &Vec<usize>) -> bool {
+    let num = arr.len();
+    for i in 1..num {
+        if arr[i-1] >= arr[i] {return false;}
+    }
+    return true;
+}
 /// Evenly divide 0..n-1. Example: uniform_partition(11,3) == [[0,1,2,3],[4,5,6,7],[8,9,10]]
 fn uniform_partition(num_items: usize, num_chunks: usize) -> Vec<Vec<usize>> {
     let num_big_chunks = num_items % num_chunks;

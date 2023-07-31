@@ -6,9 +6,12 @@ use std::collections::HashSet;
 use std::collections::btree_set::BTreeSet;
 use std::fmt::{Display, Formatter};
 use itertools::Itertools;
+use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::analyzed_transaction::StorageLocation;
 
-/// This structure holds IDs of txns who will access a certain state key.
+/// This structure is only used in `V2Partitioner`.
+/// It holds IDs of txns that claimed to access the same storage location and
+/// answers some cross-shard dependency queries efficiently.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StorageLocationHelper {
     pub storage_location: StorageLocation,
@@ -42,6 +45,7 @@ impl StorageLocationHelper {
         }
     }
 
+    /// Remove a txn from candidate pool and add it to the promoted list.
     pub fn promote_txn_id(&mut self, txn_id: usize, round_id: usize, shard_id: usize) {
         let txn_fat_id = TxnFatId {
             round_id,
@@ -57,18 +61,31 @@ impl StorageLocationHelper {
 
     }
 
-    pub fn has_write_in_range(&self, start: usize, end: usize) -> bool {
-        if start <= end {
-            self.writes.range(start..end).next().is_some()
+    /// Examples.
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=3, end=4 => false
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=3, end=5 => true
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=3, end=6 => true
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=4, end=4 => false
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=4, end=6 => true
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=5, end=6 => false
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=7, end=9 => true
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=8, end=9 => false
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=12, end=4 => false
+    /// candidates=[T4(W), T7(W), T8(R), T9(W), T11(W)], start=12, end=5 => true
+    pub fn has_write_in_range(&self, start_txn_id: usize, end_txn_id: usize) -> bool {
+        if start_txn_id <= end_txn_id {
+            self.writes.range(start_txn_id..end_txn_id).next().is_some()
         } else {
-            self.writes.range(start..).next().is_some() || self.writes.range(..end).next().is_some()
+            self.writes.range(start_txn_id..).next().is_some() || self.writes.range(..end_txn_id).next().is_some()
         }
     }
 
+    #[cfg(test)]
     pub fn is_writer(&self, old_txn_id: usize) -> bool {
         self.writer_set.contains(&old_txn_id)
     }
 
+    #[cfg(test)]
     pub fn brief(&self) -> String {
         let candidates: BTreeSet<(usize, bool)> = BTreeSet::from_iter(self.reads.iter().map(|t|(*t,false)).chain(self.writes.iter().map(|t|(*t, true))));
         let candidate_strs: Vec<String> = candidates.into_iter().map(|(txn_id, is_write)|{
@@ -88,7 +105,7 @@ impl StorageLocationHelper {
 
 #[test]
 fn test_storage_location_helper() {
-    let mut helper = StorageLocationHelper::default();
+    let mut helper = StorageLocationHelper::new(StorageLocation::Specific(StateKey::raw(vec![])), 0);
     helper.add_candidate(4, true);
     helper.add_candidate(10, true);
     helper.add_candidate(7, true);
