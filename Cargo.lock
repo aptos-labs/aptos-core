@@ -8741,6 +8741,7 @@ name = "move-compiler-v2"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
  "clap 3.2.23",
  "codespan",
  "codespan-reporting",
@@ -8748,7 +8749,10 @@ dependencies = [
  "ethnum",
  "itertools",
  "move-binary-format",
+ "move-command-line-common",
  "move-core-types",
+ "move-disassembler",
+ "move-ir-types",
  "move-model",
  "move-prover-test-utils",
  "move-stackless-bytecode",
@@ -8756,6 +8760,14 @@ dependencies = [
  "num",
  "once_cell",
  "serde 1.0.149",
+]
+
+[[package]]
+name = "move-compiler-v2-transactional-tests"
+version = "0.1.0"
+dependencies = [
+ "datatest-stable",
+ "move-transactional-test-runner",
 ]
 
 [[package]]
@@ -9253,6 +9265,7 @@ dependencies = [
  "move-cli",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-core-types",
  "move-disassembler",
  "move-ir-compiler",
@@ -9267,6 +9280,7 @@ dependencies = [
  "rayon",
  "regex",
  "tempfile",
+ "termcolor",
 ]
 
 [[package]]
