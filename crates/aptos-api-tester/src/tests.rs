@@ -378,7 +378,7 @@ async fn publish_module(client: &Client, account: &mut LocalAccount) -> Result<H
     // create payload
     let payload: aptos_types::transaction::TransactionPayload =
         EntryFunctionCall::CodePublishPackageTxn {
-            metadata_serialized: bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+            metadata_serialized: bcs::to_bytes(&metadata).expect("PackageMetadata should deserialize"),
             code: blobs.clone(),
         }
         .encode();
