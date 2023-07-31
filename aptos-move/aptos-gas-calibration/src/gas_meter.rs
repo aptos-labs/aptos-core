@@ -76,6 +76,11 @@ pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeters {
                 iterations,
             );
 
+            // record the equation names
+            gas_meter
+                .equation_names
+                .extend(meter_results.equation_names);
+
             // record with regular gas meter
             gas_meter.regular_meter.extend(meter_results.regular_meter);
 

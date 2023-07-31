@@ -113,6 +113,9 @@ impl MoveVmExt {
 
         let verifier_config = verifier_config(&features, &timed_features);
 
+        let type_max_cost = 0;
+        let type_base_cost = 0;
+        let type_byte_cost = 0;
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives_abstract_usage(builder),
@@ -123,6 +126,9 @@ impl MoveVmExt {
                     enable_invariant_violation_check_in_swap_loc,
                     type_size_limit,
                     max_value_nest_depth: Some(128),
+                    type_max_cost,
+                    type_base_cost,
+                    type_byte_cost,
                 },
             )?,
             chain_id,
