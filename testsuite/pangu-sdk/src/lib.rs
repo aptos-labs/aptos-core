@@ -562,8 +562,6 @@ impl PanguSDK {
 
 #[cfg(test)]
 mod tests {
-    #[warn(unused_imports)]
-    use super::*;
 
     #[cfg(feature = "integration-tests")]
     fn test_create_testnet() {
@@ -747,12 +745,17 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "integration-tests")]
+    // #[cfg(feature = "integration-tests")]
+    #[test]
     fn test_healthcheck_testnet() {
-        let pangu_dir = env::var("PANGU_DIR");
-        assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+        // let pangu_dir = env::var("PANGU_DIR");
+        // assert!(pangu_dir.is_ok(), "PANGU_DIR environment variable is not set");
+        env::set_var(
+            "PANGU_DIR",
+            "/Users/olsenbudanur/Desktop/aptos-repos/aptos-core/testsuite",
+        );
 
-        match PanguSDK::healthcheck_testnet("pangu-olsen", "ledger_info") {
+        match PanguSDK::healthcheck_testnet("pangu-o", "ledger_info") {
             Ok(summary) => {
                 println!("{:#?}", summary);
             },
