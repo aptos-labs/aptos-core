@@ -3,7 +3,11 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Updated
 - Updated CLI source compilation to use rust toolchain version 1.71.0 (from 1.70.0).
+
+### Fixed
+* Verify package now does not fail on a mismatched upgrade number
 
 ## [2.0.2] - 2023/07/06
 ### Added
