@@ -66,7 +66,7 @@ Usage: aptos-gas-calibration [OPTIONS]
 
 Options:
   -p, --pattern <PATTERN>        Specific tests to run that match a pattern [default: ]
-  -i, --iterations <ITERATIONS>  Number of iterations to run each Calibration Function [default: 10]
+  -i, --iterations <ITERATIONS>  Number of iterations to run each Calibration Function [default: 20]
   -h, --help                     Print help
 ```
 
