@@ -64,7 +64,7 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
         let amount = abstract_amount.evaluate(self.gas_feature_version, self.native_gas_params);
 
         if let Some(hook) = self.gas_hook {
-            let node = abstract_amount.to_dynamic().clone();
+            let node = abstract_amount.to_dynamic();
             hook(node);
         }
 

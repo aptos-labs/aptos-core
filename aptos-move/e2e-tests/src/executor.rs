@@ -666,9 +666,9 @@ impl FakeExecutor {
         self.block_time / 1_000_000
     }
 
-    /// exec_module is like exec(), however, we can run a Module published under
+    /// exec_module_record_running_time is like exec(), however, we can run a Module published under
     /// the creator address instead of 0x1, as what is currently done in exec.
-    pub fn exec_module(
+    pub fn exec_module_record_running_time(
         &mut self,
         module: &ModuleId,
         function_name: &str,
@@ -689,6 +689,7 @@ impl FakeExecutor {
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
+                None,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -777,12 +778,14 @@ impl FakeExecutor {
             });
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new_abstract_usage(
+            let vm = MoveVmExt::new(
+                NativeGasParameters::zeros(),
+                MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
-                &mut builder,
+                Some(&mut builder),
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -852,6 +855,7 @@ impl FakeExecutor {
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
+                None,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -903,6 +907,7 @@ impl FakeExecutor {
             self.features.clone(),
             // FIXME: should probably read the timestamp from storage.
             TimedFeatures::enable_all(),
+            None,
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

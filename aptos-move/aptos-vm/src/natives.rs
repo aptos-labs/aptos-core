@@ -65,7 +65,7 @@ pub fn aptos_natives_abstract_usage(builder: &mut SafeNativeBuilder) -> NativeFu
         .filter(|(_, name, _, _)| name.as_str() != "vector")
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
-            &builder,
+            builder,
         ))
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,

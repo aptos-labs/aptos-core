@@ -6,12 +6,12 @@ mod gas_meter_helpers;
 mod math;
 mod math_interface;
 mod solve;
-use aptos_abstract_gas_usage::{collect_terms, normalize};
+use aptos_abstract_gas_usage::{aggregate_terms, expand_terms};
 use aptos_gas_algebra::DynamicExpression;
 use clap::Parser;
 use gas_meter::{compile_and_run_samples, compile_and_run_samples_ir};
 use math_interface::{convert_to_matrix_format, total_num_of_cols, total_num_rows};
-use solve::{build_coefficient_matrix, build_constant_matrix, solve};
+use solve::{build_coefficient_matrix, build_constant_matrix, least_squares};
 use std::collections::BTreeMap;
 
 /// Automated Gas Calibration to calibrate Move bytecode and Native Functions
@@ -27,12 +27,10 @@ struct Args {
 }
 
 fn main() {
-    std::env::set_var("RUST_BACKTRACE", "1");
-
     // Implement CLI
     let args = Args::parse();
     let pattern = &args.pattern;
-    let iterations = *&args.iterations;
+    let iterations = args.iterations;
 
     println!(
         "Running each Calibration Function for {} iterations\n",
@@ -52,7 +50,7 @@ fn main() {
     for formula in samples.abstract_meter {
         let mut terms: Vec<DynamicExpression> = Vec::new();
         for term in formula {
-            let normal = normalize(term);
+            let normal = expand_terms(term);
             terms.extend(normal);
         }
         system_of_equations.push(terms);
@@ -60,7 +58,7 @@ fn main() {
     for formula in samples_ir.abstract_meter {
         let mut terms: Vec<DynamicExpression> = Vec::new();
         for term in formula {
-            let normal = normalize(term);
+            let normal = expand_terms(term);
             terms.extend(normal);
         }
         system_of_equations.push(terms);
@@ -69,7 +67,7 @@ fn main() {
     // Collect like terms
     let mut mappings: Vec<BTreeMap<String, u64>> = Vec::new();
     for equation in system_of_equations {
-        let map = collect_terms(equation)
+        let map = aggregate_terms(equation)
             .expect("Failed: Should not have concrete quantities in gas formulae.");
         mappings.push(map);
     }
@@ -86,7 +84,7 @@ fn main() {
     let mut const_matrix = build_constant_matrix(samples_ir.regular_meter, nrows, vec_col);
 
     // Solve the system of linear equations
-    solve(
+    least_squares(
         mappings,
         &mut coeff_matrix,
         &mut const_matrix,

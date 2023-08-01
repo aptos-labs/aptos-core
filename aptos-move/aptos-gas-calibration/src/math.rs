@@ -25,7 +25,7 @@ pub fn add_gas_formula_to_coefficient_matrix(
     let mut j = 0;
     while j < ncols {
         coefficient_matrix[(idx, j)] = formula[j];
-        j = j + 1;
+        j += 1;
     }
 }
 
@@ -65,16 +65,16 @@ fn create_augmented_matrix(
     while i < nrows {
         while j < ncols {
             augmented_matrix[(i, j)] = coefficient_matrix[(i, j)];
-            j = j + 1;
+            j += 1;
         }
-        i = i + 1;
+        i += 1;
         j = 0;
     }
 
     i = 0;
     while i < nrows {
         augmented_matrix[(i, ncols)] = constant_matrix[(i, 0)];
-        i = i + 1;
+        i += 1;
     }
 }
 
@@ -151,11 +151,11 @@ pub fn get_computed_time_and_outliers(
         let mut total_time: f64 = 0.0;
         while j < coeff_col {
             let a_ij = coefficient_matrix[(i, j)];
-            total_time = total_time + (a_ij * x_hat[(j, 0)]);
-            j = j + 1;
+            total_time += a_ij * x_hat[(j, 0)];
+            j += 1;
         }
         computed_running_time.push(total_time);
-        i = i + 1;
+        i += 1;
         j = 0;
     }
 
@@ -182,7 +182,7 @@ pub fn get_computed_time_and_outliers(
                 outliers.push((i, a_ij, computed_running_time[i], diff, false));
             }
         }
-        i = i + 1;
+        i += 1;
     }
 
     Ok(outliers)

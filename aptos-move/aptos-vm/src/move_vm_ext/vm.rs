@@ -45,6 +45,7 @@ impl MoveVmExt {
         chain_id: u8,
         features: Features,
         timed_features: TimedFeatures,
+        builder_option: Option<&mut SafeNativeBuilder>,
     ) -> VMResult<Self> {
         // Note: binary format v6 adds a few new integer types and their corresponding instructions.
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
@@ -68,16 +69,9 @@ impl MoveVmExt {
             type_byte_cost = 1;
         }
 
-        Ok(Self {
-            inner: MoveVM::new_with_config(
-                aptos_natives(
-                    gas_feature_version,
-                    native_gas_params,
-                    misc_gas_params,
-                    timed_features,
-                    features.clone(),
-                ),
-                VMConfig {
+        if let Some(builder) = builder_option {
+            Ok(Self {
+                inner: MoveVM::new_with_config(aptos_natives_abstract_usage(builder), VMConfig {
                     verifier: verifier_config,
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
@@ -87,53 +81,36 @@ impl MoveVmExt {
                     type_max_cost,
                     type_base_cost,
                     type_byte_cost,
-                },
-            )?,
-            chain_id,
-            features: Arc::new(features),
-        })
-    }
-
-    pub fn new_abstract_usage(
-        gas_feature_version: u64,
-        chain_id: u8,
-        features: Features,
-        timed_features: TimedFeatures,
-        builder: &mut SafeNativeBuilder,
-    ) -> VMResult<Self> {
-        // Note: binary format v6 adds a few new integer types and their corresponding instructions.
-        //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
-        //       the gas schedule hasn't been updated yet.
-        let max_binary_format_version =
-            get_max_binary_format_version(&features, gas_feature_version);
-
-        let enable_invariant_violation_check_in_swap_loc =
-            !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
-        let type_size_limit = true;
-
-        let verifier_config = verifier_config(&features, &timed_features);
-
-        let type_max_cost = 0;
-        let type_base_cost = 0;
-        let type_byte_cost = 0;
-        Ok(Self {
-            inner: MoveVM::new_with_config(
-                aptos_natives_abstract_usage(builder),
-                VMConfig {
-                    verifier: verifier_config,
-                    max_binary_format_version,
-                    paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
-                    enable_invariant_violation_check_in_swap_loc,
-                    type_size_limit,
-                    max_value_nest_depth: Some(128),
-                    type_max_cost,
-                    type_base_cost,
-                    type_byte_cost,
-                },
-            )?,
-            chain_id,
-            features: Arc::new(features),
-        })
+                })?,
+                chain_id,
+                features: Arc::new(features),
+            })
+        } else {
+            Ok(Self {
+                inner: MoveVM::new_with_config(
+                    aptos_natives(
+                        gas_feature_version,
+                        native_gas_params,
+                        misc_gas_params,
+                        timed_features,
+                        features.clone(),
+                    ),
+                    VMConfig {
+                        verifier: verifier_config,
+                        max_binary_format_version,
+                        paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
+                        enable_invariant_violation_check_in_swap_loc,
+                        type_size_limit,
+                        max_value_nest_depth: Some(128),
+                        type_max_cost,
+                        type_base_cost,
+                        type_byte_cost,
+                    },
+                )?,
+                chain_id,
+                features: Arc::new(features),
+            })
+        }
     }
 
     pub fn new_session<'r, S: MoveResolverExt>(

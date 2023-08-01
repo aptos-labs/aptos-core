@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::gas_meter::GasMeters;
-use aptos::move_tool::MemberId;
+use crate::gas_meter::GasMeasurements;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::TransactionPayload;
 use move_binary_format::CompiledModule;
-use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+};
 use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
 
 //// CONSTANTS
@@ -72,20 +73,26 @@ pub fn sign_module_txn(
     println!("txn status: {:?}", txn_status);
 }
 
-/// sign user transaction and only records the body of the transaction
+/// execute user transaction and the time only records the body of the transaction
 ///
 /// ### Arguments
 ///
 /// * `executor` - Runs transactions
 /// * `module_name` - Name of module
 /// * `function_name` - Name of function in the module
-pub fn sign_user_txn(
+pub fn execute_user_txn(
     executor: &mut FakeExecutor,
     module_name: &ModuleId,
     function_name: &str,
     iterations: u64,
 ) -> u128 {
-    let elapsed = executor.exec_module(module_name, function_name, vec![], vec![], iterations);
+    let elapsed = executor.exec_module_record_running_time(
+        module_name,
+        function_name,
+        vec![],
+        vec![],
+        iterations,
+    );
     println!("running time (microseconds): {}", elapsed);
     elapsed
 }
@@ -107,11 +114,11 @@ pub fn record_gas_meter(
     address: AccountAddress,
     identifier: &String,
     iterations: u64,
-) -> GasMeters {
+) -> GasMeasurements {
     // publish test-package under module address
     let creator = executor.new_account_at(address);
 
-    let mut gas_meter = GasMeters {
+    let mut gas_meter = GasMeasurements {
         regular_meter: Vec::new(),
         abstract_meter: Vec::new(),
         equation_names: Vec::new(),
@@ -125,10 +132,9 @@ pub fn record_gas_meter(
             identifier,
             func_identifier.clone(),
         );
-        gas_meter.equation_names.push(String::from(format!(
-            "{}::{}",
-            &identifier, &func_identifier
-        )));
+        gas_meter
+            .equation_names
+            .push(format!("{}::{}", &identifier, &func_identifier));
 
         // publish package similar to create_publish_package in harness.rs
         println!("Signing txn for module... ");
@@ -139,7 +145,7 @@ pub fn record_gas_meter(
         // send a txn that invokes the entry function 0x{address}::{name}::benchmark
         println!("Signing and running user txn for Regular Meter... ");
         let module_name = get_module_name(address, identifier, &func_identifier);
-        let duration = sign_user_txn(executor, &module_name, &func_identifier, iterations);
+        let duration = execute_user_txn(executor, &module_name, &func_identifier, iterations);
         gas_meter.regular_meter.push(duration);
 
         println!("Signing and running user txn for Abstract Meter... ");
@@ -165,19 +171,10 @@ pub fn record_gas_meter(
 /// * `func_identifier` - Name of function in module
 pub fn get_module_name(
     address: AccountAddress,
-    identifier: &String,
-    func_identifier: &String,
+    identifier: &str,
+    _func_identifier: &str,
 ) -> ModuleId {
-    let MemberId {
-        module_id,
-        member_id: _function_id,
-    } = str::parse(&format!(
-        "0x{}::{}::{}",
-        address, identifier, func_identifier,
-    ))
-    .unwrap();
-
-    module_id
+    ModuleId::new(address, Identifier::new(identifier).unwrap())
 }
 
 /// get all directories of Move projects
@@ -206,20 +203,19 @@ pub fn get_dir_paths(dirs: ReadDir) -> Vec<PathBuf> {
 /// * `identifier` - Name of module
 /// * `address` - Account address for the module
 /// * `pattern` - Certain functions to run based on pattern
-pub fn get_functional_identifiers(
-    cm: CompiledModule,
-    identifier: &String,
-    address: AccountAddress,
-    pattern: String,
-) -> Vec<String> {
+pub fn list_entrypoints(cm: &CompiledModule, pattern: String) -> Vec<String> {
     // find non-entry functions and ignore them
     // keep entry function names in func_identifiers vector
-    let funcs = cm.function_defs;
-    let func_handles = cm.function_handles;
-    let func_identifier_pool = cm.identifiers;
+    let funcs = &cm.function_defs;
+    let func_handles = &cm.function_handles;
+    let func_identifier_pool = &cm.identifiers;
+
+    let module_id = cm.self_id();
+    let identifier = module_id.name().to_string();
+    let address = module_id.address();
 
     // find # of params in each func if it is entry function
-    let signature_pool = cm.signatures;
+    let signature_pool = &cm.signatures;
 
     let mut func_identifiers: Vec<String> = Vec::new();
     for func in funcs {
