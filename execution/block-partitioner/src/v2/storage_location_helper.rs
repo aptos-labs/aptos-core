@@ -85,7 +85,6 @@ impl StorageLocationHelper {
         self.writer_set.contains(&old_txn_id)
     }
 
-    #[cfg(test)]
     pub fn brief(&self) -> String {
         let candidates: BTreeSet<(usize, bool)> = BTreeSet::from_iter(self.reads.iter().map(|t|(*t,false)).chain(self.writes.iter().map(|t|(*t, true))));
         let candidate_strs: Vec<String> = candidates.into_iter().map(|(txn_id, is_write)|{

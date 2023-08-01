@@ -280,6 +280,7 @@ impl V2Partitioner {
         }
 
         if num_remaining_txns >= 1 {
+            let last_round_id = txn_id_matrix.len();
             let timer = MISC_TIMERS_SECONDS.with_label_values(&["last_round"]).start_timer();
             let last_round_txns: Vec<usize> = remaining_txn_ids.into_iter().flatten().collect();
             last_round_txns.par_iter().for_each(|txn_id_ref|{
@@ -287,7 +288,7 @@ impl V2Partitioner {
                 for loc_id_ref in rsets_by_txn_id[txn_id].read().unwrap().iter().chain(wsets_by_txn_id[txn_id].read().unwrap().iter()) {
                     let loc_id = *loc_id_ref;
                     let helper = helpers_by_key_id.get(&loc_id).unwrap();
-                    helper.write().unwrap().promote_txn_id(txn_id, self.num_rounds_limit - 1, num_executor_shards - 1);
+                    helper.write().unwrap().promote_txn_id(txn_id, last_round_id, num_executor_shards - 1);
                 }
             });
 
