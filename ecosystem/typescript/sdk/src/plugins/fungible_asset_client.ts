@@ -4,6 +4,7 @@ import * as Gen from "../generated/index";
 import { OptionalTransactionArgs, Provider } from "../providers";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 import { MaybeHexString, HexString } from "../utils";
+import { AnyNumber } from "../bcs";
 
 export class FungibleAssetClient {
   provider: Provider;
@@ -85,7 +86,7 @@ export class FungibleAssetClient {
     sender: AptosAccount,
     fungibleAssetMetadataAddress: MaybeHexString,
     recipient: MaybeHexString,
-    amount: number | bigint,
+    amount: AnyNumber,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<RawTransaction> {
     const builder = new TransactionBuilderRemoteABI(this.provider, {
