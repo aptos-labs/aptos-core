@@ -166,7 +166,9 @@ impl AggregatorChangeSet {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::{aggregator_id_for_test, AggregatorStore};
+    use aptos_aggregator::{
+        aggregator_extension::ExtendedU128, aggregator_id_for_test, AggregatorStore,
+    };
     use claims::{assert_matches, assert_ok};
 
     fn get_test_resolver() -> AggregatorStore {
@@ -247,12 +249,26 @@ mod test {
             changes.get(&aggregator_id_for_test(500)).unwrap(),
             AggregatorChange::Delete
         );
-        let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0, 0, 0);
+        let delta_100 = DeltaOp::new(
+            DeltaUpdate::Plus(100),
+            600,
+            100,
+            0,
+            ExtendedU128::None,
+            ExtendedU128::None,
+        );
         assert_eq!(
             *changes.get(&aggregator_id_for_test(600)).unwrap(),
             AggregatorChange::Merge(delta_100)
         );
-        let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0, 0, 0);
+        let delta_200 = DeltaOp::new(
+            DeltaUpdate::Plus(200),
+            700,
+            200,
+            0,
+            ExtendedU128::None,
+            ExtendedU128::None,
+        );
         assert_eq!(
             *changes.get(&aggregator_id_for_test(700)).unwrap(),
             AggregatorChange::Merge(delta_200)
