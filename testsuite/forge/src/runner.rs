@@ -2,11 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::*;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use crate::{
-    success_criteria::SuccessCriteria,
-    system_metrics::{MetricsThreshold, SystemMetricsThreshold},
+    success_criteria::{MetricsThreshold, SuccessCriteria, SystemMetricsThreshold},
+    *,
 };
 use anyhow::{bail, format_err, Error, Result};
 use aptos_framework::ReleaseBundle;

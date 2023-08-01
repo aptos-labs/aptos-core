@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    interface::system_metrics::SystemMetricsThreshold, ChainInfo, FullNode, HealthCheckError,
-    LocalNode, LocalVersion, Node, Swarm, SwarmChaos, SwarmExt, Validator, Version,
+    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
+    SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
 use aptos::common::types::EncodingType;
@@ -635,15 +635,6 @@ impl Swarm for LocalSwarm {
         _end_time: i64,
         _timeout: Option<i64>,
     ) -> Result<Vec<Sample>> {
-        todo!()
-    }
-
-    async fn ensure_healthy_system_metrics(
-        &mut self,
-        _start_time: i64,
-        _end_time: i64,
-        _threshold: SystemMetricsThreshold,
-    ) -> Result<()> {
         todo!()
     }
 

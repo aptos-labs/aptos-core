@@ -7,9 +7,9 @@ use aptos_config::config::{ChainHealthBackoffValues, ConsensusConfig, PipelineBa
 use aptos_forge::{
     args::TransactionTypeArg,
     success_criteria::{
-        LatencyBreakdownThreshold, LatencyType, StateProgressThreshold, SuccessCriteria,
+        LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
+        SuccessCriteria, SystemMetricsThreshold,
     },
-    system_metrics::{MetricsThreshold, SystemMetricsThreshold},
     ForgeConfig, Options, *,
 };
 use aptos_logger::{info, Level};

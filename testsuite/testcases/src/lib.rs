@@ -27,7 +27,7 @@ pub mod validator_reboot_stress_test;
 
 use anyhow::Context;
 use aptos_forge::{
-    success_criteria::{LatencyBreakdown, LatencyBreakdownSlice, LatencySamples},
+    prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
     EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
     TestReport, TxnEmitter, TxnStats, Version,
 };
@@ -36,10 +36,7 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
-use std::{
-    collections::BTreeMap,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
-};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Runtime;
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
@@ -424,79 +421,6 @@ impl NetworkState {
             0
         }
     }
-}
-
-async fn fetch_latency_breakdown(
-    swarm: &dyn Swarm,
-    start_time: u64,
-    end_time: u64,
-) -> anyhow::Result<LatencyBreakdown> {
-    // Averaging over 1m, and skipping data points at the start that would take averages outside of the interval.
-    let start_time_adjusted = start_time + 60;
-    let consensus_proposal_to_ordered_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="ordered"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="ordered"}[1m]))"#;
-    let consensus_proposal_to_commit_query = r#"quantile(0.67, rate(aptos_consensus_block_tracing_sum{role=~"validator", stage="committed"}[1m]) / rate(aptos_consensus_block_tracing_count{role=~"validator", stage="committed"}[1m]))"#;
-
-    let qs_batch_to_pos_query = r#"sum(rate(quorum_store_batch_to_PoS_duration_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_batch_to_PoS_duration_count{role=~"validator"}[1m]))"#;
-    let qs_pos_to_proposal_query = r#"sum(rate(quorum_store_pos_to_pull_sum{role=~"validator"}[1m])) / sum(rate(quorum_store_pos_to_pull_count{role=~"validator"}[1m]))"#;
-
-    let consensus_proposal_to_ordered_samples = swarm
-        .query_range_metrics(
-            consensus_proposal_to_ordered_query,
-            start_time_adjusted as i64,
-            end_time as i64,
-            None,
-        )
-        .await?;
-
-    let consensus_ordered_to_commit_samples = swarm
-        .query_range_metrics(
-            &format!(
-                "{} - {}",
-                consensus_proposal_to_commit_query, consensus_proposal_to_ordered_query
-            ),
-            start_time_adjusted as i64,
-            end_time as i64,
-            None,
-        )
-        .await?;
-
-    let qs_batch_to_pos_samples = swarm
-        .query_range_metrics(
-            qs_batch_to_pos_query,
-            start_time_adjusted as i64,
-            end_time as i64,
-            None,
-        )
-        .await?;
-
-    let qs_pos_to_proposal_samples = swarm
-        .query_range_metrics(
-            qs_pos_to_proposal_query,
-            start_time_adjusted as i64,
-            end_time as i64,
-            None,
-        )
-        .await?;
-
-    let mut samples = BTreeMap::new();
-    samples.insert(
-        LatencyBreakdownSlice::QsBatchToPos,
-        LatencySamples::new(qs_batch_to_pos_samples),
-    );
-    samples.insert(
-        LatencyBreakdownSlice::QsPosToProposal,
-        LatencySamples::new(qs_pos_to_proposal_samples),
-    );
-    samples.insert(
-        LatencyBreakdownSlice::ConsensusProposalToOrdered,
-        LatencySamples::new(consensus_proposal_to_ordered_samples),
-    );
-    samples.insert(
-        LatencyBreakdownSlice::ConsensusOrderedToCommit,
-        LatencySamples::new(consensus_ordered_to_commit_samples),
-    );
-
-    Ok(LatencyBreakdown::new(samples))
 }
 
 pub struct LoadTestPhaseStats {
