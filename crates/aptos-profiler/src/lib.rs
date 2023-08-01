@@ -37,7 +37,7 @@ impl ProfilerConfig {
 struct CpuProfilerConfig {
     duration: u64,
     frequency: i32,
-    cpu_profiling_data_files_dir: PathBuf,
+    cpu_profiling_result: PathBuf,
 }
 
 impl CpuProfilerConfig {
@@ -45,7 +45,7 @@ impl CpuProfilerConfig {
         Some(Self {
             duration: 5,
             frequency: 100,
-            cpu_profiling_data_files_dir: PathBuf::from("./cpu_profiling_data_files"),
+            cpu_profiling_result: PathBuf::from("./cpu_flamegraph.svg"),
         })
     }
 }
@@ -53,14 +53,17 @@ impl CpuProfilerConfig {
 #[derive(Debug, Clone)]
 struct MemProfilerConfig {
     duration: u64,
-    mem_profiling_data_files_dir: PathBuf,
+    mem_profiling_result_txt: PathBuf,
+    mem_profiling_result_svg: PathBuf,
 } 
 
 impl MemProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
             duration: 60,
-            mem_profiling_data_files_dir: PathBuf::from("./mem_profiling_data_files"),
+            mem_profiling_result_txt: PathBuf::from("./heap.txt"),
+            mem_profiling_result_svg: PathBuf::from("./heap.svg"),
+
         })
     }
 }
@@ -75,7 +78,7 @@ impl ThreadProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
             profiling_thread_name: "thread_profiling_thread".to_string(),
-            thread_profiling_data_files_dir: PathBuf::from("./thread_profiling_data_files"),
+            thread_profiling_data_files_dir: PathBuf::from("./thread_profiling_result/thead_dump.txt"),
         })
     }
 }
@@ -91,6 +94,7 @@ pub trait Profiler {
     // Expose the results as a JSON string for visualization
     fn expose_svg_results(&self) -> Result<String>;
 
+    
 }
 
 
@@ -101,6 +105,7 @@ pub struct ProfilerHandler {
 impl ProfilerHandler {
 
     pub fn new(config: ProfilerConfig) -> Self {
+        //fs::create_dir("");
         Self {
             config
         }

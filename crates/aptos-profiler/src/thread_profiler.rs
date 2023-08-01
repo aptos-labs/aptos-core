@@ -3,7 +3,7 @@
 
 use anyhow::Result;
 use crate::{Profiler, ThreadProfilerConfig};
-use crate::utils::convert_svg_to_string;
+use crate::utils::{convert_svg_to_string, create_file_with_parents};
 use std::{process::Command, fs::File, io::Write, path::PathBuf};
 
 //TODO: add other config fields
@@ -31,8 +31,9 @@ impl Profiler for ThreadProfiler {
             .unwrap();
         
         // Open a file for writing
-        let mut file = File::create(self.thread_profiling_data_file.as_path()).unwrap();
-        
+        ///***let mut file = File::create(self.thread_profiling_data_file.as_path()).unwrap();***
+        let mut file = create_file_with_parents(self.thread_profiling_data_file.as_path())?;
+
         // Write the trace information to the file
         write!(file, "{:#?}", trace).unwrap();
         Ok(())

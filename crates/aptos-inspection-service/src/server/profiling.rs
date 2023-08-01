@@ -21,70 +21,113 @@ pub fn handle_profiling_request() -> (StatusCode, Body, String) {
 }
 
 pub fn handle_cpu_profiling_request() -> (StatusCode, Body, String) {
-    //Call aptos-profiling cpu profiling 
+    // Call aptos-profiling cpu profiling
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
     let cpu_profiler = handler.get_cpu_profiler();
-    cpu_profiler.start_profiling();
 
-    (StatusCode::OK, Body::from("Success"), CONTENT_TYPE_JSON.into(),)
+    match cpu_profiler.start_profiling() {
+        Ok(_) => {
+            // If profiling started successfully, return the OK status code
+            (StatusCode::OK, Body::from("Success"), CONTENT_TYPE_TEXT.into())
+        }
+        Err(_) => {
+            // If an error occurred during profiling start, return a different status code
+            (StatusCode::INTERNAL_SERVER_ERROR, Body::from("Error starting CPU profiling"), CONTENT_TYPE_TEXT.into())
+        }
+    }
 }
 
 pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
-    //Call aptos-profiling memory profiling 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
     let memory_profiler = handler.get_mem_profiler();
-    memory_profiler.start_profiling();
 
-    (StatusCode::OK, Body::from("Success"), CONTENT_TYPE_TEXT.into())
+    match memory_profiler.start_profiling() {
+        Ok(_) => {
+            (StatusCode::OK, Body::from("Success"), CONTENT_TYPE_TEXT.into())
+        }
+        Err(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Body::from("Error starting memory profiling"), CONTENT_TYPE_TEXT.into())
+        }
+    }
 }
 
-//TODO: use aptos-profiler crater
 pub fn handle_cpu_flamegraph_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
     let cpu_profiler = handler.get_cpu_profiler();
     let result = cpu_profiler.expose_svg_results();
 
-    (StatusCode::OK, Body::from(result.unwrap()), CONTENT_TYPE_SVG.into())
+    match result {
+        Ok(svg_data) => {
+            (StatusCode::OK, Body::from(svg_data), CONTENT_TYPE_SVG.into())
+        }
+        Err(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Body::from("Error generating CPU flamegraph"), CONTENT_TYPE_TEXT.into())
+        }
+    }
 }
 
-//TODO: use aptos-profiler crater
 pub fn handle_memory_svg_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
     let memory_profiler = handler.get_mem_profiler();
     let result = memory_profiler.expose_svg_results();
-    
-    (StatusCode::OK, Body::from(result.unwrap()), CONTENT_TYPE_SVG.into())
+
+    match result {
+        Ok(svg_data) => {
+            (StatusCode::OK, Body::from(svg_data), CONTENT_TYPE_SVG.into())
+        }
+        Err(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Body::from("Error generating memory SVG"), CONTENT_TYPE_TEXT.into())
+        }
+    }
 }
 
-//TODO: use aptos-profiler crater
 pub fn handle_memory_txt_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
     let memory_profiler = handler.get_mem_profiler();
     let result = memory_profiler.expose_text_results();
-    
-    (StatusCode::OK, Body::from(result.unwrap()), CONTENT_TYPE_TEXT.into())
+
+    match result {
+        Ok(text_data) => {
+            (StatusCode::OK, Body::from(text_data), CONTENT_TYPE_TEXT.into())
+        }
+        Err(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Body::from("Error generating memory text results"), CONTENT_TYPE_TEXT.into())
+        }
+    }
 }
 
 pub fn handle_thread_dump_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
     let thread_profiler = handler.get_thread_profiler();
-    thread_profiler.start_profiling();
 
-    (StatusCode::OK, Body::from("555"), CONTENT_TYPE_TEXT.into())
+    match thread_profiler.start_profiling() {
+        Ok(_) => {
+            (StatusCode::OK, Body::from("555"), CONTENT_TYPE_TEXT.into())
+        }
+        Err(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Body::from("Error starting thread profiling"), CONTENT_TYPE_TEXT.into())
+        }
+    }
 }
 
-//TODO: use aptos-profiler crater
 pub fn handle_thread_dump_result_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
     let thread_profiler = handler.get_thread_profiler();
     let result = thread_profiler.expose_text_results();
-    
-    (StatusCode::OK, Body::from(result.unwrap()), CONTENT_TYPE_TEXT.into())
+
+    match result {
+        Ok(text_data) => {
+            (StatusCode::OK, Body::from(text_data), CONTENT_TYPE_TEXT.into())
+        }
+        Err(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Body::from("Error generating thread dump results"), CONTENT_TYPE_TEXT.into())
+        }
+    }
 }

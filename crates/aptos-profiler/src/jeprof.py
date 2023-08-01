@@ -8,14 +8,15 @@ def execute_command(command):
     except subprocess.CalledProcessError as e:
         return f"Command execution failed with error code {e.returncode}. Output:\n{e.output.decode('utf-8').strip()}"
 
-arg1 = sys.argv[1]
+text_location = sys.argv[1]
+svg_location = sys.argv[2]
 
 
-command = "jeprof --show_bytes /home/yunusozer/aptos-core/target/release/aptos-node /home/yunusozer/aptos-core/prof.*.heap --svg  > /home/yunusozer/aptos-core/crates/aptos-inspection-service/src/server/memory_profile/heap.svg"
+command = "jeprof --show_bytes ./target/release/aptos-node ./*.heap --svg  > " + svg_location
 result = execute_command(command)
-command = "jeprof --show_bytes /home/yunusozer/aptos-core/target/release/aptos-node /home/yunusozer/aptos-core/prof.*.heap --text  > /home/yunusozer/aptos-core/crates/aptos-inspection-service/src/server/memory_profile/heap.txt"
+command = "jeprof --show_bytes ./target/release/aptos-node ./*.heap --text  > " + text_location
 result = execute_command(command)
 
 
-#command = "rm /home/ubuntu/aptos-core/crates/aptos-inspection-service/src/server/memory_profile/prof*"
-#result = execute_command(command)
+command = "rm ./*.heap"
+result = execute_command(command)

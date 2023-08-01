@@ -4,7 +4,7 @@
 use anyhow::Result;
 use crate::{CpuProfilerConfig, Profiler};
 use crate::utils::convert_svg_to_string;
-use std::{fs, fs::File, io::Read, thread, time, path::{Path, PathBuf}};
+use std::{fs, io::Read, thread, time, path::{Path, PathBuf}};
 
 pub struct CpuProfiler {
     duration: u64,
@@ -17,7 +17,7 @@ impl CpuProfiler {
         Self {
             duration: config.duration,
             frequency: config.frequency,
-            cpu_profiling_data_file: config.cpu_profiling_data_files_dir.clone(),
+            cpu_profiling_data_file: config.cpu_profiling_result.clone(),
         }
     }
 }
@@ -28,7 +28,7 @@ impl Profiler for CpuProfiler {
         thread::sleep(time::Duration::from_secs(self.duration));
 
         if let Ok(report) = guard.report().build() {
-            let file = File::create(self.cpu_profiling_data_file.as_path()).unwrap();
+            let file = fs::File::create(self.cpu_profiling_data_file.as_path()).unwrap();
             report.flamegraph(file).unwrap();
         };
         
@@ -45,7 +45,9 @@ impl Profiler for CpuProfiler {
 
     // Expose the results as a JSON string for visualization
     fn expose_svg_results(&self) -> Result<String> {
-        let content = convert_svg_to_string(self.cpu_profiling_data_file.join("/cpu_flamegraph.svg").as_path());
+        let content = convert_svg_to_string(self.cpu_profiling_data_file.as_path());
         return Ok(content.unwrap());
     }
 }
+
+
