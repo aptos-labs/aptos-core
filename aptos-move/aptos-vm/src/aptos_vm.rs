@@ -18,7 +18,6 @@ use crate::{
     verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
-use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
@@ -35,6 +34,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
+    state_store::state_key::StateKey,
     transaction::{
         analyzed_transaction::AnalyzedTransaction, EntryFunction, ExecutionError, ExecutionStatus,
         ModuleBundle, Multisig, MultisigTransactionPayload, SignatureCheckedTransaction,
@@ -42,7 +42,7 @@ use aptos_types::{
         VMValidatorResult, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
-    write_set::WriteSet,
+    write_set::WriteOp,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -287,7 +287,7 @@ impl AptosVM {
     ) -> (VMStatus, VMOutput) {
         let mut session = self
             .0
-            .new_session(resolver, SessionId::epilogue_meta(txn_data), true);
+            .new_session(resolver, SessionId::epilogue_meta(txn_data));
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -493,12 +493,12 @@ impl AptosVM {
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         let change_set = session.finish(&mut (), change_set_configs)?;
 
-        for (key, op) in change_set.write_set() {
+        for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
 
         gas_meter.charge_storage_fee_for_all(
-            change_set.write_set().iter(),
+            change_set.write_set_iter(),
             change_set.events(),
             txn_data.transaction_size,
             txn_data.gas_unit_price,
@@ -1033,7 +1033,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
-        let mut session = self.0.new_session(resolver, SessionId::prologue(txn), true);
+        let mut session = self.0.new_session(resolver, SessionId::prologue(txn));
         if let Err(err) = self.validate_signature_checked_transaction(
             &mut session,
             resolver,
@@ -1053,7 +1053,7 @@ impl AptosVM {
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
             resolver.release_resource_group_cache();
-            session = self.0.new_session(resolver, SessionId::txn(txn), true);
+            session = self.0.new_session(resolver, SessionId::txn(txn));
         }
 
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
@@ -1199,17 +1199,10 @@ impl AptosVM {
 
         match writeset_payload {
             WriteSetPayload::Direct(change_set) => {
-                let write_set = change_set.write_set().clone();
-                let events = change_set.events().to_vec();
-                VMChangeSet::new(
-                    write_set,
-                    DeltaChangeSet::empty(),
-                    events,
-                    &change_set_configs,
-                )
+                VMChangeSet::try_from_storage_change_set(change_set.clone(), &change_set_configs)
             },
             WriteSetPayload::Script { script, execute_as } => {
-                let mut tmp_session = self.0.new_session(resolver, session_id, true);
+                let mut tmp_session = self.0.new_session(resolver, session_id);
                 let senders = match txn_sender {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
@@ -1239,14 +1232,14 @@ impl AptosVM {
         }
     }
 
-    fn read_writeset(
+    fn read_writeset<'a>(
         &self,
         state_view: &impl StateView,
-        write_set: &WriteSet,
+        write_set: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for (state_key, _) in write_set.iter() {
+        for (state_key, _) in write_set.into_iter() {
             state_view
                 .get_state_value_bytes(state_key)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
@@ -1293,7 +1286,12 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_writeset(resolver, change_set.write_set())?;
+        self.read_writeset(resolver, change_set.write_set_iter())?;
+        assert!(
+            change_set.aggregator_write_set().is_empty(),
+            "Waypoint change set should not have any aggregator writes."
+        );
+
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = VMOutput::new(change_set, FeeStatement::zero(), VMStatus::Executed.into());
@@ -1319,9 +1317,9 @@ impl AptosVM {
             ..Default::default()
         };
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session =
-            self.0
-                .new_session(resolver, SessionId::block_meta(&block_metadata), true);
+        let mut session = self
+            .0
+            .new_session(resolver, SessionId::block_meta(&block_metadata));
 
         let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         session
@@ -1360,41 +1358,17 @@ impl AptosVM {
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        // Try to simulate with aggregator enabled.
         let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
             &simulation_vm.0.as_move_resolver(state_view),
             txn,
             &log_context,
-            true,
         );
-
-        // Because simulation returns a VMOutput, it has both writes and deltas
-        // produced by the transaction. Conversion to TransactionOutput materializes
-        // deltas and merges them with the write set, and can fail (e.g. applying
-        // a delta led to integer overflow). It is important to catch the failing
-        // case and re-simulate the transaction without an aggregator, in order to
-        // obtain the precise location of abort and gas used.
-        match vm_output.into_transaction_output(state_view) {
-            Ok(output) => (vm_status, output),
-            Err(_) => {
-                // Conversion to TransactionOutput failed, re-simulate without aggregators.
-                let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
-                    &simulation_vm.0.as_move_resolver(state_view),
-                    txn,
-                    &log_context,
-                    false,
-                );
-
-                // Make sure to return the right types. Note that here conversion
-                // never fails because delta change set is empty.
-                (
-                    vm_status,
-                    vm_output.into_transaction_output(state_view).expect(
-                        "Conversion to TransactionOutput without aggregator always succeeds.",
-                    ),
-                )
-            },
-        }
+        (
+            vm_status,
+            vm_output
+                .try_into_transaction_output(state_view)
+                .expect("Simulation cannot fail"),
+        )
     }
 
     pub fn execute_view_function(
@@ -1415,7 +1389,7 @@ impl AptosVM {
                 gas_budget,
             )));
         let resolver = vm.as_move_resolver(state_view);
-        let mut session = vm.new_session(&resolver, SessionId::Void, true);
+        let mut session = vm.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.0.extract_module_metadata(&module_id);
@@ -1593,9 +1567,7 @@ impl VMValidator for AptosVM {
         };
 
         let resolver = self.as_move_resolver(state_view);
-        let mut session = self
-            .0
-            .new_session(&resolver, SessionId::prologue(&txn), true);
+        let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn));
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,
             &resolver,
@@ -1629,9 +1601,8 @@ impl VMAdapter for AptosVM {
         &self,
         resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
-        aggregator_enabled: bool,
     ) -> SessionExt<'r, '_> {
-        self.0.new_session(resolver, session_id, aggregator_enabled)
+        self.0.new_session(resolver, session_id)
     }
 
     fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
@@ -1670,6 +1641,7 @@ impl VMAdapter for AptosVM {
     fn should_restart_execution(vm_output: &VMOutput) -> bool {
         let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
         vm_output
+            .change_set()
             .events()
             .iter()
             .any(|event| *event.key() == new_epoch_event_key)
@@ -1822,7 +1794,6 @@ impl AptosSimulationVM {
         resolver: &impl MoveResolverExt,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
-        aggregator_enabled: bool,
     ) -> (VMStatus, VMOutput) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
@@ -1832,9 +1803,7 @@ impl AptosSimulationVM {
 
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
-        let mut session =
-            self.0
-                .new_session(resolver, SessionId::txn_meta(&txn_data), aggregator_enabled);
+        let mut session = self.0.new_session(resolver, SessionId::txn_meta(&txn_data));
         if let Err(err) =
             self.validate_simulated_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {

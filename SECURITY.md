@@ -14,7 +14,7 @@ Send the email from an email domain that is less likely to get flagged for spam 
 
 This is an actively monitored account, the team will quickly respond.
 
-If you do not receive a response within 24 hours, please directly followup with the team in [Discord](https://discord.gg/aptoslabs) by reaching out to anyone with the role “Aptos Labs”.
+If you do not receive a response within 24 hours, please directly followup with the team in [Discord](https://discord.gg/aptosnetwork) by reaching out to anyone with the role “Aptos Labs”.
 
 As above, please DO NOT include attachments or provide detail regarding the security issue in this email.
 

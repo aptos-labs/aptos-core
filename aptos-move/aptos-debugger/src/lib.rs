@@ -235,7 +235,7 @@ impl AptosDebugger {
             TimedFeatures::enable_all(),
         )
         .unwrap();
-        let mut session = move_vm.new_session(&state_view_storage, SessionId::Void, true);
+        let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         let change_set = session
             .finish(

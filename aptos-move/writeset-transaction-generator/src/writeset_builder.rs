@@ -122,11 +122,9 @@ where
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
-        let mut session = GenesisSession(move_vm.new_session(
-            &state_view_storage,
-            SessionId::genesis(genesis_id),
-            true,
-        ));
+        let mut session = GenesisSession(
+            move_vm.new_session(&state_view_storage, SessionId::genesis(genesis_id)),
+        );
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
@@ -141,8 +139,8 @@ where
     };
 
     // Genesis never produces the delta change set.
-    assert!(change_set.delta_change_set().is_empty());
-
-    let (write_set, _delta_change_set, events) = change_set.unpack();
-    ChangeSet::new(write_set, events)
+    assert!(change_set.aggregator_delta_set().is_empty());
+    change_set
+        .try_into_storage_change_set()
+        .expect("Conversion from VMChangeSet into ChangeSet should always succeed")
 }

@@ -13,3 +13,8 @@ module 0x42::M {
         M::R{ dummy_field: _ } = r
     }
 } // end 0x42::M
+module <SELF> {
+    private fun main<T>(_s: &signer,_a0: T,_a1: vector<T>,_a2: vector<vector<T>>,_a3: M::S,_a4: M::R,_a5: M::Cup<u8>,_a6: M::Cup<T>,_a7: vector<M::S>) {
+        Abort(0)
+    }
+} // end <SELF>

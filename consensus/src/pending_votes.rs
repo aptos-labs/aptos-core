@@ -172,7 +172,7 @@ impl PendingVotes {
 
         // check if we have enough signatures to create a QC
         let voting_power =
-            match validator_verifier.check_voting_power(li_with_sig.signatures().keys()) {
+            match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
                 // a quorum of signature was reached, a new QC is formed
                 Ok(_) => {
                     return match li_with_sig.aggregate_signatures(validator_verifier) {
@@ -218,25 +218,25 @@ impl PendingVotes {
                 .maybe_partial_2chain_tc
                 .get_or_insert_with(|| TwoChainTimeoutWithPartialSignatures::new(timeout.clone()));
             partial_tc.add(vote.author(), timeout.clone(), signature.clone());
-            let tc_voting_power = match validator_verifier.check_voting_power(partial_tc.signers())
-            {
-                Ok(_) => {
-                    return match partial_tc.aggregate_signatures(validator_verifier) {
-                        Ok(tc_with_sig) => {
-                            VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(tc_with_sig))
-                        },
-                        Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
-                    };
-                },
-                Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
-                Err(error) => {
-                    error!(
+            let tc_voting_power =
+                match validator_verifier.check_voting_power(partial_tc.signers(), true) {
+                    Ok(_) => {
+                        return match partial_tc.aggregate_signatures(validator_verifier) {
+                            Ok(tc_with_sig) => VoteReceptionResult::New2ChainTimeoutCertificate(
+                                Arc::new(tc_with_sig),
+                            ),
+                            Err(e) => VoteReceptionResult::ErrorAggregatingTimeoutCertificate(e),
+                        };
+                    },
+                    Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => voting_power,
+                    Err(error) => {
+                        error!(
                         "MUST_FIX: 2-chain timeout vote received could not be added: {}, vote: {}",
                         error, vote
                     );
-                    return VoteReceptionResult::ErrorAddingVote(error);
-                },
-            };
+                        return VoteReceptionResult::ErrorAddingVote(error);
+                    },
+                };
 
             // Echo timeout if receive f+1 timeout message.
             if !self.echo_timeout {
@@ -497,7 +497,8 @@ mod tests {
                             .get_voters(
                                 &validator.get_ordered_account_addresses_iter().collect_vec()
                             )
-                            .iter()
+                            .iter(),
+                        true
                     )
                     .is_ok());
             },

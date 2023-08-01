@@ -95,7 +95,6 @@ pub struct FakeExecutor {
     no_parallel_exec: bool,
     features: Features,
     chain_id: u8,
-    aggregator_enabled: bool,
 }
 
 impl FakeExecutor {
@@ -117,16 +116,11 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: chain_id.id(),
-            aggregator_enabled: true,
         };
         executor.apply_write_set(write_set);
         // As a set effect, also allow module bundle txns. TODO: Remove
         aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
-    }
-
-    pub fn set_aggregator_enabled(&mut self, aggregator_enabled: bool) {
-        self.aggregator_enabled = aggregator_enabled;
     }
 
     /// Configure this executor to not use parallel execution.
@@ -187,7 +181,6 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: ChainId::test().id(),
-            aggregator_enabled: true,
         }
     }
 
@@ -533,7 +526,7 @@ impl FakeExecutor {
             )?;
 
         Ok((
-            output.into_transaction_output(self.get_state_view())?,
+            output.try_into_transaction_output(self.get_state_view())?,
             gas_profiler.finish(),
         ))
     }
@@ -684,8 +677,7 @@ impl FakeExecutor {
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session =
-                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+            let mut session = vm.new_session(&remote_view, SessionId::void());
             session
                 .execute_function_bypass_visibility(
                     module,
@@ -708,7 +700,10 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            let (write_set, _events) = change_set
+                .try_into_storage_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -736,8 +731,7 @@ impl FakeExecutor {
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session =
-                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+            let mut session = vm.new_session(&remote_view, SessionId::void());
             session
                 .execute_function_bypass_visibility(
                     &Self::module(module_name),
@@ -760,7 +754,10 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            let (write_set, _events) = change_set
+                .try_into_storage_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -785,7 +782,7 @@ impl FakeExecutor {
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+        let mut session = vm.new_session(&remote_view, SessionId::void());
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),
@@ -803,7 +800,10 @@ impl FakeExecutor {
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (write_set, _delta_change_set, _events) = change_set.unpack();
+        let (write_set, _events) = change_set
+            .try_into_storage_change_set()
+            .expect("Failed to convert to ChangeSet")
+            .into_inner();
         Ok(write_set)
     }
 

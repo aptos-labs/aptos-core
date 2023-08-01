@@ -6,8 +6,7 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
-use move_binary_format::errors::PartialVMError;
-use move_core_types::{gas_algebra::NumBytes, vm_status::StatusCode};
+use move_core_types::gas_algebra::NumBytes;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
@@ -35,12 +34,7 @@ fn native_from_bytes(
     debug_assert_eq!(args.len(), 1);
 
     // TODO(Gas): charge for getting the layout
-    let layout = context.type_to_type_layout(&ty_args[0])?.ok_or_else(|| {
-        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(format!(
-            "Failed to get layout of type {:?} -- this should not happen",
-            ty_args[0]
-        ))
-    })?;
+    let layout = context.type_to_type_layout(&ty_args[0])?;
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
     context.charge(
