@@ -4,9 +4,8 @@
 use crate::NetworkLoadTest;
 use aptos_forge::{
     args::TransactionTypeArg,
-    success_criteria::{
-        LatencyBreakdown, LatencyBreakdownSlice, SuccessCriteria, SuccessCriteriaChecker,
-    },
+    prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice},
+    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
     EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Test, TxnStats,
 };
 use aptos_logger::info;
@@ -237,10 +236,10 @@ fn to_table(results: &[SingleRunStats]) -> Vec<String> {
             rate.p50_latency,
             rate.p90_latency,
             rate.p99_latency,
-            result.latency_breakdown.get_samples(LatencyBreakdownSlice::QsBatchToPos).max_sample(),
-            result.latency_breakdown.get_samples(LatencyBreakdownSlice::QsPosToProposal).max_sample(),
-            result.latency_breakdown.get_samples(LatencyBreakdownSlice::ConsensusProposalToOrdered).max_sample(),
-            result.latency_breakdown.get_samples(LatencyBreakdownSlice::ConsensusOrderedToCommit).max_sample(),
+            result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsBatchToPos).max_sample(),
+            result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsPosToProposal).max_sample(),
+            result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).max_sample(),
+            result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusOrderedToCommit).max_sample(),
             result.actual_duration.as_secs()
         ));
     }

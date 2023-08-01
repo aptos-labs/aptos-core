@@ -4,7 +4,8 @@
 
 use super::Test;
 use crate::{
-    success_criteria::{LatencyBreakdown, SuccessCriteria, SuccessCriteriaChecker},
+    prometheus_metrics::LatencyBreakdown,
+    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
     CoreContext, Result, Swarm, TestReport,
 };
 use aptos_transaction_emitter_lib::{EmitJobRequest, TxnStats};
