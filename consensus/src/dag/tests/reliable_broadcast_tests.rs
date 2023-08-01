@@ -3,16 +3,10 @@
 
 use crate::dag::{
     dag_store::Dag,
-    reliable_broadcast::{
-        CertifiedNodeHandleError, CertifiedNodeHandler, NodeBroadcastHandleError,
-        NodeBroadcastHandler,
-    },
+    reliable_broadcast::{NodeBroadcastHandleError, NodeBroadcastHandler},
     storage::DAGStorage,
-    tests::{
-        dag_test::MockStorage,
-        helpers::{new_certified_node, new_node},
-    },
-    types::{CertifiedAck, NodeCertificate},
+    tests::{dag_test::MockStorage, helpers::new_node},
+    types::NodeCertificate,
     NodeId, RpcHandler, Vote,
 };
 use aptos_infallible::RwLock;

@@ -248,6 +248,8 @@ impl TDAGMessage for Node {
 
         let current_round = self.metadata().round();
 
+        ensure!(current_round > 0, "current round cannot be zero");
+
         if current_round == 1 {
             ensure!(self.parents().is_empty(), "invalid parents for round 1");
             return Ok(());

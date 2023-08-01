@@ -1,9 +1,10 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     dag::{
         dag_driver::{DagDriver, DagDriverError},
         dag_network::{DAGNetworkSender, RpcWithFallback},
         dag_store::Dag,
-        reliable_broadcast::ReliableBroadcast,
         tests::{dag_test::MockStorage, helpers::new_certified_node},
         types::{CertifiedAck, DAGMessage},
         RpcHandler,
@@ -13,12 +14,26 @@ use crate::{
 };
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
+use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
 use std::{sync::Arc, time::Duration};
+use tokio_retry::strategy::ExponentialBackoff;
 
 struct MockNetworkSender {}
+
+#[async_trait]
+impl RBNetworkSender<DAGMessage> for MockNetworkSender {
+    async fn send_rb_rpc(
+        &self,
+        _receiver: Author,
+        _messagee: DAGMessage,
+        _timeout: Duration,
+    ) -> anyhow::Result<DAGMessage> {
+        unimplemented!()
+    }
+}
 
 #[async_trait]
 impl DAGNetworkSender for MockNetworkSender {
@@ -59,6 +74,8 @@ fn test_certified_node_handler() {
     let rb = Arc::new(ReliableBroadcast::new(
         signers.iter().map(|s| s.author()).collect(),
         Arc::new(MockNetworkSender {}),
+        ExponentialBackoff::from_millis(10),
+        aptos_time_service::TimeService::mock(),
     ));
     let time_service = Arc::new(SimulatedTimeService::new());
     let mut driver = DagDriver::new(

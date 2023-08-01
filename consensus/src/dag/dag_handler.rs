@@ -2,7 +2,7 @@
 
 use super::{
     dag_driver::DagDriver, dag_fetcher::FetchRequestHandler, dag_network::DAGNetworkSender,
-    reliable_broadcast::ReliableBroadcast, storage::DAGStorage, types::TDAGMessage,
+    storage::DAGStorage, types::TDAGMessage,
 };
 use crate::{
     dag::{
@@ -10,7 +10,8 @@ use crate::{
         types::DAGMessage,
     },
     network::{IncomingDAGRequest, TConsensusMsg},
-    state_replication::PayloadClient, util::time_service::TimeService,
+    state_replication::PayloadClient,
+    util::time_service::TimeService,
 };
 use anyhow::bail;
 use aptos_channels::aptos_channel;
@@ -18,10 +19,12 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_logger::{error, warn};
 use aptos_network::protocols::network::RpcError;
+use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
 use bytes::Bytes;
 use futures::StreamExt;
 use std::sync::Arc;
+use tokio_retry::strategy::ExponentialBackoff;
 
 struct NetworkHandler {
     dag_rpc_rx: aptos_channel::Receiver<Author, IncomingDAGRequest>,
@@ -39,12 +42,16 @@ impl NetworkHandler {
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         payload_client: Arc<dyn PayloadClient>,
-        network_sender: Arc<dyn DAGNetworkSender>,
+        _dag_network_sender: Arc<dyn DAGNetworkSender>,
+        rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
         time_service: Arc<dyn TimeService>,
+        aptos_time_service: aptos_time_service::TimeService,
     ) -> Self {
         let rb = Arc::new(ReliableBroadcast::new(
             epoch_state.verifier.get_ordered_account_addresses().clone(),
-            network_sender,
+            rb_network_sender,
+            ExponentialBackoff::from_millis(10),
+            aptos_time_service,
         ));
         Self {
             dag_rpc_rx,
@@ -70,8 +77,8 @@ impl NetworkHandler {
     }
 
     async fn start(mut self) {
-        self.dag_driver.try_enter_new_round();        
-        
+        self.dag_driver.try_enter_new_round();
+
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         while let Some(msg) = self.dag_rpc_rx.next().await {
             if let Err(e) = self.process_rpc(msg).await {
