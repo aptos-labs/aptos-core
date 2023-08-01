@@ -13,10 +13,10 @@ pub static DEVNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
 pub static DEVNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
-pub static TESTNET_NODE_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
-pub static TESTNET_FAUCET_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
+// pub static TESTNET_NODE_URL: Lazy<Url> =
+//     Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
+// pub static TESTNET_FAUCET_URL: Lazy<Url> =
+//     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
 
 #[derive(Debug)]
 pub enum TestResult {
@@ -72,14 +72,14 @@ impl ToString for TestName {
 
 #[derive(Clone, Copy)]
 pub enum NetworkName {
-    Testnet,
+    // Testnet,
     Devnet,
 }
 
 impl ToString for NetworkName {
     fn to_string(&self) -> String {
         match &self {
-            NetworkName::Testnet => "testnet".to_string(),
+            // NetworkName::Testnet => "testnet".to_string(),
             NetworkName::Devnet => "devnet".to_string(),
         }
     }
@@ -118,7 +118,7 @@ pub fn set_metrics(
 // Create a REST client.
 pub fn get_client(network_name: NetworkName) -> Client {
     match network_name {
-        NetworkName::Testnet => Client::new(TESTNET_NODE_URL.clone()),
+        // NetworkName::Testnet => Client::new(TESTNET_NODE_URL.clone()),
         NetworkName::Devnet => Client::new(DEVNET_NODE_URL.clone()),
     }
 }
@@ -126,9 +126,9 @@ pub fn get_client(network_name: NetworkName) -> Client {
 // Create a faucet client.
 pub fn get_faucet_client(network_name: NetworkName) -> FaucetClient {
     match network_name {
-        NetworkName::Testnet => {
-            FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone())
-        },
+        // NetworkName::Testnet => {
+        //     FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone())
+        // },
         NetworkName::Devnet => {
             FaucetClient::new(DEVNET_FAUCET_URL.clone(), DEVNET_NODE_URL.clone())
         },
