@@ -45,6 +45,8 @@ struct SimpleVMTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
     storage: InMemoryStorage,
     default_syntax: SyntaxChoice,
+    comparison_mode: bool,
+    run_config: TestRunConfig,
 }
 
 pub fn view_resource_in_move_storage(
@@ -104,8 +106,14 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         self.default_syntax
     }
 
+    fn run_config(&self) -> TestRunConfig {
+        self.run_config
+    }
+
     fn init(
         default_syntax: SyntaxChoice,
+        comparison_mode: bool,
+        run_config: TestRunConfig,
         pre_compiled_deps: Option<&'a FullyCompiledProgram>,
         task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> (Self, Option<String>) {
@@ -129,6 +137,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let mut adapter = Self {
             compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps, None),
             default_syntax,
+            comparison_mode,
+            run_config,
             storage: InMemoryStorage::new(),
         };
 
@@ -202,7 +212,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             Err(e) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
                 module.self_id(),
-                format_vm_error(&e)
+                format_vm_error(&e, self.comparison_mode)
             )),
         }
     }
@@ -245,7 +255,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|e| {
                 anyhow!(
                     "Script execution failed with VMError: {}",
-                    format_vm_error(&e)
+                    format_vm_error(&e, self.comparison_mode)
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -289,7 +299,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|e| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    format_vm_error(&e)
+                    format_vm_error(&e, self.comparison_mode)
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -310,7 +320,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     }
 }
 
-pub fn format_vm_error(e: &VMError) -> String {
+pub fn format_vm_error(e: &VMError, comparison_mode: bool) -> String {
     let location_string = match e.location() {
         Location::Undefined => "undefined".to_owned(),
         Location::Script => "script".to_owned(),
@@ -321,15 +331,25 @@ pub fn format_vm_error(e: &VMError) -> String {
     major_status: {major_status:?},
     sub_status: {sub_status:?},
     location: {location_string},
-    indices: {indices:?},
-    offsets: {offsets:?},
+    indices: {indices},
+    offsets: {offsets},
 }}",
         major_status = e.major_status(),
         sub_status = e.sub_status(),
         location_string = location_string,
         // TODO maybe include source map info?
-        indices = e.indices(),
-        offsets = e.offsets(),
+        indices = if comparison_mode {
+            // During comparison testing, abstract this data.
+            "redacted".to_string()
+        } else {
+            format!("{:?}", e.indices())
+        },
+        offsets = if comparison_mode {
+            // During comparison testing, abstract this data.
+            "redacted".to_string()
+        } else {
+            format!("{:?}", e.offsets())
+        },
     )
 }
 
@@ -420,8 +440,22 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
     }
 });
 
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+pub enum TestRunConfig {
+    CompilerV1,
+    CompilerV2,
+    ComparisonV1V2,
+}
+
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<SimpleVMTestAdapter>(path, Some(&*PRECOMPILED_MOVE_STDLIB))
+    run_test_with_config(TestRunConfig::CompilerV1, path)
+}
+
+pub fn run_test_with_config(
+    config: TestRunConfig,
+    path: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB))
 }
 
 impl From<AdapterExecuteArgs> for VMConfig {

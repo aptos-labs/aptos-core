@@ -7,11 +7,11 @@ error: no matching declaration of `<<`
   │         ^^^^^^^^^^^^^
   │
   = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `bool` for argument 1)
-  = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `bool` for argument 1)
-  = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `bool` for argument 1)
-  = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `bool` for argument 1)
-  = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `bool` for argument 1)
-  = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `bool` for argument 1)
+  = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `bool` for argument 1)
+  = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `bool` for argument 1)
+  = outruled candidate `<<(u64, u8): u64` (expected `u64` but found `bool` for argument 1)
+  = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `bool` for argument 1)
+  = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `bool` for argument 1)
 
 error: no matching declaration of `<<`
   ┌─ tests/checking/typing/binary_shl_invalid.move:9:9
@@ -20,11 +20,11 @@ error: no matching declaration of `<<`
   │         ^^^^^^^^^^
   │
   = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `bool` for argument 2)
-  = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `bool` for argument 2)
-  = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `bool` for argument 2)
-  = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `bool` for argument 2)
-  = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `bool` for argument 2)
-  = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `bool` for argument 2)
+  = outruled candidate `<<(u16, u8): u16` (expected `u8` but found `bool` for argument 2)
+  = outruled candidate `<<(u32, u8): u32` (expected `u8` but found `bool` for argument 2)
+  = outruled candidate `<<(u64, u8): u64` (expected `u8` but found `bool` for argument 2)
+  = outruled candidate `<<(u128, u8): u128` (expected `u8` but found `bool` for argument 2)
+  = outruled candidate `<<(u256, u8): u256` (expected `u8` but found `bool` for argument 2)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:10:9
@@ -33,11 +33,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `bool` for argument 1)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `bool` for argument 1)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `bool` for argument 1)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `bool` for argument 1)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `bool` for argument 1)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `bool` for argument 1)
+   = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `bool` for argument 1)
+   = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `bool` for argument 1)
+   = outruled candidate `<<(u64, u8): u64` (expected `u64` but found `bool` for argument 1)
+   = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `bool` for argument 1)
+   = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `bool` for argument 1)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:11:9
@@ -46,11 +46,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `address` for argument 1)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `address` for argument 1)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `address` for argument 1)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `address` for argument 1)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `address` for argument 1)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `address` for argument 1)
+   = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `address` for argument 1)
+   = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `address` for argument 1)
+   = outruled candidate `<<(u64, u8): u64` (expected `u64` but found `address` for argument 1)
+   = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `address` for argument 1)
+   = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `address` for argument 1)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:12:9
@@ -59,11 +59,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^^^^^^^^^^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `u128` for argument 2)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `u8` for argument 1)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `u8` for argument 1)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `u8` for argument 1)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `u8` for argument 1)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `u8` for argument 1)
+   = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `u8` for argument 1)
+   = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `u8` for argument 1)
+   = outruled candidate `<<(u64, u8): u64` (expected `u64` but found `u8` for argument 1)
+   = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `u8` for argument 1)
+   = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `u8` for argument 1)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:13:9
@@ -72,11 +72,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `M::R` for argument 1)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `M::R` for argument 1)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `M::R` for argument 1)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `M::R` for argument 1)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `M::R` for argument 1)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `M::R` for argument 1)
+   = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `M::R` for argument 1)
+   = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `M::R` for argument 1)
+   = outruled candidate `<<(u64, u8): u64` (expected `u64` but found `M::R` for argument 1)
+   = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `M::R` for argument 1)
+   = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `M::R` for argument 1)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:14:9
@@ -85,11 +85,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `M::S` for argument 1)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `M::S` for argument 1)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `M::S` for argument 1)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `M::S` for argument 1)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `M::S` for argument 1)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `M::S` for argument 1)
+   = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `M::S` for argument 1)
+   = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `M::S` for argument 1)
+   = outruled candidate `<<(u64, u8): u64` (expected `u64` but found `M::S` for argument 1)
+   = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `M::S` for argument 1)
+   = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `M::S` for argument 1)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:15:9
@@ -98,11 +98,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `bool` for argument 2)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `bool` for argument 2)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `bool` for argument 2)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `bool` for argument 2)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `bool` for argument 2)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `bool` for argument 2)
+   = outruled candidate `<<(u16, u8): u16` (expected `u8` but found `bool` for argument 2)
+   = outruled candidate `<<(u32, u8): u32` (expected `u8` but found `bool` for argument 2)
+   = outruled candidate `<<(u64, u8): u64` (expected `u8` but found `bool` for argument 2)
+   = outruled candidate `<<(u128, u8): u128` (expected `u8` but found `bool` for argument 2)
+   = outruled candidate `<<(u256, u8): u256` (expected `u8` but found `bool` for argument 2)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:15:9
@@ -111,11 +111,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^^^^^^^^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `address` for argument 2)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `address` for argument 2)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `address` for argument 2)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `address` for argument 2)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `address` for argument 2)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `address` for argument 2)
+   = outruled candidate `<<(u16, u8): u16` (expected `u8` but found `address` for argument 2)
+   = outruled candidate `<<(u32, u8): u32` (expected `u8` but found `address` for argument 2)
+   = outruled candidate `<<(u64, u8): u64` (expected `u8` but found `address` for argument 2)
+   = outruled candidate `<<(u128, u8): u128` (expected `u8` but found `address` for argument 2)
+   = outruled candidate `<<(u256, u8): u256` (expected `u8` but found `address` for argument 2)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:16:9
@@ -124,11 +124,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `()` for argument 1)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `()` for argument 1)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `()` for argument 1)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `()` for argument 1)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `()` for argument 1)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `()` for argument 1)
+   = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `()` for argument 1)
+   = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `()` for argument 1)
+   = outruled candidate `<<(u64, u8): u64` (expected `u64` but found `()` for argument 1)
+   = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `()` for argument 1)
+   = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `()` for argument 1)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:17:9
@@ -137,11 +137,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `()` for argument 2)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `()` for argument 2)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `()` for argument 2)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `()` for argument 2)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `()` for argument 2)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `()` for argument 2)
+   = outruled candidate `<<(u16, u8): u16` (expected `u8` but found `()` for argument 2)
+   = outruled candidate `<<(u32, u8): u32` (expected `u8` but found `()` for argument 2)
+   = outruled candidate `<<(u64, u8): u64` (expected `u8` but found `()` for argument 2)
+   = outruled candidate `<<(u128, u8): u128` (expected `u8` but found `()` for argument 2)
+   = outruled candidate `<<(u256, u8): u256` (expected `u8` but found `()` for argument 2)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:18:9
@@ -150,11 +150,11 @@ error: no matching declaration of `<<`
    │         ^^^^^^^^^^^^^^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u64, u8): u64` (expected `u64` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `(integer, integer)` for argument 1)
 
 error: no matching declaration of `<<`
    ┌─ tests/checking/typing/binary_shl_invalid.move:19:9
@@ -163,8 +163,8 @@ error: no matching declaration of `<<`
    │         ^^^^^^^^^^^^^^^^
    │
    = outruled candidate `<<(u8, u8): u8` (expected `u8` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u16, u16): u16` (expected `u16` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u32, u32): u32` (expected `u32` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u64, u64): u64` (expected `u64` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u128, u128): u128` (expected `u128` but found `(integer, integer)` for argument 1)
-   = outruled candidate `<<(u256, u256): u256` (expected `u256` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u16, u8): u16` (expected `u16` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u32, u8): u32` (expected `u32` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u64, u8): u64` (expected `u64` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u128, u8): u128` (expected `u128` but found `(integer, integer)` for argument 1)
+   = outruled candidate `<<(u256, u8): u256` (expected `u256` but found `(integer, integer)` for argument 1)

@@ -44,7 +44,7 @@ module aptos_std::big_vector {
     /// Aborts if `v` is not empty.
     public fun destroy_empty<T>(v: BigVector<T>) {
         assert!(is_empty(&v), error::invalid_argument(EVECTOR_NOT_EMPTY));
-        let BigVector { buckets, end_index: _,  bucket_size: _ } = v;
+        let BigVector { buckets, end_index: _, bucket_size: _ } = v;
         table_with_length::destroy_empty(buckets);
     }
 
@@ -122,11 +122,13 @@ module aptos_std::big_vector {
         let res = vector::remove(cur_bucket, i % v.bucket_size);
         v.end_index = v.end_index - 1;
         move cur_bucket;
-        while ({spec {
-            invariant cur_bucket_index <= num_buckets;
-            invariant table_with_length::spec_len(v.buckets) == num_buckets;
-        };
-            (cur_bucket_index < num_buckets)}) {
+        while ({
+            spec {
+                invariant cur_bucket_index <= num_buckets;
+                invariant table_with_length::spec_len(v.buckets) == num_buckets;
+            };
+            (cur_bucket_index < num_buckets)
+        }) {
             // remove one element from the start of current vector
             let cur_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index);
             let t = vector::remove(cur_bucket, 0);
@@ -221,7 +223,7 @@ module aptos_std::big_vector {
             num_buckets_left = num_buckets_left - 1;
         };
 
-        if(vector::length(&push_bucket) > 0) {
+        if (vector::length(&push_bucket) > 0) {
             vector::push_back(&mut new_buckets, push_bucket);
         } else {
             vector::destroy_empty(push_bucket);
@@ -230,7 +232,7 @@ module aptos_std::big_vector {
         vector::reverse(&mut new_buckets);
         let i = 0;
         assert!(table_with_length::length(&v.buckets) == 0, 0);
-        while(i < num_buckets) {
+        while (i < num_buckets) {
             table_with_length::add(&mut v.buckets, i, vector::pop_back(&mut new_buckets));
             i = i + 1;
         };
@@ -247,7 +249,7 @@ module aptos_std::big_vector {
             let cur = table_with_length::borrow(&v.buckets, bucket_index);
             let (found, i) = vector::index_of(cur, val);
             if (found) {
-                return (true, bucket_index*v.bucket_size + i)
+                return (true, bucket_index * v.bucket_size + i)
             };
             bucket_index = bucket_index + 1;
         };
@@ -260,6 +262,20 @@ module aptos_std::big_vector {
         if (is_empty(v)) return false;
         let (exist, _) = index_of(v, val);
         exist
+    }
+
+    /// Convert a big vector to a native vector, which is supposed to be called mostly by view functions to get an
+    /// atomic view of the whole vector.
+    /// Disclaimer: This function may be costly as the big vector may be huge in size. Use it at your own discretion.
+    public fun to_vector<T: copy>(v: &BigVector<T>): vector<T> {
+        let res = vector[];
+        let num_buckets = table_with_length::length(&v.buckets);
+        let i = 0;
+        while (i < num_buckets) {
+            vector::append(&mut res, *table_with_length::borrow(&v.buckets, i));
+            i = i + 1;
+        };
+        res
     }
 
     /// Return the length of the vector.
@@ -357,6 +373,23 @@ module aptos_std::big_vector {
     }
 
     #[test]
+    fun big_vector_to_vector_test() {
+        let v1 = empty(7);
+        let i = 0;
+        while (i < 100) {
+            push_back(&mut v1, i);
+            i = i + 1;
+        };
+        let v2 = to_vector(&v1);
+        let j = 0;
+        while (j < 100) {
+            assert!(*vector::borrow(&v2, j) == j, 0);
+            j = j + 1;
+        };
+        destroy(v1);
+    }
+
+    #[test]
     fun big_vector_remove_and_reverse_test() {
         let v = empty(11);
         let i = 0;
@@ -425,7 +458,7 @@ module aptos_std::big_vector {
 
     #[test]
     fun big_vector_empty_contains() {
-        let v = empty<u64> (10);
+        let v = empty<u64>(10);
         assert!(!contains<u64>(&v, &(1 as u64)), 0);
         destroy_empty(v);
     }

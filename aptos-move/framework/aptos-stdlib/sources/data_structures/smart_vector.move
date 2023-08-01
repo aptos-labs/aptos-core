@@ -69,7 +69,7 @@ module aptos_std::smart_vector {
     /// Aborts if `v` is not empty.
     public fun destroy_empty<T>(v: SmartVector<T>) {
         assert!(is_empty(&v), error::invalid_argument(EVECTOR_NOT_EMPTY));
-        let SmartVector { inline_vec, big_vec, inline_capacity: _, bucket_size: _} = v;
+        let SmartVector { inline_vec, big_vec, inline_capacity: _, bucket_size: _ } = v;
         vector::destroy_empty(inline_vec);
         option::destroy_none(big_vec);
     }
@@ -114,6 +114,23 @@ module aptos_std::smart_vector {
             i = i + 1;
         };
         destroy_empty(other);
+    }
+
+    /// Add multiple values to the vector at once.
+    public fun add_all<T: store>(v: &mut SmartVector<T>, vals: vector<T>) {
+        vector::for_each(vals, |val| { push_back(v, val); })
+    }
+
+    /// Convert a smart vector to a native vector, which is supposed to be called mostly by view functions to get an
+    /// atomic view of the whole vector.
+    /// Disclaimer: This function may be costly as the smart vector may be huge in size. Use it at your own discretion.
+    public fun to_vector<T: store + copy>(v: &SmartVector<T>): vector<T> {
+        let res = v.inline_vec;
+        if (option::is_some(&v.big_vec)) {
+            let big_vec = option::borrow(&v.big_vec);
+            vector::append(&mut res, big_vector::to_vector(big_vec));
+        };
+        res
     }
 
     /// Add element `val` to the end of the vector `v`. It grows the buckets when the current buckets are full.
@@ -457,10 +474,46 @@ module aptos_std::smart_vector {
         i = 0;
         let len = length(&v);
         while (i + 1 < len) {
-            assert!(*big_vector::borrow(option::borrow(&v.big_vec), i) == *big_vector::borrow(option::borrow(&v.big_vec), i + 1) + 1, 0);
+            assert!(
+                *big_vector::borrow(option::borrow(&v.big_vec), i) == *big_vector::borrow(
+                    option::borrow(&v.big_vec),
+                    i + 1
+                ) + 1,
+                0
+            );
             i = i + 1;
         };
         destroy(v);
+    }
+
+    #[test]
+    fun smart_vector_add_all_test() {
+        let v = empty_with_config(1, 2);
+        add_all(&mut v, vector[1, 2, 3, 4, 5, 6]);
+        assert!(length(&v) == 6, 0);
+        let i = 0;
+        while (i < 6) {
+            assert!(*borrow(&v, i) == i + 1, 0);
+            i = i + 1;
+        };
+        destroy(v);
+    }
+
+    #[test]
+    fun smart_vector_to_vector_test() {
+        let v1 = empty_with_config(7, 11);
+        let i = 0;
+        while (i < 100) {
+            push_back(&mut v1, i);
+            i = i + 1;
+        };
+        let v2 = to_vector(&v1);
+        let j = 0;
+        while (j < 100) {
+            assert!(*vector::borrow(&v2, j) == j, 0);
+            j = j + 1;
+        };
+        destroy(v1);
     }
 
     #[test]

@@ -94,6 +94,12 @@ pub struct Loc {
     span: Span,
 }
 
+impl AsRef<Loc> for Loc {
+    fn as_ref(&self) -> &Loc {
+        self
+    }
+}
+
 impl Loc {
     pub fn new(file_id: FileId, span: Span) -> Loc {
         Loc { file_id, span }
@@ -1070,6 +1076,49 @@ impl GlobalEnv {
                 && &*self.symbol_pool.string(struct_env.get_name()) == "EventHandle"
         } else {
             false
+        }
+    }
+
+    /// Computes the abilities associated with the given type.
+    pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
+        match ty {
+            Type::Primitive(p) => match p {
+                PrimitiveType::Bool
+                | PrimitiveType::U8
+                | PrimitiveType::U16
+                | PrimitiveType::U32
+                | PrimitiveType::U64
+                | PrimitiveType::U128
+                | PrimitiveType::U256
+                | PrimitiveType::Num
+                | PrimitiveType::Range
+                | PrimitiveType::EventStore
+                | PrimitiveType::Address => AbilitySet::PRIMITIVES,
+                PrimitiveType::Signer => AbilitySet::SIGNER,
+            },
+            Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities(et, ty_params)),
+            Type::Struct(mid, sid, inst) => {
+                let struct_env = self.get_struct(mid.qualified(*sid));
+                let mut abilities = struct_env.get_abilities();
+                for inst_ty in inst {
+                    abilities = abilities.intersect(self.type_abilities(inst_ty, ty_params))
+                }
+                abilities
+            },
+            Type::TypeParameter(i) => {
+                if let Some(tp) = ty_params.get(*i as usize) {
+                    tp.1.abilities
+                } else {
+                    AbilitySet::EMPTY
+                }
+            },
+            Type::Reference(_, _) => AbilitySet::REFERENCES,
+            Type::Fun(_, _)
+            | Type::Tuple(_)
+            | Type::TypeDomain(_)
+            | Type::ResourceDomain(_, _, _)
+            | Type::Error
+            | Type::Var(_) => AbilitySet::EMPTY,
         }
     }
 

@@ -164,23 +164,12 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.resolver.loader().type_to_type_tag(ty)
     }
 
-    pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<Option<MoveTypeLayout>> {
-        match self.resolver.type_to_type_layout(ty) {
-            Ok(ty_layout) => Ok(Some(ty_layout)),
-            Err(e) if e.major_status().status_type() == StatusType::InvariantViolation => Err(e),
-            Err(_) => Ok(None),
-        }
+    pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        self.resolver.type_to_type_layout(ty)
     }
 
-    pub fn type_to_fully_annotated_layout(
-        &self,
-        ty: &Type,
-    ) -> PartialVMResult<Option<MoveTypeLayout>> {
-        match self.resolver.type_to_fully_annotated_layout(ty) {
-            Ok(ty_layout) => Ok(Some(ty_layout)),
-            Err(e) if e.major_status().status_type() == StatusType::InvariantViolation => Err(e),
-            Err(_) => Ok(None),
-        }
+    pub fn type_to_fully_annotated_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        self.resolver.type_to_fully_annotated_layout(ty)
     }
 
     pub fn extensions(&self) -> &NativeContextExtensions<'b> {

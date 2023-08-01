@@ -56,16 +56,11 @@ module aptos_framework::event {
     }
 
     #[test_only]
-    public fun emitted_events<T: drop + store>(handle: &EventHandle<T>): vector<T> {
-        emitted_events_internal(bcs::to_bytes(&handle.guid))
-    }
+    public native fun emitted_events_by_handle<T: drop + store>(handle: &EventHandle<T>): vector<T>;
 
     #[test_only]
-    public fun was_event_emitted<T: drop + store>(handle: &EventHandle<T>, msg: &T): bool {
+    public fun was_event_emitted_by_handle<T: drop + store>(handle: &EventHandle<T>, msg: &T): bool {
         use std::vector;
-        vector::contains(&emitted_events(handle), msg)
+        vector::contains(&emitted_events_by_handle(handle), msg)
     }
-
-    #[test_only]
-    native fun emitted_events_internal<T: drop + store>(id: vector<u8>): vector<T>;
 }

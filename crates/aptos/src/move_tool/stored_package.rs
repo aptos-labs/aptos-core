@@ -175,12 +175,6 @@ impl<'a> CachedPackageMetadata<'a> {
                 package_metadata.upgrade_policy,
                 self_metadata.upgrade_policy
             )
-        } else if self_metadata.upgrade_number != package_metadata.upgrade_number {
-            bail!(
-                "Upgrade number doesn't match {:?} : {:?}",
-                package_metadata.upgrade_number,
-                self_metadata.upgrade_number
-            )
         } else if self_metadata.extension != package_metadata.extension {
             bail!(
                 "Extensions doesn't match {:?} : {:?}",

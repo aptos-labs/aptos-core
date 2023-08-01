@@ -46,7 +46,7 @@ use tokio_util::compat::{
 // it easy to build connections without going through the whole transport pipeline.
 pub fn build_test_transport(
 ) -> BoxedTransport<Connection<MemorySocket>, impl ::std::error::Error + Sync + Send + 'static> {
-    let memory_transport = MemoryTransport::default();
+    let memory_transport = MemoryTransport;
 
     memory_transport
         .and_then(move |socket, addr, origin| async move {
@@ -108,7 +108,10 @@ fn build_test_peer_manager(
         PeersAndMetadata::new(&[network_id]),
         peer_manager_request_rx,
         connection_reqs_rx,
-        [(ProtocolId::mock(), hello_tx)].iter().cloned().collect(),
+        [(ProtocolId::DiscoveryDirectSend, hello_tx)]
+            .iter()
+            .cloned()
+            .collect(),
         vec![conn_status_tx],
         constants::NETWORK_CHANNEL_SIZE,
         constants::MAX_CONCURRENT_NETWORK_REQS,

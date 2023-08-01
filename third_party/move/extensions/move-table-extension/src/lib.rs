@@ -211,8 +211,8 @@ impl TableData {
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
-                let key_layout = get_type_layout(context, key_ty)?;
-                let value_layout = get_type_layout(context, value_ty)?;
+                let key_layout = context.type_to_type_layout(key_ty)?;
+                let value_layout = context.type_to_type_layout(value_ty)?;
                 let table = Table {
                     handle,
                     key_layout,
@@ -696,10 +696,4 @@ fn deserialize(layout: &MoveTypeLayout, bytes: &[u8]) -> PartialVMResult<Value> 
 
 fn partial_extension_error(msg: impl ToString) -> PartialVMError {
     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(msg.to_string())
-}
-
-fn get_type_layout(context: &NativeContext, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
-    context
-        .type_to_type_layout(ty)?
-        .ok_or_else(|| partial_extension_error("cannot determine type layout"))
 }

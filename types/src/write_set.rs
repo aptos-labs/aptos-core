@@ -301,6 +301,10 @@ impl WriteSetMut {
         self.write_set.insert(item.0, item.1);
     }
 
+    pub fn extend(&mut self, write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) {
+        self.write_set.extend(write_ops);
+    }
+
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.write_set.is_empty()

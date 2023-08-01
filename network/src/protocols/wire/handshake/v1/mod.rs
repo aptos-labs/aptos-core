@@ -13,6 +13,7 @@
 //!
 //! [AptosNet Handshake v1 Specification]: https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/handshake-v1.md
 
+use crate::counters::{start_serialization_timer, DESERIALIZATION_LABEL, SERIALIZATION_LABEL};
 use anyhow::anyhow;
 use aptos_compression::metrics::CompressionClient;
 use aptos_config::{config::MAX_APPLICATION_MESSAGE_SIZE, network_id::NetworkId};
@@ -85,6 +86,7 @@ impl ProtocolId {
         }
     }
 
+    /// Returns all protocol ID types
     pub fn all() -> &'static [ProtocolId] {
         &[
             ProtocolId::ConsensusRpcBcs,
@@ -103,7 +105,7 @@ impl ProtocolId {
         ]
     }
 
-    /// How to encode messages for a given `ProtocolId`
+    /// Specifies how to encode messages for a given `ProtocolId`
     fn encoding(self) -> Encoding {
         match self {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
@@ -130,13 +132,14 @@ impl ProtocolId {
         }
     }
 
-    #[cfg(test)]
-    pub fn mock() -> Self {
-        ProtocolId::DiscoveryDirectSend
-    }
-
+    /// Serializes the given message into bytes (based on the protocol ID
+    /// and encoding to use).
     pub fn to_bytes<T: Serialize>(&self, value: &T) -> anyhow::Result<Vec<u8>> {
-        match self.encoding() {
+        // Start the serialization timer
+        let serialization_timer = start_serialization_timer(*self, SERIALIZATION_LABEL);
+
+        // Serialize the message
+        let result = match self.encoding() {
             Encoding::Bcs(limit) => self.bcs_encode(value, limit),
             Encoding::CompressedBcs(limit) => {
                 let compression_client = self.get_compression_client();
@@ -149,11 +152,24 @@ impl ProtocolId {
                 .map_err(|e| anyhow!("{:?}", e))
             },
             Encoding::Json => serde_json::to_vec(value).map_err(|e| anyhow!("{:?}", e)),
+        };
+
+        // Only record the duration if serialization was successful
+        if result.is_ok() {
+            serialization_timer.observe_duration();
         }
+
+        result
     }
 
+    /// Deserializes the given bytes into a typed message (based on the
+    /// protocol ID and encoding to use).
     pub fn from_bytes<T: DeserializeOwned>(&self, bytes: &[u8]) -> anyhow::Result<T> {
-        match self.encoding() {
+        // Start the deserialization timer
+        let deserialization_timer = start_serialization_timer(*self, DESERIALIZATION_LABEL);
+
+        // Deserialize the message
+        let result = match self.encoding() {
             Encoding::Bcs(limit) => self.bcs_decode(bytes, limit),
             Encoding::CompressedBcs(limit) => {
                 let compression_client = self.get_compression_client();
@@ -166,13 +182,22 @@ impl ProtocolId {
                 self.bcs_decode(&raw_bytes, limit)
             },
             Encoding::Json => serde_json::from_slice(bytes).map_err(|e| anyhow!("{:?}", e)),
+        };
+
+        // Only record the duration if deserialization was successful
+        if result.is_ok() {
+            deserialization_timer.observe_duration();
         }
+
+        result
     }
 
+    /// Serializes the value using BCS encoding (with a specified limit)
     fn bcs_encode<T: Serialize>(&self, value: &T, limit: usize) -> anyhow::Result<Vec<u8>> {
         bcs::to_bytes_with_limit(value, limit).map_err(|e| anyhow!("{:?}", e))
     }
 
+    /// Deserializes the value using BCS encoding (with a specified limit)
     fn bcs_decode<T: DeserializeOwned>(&self, bytes: &[u8], limit: usize) -> anyhow::Result<T> {
         bcs::from_bytes_with_limit(bytes, limit).map_err(|e| anyhow!("{:?}", e))
     }
@@ -215,7 +240,7 @@ impl ProtocolIdSet {
 
     #[cfg(test)]
     pub fn mock() -> Self {
-        Self::from_iter([ProtocolId::mock()])
+        Self::from_iter([ProtocolId::DiscoveryDirectSend])
     }
 
     pub fn is_empty(&self) -> bool {

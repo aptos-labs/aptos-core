@@ -22,3 +22,15 @@ module 0x42::M {
         [97, 98, 99, 100]
     }
 } // end 0x42::M
+module <SELF> {
+    private fun t() {
+        0;
+        0;
+        0;
+        false;
+        0x0;
+        [1, 35];
+        [97, 98, 99, 100];
+        Tuple()
+    }
+} // end <SELF>

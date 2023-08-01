@@ -1757,13 +1757,20 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     // type of the expression is `()`.
                     let exp_loc = self.to_loc(&exp.loc);
                     let var = self.fresh_type_var_idx();
-                    self.subs.add_constraint(
-                        var,
-                        exp_loc,
-                        WideningOrder::LeftToRight,
-                        Constraint::WithDefault(Type::unit()),
-                    );
-                    let exp = self.translate_exp(exp, &Type::Var(var));
+
+                    let item_type = Type::Var(var);
+                    let exp = self.translate_exp(exp, &item_type);
+                    let item_type = self.subs.specialize(&item_type);
+                    if self.subs.is_free_var_without_constraints(&item_type) {
+                        // If this is a totally unbound item, assign default unit type.
+                        self.subs.add_constraint(
+                            var,
+                            exp_loc,
+                            WideningOrder::LeftToRight,
+                            Constraint::WithDefault(Type::unit()),
+                        );
+                    }
+
                     if self.mode == ExpTranslationMode::TryImplAsSpec
                         && matches!(exp, ExpData::Call(_, Operation::NoOp, _))
                     {

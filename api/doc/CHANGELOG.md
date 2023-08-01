@@ -125,4 +125,4 @@ This section is dedicated to the finer details of the API change, but we include
 - This PR adds a standalone binary for spec generation: https://github.com/aptos-labs/aptos-core/pull/2317
 
 ## Deprecation notes
-- Currently Aptos nodes host both the v0 and v1 APIs. We will remove the v0 API by 2022-09-01. If you're a dapp developer, you should only need to update to a newer version of the SDK you use. If you're an SDK / client developer, please update your SDK / client. Reach out to the Aptos team via [Discord](https://discord.com/invite/zTDYBEud7U) for assistance with this, we will be happy to help.
+- Currently Aptos nodes host both the v0 and v1 APIs. We will remove the v0 API by 2022-09-01. If you're a dapp developer, you should only need to update to a newer version of the SDK you use. If you're an SDK / client developer, please update your SDK / client. Reach out to the Aptos team via [Discord](https://discord.gg/aptosnetwork) for assistance with this, we will be happy to help.

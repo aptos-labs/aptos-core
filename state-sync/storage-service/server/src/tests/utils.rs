@@ -466,7 +466,7 @@ pub fn update_storage_server_summary(
     let mut storage_server_summary = StorageServerSummary::default();
 
     // Set the highest synced ledger info
-    let mut data_summary = &mut storage_server_summary.data_summary;
+    let data_summary = &mut storage_server_summary.data_summary;
     data_summary.synced_ledger_info = Some(create_epoch_ending_ledger_info(
         highest_synced_epoch,
         highest_synced_version,

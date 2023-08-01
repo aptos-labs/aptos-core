@@ -374,7 +374,7 @@ impl CheckChangeSet for ChangeSetConfigs {
         const ERR: StatusCode = StatusCode::STORAGE_WRITE_LIMIT_REACHED;
 
         let mut write_set_size = 0;
-        for (key, op) in change_set.write_set() {
+        for (key, op) in change_set.write_set_iter() {
             if let Some(bytes) = op.bytes() {
                 let write_op_size = (bytes.len() + key.size()) as u64;
                 if write_op_size > self.max_bytes_per_write_op {

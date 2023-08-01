@@ -1,0 +1,69 @@
+comparison between v1 and v2 failed:
+= processed 7 tasks
+= 
+= task 1 'run'. lines 57-64:
+= Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
++     major_status: ABORTED,
++     sub_status: Some(0),
+=     location: 0x42::M,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 2 'run'. lines 66-73:
+= Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
++     major_status: ABORTED,
++     sub_status: Some(0),
+=     location: 0x42::M,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 3 'run'. lines 75-82:
+= Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
++     major_status: ABORTED,
++     sub_status: Some(0),
+=     location: 0x42::M,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 4 'run'. lines 84-91:
+= Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
++     major_status: ABORTED,
++     sub_status: Some(0),
+=     location: 0x42::M,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 5 'run'. lines 93-110:
+= Error: Script execution failed with VMError: {
+-     major_status: ARITHMETIC_ERROR,
+-     sub_status: None,
++     major_status: ABORTED,
++     sub_status: Some(0),
+=     location: 0x42::M,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 
+= task 6 'run'. lines 112-119:
+= Error: Script execution failed with VMError: {
+-     major_status: RESOURCE_ALREADY_EXISTS,
+-     sub_status: None,
++     major_status: ABORTED,
++     sub_status: Some(0),
+=     location: 0x42::M,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 

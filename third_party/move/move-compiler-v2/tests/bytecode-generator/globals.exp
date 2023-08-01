@@ -65,13 +65,13 @@ fun globals::write($t0: address, $t1: u64): u64 {
      var $t2: u64
      var $t3: &mut globals::R
      var $t4: &mut globals::R
-     var $t5: &mut u64
-     var $t6: u64
+     var $t5: u64
+     var $t6: &mut u64
   0: $t4 := borrow_global<globals::R>($t0)
   1: $t3 := move($t4)
-  2: $t5 := borrow_field<globals::R>.f($t3)
-  3: $t6 := 2
-  4: write_ref($t5, $t6)
+  2: $t5 := 2
+  3: $t6 := borrow_field<globals::R>.f($t3)
+  4: write_ref($t6, $t5)
   5: $t2 := 9
   6: return $t2
 }

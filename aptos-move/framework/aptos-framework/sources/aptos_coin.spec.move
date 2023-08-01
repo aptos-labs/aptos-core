@@ -40,4 +40,9 @@ spec aptos_framework::aptos_coin {
     spec find_delegation(addr: address): Option<u64> {
         aborts_if !exists<Delegations>(@core_resources);
     }
+
+    spec schema ExistsAptosCoin {
+        requires exists<coin::CoinInfo<AptosCoin>>(@aptos_framework);
+    }
+
 }

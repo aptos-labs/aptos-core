@@ -11,6 +11,8 @@ spec aptos_framework::account {
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<OriginatingAddress>(aptos_addr);
         ensures exists<OriginatingAddress>(aptos_addr);
+        // TODO: an compiler error is occur when using table::new()
+        //ensures global<OriginatingAddress>(aptos_addr).address_map == table::new();
     }
 
     /// Check if the bytes of the new address is 32.
@@ -40,6 +42,7 @@ spec aptos_framework::account {
         let authentication_key = bcs::to_bytes(addr);
         aborts_if len(authentication_key) != 32;
         aborts_if exists<Account>(addr);
+        ensures len(authentication_key) == 32;
     }
 
     spec get_guid_next_creation_num(addr: address): u64 {
@@ -108,6 +111,7 @@ spec aptos_framework::account {
             challenge
         );
         aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME;
+        ensures scheme == ED25519_SCHEME || scheme == MULTI_ED25519_SCHEME;
     }
 
     /// The Account existed under the signer
@@ -504,6 +508,8 @@ spec aptos_framework::account {
             table::spec_get(address_map, curr_auth_key) != originating_addr;
         aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
+
+        ensures table::spec_contains(global<OriginatingAddress>(@aptos_framework).address_map, from_bcs::deserialize<address>(new_auth_key_vector));
     }
 
     spec verify_signed_message<T: drop>(
@@ -513,7 +519,40 @@ spec aptos_framework::account {
         signed_message_bytes: vector<u8>,
         message: T,
     ) {
-        pragma verify = false;
+        pragma aborts_if_is_partial;
+
         modifies global<Account>(account);
+        let account_resource = global<Account>(account);
+        aborts_if !exists<Account>(account);
+
+        include account_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key };
+        aborts_if account_scheme == ED25519_SCHEME && ({
+            let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(account_public_key);
+            account_resource.authentication_key != expected_auth_key
+        });
+
+        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key };
+        aborts_if account_scheme == MULTI_ED25519_SCHEME && ({
+            let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key);
+            account_resource.authentication_key != expected_auth_key
+        });
+
+        include account_scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: signed_message_bytes };
+        // TODO: compiler error with message T
+        // aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
+        //     ed25519::Signature { bytes: signed_message_bytes },
+        //     ed25519::UnvalidatedPublicKey { bytes: account_public_key },
+        //     message
+        // );
+
+        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: signed_message_bytes };
+        // TODO: compiler error with message T
+        // aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
+        //     multi_ed25519::Signature { bytes: signed_message_bytes },
+        //     multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key },
+        //     message
+        // );
+
+        aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
     }
 }

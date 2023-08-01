@@ -61,7 +61,7 @@
 //! # }
 //! ```
 //!
-#![allow(clippy::integer_arithmetic)]
+#![allow(clippy::arithmetic_side_effects)]
 
 use crate::{hash::HashValue, hkdf::Hkdf, traits::Uniform as _, x25519, ValidCryptoMaterial};
 use ring::aead::{self, Aad, LessSafeKey, UnboundKey};

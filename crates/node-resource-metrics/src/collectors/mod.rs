@@ -19,10 +19,10 @@ pub(crate) use memory_metrics_collector::MemoryMetricsCollector;
 pub(crate) use network_metrics_collector::NetworkMetricsCollector;
 pub(crate) use process_metrics_collector::ProcessMetricsCollector;
 
-#[cfg(all(target_os = "linux"))]
+#[cfg(target_os = "linux")]
 mod linux_collectors;
 
-#[cfg(all(target_os = "linux"))]
+#[cfg(target_os = "linux")]
 pub(crate) use linux_collectors::LinuxCpuMetricsCollector;
-#[cfg(all(target_os = "linux"))]
+#[cfg(target_os = "linux")]
 pub(crate) use linux_collectors::LinuxDiskMetricsCollector;

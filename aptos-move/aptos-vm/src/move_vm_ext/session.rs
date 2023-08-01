@@ -5,10 +5,7 @@ use crate::{
     access_path_cache::AccessPathCache, data_cache::get_resource_group_from_metadata,
     move_vm_ext::MoveResolverExt, transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
-    delta_change_set::{serialize, DeltaChangeSet},
-};
+use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::serialize};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
@@ -22,7 +19,7 @@ use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
     transaction::SignatureCheckedTransaction,
-    write_set::{WriteOp, WriteSetMut},
+    write_set::WriteOp,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
@@ -320,8 +317,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let mut write_set_mut = WriteSetMut::new(Vec::new());
-        let mut delta_change_set = DeltaChangeSet::empty();
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
         if is_storage_slot_metadata_enabled {
             if let Some(payer) = new_slot_payer {
@@ -335,6 +330,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             new_slot_metadata,
         };
 
+        let mut resource_write_set = BTreeMap::new();
+        let mut module_write_set = BTreeMap::new();
+        let mut aggregator_write_set = BTreeMap::new();
+        let mut aggregator_delta_set = BTreeMap::new();
+
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_op) in resources {
@@ -345,14 +345,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     configs.legacy_resource_creation_as_modification(),
                 )?;
 
-                write_set_mut.insert((state_key, op))
+                resource_write_set.insert(state_key, op);
             }
 
             for (name, blob_op) in modules {
                 let state_key =
                     StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
                 let op = woc.convert(&state_key, blob_op, false)?;
-                write_set_mut.insert((state_key, op))
+                module_write_set.insert(state_key, op);
             }
         }
 
@@ -362,7 +362,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let state_key =
                     StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
                 let op = woc.convert(&state_key, blob_op, false)?;
-                write_set_mut.insert((state_key, op))
+                resource_write_set.insert(state_key, op);
             }
         }
 
@@ -370,7 +370,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
                 let op = woc.convert(&state_key, value_op, false)?;
-                write_set_mut.insert((state_key, op))
+                resource_write_set.insert(state_key, op);
             }
         }
 
@@ -382,19 +382,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             match change {
                 AggregatorChange::Write(value) => {
                     let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                    write_set_mut.insert((state_key, write_op));
+                    aggregator_write_set.insert(state_key, write_op);
                 },
-                AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
+                AggregatorChange::Merge(delta_op) => {
+                    aggregator_delta_set.insert(state_key, delta_op);
+                },
                 AggregatorChange::Delete => {
                     let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                    write_set_mut.insert((state_key, write_op));
+                    aggregator_write_set.insert(state_key, write_op);
                 },
             }
         }
-
-        let write_set = write_set_mut
-            .freeze()
-            .map_err(|_| VMStatus::error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
@@ -404,7 +402,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
-        VMChangeSet::new(write_set, delta_change_set, events, configs)
+        VMChangeSet::new(
+            resource_write_set,
+            module_write_set,
+            aggregator_write_set,
+            aggregator_delta_set,
+            events,
+            configs,
+        )
     }
 }
 
