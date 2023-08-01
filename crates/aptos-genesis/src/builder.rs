@@ -523,7 +523,7 @@ impl Builder {
         let name = index.to_string();
 
         let mut config = template.clone();
-        let mut genesis_stake_amount = 1;
+        let mut genesis_stake_amount = 10;
         if let Some(init_config) = &self.init_config {
             (init_config)(index, &mut config, &mut genesis_stake_amount);
         }
