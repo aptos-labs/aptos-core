@@ -4,6 +4,8 @@
 #![forbid(unsafe_code)]
 
 mod counters;
+mod fail_message;
+mod persistent_check;
 mod tests;
 mod utils;
 

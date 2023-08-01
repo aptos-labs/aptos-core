@@ -2,7 +2,6 @@
 
 use crate::counters::{test_error, test_fail, test_latency, test_success};
 use anyhow::Result;
-use aptos_logger::info;
 use aptos_rest_client::{error::RestError, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
 use once_cell::sync::Lazy;
@@ -139,7 +138,6 @@ pub fn get_faucet_client(network_name: NetworkName) -> FaucetClient {
 pub async fn create_account(faucet_client: &FaucetClient) -> Result<LocalAccount> {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.create_account(account.address()).await?;
-    info!("{:?}", account.address());
 
     Ok(account)
 }
@@ -148,7 +146,6 @@ pub async fn create_account(faucet_client: &FaucetClient) -> Result<LocalAccount
 pub async fn create_and_fund_account(faucet_client: &FaucetClient) -> Result<LocalAccount> {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(account.address(), 100_000_000).await?;
-    info!("{:?}", account.address());
 
     Ok(account)
 }
