@@ -209,10 +209,10 @@ pub(crate) struct MockIncarnation<K, V, E> {
     pub(crate) reads: Vec<K>,
     /// A vector of keys and corresponding values to be written during mock incarnation execution.
     pub(crate) writes: Vec<(K, V)>,
-    // A vector of events
-    pub(crate) events: Vec<E>,
     /// A vector of keys and corresponding deltas to be produced during mock incarnation execution.
     pub(crate) deltas: Vec<(K, DeltaOp)>,
+    // A vector of events.
+    pub(crate) events: Vec<E>,
     /// total execution gas to be charged for mock incarnation execution.
     pub(crate) gas: u64,
 }
@@ -383,7 +383,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         MockTransaction::from_behaviors(behaviors)
     }
 
-     pub fn materialize<
+    pub(crate) fn materialize<
         K: Clone + Hash + Debug + Eq + Ord,
         E: Send + Sync + Debug + Clone + ReadWriteEvent,
     >(
@@ -407,7 +407,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         )
     }
 
-    pub fn materialize_with_deltas<
+    pub(crate) fn materialize_with_deltas<
         K: Clone + Hash + Debug + Eq + Ord,
         E: Send + Sync + Debug + Clone + ReadWriteEvent,
     >(
@@ -444,7 +444,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         )
     }
 
-    pub fn materialize_disjoint_module_rw<
+    pub(crate) fn materialize_disjoint_module_rw<
         K: Clone + Hash + Debug + Eq + Ord,
         E: Send + Sync + Debug + Clone + ReadWriteEvent,
     >(
@@ -533,14 +533,15 @@ where
                         Err(_) => reads_result.push(None),
                     }
                 }
-                ExecutionStatus::Success(MockOutput {
-                    writes: behavior.writes.clone(),
-                    deltas: behavior.deltas.clone(),
+                ExecutionStatus::Success(MockOutput(
+                    behavior.writes.clone(),
+                    behavior.deltas.clone(),
                     events.to_vec(),
-                    read_results: reads_result,
-                    materialized_delta_writes: OnceCell::new(),
-                    total_gas: behavior.gas,
-                })
+                    reads_result,
+                    OnceCell::new(),
+                    behavior.gas,
+                    
+                ))
             },
             MockTransaction::SkipRest => ExecutionStatus::SkipRest(MockOutput::skip_output()),
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
