@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    system_metrics::{ensure_metrics_threshold, MetricsThreshold, SystemMetricsThreshold},
+    prometheus_metrics::{
+        fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice, SystemMetrics,
+    },
     Swarm, SwarmExt, TestReport,
 };
 use anyhow::{bail, Context};
@@ -10,7 +12,7 @@ use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
 use prometheus_http_query::response::Sample;
-use std::{collections::BTreeMap, fmt, time::Duration};
+use std::{collections::BTreeMap, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
@@ -24,6 +26,118 @@ pub enum LatencyType {
     P50,
     P90,
     P99,
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct MetricsThreshold {
+    max: f64,
+    // % of the data point that can breach the max threshold
+    max_breach_pct: usize,
+}
+
+impl MetricsThreshold {
+    pub fn new(max: f64, max_breach_pct: usize) -> Self {
+        Self {
+            max,
+            max_breach_pct,
+        }
+    }
+
+    pub fn new_gb(max: f64, max_breach_pct: usize) -> Self {
+        Self {
+            max: max * 1024.0 * 1024.0 * 1024.0,
+            max_breach_pct,
+        }
+    }
+
+    pub fn ensure_metrics_threshold(
+        &self,
+        metrics_name: &str,
+        metrics: &Vec<Sample>,
+    ) -> anyhow::Result<()> {
+        if metrics.is_empty() {
+            bail!("Empty metrics provided");
+        }
+        let breach_count = metrics
+            .iter()
+            .filter(|sample| sample.value() > self.max)
+            .count();
+        let breach_pct = (breach_count * 100) / metrics.len();
+        if breach_pct > self.max_breach_pct {
+            bail!(
+                "{:?} metric violated threshold of {:?}, max_breach_pct: {:?}, breach_pct: {:?} ",
+                metrics_name,
+                self.max,
+                self.max_breach_pct,
+                breach_pct
+            );
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct SystemMetricsThreshold {
+    cpu_threshold: MetricsThreshold,
+    memory_threshold: MetricsThreshold,
+}
+
+impl SystemMetricsThreshold {
+    pub fn ensure_threshold(&self, metrics: &SystemMetrics) -> anyhow::Result<()> {
+        self.cpu_threshold
+            .ensure_metrics_threshold("cpu", metrics.cpu_core_metrics.get())?;
+        self.memory_threshold
+            .ensure_metrics_threshold("memory", metrics.memory_bytes_metrics.get())?;
+        Ok(())
+    }
+
+    pub fn new(cpu_threshold: MetricsThreshold, memory_threshold: MetricsThreshold) -> Self {
+        Self {
+            cpu_threshold,
+            memory_threshold,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LatencyBreakdownThreshold {
+    pub thresholds: BTreeMap<LatencyBreakdownSlice, MetricsThreshold>,
+}
+
+impl LatencyBreakdownThreshold {
+    pub fn new_strict(
+        qs_batch_to_pos_threshold: f64,
+        qs_pos_to_proposal_threshold: f64,
+        consensus_proposal_to_ordered_threshold: f64,
+        consensus_ordered_to_commit_threshold: f64,
+    ) -> Self {
+        let mut thresholds = BTreeMap::new();
+        thresholds.insert(
+            LatencyBreakdownSlice::QsBatchToPos,
+            MetricsThreshold::new(qs_batch_to_pos_threshold, 0),
+        );
+        thresholds.insert(
+            LatencyBreakdownSlice::QsPosToProposal,
+            MetricsThreshold::new(qs_pos_to_proposal_threshold, 0),
+        );
+        thresholds.insert(
+            LatencyBreakdownSlice::ConsensusProposalToOrdered,
+            MetricsThreshold::new(consensus_proposal_to_ordered_threshold, 0),
+        );
+        thresholds.insert(
+            LatencyBreakdownSlice::ConsensusOrderedToCommit,
+            MetricsThreshold::new(consensus_ordered_to_commit_threshold, 0),
+        );
+        Self { thresholds }
+    }
+
+    pub fn ensure_threshold(&self, metrics: &LatencyBreakdown) -> anyhow::Result<()> {
+        for (slice, threshold) in &self.thresholds {
+            let samples = metrics.get_samples(slice);
+            threshold.ensure_metrics_threshold(&format!("{:?}", slice), samples.get())?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Default, Clone, Debug)]
@@ -94,105 +208,6 @@ impl SuccessCriteria {
     pub fn add_latency_breakdown_threshold(mut self, threshold: LatencyBreakdownThreshold) -> Self {
         self.latency_breakdown_thresholds = Some(threshold);
         self
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub enum LatencyBreakdownSlice {
-    QsBatchToPos,
-    QsPosToProposal,
-    ConsensusProposalToOrdered,
-    ConsensusOrderedToCommit,
-}
-
-#[derive(Clone)]
-pub struct LatencySamples(Vec<Sample>);
-
-impl LatencySamples {
-    pub fn new(samples: Vec<Sample>) -> Self {
-        Self(samples)
-    }
-
-    pub fn max_sample(&self) -> f64 {
-        self.0
-            .iter()
-            .map(|s| s.value())
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap_or_default()
-    }
-
-    pub fn get(&self) -> &Vec<Sample> {
-        &self.0
-    }
-}
-
-impl fmt::Debug for LatencySamples {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{:?}",
-            self.0
-                .iter()
-                .map(|s| (s.value(), s.timestamp()))
-                .collect::<Vec<_>>()
-        )
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct LatencyBreakdown(BTreeMap<LatencyBreakdownSlice, LatencySamples>);
-
-impl LatencyBreakdown {
-    pub fn new(latency: BTreeMap<LatencyBreakdownSlice, LatencySamples>) -> Self {
-        Self(latency)
-    }
-
-    pub fn get_samples(&self, slice: LatencyBreakdownSlice) -> &LatencySamples {
-        self.0.get(&slice).unwrap()
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct LatencyBreakdownThreshold {
-    pub thresholds: BTreeMap<LatencyBreakdownSlice, MetricsThreshold>,
-}
-
-impl LatencyBreakdownThreshold {
-    pub fn new_strict(
-        qs_batch_to_pos_threshold: f64,
-        qs_pos_to_proposal_threshold: f64,
-        consensus_proposal_to_ordered_threshold: f64,
-        consensus_ordered_to_commit_threshold: f64,
-    ) -> Self {
-        let mut thresholds = BTreeMap::new();
-        thresholds.insert(
-            LatencyBreakdownSlice::QsBatchToPos,
-            MetricsThreshold::new(qs_batch_to_pos_threshold, 0),
-        );
-        thresholds.insert(
-            LatencyBreakdownSlice::QsPosToProposal,
-            MetricsThreshold::new(qs_pos_to_proposal_threshold, 0),
-        );
-        thresholds.insert(
-            LatencyBreakdownSlice::ConsensusProposalToOrdered,
-            MetricsThreshold::new(consensus_proposal_to_ordered_threshold, 0),
-        );
-        thresholds.insert(
-            LatencyBreakdownSlice::ConsensusOrderedToCommit,
-            MetricsThreshold::new(consensus_ordered_to_commit_threshold, 0),
-        );
-        Self { thresholds }
-    }
-
-    pub fn ensure_threshold(&self, metrics: &LatencyBreakdown) -> anyhow::Result<()> {
-        for (slice, threshold) in &self.thresholds {
-            let samples = metrics
-                .0
-                .get(slice)
-                .ok_or_else(|| anyhow::anyhow!("Missing latency breakdown for {:?}", slice))?;
-            ensure_metrics_threshold(&format!("{:?}", slice), threshold, samples.get())?;
-        }
-        Ok(())
     }
 }
 
@@ -282,12 +297,8 @@ impl SuccessCriteriaChecker {
                 .context("Failed ensuring no fullnode restarted")?;
         }
 
-        // TODO(skedia) Add end-to-end latency from counters after we have support for querying prometheus
-        // latency (in addition to checking latency from txn-emitter)
-
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
-            swarm
-                .ensure_healthy_system_metrics(start_time, end_time, system_metrics_threshold)
+            Self::check_system_metrics(swarm, start_time, end_time, system_metrics_threshold)
                 .await?;
         }
 
@@ -521,5 +532,29 @@ impl SuccessCriteriaChecker {
         } else {
             Ok(())
         }
+    }
+
+    async fn check_system_metrics(
+        swarm: &mut dyn Swarm,
+        start_time: i64,
+        end_time: i64,
+        threshold: SystemMetricsThreshold,
+    ) -> anyhow::Result<()> {
+        let system_metrics = fetch_system_metrics(swarm, start_time, end_time).await?;
+        threshold.ensure_threshold(&system_metrics)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    #[tokio::test]
+    async fn test_empty_metrics_threshold() {
+        let cpu_threshold = MetricsThreshold::new(10.0, 30);
+        let memory_threshold = MetricsThreshold::new(100.0, 40);
+        let threshold = SystemMetricsThreshold::new(cpu_threshold, memory_threshold);
+        let metrics = SystemMetrics::new(vec![], vec![]);
+        threshold.ensure_threshold(&metrics).unwrap_err();
     }
 }

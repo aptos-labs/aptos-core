@@ -169,7 +169,7 @@ pub async fn query_range_with_metadata(
                 new_query
             )
         })?;
-    Ok(r.as_range()
+    let range = r.as_range()
         .ok_or_else(|| {
             anyhow!(
                 "Failed to get range from prometheus response. start={}, end={}, query={}",
@@ -177,7 +177,19 @@ pub async fn query_range_with_metadata(
                 end_time,
                 new_query
             )
-        })?
+        })?;
+    info!("For Query {} got range {:?}", new_query, range);
+    if range.len() != 1 {
+        bail!(
+            "Expected only one range vector from prometheus, recieved {} ({:?}). start={}, end={}, query={}",
+            range.len(),
+            range,
+            start_time,
+            end_time,
+            new_query
+        );
+    }
+    Ok(range
         .first()
         .ok_or_else(|| {
             anyhow!(

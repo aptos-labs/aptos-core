@@ -5,7 +5,6 @@
 use crate::{
     check_for_container_restart, create_k8s_client, delete_all_chaos, get_default_pfn_node_config,
     get_free_port, get_stateful_set_image, install_public_fullnode,
-    interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold},
     node::K8sNode,
     prometheus::{self, query_range_with_metadata, query_with_metadata},
     query_sequence_number, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
@@ -432,29 +431,6 @@ impl Swarm for K8sSwarm {
             .await;
         }
         bail!("No prom client");
-    }
-
-    async fn ensure_healthy_system_metrics(
-        &mut self,
-        start_time: i64,
-        end_time: i64,
-        threshold: SystemMetricsThreshold,
-    ) -> Result<()> {
-        if let Some(c) = &self.prom_client {
-            let system_metrics = query_prometheus_system_metrics(
-                c,
-                start_time,
-                end_time,
-                30.0,
-                &self.kube_namespace,
-            )
-            .await?;
-            threshold.ensure_threshold(&system_metrics)?;
-            info!("System metrics are healthy");
-            Ok(())
-        } else {
-            bail!("No prom client");
-        }
     }
 
     fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
