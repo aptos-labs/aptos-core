@@ -219,7 +219,7 @@ impl PayloadManager {
                 }
             },
             (
-                PayloadManager::InQuorumStore(batch_store, _),
+                PayloadManager::InQuorumStore(_batch_store, _),
                 Payload::DKG(dkg_payload),
             ) => {
                 // extract dkg transactions

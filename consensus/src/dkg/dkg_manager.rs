@@ -9,6 +9,7 @@ use crate::dkg::types::DKGNode;
 use futures::future::{AbortHandle, Abortable};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_logger::error;
+use tokio_retry::strategy::ExponentialBackoff;
 
 use super::{types::{DKGAggNode, DKGNodeAckState, DKGAggNodeAckState, DKGMessage}, dkg_store::DKGStore};
 
@@ -53,13 +54,13 @@ impl DKGManagerWrapper {
 pub struct DKGManager {
     author: Author,
     epoch_state: Arc<EpochState>,
-    reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>,
+    reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     rb_abort_handle: Arc<Mutex<Option<AbortHandle>>>,
     dkg_store: Arc<Mutex<DKGStore>>,
 }
 
 impl DKGManager {
-    pub fn new(author: Author, epoch_state: Arc<EpochState>, reliable_broadcast: Arc<ReliableBroadcast<DKGMessage>>) -> Self {
+    pub fn new(author: Author, epoch_state: Arc<EpochState>, reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>) -> Self {
         Self {
             author,
             epoch_state,

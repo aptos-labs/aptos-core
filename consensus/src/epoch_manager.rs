@@ -50,6 +50,8 @@ use crate::{
     transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService, dkg::{DKGMessage, dkg_handler::DKGNetworkHandler, dkg_manager::{DKGManager, DKGManagerWrapper}},
 };
+use aptos_time_service;
+
 use anyhow::{bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -85,6 +87,7 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
+use tokio_retry::strategy::ExponentialBackoff;
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -708,7 +711,7 @@ impl EpochManager {
         );
         self.dkg_handler_tx = Some(dkg_handler_tx.clone());
         let dkg_network_sender = NetworkSenderWrapper::<DKGMessage>::new(network_sender.clone());
-        let dkg_reliable_broadcast = Arc::new(ReliableBroadcast::new(epoch_state.verifier.get_ordered_account_addresses(), Arc::new(dkg_network_sender)));
+        let dkg_reliable_broadcast = Arc::new(ReliableBroadcast::new(epoch_state.verifier.get_ordered_account_addresses(), Arc::new(dkg_network_sender), ExponentialBackoff::from_millis(5), aptos_time_service::TimeService::real()));
         let dkg_manager = DKGManager::new(self.author, Arc::new(epoch_state.clone()), dkg_reliable_broadcast);
         let dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
         let dkg_handler: DKGNetworkHandler = DKGNetworkHandler::new(self.author, dkg_handler_rx, Arc::new(epoch_state.clone()), dkg_manager);
