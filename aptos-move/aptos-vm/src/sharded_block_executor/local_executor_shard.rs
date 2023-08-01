@@ -15,6 +15,7 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
+use aptos_block_executor::view::GenID;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
@@ -23,7 +24,7 @@ pub struct LocalExecutorService<S: StateView + Sync + Send + 'static> {
     phantom: std::marker::PhantomData<S>,
 }
 
-impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
+impl<S: StateView + GenID + Sync + Send + 'static> LocalExecutorService<S> {
     fn new(
         shard_id: ShardId,
         num_shards: usize,
@@ -191,7 +192,7 @@ impl<S> LocalCoordinatorClient<S> {
     }
 }
 
-impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordinatorClient<S> {
+impl<S: StateView + GenID + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordinatorClient<S> {
     fn receive_execute_command(&self) -> ExecutorShardCommand<S> {
         self.command_rx.recv().unwrap()
     }

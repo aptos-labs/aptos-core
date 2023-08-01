@@ -10,6 +10,7 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
 };
+use aptos_block_executor::view::GenID;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Condvar, Mutex},
@@ -67,7 +68,7 @@ pub struct CrossShardStateView<'a, S> {
     base_view: &'a S,
 }
 
-impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
+impl<'a, S: StateView + GenID + Sync + Send> CrossShardStateView<'a, S> {
     pub fn new(shard_id: ShardId, cross_shard_keys: HashSet<StateKey>, base_view: &'a S) -> Self {
         let mut cross_shard_data = HashMap::new();
         trace!(
