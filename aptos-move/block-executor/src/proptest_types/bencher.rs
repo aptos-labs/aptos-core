@@ -129,8 +129,8 @@ where
         );
 
         let output = BlockExecutor::<
-            MockTransaction<KeyType<K>, ValueType<V>>,
-            MockTask<KeyType<K>, ValueType<V>>,
+            MockTransaction<KeyType<K>, ValueType<V>, E>,
+            MockTask<KeyType<K>, ValueType<V>, E>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType<V>, E>, usize>,
             ExecutableTestType,

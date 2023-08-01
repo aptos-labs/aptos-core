@@ -255,6 +255,17 @@ impl<K, V, E> MockTransaction<K, V, E> {
     }
 }
 
+impl<
+        K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
+        V: Clone + Send + Sync + TransactionWrite + 'static,
+        E: Debug + Clone + Send + Sync + ReadWriteEvent + 'static,
+    > Transaction for MockTransaction<K, V, E>
+{
+    type Event = E;
+    type Key = K;
+    type Value = V;
+}
+
 // TODO: try and test different strategies.
 impl TransactionGenParams {
     pub fn new_dynamic() -> Self {
@@ -374,8 +385,8 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         .map(|(((writes, deltas), reads), gas)| MockIncarnation {
             reads,
             writes,
-            events,
             deltas,
+            events: vec![],
             gas,
         })
         .collect();
@@ -514,7 +525,6 @@ where
             MockTransaction::Write {
                 incarnation_counter,
                 incarnation_behaviors,
-                events
             } => {
                 // Use incarnation counter value as an index to determine the read-
                 // and write-sets of the execution. Increment incarnation counter to
@@ -533,15 +543,14 @@ where
                         Err(_) => reads_result.push(None),
                     }
                 }
-                ExecutionStatus::Success(MockOutput(
-                    behavior.writes.clone(),
-                    behavior.deltas.clone(),
-                    events.to_vec(),
-                    reads_result,
-                    OnceCell::new(),
-                    behavior.gas,
-                    
-                ))
+                ExecutionStatus::Success(MockOutput {
+                    writes: behavior.writes.clone(),
+                    deltas: behavior.deltas.clone(),
+                    events: behavior.events.to_vec(),
+                    read_results: reads_result,
+                    materialized_delta_writes: OnceCell::new(),
+                    total_gas: behavior.gas,
+                })
             },
             MockTransaction::SkipRest => ExecutionStatus::SkipRest(MockOutput::skip_output()),
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
@@ -551,7 +560,7 @@ where
 
 #[derive(Debug)]
 
-pub(crate) struct MockOutput<K, V> {
+pub(crate) struct MockOutput<K, V, E> {
     // TODO: Split writes into resources & modules.
     pub(crate) writes: Vec<(K, V)>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
@@ -578,7 +587,7 @@ where
     }
 
     fn get_events(&self) -> Vec<E> {
-        self.2.clone()
+        self.events.clone()
     }
 
     fn skip_output() -> Self {

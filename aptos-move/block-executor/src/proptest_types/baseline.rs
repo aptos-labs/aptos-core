@@ -16,7 +16,7 @@ use crate::{
     proptest_types::types::{MockOutput, MockTransaction, STORAGE_AGGREGATOR_VALUE},
 };
 use aptos_aggregator::{delta_change_set::serialize, transaction::AggregatorValue};
-use aptos_types::{write_set::TransactionWrite, contract_event::ReadWriteEvent};
+use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
 use claims::{assert_matches, assert_none, assert_some_eq};
 use itertools::izip;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};

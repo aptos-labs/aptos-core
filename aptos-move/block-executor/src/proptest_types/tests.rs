@@ -208,7 +208,10 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>, usize>,
+            NoOpTransactionCommitHook<
+                MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+                usize,
+            >,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -259,7 +262,10 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>, usize>,
+            NoOpTransactionCommitHook<
+                MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+                usize,
+            >,
             ExecutableTestType,
         >::new(
             num_cpus::get(),
@@ -415,7 +421,10 @@ fn publishing_fixed_params_with_block_gas_limit(
         MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
         MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>, usize>,
+        NoOpTransactionCommitHook<
+            MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+            usize,
+        >,
         ExecutableTestType,
     >::new(
         num_cpus::get(),
@@ -458,7 +467,10 @@ fn publishing_fixed_params_with_block_gas_limit(
             MockTransaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             MockTask<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>, usize>,
+            NoOpTransactionCommitHook<
+                MockOutput<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent>,
+                usize,
+            >,
             ExecutableTestType,
         >::new(
             num_cpus::get(),

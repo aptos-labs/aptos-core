@@ -120,6 +120,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output to be set to get events")
+            .change_set()
             .events()
             .to_vec()
     }

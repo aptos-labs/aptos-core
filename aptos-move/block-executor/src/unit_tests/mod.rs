@@ -27,6 +27,7 @@ use std::{
     cmp::min, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc,
 };
 
+// TODO: add unit test for block gas limit!
 fn run_and_assert<K, V, E>(transactions: Vec<MockTransaction<K, V, E>>)
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
@@ -58,7 +59,14 @@ where
 }
 
 fn random_value(delete_value: bool) -> ValueType<[u8; 32]> {
-    ValueType((0..4).map(|_| (random::<u8>())).collect::<Vec<u8>>().try_into().expect("Unable to convert Vec<u8> to [u8; 32]"), !delete_value)
+    ValueType(
+        (0..4)
+            .map(|_| (random::<u8>()))
+            .collect::<Vec<u8>>()
+            .try_into()
+            .expect("Unable to convert Vec<u8> to [u8; 32]"),
+        !delete_value,
+    )
 }
 
 #[test]
@@ -71,7 +79,11 @@ fn empty_block() {
 #[test]
 fn delta_counters() {
     let key = KeyType(random::<[u8; 32]>(), false);
-    let mut transactions = vec![MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+    let mut transactions = vec![MockTransaction::from_behavior(MockIncarnation::<
+        KeyType<[u8; 32]>,
+        ValueType<[u8; 32]>,
+        ContractEvent,
+    > {
         reads: vec![],
         writes: vec![(key, random_value(false))],
         events: vec![],
@@ -80,7 +92,11 @@ fn delta_counters() {
     })];
 
     for _ in 0..50 {
-        transactions.push(MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+        transactions.push(MockTransaction::from_behavior(MockIncarnation::<
+            KeyType<[u8; 32]>,
+            ValueType<[u8; 32]>,
+            ContractEvent,
+        > {
             reads: vec![key],
             writes: vec![],
             events: vec![],
@@ -89,7 +105,11 @@ fn delta_counters() {
         }));
     }
 
-    transactions.push(MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+    transactions.push(MockTransaction::from_behavior(MockIncarnation::<
+        KeyType<[u8; 32]>,
+        ValueType<[u8; 32]>,
+        ContractEvent,
+    > {
         reads: vec![],
         writes: vec![(key, random_value(false))],
         events: vec![],
@@ -98,7 +118,11 @@ fn delta_counters() {
     }));
 
     for _ in 0..50 {
-        transactions.push(MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+        transactions.push(MockTransaction::from_behavior(MockIncarnation::<
+            KeyType<[u8; 32]>,
+            ValueType<[u8; 32]>,
+            ContractEvent,
+        > {
             reads: vec![key],
             writes: vec![],
             events: vec![],
@@ -120,38 +144,38 @@ fn delta_chains() {
         .collect();
 
     for i in 0..500 {
-        transactions.push(
-            MockTransaction::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, E>::from_behavior(
-                MockIncarnation {
-                    reads: keys.clone(),
-                    writes: vec![],
-                    events: vec![],
-                    deltas: keys
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(j, k)| match (i + j) % 2 == 0 {
-                            true => Some((
-                                *k,
-                                // Deterministic pattern for adds/subtracts.
-                                DeltaOp::new(
-                                    if (i % 2 == 0) == (j < 5) {
-                                        DeltaUpdate::Plus(10)
-                                    } else {
-                                        DeltaUpdate::Minus(1)
-                                    },
-                                    // below params irrelevant for this test.
-                                    u128::MAX,
-                                    0,
-                                    0,
-                                ),
-                            )),
-                            false => None,
-                        })
-                        .collect(),
-                    gas: 1,
-                },
-            ),
-        );
+        transactions.push(MockTransaction::<
+            KeyType<[u8; 32]>,
+            ValueType<[u8; 32]>,
+            ContractEvent,
+        >::from_behavior(MockIncarnation {
+            reads: keys.clone(),
+            writes: vec![],
+            events: vec![],
+            deltas: keys
+                .iter()
+                .enumerate()
+                .filter_map(|(j, k)| match (i + j) % 2 == 0 {
+                    true => Some((
+                        *k,
+                        // Deterministic pattern for adds/subtracts.
+                        DeltaOp::new(
+                            if (i % 2 == 0) == (j < 5) {
+                                DeltaUpdate::Plus(10)
+                            } else {
+                                DeltaUpdate::Minus(1)
+                            },
+                            // below params irrelevant for this test.
+                            u128::MAX,
+                            0,
+                            0,
+                        ),
+                    )),
+                    false => None,
+                })
+                .collect(),
+            gas: 1,
+        }));
     }
 
     run_and_assert(transactions)
@@ -168,7 +192,11 @@ fn cycle_transactions() {
     for _ in 0..TOTAL_KEY_NUM {
         let key = random::<[u8; 32]>();
         for _ in 0..WRITES_PER_KEY {
-            transactions.push(MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+            transactions.push(MockTransaction::from_behavior(MockIncarnation::<
+                KeyType<[u8; 32]>,
+                ValueType<[u8; 32]>,
+                ContractEvent,
+            > {
                 reads: vec![KeyType(key, false)],
                 writes: vec![(KeyType(key, false), random_value(false))],
                 events: vec![],
@@ -191,7 +219,11 @@ fn one_reads_all_barrier() {
         .collect();
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
-            transactions.push(MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+            transactions.push(MockTransaction::from_behavior(MockIncarnation::<
+                KeyType<[u8; 32]>,
+                ValueType<[u8; 32]>,
+                ContractEvent,
+            > {
                 reads: vec![*key],
                 writes: vec![(*key, random_value(false))],
                 events: vec![],
@@ -200,7 +232,11 @@ fn one_reads_all_barrier() {
             }));
         }
         // One transaction reading the write results of every prior transactions in the block.
-        transactions.push(MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+        transactions.push(MockTransaction::from_behavior(MockIncarnation::<
+            KeyType<[u8; 32]>,
+            ValueType<[u8; 32]>,
+            ContractEvent,
+        > {
             reads: keys.clone(),
             writes: vec![],
             events: vec![],
@@ -228,7 +264,11 @@ fn one_writes_all_barrier() {
             }));
         }
         // One transaction writing to the write results of every prior transactions in the block.
-        transactions.push(MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+        transactions.push(MockTransaction::from_behavior(MockIncarnation::<
+            KeyType<[u8; 32]>,
+            ValueType<[u8; 32]>,
+            ContractEvent,
+        > {
             reads: keys.clone(),
             writes: keys
                 .iter()
@@ -251,7 +291,11 @@ fn early_aborts() {
 
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
-            transactions.push(MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+            transactions.push(MockTransaction::from_behavior(MockIncarnation::<
+                KeyType<[u8; 32]>,
+                ValueType<[u8; 32]>,
+                ContractEvent,
+            > {
                 reads: vec![*key],
                 writes: vec![(*key, random_value(false))],
                 events: vec![],
@@ -274,7 +318,11 @@ fn early_skips() {
 
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
-            transactions.push(MockTransaction::from_behavior(MockIncarnation::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, ContractEvent> {
+            transactions.push(MockTransaction::from_behavior(MockIncarnation::<
+                KeyType<[u8; 32]>,
+                ValueType<[u8; 32]>,
+                ContractEvent,
+            > {
                 reads: vec![*key],
                 writes: vec![(*key, random_value(false))],
                 events: vec![],
