@@ -14,13 +14,13 @@ use futures::{
     FutureExt,
 };
 use futures_channel::oneshot;
-use tokio_retry::strategy::FixedInterval;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     marker::PhantomData,
     sync::Arc,
     time::Duration,
 };
+use tokio_retry::strategy::FixedInterval;
 
 #[derive(Clone)]
 struct TestMessage(Vec<u8>);
@@ -116,7 +116,12 @@ async fn test_reliable_broadcast() {
     let validators = validator_verifier.get_ordered_account_addresses();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
-    let mut rb = ReliableBroadcast::new(validators.clone(), sender, FixedInterval::from_millis(10), TimeService::real());
+    let rb = ReliableBroadcast::new(
+        validators.clone(),
+        sender,
+        FixedInterval::from_millis(10),
+        TimeService::real(),
+    );
     let message = TestMessage(vec![42; validators.len() - 1]);
     let aggregating = TestBroadcastStatus {
         threshold: validators.len(),
@@ -132,7 +137,12 @@ async fn test_chaining_reliable_broadcast() {
     let validators = validator_verifier.get_ordered_account_addresses();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
-    let mut rb = ReliableBroadcast::new(validators.clone(), sender, FixedInterval::from_millis(10), TimeService::real());
+    let rb = ReliableBroadcast::new(
+        validators.clone(),
+        sender,
+        FixedInterval::from_millis(10),
+        TimeService::real(),
+    );
     let message = TestMessage(vec![42; validators.len()]);
     let expected = validators.iter().cloned().collect();
     let aggregating = TestBroadcastStatus {
@@ -158,7 +168,12 @@ async fn test_abort_reliable_broadcast() {
     let validators = validator_verifier.get_ordered_account_addresses();
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
-    let mut rb = ReliableBroadcast::new(validators.clone(), sender, FixedInterval::from_millis(10), TimeService::real());
+    let rb = ReliableBroadcast::new(
+        validators.clone(),
+        sender,
+        FixedInterval::from_millis(10),
+        TimeService::real(),
+    );
     let message = TestMessage(vec![42; validators.len()]);
     let (tx, rx) = oneshot::channel();
     let (abort_handle, abort_registration) = AbortHandle::new_pair();

@@ -18,8 +18,8 @@ use futures::{
     future::{AbortHandle, Abortable},
     FutureExt,
 };
-use tokio_retry::strategy::ExponentialBackoff;
 use std::sync::Arc;
+use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
     author: Author,

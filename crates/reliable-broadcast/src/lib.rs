@@ -56,19 +56,20 @@ where
         let receivers: Vec<_> = self.validators.clone();
         let network_sender = self.network_sender.clone();
         let time_service = self.time_service.clone();
-        let mut backoff_policies: HashMap<Author, TBackoff> = self.validators
+        let mut backoff_policies: HashMap<Author, TBackoff> = self
+            .validators
             .iter()
             .cloned()
             .map(|author| (author, self.backoff_policy.clone()))
             .collect();
         async move {
             let mut fut = FuturesUnordered::new();
-            let send_message = |receiver, message, sleep_duration: Duration| {
+            let send_message = |receiver, message, sleep_duration: Option<Duration>| {
                 let network_sender = network_sender.clone();
                 let time_service = time_service.clone();
                 async move {
-                    if !sleep_duration.is_zero() {
-                        time_service.sleep(sleep_duration).await;
+                    if let Some(duration) = sleep_duration {
+                        time_service.sleep(duration).await;
                     }
                     (
                         receiver,
@@ -80,11 +81,7 @@ where
             };
             let message: M = message.into();
             for receiver in receivers {
-                fut.push(send_message(
-                    receiver,
-                    message.clone(),
-                    Duration::from_millis(0),
-                ));
+                fut.push(send_message(receiver, message.clone(), None));
             }
             while let Some((receiver, result)) = fut.next().await {
                 match result {
@@ -100,7 +97,7 @@ where
                             .get_mut(&receiver)
                             .expect("should be present");
                         let duration = backoff_strategy.next().expect("should produce value");
-                        fut.push(send_message(receiver, message.clone(), duration));
+                        fut.push(send_message(receiver, message.clone(), Some(duration)));
                     },
                 }
             }
