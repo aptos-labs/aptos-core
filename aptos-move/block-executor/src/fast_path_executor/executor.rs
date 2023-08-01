@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{marker::PhantomData, sync::Arc};
-use std::cell::RefCell;
+use std::cell::{RefCell, UnsafeCell};
+use std::mem::MaybeUninit;
 
 use futures::channel::oneshot;
 use futures::SinkExt;
@@ -18,6 +19,8 @@ use aptos_state_view::TStateView;
 use aptos_types::executable::Executable;
 use aptos_types::write_set::WriteOp;
 use anyhow::Result;
+use crossbeam::atomic::AtomicCell;
+use parking_lot::Mutex;
 use rayon::iter::Either::{Left, Right};
 
 use crate::{
@@ -79,8 +82,9 @@ pub struct FastPathBlockExecutor<T: Transaction, E, S, X, FB = NoFallback<T, E, 
 impl<T, E, S, X, FB> FastPathBlockExecutor<T, E, S, X, FB>
 where
     T: Transaction,
-    E: ExecutorTask<Txn = T> + Send,
+    E: ExecutorTask<Txn = T> + Send + Sync,
     E::Error: std::error::Error,
+    E::Output: Send,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
     FB: BlockExecutor<Transaction = T, ExecutorTask = E, StateView = S, Executable = X>,
@@ -161,6 +165,7 @@ where
             read_set: read_set_capturing_view.clone_read_set(),
             output,
             skip_rest,
+            txn_idx,
             phantom: PhantomData,
         })
     }
@@ -201,24 +206,25 @@ where
             .collect()
     }
 
-    fn validate_transaction<'data>(
-        txn_reads: impl IntoIterator<Item = &'data T::Key>,
-        _txn_output: &E::Output, // This will be used in later, more advanced prototypes.
-        txn_idx: TxnIndex,
+    fn validate_transaction(
+        execution_info: &TxnExecutionInfo<E>,
         write_reservations: &(impl ReservationTable<T::Key> + Sync),
         delta_reservations: &(impl ReservationTable<T::Key> + Sync),
     ) -> bool {
-        for k in txn_reads.into_iter() {
+        let txn_idx = execution_info.txn_idx;
+        for k in execution_info.read_set.iter() {
             let k: &T::Key = k; // help the IDE figure out the type of `k`
 
-            // A transaction cannot be committed on the fast path if a smaller-id transaction
-            // writes to a location this transaction reads.
+            // A transaction cannot be committed if it reads a location that is written by
+            // a smaller-id transaction in the same batch.
             if let Some(reservation) = write_reservations.get_reservation(k) {
                 if reservation < txn_idx {
                     return false;
                 }
             }
 
+            // A transaction cannot be committed if it reads an accumulator that was updated
+            // by a smaller-id transaction in the same batch.
             if let Some(reservation) = delta_reservations.get_reservation(k) {
                 if reservation < txn_idx {
                     return false;
@@ -226,7 +232,7 @@ where
             }
         }
 
-        // We do not need to track write-write conflicts as each transaction always
+        // NB: We do not need to track write-write conflicts as each transaction always
         // reads a key before writing to it.
 
         // TODO: later we will need to add accumulator overflow detection
@@ -254,28 +260,32 @@ where
         delta_reservations: &(impl ReservationTable<T::Key> + Sync),
         writable_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
     ) -> Result<(Vec<TxnExecutionInfo<E>>, Vec<TxnExecutionInfo<E>>)> {
-        todo!()
-        // let (committed_info, other_info): (Result<Vec<_>>, Result<Vec<_>>) =
-        //     execution_results
-        //         .into_par_iter()
-        //         .partition_map(|execution_result| {
-        //             let commit = Self::validate_transaction(
-        //                 txn_reads,
-        //                 txn_output,
-        //                 txn_idx,
-        //                 write_reservations,
-        //                 delta_reservations,
-        //             );
-        //
-        //             if commit {
-        //                 Self::apply_transaction_output(txn_output, writable_view)?;
-        //                 Left(Ok(txn_idx))
-        //             } else {
-        //                 Right(Ok(txn_idx))
-        //             }
-        //         });
-        //
-        // Ok((committed_info?, other_info?))
+        let mut err: AtomicCell<Option<anyhow::Error>> = AtomicCell::new(None);
+
+        let (committed_info, other_info): (Vec<_>, Vec<_>) =
+            execution_results
+                .into_par_iter()
+                .partition(|execution_result| {
+                    let commit = Self::validate_transaction(
+                        &execution_result,
+                        write_reservations,
+                        delta_reservations,
+                    );
+
+                    if commit {
+                        if let Err(e) = Self::apply_transaction_output(&execution_result.output, writable_view) {
+                            err.store(Some(e));
+                        }
+                    }
+
+                    commit
+                });
+
+        if let Some(e) = err.take() {
+            return Err(e);
+        }
+
+        Ok((committed_info, other_info))
     }
 
     // fn materialize_deltas<'data, Outputs, View>(
@@ -329,9 +339,9 @@ where
         transactions: &[T],
         executor_arguments: &E::Argument,
         writable_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
-        committed_outputs: &mut Vec<E::Output>,
-        discarded_txns_info: &mut Vec<TxnExecutionInfo<E>>
-    ) -> Result<BatchExecutionOutput<E::Output>> {
+        committed_outputs: &mut [MaybeUninit<E::Output>],
+        // discarded_txns_info: &mut Vec<TxnExecutionInfo<E>>
+    ) -> Result<BatchExecutionOutput<E>> {
         let transaction_count = transactions.len();
 
         let write_reservations = DashMapReservationTable::with_capacity(transaction_count * 2);
@@ -361,22 +371,28 @@ where
             writable_view,
         )?;
 
-        // let (done_tx, done_rx) = oneshot::channel();
+        assert!(committed_outputs.len() > committed_results.len());
+        let (my_outputs, tail) = committed_outputs.split_at_mut(committed_results.len());
+        let (done_tx, done_rx) = oneshot::channel::<()>();
 
         // Materialize deltas asynchronously, off the critical path
         rayon::spawn(move || {
-            // let res = Self::materialize_deltas(
-            //     committed_results.iter().map(|info| &info.output),
-            //     accumulators_snapshot
-            // );
-            todo!()
-            // done_tx.send(committed_results.into_iter()).unwrap();
+            Self::materialize_deltas(
+                committed_results.iter().map(|info| &info.output),
+                accumulators_snapshot
+            ).unwrap();
+            for (i, committed_result) in committed_results.into_iter().enumerate() {
+                my_outputs[i] = committed_result.output;
+            }
+
+            done_tx.send(()).unwrap();
         });
 
-        // Ok(BatchExecutionOutput{
-        //     committed_outputs:
-        // })
-        todo!()
+        Ok(BatchExecutionOutput{
+            committed_outputs_tail: tail,
+            discarded_outputs: other_results,
+            phantom: PhantomData,
+        })
     }
 
     /// This function should be executed in the context of the thread pool via
@@ -393,10 +409,9 @@ where
 
         let state = DashMapStateView::with_capacity(base_view, block_size);
 
-        let mut committed_outputs_in_serialization_order = vec![];
-
-        let mut committed_outputs = Vec::<E::Output>::with_capacity(block_size);
-        let mut discarded_txns_info = Vec::<TxnExecutionInfo<_>>::with_capacity(block_size);
+        let mut committed_outputs = vec![MaybeUninit::uninit(); block_size];
+        let mut committed_outputs_tail = committed_outputs.as_mut_slice();
+        // let mut discarded_txns_info = Vec::<TxnExecutionInfo<_>>::with_capacity(block_size);
 
         for batch_idx in 0..batch_count {
             let batch_begin = batch_idx * batch_size;
@@ -406,12 +421,11 @@ where
                 batch_transactions,
                 &executor_arguments,
                 &state,
-                &mut committed_outputs,
-                &mut discarded_txns_info,
+                committed_outputs_tail,
+                // &mut discarded_txns_info,
             )?;
 
-            committed_outputs_in_serialization_order.par_extend(
-                batch_res.committed_outputs.into_par_iter().map(|(out, _id)| out));
+            committed_outputs_tail = batch_res.committed_outputs_tail;
         }
 
         todo!()
@@ -422,14 +436,16 @@ struct TxnExecutionInfo<E: ExecutorTask> {
     read_set: Vec<<E::Txn as Transaction>::Key>,
     output: E::Output,
     skip_rest: bool,
+    txn_idx: TxnIndex,
 
     phantom: PhantomData<E>,
 }
 
-struct BatchExecutionOutput<O> {
-    committed_outputs: Vec<(O, TxnIndex)>,
-    discarded_outputs: Vec<(O, TxnIndex)>,
-    materialization_complete: oneshot::Receiver<Result<()>>,
+struct BatchExecutionOutput<'a, E: ExecutorTask> {
+    committed_outputs_tail: &'a mut [MaybeUninit<E::Output>],
+    discarded_outputs: Vec<TxnExecutionInfo<E>>,
+
+    phantom: PhantomData<E>,
 }
 
 const MAX_BATCH_SIZE: usize = 2000;

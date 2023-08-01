@@ -5,5 +5,6 @@
 mod executor;
 mod reservation_table;
 mod view;
+mod parallel_slice;
 
 pub use executor::FastPathBlockExecutor;
