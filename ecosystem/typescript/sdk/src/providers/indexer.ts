@@ -53,14 +53,14 @@ import { ApiError } from "./aptos_client";
  * you would set the offset parameter to 10 (i.e., the index of the first record to retrieve is 10)
  * and the limit parameter to 10 (i.e., the number of records to retrieve is 10))
  */
-interface PaginationArgs {
+export interface IndexerPaginationArgs {
   offset?: AnyNumber;
   limit?: number;
 }
 
-type TokenStandard = "v1" | "v2";
+export type TokenStandard = "v1" | "v2";
 
-type GraphqlQuery = {
+export type GraphqlQuery = {
   query: string;
   variables?: {};
 };
@@ -134,7 +134,10 @@ export class IndexerClient {
    * @param ownerAddress Hex-encoded 32 byte Aptos account address
    * @returns GetAccountCurrentTokensQuery response type
    */
-  async getAccountNFTs(ownerAddress: MaybeHexString, options?: PaginationArgs): Promise<GetAccountCurrentTokensQuery> {
+  async getAccountNFTs(
+    ownerAddress: MaybeHexString,
+    options?: IndexerPaginationArgs,
+  ): Promise<GetAccountCurrentTokensQuery> {
     const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);
     const graphqlQuery = {
@@ -151,7 +154,7 @@ export class IndexerClient {
    * @param idHash token id hash
    * @returns GetTokenActivitiesQuery response type
    */
-  async getTokenActivities(idHash: string, options?: PaginationArgs): Promise<GetTokenActivitiesQuery> {
+  async getTokenActivities(idHash: string, options?: IndexerPaginationArgs): Promise<GetTokenActivitiesQuery> {
     const graphqlQuery = {
       query: GetTokenActivities,
       variables: { idHash, offset: options?.offset, limit: options?.limit },
@@ -165,7 +168,10 @@ export class IndexerClient {
    * @param ownerAddress Owner address
    * @returns GetAccountCoinsDataQuery response type
    */
-  async getAccountCoinsData(ownerAddress: MaybeHexString, options?: PaginationArgs): Promise<GetAccountCoinsDataQuery> {
+  async getAccountCoinsData(
+    ownerAddress: MaybeHexString,
+    options?: IndexerPaginationArgs,
+  ): Promise<GetAccountCoinsDataQuery> {
     const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);
     const graphqlQuery = {
@@ -215,7 +221,7 @@ export class IndexerClient {
    */
   async getAccountTransactionsData(
     accountAddress: MaybeHexString,
-    options?: PaginationArgs,
+    options?: IndexerPaginationArgs,
   ): Promise<GetAccountTransactionsDataQuery> {
     const address = HexString.ensure(accountAddress).hex();
     IndexerClient.validateAddress(address);
@@ -390,7 +396,7 @@ export class IndexerClient {
    *
    * @returns GetUserTransactionsQuery response type
    */
-  async getUserTransactions(startVersion?: number, options?: PaginationArgs): Promise<GetUserTransactionsQuery> {
+  async getUserTransactions(startVersion?: number, options?: IndexerPaginationArgs): Promise<GetUserTransactionsQuery> {
     const graphqlQuery = {
       query: GetUserTransactions,
       variables: { start_version: startVersion, offset: options?.offset, limit: options?.limit },
@@ -430,7 +436,7 @@ export class IndexerClient {
     ownerAddress: MaybeHexString,
     extraArgs?: {
       tokenStandard?: TokenStandard;
-      options?: PaginationArgs;
+      options?: IndexerPaginationArgs;
     },
   ): Promise<GetOwnedTokensQuery> {
     const address = HexString.ensure(ownerAddress).hex();
@@ -468,7 +474,7 @@ export class IndexerClient {
     collectionAddress: string,
     extraArgs?: {
       tokenStandard?: TokenStandard;
-      options?: PaginationArgs;
+      options?: IndexerPaginationArgs;
     },
   ): Promise<GetTokenOwnedFromCollectionQuery> {
     const ownerHexAddress = HexString.ensure(ownerAddress).hex();
@@ -513,7 +519,7 @@ export class IndexerClient {
     creatorAddress: MaybeHexString,
     extraArgs?: {
       tokenStandard?: TokenStandard;
-      options?: PaginationArgs;
+      options?: IndexerPaginationArgs;
     },
   ): Promise<GetTokenOwnedFromCollectionQuery> {
     const collectionAddress = await this.getCollectionAddress(creatorAddress, collectionName, extraArgs);
@@ -536,7 +542,7 @@ export class IndexerClient {
     collectionName: string,
     extraArgs?: {
       tokenStandard?: TokenStandard;
-      options?: PaginationArgs;
+      options?: IndexerPaginationArgs;
     },
   ): Promise<GetCollectionDataQuery> {
     const address = HexString.ensure(creatorAddress).hex();
@@ -590,7 +596,7 @@ export class IndexerClient {
     ownerAddress: MaybeHexString,
     extraArgs?: {
       tokenStandard?: TokenStandard;
-      options?: PaginationArgs;
+      options?: IndexerPaginationArgs;
     },
   ): Promise<GetCollectionsWithOwnedTokensQuery> {
     const ownerHexAddress = HexString.ensure(ownerAddress).hex();
