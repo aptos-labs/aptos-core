@@ -213,55 +213,59 @@ fn find_pivot_columns(matrix: &mut DMatrix<f64>) -> Vec<usize> {
     pivot_columns
 }
 
-/// Reduced row echelon form (RREF)
+/// Reduced row echelon form (RREF) with partial pivoting
 ///
 /// ### Arguments
 ///
 /// * `matrix` - A matrix to perform RREF
 fn rref(matrix: &mut DMatrix<f64>) {
-    let (nrows, ncols) = matrix.shape();
-    let mut lead = 0;
+    let (rows, cols) = matrix.shape();
+    let num_pivots = rows.min(cols);
 
-    for r in 0..nrows {
-        if ncols <= lead {
-            break;
+    for pivot_row in 0..num_pivots {
+        partial_pivoting(matrix, pivot_row);
+
+        let pivot_val = matrix[(pivot_row, pivot_row)];
+
+        // Scale the pivot row to make the pivot element 1
+        for j in pivot_row..cols {
+            matrix[(pivot_row, j)] /= pivot_val;
         }
 
-        let mut i = r;
-
-        while approx_eq!(f64, matrix[(i, lead)], 0.0, ulps = 2) {
-            i += 1;
-
-            if nrows == i {
-                i = r;
-                lead += 1;
-
-                if ncols == lead {
-                    return;
+        // Eliminate other rows' entries in the current column
+        for i in 0..rows {
+            if i != pivot_row {
+                let factor = matrix[(i, pivot_row)];
+                for j in pivot_row..cols {
+                    matrix[(i, j)] -= factor * matrix[(pivot_row, j)];
                 }
             }
         }
+    }
+}
 
-        if i != r {
-            matrix.swap_rows(i, r);
+/// Perform partial pivoting on the rows to find the maximum pivot element
+///
+/// ### Arguments
+///
+/// * `matrix` - Augmented matrix
+/// * `pivot_row` - Current row of the matrix
+fn partial_pivoting(matrix: &mut DMatrix<f64>, pivot_row: usize) {
+    // Find the row with the maximum absolute value in the current column
+    let mut max_val = matrix[(pivot_row, pivot_row)].abs();
+    let mut max_row = pivot_row;
+
+    for i in pivot_row + 1..matrix.nrows() {
+        let val = matrix[(i, pivot_row)].abs();
+        if val > max_val {
+            max_val = val;
+            max_row = i;
         }
+    }
 
-        let pivot = matrix[(r, lead)];
-
-        for j in 0..ncols {
-            matrix[(r, j)] /= pivot;
-        }
-
-        for i in 0..nrows {
-            if i != r {
-                let factor = matrix[(i, lead)];
-                for j in 0..ncols {
-                    matrix[(i, j)] -= factor * matrix[(r, j)];
-                }
-            }
-        }
-
-        lead += 1;
+    // Swap the current row with the row containing the maximum value
+    if max_row != pivot_row {
+        matrix.swap_rows(pivot_row, max_row);
     }
 }
 
@@ -328,15 +332,17 @@ fn find_linear_dependent_combinations(matrix: &mut DMatrix<f64>) -> Vec<(usize, 
         let mut independent_vars = Vec::new();
         while j < matrix.ncols() - 1 {
             let a_ij = matrix[(i, j)];
-            let ratio = max_val / a_ij;
-            if approx_eq!(f64, ratio, 1.0, ulps = 2) {
+            let ratio = a_ij / max_val;
+            // if each element / max_val is approximately not 0
+            if !approx_eq!(f64, ratio, 0.0, ulps = 2) {
                 independent_vars.push((i, j));
             }
 
             j += 1;
         }
 
-        if independent_vars.len() != 1 {
+        if independent_vars.len() > 1 {
+            // mark all linear combinations as undetermined
             for (eq, gas_param) in independent_vars {
                 linear_combos.push((eq, gas_param));
             }
