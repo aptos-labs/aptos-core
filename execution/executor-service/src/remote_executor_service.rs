@@ -39,6 +39,11 @@ impl ExecutorService {
             remote_shard_addresses,
         ));
 
+        let num_threads = if shard_id == num_shards - 1 {
+            num_threads * num_shards
+        } else {
+            num_threads
+        };
         let executor_service = Arc::new(ShardedExecutorService::new(
             shard_id,
             num_shards,
