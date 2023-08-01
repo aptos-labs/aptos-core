@@ -42,39 +42,10 @@ use crate::fast_path_executor::{
 use crate::fast_path_executor::reservation_table::OptimisticDashMapReservationTable;
 use crate::fast_path_executor::view::{DashMapStateView, EmptyStateView, WritableStateView};
 
-// Fake BlockExecutor to use a placeholder type parameter.
-pub struct NoFallback<T, E, S, X> {
-    phantom: PhantomData<(T, E, S, X)>,
-}
-
-impl<T, E, S, X> BlockExecutor for NoFallback<T, E, S, X>
-where
-    T: Transaction,
-    E: ExecutorTask<Txn = T>,
-    S: TStateView<Key = T::Key> + Sync,
-    X: Executable + 'static,
-{
-    type Transaction = T;
-    type ExecutorTask = E;
-    type StateView = S;
-    type Executable = X;
-    type Error = anyhow::Error;
-
-    fn execute_block(
-        &self,
-        _executor_arguments: E::Argument,
-        _signature_verified_block: Vec<T>,
-        _base_view: &S,
-    ) -> Result<Vec<E::Output>> {
-        panic!("This function should never be called.");
-    }
-}
-
-// TODO: there should be some default value for FB for FastPathBlockExecutor::without_fallback to work as expected.
-pub struct FastPathBlockExecutor<T: Transaction, E, S, X, FB = NoFallback<T, E, S, X>> {
+pub struct FastPathBlockExecutor<T: Transaction, E, S, X, FB> {
     executor_thread_pool: Arc<ThreadPool>,
     maybe_block_gas_limit: Option<u64>,
-    maybe_fallback: Option<FB>,
+    fallback: FB,
 
     phantom: PhantomData<(T, E, S, X)>,
 }
@@ -82,7 +53,7 @@ pub struct FastPathBlockExecutor<T: Transaction, E, S, X, FB = NoFallback<T, E, 
 impl<T, E, S, X, FB> FastPathBlockExecutor<T, E, S, X, FB>
 where
     T: Transaction,
-    E: ExecutorTask<Txn = T> + Send + Sync,
+    E: ExecutorTask<Txn = T> + Send + Sync + 'static,
     E::Error: std::error::Error,
     E::Output: Send,
     S: TStateView<Key = T::Key> + Sync,
@@ -92,29 +63,14 @@ where
     pub fn new(
         executor_thread_pool: Arc<ThreadPool>,
         maybe_block_gas_limit: Option<u64>,
-        maybe_fallback: Option<FB>,
+        fallback: FB,
     ) -> Self {
         Self {
             executor_thread_pool,
             maybe_block_gas_limit,
-            maybe_fallback,
+            fallback,
             phantom: PhantomData,
         }
-    }
-
-    pub fn without_fallback(
-        executor_thread_pool: Arc<ThreadPool>,
-        maybe_block_gas_limit: Option<u64>,
-    ) -> Self {
-        Self::new(executor_thread_pool, maybe_block_gas_limit, None)
-    }
-
-    pub fn with_fallback(
-        executor_thread_pool: Arc<ThreadPool>,
-        maybe_block_gas_limit: Option<u64>,
-        fallback: FB,
-    ) -> Self {
-        Self::new(executor_thread_pool, maybe_block_gas_limit, Some(fallback))
     }
 
     fn execute_transaction(
@@ -288,31 +244,6 @@ where
         Ok((committed_info, other_info))
     }
 
-    // fn materialize_deltas<'data, Outputs, View>(
-    //     outputs_in_serialization_order: Outputs,
-    //     base_view: &View,
-    // ) -> Result<()>
-    // where
-    //     Outputs: IntoIterator<Item = &'data E::Output>,
-    //     View: TStateView<Key = T::Key>,
-    // {
-    //     let updated_view = DashMapStateView::<_, T::Value, _>::new(base_view);
-    //
-    //     for output in outputs_in_serialization_order {
-    //         let deltas = output.get_deltas();
-    //         let mut delta_writes = Vec::with_capacity(deltas.len());
-    //
-    //         for (k, delta) in deltas {
-    //             let new_value = updated_view.apply_delta(&k, &delta)?;
-    //             delta_writes.push((k, WriteOp::Modification(serialize(&new_value))))
-    //         }
-    //
-    //         output.incorporate_delta_writes(delta_writes);
-    //     }
-    //
-    //     Ok(())
-    // }
-
     fn materialize_deltas<'data>(
         outputs_in_serialization_order: impl IntoIterator<Item = &'data E::Output>,
         base_view: impl TStateView<Key = T::Key>,
@@ -339,8 +270,6 @@ where
         transactions: &[T],
         executor_arguments: &E::Argument,
         writable_view: &(impl WritableStateView<Key = T::Key, Value = T::Value> + Sync),
-        committed_outputs: &mut [MaybeUninit<E::Output>],
-        // discarded_txns_info: &mut Vec<TxnExecutionInfo<E>>
     ) -> Result<BatchExecutionOutput<E>> {
         let transaction_count = transactions.len();
 
@@ -371,26 +300,23 @@ where
             writable_view,
         )?;
 
-        assert!(committed_outputs.len() > committed_results.len());
-        let (my_outputs, tail) = committed_outputs.split_at_mut(committed_results.len());
-        let (done_tx, done_rx) = oneshot::channel::<()>();
+        let (done_tx, done_rx) = oneshot::channel::<Vec<E::Output>>();
 
-        // Materialize deltas asynchronously, off the critical path
+        // Materialize deltas asynchronously, off the critical path.
+        // Take the ownership of the committed outputs for the materialization and then
+        // return it via the channel.
         rayon::spawn(move || {
             Self::materialize_deltas(
                 committed_results.iter().map(|info| &info.output),
                 accumulators_snapshot
-            ).unwrap();
-            for (i, committed_result) in committed_results.into_iter().enumerate() {
-                my_outputs[i] = committed_result.output;
-            }
+            ).unwrap();  // TODO: potentially handle the materialization errors
 
-            done_tx.send(()).unwrap();
+            done_tx.send(committed_results.into_iter().map(|info| info.output).collect()).unwrap();
         });
 
         Ok(BatchExecutionOutput{
-            committed_outputs_tail: tail,
-            discarded_outputs: other_results,
+            committed_info_receiver: done_rx,
+            discarded_info: other_results,
             phantom: PhantomData,
         })
     }
@@ -409,8 +335,7 @@ where
 
         let state = DashMapStateView::with_capacity(base_view, block_size);
 
-        let mut committed_outputs = vec![MaybeUninit::uninit(); block_size];
-        let mut committed_outputs_tail = committed_outputs.as_mut_slice();
+        let mut committed_outputs_receivers = vec![];
         // let mut discarded_txns_info = Vec::<TxnExecutionInfo<_>>::with_capacity(block_size);
 
         for batch_idx in 0..batch_count {
@@ -421,14 +346,23 @@ where
                 batch_transactions,
                 &executor_arguments,
                 &state,
-                committed_outputs_tail,
-                // &mut discarded_txns_info,
             )?;
-
-            committed_outputs_tail = batch_res.committed_outputs_tail;
+            let BatchExecutionOutput{committed_info_receiver, discarded_info, ..} = batch_res;
+            committed_outputs_receivers.push(committed_info_receiver);
         }
 
-        todo!()
+        // Wait for all materialization tasks to finish.
+        let committed_outputs: Vec<Vec<E::Output>> = committed_outputs_receivers.into_iter().map(|mut receiver| {
+            loop {
+                if let Some(data) = receiver.try_recv().unwrap() {
+                    return data;
+                }
+            }
+        }).collect();
+
+        // TODO: execute the fallback
+
+        Ok(committed_outputs.into_par_iter().flatten().collect())
     }
 }
 
@@ -441,9 +375,9 @@ struct TxnExecutionInfo<E: ExecutorTask> {
     phantom: PhantomData<E>,
 }
 
-struct BatchExecutionOutput<'a, E: ExecutorTask> {
-    committed_outputs_tail: &'a mut [MaybeUninit<E::Output>],
-    discarded_outputs: Vec<TxnExecutionInfo<E>>,
+struct BatchExecutionOutput<E: ExecutorTask> {
+    committed_info_receiver: oneshot::Receiver<Vec<E::Output>>,
+    discarded_info: Vec<TxnExecutionInfo<E>>,
 
     phantom: PhantomData<E>,
 }
@@ -454,7 +388,7 @@ const MIN_BATCH_SIZE: usize = 200;
 impl<T, E, S, X, FB> BlockExecutor for FastPathBlockExecutor<T, E, S, X, FB>
 where
     T: Transaction,
-    E: ExecutorTask<Txn = T> + Send,
+    E: ExecutorTask<Txn = T> + Send + 'static,
     E::Error: std::error::Error,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
