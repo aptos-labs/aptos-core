@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{storage::DAGStorage, types::CertifiedAck, RpcHandler};
+use super::{
+    storage::DAGStorage,
+    types::{CertifiedAck, DAGMessage},
+    RpcHandler,
+};
 use crate::{
     dag::{
         dag_store::Dag,
@@ -20,8 +24,8 @@ use futures::{
     FutureExt,
 };
 use std::sync::Arc;
-use tokio_retry::strategy::ExponentialBackoff;
 use thiserror::Error as ThisError;
+use tokio_retry::strategy::ExponentialBackoff;
 
 #[derive(Debug, ThisError)]
 pub enum DagDriverError {
@@ -67,9 +71,12 @@ impl DagDriver {
     }
 
     pub fn try_enter_new_round(&mut self) {
+        // In case of a new epoch, kickstart building the DAG by entering the next round
+        // without any parents.
         if self.current_round == 0 {
             self.enter_new_round(vec![]);
         }
+        // TODO: add logic to handle building DAG from the middle, etc.
     }
 
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
