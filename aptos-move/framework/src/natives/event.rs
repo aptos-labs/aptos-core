@@ -6,10 +6,24 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+#[cfg(feature = "testing")]
+use move_binary_format::errors::PartialVMError;
+use move_core_types::account_address::AccountAddress;
+#[cfg(feature = "testing")]
+use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
+#[cfg(feature = "testing")]
+use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use serde::Serialize;
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+
+#[derive(Serialize)]
+pub struct GUID {
+    creation_num: u64,
+    addr: AccountAddress,
+}
 
 /***************************************************************************************************
  * native fun write_to_event_store
@@ -45,7 +59,7 @@ fn native_write_to_event_store(
 }
 
 #[cfg(feature = "testing")]
-fn native_emitted_events_internal(
+fn native_emitted_events_by_handle(
     context: &mut SafeNativeContext,
     mut ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -54,9 +68,29 @@ fn native_emitted_events_internal(
     debug_assert!(arguments.len() == 1);
 
     let ty = ty_args.pop().unwrap();
-    let guid = safely_pop_arg!(arguments, Vec<u8>);
+    let mut guid = safely_pop_arg!(arguments, StructRef)
+        .borrow_field(1)?
+        .value_as::<StructRef>()?
+        .borrow_field(0)?
+        .value_as::<Reference>()?
+        .read_ref()?
+        .value_as::<Struct>()?
+        .unpack()?;
 
-    let events = context.emitted_events(guid, ty)?;
+    let creation_num = guid
+        .next()
+        .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?
+        .value_as::<u64>()?;
+    let addr = guid
+        .next()
+        .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?
+        .value_as::<AccountAddress>()?;
+    let guid = GUID { creation_num, addr };
+    let events = context.emitted_events(
+        bcs::to_bytes(&guid)
+            .map_err(|_| PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR))?,
+        ty,
+    )?;
     Ok(smallvec![Value::vector_for_testing_only(events)])
 }
 
@@ -71,8 +105,8 @@ pub fn make_all(
 
     #[cfg(feature = "testing")]
     natives.extend([(
-        "emitted_events_internal",
-        native_emitted_events_internal as RawSafeNative,
+        "emitted_events_by_handle",
+        native_emitted_events_by_handle as RawSafeNative,
     )]);
 
     natives.extend([(
