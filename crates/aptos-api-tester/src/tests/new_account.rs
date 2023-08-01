@@ -1,20 +1,18 @@
 // Copyright © Aptos Foundation
 
-use crate::utils::{get_client, get_faucet_client, NetworkName, TestFailure};
-use anyhow::anyhow;
+use crate::{
+    fail_message::{
+        ERROR_COULD_NOT_CREATE_ACCOUNT, ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_ACCOUNT_DATA,
+        ERROR_NO_BALANCE, FAIL_WRONG_ACCOUNT_DATA, FAIL_WRONG_BALANCE,
+    },
+    persistent_check,
+    utils::{create_account, get_client, get_faucet_client, NetworkName, TestFailure},
+};
 use aptos_api_types::U64;
 use aptos_logger::info;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
-use futures::Future;
-use std::time::Duration;
-use tokio::time::Instant;
-
-static FAIL_WRONG_ACCOUNT_DATA: &str = "wrong account data";
-static FAIL_WRONG_BALANCE: &str = "wrong balance";
-static ERROR_COULD_NOT_CREATE_ACCOUNT: &str = "faucet client failed to create account";
-static ERROR_COULD_NOT_CHECK: &str = "persistency check never started";
-static ERROR_NO_ACCOUNT_DATA: &str = "can't find account data";
+use aptos_types::account_address::AccountAddress;
 
 /// Tests new account creation. Checks that:
 ///   - account data exists
@@ -24,40 +22,15 @@ pub async fn test_newaccount(network_name: NetworkName) -> Result<(), TestFailur
     let (client, faucet_client, account) = setup(network_name).await?;
 
     // check account data persistently
-    persistent_check(check_account_data, &client, &account).await?;
+    persistent_check::account(check_account_data, &client, &account).await?;
 
     // fund account
-    faucet_client.fund(account.address(), 100_000_000).await?;
+    fund(account.address(), &faucet_client).await?;
 
     // check account balance persistently
-    persistent_check(check_account_balance, &client, &account).await?;
+    persistent_check::address(check_account_balance, &client, account.address()).await?;
 
     Ok(())
-}
-
-async fn persistent_check<'a, 'b, F, Fut>(
-    f: F,
-    client: &'a Client,
-    account: &'b LocalAccount,
-) -> Result<(), TestFailure>
-where
-    F: Fn(&'a Client, &'b LocalAccount) -> Fut,
-    Fut: Future<Output = Result<(), TestFailure>>,
-{
-    // set a default error in case checks never start
-    let mut result: Result<(), TestFailure> = Err(anyhow!(ERROR_COULD_NOT_CHECK).into());
-    let timer = Instant::now();
-
-    // try to get a good result for 30 seconds
-    while Instant::now().duration_since(timer) < Duration::from_secs(30) {
-        result = f(client, account).await;
-        if result.is_ok() {
-            break;
-        }
-    }
-
-    // return last failure if no good result occurs
-    result
 }
 
 async fn setup(
@@ -68,16 +41,31 @@ async fn setup(
     let faucet_client = get_faucet_client(network_name);
 
     // create account
-    let account = LocalAccount::generate(&mut rand::rngs::OsRng);
-    if let Err(e) = faucet_client.create_account(account.address()).await {
-        info!(
-            "test: new_account part: setup ERROR: {}, with error {:?}",
-            ERROR_COULD_NOT_CREATE_ACCOUNT, e
-        );
-        return Err(e.into());
+    let account = match create_account(&faucet_client).await {
+        Ok(account) => account,
+        Err(e) => {
+            info!(
+                "test: new_account part: setup ERROR: {}, with error {:?}",
+                ERROR_COULD_NOT_CREATE_ACCOUNT, e
+            );
+            return Err(e.into());
+        },
     };
 
     Ok((client, faucet_client, account))
+}
+
+async fn fund(address: AccountAddress, faucet_client: &FaucetClient) -> Result<(), TestFailure> {
+    // fund account
+    if let Err(e) = faucet_client.fund(address, 100_000_000).await {
+        info!(
+            "test: new_account part: fund ERROR: {}, with error {:?}",
+            ERROR_COULD_NOT_FUND_ACCOUNT, e
+        );
+        return Err(e.into());
+    }
+
+    Ok(())
 }
 
 async fn check_account_data(client: &Client, account: &LocalAccount) -> Result<(), TestFailure> {
@@ -111,22 +99,29 @@ async fn check_account_data(client: &Client, account: &LocalAccount) -> Result<(
     Ok(())
 }
 
-async fn check_account_balance(client: &Client, account: &LocalAccount) -> Result<(), TestFailure> {
+async fn check_account_balance(
+    client: &Client,
+    address: AccountAddress,
+) -> Result<(), TestFailure> {
     // expected
     let expected = U64(100_000_000);
 
     // actual
-    let actual = client
-        .get_account_balance(account.address())
-        .await?
-        .into_inner()
-        .coin
-        .value;
+    let actual = match client.get_account_balance(address).await {
+        Ok(response) => response.into_inner().coin.value,
+        Err(e) => {
+            info!(
+                "test: new_account part: check_account_balance ERROR: {}, with error {:?}",
+                ERROR_NO_BALANCE, e
+            );
+            return Err(e.into());
+        },
+    };
 
     // compare
     if expected != actual {
         info!(
-            "fail: {}, expected {:?}, got {:?}",
+            "test: new_account part: check_account_balance FAIL: {}, expected {:?}, got {:?}",
             FAIL_WRONG_BALANCE, expected, actual
         );
         return Err(TestFailure::Fail(FAIL_WRONG_BALANCE));

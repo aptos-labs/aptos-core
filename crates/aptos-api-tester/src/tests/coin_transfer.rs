@@ -1,23 +1,23 @@
 // Copyright © Aptos Foundation
 
-use std::time::Duration;
-
-use crate::utils::{get_client, get_faucet_client, NetworkName, TestFailure};
+use crate::{
+    fail_message::{
+        ERROR_COULD_NOT_CREATE_ACCOUNT, ERROR_COULD_NOT_CREATE_TRANSACTION,
+        ERROR_COULD_NOT_FINISH_TRANSACTION, ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_BALANCE,
+        ERROR_NO_VERSION, FAIL_WRONG_BALANCE, FAIL_WRONG_BALANCE_AT_VERSION,
+    },
+    persistent_check,
+    utils::{
+        create_account, create_and_fund_account, get_client, get_faucet_client, NetworkName,
+        TestFailure,
+    },
+};
 use anyhow::{anyhow, Result};
 use aptos_api_types::U64;
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_sdk::{coin_client::CoinClient, types::LocalAccount};
 use aptos_types::account_address::AccountAddress;
-use futures::Future;
-use tokio::time::Instant;
-
-static ERROR_MODULE_INTERACTION: &str = "module interaction isn't reflected";
-static ERROR_NO_VERSION: &str = "transaction did not return version";
-
-static FAIL_WRONG_BALANCE: &str = "wrong balance";
-static ERROR_COULD_NOT_CHECK: &str = "persistency check never started";
-static ERROR_COULD_NOT_CREATE_ACCOUNT: &str = "faucet client failed to create account";
 
 /// Tests coin transfer. Checks that:
 ///   - receiver balance reflects transferred amount
@@ -31,63 +31,13 @@ pub async fn test_cointransfer(network_name: NetworkName) -> Result<(), TestFail
     let version = transfer_coins(&client, &coin_client, &mut account, receiver).await?;
 
     // check receiver balance persistently
-    persistent_check(check_account_balance, &client, receiver).await?;
+    persistent_check::address(check_account_balance, &client, receiver).await?;
 
     // check receiver balance at previous version persistently
-    persistent_check_2(check_account_balance_at_version, &client, receiver, version).await?;
+    persistent_check::address_version(check_account_balance_at_version, &client, receiver, version)
+        .await?;
 
     Ok(())
-}
-
-async fn persistent_check<'a, F, Fut>(
-    f: F,
-    client: &'a Client,
-    address: AccountAddress,
-) -> Result<(), TestFailure>
-where
-    F: Fn(&'a Client, AccountAddress) -> Fut,
-    Fut: Future<Output = Result<(), TestFailure>>,
-{
-    // set a default error in case checks never start
-    let mut result: Result<(), TestFailure> = Err(anyhow!(ERROR_COULD_NOT_CHECK).into());
-    let timer = Instant::now();
-
-    // try to get a good result for 30 seconds
-    while Instant::now().duration_since(timer) < Duration::from_secs(30) {
-        result = f(client, address).await;
-        if result.is_ok() {
-            break;
-        }
-    }
-
-    // return last failure if no good result occurs
-    result
-}
-
-async fn persistent_check_2<'a, F, Fut>(
-    f: F,
-    client: &'a Client,
-    address: AccountAddress,
-    version: u64,
-) -> Result<(), TestFailure>
-where
-    F: Fn(&'a Client, AccountAddress, u64) -> Fut,
-    Fut: Future<Output = Result<(), TestFailure>>,
-{
-    // set a default error in case checks never start
-    let mut result: Result<(), TestFailure> = Err(anyhow!(ERROR_COULD_NOT_CHECK).into());
-    let timer = Instant::now();
-
-    // try to get a good result for 30 seconds
-    while Instant::now().duration_since(timer) < Duration::from_secs(30) {
-        result = f(client, address, version).await;
-        if result.is_ok() {
-            break;
-        }
-    }
-
-    // return last failure if no good result occurs
-    result
 }
 
 async fn setup(
@@ -98,27 +48,30 @@ async fn setup(
     let faucet_client = get_faucet_client(network_name);
 
     // create account
-    let account = LocalAccount::generate(&mut rand::rngs::OsRng);
-    if let Err(e) = faucet_client.create_account(account.address()).await {
-        info!(
-            "test: new_account part: setup ERROR: {}, with error {:?}",
-            ERROR_COULD_NOT_CREATE_ACCOUNT, e
-        );
-        return Err(e.into());
+    let account = match create_and_fund_account(&faucet_client).await {
+        Ok(account) => account,
+        Err(e) => {
+            info!(
+                "test: coin_transfer part: setup ERROR: {}, with error {:?}",
+                ERROR_COULD_NOT_FUND_ACCOUNT, e
+            );
+            return Err(e.into());
+        },
     };
-    faucet_client.fund(account.address(), 100_000_000).await?;
 
     // create receiver
-    let receiver = LocalAccount::generate(&mut rand::rngs::OsRng);
-    if let Err(e) = faucet_client.create_account(receiver.address()).await {
-        info!(
-            "test: new_account part: setup ERROR: {}, with error {:?}",
-            ERROR_COULD_NOT_CREATE_ACCOUNT, e
-        );
-        return Err(e.into());
+    let receiver = match create_account(&faucet_client).await {
+        Ok(account) => account.address(),
+        Err(e) => {
+            info!(
+                "test: coin_transfer part: setup ERROR: {}, with error {:?}",
+                ERROR_COULD_NOT_CREATE_ACCOUNT, e
+            );
+            return Err(e.into());
+        },
     };
 
-    Ok((client, account, receiver.address()))
+    Ok((client, account, receiver))
 }
 
 async fn transfer_coins(
@@ -127,15 +80,42 @@ async fn transfer_coins(
     account: &mut LocalAccount,
     receiver: AccountAddress,
 ) -> Result<u64, TestFailure> {
-    let pending_txn = coin_client.transfer(account, receiver, 1_000, None).await?;
-    let version = match client.wait_for_transaction(&pending_txn).await?.inner().version() {
-        Some(version) => version,
-        _ => {
-            info!("error: {}", ERROR_MODULE_INTERACTION);
-            return Err(TestFailure::Error(anyhow!(ERROR_NO_VERSION)));
+    // create transaction
+    let pending_txn = match coin_client.transfer(account, receiver, 1_000, None).await {
+        Ok(pending_txn) => pending_txn,
+        Err(e) => {
+            info!(
+                "test: coin_transfer part: transfer_coins ERROR: {}, with error {:?}",
+                ERROR_COULD_NOT_CREATE_TRANSACTION, e
+            );
+            return Err(e.into());
         },
     };
 
+    // wait and get version
+    let response = match client.wait_for_transaction(&pending_txn).await {
+        Ok(response) => response,
+        Err(e) => {
+            info!(
+                "test: coin_transfer part: transfer_coins ERROR: {}, with error {:?}",
+                ERROR_COULD_NOT_FINISH_TRANSACTION, e
+            );
+            return Err(e.into());
+        },
+    };
+
+    let version = match response.inner().version() {
+        Some(version) => version,
+        None => {
+            info!(
+                "test: coin_transfer part: transfer_coins ERROR: {}",
+                ERROR_NO_VERSION
+            );
+            return Err(anyhow!(ERROR_NO_VERSION).into());
+        },
+    };
+
+    // return version
     Ok(version)
 }
 
@@ -147,17 +127,21 @@ async fn check_account_balance(
     let expected = U64(1_000);
 
     // actual
-    let actual = client
-        .get_account_balance(address)
-        .await?
-        .into_inner()
-        .coin
-        .value;
+    let actual = match client.get_account_balance(address).await {
+        Ok(response) => response.into_inner().coin.value,
+        Err(e) => {
+            info!(
+                "test: coin_transfer part: check_account_balance ERROR: {}, with error {:?}",
+                ERROR_NO_BALANCE, e
+            );
+            return Err(e.into());
+        },
+    };
 
     // compare
     if expected != actual {
         info!(
-            "fail: {}, expected {:?}, got {:?}",
+            "test: coin_transfer part: check_account_balance FAIL: {}, expected {:?}, got {:?}",
             FAIL_WRONG_BALANCE, expected, actual
         );
         return Err(TestFailure::Fail(FAIL_WRONG_BALANCE));
@@ -169,26 +153,33 @@ async fn check_account_balance(
 async fn check_account_balance_at_version(
     client: &Client,
     address: AccountAddress,
-    version: u64,
+    transaction_version: u64,
 ) -> Result<(), TestFailure> {
     // expected
     let expected = U64(0);
 
     // actual
-    let actual = client
-        .get_account_balance_at_version(address, version - 1)
-        .await?
-        .into_inner()
-        .coin
-        .value;
+    let actual = match client
+        .get_account_balance_at_version(address, transaction_version - 1)
+        .await
+    {
+        Ok(response) => response.into_inner().coin.value,
+        Err(e) => {
+            info!(
+                "test: coin_transfer part: check_account_balance_at_version ERROR: {}, with error {:?}",
+                ERROR_NO_BALANCE, e
+            );
+            return Err(e.into());
+        },
+    };
 
     // compare
     if expected != actual {
         info!(
-            "fail: {}, expected {:?}, got {:?}",
-            FAIL_WRONG_BALANCE, expected, actual
+            "test: coin_transfer part: check_account_balance_at_version FAIL: {}, expected {:?}, got {:?}",
+            FAIL_WRONG_BALANCE_AT_VERSION, expected, actual
         );
-        return Err(TestFailure::Fail(FAIL_WRONG_BALANCE));
+        return Err(TestFailure::Fail(FAIL_WRONG_BALANCE_AT_VERSION));
     }
 
     Ok(())
