@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::gas_meter_helpers::{get_dir_paths, get_functional_identifiers, record_gas_meter};
+use crate::gas_meter_helpers::{get_dir_paths, list_entrypoints, record_gas_meter};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas_algebra::DynamicExpression;
 use aptos_language_e2e_tests::executor::FakeExecutor;
@@ -12,7 +12,7 @@ use std::{
 };
 use walkdir::WalkDir;
 
-pub struct GasMeters {
+pub struct GasMeasurements {
     pub regular_meter: Vec<u128>,
     pub abstract_meter: Vec<Vec<DynamicExpression>>,
     pub equation_names: Vec<String>,
@@ -21,7 +21,7 @@ pub struct GasMeters {
 /// Compile every Move sample and run each sample with two different measuring methods.
 /// The first is with the Regular Gas Meter (used in production) to record the running time.
 /// The second is with the Abstract Algebra Gas Meter to record abstract gas usage.
-pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeters {
+pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeasurements {
     // Discover all top-level packages in samples directory
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples");
     let dirs = read_dir(path.as_path()).unwrap();
@@ -30,7 +30,7 @@ pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeters {
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
 
-    let mut gas_meter = GasMeters {
+    let mut gas_meter = GasMeasurements {
         regular_meter: Vec::new(),
         abstract_meter: Vec::new(),
         equation_names: Vec::new(),
@@ -60,14 +60,9 @@ pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeters {
             let address = module_id.address();
 
             // get all benchmark tagged functions
-            let func_identifiers = get_functional_identifiers(
-                compiled_module,
-                identifier,
-                *address,
-                pattern.to_string(),
-            );
+            let func_identifiers = list_entrypoints(&compiled_module, pattern.to_string());
 
-            let meter_results = record_gas_meter(
+            let measurement_results = record_gas_meter(
                 &package,
                 &mut executor,
                 func_identifiers,
@@ -79,15 +74,17 @@ pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeters {
             // record the equation names
             gas_meter
                 .equation_names
-                .extend(meter_results.equation_names);
+                .extend(measurement_results.equation_names);
 
             // record with regular gas meter
-            gas_meter.regular_meter.extend(meter_results.regular_meter);
+            gas_meter
+                .regular_meter
+                .extend(measurement_results.regular_meter);
 
             // record with abstract gas meter
             gas_meter
                 .abstract_meter
-                .extend(meter_results.abstract_meter);
+                .extend(measurement_results.abstract_meter);
         }
     }
     gas_meter
@@ -96,13 +93,13 @@ pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeters {
 /// Compile every MVIR and run each sample with two different measuring methods.
 /// The first is with the Regular Gas Meter (used in production) to record the running time.
 /// The second is with the Abstract Algebra Gas Meter to record abstract gas usage.
-pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeters {
+pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasurements {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples_ir");
 
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
 
-    let mut gas_meter = GasMeters {
+    let mut gas_meter = GasMeasurements {
         regular_meter: Vec::new(),
         abstract_meter: Vec::new(),
         equation_names: Vec::new(),
@@ -127,7 +124,7 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeter
                 // Convert the file_name to a string slice
                 if let Some(_file_name_str) = file_name.to_str() {
                     // compile module
-                    let code = read_to_string(&path_entry).expect("Failed to read file contents");
+                    let code = read_to_string(path_entry).expect("Failed to read file contents");
                     let module = Compiler::new(vec![])
                         .into_compiled_module(&code)
                         .expect("should compile mvir");
@@ -135,13 +132,7 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeter
                     // get relevant module metadata
                     let module_id = module.self_id();
                     let identifier = &module_id.name().to_string();
-                    let address = module_id.address();
-                    let func_identifiers = get_functional_identifiers(
-                        module.clone(),
-                        identifier,
-                        *address,
-                        pattern.to_string(),
-                    );
+                    let func_identifiers = list_entrypoints(&module, pattern.to_string());
 
                     // build .mv of module
                     let mut module_blob: Vec<u8> = vec![];
@@ -155,12 +146,11 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeter
                     executor.add_module(&module_id, module_blob);
 
                     for func_identifier in func_identifiers {
-                        gas_meter.equation_names.push(String::from(format!(
-                            "{}::{}",
-                            &identifier, func_identifier
-                        )));
+                        gas_meter
+                            .equation_names
+                            .push(format!("{}::{}", &identifier, func_identifier));
 
-                        let elapsed = executor.exec_module(
+                        let elapsed = executor.exec_module_record_running_time(
                             &module_id,
                             &func_identifier,
                             vec![],

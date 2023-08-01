@@ -283,6 +283,7 @@ dependencies = [
 name = "aptos-abstract-gas-usage"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-gas-algebra",
  "aptos-gas-meter",
  "aptos-gas-schedule",

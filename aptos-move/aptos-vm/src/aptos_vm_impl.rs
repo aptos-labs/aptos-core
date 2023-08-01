@@ -144,6 +144,7 @@ impl AptosVMImpl {
             chain_id.id(),
             features.clone(),
             timed_features,
+            None,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 

@@ -8,11 +8,11 @@ use std::{
     ops::{Add, Mul},
 };
 
-/// Enum representing the dynamic form of an Expression. Originally, it is in static
+/// Enum representing the dynamic form of an expression. Originally, it is in static
 /// form, which is hard to work with. The reason why the dynamic form isn't used as
 /// the default is because of performance issues especially since the Abstract Gas
 /// Algebra is used in the validator code as well. Dynamic Expressions let us work
-/// with expressions when it is not performance dependent.
+/// with expressions when it is not performance critical.
 #[derive(Debug, Clone)]
 pub enum DynamicExpression {
     //// Represent GasAdd
@@ -39,9 +39,9 @@ pub enum DynamicExpression {
  * Gas Expression & Visitor
  *
  **************************************************************************************************/
-/// Trait representing an abstract Expression that can be used to calculate some gas amount.
+/// Trait representing an abstract expression that can be used to calculate some gas amount.
 ///
-/// It carries a type parameter `E`, indicating an environment in which the Expression can be
+/// It carries a type parameter `E`, indicating an environment in which the expression can be
 /// evaluated/materialized.
 pub trait GasExpression<Env> {
     type Unit;
@@ -49,7 +49,7 @@ pub trait GasExpression<Env> {
     /// Evaluates the expression within the given environment to a concrete number.
     fn evaluate(&self, feature_version: u64, env: &Env) -> GasQuantity<Self::Unit>;
 
-    /// Traverse the Expression in post-order using the given visitor.
+    /// Traverse the expression in post-order using the given visitor.
     /// See [`GasExpressionVisitor`] for details.
     fn visit(&self, visitor: &mut impl GasExpressionVisitor);
 
@@ -104,9 +104,7 @@ pub trait GasExpression<Env> {
                 self.node.push(expr);
             }
 
-            fn per<U>(&mut self) {
-                return;
-            }
+            fn per<U>(&mut self) {}
         }
 
         let mut visitor = DynamicExpressionBuilder { node: Vec::new() };
@@ -118,10 +116,10 @@ pub trait GasExpression<Env> {
     }
 }
 
-/// An interface for performing post-order traversal of the tree structure of a gas Expression.
+/// An interface for performing post-order traversal of the tree structure of a gas expression.
 ///
 /// Alternatively, one could think that the callbacks are invoked following the Reverse Polish
-/// notation of the Expression.
+/// notation of the expression.
 ///
 /// Here are a few examples:
 /// - `1 + 2`
@@ -164,7 +162,7 @@ pub struct GasMul<L, R> {
     pub right: R,
 }
 
-/// Representing a gas Expression divided by a particular unit.
+/// Representing a gas expression divided by a particular unit.
 /// This is sometimes required for further multiplications.
 #[derive(Debug, Clone)]
 pub struct GasPerUnit<T, U> {
@@ -177,7 +175,7 @@ pub struct GasPerUnit<T, U> {
  *
  **************************************************************************************************/
 // Notation:
-//   E | T: U means T is a valid gas Expression with unit U under environment E.
+//   E | T: U means T is a valid gas expression with unit U under environment E.
 
 // E | T: U
 // ---------

@@ -62,10 +62,9 @@ pub fn sign_module_txn(
 
 //// sign user transaction and only records the body of the transaction
 pub fn sign_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
-    let start = Instant::now();
-    executor.exec_module(module_name, function_name, vec![], vec![]);
-    let elapsed = start.elapsed();
-    println!("running time (microseconds): {}", elapsed.as_micros());
+    let elapsed =
+        executor.exec_module_record_running_time(module_name, function_name, vec![], vec![], 10);
+    println!("running time (microseconds): {}", elapsed);
 }
 
 //// publish module under user and sign user transaction

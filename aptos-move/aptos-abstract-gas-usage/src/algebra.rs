@@ -45,7 +45,7 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         self.shared_buffer.lock().unwrap().push(node);
 
         let amount =
-            abstract_amount.evaluate(self.base.feature_version(), &self.base.vm_gas_params());
+            abstract_amount.evaluate(self.base.feature_version(), self.base.vm_gas_params());
         self.base.charge_execution(amount)?;
         Ok(())
     }
@@ -58,7 +58,7 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         self.shared_buffer.lock().unwrap().push(node);
 
         let amount =
-            abstract_amount.evaluate(self.base.feature_version(), &self.base.vm_gas_params());
+            abstract_amount.evaluate(self.base.feature_version(), self.base.vm_gas_params());
         self.base.charge_execution(amount)?;
         Ok(())
     }

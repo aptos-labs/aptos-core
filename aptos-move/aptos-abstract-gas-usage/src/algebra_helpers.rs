@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::{anyhow, Result};
 use aptos_gas_algebra::DynamicExpression;
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
@@ -22,20 +23,20 @@ use std::collections::{
 /// * case 2: var -> Vec(var)
 /// * case 3: e1 * e2 -> t1 * t2
 /// * case 4: e1 * e2 -> t1 + t2
-pub fn normalize(expr: DynamicExpression) -> Vec<DynamicExpression> {
+pub fn expand_terms(expr: DynamicExpression) -> Vec<DynamicExpression> {
     let mut result: Vec<DynamicExpression> = Vec::new();
     match expr {
         DynamicExpression::GasValue { value } => {
             result.push(DynamicExpression::GasValue { value });
-            return result;
+            result
         },
         DynamicExpression::GasParam { name } => {
             result.push(DynamicExpression::GasParam { name });
-            return result;
+            result
         },
         DynamicExpression::Mul { left, right } => {
-            let t1 = normalize(*left);
-            let t2 = normalize(*right);
+            let t1 = expand_terms(*left);
+            let t2 = expand_terms(*right);
             let mut subresult: Vec<DynamicExpression> = Vec::new();
             for a_i in t1 {
                 for b_j in &t2 {
@@ -56,14 +57,14 @@ pub fn normalize(expr: DynamicExpression) -> Vec<DynamicExpression> {
                 }
             }
             result.extend(subresult.clone());
-            return result;
+            result
         },
         DynamicExpression::Add { left, right } => {
-            let t1 = normalize(*left);
-            let t2 = normalize(*right);
+            let t1 = expand_terms(*left);
+            let t2 = expand_terms(*right);
             result.extend(t1.clone());
             result.extend(t2.clone());
-            return result;
+            result
         },
     }
 }
@@ -77,7 +78,7 @@ pub fn normalize(expr: DynamicExpression) -> Vec<DynamicExpression> {
 /// ### Example
 ///
 /// (A + A) * (5 + 5) => 5A + 5A + 5A + 5A => 20A
-pub fn collect_terms(terms: Vec<DynamicExpression>) -> Result<BTreeMap<String, u64>, String> {
+pub fn aggregate_terms(terms: Vec<DynamicExpression>) -> Result<BTreeMap<String, u64>> {
     let mut map: BTreeMap<String, u64> = BTreeMap::new();
     for term in terms {
         match term {
@@ -86,8 +87,8 @@ pub fn collect_terms(terms: Vec<DynamicExpression>) -> Result<BTreeMap<String, u
                 // isn't providing expressions in the GasExpression.
                 // this makes calibration impossible and we should error
                 if value != 0 {
-                    return Err(String::from(
-                        "Concrete quantity provided. Should be GasExpression.",
+                    return Err(anyhow!(
+                        "Concrete quantity provided. Should be GasExpression."
                     ));
                 }
             },
@@ -103,22 +104,16 @@ pub fn collect_terms(terms: Vec<DynamicExpression>) -> Result<BTreeMap<String, u
                 let mut key: String = String::new();
                 let mut val: u64 = 0;
 
-                match *right {
-                    DynamicExpression::GasParam { name } => {
-                        key = name;
-                    },
-                    _ => {},
+                if let DynamicExpression::GasParam { name } = *right {
+                    key = name;
                 }
 
-                match *left {
-                    DynamicExpression::GasValue { value } => {
-                        val = value;
-                    },
-                    _ => {},
+                if let DynamicExpression::GasValue { value } = *left {
+                    val = value;
                 }
 
-                if !map.contains_key(&key) {
-                    map.insert(key, val);
+                if let Vacant(e) = map.entry(key.clone()) {
+                    e.insert(val);
                 } else {
                     map.entry(key).and_modify(|v| *v += val);
                 }

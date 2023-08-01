@@ -129,7 +129,7 @@ impl SafeNativeBuilder {
 
                 enable_incremental_gas_charging,
 
-                gas_hook: hook.as_ref().map(|h| &**h),
+                gas_hook: hook.as_deref(),
             };
 
             let res: Result<SmallVec<[Value; 1]>, SafeNativeError> =

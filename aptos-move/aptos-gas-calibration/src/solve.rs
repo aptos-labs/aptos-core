@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::math::{
-    add_gas_formula_to_coefficient_matrix, add_running_time_to_constant_matrix,
-    compute_least_square_solutions, find_linearly_dependent_variables,
-    get_computed_time_and_outliers,
+use crate::{
+    math::{
+        add_gas_formula_to_coefficient_matrix, add_running_time_to_constant_matrix,
+        compute_least_square_solutions, find_linearly_dependent_variables,
+        get_computed_time_and_outliers,
+    },
+    math_interface::generic_map,
 };
-use crate::math_interface::generic_map;
 use nalgebra::DMatrix;
 use std::collections::BTreeMap;
 
@@ -47,15 +49,15 @@ pub fn build_constant_matrix(input: Vec<u128>, nrows: usize, ncols: usize) -> DM
 /// * `input` - Collection of like-terms
 /// * `coeff_matrix` - Coefficient Matrix
 /// * `const_matrix` - Constant Matrix
-pub fn solve(
+pub fn least_squares(
     input: Vec<BTreeMap<String, u64>>,
     coeff_matrix: &mut DMatrix<f64>,
     const_matrix: &mut DMatrix<f64>,
     equation_names: Vec<String>,
 ) {
     let lss = compute_least_square_solutions(coeff_matrix, const_matrix);
-    if lss.is_ok() {
-        let mut x_hat = lss.unwrap();
+    if let Ok(answer) = lss {
+        let mut x_hat = answer;
 
         let map = generic_map(input.clone());
         let keys: Vec<String> = map.keys().map(|key| key.to_string()).collect();
@@ -96,7 +98,7 @@ pub fn solve(
 /// * `coeff_matrix` - Coefficient Matrix
 /// * `const_matrix` - Constant Matrix
 fn report_computed_times(
-    equation_names: &Vec<String>,
+    equation_names: &[String],
     actual_times: &Vec<(usize, f64, f64, f64, bool)>,
 ) {
     println!("\nActual running times are:\n");
@@ -108,8 +110,8 @@ fn report_computed_times(
             "- {} | Computed {}µs vs. Actual {}µs | Error {}\n",
             equation_names[*idx],
             cr,
-            format!("{:.3}", ar),
-            format!("{:.3}", err)
+            format_args!("{:.3}", ar),
+            format_args!("{:.3}", err)
         );
     }
 }
@@ -122,7 +124,7 @@ fn report_computed_times(
 /// * `x_hat` - Least squares solution
 /// * `coeff_matrix` - Coefficient Matrix
 /// * `const_matrix` - Constant Matrix
-fn report_outliers(equation_names: &Vec<String>, outliers: &Vec<(usize, f64, f64, f64, bool)>) {
+fn report_outliers(equation_names: &[String], outliers: &Vec<(usize, f64, f64, f64, bool)>) {
     println!("\nOutliers are:\n");
     for (idx, cr, ar, err, is_outlier) in outliers {
         if !is_outlier {
@@ -132,8 +134,8 @@ fn report_outliers(equation_names: &Vec<String>, outliers: &Vec<(usize, f64, f64
             "- {} | Computed {}µs vs. Actual {}µs | Error {}\n",
             equation_names[*idx],
             cr,
-            format!("{:.3}", ar),
-            format!("{:.3}", err)
+            format_args!("{:.3}", ar),
+            format_args!("{:.3}", err)
         );
     }
 }
@@ -156,19 +158,19 @@ fn report_undetermined_gas_params(
     let keys: Vec<String> = map.keys().map(|key| key.to_string()).collect();
 
     let result = find_linearly_dependent_variables(coeff_matrix, const_matrix);
-    if result.is_err() {
+    if let Err(pivot_columns) = &result {
         println!("free variables are:\n");
-        let pivot_columns = result.unwrap_err();
         for col in pivot_columns {
-            let gas_param = &keys[col];
+            let gas_param = &keys[*col];
             println!("- gas parameter: {}\n", gas_param);
         }
-    } else {
+    }
+
+    if let Ok(linear_combos) = &result {
         println!("linearly dependent variables are:\n");
-        let linear_combos = result.unwrap();
         for (eq, gas_param) in linear_combos {
-            let eq_name = &equation_names[eq];
-            let gas_param_name = &keys[gas_param];
+            let eq_name = &equation_names[*eq];
+            let gas_param_name = &keys[*gas_param];
             println!("- {} | gas parameter: {}\n", eq_name, gas_param_name);
         }
     }
