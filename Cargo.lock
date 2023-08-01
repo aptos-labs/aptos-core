@@ -716,6 +716,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-metrics",
+ "tokio-retry",
 ]
 
 [[package]]
@@ -2799,11 +2800,13 @@ dependencies = [
  "aptos-enum-conversion-derive",
  "aptos-infallible",
  "aptos-logger",
+ "aptos-time-service",
  "aptos-types",
  "async-trait",
  "futures",
  "futures-channel",
  "tokio",
+ "tokio-retry",
 ]
 
 [[package]]
