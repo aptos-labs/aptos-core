@@ -135,6 +135,14 @@ impl StructTag {
             && self.name.as_str().eq("String")
     }
 
+    /// Returns true if this is a `StructTag` for a `std::option::Option` struct defined in the
+    /// standard library at address `move_std_addr`.
+    pub fn is_std_option(&self, move_std_addr: &AccountAddress) -> bool {
+        self.address == *move_std_addr
+            && self.module.as_str().eq("option")
+            && self.name.as_str().eq("Option")
+    }
+
     pub fn module_id(&self) -> ModuleId {
         ModuleId::new(self.address, self.module.to_owned())
     }
