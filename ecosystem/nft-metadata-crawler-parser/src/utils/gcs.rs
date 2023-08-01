@@ -1,33 +1,40 @@
 // Copyright © Aptos Foundation
 
-use google_cloud_auth::project::{create_token_source, Config};
-use image::ImageFormat;
-use reqwest::{
-    header::{self, HeaderMap},
-    Client,
+use anyhow::Context;
+use google_cloud_storage::{
+    client::{Client, ClientConfig},
+    http::objects::upload::{Media, UploadObjectRequest, UploadType},
 };
+use image::ImageFormat;
 use serde_json::Value;
 
 /// Writes JSON Value to GCS
 pub async fn write_json_to_gcs(bucket: String, id: String, json: Value) -> anyhow::Result<String> {
-    let (client, filename, url) = init_client_and_format_url(id, bucket);
+    let client = init_client().await?;
+
+    let filename = format!("{}/json.json", id);
     let json_string = json.to_string();
+    let json_bytes = json_string.into_bytes();
 
-    let res = client
-        .post(url)
-        .bearer_auth(get_gcp_auth_token().await?)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(json_string)
-        .send()
-        .await?;
+    let upload_type = UploadType::Simple(Media {
+        name: filename.clone().into(),
+        content_type: "application/json".into(),
+        content_length: Some(json_bytes.len() as u64),
+    });
 
-    match res.status().as_u16() {
-        200..=299 => Ok(filename),
-        _ => {
-            let text = res.text().await?;
-            Err(anyhow::anyhow!("Error saving JSON to GCS {}", text))
-        },
-    }
+    client
+        .upload_object(
+            &UploadObjectRequest {
+                bucket,
+                ..Default::default()
+            },
+            json_bytes,
+            &upload_type,
+        )
+        .await
+        .context("Error uploading JSON to GCS")?;
+
+    Ok(filename)
 }
 
 /// Infers file type and writes image to GCS
@@ -37,8 +44,7 @@ pub async fn write_image_to_gcs(
     id: String,
     buffer: Vec<u8>,
 ) -> anyhow::Result<String> {
-    let (client, filename, url) = init_client_and_format_url(id, bucket);
-    let mut headers = HeaderMap::new();
+    let client = init_client().await?;
 
     let extension = match img_format {
         ImageFormat::Gif | ImageFormat::Avif => img_format
@@ -49,49 +55,31 @@ pub async fn write_image_to_gcs(
         _ => "jpeg".to_string(),
     };
 
-    headers.insert(
-        header::CONTENT_TYPE,
-        format!("image/{}", extension).parse().unwrap(),
-    );
-    headers.insert(
-        header::CONTENT_LENGTH,
-        buffer.len().to_string().parse().unwrap(),
-    );
+    let filename = format!("{}/image.{}", id, extension);
 
-    let res = client
-        .post(&url)
-        .bearer_auth(get_gcp_auth_token().await?)
-        .headers(headers)
-        .body(buffer)
-        .send()
-        .await?;
+    let upload_type = UploadType::Simple(Media {
+        name: filename.clone().into(),
+        content_type: format!("image/{}", extension).into(),
+        content_length: Some(buffer.len() as u64),
+    });
 
-    match res.status().as_u16() {
-        200..=299 => Ok(filename),
-        _ => {
-            let text = res.text().await?;
-            Err(anyhow::anyhow!("Error saving image to GCS {}", text))
-        },
-    }
+    client
+        .upload_object(
+            &UploadObjectRequest {
+                bucket,
+                ..Default::default()
+            },
+            buffer,
+            &upload_type,
+        )
+        .await
+        .context("Error uploading image to GCS")?;
+
+    Ok(filename)
 }
 
-async fn get_gcp_auth_token() -> anyhow::Result<String> {
-    let config = Config {
-        audience: None,
-        scopes: Some(&["https://www.googleapis.com/auth/cloud-platform"]),
-        sub: None,
-    };
-    let ts = create_token_source(config).await?;
-    Ok(ts.token().await?.access_token)
-}
-
-/// Creates the request client and formats the filename and URL
-fn init_client_and_format_url(id: String, bucket: String) -> (Client, String, String) {
-    let client = Client::new();
-    let filename = format!("json_{}.json", id);
-    let url = format!(
-        "https://storage.googleapis.com/upload/storage/v1/b/{}/o?uploadType=media&name={}",
-        bucket, filename
-    );
-    (client, filename, url)
+/// Creates a GCS client using auth from env variable
+async fn init_client() -> anyhow::Result<Client> {
+    let config = ClientConfig::default().with_auth().await?;
+    Ok(Client::new(config))
 }
