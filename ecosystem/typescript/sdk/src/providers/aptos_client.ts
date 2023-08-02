@@ -759,7 +759,7 @@ export class AptosClient {
     }
     if (!(lastTxn as any)?.success) {
       throw new FailedTransactionError(
-        `Transaction ${txnHash} committed to the blockchain but execution failed`,
+        `Transaction ${txnHash} failed with an error: ${(lastTxn as any).vm_status}`,
         lastTxn,
       );
     }
