@@ -9,7 +9,8 @@ from .account import Account
 from .account_address import AccountAddress
 from .async_client import RestClient
 from .bcs import Deserializer, Serializer
-from .transactions import EntryFunction, TransactionArgument, TransactionPayload
+from .transactions import (EntryFunction, TransactionArgument,
+                           TransactionPayload)
 from .type_tag import StructTag, TypeTag
 
 
@@ -383,6 +384,7 @@ class AptosTokenClient:
 
         return TransactionPayload(payload)
 
+    # :!:>create_collection
     async def create_collection(
         self,
         creator: Account,
@@ -401,7 +403,7 @@ class AptosTokenClient:
         tokens_freezable_by_creator: bool,
         royalty_numerator: int,
         royalty_denominator: int,
-    ) -> str:
+    ) -> str:  # <:!:create_collection
         payload = AptosTokenClient.create_collection_payload(
             description,
             max_supply,
@@ -458,6 +460,7 @@ class AptosTokenClient:
 
         return TransactionPayload(payload)
 
+    # :!:>mint_token
     async def mint_token(
         self,
         creator: Account,
@@ -466,7 +469,7 @@ class AptosTokenClient:
         name: str,
         uri: str,
         properties: PropertyMap,
-    ) -> str:
+    ) -> str:  # <:!:mint_token
         payload = AptosTokenClient.mint_token_payload(
             collection, description, name, uri, properties
         )
@@ -514,6 +517,27 @@ class AptosTokenClient:
             creator, TransactionPayload(payload)
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
+
+    # :!:>transfer_token
+    async def transfer_token(
+        self, sender: Account, token: AccountAddress, to: AccountAddress
+    ) -> str:
+        payload = EntryFunction.natural(
+            "0x1::object",
+            "transfer",
+            [TypeTag(StructTag.from_str("0x4::token::Token"))],
+            [
+                TransactionArgument(token, Serializer.struct),
+                TransactionArgument(to, Serializer.struct),
+            ],
+        )
+
+        signed_transaction = await self.client.create_bcs_signed_transaction(
+            sender, TransactionPayload(payload)
+        )
+        return await self.client.submit_bcs_transaction(
+            signed_transaction
+        )  # <:!:transfer_token
 
     async def burn_token(self, creator: Account, token: AccountAddress) -> str:
         payload = EntryFunction.natural(
