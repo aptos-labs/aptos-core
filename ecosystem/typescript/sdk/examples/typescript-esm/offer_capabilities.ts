@@ -19,7 +19,7 @@ type CapabilityOfferProofChallengeV2 = {
 const createAndFundAliceAndBob = async (
   faucetClient: FaucetClient,
 ): Promise<{ alice: AptosAccount; bob: AptosAccount }> => {
-  console.log(`-------------------  Creating and funding a new Bob & Alice  -------------------`);
+  console.log(`---------------  Creating and funding a new Bob & Alice  ---------------`);
   const alice = new AptosAccount();
   const bob = new AptosAccount();
   await faucetClient.fundAccount(alice.address(), 100_000_000);
@@ -43,7 +43,7 @@ const createAndFundAliceAndBob = async (
     // Create and fund two new accounts
     const { alice, bob } = await createAndFundAliceAndBob(faucetClient);
     // Note that the rotation capability offer needs the chainId
-    console.log(`-------------------  RotationCapabilityOfferProofChallengeV2 ------------------`);
+    console.log(`---------------  RotationCapabilityOfferProofChallengeV2 --------------`);
     const { hash, version, success, payload } = await signStructAndSubmitTransaction(
       provider,
       alice,
@@ -70,7 +70,7 @@ const createAndFundAliceAndBob = async (
     // Create and fund two new accounts
     const { alice, bob } = await createAndFundAliceAndBob(faucetClient);
     // Note that the signer capability offer doesn't require the chainId
-    console.log(`-------------------  SignerCapabilityOfferProofChallengeV2 -------------------`);
+    console.log(`---------------  SignerCapabilityOfferProofChallengeV2 ---------------`);
     const { hash, version, success, payload } = await signStructAndSubmitTransaction(
       provider,
       alice,
