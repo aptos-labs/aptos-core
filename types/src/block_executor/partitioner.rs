@@ -12,7 +12,7 @@ pub type ShardId = usize;
 pub type TxnIndex = usize;
 pub type RoundId = usize;
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct ShardedTxnIndex {
     pub txn_index: TxnIndex,
     pub shard_id: ShardId,

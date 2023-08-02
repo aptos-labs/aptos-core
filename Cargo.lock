@@ -548,12 +548,25 @@ dependencies = [
  "clap 4.3.5",
  "dashmap",
  "itertools",
- "jemallocator",
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
  "rayon",
  "serde 1.0.149",
+]
+
+[[package]]
+name = "aptos-block-partitioner-runner"
+version = "0.1.0"
+dependencies = [
+ "aptos-block-partitioner",
+ "aptos-logger",
+ "aptos-transaction-orderer",
+ "aptos-types",
+ "clap 4.3.5",
+ "jemallocator",
+ "rand 0.7.3",
+ "rayon",
 ]
 
 [[package]]
@@ -1141,6 +1154,7 @@ dependencies = [
  "anyhow",
  "aptos-block-executor",
  "aptos-block-partitioner",
+ "aptos-block-partitioner-runner",
  "aptos-config",
  "aptos-crypto",
  "aptos-db",

@@ -11,9 +11,11 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use aptos_block_partitioner::test_utils::{
     create_signed_p2p_transaction, generate_test_account, TestAccount,
 };
-use aptos_transaction_orderer::batch_orderer::SequentialDynamicAriaOrderer;
+use aptos_transaction_orderer::batch_orderer::{SequentialDynamicAriaOrderer, WindowManager};
 use aptos_transaction_orderer::block_orderer::BatchedBlockOrdererWithWindow;
 use aptos_transaction_orderer::block_partitioner::{BlockPartitioner, OrderedRoundRobinPartitioner};
+use aptos_transaction_orderer::const_option::ConstSome;
+use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 #[derive(Debug, Parser)]
@@ -55,12 +57,12 @@ fn main() {
         .collect();
 
     let min_ordered_transaction_before_execution = min(100, args.block_size);
-    let block_orderer = BatchedBlockOrdererWithWindow::new(
+    let block_orderer: BatchedBlockOrdererWithWindow<SequentialDynamicAriaOrderer<AnalyzedTransaction, ConstSome<WindowManager<StateKey>>>> = BatchedBlockOrdererWithWindow::new(
         SequentialDynamicAriaOrderer::with_window(),
         min_ordered_transaction_before_execution * 5,
         1000,
     );
-    let block_partitioner = OrderedRoundRobinPartitioner::new(
+    let block_partitioner: OrderedRoundRobinPartitioner<BatchedBlockOrdererWithWindow<SequentialDynamicAriaOrderer<AnalyzedTransaction, ConstSome<WindowManager<StateKey>>>>> = OrderedRoundRobinPartitioner::new(
         block_orderer,
         args.num_shards,
         (min_ordered_transaction_before_execution + args.num_shards - 1) / args.num_shards,

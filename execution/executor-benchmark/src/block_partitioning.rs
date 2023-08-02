@@ -12,8 +12,9 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::time::Instant;
-use aptos_block_partitioner::{BlockPartitioner, build_partitioner};
+use aptos_block_partitioner::BlockPartitioner;
 use crate::metrics::TIMER;
+use aptos_block_partitioner_runner::build_partitioner;
 
 pub(crate) struct BlockPartitioningStage {
     num_executor_shards: usize,
