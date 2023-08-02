@@ -41,14 +41,6 @@ impl OnChainExecutionConfig {
             OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
         }
     }
-
-    // TODO: Remove and replace all calls with default once shuffler is enabled in all networks
-    pub fn default_for_test() -> Self {
-        OnChainExecutionConfig::V3(ExecutionConfigV3 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
-            ..Default::default()
-        })
-    }
 }
 
 /// This is used when on-chain config is not initialized.
@@ -114,7 +106,7 @@ pub struct ExecutionConfigV3 {
 impl Default for ExecutionConfigV3 {
     fn default() -> Self {
         Self {
-            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
             block_gas_limit: None,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         }

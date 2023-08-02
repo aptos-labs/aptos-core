@@ -295,7 +295,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
             consensus_config: OnChainConsensusConfig::default(),
-            execution_config: OnChainExecutionConfig::default_for_test(),
+            execution_config: OnChainExecutionConfig::default(),
             gas_schedule: default_gas_schedule(),
         },
     )?)
