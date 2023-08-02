@@ -391,7 +391,7 @@ impl Default for TransactionOptions {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct CollectionData {
     pub name: String,
     pub description: String,
@@ -400,7 +400,7 @@ pub struct CollectionData {
     pub mutability_config: CollectionMutabilityConfig,
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Debug, PartialEq)]
 pub struct CollectionMutabilityConfig {
     pub description: bool,
     pub maximum: bool,
