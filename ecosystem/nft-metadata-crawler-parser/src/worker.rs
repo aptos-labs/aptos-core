@@ -77,8 +77,6 @@ async fn consume_pubsub_entries_to_channel_loop(
                 NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")?,
             ),
             parts[4].parse::<bool>().unwrap_or(false),
-            parser_config.max_file_size_bytes,
-            parser_config.image_quality,
         );
 
         // Send worker to channel
@@ -181,8 +179,6 @@ pub struct Worker {
     last_transaction_version: i32,
     last_transaction_timestamp: chrono::NaiveDateTime,
     force: bool,
-    max_file_size_bytes: u32,
-    image_quality: u8,
 }
 
 impl Worker {
@@ -194,8 +190,6 @@ impl Worker {
         last_transaction_version: i32,
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
-        max_file_size_bytes: u32,
-        image_quality: u8,
     ) -> Self {
         Self {
             config,
@@ -206,8 +200,6 @@ impl Worker {
             last_transaction_version,
             last_transaction_timestamp,
             force,
-            max_file_size_bytes,
-            image_quality,
         }
     }
 
@@ -230,11 +222,12 @@ impl Worker {
             // Parse token_uri
             self.model.set_token_uri(self.token_uri.clone());
             let token_uri = self.model.get_token_uri();
-            let json_uri = URIParser::parse(token_uri.clone()).unwrap_or(token_uri);
+            let json_uri = URIParser::parse(self.config.ipfs_prefix.clone(), token_uri.clone())
+                .unwrap_or(token_uri);
 
             // Parse JSON for raw_image_uri and raw_animation_uri
             let (raw_image_uri, raw_animation_uri, json) =
-                JSONParser::parse(json_uri, self.max_file_size_bytes)
+                JSONParser::parse(json_uri, self.config.max_file_size_bytes)
                     .await
                     .unwrap_or_else(|e| {
                         // Increment retry count if JSON parsing fails
@@ -282,22 +275,26 @@ impl Worker {
                 .model
                 .get_raw_image_uri()
                 .unwrap_or(self.model.get_token_uri());
-            let img_uri = URIParser::parse(raw_image_uri).unwrap_or(self.model.get_token_uri());
+            let img_uri = URIParser::parse(self.config.ipfs_prefix.clone(), raw_image_uri)
+                .unwrap_or(self.model.get_token_uri());
 
             // Resize and optimize image and animation
-            let (image, format) =
-                ImageOptimizer::optimize(img_uri, self.max_file_size_bytes, self.image_quality)
-                    .await
-                    .unwrap_or_else(|e| {
-                        // Increment retry count if image is None
-                        error!(
-                            last_transaction_version = self.last_transaction_version,
-                            error = ?e,
-                            "[NFT Metadata Crawler] Image optimization failed"
-                        );
-                        self.model.increment_image_optimizer_retry_count();
-                        (vec![], ImageFormat::Png)
-                    });
+            let (image, format) = ImageOptimizer::optimize(
+                img_uri,
+                self.config.max_file_size_bytes,
+                self.config.image_quality,
+            )
+            .await
+            .unwrap_or_else(|e| {
+                // Increment retry count if image is None
+                error!(
+                    last_transaction_version = self.last_transaction_version,
+                    error = ?e,
+                    "[NFT Metadata Crawler] Image optimization failed"
+                );
+                self.model.increment_image_optimizer_retry_count();
+                (vec![], ImageFormat::Png)
+            });
 
             if !image.is_empty() {
                 // Save resized and optimized image to GCS
@@ -338,13 +335,14 @@ impl Worker {
         // If raw_animation_uri_option is None, skip
         if let Some(raw_animation_uri) = raw_animation_uri_option {
             let animation_uri =
-                URIParser::parse(raw_animation_uri.clone()).unwrap_or(raw_animation_uri);
+                URIParser::parse(self.config.ipfs_prefix.clone(), raw_animation_uri.clone())
+                    .unwrap_or(raw_animation_uri);
 
             // Resize and optimize animation
             let (animation, format) = ImageOptimizer::optimize(
                 animation_uri,
-                self.max_file_size_bytes,
-                self.image_quality,
+                self.config.max_file_size_bytes,
+                self.config.image_quality,
             )
             .await
             .unwrap_or_else(|e| {
