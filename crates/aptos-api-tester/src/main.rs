@@ -10,10 +10,7 @@ mod tests;
 mod utils;
 
 use crate::{
-    tests::{
-        coin_transfer, new_account,
-        nft_transfer, publish_module::setup_and_run_publishmodule,
-    },
+    tests::{coin_transfer, new_account, nft_transfer, publish_module},
     utils::{set_metrics, NetworkName, TestFailure, TestName, TestResult},
 };
 use anyhow::Result;
@@ -113,7 +110,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
         TestName::PublishModule,
         network_name,
         &test_time,
-        setup_and_run_publishmodule(network_name),
+        publish_module::test(network_name),
     )
     .await;
 
