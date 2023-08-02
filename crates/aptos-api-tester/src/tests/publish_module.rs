@@ -54,7 +54,7 @@ pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
 
 // Steps
 
-async fn setup(network_name: NetworkName) -> Result<(Client, LocalAccount)> {
+async fn setup(network_name: NetworkName) -> Result<(Client, LocalAccount), TestFailure> {
     // spin up clients
     let client = get_client(network_name);
     let faucet_client = get_faucet_client(network_name);

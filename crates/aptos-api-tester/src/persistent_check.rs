@@ -3,11 +3,13 @@
 use crate::{fail_message::ERROR_COULD_NOT_CHECK, utils::TestFailure};
 use anyhow::anyhow;
 use aptos_rest_client::Client;
-use aptos_sdk::{types::LocalAccount, token_client::TokenClient};
+use aptos_sdk::{token_client::TokenClient, types::LocalAccount};
 use aptos_types::account_address::AccountAddress;
 use futures::Future;
 use std::time::Duration;
 use tokio::time::Instant;
+
+static PERSISTENCY_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub async fn account<'a, 'b, F, Fut>(
     f: F,
@@ -22,8 +24,8 @@ where
     let mut result: Result<(), TestFailure> = Err(anyhow!(ERROR_COULD_NOT_CHECK).into());
     let timer = Instant::now();
 
-    // try to get a good result for 30 seconds
-    while Instant::now().duration_since(timer) < Duration::from_secs(30) {
+    // try to get a good result
+    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
         result = f(client, account).await;
         if result.is_ok() {
             break;
@@ -47,8 +49,8 @@ where
     let mut result: Result<(), TestFailure> = Err(anyhow!(ERROR_COULD_NOT_CHECK).into());
     let timer = Instant::now();
 
-    // try to get a good result for 30 seconds
-    while Instant::now().duration_since(timer) < Duration::from_secs(30) {
+    // try to get a good result
+    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
         result = f(client, address).await;
         if result.is_ok() {
             break;
@@ -73,8 +75,8 @@ where
     let mut result: Result<(), TestFailure> = Err(anyhow!(ERROR_COULD_NOT_CHECK).into());
     let timer = Instant::now();
 
-    // try to get a good result for 30 seconds
-    while Instant::now().duration_since(timer) < Duration::from_secs(30) {
+    // try to get a good result
+    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
         result = f(client, address, version).await;
         if result.is_ok() {
             break;
@@ -98,8 +100,8 @@ where
     let mut result: Result<(), TestFailure> = Err(anyhow!(ERROR_COULD_NOT_CHECK).into());
     let timer = Instant::now();
 
-    // try to get a good result for 30 seconds
-    while Instant::now().duration_since(timer) < Duration::from_secs(30) {
+    // try to get a good result
+    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
         result = f(token_client, address).await;
         if result.is_ok() {
             break;
@@ -124,8 +126,8 @@ where
     let mut result: Result<(), TestFailure> = Err(anyhow!(ERROR_COULD_NOT_CHECK).into());
     let timer = Instant::now();
 
-    // try to get a good result for 30 seconds
-    while Instant::now().duration_since(timer) < Duration::from_secs(30) {
+    // try to get a good result
+    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
         result = f(token_client, address, address2).await;
         if result.is_ok() {
             break;
