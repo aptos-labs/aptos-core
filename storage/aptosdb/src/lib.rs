@@ -789,8 +789,8 @@ impl AptosDB {
             .map(|(seq, ver, idx)| {
                 let event = self.event_store.get_event_by_version_and_index(ver, idx)?;
                 let v0 = match &event {
-                    ContractEvent::V0(event) => event,
-                    ContractEvent::V1(_) => bail!("Unexpected module event"),
+                    ContractEvent::V1(event) => event,
+                    ContractEvent::V2(_) => bail!("Unexpected module event"),
                 };
                 ensure!(
                     seq == v0.sequence_number(),

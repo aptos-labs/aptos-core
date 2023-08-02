@@ -52,7 +52,7 @@ impl NativeEventContext {
     ) -> PartialVMResult<Vec<&[u8]>> {
         let mut events = vec![];
         for event in self.events.iter() {
-            if let ContractEvent::V0(e) = event {
+            if let ContractEvent::V1(e) = event {
                 if e.key() == event_key && e.type_tag() == ty_tag {
                     events.push(e.event_data());
                 }
@@ -101,7 +101,7 @@ fn native_write_to_event_store(
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
     ctx.events
-        .push(ContractEvent::new_v0(key, seq_num, ty_tag, blob));
+        .push(ContractEvent::new_v1(key, seq_num, ty_tag, blob));
     Ok(smallvec![])
 }
 

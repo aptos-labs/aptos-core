@@ -536,16 +536,16 @@ pub struct Event {
 impl From<(&ContractEvent, serde_json::Value)> for Event {
     fn from((event, data): (&ContractEvent, serde_json::Value)) -> Self {
         match event {
-            ContractEvent::V0(v0) => Self {
-                guid: (*v0.key()).into(),
-                sequence_number: v0.sequence_number().into(),
-                typ: v0.type_tag().clone().into(),
+            ContractEvent::V1(v1) => Self {
+                guid: (*v1.key()).into(),
+                sequence_number: v1.sequence_number().into(),
+                typ: v1.type_tag().clone().into(),
                 data,
             },
-            ContractEvent::V1(v1) => Self {
+            ContractEvent::V2(v2) => Self {
                 guid: *DUMMY_GUID,
                 sequence_number: *DUMMY_SEQUENCE_NUMBER,
-                typ: v1.type_tag().clone().into(),
+                typ: v2.type_tag().clone().into(),
                 data,
             },
         }
@@ -570,18 +570,18 @@ pub struct VersionedEvent {
 impl From<(&EventWithVersion, serde_json::Value)> for VersionedEvent {
     fn from((event, data): (&EventWithVersion, serde_json::Value)) -> Self {
         match &event.event {
-            ContractEvent::V0(v0) => Self {
+            ContractEvent::V1(v1) => Self {
                 version: event.transaction_version.into(),
-                guid: (*v0.key()).into(),
-                sequence_number: v0.sequence_number().into(),
-                typ: v0.type_tag().clone().into(),
+                guid: (*v1.key()).into(),
+                sequence_number: v1.sequence_number().into(),
+                typ: v1.type_tag().clone().into(),
                 data,
             },
-            ContractEvent::V1(v1) => Self {
+            ContractEvent::V2(v2) => Self {
                 version: event.transaction_version.into(),
                 guid: *DUMMY_GUID,
                 sequence_number: *DUMMY_SEQUENCE_NUMBER,
-                typ: v1.type_tag().clone().into(),
+                typ: v2.type_tag().clone().into(),
                 data,
             },
         }

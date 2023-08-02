@@ -1197,7 +1197,7 @@ impl Client {
                 .into_iter()
                 .map(|event| {
                     let version = event.transaction_version;
-                    let event = event.event.v0()?;
+                    let event = event.event.v1()?;
                     let sequence_number = event.sequence_number();
 
                     Ok(VersionedNewBlockEvent {

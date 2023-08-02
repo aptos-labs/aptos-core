@@ -192,14 +192,14 @@ fn test_index_get_impl(event_batches: Vec<Vec<ContractEvent>>) {
         .for_each(|(ver, batch)| {
             batch
                 .into_iter()
-                .filter(|e| matches!(e, ContractEvent::V0(_)))
+                .filter(|e| matches!(e, ContractEvent::V1(_)))
                 .for_each(|e| {
                     let mut events_and_versions = events_by_event_key
-                        .entry(*e.v0().unwrap().key())
+                        .entry(*e.v1().unwrap().key())
                         .or_insert_with(Vec::new);
                     assert_eq!(
                         events_and_versions.len() as u64,
-                        e.v0().unwrap().sequence_number()
+                        e.v1().unwrap().sequence_number()
                     );
                     events_and_versions.push((e, ver as Version));
                 })
@@ -278,7 +278,7 @@ prop_compose! {
                 Vec::new(), // failed_proposers
                 timestamp,
             );
-            let event = ContractEvent::new_v0(
+            let event = ContractEvent::new_v1(
                 new_block_event_key(),
                 seq,
                 TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
