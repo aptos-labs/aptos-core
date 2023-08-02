@@ -277,8 +277,8 @@ impl Default for TransactionGenParams {
 // TODO: consider adding writes to reads (read-before-write). Similar behavior to the Move-VM
 // and may force more testing (since we check read results).
 impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> TransactionGen<V> {
-    // TODO: disentangle writes and deltas.
     fn writes_and_deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
+        // TODO: disentangle writes and deltas.
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
         module_write_fn: &dyn Fn(usize) -> bool,
@@ -527,13 +527,13 @@ where
                         Err(_) => reads_result.push(None),
                     }
                 }
-                ExecutionStatus::Success(MockOutput(
-                    behavior.writes.clone(),
-                    behavior.deltas.clone(),
-                    reads_result,
-                    OnceCell::new(),
-                    behavior.gas,
-                ))
+                ExecutionStatus::Success(MockOutput {
+                    writes: behavior.writes.clone(),
+                    deltas: behavior.deltas.clone(),
+                    read_results: reads_result,
+                    materialized_delta_writes: OnceCell::new(),
+                    total_gas: behavior.gas,
+                })
             },
             MockTransaction::SkipRest => ExecutionStatus::SkipRest(MockOutput::skip_output()),
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
@@ -542,14 +542,14 @@ where
 }
 
 #[derive(Debug)]
-// TODO: name members.
-pub(crate) struct MockOutput<K, V>(
-    pub(crate) Vec<(K, V)>,
-    pub(crate) Vec<(K, DeltaOp)>,
-    pub(crate) Vec<Option<Vec<u8>>>,
-    pub(crate) OnceCell<Vec<(K, WriteOp)>>,
-    pub(crate) u64,
-);
+pub(crate) struct MockOutput<K, V> {
+    // TODO: Split writes into resources & modules.
+    pub(crate) writes: Vec<(K, V)>,
+    pub(crate) deltas: Vec<(K, DeltaOp)>,
+    pub(crate) read_results: Vec<Option<Vec<u8>>>,
+    pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
+    pub(crate) total_gas: u64,
+}
 
 impl<K, V> TransactionOutput for MockOutput<K, V>
 where
@@ -559,32 +559,38 @@ where
     type Txn = MockTransaction<K, V>;
 
     fn get_writes(&self) -> Vec<(K, V)> {
-        self.0.clone()
+        self.writes.clone()
     }
 
     fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
-        self.1.clone()
+        self.deltas.clone()
     }
 
     fn skip_output() -> Self {
-        Self(
-            /*writes = */ vec![],
-            /*deltas = */ vec![],
-            /*read results = */ vec![],
-            /*materialized delta writes = */ OnceCell::new(),
-            /*gas = */ 0,
-        )
+        Self {
+            writes: vec![],
+            deltas: vec![],
+            read_results: vec![],
+            materialized_delta_writes: OnceCell::new(),
+            total_gas: 0,
+        }
     }
 
     fn incorporate_delta_writes(&self, delta_writes: Vec<(K, WriteOp)>) {
-        assert_ok!(self.3.set(delta_writes));
+        assert_ok!(self.materialized_delta_writes.set(delta_writes));
     }
 
     fn fee_statement(&self) -> FeeStatement {
         // First argument is supposed to be total (not important for the test though).
         // Next two arguments are different kinds of execution gas that are counted
         // towards the block limit. We split the total into two pieces for these arguments.
-        // TODO: add variety to generating fee statement based on total gas (self.4).
-        FeeStatement::new(self.4, self.4 / 2, (self.4 + 1) / 2, 0, 0)
+        // TODO: add variety to generating fee statement based on total gas.
+        FeeStatement::new(
+            self.total_gas,
+            self.total_gas / 2,
+            (self.total_gas + 1) / 2,
+            0,
+            0,
+        )
     }
 }

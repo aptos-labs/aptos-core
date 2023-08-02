@@ -526,7 +526,7 @@ impl FakeExecutor {
             )?;
 
         Ok((
-            output.into_transaction_output(self.get_state_view())?,
+            output.try_into_transaction_output(self.get_state_view())?,
             gas_profiler.finish(),
         ))
     }
@@ -700,7 +700,10 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            let (write_set, _events) = change_set
+                .try_into_storage_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -751,7 +754,10 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            let (write_set, _events) = change_set
+                .try_into_storage_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -794,7 +800,10 @@ impl FakeExecutor {
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (write_set, _delta_change_set, _events) = change_set.unpack();
+        let (write_set, _events) = change_set
+            .try_into_storage_change_set()
+            .expect("Failed to convert to ChangeSet")
+            .into_inner();
         Ok(write_set)
     }
 

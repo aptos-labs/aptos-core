@@ -4,6 +4,9 @@
 import { HexString, MaybeHexString } from "../utils";
 import { Serializer, Deserializer, Bytes } from "../bcs";
 
+/**
+ * Exported as TransactionBuilderTypes.AccountAddress
+ */
 export class AccountAddress {
   static readonly LENGTH: number = 32;
 

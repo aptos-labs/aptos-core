@@ -45,7 +45,7 @@ export interface OptionalTransactionArgs {
   providedSequenceNumber?: string | bigint;
 }
 
-interface PaginationArgs {
+export interface PaginationArgs {
   start?: AnyNumber;
   limit?: number;
 }

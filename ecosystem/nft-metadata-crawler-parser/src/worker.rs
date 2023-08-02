@@ -48,6 +48,7 @@ pub struct ParserConfig {
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
     pub num_parsers: usize,
+    pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
 }
 
@@ -150,13 +151,13 @@ impl RunnableConfig for ParserConfig {
 
         match producer.await {
             Ok(_) => (),
-            Err(e) => error!("Producer error: {:?}", e),
+            Err(e) => error!("[NFT Metadata Crawler] Producer error: {:?}", e),
         }
 
         for worker in workers {
             match worker.await {
                 Ok(_) => (),
-                Err(e) => error!("Worker error: {:?}", e),
+                Err(e) => error!("[NFT Metadata Crawler] Worker error: {:?}", e),
             }
         }
         Ok(())
@@ -221,20 +222,23 @@ impl Worker {
             // Parse token_uri
             self.model.set_token_uri(self.token_uri.clone());
             let token_uri = self.model.get_token_uri();
-            let json_uri = URIParser::parse(token_uri.clone()).unwrap_or(token_uri);
+            let json_uri = URIParser::parse(self.config.ipfs_prefix.clone(), token_uri.clone())
+                .unwrap_or(token_uri);
 
             // Parse JSON for raw_image_uri and raw_animation_uri
             let (raw_image_uri, raw_animation_uri, json) =
-                JSONParser::parse(json_uri).await.unwrap_or_else(|e| {
-                    // Increment retry count if JSON parsing fails
-                    error!(
-                        last_transaction_version = self.last_transaction_version,
-                        error = ?e,
-                        "[NFT Metadata Crawler] JSON parse failed",
-                    );
-                    self.model.increment_json_parser_retry_count();
-                    (None, None, Value::Null)
-                });
+                JSONParser::parse(json_uri, self.config.max_file_size_bytes)
+                    .await
+                    .unwrap_or_else(|e| {
+                        // Increment retry count if JSON parsing fails
+                        error!(
+                            last_transaction_version = self.last_transaction_version,
+                            error = ?e,
+                            "[NFT Metadata Crawler] JSON parse failed",
+                        );
+                        self.model.increment_json_parser_retry_count();
+                        (None, None, Value::Null)
+                    });
 
             self.model.set_raw_image_uri(raw_image_uri);
             self.model.set_raw_animation_uri(raw_animation_uri);
@@ -271,10 +275,17 @@ impl Worker {
                 .model
                 .get_raw_image_uri()
                 .unwrap_or(self.model.get_token_uri());
-            let img_uri = URIParser::parse(raw_image_uri).unwrap_or(self.model.get_token_uri());
+            let img_uri = URIParser::parse(self.config.ipfs_prefix.clone(), raw_image_uri)
+                .unwrap_or(self.model.get_token_uri());
 
             // Resize and optimize image and animation
-            let (image, format) = ImageOptimizer::optimize(img_uri).await.unwrap_or_else(|e| {
+            let (image, format) = ImageOptimizer::optimize(
+                img_uri,
+                self.config.max_file_size_bytes,
+                self.config.image_quality,
+            )
+            .await
+            .unwrap_or_else(|e| {
                 // Increment retry count if image is None
                 error!(
                     last_transaction_version = self.last_transaction_version,
@@ -324,21 +335,26 @@ impl Worker {
         // If raw_animation_uri_option is None, skip
         if let Some(raw_animation_uri) = raw_animation_uri_option {
             let animation_uri =
-                URIParser::parse(raw_animation_uri.clone()).unwrap_or(raw_animation_uri);
+                URIParser::parse(self.config.ipfs_prefix.clone(), raw_animation_uri.clone())
+                    .unwrap_or(raw_animation_uri);
 
             // Resize and optimize animation
-            let (animation, format) = ImageOptimizer::optimize(animation_uri)
-                .await
-                .unwrap_or_else(|e| {
-                    // Increment retry count if animation is None
-                    error!(
-                        last_transaction_version = self.last_transaction_version,
-                        error = ?e,
-                        "[NFT Metadata Crawler] Animation optimization failed"
-                    );
-                    self.model.increment_animation_optimizer_retry_count();
-                    (vec![], ImageFormat::Png)
-                });
+            let (animation, format) = ImageOptimizer::optimize(
+                animation_uri,
+                self.config.max_file_size_bytes,
+                self.config.image_quality,
+            )
+            .await
+            .unwrap_or_else(|e| {
+                // Increment retry count if animation is None
+                error!(
+                    last_transaction_version = self.last_transaction_version,
+                    error = ?e,
+                    "[NFT Metadata Crawler] Animation optimization failed"
+                );
+                self.model.increment_animation_optimizer_retry_count();
+                (vec![], ImageFormat::Png)
+            });
 
             // Save resized and optimized animation to GCS
             if !animation.is_empty() {
