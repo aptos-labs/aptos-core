@@ -14,10 +14,12 @@ use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 
+static FUND_AMOUNT: u64 = 1_000_000;
+
 /// Tests new account creation. Checks that:
 ///   - account data exists
 ///   - account balance reflects funded amount
-pub async fn test_newaccount(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
     // setup
     let (client, faucet_client, account) = setup(network_name).await?;
 
@@ -25,13 +27,15 @@ pub async fn test_newaccount(network_name: NetworkName) -> Result<(), TestFailur
     persistent_check::account(check_account_data, &client, &account).await?;
 
     // fund account
-    fund(account.address(), &faucet_client).await?;
+    fund(&faucet_client, account.address()).await?;
 
     // check account balance persistently
     persistent_check::address(check_account_balance, &client, account.address()).await?;
 
     Ok(())
 }
+
+// Steps
 
 async fn setup(
     network_name: NetworkName,
@@ -55,9 +59,9 @@ async fn setup(
     Ok((client, faucet_client, account))
 }
 
-async fn fund(address: AccountAddress, faucet_client: &FaucetClient) -> Result<(), TestFailure> {
+async fn fund(faucet_client: &FaucetClient, address: AccountAddress) -> Result<(), TestFailure> {
     // fund account
-    if let Err(e) = faucet_client.fund(address, 100_000_000).await {
+    if let Err(e) = faucet_client.fund(address, FUND_AMOUNT).await {
         info!(
             "test: new_account part: fund ERROR: {}, with error {:?}",
             ERROR_COULD_NOT_FUND_ACCOUNT, e
@@ -104,7 +108,7 @@ async fn check_account_balance(
     address: AccountAddress,
 ) -> Result<(), TestFailure> {
     // expected
-    let expected = U64(100_000_000);
+    let expected = U64(FUND_AMOUNT);
 
     // actual
     let actual = match client.get_account_balance(address).await {

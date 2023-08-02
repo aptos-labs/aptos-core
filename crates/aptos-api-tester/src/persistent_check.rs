@@ -3,7 +3,7 @@
 use crate::{fail_message::ERROR_COULD_NOT_CHECK, utils::TestFailure};
 use anyhow::anyhow;
 use aptos_rest_client::Client;
-use aptos_sdk::{types::LocalAccount, token_client::{TokenClient, Token}};
+use aptos_sdk::{types::LocalAccount, token_client::TokenClient};
 use aptos_types::account_address::AccountAddress;
 use futures::Future;
 use std::time::Duration;

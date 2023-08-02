@@ -19,10 +19,12 @@ use aptos_rest_client::Client;
 use aptos_sdk::{coin_client::CoinClient, types::LocalAccount};
 use aptos_types::account_address::AccountAddress;
 
+static TRANSFER_AMOUNT: u64 = 1_000;
+
 /// Tests coin transfer. Checks that:
 ///   - receiver balance reflects transferred amount
 ///   - receiver balance shows correct amount at the previous version
-pub async fn test_cointransfer(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
     // setup
     let (client, mut account, receiver) = setup(network_name).await?;
     let coin_client = CoinClient::new(&client);
@@ -39,6 +41,8 @@ pub async fn test_cointransfer(network_name: NetworkName) -> Result<(), TestFail
 
     Ok(())
 }
+
+// Steps
 
 async fn setup(
     network_name: NetworkName,
@@ -81,7 +85,7 @@ async fn transfer_coins(
     receiver: AccountAddress,
 ) -> Result<u64, TestFailure> {
     // create transaction
-    let pending_txn = match coin_client.transfer(account, receiver, 1_000, None).await {
+    let pending_txn = match coin_client.transfer(account, receiver, TRANSFER_AMOUNT, None).await {
         Ok(pending_txn) => pending_txn,
         Err(e) => {
             info!(
@@ -124,7 +128,7 @@ async fn check_account_balance(
     address: AccountAddress,
 ) -> Result<(), TestFailure> {
     // expected
-    let expected = U64(1_000);
+    let expected = U64(TRANSFER_AMOUNT);
 
     // actual
     let actual = match client.get_account_balance(address).await {

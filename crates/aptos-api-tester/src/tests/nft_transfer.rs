@@ -31,7 +31,7 @@ static OFFER_AMOUNT: u64 = 2;
 ///   - collection data exists
 ///   - token data exists
 ///   - token balance reflects transferred amount
-pub async fn test_nfttransfer(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
     // setup
     let (client, mut account, mut receiver) = setup(network_name).await?;
     let token_client = TokenClient::new(&client);
