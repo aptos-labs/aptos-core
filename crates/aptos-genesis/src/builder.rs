@@ -610,7 +610,7 @@ impl Builder {
             employee_vesting_start: None,
             employee_vesting_period_duration: None,
             consensus_config: OnChainConsensusConfig::default(),
-            execution_config: OnChainExecutionConfig::default(),
+            execution_config: OnChainExecutionConfig::default_for_test(),
             gas_schedule: default_gas_schedule(),
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
