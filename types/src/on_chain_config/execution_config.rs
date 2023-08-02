@@ -11,6 +11,9 @@ pub enum OnChainExecutionConfig {
     V1(ExecutionConfigV1),
     V2(ExecutionConfigV2),
     V3(ExecutionConfigV3),
+    /// To maintain backwards compatibility on replay, we must ensure that any new features resolve
+    /// to previous behavior (before OnChainExecutionConfig was registered) in case of Missing.
+    Missing,
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -18,6 +21,7 @@ impl OnChainExecutionConfig {
     /// The type of the transaction shuffler being used.
     pub fn transaction_shuffler_type(&self) -> TransactionShufflerType {
         match &self {
+            OnChainExecutionConfig::Missing => TransactionShufflerType::NoShuffling,
             OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
@@ -27,6 +31,7 @@ impl OnChainExecutionConfig {
     /// The per-block gas limit being used.
     pub fn block_gas_limit(&self) -> Option<u64> {
         match &self {
+            OnChainExecutionConfig::Missing => None,
             OnChainExecutionConfig::V1(_config) => None,
             OnChainExecutionConfig::V2(config) => config.block_gas_limit,
             OnChainExecutionConfig::V3(config) => config.block_gas_limit,
@@ -36,25 +41,28 @@ impl OnChainExecutionConfig {
     /// The type of the transaction deduper being used.
     pub fn transaction_deduper_type(&self) -> TransactionDeduperType {
         match &self {
+            // Note, this behavior was enabled before OnChainExecutionConfig was registered.
+            OnChainExecutionConfig::Missing => TransactionDeduperType::TxnHashAndAuthenticatorV1,
             OnChainExecutionConfig::V1(_config) => TransactionDeduperType::NoDedup,
             OnChainExecutionConfig::V2(_config) => TransactionDeduperType::NoDedup,
             OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
         }
     }
 
-    // TODO: Remove and replace all calls with default once shuffler is enabled in all networks
-    pub fn default_for_test() -> Self {
+    /// The default values to use for new networks, e.g., devnet, forge.
+    /// Features that are ready for deployment can be enabled here.
+    pub fn default_for_genesis() -> Self {
         OnChainExecutionConfig::V3(ExecutionConfigV3 {
             transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            block_gas_limit: Some(35000),
             ..Default::default()
         })
     }
-}
 
-/// This is used when on-chain config is not initialized.
-impl Default for OnChainExecutionConfig {
-    fn default() -> Self {
-        OnChainExecutionConfig::V3(ExecutionConfigV3::default())
+    /// The default values to use when on-chain config is not initialized.
+    /// This value should not be changed, for replay purposes.
+    pub fn default_if_missing() -> Self {
+        OnChainExecutionConfig::Missing
     }
 }
 
@@ -145,7 +153,7 @@ mod test {
 
     #[test]
     fn test_config_yaml_serialization() {
-        let config = OnChainExecutionConfig::default();
+        let config = OnChainExecutionConfig::default_for_genesis();
         let s = serde_yaml::to_string(&config).unwrap();
 
         serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
@@ -153,7 +161,7 @@ mod test {
 
     #[test]
     fn test_config_bcs_serialization() {
-        let config = OnChainExecutionConfig::default();
+        let config = OnChainExecutionConfig::default_for_genesis();
         let s = bcs::to_bytes(&config).unwrap();
 
         bcs::from_bytes::<OnChainExecutionConfig>(&s).unwrap();
