@@ -69,6 +69,10 @@ fn main() {
         (min_ordered_transaction_before_execution + args.num_shards - 1) / args.num_shards,
     );
 
+    let now = Instant::now();
+    let transactions = compress_transactions(transactions);
+    println!("Mapping time: {:?}", now.elapsed());
+
     for _ in 0..args.num_blocks {
         let transactions = transactions.clone();
         println!("Starting to order");
@@ -78,7 +82,6 @@ fn main() {
         // even including the time it takes to do the mapping itself.
         // When we move to the streaming approach, compression also can (should?) be done
         // in batches instead of doing it for the whole block.
-        let transactions = compress_transactions(transactions);
 
         let mut latency = None;
         let mut count_ordered = 0;
