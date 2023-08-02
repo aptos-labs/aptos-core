@@ -727,7 +727,7 @@ impl FakeExecutor {
             let length = times.len();
             let mid = length / 2;
             if length % 2 == 0 {
-                running_time = times[mid - 1] + times[mid] / 2;
+                running_time = (times[mid - 1] + times[mid]) / 2;
             } else {
                 running_time = times[mid];
             }
