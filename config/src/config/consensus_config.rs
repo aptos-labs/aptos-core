@@ -145,13 +145,13 @@ impl Default for ConsensusConfig {
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2000,
-                    max_sending_block_txns_override: 10000,
+                    max_sending_block_txns_override: 2000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2500,
-                    max_sending_block_txns_override: 2000,
+                    max_sending_block_txns_override: 300,
                     max_sending_block_bytes_override: 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
@@ -161,7 +161,7 @@ impl Default for ConsensusConfig {
                     // meaning that most aggressively we limit to ~1000 TPS
                     // For transactions that are more expensive than that, we should
                     // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 500,
+                    max_sending_block_txns_override: 300,
                     // stop reducing size, so 1MB transactions can still go through
                     max_sending_block_bytes_override: 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,

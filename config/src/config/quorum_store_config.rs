@@ -79,7 +79,7 @@ impl Default for QuorumStoreConfig {
             batch_generation_poll_interval_ms: 25,
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
-            sender_max_batch_txns: 250,
+            sender_max_batch_txns: 100,
             sender_max_batch_bytes: 1024 * 1024,
             sender_max_num_batches: 20,
             sender_max_total_txns: 2000,

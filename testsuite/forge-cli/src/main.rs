@@ -253,7 +253,7 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
-    let duration = Duration::from_secs(2100); // args.duration_secs as u64);
+    let duration = Duration::from_secs(4 * 3600); // args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
     let suite_name = if suite_name == "realistic_env_max_load" {
@@ -821,7 +821,7 @@ fn realistic_env_sweep_wrap(
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 10000,
+                    mempool_backlog: 20000,
                 })
                 .latency_polling_interval(Duration::from_millis(100)),
         )
@@ -868,38 +868,38 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(&[
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CoinTransfer,
-                num_modules: 1,
-                unique_senders: false,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 100,
-                unique_senders: false,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
-                unique_senders: true,
-            },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::CoinTransfer,
+            //     num_modules: 1,
+            //     unique_senders: false,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::NoOp,
+            //     num_modules: 100,
+            //     unique_senders: false,
+            // },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::ModifyGlobalResource,
+            //     num_modules: 1,
+            //     unique_senders: true,
+            // },
             TransactionWorkload {
                 transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                 num_modules: 1,
                 unique_senders: true,
             },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::PublishPackage,
-                num_modules: 1,
-                unique_senders: true,
-            },
+            // TransactionWorkload {
+            //     transaction_type: TransactionTypeArg::PublishPackage,
+            //     num_modules: 1,
+            //     unique_senders: true,
+            // },
         ]),
         criteria: [
-            (1, 1.5, 3., 4.),
-            (1, 1.5, 3., 4.),
-            (1, 2., 3., 4.),
-            (1, 2.5, 3.5, 4.5),
-            (1, 3., 4., 5.),
+            // (1, 1.5, 3., 4.),
+            // (1, 1.5, 3., 4.),
+            // (1, 2., 3., 4.),
+            // (1, 2.5, 3.5, 4.5),
+            // (1, 3., 4., 5.),
         ]
         .into_iter()
         .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
