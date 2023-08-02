@@ -35,11 +35,9 @@ fn native_snapshot(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    let snapshot = aggregator_data.snapshot(id);
+    let snapshot = aggregator_data.snapshot(id, limit);
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
-        Value::u128(0),
         Value::u128(limit),
     ]))])
 }
@@ -62,11 +60,11 @@ fn native_snapshot_with_u64_limit(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let snapshot = aggregator_data.snapshot_with_u64_limit(id, limit);
 
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
-        Value::u128(limit),
+        Value::u64(limit),
     ]))])
 }
 
