@@ -5,8 +5,14 @@ use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, Storag
 
 pub trait PTransaction {
     type Key;
-    type ReadSetIter<'a>: Iterator<Item = &'a Self::Key> where Self: 'a;
-    type WriteSetIter<'a>: Iterator<Item = &'a Self::Key> where Self: 'a;
+
+    type ReadSetIter<'a>: Iterator<Item = &'a Self::Key>
+    where
+        Self: 'a;
+
+    type WriteSetIter<'a>: Iterator<Item = &'a Self::Key>
+    where
+        Self: 'a;
 
     fn read_set<'a>(&'a self) -> Self::ReadSetIter<'a>;
 
@@ -15,8 +21,10 @@ pub trait PTransaction {
 
 impl PTransaction for AnalyzedTransaction {
     type Key = StateKey;
-    type ReadSetIter<'a> = std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
-    type WriteSetIter<'a> = std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
+    type ReadSetIter<'a> =
+        std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
+    type WriteSetIter<'a> =
+        std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
 
     fn read_set<'a>(&'a self) -> Self::ReadSetIter<'a> {
         self.read_hints()

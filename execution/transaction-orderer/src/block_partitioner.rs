@@ -50,21 +50,22 @@ where
         let mut ordered = 0;
         let mut batch = vec![vec![]; self.n_shards];
 
-        self.block_orderer.order_transactions(txns, |ordered_txns| {
-            for tx in ordered_txns {
-                let idx = ordered;
-                let shard_id = idx % self.n_shards;
-                batch[shard_id].push((idx, tx));
-                ordered += 1;
-            }
-            if batch[self.n_shards - 1].len() >= self.min_per_shard_batch_size {
-                send_transactions_for_execution(batch.clone())?;
-                for shard in &mut batch {
-                    shard.clear();
+        self.block_orderer
+            .order_transactions(txns, |ordered_txns| {
+                for tx in ordered_txns {
+                    let idx = ordered;
+                    let shard_id = idx % self.n_shards;
+                    batch[shard_id].push((idx, tx));
+                    ordered += 1;
                 }
-            }
-            Ok(())
-        })?;
+                if batch[self.n_shards - 1].len() >= self.min_per_shard_batch_size {
+                    send_transactions_for_execution(batch.clone())?;
+                    for shard in &mut batch {
+                        shard.clear();
+                    }
+                }
+                Ok(())
+            })?;
 
         if !batch[0].is_empty() {
             send_transactions_for_execution(batch)?;

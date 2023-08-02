@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
+use crate::batch_orderer::{BatchOrderer, BatchOrdererWithWindow};
 use std::cell::RefCell;
 use std::cmp::{max, min};
-use crate::batch_orderer::{BatchOrderer, BatchOrdererWithWindow};
 
 /// Orders transactions in a way to avoid close dependencies between transactions
 /// as much as possible. I.e., if transaction A depends on transaction B (i.e., it reads or
@@ -17,9 +17,9 @@ pub trait BlockOrderer {
         txns: Vec<Self::Txn>,
         send_transactions_for_execution: F,
     ) -> Result<(), E>
-        where
-            F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
-            E: std::error::Error;
+    where
+        F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
+        E: std::error::Error;
 }
 
 /// Orders the transactions in a block in batches, using the underlying `BatchOrderer`,
@@ -53,9 +53,9 @@ where
         txns: Vec<Self::Txn>,
         mut send_transactions_for_execution: F,
     ) -> Result<(), E>
-        where
-            F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
-            E: std::error::Error,
+    where
+        F: FnMut(Vec<Self::Txn>) -> Result<(), E>,
+        E: std::error::Error,
     {
         let mut batch_orderer = self.batch_orderer.borrow_mut();
         assert!(batch_orderer.is_empty());
@@ -75,13 +75,10 @@ where
 
             let n_selected = batch_orderer.count_selected();
             assert!(n_selected > 0);
-            batch_orderer.commit_prefix_callback(
-                (n_selected + 1) / 2,
-                |ordered_batch| {
-                    n_ordered += ordered_batch.len();
-                    send_transactions_for_execution(ordered_batch)
-                },
-            )?;
+            batch_orderer.commit_prefix_callback((n_selected + 1) / 2, |ordered_batch| {
+                n_ordered += ordered_batch.len();
+                send_transactions_for_execution(ordered_batch)
+            })?;
         }
         Ok(())
     }
@@ -151,13 +148,10 @@ where
 
             let n_selected = batch_orderer.count_selected();
             assert!(n_selected > 0);
-            batch_orderer.commit_prefix_callback(
-                (n_selected + 1) / 2,
-                |ordered_batch| {
-                    n_ordered += ordered_batch.len();
-                    send_transactions_for_execution(ordered_batch)
-                },
-            )?;
+            batch_orderer.commit_prefix_callback((n_selected + 1) / 2, |ordered_batch| {
+                n_ordered += ordered_batch.len();
+                send_transactions_for_execution(ordered_batch)
+            })?;
         }
         Ok(())
     }

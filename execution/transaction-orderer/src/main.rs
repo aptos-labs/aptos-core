@@ -13,7 +13,9 @@ use aptos_block_partitioner::test_utils::{
 };
 use aptos_transaction_orderer::batch_orderer::SequentialDynamicAriaOrderer;
 use aptos_transaction_orderer::block_orderer::BatchedBlockOrdererWithWindow;
-use aptos_transaction_orderer::block_partitioner::{BlockPartitioner, OrderedRoundRobinPartitioner};
+use aptos_transaction_orderer::block_partitioner::{
+    BlockPartitioner, OrderedRoundRobinPartitioner,
+};
 use aptos_transaction_orderer::transaction_compressor::compress_transactions;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
@@ -81,7 +83,8 @@ fn main() {
         let mut latency = None;
         let mut count_ordered = 0;
 
-        block_partitioner.partition_transactions(transactions, |sharded_txns| -> Result<(), io::Error> {
+        block_partitioner
+            .partition_transactions(transactions, |sharded_txns| -> Result<(), io::Error> {
                 count_ordered += sharded_txns.iter().map(|txns| txns.len()).sum::<usize>();
                 if latency.is_none() && count_ordered >= min_ordered_transaction_before_execution {
                     latency = Some(now.elapsed());

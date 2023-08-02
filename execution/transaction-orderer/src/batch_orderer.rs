@@ -223,8 +223,7 @@ where
 
             self.write_reservations
                 .make_reservations(idx, tx.write_set());
-            self.read_reservations
-                .make_reservations(idx, tx.read_set());
+            self.read_reservations.make_reservations(idx, tx.read_set());
 
             let mut pending_recent_write_dependencies = 0;
             if let Some(window) = self.window.as_option_mut() {

@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use std::collections::{VecDeque, HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
 /// For each key, maintains a set of reservations and a set of pending requests,
