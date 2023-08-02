@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
 
-pub type CompressedKey = u64;
+pub type CompressedKey = u32;
 
 #[derive(Default)]
 pub struct CompressedPTransactionInner<T> {
