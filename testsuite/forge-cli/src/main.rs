@@ -500,7 +500,7 @@ fn single_test_suite(
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => pfn_performance(duration, true, true),
+        "realistic_env_max_load" => pfn_const_tps(duration, true, true),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         // Rest of the tests:
