@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
 
 use super::{
+    dag_driver::DagDriver,
+    dag_fetcher::{DagFetcher, FetchRequestHandler},
+    dag_network::DAGNetworkSender,
     order_rule::OrderRule,
+    storage::DAGStorage,
+    types::TDAGMessage,
 };
 use crate::{
     dag::{
@@ -41,7 +46,7 @@ impl NetworkHandler {
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         payload_client: Arc<dyn PayloadClient>,
-        _dag_network_sender: Arc<dyn DAGNetworkSender>,
+        dag_network_sender: Arc<dyn DAGNetworkSender>,
         rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
         time_service: Arc<dyn TimeService>,
         aptos_time_service: aptos_time_service::TimeService,
@@ -51,8 +56,14 @@ impl NetworkHandler {
             epoch_state.verifier.get_ordered_account_addresses().clone(),
             rb_network_sender,
             ExponentialBackoff::from_millis(10),
-            aptos_time_service,
+            aptos_time_service.clone(),
         ));
+        let (dag_fetcher, fetch_requester) = DagFetcher::new(
+            epoch_state.clone(),
+            dag_network_sender,
+            dag.clone(),
+            aptos_time_service,
+        );
         Self {
             dag_rpc_rx,
             node_receiver: NodeBroadcastHandler::new(
@@ -71,6 +82,7 @@ impl NetworkHandler {
                 time_service,
                 storage,
                 order_rule,
+                Arc::new(fetch_requester),
             ),
             epoch_state: epoch_state.clone(),
             fetch_receiver: FetchRequestHandler::new(dag, epoch_state),

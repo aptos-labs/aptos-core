@@ -8,7 +8,7 @@ use crate::{
         tests::{dag_test::MockStorage, helpers::new_certified_node},
         types::{CertifiedAck, DAGMessage},
         RpcHandler, order_rule::OrderRule, 
-        RpcHandler,
+        anchor_election::RoundRobinAnchorElection, dag_fetcher::FetchRequester,
     },
     test_utils::MockPayloadManager,
     util::mock_time_service::SimulatedTimeService,
@@ -82,6 +82,10 @@ fn test_certified_node_handler() {
     let (ordered_nodes_sender, _) = futures_channel::mpsc::unbounded();
     let validators = signers.iter().map(|vs| vs.author()).collect();
     let order_rule = OrderRule::new(epoch_state.clone(), LedgerInfo::mock_genesis(None), dag.clone(), Box::new(RoundRobinAnchorElection::new(validators)), ordered_nodes_sender);
+
+    let (request_tx, _) = tokio::sync::mpsc::channel(10);
+    let fetch_requester = Arc::new(FetchRequester::new(request_tx));
+
     let mut driver = DagDriver::new(
         signers[0].author(),
         epoch_state,
@@ -92,6 +96,7 @@ fn test_certified_node_handler() {
         time_service,
         storage,
         order_rule,
+        fetch_requester,
     );
 
     // expect an ack for a valid message
