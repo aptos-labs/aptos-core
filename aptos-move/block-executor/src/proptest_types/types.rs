@@ -13,12 +13,14 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     contract_event::ReadWriteEvent,
+    event::EventKey,
     executable::ModulePath,
     fee_statement::FeeStatement,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
 use claims::assert_ok;
+use move_core_types::language_storage::TypeTag;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -617,5 +619,28 @@ where
             0,
             0,
         )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MockEvent {
+    key: EventKey,
+    sequence_number: u64,
+    type_tag: TypeTag,
+    event_data: Vec<u8>,
+}
+
+impl ReadWriteEvent for MockEvent {
+    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]) {
+        (
+            self.key,
+            self.sequence_number,
+            &self.type_tag,
+            &self.event_data,
+        )
+    }
+
+    fn update_event_data(&mut self, event_data: Vec<u8>) {
+        self.event_data = event_data;
     }
 }

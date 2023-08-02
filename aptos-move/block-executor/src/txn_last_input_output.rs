@@ -313,30 +313,19 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     pub(crate) fn events(
         &self,
         txn_idx: TxnIndex,
-    ) -> (
-        usize,
-        Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Event>>,
-    ) {
-        let ret: (
-            usize,
-            Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Event>>,
-        ) = self.outputs[txn_idx as usize].load().as_ref().map_or(
-            (
-                0,
-                Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>()),
-            ),
+    ) -> Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Event>> {
+        self.outputs[txn_idx as usize].load().as_ref().map_or(
+            Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>()),
             |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     let events = t.get_events();
-                    (events.len(), Box::new(events.into_iter()))
+                    Box::new(events.into_iter())
                 },
-                ExecutionStatus::Abort(_) => (
-                    0,
-                    Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>()),
-                ),
+                ExecutionStatus::Abort(_) => {
+                    Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>())
+                },
             },
-        );
-        ret
+        )
     }
 
     // Called when a transaction is committed to record WriteOps for materialized aggregator values
