@@ -57,7 +57,7 @@ const createAndFundAliceAndBob = async (
         moduleName: "account",
         structName: "RotationCapabilityOfferProofChallengeV2",
         chainId: await provider.aptosClient.getChainId(),
-        sequenceNumber: Number((await provider.aptosClient.getAccount(alice.address())).sequence_number),
+        sequenceNumber: Number((await provider.getAccount(alice.address())).sequence_number),
         sourceAddress: TxnBuilderTypes.AccountAddress.fromHex(alice.address()),
         recipientAddress: TxnBuilderTypes.AccountAddress.fromHex(bob.address()),
       },
