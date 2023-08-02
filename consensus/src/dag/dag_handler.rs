@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
 use super::{
-    dag_driver::DagDriver, dag_fetcher::FetchRequestHandler, dag_network::DAGNetworkSender,
-    storage::DAGStorage, types::TDAGMessage,
+    order_rule::OrderRule,
 };
 use crate::{
     dag::{
@@ -46,6 +45,7 @@ impl NetworkHandler {
         rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
         time_service: Arc<dyn TimeService>,
         aptos_time_service: aptos_time_service::TimeService,
+        order_rule: OrderRule,
     ) -> Self {
         let rb = Arc::new(ReliableBroadcast::new(
             epoch_state.verifier.get_ordered_account_addresses().clone(),
@@ -70,6 +70,7 @@ impl NetworkHandler {
                 1,
                 time_service,
                 storage,
+                order_rule,
             ),
             epoch_state: epoch_state.clone(),
             fetch_receiver: FetchRequestHandler::new(dag, epoch_state),

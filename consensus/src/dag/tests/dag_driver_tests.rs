@@ -7,6 +7,7 @@ use crate::{
         dag_store::Dag,
         tests::{dag_test::MockStorage, helpers::new_certified_node},
         types::{CertifiedAck, DAGMessage},
+        RpcHandler, order_rule::OrderRule, 
         RpcHandler,
     },
     test_utils::MockPayloadManager,
@@ -15,7 +16,7 @@ use crate::{
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
-use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
+use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier, ledger_info::LedgerInfo};
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
 use std::{sync::Arc, time::Duration};
@@ -78,6 +79,9 @@ fn test_certified_node_handler() {
         aptos_time_service::TimeService::mock(),
     ));
     let time_service = Arc::new(SimulatedTimeService::new());
+    let (ordered_nodes_sender, _) = futures_channel::mpsc::unbounded();
+    let validators = signers.iter().map(|vs| vs.author()).collect();
+    let order_rule = OrderRule::new(epoch_state.clone(), LedgerInfo::mock_genesis(None), dag.clone(), Box::new(RoundRobinAnchorElection::new(validators)), ordered_nodes_sender);
     let mut driver = DagDriver::new(
         signers[0].author(),
         epoch_state,
@@ -87,6 +91,7 @@ fn test_certified_node_handler() {
         1,
         time_service,
         storage,
+        order_rule,
     );
 
     // expect an ack for a valid message
