@@ -1,0 +1,33 @@
+blueprints:
+  nodebp: # Must to be all lowercase, and distinct
+    validator_config_path: "" # Should provide an absolute path. Can leave empty for the default
+    validator_image: "" # Can leave empty for the default
+    validator_storage_class_name: "" # Can leave empty for the default
+    vfn_config_path: "" # Should provide an absolute path. Use empty str if create_vfns: false. # Can leave empty for the default
+    vfn_image: ""  # Can leave empty for the default
+    vfn_storage_class_name: "" # Can leave empty for the default
+    nodes_persistent_volume_claim_size: "" # Can leave empty for the default
+    create_vfns: true # CANNOT BE MODIFIED AFTER DEPLOYMENT
+    stake_amount: 100000000000000 # CANNOT BE MODIFIED AFTER DEPLOYMENT
+    count: -1 # CANNOT BE MODIFIED AFTER DEPLOYMENT... This is count of validators. In the template, the count doesn't matter as it gets overriden by either the default (10), user's --num-of-validators, or user's custom pangue node config.
+  # nodebpexample1: 
+  #   validator_config_path: ""
+  #   validator_image: "" 
+  #   validator_storage_class_name: "" # Can leave empty for the default
+  #   vfn_config_path: "" 
+  #   vfn_image: ""
+  #   nodes_persistent_volume_claim_size: "" # Can leave empty for the default 
+  #   create_vfns: false # 
+  #   stake_amount: 100000000000000 
+  #   count: -1
+  # nodebpexample2: 
+  #   validator_config_path: ""
+  #   validator_image: "" 
+  #   validator_storage_class_name: "" # Can leave empty for the default
+  #   vfn_config_path: "" 
+  #   nodes_persistent_volume_claim_size: "" # Can leave empty for the default 
+  #   vfn_image: "" 
+  #   vfn_storage_class_name: "" # Can leave empty for the default
+  #   create_vfns: false # 
+  #   stake_amount: 100000000000000 
+  #   count: -1

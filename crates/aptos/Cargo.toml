@@ -26,8 +26,8 @@ aptos-db-tool = { workspace = true }
 aptos-debugger = { workspace = true }
 aptos-faucet-core = { workspace = true }
 aptos-framework = { workspace = true }
-aptos-gas = { workspace = true }
 aptos-gas-profiling = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-github-client = { workspace = true }
 aptos-global-constants = { workspace = true }
