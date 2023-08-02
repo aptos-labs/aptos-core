@@ -105,30 +105,13 @@ pub struct LatencyBreakdownThreshold {
 }
 
 impl LatencyBreakdownThreshold {
-    pub fn new_strict(
-        qs_batch_to_pos_threshold: f64,
-        qs_pos_to_proposal_threshold: f64,
-        consensus_proposal_to_ordered_threshold: f64,
-        consensus_ordered_to_commit_threshold: f64,
-    ) -> Self {
-        let mut thresholds = BTreeMap::new();
-        thresholds.insert(
-            LatencyBreakdownSlice::QsBatchToPos,
-            MetricsThreshold::new(qs_batch_to_pos_threshold, 0),
-        );
-        thresholds.insert(
-            LatencyBreakdownSlice::QsPosToProposal,
-            MetricsThreshold::new(qs_pos_to_proposal_threshold, 0),
-        );
-        thresholds.insert(
-            LatencyBreakdownSlice::ConsensusProposalToOrdered,
-            MetricsThreshold::new(consensus_proposal_to_ordered_threshold, 0),
-        );
-        thresholds.insert(
-            LatencyBreakdownSlice::ConsensusOrderedToCommit,
-            MetricsThreshold::new(consensus_ordered_to_commit_threshold, 0),
-        );
-        Self { thresholds }
+    pub fn new_strict(thresholds: Vec<(LatencyBreakdownSlice, f64)>) -> Self {
+        Self {
+            thresholds: thresholds
+                .into_iter()
+                .map(|(k, v)| (k, MetricsThreshold::new(v, 0)))
+                .collect(),
+        }
     }
 
     pub fn ensure_threshold(&self, metrics: &LatencyBreakdown) -> anyhow::Result<()> {
