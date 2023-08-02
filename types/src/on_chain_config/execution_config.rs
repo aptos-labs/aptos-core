@@ -14,6 +14,7 @@ pub enum OnChainExecutionConfig {
     /// To maintain backwards compatibility on replay, we must ensure that any new features resolve
     /// to previous behavior (before OnChainExecutionConfig was registered) in case of Missing.
     Missing,
+    // Reminder: Add V4 and future versions here, after Missing (order matters for enums).
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -52,7 +53,11 @@ impl OnChainExecutionConfig {
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        OnChainExecutionConfig::V3(ExecutionConfigV3::default())
+        OnChainExecutionConfig::V3(ExecutionConfigV3 {
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            block_gas_limit: Some(35000),
+            transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
+        })
     }
 
     /// The default values to use when on-chain config is not initialized.
@@ -85,27 +90,10 @@ pub struct ExecutionConfigV1 {
     pub transaction_shuffler_type: TransactionShufflerType,
 }
 
-impl Default for ExecutionConfigV1 {
-    fn default() -> Self {
-        Self {
-            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ExecutionConfigV2 {
     pub transaction_shuffler_type: TransactionShufflerType,
     pub block_gas_limit: Option<u64>,
-}
-
-impl Default for ExecutionConfigV2 {
-    fn default() -> Self {
-        Self {
-            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
-            block_gas_limit: None,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -113,16 +101,6 @@ pub struct ExecutionConfigV3 {
     pub transaction_shuffler_type: TransactionShufflerType,
     pub block_gas_limit: Option<u64>,
     pub transaction_deduper_type: TransactionDeduperType,
-}
-
-impl Default for ExecutionConfigV3 {
-    fn default() -> Self {
-        Self {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
-            block_gas_limit: Some(35000),
-            transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
