@@ -222,9 +222,9 @@ where
             self.active_txns_count += 1;
 
             self.write_reservations
-                .make_reservations(idx, &tx.write_set());
+                .make_reservations(idx, tx.write_set());
             self.read_reservations
-                .make_reservations(idx, &tx.read_set());
+                .make_reservations(idx, tx.read_set());
 
             let mut pending_recent_write_dependencies = 0;
             if let Some(window) = self.window.as_option_mut() {
@@ -242,7 +242,7 @@ where
             if pending_recent_write_dependencies == 0 {
                 if self
                     .write_reservations
-                    .are_all_satisfied(idx, &tx.read_set())
+                    .are_all_satisfied(idx, tx.read_set())
                 {
                     // if no smaller-id dependencies, select this transaction and put it to the
                     // back of the serialization order.
@@ -250,7 +250,7 @@ where
                     self.selected.insert((Direction::Back, idx));
                 } else if self
                     .read_reservations
-                    .are_all_satisfied(idx, &tx.write_set())
+                    .are_all_satisfied(idx, tx.write_set())
                 {
                     // if no smaller-id dependants, select this transaction and put it to the
                     // front of the serialization order.
@@ -263,9 +263,9 @@ where
             let mut pending_read_table_requests = 0;
             if !selected {
                 pending_write_table_requests =
-                    self.write_reservations.make_requests(idx, &tx.read_set());
+                    self.write_reservations.make_requests(idx, tx.read_set());
                 pending_read_table_requests =
-                    self.read_reservations.make_requests(idx, &tx.write_set());
+                    self.read_reservations.make_requests(idx, tx.write_set());
             }
 
             self.txn_info.push(TxnInfo {
@@ -312,18 +312,17 @@ where
 
         for &committed_idx in committed_indices.iter() {
             let tx = &self.txn_info[committed_idx].transaction;
-            let write_set = tx.write_set();
 
             if let Some(window) = self.window.as_option_mut() {
                 window.recently_committed_txns.push_back(committed_idx);
-                for key in &write_set {
+                for key in tx.write_set() {
                     window.recent_writes.entry(key.clone()).or_default().count += 1;
                 }
             }
 
             let satisfied_write_table_requests = self
                 .write_reservations
-                .remove_reservations(committed_idx, &write_set);
+                .remove_reservations(committed_idx, tx.write_set());
 
             for (idx, key) in satisfied_write_table_requests {
                 self.satisfy_pending_write_table_request(idx, &key);
@@ -337,7 +336,7 @@ where
 
             let satisfied_read_table_requests = self
                 .read_reservations
-                .remove_reservations(committed_idx, &tx.read_set());
+                .remove_reservations(committed_idx, tx.read_set());
 
             for (idx, _) in satisfied_read_table_requests {
                 self.satisfy_pending_read_table_request(idx);
@@ -363,7 +362,8 @@ where
 
         for forgotten_idx in forgotten_indices {
             let tx = &self.txn_info[forgotten_idx].transaction;
-            for key in tx.write_set() {
+            let write_set: Vec<_> = tx.write_set().cloned().collect();
+            for key in write_set {
                 let write_info = self.window.0.recent_writes.get_mut(&key).unwrap();
                 write_info.count -= 1;
                 if write_info.count == 0 {

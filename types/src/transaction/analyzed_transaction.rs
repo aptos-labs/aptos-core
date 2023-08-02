@@ -134,7 +134,7 @@ impl AnalyzedTransaction {
         AnalyzedTransaction::new(
             Transaction::UserTransaction(signed_txn),
             // Please note that we omit all the modules we read and the global supply we write to?
-            vec![],
+            write_hints.clone(),
             // read and write locations are same for coin transfer
             write_hints,
         )

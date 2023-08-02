@@ -5,34 +5,29 @@ use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, Storag
 
 pub trait PTransaction {
     type Key;
+    type ReadSetIter<'a>: Iterator<Item = &'a Self::Key> where Self: 'a;
+    type WriteSetIter<'a>: Iterator<Item = &'a Self::Key> where Self: 'a;
 
-    // TODO: return an iterator for a potentially more efficient implementation
-    fn read_set(&self) -> Vec<Self::Key>;
+    fn read_set<'a>(&'a self) -> Self::ReadSetIter<'a>;
 
-    fn write_set(&self) -> Vec<Self::Key>;
+    fn write_set<'a>(&'a self) -> Self::WriteSetIter<'a>;
 }
 
 impl PTransaction for AnalyzedTransaction {
     type Key = StateKey;
+    type ReadSetIter<'a> = std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
+    type WriteSetIter<'a> = std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
 
-    fn read_set(&self) -> Vec<StateKey> {
-        let read_set_iter = self.read_hints()
-            .iter()
+    fn read_set<'a>(&'a self) -> Self::ReadSetIter<'a> {
+        self.read_hints()
+            .into_iter()
             .map(StorageLocation::state_key)
-            .cloned();
-        let write_set_iter = self.write_hints()
-            .iter()
-            .map(StorageLocation::state_key)
-            .cloned();
-        read_set_iter.chain(write_set_iter).collect()
     }
 
-    fn write_set(&self) -> Vec<StateKey> {
+    fn write_set<'a>(&'a self) -> Self::WriteSetIter<'a> {
         self.write_hints()
-            .iter()
+            .into_iter()
             .map(StorageLocation::state_key)
-            .cloned()
-            .collect()
     }
 }
 
