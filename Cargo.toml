@@ -115,6 +115,7 @@ members = [
     "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
+    "execution/transaction-orderer",
     "mempool",
     "network",
     "network/builder",
@@ -389,6 +390,7 @@ aptos-time-service = { path = "crates/aptos-time-service", features = [
 ] }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
+aptos-transaction-orderer = { path = "execution/transaction-orderer" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-utils = { path = "aptos-utils" }
