@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delta_change_set::{addition, subtraction},
+    delta_change_set::{abort_error, addition, subtraction, EADD_OVERFLOW, ESUB_UNDERFLOW},
     resolver::AggregatorResolver,
 };
 use aptos_table_natives::TableHandle;
@@ -236,11 +236,15 @@ impl Aggregator {
                 //     1. X <= Y: then the result is +(Y-X)
                 //     2. X  > Y: then the result is -(X-Y)
                 if self.value <= value {
+                    if value - self.value > self.limit {
+                        self.record_overflow(self.value);
+                        return Err(abort_error(
+                            format!("overflow occurred when adding {} to -{}", value, self.value),
+                            EADD_OVERFLOW,
+                        ));
+                    }
                     self.value = subtraction(value, self.value)?;
                     self.state = AggregatorState::PositiveDelta;
-                    if self.value > self.limit {
-                        self.record_overflow(self.value);
-                    }
                 } else {
                     self.value = subtraction(self.value, value)?;
                 }
@@ -281,11 +285,18 @@ impl Aggregator {
                         err
                     })?;
 
-                    self.value = subtraction(value, self.value)?;
-                    self.state = AggregatorState::NegativeDelta;
                     if value - self.value > self.limit {
                         self.record_underflow(value - self.value);
+                        return Err(abort_error(
+                            format!(
+                                "underflow occurred when subtracting {} from {}",
+                                value, self.value
+                            ),
+                            ESUB_UNDERFLOW,
+                        ));
                     }
+                    self.value = subtraction(value, self.value)?;
+                    self.state = AggregatorState::NegativeDelta;
                 }
             },
             AggregatorState::NegativeDelta => {
