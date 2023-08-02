@@ -63,14 +63,6 @@ module 0x1::aggregator_v2_test {
         aggregator_v2::try_add(aggregator, b);
     }
 
-    public entry fun destroy(account: &signer, i: u64) acquires AggregatorStore {
-        let addr = signer::address_of(account);
-        let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
-
-        let aggregator = table::remove(aggregators, i);
-        aggregator_v2::destroy(aggregator);
-    }
-
     public entry fun materialize(account: &signer, i: u64) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &borrow_global<AggregatorStore>(addr).aggregators;
