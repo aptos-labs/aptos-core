@@ -1,0 +1,12 @@
+# This is a template yaml for the NFT Metadata Crawler Parser.
+health_check_port: 8080
+server_config:
+    google_application_credentials: PATH_TO_CREDENTIALS_FILE
+    bucket: BUCKET_NAME
+    subscription_name: projects/PROJECT_NAME/subscriptions/SUBSCRIPTION_NAME
+    database_url: postgres://localhost:5432/postgres
+    cdn_prefix: https://YOUR_CDN_URI.com # GCP load balancer IP
+    ipfs_prefix: https://YOUR_IPFS_PREFIX.com # Dedicated IPFS gateway
+    num_parsers: 10
+    max_file_size_bytes: 50000000 # 50 Mb
+    image_quality: 50 # Quality out of 100
