@@ -10,10 +10,10 @@ type CapabilityOfferProofChallengeV2 = {
   accountAddress: TxnBuilderTypes.AccountAddress;
   moduleName: string;
   structName: string;
-  chainId?: number; // not used in SignerCapabilityOffer
   sequenceNumber: number;
   sourceAddress: TxnBuilderTypes.AccountAddress;
   recipientAddress: TxnBuilderTypes.AccountAddress;
+  chainId?: number; // not used in SignerCapabilityOffer
 };
 
 const createAndFundAliceAndBob = async (
@@ -52,10 +52,10 @@ const createAndFundAliceAndBob = async (
         accountAddress: TxnBuilderTypes.AccountAddress.fromHex(CORE_CODE_ADDRESS),
         moduleName: "account",
         structName: "RotationCapabilityOfferProofChallengeV2",
-        chainId: await provider.aptosClient.getChainId(),
         sequenceNumber: Number((await provider.getAccount(alice.address())).sequence_number),
         sourceAddress: TxnBuilderTypes.AccountAddress.fromHex(alice.address()),
         recipientAddress: TxnBuilderTypes.AccountAddress.fromHex(bob.address()),
+        chainId: await provider.aptosClient.getChainId(),
       },
     );
     console.log({ hash, version, success, payload });
@@ -100,6 +100,7 @@ const signStructAndSubmitTransaction = async (
 ): Promise<any> => {
   // The proof bytes are just the individual BCS serialized
   // data concatenated into a single byte array.
+  // Note that the proof bytes must be constructed in this specific order- the order of the struct data on-chain.
   const proofBytes = new Uint8Array([
     ...BCS.bcsToBytes(struct.accountAddress),
     ...BCS.bcsSerializeStr(struct.moduleName),
