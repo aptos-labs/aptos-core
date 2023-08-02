@@ -66,7 +66,7 @@ pub fn least_squares(
         let ncols = x_hat.ncols();
         let mut i = 0;
         let mut j = 0;
-        println!("where the gas parameter values are:\n");
+        println!("where the gas parameter values are (microsecond per instruction):\n");
         while i < nrows {
             while j < ncols {
                 println!("{} {}", x_hat[(i, j)], keys[i]);
@@ -101,7 +101,7 @@ fn report_computed_times(
     equation_names: &[String],
     actual_times: &Vec<(usize, f64, f64, f64, bool)>,
 ) {
-    println!("\nActual running times are:\n");
+    println!("\nComputed running times are:\n");
     for (idx, cr, ar, err, is_outlier) in actual_times {
         if *is_outlier {
             continue;
@@ -157,7 +157,7 @@ fn report_undetermined_gas_params(
     let map = generic_map(input);
     let keys: Vec<String> = map.keys().map(|key| key.to_string()).collect();
 
-    let result = find_linearly_dependent_variables(coeff_matrix, const_matrix);
+    let result = find_linearly_dependent_variables(coeff_matrix, const_matrix, keys.clone());
     if let Err(pivot_columns) = &result {
         println!("free variables are:\n");
         for col in pivot_columns {
@@ -168,10 +168,13 @@ fn report_undetermined_gas_params(
 
     if let Ok(linear_combos) = &result {
         println!("linearly dependent variables are:\n");
-        for (eq, gas_param) in linear_combos {
+        /*for (eq, gas_param) in linear_combos {
             let eq_name = &equation_names[*eq];
             let gas_param_name = &keys[*gas_param];
             println!("- {} | gas parameter: {}\n", eq_name, gas_param_name);
+        }*/
+        for gas_param in linear_combos {
+            println!("- gas parameter: {}\n", gas_param);
         }
     }
 }

@@ -140,12 +140,12 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasu
                         .serialize(&mut module_blob)
                         .expect("Failed to serialize module");
 
-                    //println!("BLOB {:#?}\n", module);
-
                     // publish module
                     executor.add_module(&module_id, module_blob);
 
                     for func_identifier in func_identifiers {
+                        println!("Benchmarking {}::{}\n", &identifier, func_identifier);
+
                         gas_meter
                             .equation_names
                             .push(format!("{}::{}", &identifier, func_identifier));
