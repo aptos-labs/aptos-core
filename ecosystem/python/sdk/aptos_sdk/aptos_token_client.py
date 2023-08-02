@@ -9,8 +9,7 @@ from .account import Account
 from .account_address import AccountAddress
 from .async_client import RestClient
 from .bcs import Deserializer, Serializer
-from .transactions import (EntryFunction, TransactionArgument,
-                           TransactionPayload)
+from .transactions import EntryFunction, TransactionArgument, TransactionPayload
 from .type_tag import StructTag, TypeTag
 
 
