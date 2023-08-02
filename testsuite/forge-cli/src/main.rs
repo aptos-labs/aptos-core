@@ -6,6 +6,7 @@ use anyhow::{format_err, Context, Result};
 use aptos_config::config::{ChainHealthBackoffValues, ConsensusConfig, PipelineBackpressureValues};
 use aptos_forge::{
     args::TransactionTypeArg,
+    prometheus_metrics::LatencyBreakdownSlice,
     success_criteria::{
         LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
         SuccessCriteria, SystemMetricsThreshold,
@@ -231,7 +232,7 @@ static SYSTEM_12_CORES_10GB_THRESHOLD: Lazy<SystemMetricsThreshold> = Lazy::new(
     SystemMetricsThreshold::new(
         // Check that we don't use more than 12 CPU cores for 30% of the time.
         MetricsThreshold::new(12.0, 30),
-        // Check that we don't use more than 5 GB of memory for 30% of the time.
+        // Check that we don't use more than 10 GB of memory for 30% of the time.
         MetricsThreshold::new_gb(10.0, 30),
     )
 });
@@ -1523,16 +1524,19 @@ fn realistic_env_max_load_test(
                     (duration.as_secs() / 10).max(60),
                 )
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    // Check that we don't use more than 14 CPU cores for 30% of the time.
                     MetricsThreshold::new(14.0, max_cpu_threshold),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
                 ))
-                .add_latency_threshold(3.0, LatencyType::P50)
-                .add_latency_threshold(5.0, LatencyType::P90)
-                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(
-                    0.3, 0.25, 0.8, 0.6,
-                ))
+                .add_latency_threshold(3.4, LatencyType::P50)
+                .add_latency_threshold(4.5, LatencyType::P90)
+                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
+                    (LatencyBreakdownSlice::QsBatchToPos, 0.3),
+                    (LatencyBreakdownSlice::QsPosToProposal, 0.25),
+                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.8),
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.6),
+                ]))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,

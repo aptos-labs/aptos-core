@@ -339,7 +339,7 @@ impl dyn NetworkLoadTest {
                 phase_timing[i].end_unixtime_s,
             ))?;
             info!(
-                "latency_breakdown: from {} to {}: {:?}",
+                "Latency breakdown: from {} to {}: {:?}",
                 phase_timing[i].start_unixtime_s, phase_timing[i].end_unixtime_s, latency_breakdown
             );
             stats_by_phase_filtered.push(LoadTestPhaseStats {
