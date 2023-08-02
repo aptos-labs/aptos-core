@@ -283,13 +283,15 @@ impl V2Partitioner {
             let last_round_id = txn_id_matrix.len();
             let timer = MISC_TIMERS_SECONDS.with_label_values(&["last_round"]).start_timer();
             let last_round_txns: Vec<usize> = remaining_txn_ids.into_iter().flatten().collect();
-            last_round_txns.par_iter().for_each(|txn_id_ref|{
-                let txn_id = *txn_id_ref;
-                for loc_id_ref in rsets_by_txn_id[txn_id].read().unwrap().iter().chain(wsets_by_txn_id[txn_id].read().unwrap().iter()) {
-                    let loc_id = *loc_id_ref;
-                    let helper = helpers_by_key_id.get(&loc_id).unwrap();
-                    helper.write().unwrap().promote_txn_id(txn_id, last_round_id, num_executor_shards - 1);
-                }
+            self.thread_pool.install(||{
+                last_round_txns.par_iter().for_each(|txn_id_ref|{
+                    let txn_id = *txn_id_ref;
+                    for loc_id_ref in rsets_by_txn_id[txn_id].read().unwrap().iter().chain(wsets_by_txn_id[txn_id].read().unwrap().iter()) {
+                        let loc_id = *loc_id_ref;
+                        let helper = helpers_by_key_id.get(&loc_id).unwrap();
+                        helper.write().unwrap().promote_txn_id(txn_id, last_round_id, num_executor_shards - 1);
+                    }
+                });
             });
 
             remaining_txn_ids = vec![vec![]; num_executor_shards];
@@ -311,12 +313,14 @@ impl V2Partitioner {
             }
         }
 
-        (0..num_rounds).into_par_iter().for_each(|round_id| {
-            (0..num_executor_shards).into_par_iter().for_each(|shard_id| {
-                let sub_block_size = txn_id_matrix[round_id][shard_id].len();
-                (0..sub_block_size).into_par_iter().for_each(|new_id_in_sub_block|{
-                    let txn_id = txn_id_matrix[round_id][shard_id][new_id_in_sub_block];
-                    *new_indices[txn_id].write().unwrap() = start_index_matrix[round_id][shard_id] + new_id_in_sub_block;
+        self.thread_pool.install(||{
+            (0..num_rounds).into_par_iter().for_each(|round_id| {
+                (0..num_executor_shards).into_par_iter().for_each(|shard_id| {
+                    let sub_block_size = txn_id_matrix[round_id][shard_id].len();
+                    (0..sub_block_size).into_par_iter().for_each(|new_id_in_sub_block|{
+                        let txn_id = txn_id_matrix[round_id][shard_id][new_id_in_sub_block];
+                        *new_indices[txn_id].write().unwrap() = start_index_matrix[round_id][shard_id] + new_id_in_sub_block;
+                    });
                 });
             });
         });
