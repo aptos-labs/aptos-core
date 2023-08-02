@@ -497,7 +497,7 @@ pub fn test_execution_with_storage_impl_inner(
     assert_eq!(
         account3_received_events_batch1[0]
             .event
-            .v0()
+            .v1()
             .unwrap()
             .sequence_number(),
         16
@@ -517,7 +517,7 @@ pub fn test_execution_with_storage_impl_inner(
     assert_eq!(
         account3_received_events_batch2[0]
             .event
-            .v0()
+            .v1()
             .unwrap()
             .sequence_number(),
         6
