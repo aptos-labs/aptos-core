@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     dag::{
-        dag_network::RpcHandler, dag_store::Dag, reliable_broadcast::NodeBroadcastHandler,
+        dag_network::RpcHandler, dag_store::Dag, rb_handler::NodeBroadcastHandler,
         types::DAGMessage,
     },
     network::{IncomingDAGRequest, TConsensusMsg},
