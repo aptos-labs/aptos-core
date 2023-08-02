@@ -1,10 +1,6 @@
 import { AptosAccount, FaucetClient, Network, Provider, HexString, TxnBuilderTypes, BCS, Types } from "aptos";
 import assert from "assert";
 
-const NETWORK = Network.DEVNET;
-const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
-const APTOS_COIN_DECIMALS = 8;
-
 const CORE_CODE_ADDRESS = new HexString("0x0000000000000000000000000000000000000000000000000000000000000001");
 const ED25519_ACCOUNT_SCHEME = 0;
 
@@ -26,8 +22,8 @@ const createAndFundAliceAndBob = async (
   console.log(`-------------------  Creating and funding a new Bob & Alice  -------------------`);
   const alice = new AptosAccount();
   const bob = new AptosAccount();
-  await faucetClient.fundAccount(alice.address(), 1 * Math.pow(10, APTOS_COIN_DECIMALS));
-  await faucetClient.fundAccount(bob.address(), 1 * Math.pow(10, APTOS_COIN_DECIMALS));
+  await faucetClient.fundAccount(alice.address(), 100_000_000);
+  await faucetClient.fundAccount(bob.address(), 100_000_000);
   console.log({
     alice: alice.address().toString(),
     bob: bob.address().toString(),
@@ -39,8 +35,8 @@ const createAndFundAliceAndBob = async (
 };
 
 (async () => {
-  const provider = new Provider(NETWORK);
-  const faucetClient = new FaucetClient(provider.aptosClient.nodeUrl, FAUCET_URL);
+  const provider = new Provider(Network.DEVNET);
+  const faucetClient = new FaucetClient(provider.aptosClient.nodeUrl, "https://faucet.devnet.aptoslabs.com");
 
   // Offer rotation capability
   {
