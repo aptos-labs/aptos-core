@@ -188,7 +188,7 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 | `vec_unpack_base`              | Base cost to unpack a vector             |
 | `vec_unpack_per_expected_elem` | Base cost to unpack a vector per element |
 
-Additional storage gas parameters are defined in [`table.rs`], [`move_stdlib.rs`], and other assorted source files in [`aptos-gas/src/`].
+Additional storage gas parameters are defined in [`table.rs`], [`move_stdlib.rs`], and other assorted source files in [`aptos-gas-schedule/src/`].
 
 ## Storage gas
 
@@ -332,7 +332,7 @@ Hence in practice, payload gas is unlikely to be a concern.
 <!--- Alphabetized reference links -->
 
 [#4540]:                           https://github.com/aptos-labs/aptos-core/pull/4540/files
-[`aptos-gas/src/`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/
+[`aptos-gas-schedule/src/`]:       https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src
 [`aptos_global_constants`]:        https://github.com/aptos-labs/aptos-core/blob/main/config/global-constants/src/lib.rs
 [`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
 [BCS sequence specification]:      https://github.com/diem/bcs#fixed-and-variable-length-sequences
