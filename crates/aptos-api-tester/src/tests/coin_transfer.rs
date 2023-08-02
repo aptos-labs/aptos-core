@@ -85,7 +85,10 @@ async fn transfer_coins(
     receiver: AccountAddress,
 ) -> Result<u64, TestFailure> {
     // create transaction
-    let pending_txn = match coin_client.transfer(account, receiver, TRANSFER_AMOUNT, None).await {
+    let pending_txn = match coin_client
+        .transfer(account, receiver, TRANSFER_AMOUNT, None)
+        .await
+    {
         Ok(pending_txn) => pending_txn,
         Err(e) => {
             info!(
