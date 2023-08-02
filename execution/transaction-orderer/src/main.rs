@@ -14,6 +14,7 @@ use aptos_block_partitioner::test_utils::{
 use aptos_transaction_orderer::batch_orderer::SequentialDynamicAriaOrderer;
 use aptos_transaction_orderer::block_orderer::BatchedBlockOrdererWithWindow;
 use aptos_transaction_orderer::block_partitioner::{BlockPartitioner, OrderedRoundRobinPartitioner};
+use aptos_transaction_orderer::transaction_compressor::compress_transactions;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 
 #[derive(Debug, Parser)]
@@ -70,6 +71,13 @@ fn main() {
         let transactions = transactions.clone();
         println!("Starting to order");
         let now = Instant::now();
+
+        // Mapping state keys to u64 significantly speeds up the orderer,
+        // even including the time it takes to do the mapping itself.
+        // When we move to the streaming approach, compression also can (should?) be done
+        // in batches instead of doing it for the whole block.
+        let transactions = compress_transactions(transactions);
+
         let mut latency = None;
         let mut count_ordered = 0;
 
