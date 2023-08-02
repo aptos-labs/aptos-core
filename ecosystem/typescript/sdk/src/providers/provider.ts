@@ -14,6 +14,10 @@ type NetworkWithCustom = Network | "CUSTOM";
  * This class holds both AptosClient and IndexerClient classes's methods and properties so we
  * can instantiate the Provider class and use it to query full node and/or Indexer.
  *
+ * NOTE: Indexer client can be undefined/not set when we use Network.LOCAL (since Indexer
+ * does not support local environment) or when we use a CUSTOM network to support applications
+ * that only use custom fullnode and not Indexer
+ *
  * @example An example of how to use this class with a live network
  * ```
  * const provider = new Provider(Network.DEVNET)
@@ -28,7 +32,7 @@ type NetworkWithCustom = Network | "CUSTOM";
  * const account = await provider.getAccount("0x123");
  * ```
  *
- * @example An example of how to use this class with a lcustom network.
+ * @example An example of how to use this class with a custom network.
  * ```
  * const provider = new Provider({fullnodeUrl:"my-fullnode-url",indexerUrl:"my-indexer-url"})
  * const account = await provider.getAccount("0x123");
@@ -36,7 +40,7 @@ type NetworkWithCustom = Network | "CUSTOM";
  * ```
  *
  * @param network enum of type Network - MAINNET | TESTNET | DEVNET | LOCAL or custom endpoints of type CustomEndpoints
- * @param config AptosClient config arg - additional configuration options for the generated Axios client.
+ * @param config optional ClientConfig config arg - additional configuration we can pass with the request to the server.
  */
 export class Provider {
   aptosClient: AptosClient;
