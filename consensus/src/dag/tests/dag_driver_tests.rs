@@ -2,13 +2,15 @@
 
 use crate::{
     dag::{
+        anchor_election::RoundRobinAnchorElection,
         dag_driver::{DagDriver, DagDriverError},
+        dag_fetcher::FetchRequester,
         dag_network::{DAGNetworkSender, RpcWithFallback},
         dag_store::Dag,
+        order_rule::OrderRule,
         tests::{dag_test::MockStorage, helpers::new_certified_node},
         types::{CertifiedAck, DAGMessage},
-        RpcHandler, order_rule::OrderRule, 
-        anchor_election::RoundRobinAnchorElection, dag_fetcher::FetchRequester,
+        RpcHandler,
     },
     test_utils::MockPayloadManager,
     util::mock_time_service::SimulatedTimeService,
@@ -16,7 +18,9 @@ use crate::{
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
-use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier, ledger_info::LedgerInfo};
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfo, validator_verifier::random_validator_verifier,
+};
 use async_trait::async_trait;
 use claims::{assert_ok, assert_ok_eq};
 use std::{sync::Arc, time::Duration};
@@ -81,7 +85,13 @@ fn test_certified_node_handler() {
     let time_service = Arc::new(SimulatedTimeService::new());
     let (ordered_nodes_sender, _) = futures_channel::mpsc::unbounded();
     let validators = signers.iter().map(|vs| vs.author()).collect();
-    let order_rule = OrderRule::new(epoch_state.clone(), LedgerInfo::mock_genesis(None), dag.clone(), Box::new(RoundRobinAnchorElection::new(validators)), ordered_nodes_sender);
+    let order_rule = OrderRule::new(
+        epoch_state.clone(),
+        LedgerInfo::mock_genesis(None),
+        dag.clone(),
+        Box::new(RoundRobinAnchorElection::new(validators)),
+        ordered_nodes_sender,
+    );
 
     let (request_tx, _) = tokio::sync::mpsc::channel(10);
     let fetch_requester = Arc::new(FetchRequester::new(request_tx));

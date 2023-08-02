@@ -25,7 +25,7 @@ pub enum NodeBroadcastHandleError {
     NotEnoughParents,
 }
 
-pub struct NodeBroadcastHandler {
+pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
     votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
     signer: ValidatorSigner,

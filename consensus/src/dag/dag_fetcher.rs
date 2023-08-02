@@ -14,9 +14,12 @@ use aptos_logger::error;
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
 use futures::{stream::FuturesUnordered, StreamExt};
-use tokio::sync::{oneshot, mpsc::{Sender, Receiver}};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use thiserror::Error as ThisError;
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    oneshot,
+};
 
 pub struct FetchRequester {
     request_tx: Sender<LocalFetchRequest>,

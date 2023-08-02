@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 mod anchor_election;
+mod bootstrap;
 mod dag_driver;
 mod dag_fetcher;
 mod dag_handler;
