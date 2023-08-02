@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delta_change_set::{addition, subtraction},
+    delta_change_set::{abort_error, addition, subtraction, EADD_OVERFLOW, ESUB_UNDERFLOW},
     resolver::AggregatorResolver,
 };
 use aptos_table_natives::TableHandle;
@@ -128,23 +128,17 @@ impl History {
         self.min_achieved_negative = u128::max(self.min_achieved_negative, value);
     }
 
-    fn record_overflow_positive(&mut self, value: Option<u128>) {
+    fn record_overflow_positive(&mut self, value: u128) {
         self.min_overflow_positive = match self.min_overflow_positive {
-            Some(min) => match value {
-                Some(v) => Some(u128::min(min, v)),
-                None => Some(min),
-            },
-            None => value,
+            Some(min) => Some(u128::min(min, value)),
+            None => Some(value),
         }
     }
 
-    fn record_underflow_negative(&mut self, value: Option<u128>) {
+    fn record_underflow_negative(&mut self, value: u128) {
         self.max_underflow_negative = match self.max_underflow_negative {
-            Some(min) => match value {
-                Some(v) => Some(u128::min(min, v)),
-                None => Some(min),
-            },
-            None => value,
+            Some(min) => Some(u128::min(min, value)),
+            None => Some(value),
         }
     }
 }
@@ -176,7 +170,7 @@ impl Aggregator {
                 AggregatorState::PositiveDelta => history.record_success_positive(self.value),
                 AggregatorState::NegativeDelta => history.record_success_negative(self.value),
                 AggregatorState::Data => {
-                    unreachable!("history is not tracked when aggregator knows its value")
+                    unreachable!("history is not tracked for aggregators that are newly created")
                 },
             }
         }
@@ -184,7 +178,7 @@ impl Aggregator {
 
     /// Records overflows in history. Should be called after an addition is unsuccessful
     /// to record its side-effects.
-    fn record_overflow(&mut self, value: Option<u128>) {
+    fn record_overflow(&mut self, value: u128) {
         if let Some(history) = self.history.as_mut() {
             history.record_overflow_positive(value);
         }
@@ -192,7 +186,7 @@ impl Aggregator {
 
     /// Records underflows in history. Should be called after a subtraction is unsuccessful
     /// to record its side-effects.
-    fn record_underflow(&mut self, value: Option<u128>) {
+    fn record_underflow(&mut self, value: u128) {
         if let Some(history) = self.history.as_mut() {
             history.record_underflow_negative(value);
         }
@@ -229,9 +223,7 @@ impl Aggregator {
                 // If positive delta, add directly but also record the state.
                 self.value = addition(self.value, value, self.limit).map_err(|err| {
                     if self.value < u128::MAX - value {
-                        self.record_overflow(Some(self.value + value));
-                    } else {
-                        self.record_overflow(None);
+                        self.record_overflow(self.value + value);
                     }
                     err
                 })?;
@@ -244,11 +236,15 @@ impl Aggregator {
                 //     1. X <= Y: then the result is +(Y-X)
                 //     2. X  > Y: then the result is -(X-Y)
                 if self.value <= value {
+                    if value - self.value > self.limit {
+                        self.record_overflow(self.value);
+                        return Err(abort_error(
+                            format!("overflow occurred when adding {} to -{}", value, self.value),
+                            EADD_OVERFLOW,
+                        ));
+                    }
                     self.value = subtraction(value, self.value)?;
                     self.state = AggregatorState::PositiveDelta;
-                    if self.value > self.limit {
-                        self.record_overflow(Some(self.value));
-                    }
                 } else {
                     self.value = subtraction(self.value, value)?;
                 }
@@ -285,15 +281,22 @@ impl Aggregator {
                     // TODO: maybe `subtraction` should also know about the limit?
                     subtraction(self.limit, value).map_err(|err| {
                         // TODO: The underflow value may not be correct here.
-                        self.record_underflow(Some(value));
+                        self.record_underflow(value);
                         err
                     })?;
 
+                    if value - self.value > self.limit {
+                        self.record_underflow(value - self.value);
+                        return Err(abort_error(
+                            format!(
+                                "underflow occurred when subtracting {} from {}",
+                                value, self.value
+                            ),
+                            ESUB_UNDERFLOW,
+                        ));
+                    }
                     self.value = subtraction(value, self.value)?;
                     self.state = AggregatorState::NegativeDelta;
-                    if value - self.value > self.limit {
-                        self.record_underflow(Some(value - self.value));
-                    }
                 }
             },
             AggregatorState::NegativeDelta => {
@@ -303,9 +306,7 @@ impl Aggregator {
                 // we should return an error there.
                 self.value = addition(self.value, value, self.limit).map_err(|err| {
                     if self.value < u128::MAX - value {
-                        self.record_underflow(Some(self.value + value));
-                    } else {
-                        self.record_underflow(None);
+                        self.record_underflow(self.value + value);
                     }
                     err
                 })?;

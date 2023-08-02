@@ -16,10 +16,10 @@ use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 use std::collections::{btree_map::Entry, BTreeMap};
 
 /// When `Addition` operation overflows the `limit`.
-const EADD_OVERFLOW: u64 = 0x02_0001;
+pub const EADD_OVERFLOW: u64 = 0x02_0001;
 
 /// When `Subtraction` operation goes below zero.
-const ESUB_UNDERFLOW: u64 = 0x02_0002;
+pub const ESUB_UNDERFLOW: u64 = 0x02_0002;
 
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
@@ -266,7 +266,7 @@ pub fn subtraction(base: u128, value: u128) -> PartialVMResult<u128> {
 
 /// Error for delta application. Can be used by delta partial functions
 /// to return descriptive error messages and an appropriate error code.
-fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
+pub fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
     PartialVMError::new(StatusCode::ABORTED)
         .with_message(message.to_string())
         .with_sub_status(code)
