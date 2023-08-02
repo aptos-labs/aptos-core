@@ -16,6 +16,9 @@ This SDK provides all the necessary components for building on top of the Aptos 
 * `transaction_builder` - Includes helpers for constructing transactions
 * `types` - Includes types for Aptos on-chain data structures
 
+## Installing Rust SDK
+Please refer to [Rust SDK Doc](https://aptos.dev/sdks/rust-sdk/) for details on how to install the Rust SDK.
+
 ## License
 
 Aptos Core is licensed as [Apache 2.0](https://github.com/aptos-labs/aptos-core/blob/main/LICENSE).

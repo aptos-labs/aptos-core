@@ -8,8 +8,10 @@ use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
 use aptos_types::{
+    state_store::state_key::StateKey,
     transaction::ExecutionStatus,
     vm_status::{StatusCode, VMStatus},
+    write_set::WriteOp,
 };
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -56,7 +58,9 @@ fn failed_transaction_cleanup_test() {
         &log_context,
         &change_set_configs,
     );
-    assert!(!out1.write_set().is_empty());
+
+    let write_set: Vec<(&StateKey, &WriteOp)> = out1.change_set().write_set_iter().collect();
+    assert!(!write_set.is_empty());
     assert_eq!(out1.gas_used(), 90_000);
     assert!(!out1.status().is_discarded());
     assert_eq!(
