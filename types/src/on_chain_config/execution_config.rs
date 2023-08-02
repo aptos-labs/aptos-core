@@ -17,29 +17,32 @@ pub enum OnChainExecutionConfig {
 impl OnChainExecutionConfig {
     /// The type of the transaction shuffler being used.
     pub fn transaction_shuffler_type(&self) -> TransactionShufflerType {
-        match &self {
-            OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
-            OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
-        }
+        TransactionShufflerType::NoShuffling
+        // match &self {
+        //     OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
+        //     OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
+        //     OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
+        // }
     }
 
     /// The per-block gas limit being used.
     pub fn block_gas_limit(&self) -> Option<u64> {
-        match &self {
-            OnChainExecutionConfig::V1(_config) => None,
-            OnChainExecutionConfig::V2(config) => config.block_gas_limit,
-            OnChainExecutionConfig::V3(config) => config.block_gas_limit,
-        }
+        None
+        // match &self {
+        //     OnChainExecutionConfig::V1(_config) => None,
+        //     OnChainExecutionConfig::V2(config) => config.block_gas_limit,
+        //     OnChainExecutionConfig::V3(config) => config.block_gas_limit,
+        // }
     }
 
     /// The type of the transaction deduper being used.
     pub fn transaction_deduper_type(&self) -> TransactionDeduperType {
-        match &self {
-            OnChainExecutionConfig::V1(_config) => TransactionDeduperType::NoDedup,
-            OnChainExecutionConfig::V2(_config) => TransactionDeduperType::NoDedup,
-            OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
-        }
+        TransactionDeduperType::TxnHashAndAuthenticatorV1
+        // match &self {
+        //     OnChainExecutionConfig::V1(_config) => TransactionDeduperType::NoDedup,
+        //     OnChainExecutionConfig::V2(_config) => TransactionDeduperType::NoDedup,
+        //     OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
+        // }
     }
 }
 
