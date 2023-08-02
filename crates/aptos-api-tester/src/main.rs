@@ -11,8 +11,8 @@ mod utils;
 
 use crate::{
     tests::{
-        coin_transfer::test_cointransfer, new_account::test_newaccount,
-        nft_transfer::test_nfttransfer, publish_module::setup_and_run_publishmodule,
+        coin_transfer, new_account,
+        nft_transfer, publish_module::setup_and_run_publishmodule,
     },
     utils::{set_metrics, NetworkName, TestFailure, TestName, TestResult},
 };
@@ -78,7 +78,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
             TestName::NewAccount,
             network_name,
             &test_time,
-            test_newaccount(network_name),
+            new_account::test(network_name),
         )
         .await;
     });
@@ -90,7 +90,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
             TestName::CoinTransfer,
             network_name,
             &test_time,
-            test_cointransfer(network_name),
+            coin_transfer::test(network_name),
         )
         .await;
     });
@@ -102,7 +102,7 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
             TestName::NftTransfer,
             network_name,
             &test_time,
-            test_nfttransfer(network_name),
+            nft_transfer::test(network_name),
         )
         .await;
     });
