@@ -519,24 +519,9 @@ class AptosTokenClient:
 
     # :!:>transfer_token
     async def transfer_token(
-        self, sender: Account, token: AccountAddress, to: AccountAddress
+        self, owner: Account, token: AccountAddress, to: AccountAddress
     ) -> str:
-        payload = EntryFunction.natural(
-            "0x1::object",
-            "transfer",
-            [TypeTag(StructTag.from_str("0x4::token::Token"))],
-            [
-                TransactionArgument(token, Serializer.struct),
-                TransactionArgument(to, Serializer.struct),
-            ],
-        )
-
-        signed_transaction = await self.client.create_bcs_signed_transaction(
-            sender, TransactionPayload(payload)
-        )
-        return await self.client.submit_bcs_transaction(
-            signed_transaction
-        )  # <:!:transfer_token
+        return await self.client.transfer_object(owner, token, to) # <:!:transfer_token
 
     async def burn_token(self, creator: Account, token: AccountAddress) -> str:
         payload = EntryFunction.natural(
