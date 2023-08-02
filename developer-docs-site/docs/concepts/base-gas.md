@@ -252,8 +252,8 @@ As of the time of this writing, `min_price_per_gas_unit` in [`transaction.rs`](h
 | Constant                  | Value  |
 |---------------------------|--------|
 | `min_price_per_gas_unit`  | 100    |
-| `max_price_per_gas_unit`  | 10,000 |
-| `gas_unit_scaling_factor` | 10,000 |
+| `max_price_per_gas_unit`  | 10,000,000,000 |
+| `gas_unit_scaling_factor` | 1,000,000 |
 
 See [Payload gas](#payload-gas) for the meaning of these constants.
 
@@ -264,7 +264,7 @@ As of the time of this writing, [`initialize()`] sets the following minimum stor
 | Data style | Operation | Symbol | Minimum internal gas |
 |------------|-----------|--------|----------------------|
 | Per item   | Read      | $r_i$  | 300,000              |
-| Per item   | Create    | $c_i$  | 5,000,000            |
+| Per item   | Create    | $c_i$  | 300,000              |
 | Per item   | Write     | $w_i$  | 300,000              |
 | Per byte   | Read      | $r_b$  | 300                  |
 | Per byte   | Create    | $c_b$  | 5,000                |
@@ -276,7 +276,7 @@ Hence, in terms of octas, initial mainnet gas costs can be estimated as follows 
 | Operation       | Operation | Minimum octas |
 |-----------------|-----------|---------------|
 | Per-item read   | $r_i$     | 3000          |
-| Per-item create | $c_i$     | 50,000        |
+| Per-item create | $c_i$     | 3000          |
 | Per-item write  | $w_i$     | 3000          |
 | Per-byte read   | $r_b$     | 3             |
 | Per-byte create | $c_b$     | 50            |
