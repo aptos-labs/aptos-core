@@ -170,7 +170,7 @@ impl Aggregator {
                 AggregatorState::PositiveDelta => history.record_success_positive(self.value),
                 AggregatorState::NegativeDelta => history.record_success_negative(self.value),
                 AggregatorState::Data => {
-                    unreachable!("history is not tracked when aggregator knows its value")
+                    unreachable!("history is not tracked for aggregators that are newly created")
                 },
             }
         }
