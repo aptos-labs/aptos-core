@@ -49,28 +49,32 @@ test("gets genesis resources", async () => {
   expect(accountResource).toBeDefined();
 });
 
-test("gets object", async () => {
-  const alice = new AptosAccount();
-  const faucetClient = getFaucetClient();
-  await faucetClient.fundAccount(alice.address(), 100000000);
+test(
+  "gets object",
+  async () => {
+    const alice = new AptosAccount();
+    const faucetClient = getFaucetClient();
+    await faucetClient.fundAccount(alice.address(), 100000000);
 
-  const provider = new Provider({
-    fullnodeUrl: NODE_URL,
-    indexerUrl: NODE_URL,
-  });
-  const aptosToken = new AptosToken(provider);
+    const provider = new Provider({
+      fullnodeUrl: NODE_URL,
+      indexerUrl: NODE_URL,
+    });
+    const aptosToken = new AptosToken(provider);
 
-  const txn = await provider.waitForTransactionWithResult(
-    await aptosToken.createCollection(alice, "Alice's simple collection", "AliceCollection", "https://aptos.dev"),
-    { checkSuccess: true },
-  );
-  const objectAddress = ((txn as Gen.UserTransaction).changes[0] as WriteSetChange_WriteResource).address; // should be the new object address
+    const txn = await provider.waitForTransactionWithResult(
+      await aptosToken.createCollection(alice, "Alice's simple collection", "AliceCollection", "https://aptos.dev"),
+      { checkSuccess: true },
+    );
+    const objectAddress = ((txn as Gen.UserTransaction).changes[0] as WriteSetChange_WriteResource).address; // should be the new object address
 
-  const object = await provider.getAccountResource(objectAddress, "0x4::aptos_token::AptosCollection");
+    const object = await provider.getAccountResource(objectAddress, "0x4::aptos_token::AptosCollection");
 
-  expect(object.type).toBeDefined();
-  expect(object.data).toBeDefined();
-});
+    expect(object.type).toBeDefined();
+    expect(object.data).toBeDefined();
+  },
+  longTestTimeout,
+);
 
 test("gets the Account resource", async () => {
   const client = new AptosClient(NODE_URL);
