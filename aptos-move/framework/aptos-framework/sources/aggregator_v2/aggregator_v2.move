@@ -57,9 +57,6 @@ module aptos_framework::aggregator_v2 {
 
     public native fun snapshot(aggregator: &Aggregator): AggregatorSnapshot<u128>;
 
-    // Deletes the aggregator.
-    public native fun destroy(aggregator: Aggregator);
-
     // Do automatic conversion to u64, if all possible values of aggregator fit it (i.e. limit is <= u64::MAX)
     // If limit of the aggregator exceeds u64::MAX, this will throw an exception.
     // This doesn't check if actual value can be converted, only if it can always be converted, based on the limit.

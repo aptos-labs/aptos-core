@@ -205,7 +205,6 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [aggregator_v2_try_add_base: InternalGas, "aggregator_v2.try_add.base", 6000],
         [aggregator_v2_read_base: InternalGas, "aggregator_v2.read.base", 6000],
         [aggregator_v2_try_sub_base: InternalGas, "aggregator_v2.try_sub.base", 6000],
-        [aggregator_v2_destroy_base: InternalGas, "aggregator_v2.destroy.base", 10000],
         
         [aggregator_v2_snapshot_base: InternalGas, "aggregator_snapshot.snapshot", 6000],
         [aggregator_v2_snapshot_with_u64_limit_base: InternalGas, "aggregator_snapshot.snapshot_with_u64_limit", 6000],
