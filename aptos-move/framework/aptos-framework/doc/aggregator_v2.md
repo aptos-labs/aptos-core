@@ -17,6 +17,7 @@ This module provides an interface for aggregators (version 2).
 -  [Function `sub`](#0x1_aggregator_v2_sub)
 -  [Function `read`](#0x1_aggregator_v2_read)
 -  [Function `snapshot`](#0x1_aggregator_v2_snapshot)
+-  [Function `destroy`](#0x1_aggregator_v2_destroy)
 -  [Function `snapshot_with_u64_limit`](#0x1_aggregator_v2_snapshot_with_u64_limit)
 -  [Function `read_snapshot`](#0x1_aggregator_v2_read_snapshot)
 
@@ -308,6 +309,28 @@ Returns a value stored in this aggregator.
 
 
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;u128&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_aggregator_v2_destroy"></a>
+
+## Function `destroy`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>);
 </code></pre>
 
 

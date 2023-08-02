@@ -20,7 +20,7 @@ pub mod type_info;
 pub mod util;
 
 use crate::natives::cryptography::multi_ed25519;
-use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};
+use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2, aggregator_snapshot};
 use aptos_native_interface::SafeNativeBuilder;
 use cryptography::ed25519;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
@@ -77,6 +77,7 @@ pub fn all_natives(
     add_natives_from_module!("aggregator", aggregator::make_all(builder));
     add_natives_from_module!("aggregator_factory", aggregator_factory::make_all(builder));
     add_natives_from_module!("aggregator_v2", aggregator_v2::make_all(builder));
+    add_natives_from_module!("aggregator_snapshot", aggregator_v2::make_all(builder));
     add_natives_from_module!("object", object::make_all(builder));
     add_natives_from_module!("debug", debug::make_all(builder));
     add_natives_from_module!("string_utils", string_utils::make_all(builder));
