@@ -64,6 +64,10 @@ fn main() {
         system_of_equations.push(terms);
     }
 
+    let mut running_times = Vec::new();
+    running_times.extend(samples.regular_meter);
+    running_times.extend(samples_ir.regular_meter);
+
     // Collect like terms
     let mut mappings: Vec<BTreeMap<String, u64>> = Vec::new();
     for equation in system_of_equations {
@@ -81,7 +85,7 @@ fn main() {
     let vec_col: usize = 1;
 
     let mut coeff_matrix = build_coefficient_matrix(vec_format, nrows, ncols);
-    let mut const_matrix = build_constant_matrix(samples_ir.regular_meter, nrows, vec_col);
+    let mut const_matrix = build_constant_matrix(running_times, nrows, vec_col);
 
     // Solve the system of linear equations
     least_squares(

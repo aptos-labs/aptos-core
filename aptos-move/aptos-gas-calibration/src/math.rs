@@ -182,11 +182,11 @@ pub fn get_computed_time_and_outliers(
             let diff = numerator.div(denominator);
             if diff > MARGIN_OF_ERROR {
                 // append equation that is an outlier
-                outliers.push((i, a_ij, computed_running_time[i], diff, true));
+                outliers.push((i, computed_running_time[i], a_ij, diff, true));
             } else {
                 // not outlier, but still display to the user
                 // the running time of that Calibration Function
-                outliers.push((i, a_ij, computed_running_time[i], diff, false));
+                outliers.push((i, computed_running_time[i], a_ij, diff, false));
             }
         }
         i += 1;
@@ -195,61 +195,12 @@ pub fn get_computed_time_and_outliers(
     Ok(outliers)
 }
 
-/// Find pivot columns if system of linear eq can't be solved
-///
-/// ### Arguments
-///
-/// * `matrix` - An input matrix to solve, typically the RREF'd matrix
-fn find_pivot_columns(matrix: &mut DMatrix<f64>) -> Vec<usize> {
-    let mut pivot_columns = Vec::new();
-    let ncols = matrix.ncols() - 1;
-
-    for j in 0..ncols {
-        let mut has_pivot = false;
-        for i in 0..matrix.nrows() {
-            if !approx_eq!(f64, matrix[(i, j)], 0.0, ulps = 2) {
-                has_pivot = true;
-                break;
-            }
-        }
-        if has_pivot {
-            pivot_columns.push(j);
-        }
-    }
-
-    pivot_columns
-}
-
 /// Reduced row echelon form (RREF) with partial pivoting
 ///
 /// ### Arguments
 ///
 /// * `matrix` - A matrix to perform RREF
 fn rref(matrix: &mut DMatrix<f64>) {
-    /*let (rows, cols) = matrix.shape();
-    let num_pivots = rows.min(cols);
-
-    for pivot_row in 0..num_pivots {
-        partial_pivoting(matrix, pivot_row);
-
-        let pivot_val = matrix[(pivot_row, pivot_row)];
-
-        // Scale the pivot row to make the pivot element 1
-        for j in pivot_row..cols {
-            matrix[(pivot_row, j)] /= pivot_val;
-        }
-
-        // Eliminate other rows' entries in the current column
-        for i in 0..rows {
-            if i != pivot_row {
-                let factor = matrix[(i, pivot_row)];
-                for j in pivot_row..cols {
-                    matrix[(i, j)] -= factor * matrix[(pivot_row, j)];
-                }
-            }
-        }
-    }*/
-
     let (nrows, ncols) = matrix.shape();
     let mut lead = 0;
 
@@ -294,66 +245,6 @@ fn rref(matrix: &mut DMatrix<f64>) {
 
         lead += 1;
     }
-}
-
-/// Perform partial pivoting on the rows to find the maximum pivot element
-///
-/// ### Arguments
-///
-/// * `matrix` - Augmented matrix
-/// * `pivot_row` - Current row of the matrix
-fn partial_pivoting(matrix: &mut DMatrix<f64>, pivot_row: usize) {
-    // Find the row with the maximum absolute value in the current column
-    let mut max_val = matrix[(pivot_row, pivot_row)].abs();
-    let mut max_row = pivot_row;
-
-    for i in pivot_row + 1..matrix.nrows() {
-        let val = matrix[(i, pivot_row)].abs();
-        if val > max_val {
-            max_val = val;
-            max_row = i;
-        }
-    }
-
-    // Swap the current row with the row containing the maximum value
-    if max_row != pivot_row {
-        matrix.swap_rows(pivot_row, max_row);
-    }
-}
-
-/// If the matrix is not invertible, we should check if every row
-/// has one approximate value of 1. If that is true, then there
-/// aren't linear combinations of variables that are dependent
-/// of each other, but instead, the entire system is not solvable.
-///
-/// ### Arguments
-///
-/// * `matrix` - Augmented matrix that has been RREF'd
-fn validate_rref_rows_are_one(matrix: &mut DMatrix<f64>) -> bool {
-    let mut i = 0;
-    let mut j = 0;
-
-    let mut is_all_one = true;
-    while i < matrix.nrows() {
-        let mut one_count = 0;
-
-        while j < matrix.ncols() - 1 {
-            let a_ij = matrix[(i, j)];
-            if approx_eq!(f64, a_ij, 1.0, ulps = 2) {
-                one_count += 1;
-            }
-            j += 1;
-        }
-
-        if one_count > 1 {
-            is_all_one = false;
-        }
-
-        i += 1;
-        j = 0;
-    }
-
-    is_all_one
 }
 
 /// If the matrix is not invertible, and there exists a row that has more than one
