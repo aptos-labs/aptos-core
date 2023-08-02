@@ -530,7 +530,7 @@ fn get_events_by_event_key(
                 .unwrap()
                 .1
                 .clone()
-                .v0()
+                .v1()
                 .unwrap()
                 .sequence_number(),
             cursor
@@ -585,7 +585,7 @@ fn verify_events_by_event_key(
                 .expect("Shouldn't be empty")
                 .1
                 .clone()
-                .v0()
+                .v1()
                 .unwrap()
                 .sequence_number();
             let last_seq = events
@@ -593,7 +593,7 @@ fn verify_events_by_event_key(
                 .expect("Shouldn't be empty")
                 .1
                 .clone()
-                .v0()
+                .v1()
                 .unwrap()
                 .sequence_number();
 
@@ -633,9 +633,9 @@ fn group_events_by_event_key(
     let mut event_key_to_events: HashMap<EventKey, Vec<(Version, ContractEvent)>> = HashMap::new();
     for (batch_idx, txn) in txns_to_commit.iter().enumerate() {
         for event in txn.events() {
-            if let ContractEvent::V0(v0) = event {
+            if let ContractEvent::V1(v1) = event {
                 event_key_to_events
-                    .entry(*v0.key())
+                    .entry(*v1.key())
                     .or_default()
                     .push((first_version + batch_idx as u64, event.clone()));
             }

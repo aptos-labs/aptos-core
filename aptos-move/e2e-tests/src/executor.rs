@@ -624,7 +624,7 @@ impl FakeExecutor {
 
         // Check if we emit the expected event for block metadata, there might be more events for transaction fees.
         let event = outputs[0].events()[0]
-            .v0()
+            .v1()
             .expect("The first event must be a block metadata v0 event")
             .clone();
         assert_eq!(event.key(), &new_block_event_key());
