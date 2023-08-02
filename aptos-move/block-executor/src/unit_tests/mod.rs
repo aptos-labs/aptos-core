@@ -14,10 +14,7 @@ use crate::{
     scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_aggregator::{
-    aggregator_extension::ExtendedU128,
-    delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate},
-};
+use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
@@ -141,8 +138,8 @@ fn delta_chains() {
                                     u128::MAX,
                                     0,
                                     0,
-                                    ExtendedU128::None,
-                                    ExtendedU128::None,
+                                    None,
+                                    None,
                                 ),
                             )),
                             false => None,
