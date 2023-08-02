@@ -1723,8 +1723,8 @@ async fn parse_delegation_pool_resource_changes(
                     } else {
                         warn!(
                             "Failed to parse withdraw undelegated event! Skipping for {}:{}",
-                            e.v0()?.key().get_creator_address(),
-                            e.v0()?.key().get_creation_number()
+                            e.v1()?.key().get_creator_address(),
+                            e.v1()?.key().get_creation_number()
                         );
                         continue;
                     };
@@ -1817,13 +1817,13 @@ fn filter_events<F: Fn(&EventKey, &ContractEvent) -> Option<T>, T>(
 ) -> Vec<T> {
     events
         .iter()
-        .filter(|event| event.is_v0())
-        .filter(|event| event.v0().unwrap().key() == event_key)
+        .filter(|event| event.is_v1())
+        .filter(|event| event.v1().unwrap().key() == event_key)
         .sorted_by(|a, b| {
-            a.v0()
+            a.v1()
                 .unwrap()
                 .sequence_number()
-                .cmp(&b.v0().unwrap().sequence_number())
+                .cmp(&b.v1().unwrap().sequence_number())
         })
         .filter_map(|event| parser(event_key, event))
         .collect()

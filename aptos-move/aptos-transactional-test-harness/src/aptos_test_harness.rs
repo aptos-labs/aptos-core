@@ -930,11 +930,11 @@ impl<'a> fmt::Display for PrettyEvent<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{{")?;
         match self.0 {
-            ContractEvent::V0(v0) => {
-                writeln!(f, "    key:     {}", v0.key())?;
-                writeln!(f, "    seq_num: {}", v0.sequence_number())?;
+            ContractEvent::V1(v1) => {
+                writeln!(f, "    key:     {}", v1.key())?;
+                writeln!(f, "    seq_num: {}", v1.sequence_number())?;
             },
-            ContractEvent::V1(_v1) => (),
+            ContractEvent::V2(_v2) => (),
         }
         writeln!(f, "    type:    {}", self.0.type_tag())?;
         writeln!(f, "    data:    {:?}", hex::encode(self.0.event_data()))?;

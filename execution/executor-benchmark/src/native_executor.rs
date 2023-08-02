@@ -130,7 +130,7 @@ impl NativeExecutor {
         ];
 
         // TODO(grao): Some values are fake, because I'm lazy.
-        let events = vec![ContractEvent::new_v0(
+        let events = vec![ContractEvent::new_v1(
             EventKey::new(0, sender_address),
             0,
             TypeTag::Struct(Box::new(WithdrawEvent::struct_tag())),
@@ -224,7 +224,7 @@ impl NativeExecutor {
         }
 
         let events = vec![
-            ContractEvent::new_v0(
+            ContractEvent::new_v1(
                 EventKey::new(0, recipient_address),
                 0,
                 TypeTag::Struct(Box::new(DepositEvent::struct_tag())),

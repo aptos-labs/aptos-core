@@ -203,8 +203,8 @@ impl EventSubscriptionService {
 
         // TODO(eventv2): This doesn't deal with module events subscriptions.
         for event in events.iter() {
-            if let ContractEvent::V0(v0) = event {
-                let event_key = v0.key();
+            if let ContractEvent::V1(v1) = event {
+                let event_key = v1.key();
 
                 // Process all subscriptions for the current event
                 if let Some(subscription_ids) = self.event_key_subscriptions.get(event_key) {
