@@ -15,3 +15,4 @@ export * from "./utils/hex_string";
 export * from "./utils/hd-key";
 export * from "./utils/property_map_serde";
 export { APTOS_COIN } from "./utils/misc";
+export * from "./indexer/generated/types";

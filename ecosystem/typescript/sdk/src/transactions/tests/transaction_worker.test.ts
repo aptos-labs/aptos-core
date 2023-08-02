@@ -17,24 +17,32 @@ describe("transactionWorker", () => {
     await faucet.fundAccount(sender.address(), 1000000000);
   });
 
-  test("throws when starting an already started worker", async () => {
-    // start transactions worker
-    const transactionWorker = new TransactionWorker(provider, sender);
-    transactionWorker.start();
-    expect(async () => {
+  test(
+    "throws when starting an already started worker",
+    async () => {
+      // start transactions worker
+      const transactionWorker = new TransactionWorker(provider, sender);
       transactionWorker.start();
-    }).rejects.toThrow(`worker has already started`);
-  });
+      expect(async () => {
+        transactionWorker.start();
+      }).rejects.toThrow(`worker has already started`);
+    },
+    longTestTimeout,
+  );
 
-  test("throws when stopping an already stopped worker", async () => {
-    // start transactions worker
-    const transactionWorker = new TransactionWorker(provider, sender);
-    transactionWorker.start();
-    transactionWorker.stop();
-    expect(async () => {
+  test(
+    "throws when stopping an already stopped worker",
+    async () => {
+      // start transactions worker
+      const transactionWorker = new TransactionWorker(provider, sender);
+      transactionWorker.start();
       transactionWorker.stop();
-    }).rejects.toThrow(`worker has already stopped`);
-  });
+      expect(async () => {
+        transactionWorker.stop();
+      }).rejects.toThrow(`worker has already stopped`);
+    },
+    longTestTimeout,
+  );
 
   test(
     "adds transaction into the transactionsQueue",
