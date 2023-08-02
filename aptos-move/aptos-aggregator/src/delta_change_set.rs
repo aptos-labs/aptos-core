@@ -5,7 +5,7 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::{aggregator_extension::ExtendedU128, module::AGGREGATOR_MODULE};
+use crate::module::AGGREGATOR_MODULE;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
@@ -29,9 +29,9 @@ pub struct DeltaOp {
     /// Smallest negative delta seen during execution.
     min_achieved_negative: u128,
     /// Smallest positive delta observed during execution that resulted in an overflow.
-    min_overflow_positive: ExtendedU128,
+    min_overflow_positive: Option<u128>,
     /// Maximum negative delta observed during execution that result in an underflow.
-    max_underflow_negative: ExtendedU128,
+    max_underflow_negative: Option<u128>,
     /// Postcondition: delta overflows on exceeding this limit or going below
     /// zero.
     limit: u128,
@@ -53,8 +53,8 @@ impl DeltaOp {
         limit: u128,
         max_achieved_positive: u128,
         min_achieved_negative: u128,
-        min_overflow_positive: ExtendedU128,
-        max_underflow_negative: ExtendedU128,
+        min_overflow_positive: Option<u128>,
+        max_underflow_negative: Option<u128>,
     ) -> Self {
         Self {
             max_achieved_positive,
@@ -305,26 +305,12 @@ pub fn deserialize(value_bytes: &[u8]) -> u128 {
 
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
 pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(
-        DeltaUpdate::Minus(v),
-        limit,
-        0,
-        v,
-        ExtendedU128::None,
-        ExtendedU128::None,
-    )
+    DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v, None, None)
 }
 
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
 pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(
-        DeltaUpdate::Plus(v),
-        limit,
-        v,
-        0,
-        ExtendedU128::None,
-        ExtendedU128::None,
-    )
+    DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0, None, None)
 }
 
 /// `DeltaChangeSet` contains all access paths that one transaction wants to update with deltas.

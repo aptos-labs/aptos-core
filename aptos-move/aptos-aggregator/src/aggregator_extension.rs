@@ -64,14 +64,6 @@ impl AggregatorID {
     }
 }
 
-#[derive(Debug, Clone, Copy, Hash, Ord, PartialOrd, PartialEq, Eq)]
-pub enum ExtendedU128 {
-    None,
-    U128(u128),
-    Overflow,
-    Underflow,
-}
-
 /// Tracks values seen by aggregator. In particular, stores information about
 /// the biggest and the smallest deltas seen during execution in the VM. This
 /// information can be used by the executor to check if delta should have
@@ -104,8 +96,18 @@ pub enum ExtendedU128 {
 pub struct History {
     pub max_achieved_positive: u128,
     pub min_achieved_negative: u128,
-    pub min_overflow_positive: ExtendedU128,
-    pub max_underflow_negative: ExtendedU128,
+    // `min_overflow_positive` is None in two possible cases:
+    // 1. No overflow occured in the try_add/try_sub functions throughout the
+    // transaction execution.
+    // 2. The only overflows that occured in the try_add/try_sub functions in
+    // this transaction execution are with delta that exceeds u128::MAX.
+    pub min_overflow_positive: Option<u128>,
+    // `max_underflow_negative` is None in two possible cases:
+    // 1. No underflow occured in the try_add/try_sub functions throughout the
+    // transaction execution.
+    // 2. The only underflows that occured in the try_add/try_sub functions in
+    // this transaction execution are with delta that drops below -u128::MAX.
+    pub max_underflow_negative: Option<u128>,
 }
 
 impl History {
@@ -113,8 +115,8 @@ impl History {
         History {
             max_achieved_positive: 0,
             min_achieved_negative: 0,
-            min_overflow_positive: ExtendedU128::None,
-            max_underflow_negative: ExtendedU128::None,
+            min_overflow_positive: None,
+            max_underflow_negative: None,
         }
     }
 
@@ -126,33 +128,24 @@ impl History {
         self.min_achieved_negative = u128::max(self.min_achieved_negative, value);
     }
 
-    fn record_overflow_positive(&mut self, value: ExtendedU128) {
+    fn record_overflow_positive(&mut self, value: Option<u128>) {
         self.min_overflow_positive = match self.min_overflow_positive {
-            ExtendedU128::None => value,
-            ExtendedU128::Overflow => value,
-            ExtendedU128::U128(min) => match value {
-                ExtendedU128::None => unreachable!("overflow cannot be None"),
-                ExtendedU128::Overflow => ExtendedU128::U128(min),
-                ExtendedU128::U128(v) => ExtendedU128::U128(u128::min(min, v)),
-                ExtendedU128::Underflow => unreachable!("overflow cannot be Underflow"),
+            Some(min) => match value {
+                Some(v) => Some(u128::min(min, v)),
+                None => Some(min),
             },
-            ExtendedU128::Underflow => unreachable!("min_overflow_positive cannot be Underflow"),
+            None => value,
         }
     }
 
-    fn record_underflow_negative(&mut self, value: ExtendedU128) {
-        println!("record_underflow_negative");
+    fn record_underflow_negative(&mut self, value: Option<u128>) {
         self.max_underflow_negative = match self.max_underflow_negative {
-            ExtendedU128::None => value,
-            ExtendedU128::Overflow => unreachable!("max_underflow_negative cannot be Overflow"),
-            ExtendedU128::U128(min) => match value {
-                ExtendedU128::None => unreachable!("underflow cannot be None"),
-                ExtendedU128::Overflow => unreachable!("underflow cannot be Overflow"),
-                ExtendedU128::U128(v) => ExtendedU128::U128(u128::min(min, v)),
-                ExtendedU128::Underflow => ExtendedU128::U128(min),
+            Some(min) => match value {
+                Some(v) => Some(u128::min(min, v)),
+                None => Some(min),
             },
-            ExtendedU128::Underflow => value,
-        };
+            None => value,
+        }
     }
 }
 
@@ -191,7 +184,7 @@ impl Aggregator {
 
     /// Records overflows in history. Should be called after an addition is unsuccessful
     /// to record its side-effects.
-    fn record_overflow(&mut self, value: ExtendedU128) {
+    fn record_overflow(&mut self, value: Option<u128>) {
         if let Some(history) = self.history.as_mut() {
             history.record_overflow_positive(value);
         }
@@ -199,7 +192,7 @@ impl Aggregator {
 
     /// Records underflows in history. Should be called after a subtraction is unsuccessful
     /// to record its side-effects.
-    fn record_underflow(&mut self, value: ExtendedU128) {
+    fn record_underflow(&mut self, value: Option<u128>) {
         if let Some(history) = self.history.as_mut() {
             history.record_underflow_negative(value);
         }
@@ -236,9 +229,9 @@ impl Aggregator {
                 // If positive delta, add directly but also record the state.
                 self.value = addition(self.value, value, self.limit).map_err(|err| {
                     if self.value < u128::MAX - value {
-                        self.record_overflow(ExtendedU128::U128(self.value + value));
+                        self.record_overflow(Some(self.value + value));
                     } else {
-                        self.record_overflow(ExtendedU128::Overflow);
+                        self.record_overflow(None);
                     }
                     err
                 })?;
@@ -254,7 +247,7 @@ impl Aggregator {
                     self.value = subtraction(value, self.value)?;
                     self.state = AggregatorState::PositiveDelta;
                     if self.value > self.limit {
-                        self.record_overflow(ExtendedU128::U128(self.value));
+                        self.record_overflow(Some(self.value));
                     }
                 } else {
                     self.value = subtraction(self.value, value)?;
@@ -292,14 +285,14 @@ impl Aggregator {
                     // TODO: maybe `subtraction` should also know about the limit?
                     subtraction(self.limit, value).map_err(|err| {
                         // TODO: The underflow value may not be correct here.
-                        self.record_underflow(ExtendedU128::U128(value));
+                        self.record_underflow(Some(value));
                         err
                     })?;
 
                     self.value = subtraction(value, self.value)?;
                     self.state = AggregatorState::NegativeDelta;
                     if value - self.value > self.limit {
-                        self.record_underflow(ExtendedU128::U128(value - self.value));
+                        self.record_underflow(Some(value - self.value));
                     }
                 }
             },
@@ -310,9 +303,9 @@ impl Aggregator {
                 // we should return an error there.
                 self.value = addition(self.value, value, self.limit).map_err(|err| {
                     if self.value < u128::MAX - value {
-                        self.record_underflow(ExtendedU128::U128(self.value + value));
+                        self.record_underflow(Some(self.value + value));
                     } else {
-                        self.record_underflow(ExtendedU128::Underflow);
+                        self.record_underflow(None);
                     }
                     err
                 })?;
@@ -524,7 +517,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::None
+            None
         );
         assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
@@ -544,7 +537,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().max_underflow_negative,
-            ExtendedU128::None
+            None
         );
         assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
@@ -595,7 +588,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::U128(800)
+            Some(800)
         );
 
         // +0 + 300 < 600
@@ -606,7 +599,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::U128(800)
+            Some(800)
         );
 
         // +300 + 400 > 600!x
@@ -617,7 +610,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::U128(700)
+            Some(700)
         );
 
         let aggregator = aggregator_data
@@ -632,7 +625,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::None
+            None
         );
 
         // 100 + 200 > 200!
@@ -643,7 +636,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::U128(300)
+            Some(300)
         );
 
         // 100 + 150 > 200!
@@ -654,7 +647,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::U128(250)
+            Some(250)
         );
 
         // 100 + u128::MAX > 200!
@@ -665,7 +658,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::U128(250)
+            Some(250)
         );
 
         let aggregator = aggregator_data
@@ -680,7 +673,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::None
+            None
         );
 
         // 100 + u128::MAX > 300!
@@ -691,7 +684,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::Overflow
+            None
         );
 
         // 100 + 250 > 300!
@@ -702,7 +695,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().min_overflow_positive,
-            ExtendedU128::U128(350)
+            Some(350)
         );
     }
 
@@ -722,7 +715,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().max_underflow_negative,
-            ExtendedU128::U128(700)
+            Some(700)
         );
 
         assert_ok!(aggregator.try_add(200));
@@ -734,7 +727,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().max_underflow_negative,
-            ExtendedU128::U128(700)
+            Some(700)
         );
 
         assert_err!(aggregator.try_sub(550));
@@ -744,7 +737,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().max_underflow_negative,
-            ExtendedU128::U128(650)
+            Some(650)
         );
 
         assert_err!(aggregator.try_sub(800));
@@ -754,7 +747,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().max_underflow_negative,
-            ExtendedU128::U128(650)
+            Some(650)
         );
 
         // Similarly, we cannot subtract anything from 0...
@@ -782,7 +775,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().max_underflow_negative,
-            ExtendedU128::Underflow
+            None
         );
 
         assert_ok!(aggregator.try_sub(100));
@@ -792,7 +785,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().max_underflow_negative,
-            ExtendedU128::Underflow
+            None
         );
 
         assert_err!(aggregator.try_sub(101));
@@ -802,7 +795,7 @@ mod test {
         );
         assert_eq!(
             aggregator.history.as_ref().unwrap().max_underflow_negative,
-            ExtendedU128::U128(301)
+            Some(301)
         );
     }
 

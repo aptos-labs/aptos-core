@@ -8,7 +8,6 @@ use super::{
     *,
 };
 use aptos_aggregator::{
-    aggregator_extension::ExtendedU128,
     delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate},
     transaction::AggregatorValue,
 };
@@ -222,14 +221,7 @@ fn materialize_delta_shortcut() {
     match_unresolved(vd.fetch_data(&ap, 10), DeltaUpdate::Plus(30));
     assert_err_eq!(
         vd.materialize_delta(&ap, 8),
-        DeltaOp::new(
-            DeltaUpdate::Plus(30),
-            limit,
-            30,
-            0,
-            ExtendedU128::None,
-            ExtendedU128::None
-        )
+        DeltaOp::new(DeltaUpdate::Plus(30), limit, 30, 0, None, None)
     );
     vd.set_aggregator_base_value(&ap, 5);
     // Multiple calls are idempotent.
