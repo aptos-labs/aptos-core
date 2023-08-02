@@ -106,15 +106,6 @@ pub fn try_sub_add(
     )
 }
 
-pub fn destroy(harness: &mut MoveHarness, account: &Account, index: u64) -> SignedTransaction {
-    harness.create_entry_function(
-        account,
-        str::parse("0x1::aggregator_v2_test::destroy").unwrap(),
-        vec![],
-        vec![bcs::to_bytes(&index).unwrap()],
-    )
-}
-
 pub fn materialize(harness: &mut MoveHarness, account: &Account, index: u64) -> SignedTransaction {
     harness.create_entry_function(
         account,

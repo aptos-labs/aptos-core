@@ -4,8 +4,7 @@
 use crate::natives::aggregator_natives::{helpers_v2::aggregator_info, NativeAggregatorContext};
 use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::{
-    AGGREGATOR_V2_DESTROY_BASE, AGGREGATOR_V2_READ_BASE, AGGREGATOR_V2_TRY_ADD_BASE,
-    AGGREGATOR_V2_TRY_SUB_BASE, *,
+    AGGREGATOR_V2_READ_BASE, AGGREGATOR_V2_TRY_ADD_BASE, AGGREGATOR_V2_TRY_SUB_BASE, *,
 };
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
@@ -119,32 +118,6 @@ fn native_read(
 }
 
 /***************************************************************************************************
- * native fun destroy(aggregator: Aggregator);
- **************************************************************************************************/
-
-fn native_destroy(
-    context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert_eq!(args.len(), 1);
-
-    context.charge(AGGREGATOR_V2_DESTROY_BASE)?;
-
-    // Extract information from aggregator struct reference.
-    let (id, _limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
-
-    // Get aggregator data.
-    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-
-    // Actually remove the aggregator.
-    aggregator_data.remove_aggregator(id);
-
-    Ok(smallvec![])
-}
-
-/***************************************************************************************************
  * module
  **************************************************************************************************/
 
@@ -159,7 +132,6 @@ pub fn make_all(
         ("try_add", native_try_add),
         ("read", native_read),
         ("try_sub", native_try_sub),
-        ("destroy", native_destroy),
     ];
 
     builder.make_named_natives(natives)

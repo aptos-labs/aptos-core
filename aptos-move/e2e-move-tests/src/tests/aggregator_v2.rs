@@ -3,8 +3,8 @@
 
 use crate::{
     aggregator_v2::{
-        check, destroy, initialize, materialize, materialize_and_try_add, materialize_and_try_sub,
-        new, try_add, try_add_and_materialize, try_sub, try_sub_add, try_sub_and_materialize,
+        check, initialize, materialize, materialize_and_try_add, materialize_and_try_sub, new,
+        try_add, try_add_and_materialize, try_sub, try_sub_add, try_sub_and_materialize,
     },
     assert_abort, assert_success,
     tests::common,
@@ -88,9 +88,6 @@ fn test_aggregator_lifetime() {
         try_add_and_materialize(&mut h, &acc, 0, 501),
         try_sub_and_materialize(&mut h, &acc, 0, 1001),
         check(&mut h, &acc, 0, 1000),
-        destroy(&mut h, &acc, 0),
-        // Aggregator has been destroyed and we cannot add this delta.
-        try_add(&mut h, &acc, 0, 1),
     ];
     let outputs = h.run_block(txns);
     // 2 materializations should have failed.
@@ -102,10 +99,6 @@ fn test_aggregator_lifetime() {
     assert_success!(outputs[7]);
     assert_success!(outputs[9]);
     assert_success!(outputs[12]);
-
-    // Aggregator is destroyed (abort code from `table::borrow` failure).
-    assert_success!(outputs[13]);
-    assert_abort!(outputs[14], 25863);
 }
 
 #[test]
