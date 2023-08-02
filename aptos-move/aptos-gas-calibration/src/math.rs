@@ -112,18 +112,25 @@ pub fn compute_least_square_solutions(
 pub fn find_linearly_dependent_variables(
     A: &mut DMatrix<f64>,
     b: &mut DMatrix<f64>,
-) -> Result<Vec<(usize, usize)>, Vec<usize>> {
+    gas_params: Vec<String>,
+) -> Result<Vec<String>, Vec<usize>> {
     let mut aug_matrix = DMatrix::<f64>::zeros(A.nrows(), A.ncols() + 1);
     create_augmented_matrix(&mut aug_matrix, A, b);
     rref(&mut aug_matrix);
 
-    let is_ones = validate_rref_rows_are_one(&mut aug_matrix);
+    /*let is_ones = validate_rref_rows_are_one(&mut aug_matrix);
     if is_ones {
         return Err(find_pivot_columns(&mut aug_matrix));
-    }
+    }*/
 
-    let linear_combos = find_linear_dependent_combinations(&mut aug_matrix);
-    Ok(linear_combos)
+    let linearly_independent = find_linear_independent_variables(&mut aug_matrix);
+    let mut linearly_dependent = Vec::new();
+    for (idx, gas_param) in gas_params.into_iter().enumerate() {
+        if !linearly_independent.contains(&idx) {
+            linearly_dependent.push(gas_param)
+        }
+    }
+    Ok(linearly_dependent)
 }
 
 /// We use the Least Squares solution to input into the LHS to get what we
@@ -219,7 +226,7 @@ fn find_pivot_columns(matrix: &mut DMatrix<f64>) -> Vec<usize> {
 ///
 /// * `matrix` - A matrix to perform RREF
 fn rref(matrix: &mut DMatrix<f64>) {
-    let (rows, cols) = matrix.shape();
+    /*let (rows, cols) = matrix.shape();
     let num_pivots = rows.min(cols);
 
     for pivot_row in 0..num_pivots {
@@ -241,6 +248,51 @@ fn rref(matrix: &mut DMatrix<f64>) {
                 }
             }
         }
+    }*/
+
+    let (nrows, ncols) = matrix.shape();
+    let mut lead = 0;
+
+    for r in 0..nrows {
+        if ncols <= lead {
+            break;
+        }
+
+        let mut i = r;
+
+        while matrix[(i, lead)] == 0.0 {
+            i += 1;
+
+            if nrows == i {
+                i = r;
+                lead += 1;
+
+                if ncols == lead {
+                    return;
+                }
+            }
+        }
+
+        if i != r {
+            matrix.swap_rows(i, r);
+        }
+
+        let pivot = matrix[(r, lead)];
+
+        for j in 0..ncols {
+            matrix[(r, j)] /= pivot;
+        }
+
+        for i in 0..nrows {
+            if i != r {
+                let factor = matrix[(i, lead)];
+                for j in 0..ncols {
+                    matrix[(i, j)] -= factor * matrix[(r, j)];
+                }
+            }
+        }
+
+        lead += 1;
     }
 }
 
@@ -313,12 +365,13 @@ fn validate_rref_rows_are_one(matrix: &mut DMatrix<f64>) -> bool {
 /// ### Arguments
 ///
 /// * `matrix` - Augmented matrix that has been RREF'd
-fn find_linear_dependent_combinations(matrix: &mut DMatrix<f64>) -> Vec<(usize, usize)> {
+fn find_linear_independent_variables(matrix: &mut DMatrix<f64>) -> Vec<usize> {
     let mut i = 0;
-    let mut j = 0;
 
     let mut linear_combos = Vec::new();
     while i < matrix.nrows() {
+        let mut j = 0;
+
         let mut max_val: f64 = 0.0;
         let mut k = 0;
         while k < matrix.ncols() - 1 {
@@ -327,6 +380,12 @@ fn find_linear_dependent_combinations(matrix: &mut DMatrix<f64>) -> Vec<(usize, 
                 max_val = a_ik;
             }
             k += 1;
+        }
+
+        if approx_eq!(f64, max_val, 0.0, ulps = 2) {
+            // ignore this row
+            i += 1;
+            continue;
         }
 
         let mut independent_vars = Vec::new();
@@ -341,15 +400,14 @@ fn find_linear_dependent_combinations(matrix: &mut DMatrix<f64>) -> Vec<(usize, 
             j += 1;
         }
 
-        if independent_vars.len() > 1 {
+        if independent_vars.len() == 1 {
             // mark all linear combinations as undetermined
-            for (eq, gas_param) in independent_vars {
-                linear_combos.push((eq, gas_param));
+            for (_, gas_param) in independent_vars {
+                linear_combos.push(gas_param);
             }
         }
 
         i += 1;
-        j = 0;
     }
 
     linear_combos
