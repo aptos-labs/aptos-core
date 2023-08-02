@@ -248,6 +248,7 @@ impl Worker {
                 let cdn_json_uri =
                     write_json_to_gcs(self.config.bucket.clone(), self.token_data_id.clone(), json)
                         .await
+                        .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                         .ok();
                 self.model.set_cdn_json_uri(cdn_json_uri);
             }
@@ -305,6 +306,7 @@ impl Worker {
                     image,
                 )
                 .await
+                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                 .ok();
                 self.model.set_cdn_image_uri(cdn_image_uri);
             }
@@ -365,6 +367,7 @@ impl Worker {
                     animation,
                 )
                 .await
+                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                 .ok();
                 self.model.set_cdn_animation_uri(cdn_animation_uri);
             }
