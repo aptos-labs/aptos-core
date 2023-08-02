@@ -52,11 +52,7 @@ impl OnChainExecutionConfig {
     /// The default values to use for new networks, e.g., devnet, forge.
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
-        OnChainExecutionConfig::V3(ExecutionConfigV3 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
-            block_gas_limit: Some(35000),
-            ..Default::default()
-        })
+        OnChainExecutionConfig::V3(ExecutionConfigV3::default())
     }
 
     /// The default values to use when on-chain config is not initialized.
@@ -122,8 +118,8 @@ pub struct ExecutionConfigV3 {
 impl Default for ExecutionConfigV3 {
     fn default() -> Self {
         Self {
-            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
-            block_gas_limit: None,
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            block_gas_limit: Some(35000),
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         }
     }
