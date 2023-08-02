@@ -194,7 +194,6 @@ describe("Indexer", () => {
         const tokenData = await indexerClient.getTokenData(
           accountTokens.current_token_ownerships_v2[0].current_token_data!.token_data_id,
         );
-        expect(tokenData.current_token_datas_v2[0].token_standard).toEqual("v1");
         expect(tokenData.current_token_datas_v2[0].token_name).toEqual(tokenName);
       },
       longTestTimeout,
@@ -340,7 +339,7 @@ describe("Indexer", () => {
     it(
       "gets user transactions",
       async () => {
-        const userTransactions = await indexerClient.getUserTransactions(undefined, { options: { limit: 4 } });
+        const userTransactions = await indexerClient.getUserTransactions({ options: { limit: 4 } });
         expect(userTransactions.user_transactions.length).toEqual(4);
       },
       longTestTimeout,

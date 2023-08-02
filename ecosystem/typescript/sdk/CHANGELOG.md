@@ -22,6 +22,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 - Add support for local/custom networks without an indexer client
 - Move to use `account_transactions` query in `getAccountTransactionsData` on `IndexerClient`
 - Move to use `account_transaction_aggregate` query in `getAccountTransactionsCount` on `IndexerClient`
+- Optional `startVersion` argument on `getUserTransactions` is not positional and part of the object param
 
 ## 1.15.0 (2023-07-28)
 

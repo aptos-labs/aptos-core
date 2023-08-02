@@ -747,17 +747,16 @@ export class IndexerClient {
   /**
    * Queries top user transactions
    *
+   * @param startVersion optional - can be set to tell indexer what version to start from
    * @returns GetUserTransactionsQuery response type
    */
-  async getUserTransactions(
-    startVersion?: number,
-    extraArgs?: {
-      options?: IndexerPaginationArgs;
-      orderBy?: IndexerSortBy<User_Transactions_Order_By>[];
-    },
-  ): Promise<GetUserTransactionsQuery> {
+  async getUserTransactions(extraArgs?: {
+    startVersion?: number;
+    options?: IndexerPaginationArgs;
+    orderBy?: IndexerSortBy<User_Transactions_Order_By>[];
+  }): Promise<GetUserTransactionsQuery> {
     const whereCondition: any = {
-      version: { _lte: startVersion },
+      version: { _lte: extraArgs?.startVersion },
     };
 
     const graphqlQuery = {
