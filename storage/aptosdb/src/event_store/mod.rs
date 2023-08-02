@@ -317,14 +317,14 @@ impl EventStore {
             .iter()
             .enumerate()
             .try_for_each::<_, Result<_>>(|(idx, event)| {
-                if let ContractEvent::V0(v0) = event {
+                if let ContractEvent::V1(v1) = event {
                     if !skip_index {
                         batch.put::<EventByKeySchema>(
-                            &(*v0.key(), v0.sequence_number()),
+                            &(*v1.key(), v1.sequence_number()),
                             &(version, idx as u64),
                         )?;
                         batch.put::<EventByVersionSchema>(
-                            &(*v0.key(), version, v0.sequence_number()),
+                            &(*v1.key(), version, v1.sequence_number()),
                             &(idx as u64),
                         )?;
                     }
@@ -472,8 +472,8 @@ impl EventStore {
         let mut current_version = start;
         for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
             for (current_index, event) in (events?).into_iter().enumerate().filter_map(|(i, e)| {
-                if let ContractEvent::V0(v0) = e {
-                    Some((i, v0))
+                if let ContractEvent::V1(v1) = e {
+                    Some((i, v1))
                 } else {
                     None
                 }

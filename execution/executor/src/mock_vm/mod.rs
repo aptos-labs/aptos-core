@@ -111,7 +111,7 @@ impl VMExecutor for MockVM {
                     // WriteSet cannot be empty so use genesis writeset only for testing.
                     gen_genesis_writeset(),
                     // mock the validator set event
-                    vec![ContractEvent::new_v0(
+                    vec![ContractEvent::new_v1(
                         new_epoch_event_key(),
                         0,
                         TypeTag::Bool,
@@ -320,7 +320,7 @@ fn gen_payment_writeset(
 }
 
 fn gen_events(sender: AccountAddress) -> Vec<ContractEvent> {
-    vec![ContractEvent::new_v0(
+    vec![ContractEvent::new_v1(
         EventKey::new(111, sender),
         0,
         TypeTag::Vector(Box::new(TypeTag::U8)),
