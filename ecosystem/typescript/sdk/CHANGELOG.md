@@ -11,6 +11,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
   - Aggregate query suports token v2 activities - `getTokenActivitiesCount`
   - Support for sorting indexer queries - `orderBy` optional argument in `extraArgs` arguments
   - Support for get owned tokens by token address or token data id - `getOwnedTokensByTokenData`
+- Add support for local/custom networks without an indexer client
 
 ## 1.15.0 (2023-07-28)
 
