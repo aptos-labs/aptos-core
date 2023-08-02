@@ -4,6 +4,7 @@ use crate::{
     dag::{
         anchor_election::RoundRobinAnchorElection,
         dag_driver::{DagDriver, DagDriverError},
+        dag_fetcher::FetchRequester,
         dag_network::{DAGNetworkSender, RpcWithFallback},
         dag_store::Dag,
         order_rule::OrderRule,
@@ -91,6 +92,10 @@ fn test_certified_node_handler() {
         Box::new(RoundRobinAnchorElection::new(validators)),
         ordered_nodes_sender,
     );
+
+    let (request_tx, _) = tokio::sync::mpsc::channel(10);
+    let fetch_requester = Arc::new(FetchRequester::new(request_tx));
+
     let mut driver = DagDriver::new(
         signers[0].author(),
         epoch_state,
@@ -101,6 +106,7 @@ fn test_certified_node_handler() {
         time_service,
         storage,
         order_rule,
+        fetch_requester,
     );
 
     // expect an ack for a valid message
