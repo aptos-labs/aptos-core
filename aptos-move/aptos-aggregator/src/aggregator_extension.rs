@@ -22,11 +22,11 @@ pub enum AggregatorState {
     NegativeDelta,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorHandle(pub AccountAddress);
 
 /// Uniquely identifies each aggregator instance in storage.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AggregatorID {
     // Aggregator V1 is implemented as a Table item, and so can be queried by the
     // state key.
@@ -64,6 +64,33 @@ impl AggregatorID {
     }
 }
 
+/// Uniquely identifies each aggregator snapshot instance during the block execution.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AggregatorSnapshotID {
+    id: u64
+}
+
+/// Internal AggregatorSnapshot data structure.
+#[derive(Debug)]
+pub struct AggregatorSnapshot {
+    // Describes a value of an aggregator.
+    value: u128,
+    // Describes a state of an aggregator.
+    state: AggregatorState,
+    // Describes an upper bound of an aggregator. If `value` exceeds it, the
+    // aggregator overflows.
+    // TODO: Currently this is a single u128 value since we use 0 as a trivial
+    // lower bound. If we want to support custom lower bounds, or have more
+    // complex postconditions, we should factor this out in its own struct.
+    limit: u128,
+    // Describes values seen by this aggregator. Note that if aggregator knows
+    // its value, then storing history doesn't make sense.
+    history: Option<History>,
+    // The AggregatorID of the aggregator from which the snapshot is taken.
+    base_aggregator: AggregatorID
+}
+
+
 /// Tracks values seen by aggregator. In particular, stores information about
 /// the biggest and the smallest deltas seen during execution in the VM. This
 /// information can be used by the executor to check if delta should have
@@ -92,7 +119,7 @@ impl AggregatorID {
 ///
 /// TODO: while we support tracking of the history, it is not yet fully used on
 /// executor side because we don't know how to throw errors.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct History {
     pub max_achieved_positive: u128,
     pub min_achieved_negative: u128,
@@ -376,6 +403,8 @@ pub struct AggregatorData {
     destroyed_aggregators: BTreeSet<AggregatorID>,
     // All aggregator instances that exist in the current transaction.
     aggregators: BTreeMap<AggregatorID, Aggregator>,
+    // All aggregatorsnapshot instances that exist in the current transaction.
+    aggregator_snapshots: BTreeMap<AggregatorSnapshotID, AggregatorSnapshot>,
     // Counter for generating identifiers for AggregatorSnapshots.
     pub id_counter: u64,
 }
@@ -439,6 +468,44 @@ impl AggregatorData {
             // Otherwise, aggregator has been created somewhere else.
             self.destroyed_aggregators.insert(id);
         }
+    }
+
+    pub fn snapshot(&mut self,
+        id: &AggregatorID,
+    ) -> AggregatorSnapshotID {
+        let snapshot_id = AggregatorSnapshotID {
+            id: self.generate_id()
+        };
+        let aggregator = self.aggregators.get(id).expect("Aggregator doesn't exist");
+        self.aggregator_snapshots.insert(snapshot_id,
+            AggregatorSnapshot {
+                value: aggregator.value,
+                state: aggregator.state,
+                limit: aggregator.limit,
+                history: aggregator.history.clone(),
+                base_aggregator: *id
+            }
+        );
+        snapshot_id
+    }
+
+    pub fn snapshot_with_u64_limit(&mut self,
+        id: &AggregatorID
+    ) -> AggregatorSnapshotID {
+        let snapshot_id = AggregatorSnapshotID {
+            id: self.generate_id()
+        };
+        let aggregator = self.aggregators.get(id).expect("Aggregator doesn't exist");
+        self.aggregator_snapshots.insert(snapshot_id,
+            AggregatorSnapshot {
+                value: aggregator.value,
+                state: aggregator.state,
+                limit: u128::min(aggregator.limit, u64::MAX as u128),
+                history: aggregator.history.clone(),
+                base_aggregator: *id
+            }
+        );
+        snapshot_id
     }
 
     pub fn generate_id(&mut self) -> u64 {
