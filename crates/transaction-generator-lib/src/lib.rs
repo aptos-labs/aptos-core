@@ -13,6 +13,11 @@ use aptos_sdk::{
 };
 use args::TransactionTypeArg;
 use async_trait::async_trait;
+use rand::{rngs::StdRng, seq::SliceRandom, Rng};
+#[cfg(test)]
+use rand_core::SeedableRng;
+#[cfg(test)]
+use std::collections::HashSet;
 use std::{
     collections::HashMap,
     sync::{
@@ -88,6 +93,231 @@ pub trait TransactionGenerator: Sync + Send {
         account: &mut LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction>;
+}
+
+pub trait TxnPatternGenerator: Send + Sync {
+    /*
+        1. The class implementing the trait should ensure that the pool is large enough.
+        2. The trait is independent of the contents of the pool. In case the contents of the pool
+           matter, then the class implementing the trait should handle it.
+        3. The trait returns: array of [senders, [multi_sig_signers], [receivers]]
+    */
+    fn generate_tx_pattern(
+        &mut self,
+        rng: &mut StdRng,
+        pool_start: usize,
+        pool_size: usize,
+        num_txns: usize,
+        num_multi_sig_signers_per_txn: usize,
+        num_receivers_per_txn: usize,
+    ) -> Vec<(usize, Vec<usize>, Vec<usize>)>;
+}
+
+/// A sampler that samples a random subset of the pool. Samples are replaced immediately.
+#[derive(Default)]
+pub struct RandomTxnPatternGenerator {}
+
+impl TxnPatternGenerator for RandomTxnPatternGenerator {
+    fn generate_tx_pattern(
+        &mut self,
+        rng: &mut StdRng,
+        pool_start: usize,
+        pool_size: usize,
+        num_txns: usize,
+        num_multi_sig_signers_per_txn: usize,
+        num_receivers_per_txn: usize,
+    ) -> Vec<(usize, Vec<usize>, Vec<usize>)> {
+        let pool_end = pool_start + pool_size;
+        let mut result = Vec::new();
+        for _ in 0..num_txns {
+            let sender = rng.gen_range(pool_start, pool_end);
+            let mut multi_sig_signers = Vec::new();
+            for _ in 0..num_multi_sig_signers_per_txn {
+                multi_sig_signers.push(rng.gen_range(pool_start, pool_end));
+            }
+            let mut receivers = Vec::new();
+            for _ in 0..num_receivers_per_txn {
+                receivers.push(rng.gen_range(pool_start, pool_end));
+            }
+            result.push((sender, multi_sig_signers, receivers));
+        }
+        result
+    }
+}
+
+#[test]
+fn test_random_txn_pattern_generator() {
+    let mut rng = StdRng::from_entropy();
+    let mut generator = RandomTxnPatternGenerator::default();
+    let pool_size = 100;
+    let num_txns = 10;
+    let num_multi_sig_signers_per_txn = 2;
+    let num_receivers_per_txn = 3;
+    let result = generator.generate_tx_pattern(
+        &mut rng,
+        0,
+        pool_size,
+        num_txns,
+        num_multi_sig_signers_per_txn,
+        num_receivers_per_txn,
+    );
+
+    assert_eq!(result.len(), num_txns);
+    for (sender, multi_sig_signers, receivers) in result {
+        assert!(sender < pool_size);
+        assert_eq!(multi_sig_signers.len(), num_multi_sig_signers_per_txn);
+        assert_eq!(receivers.len(), num_receivers_per_txn);
+        for signer in multi_sig_signers {
+            assert!(signer < pool_size);
+        }
+        for receiver in receivers {
+            assert!(receiver < pool_size);
+        }
+    }
+}
+
+pub struct ConnectedTxnPatternGenerator {
+    /*
+        A 'connected transaction group' is a group of transactions where all the transactions are
+        connected to each other, that is they cannot be executed in parallel.
+        Transactions across different groups can be executed in parallel.
+    */
+    num_connected_txn_grps: usize,
+}
+
+impl ConnectedTxnPatternGenerator {
+    pub fn new(num_connected_txn_grps: usize) -> Self {
+        Self {
+            num_connected_txn_grps,
+        }
+    }
+
+    fn get_connected_random_transfers(
+        &mut self,
+        rng: &mut StdRng,
+        num_transfers: usize,
+        accounts_st_idx: usize,
+        accounts_end_idx: usize,
+    ) -> Vec<(usize, Vec<usize>, Vec<usize>)> {
+        let mut unused_indices: Vec<_> = (accounts_st_idx..=accounts_end_idx).collect();
+        unused_indices.shuffle(rng);
+        let mut used_indices: Vec<_> =
+            vec![unused_indices.pop().unwrap(), unused_indices.pop().unwrap()];
+        let mut transfer_indices: Vec<(usize, Vec<usize>, Vec<usize>)> =
+            vec![(used_indices[0], vec![], vec![used_indices[1]])];
+
+        for _ in 1..num_transfers {
+            // index1 is from used_indices, so that all the txns are connected
+            let mut index1 = used_indices[rng.gen_range(0, used_indices.len())];
+
+            // index2 is either from used_indices or unused_indices
+            let mut index2;
+            let rnd = rng.gen_range(0, used_indices.len() + unused_indices.len());
+            if rnd < used_indices.len() {
+                index2 = used_indices[rnd];
+            } else {
+                // unused_indices is shuffled already, so last element is random
+                index2 = unused_indices.pop().unwrap();
+                used_indices.push(index2);
+            }
+
+            if rng.gen_range(0, 2) == 0 {
+                // with 50% probability, swap the indices of sender and receiver
+                (index1, index2) = (index2, index1);
+            }
+            transfer_indices.push((index1, vec![], vec![index2]));
+        }
+        transfer_indices
+    }
+}
+
+impl TxnPatternGenerator for ConnectedTxnPatternGenerator {
+    fn generate_tx_pattern(
+        &mut self,
+        rng: &mut StdRng,
+        pool_start: usize,
+        pool_size: usize,
+        num_txns: usize,
+        _: usize, // num_multi_sig_signers_per_txn == 0
+        _: usize, // num_receivers_per_txn == 1
+    ) -> Vec<(usize, Vec<usize>, Vec<usize>)> {
+        let num_accounts_per_grp = pool_size / self.num_connected_txn_grps;
+
+        // TODO: handle when block_size isn't divisible by num_connected_txn_grps; an easy
+        //       way to do this is to just generate a few more transactions in the last group
+        let num_txns_per_grp = num_txns / self.num_connected_txn_grps;
+
+        if num_txns_per_grp >= num_accounts_per_grp {
+            panic!("For the desired workload we want num_accounts_per_grp ({}) > num_txns_per_grp ({})", num_accounts_per_grp, num_txns_per_grp);
+        }
+
+        let result: Vec<_> = (0..self.num_connected_txn_grps)
+            .flat_map(|grp_idx| {
+                self.get_connected_random_transfers(
+                    rng,
+                    num_txns_per_grp,
+                    pool_start + grp_idx * num_accounts_per_grp,
+                    (grp_idx + 1) * num_accounts_per_grp - 1,
+                )
+            })
+            .collect();
+        result
+    }
+}
+
+#[test]
+fn test_connected_txn_pattern_generator() {
+    let mut rng = StdRng::from_entropy();
+    let num_connected_txn_grps = 3;
+    let mut generator = ConnectedTxnPatternGenerator::new(num_connected_txn_grps);
+    let pool_size = 100;
+    let num_txns = 10;
+    let result = generator.generate_tx_pattern(&mut rng, 0, pool_size, num_txns, 0, 1);
+
+    {
+        let mut adj_list: HashMap<usize, HashSet<usize>> = HashMap::new();
+        assert_eq!(
+            result.len(),
+            num_txns / num_connected_txn_grps * num_connected_txn_grps
+        );
+        for (sender, multi_sig_signers, receivers) in result {
+            assert!(sender < pool_size);
+            assert_eq!(multi_sig_signers.len(), 0);
+            assert_eq!(receivers.len(), 1);
+            assert!(receivers[0] < pool_size);
+            adj_list
+                .entry(sender)
+                .or_insert(HashSet::new())
+                .insert(receivers[0]);
+            adj_list
+                .entry(receivers[0])
+                .or_insert(HashSet::new())
+                .insert(sender);
+        }
+        // check the number of connected components in the graph
+        fn dfs(
+            node: usize,
+            adj_list: &HashMap<usize, HashSet<usize>>,
+            visited: &mut HashSet<usize>,
+        ) {
+            visited.insert(node);
+            for &next_node in adj_list.get(&node).unwrap() {
+                if !visited.contains(&next_node) {
+                    dfs(next_node, adj_list, visited);
+                }
+            }
+        }
+
+        let mut visited = HashSet::new();
+        let mut num_connected_components = 0;
+        for node in adj_list.keys() {
+            if !visited.contains(node) {
+                dfs(*node, &adj_list, &mut visited);
+                num_connected_components += 1;
+            }
+        }
+        assert_eq!(num_connected_components, num_connected_txn_grps);
+    }
 }
 
 #[async_trait]
