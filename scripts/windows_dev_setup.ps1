@@ -149,29 +149,37 @@ function check_os {
 }
 
 function install_winget {
-  $xaml_url = "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.7.1"
-  $xaml_downloadpath = "Microsoft.UI.Xaml.2.7.1.nupkg.zip"
-  $xaml_filepath = "Microsoft.UI.Xaml.2.7.1.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.7.appx"
+  $xaml_short_version = "2.8"
+  $xaml_version = "2.8.5"
+  $xaml_url = "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/$xaml_version"
+  $xaml_downloadpath = "Microsoft.UI.Xaml.$xaml_version.nupkg.zip"
+  $xaml_filepath = "Microsoft.UI.Xaml.$xaml_version.nupkg\tools\AppX\x64\Release\Microsoft.UI.Xaml.$xaml_short_version.appx"
 
-  $vclib_url = "https://aka.ms/Microsoft.VCLibs.x$global:architecture.14.00.Desktop.appx"
-  $vclib_downloadpath = "Microsoft.VCLibs.x$global:architecture.14.00.Desktop.appx"
+  $vclib_version = "14.00"
+  $vclib_url = "https://aka.ms/Microsoft.VCLibs.x$global:architecture.$vclib_version.Desktop.appx"
+  $vclib_downloadpath = "Microsoft.VCLibs.x$global:architecture.$vclib_version.Desktop.appx"
 
-  $installer_url = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+  $winget_version = "v1.5.1881"
+  $installer_url = "https://github.com/microsoft/winget-cli/releases/download/$winget_version/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
   $installer_downloadpath = "msftwinget.msixbundle"
 
-  $license_url = "https://github.com/microsoft/winget-cli/releases/download/v1.4.10173/3463fe9ad25e44f28630526aa9ad5648_License1.xml"  
+  # Note this URL will need to be updated each time because the license changes over time
+  $license_url = "https://github.com/microsoft/winget-cli/releases/download/$winget_version/c6bee58ade21451eb54dc52e559a314c_License1.xml"
   $license_downloadpath = "license.xml"
   
   # Download and extract XAML (dependency)
+  Write-Host "Fetching Microsoft.UI.XAML $xaml_version"
   Invoke-WebRequest -Uri $xaml_url -OutFile $xaml_downloadpath -ErrorAction SilentlyContinue
   Expand-Archive $xaml_downloadpath -ErrorAction SilentlyContinue
 
   # Download and install VCLibs and XAML (dependencies)
+  Write-Host "Fetching VCLib $vclib_version"
   Invoke-WebRequest -Uri $vclib_url -OutFile $vclib_downloadpath -ErrorAction SilentlyContinue
   Add-AppxPackage $vclib_downloadpath -ErrorAction SilentlyContinue
   Add-AppxPackage $xaml_filepath -ErrorAction SilentlyContinue
 
   # Download and install WinGet
+  Write-Host "Fetching Winget $winget_version"
   Invoke-WebRequest -Uri $installer_url -OutFile $installer_downloadpath -ErrorAction SilentlyContinue
   Invoke-WebRequest -Uri $license_url -OutFile $license_downloadpath -ErrorAction SilentlyContinue
   Add-AppxProvisionedPackage -Online -PackagePath $installer_downloadpath -LicensePath $license_downloadpath -ErrorAction SilentlyContinue
@@ -455,7 +463,7 @@ function install_boogie {
     $boogie_exe_path = "$env:USERPROFILE\.dotnet\tools\boogie.exe"
     [Environment]::SetEnvironmentVariable("BOOGIE_EXE", $boogie_exe_path, "User")
     Write-Host "User environment variables set for Boogie"
-  } 
+  }
   else {
     Write-Host "Boogie is already installed."
   }
@@ -503,7 +511,12 @@ if ($t -or $y) {
   switch ($selection) {
     't' { install_build_tools }
     'y' { install_move_prover }
-    default { Write-Host "Invalid option selected. Please enter 't' or 'y'." }
+    default {
+      Write-Host "Invalid option selected. Please enter 't' or 'y'."
+
+      # Exit so users don't think it finished successfully
+      Exit
+    }
   }
 }
 
