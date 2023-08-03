@@ -4,7 +4,7 @@
 //! This file implements traits for Ed25519 signatures.
 
 use crate::{
-    p256::{P256PrivateKey, P256PublicKey,L},
+    p256::{P256PrivateKey, P256PublicKey, ORDER_HALF},
     hash::CryptoHash,
     traits::*,
 };
@@ -13,6 +13,7 @@ use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use core::convert::TryFrom;
 use serde::Serialize;
 use std::{cmp::Ordering, fmt};
+use signature::Verifier;
 
 use super::P256_SIGNATURE_LENGTH;
 
@@ -28,7 +29,8 @@ impl P256Signature {
 
     /// Serialize an P256Signature.
     pub fn to_bytes(&self) -> [u8; P256_SIGNATURE_LENGTH] {
-        self.0.to_bytes()
+        // TODO: Better error handling
+        self.0.to_bytes().try_into().unwrap()
     }
 
     /// Deserialize an P256Signature without any validation checks (malleability)
@@ -48,7 +50,7 @@ impl P256Signature {
         Self::from_bytes_unchecked(&[0u8; Self::LENGTH]).unwrap()
     }
 
-    /*/// Check for correct size and third-party based signature malleability issues.
+    /// Check for correct size and third-party based signature malleability issues.
     /// This method is required to ensure that given a valid signature for some message under some
     /// key, an attacker cannot produce another valid signature for the same message and key.
     ///
@@ -65,21 +67,20 @@ impl P256Signature {
     /// Note: It's true that malicious signers can already produce varying signatures by
     /// choosing a different nonce, so this method protects against malleability attacks performed
     /// by a non-signer.
-    // TODO: Check if this is needed for p256
-    /*pub fn check_s_malleability(bytes: &[u8]) -> std::result::Result<(), CryptoMaterialError> {
-        if bytes.len() != ED25519_SIGNATURE_LENGTH {
+    pub fn check_s_malleability(bytes: &[u8]) -> std::result::Result<(), CryptoMaterialError> {
+        if bytes.len() != P256_SIGNATURE_LENGTH {
             return Err(CryptoMaterialError::WrongLengthError);
         }
-        if !Ed25519Signature::check_s_lt_l(&bytes[32..]) {
+        if !P256Signature::check_s_lt_order_half(&bytes[32..]) {
             return Err(CryptoMaterialError::CanonicalRepresentationError);
         }
         Ok(())
-    }*/
+    }
 
-    /// Check if S < L to capture invalid signatures.
-    /*fn check_s_lt_l(s: &[u8]) -> bool {
+    /// Check if S < ORDER_HALF to capture invalid signatures.
+    fn check_s_lt_order_half(s: &[u8]) -> bool {
         for i in (0..32).rev() {
-            match s[i].cmp(&L[i]) {
+            match s[i].cmp(&ORDER_HALF[i]) {
                 Ordering::Less => return true,
                 Ordering::Greater => return false,
                 _ => {},
@@ -87,7 +88,7 @@ impl P256Signature {
         }
         // As this stage S == L which implies a non canonical S.
         false
-    }*/*/
+    }
 }
 
 //////////////////////
@@ -124,7 +125,7 @@ impl Signature for P256Signature {
         // is not mauled, but does so via an optimistic path which fails into a slower path. By doing
         // our own (much faster) checking here, we can ensure dalek's optimistic path always succeeds
         // and the slow path is never triggered.
-        //Ed25519Signature::check_s_malleability(&self.to_bytes())?;
+        P256Signature::check_s_malleability(&self.to_bytes())?;
 
         // NOTE: ed25519::PublicKey::verify_strict checks that the signature's R-component and
         // the public key are *not* in a small subgroup.
@@ -133,7 +134,7 @@ impl Signature for P256Signature {
             .verify_strict(message, &self.0)
             .map_err(|e| anyhow!("{}", e))
             .and(Ok(()))*/
-        public_key.0.verify(message, &self.0).map_err(|e| anyhow!("{}", e)).and(Ok())
+        public_key.0.verify(message, &self.0).map_err(|e| anyhow!("{}", e)).and(Ok(()))
     }
 
     fn to_bytes(&self) -> Vec<u8> {

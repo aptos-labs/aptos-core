@@ -10,7 +10,7 @@ use crate::{
     hash::CryptoHash,
     traits::*,
 };
-use p256::{ecdsa::signature::Signer, elliptic_curve::sec1, NistP256};
+use p256::ecdsa::signature::Signer;
 use p256;
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
@@ -55,7 +55,7 @@ impl P256PrivateKey {
     fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PrivateKey, CryptoMaterialError> {
-        match p256::ecdsa::SigningKey::from_bytes(bytes) {
+        match p256::ecdsa::SigningKey::from_slice(bytes) {
             Ok(p256_secret_key) => Ok(P256PrivateKey(p256_secret_key)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
@@ -65,7 +65,6 @@ impl P256PrivateKey {
     /// methods of the SigningKey implementation. This should remain private.
     fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
         let secret_key: &p256::ecdsa::SigningKey = &self.0;
-        let public_key: P256PublicKey = self.into();
         let sig = secret_key.sign(message.as_ref());
         P256Signature(sig)
     }
@@ -75,9 +74,7 @@ impl P256PublicKey {
     /// Serialize a P256PublicKey.
     // TODO: Better error handling here. Also should we compress?
     pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
-        let enc = self.0.to_encoded_point(false);
-        let bytes = &*self.0.to_encoded_point(false).to_bytes();
-        bytes.try_into().unwrap()
+        (*self.0.to_sec1_bytes()).try_into().unwrap()
     }
 
     /// Deserialize a P256PublicKey without any validation checks apart from expected key size
@@ -87,9 +84,7 @@ impl P256PublicKey {
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
-        // TODO: Better error handling
-        let enc_point: sec1::EncodedPoint<NistP256> = sec1::EncodedPoint<NistP256>::from_bytes(bytes).unwrap();
-        match p256::ecdsa::VerifyingKey::from_encoded_point(&enc_point) {
+        match p256::ecdsa::VerifyingKey::from_sec1_bytes(bytes) {
             Ok(p256_public_key) => Ok(P256PublicKey(p256_public_key)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
@@ -127,10 +122,11 @@ impl SigningKey for P256PrivateKey {
 impl Uniform for P256PrivateKey {
     fn generate<R>(rng: &mut R) -> Self
     where
-       // R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
-       R: p256::elliptic_curve::rand_core::RngCore + p256::elliptic_curve::rand_core::CryptoRng,
+       R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
-        P256PrivateKey(p256::ecdsa::SigningKey::random(rng))
+        let mut bytes: [u8; P256_PRIVATE_KEY_LENGTH] = Default::default();
+        rng.fill_bytes(&mut bytes);
+        P256PrivateKey(p256::ecdsa::SigningKey::from_slice(&bytes[..]).unwrap())
     }
 }
 
@@ -188,8 +184,8 @@ impl Genesis for P256PrivateKey {
 // Implementing From<&PrivateKey<...>> allows to derive a public key in a more elegant fashion
 impl From<&P256PrivateKey> for P256PublicKey {
     fn from(private_key: &P256PrivateKey) -> Self {
-        let secret: &p256::SecretKey = &private_key.0;
-        let public: p256::PublicKey = secret.into();
+        let secret = &private_key.0;
+        let public: p256::ecdsa::VerifyingKey = secret.into();
         P256PublicKey(public)
     }
 }
@@ -224,7 +220,7 @@ impl VerifyingKey for P256PublicKey {
 
 impl fmt::Display for P256PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(self.0.as_bytes()))
+        write!(f, "{}", hex::encode(self.0.to_sec1_bytes()))
     }
 }
 
@@ -254,7 +250,7 @@ impl Length for P256PublicKey {
 
 impl ValidCryptoMaterial for P256PublicKey {
     fn to_bytes(&self) -> Vec<u8> {
-        self.0.to_bytes().to_vec()
+        self.0.to_sec1_bytes().to_vec()
     }
 }
 
