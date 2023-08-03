@@ -192,7 +192,7 @@ impl V2Partitioner {
                 (0..num_keys).into_par_iter().map(|_|RwLock::new(None)).collect()
             });
         let duration = timer.stop_and_record();
-        println!("add_edges_v2__preprocess={}", duration);
+        info!("add_edges_v2__preprocess={}", duration);
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges_v2__main"]).start_timer();
         for round_id in 0..num_rounds {
@@ -244,7 +244,7 @@ impl V2Partitioner {
             }
         }
         let duration = timer.stop_and_record();
-        println!("add_edges_v2__main={duration:?}");
+        info!("add_edges_v2__main={duration:?}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges_v2__build_return_obj"]).start_timer();
         let ret = self.thread_pool.install(||{
@@ -278,7 +278,7 @@ impl V2Partitioner {
             }).collect()
         });
         let duration = timer.stop_and_record();
-        println!("add_edges_v2__build_return_obj={duration:?}");
+        info!("add_edges_v2__build_return_obj={duration:?}");
 
         self.thread_pool.spawn(move||{
             drop(txns);

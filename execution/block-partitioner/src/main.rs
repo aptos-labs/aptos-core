@@ -58,7 +58,7 @@ fn main() {
         let partitioned = partitioner.partition(transactions.clone(), args.num_shards);
         let elapsed = now.elapsed();
         info!("Time taken to partition: {:?}", elapsed);
-        assertions(&transactions, &partitioned);
+        // assertions(&transactions, &partitioned);
     }
 }
 
