@@ -23,6 +23,7 @@ clap = { workspace = true }
 crossbeam-channel = { workspace = true }
 csv = { workspace = true }
 diesel = { workspace = true }
+diesel_migrations = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
 google-cloud-pubsub = { workspace = true }
