@@ -24,6 +24,7 @@ pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 // Core mempool stages labels
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_ACCEPTED_BLOCK_LABEL: &str = "commit_accepted_block";
+pub const COMMIT_ACCEPTED_BLOCK_TOO_SMALL_LABEL: &str = "commit_accepted_block_too_small";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
 pub const COMMIT_REJECTED_DUPLICATE_LABEL: &str = "commit_rejected_duplicate";
 pub const COMMIT_IGNORED_LABEL: &str = "commit_ignored";
