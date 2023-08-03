@@ -57,6 +57,9 @@ pub enum Commands {
         /// Url endpoint for the desired network. e.g: https://fullnode.mainnet.aptoslabs.com/v1.
         #[clap(short, long)]
         endpoint: url::Url,
+        /// Whether to print out the full gas schedule.
+        #[clap(short, long)]
+        print_gas_schedule: bool,
     },
 }
 
@@ -170,7 +173,10 @@ async fn main() -> Result<()> {
                 .set_fast_resolve(DEFAULT_RESOLUTION_TIME)
                 .await
         },
-        Commands::PrintConfigs { endpoint } => {
+        Commands::PrintConfigs {
+            endpoint,
+            print_gas_schedule,
+        } => {
             use aptos_types::on_chain_config::*;
 
             let client = aptos_rest_client::Client::new(endpoint);
@@ -184,12 +190,11 @@ async fn main() -> Result<()> {
                 }
             }
 
-            print_configs!(
-                OnChainConsensusConfig,
-                OnChainExecutionConfig,
-                Version,
-                GasScheduleV2
-            );
+            print_configs!(OnChainConsensusConfig, OnChainExecutionConfig, Version);
+
+            if print_gas_schedule {
+                print_configs!(GasScheduleV2, StorageGasSchedule);
+            }
 
             // Print Activated Features
             let features = fetch_config::<Features>(&client)?;
