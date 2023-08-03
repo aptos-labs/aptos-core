@@ -1324,12 +1324,12 @@ module aptos_framework::account {
         let eventhandle = &borrow_global<Account>(addr).coin_register_events;
         let event = CoinRegisterEvent { type_info: type_info::type_of<FakeCoin>() };
 
-        let events = event::emitted_events(eventhandle);
+        let events = event::emitted_events_by_handle(eventhandle);
         assert!(vector::length(&events) == 1, 0);
         assert!(vector::borrow(&events, 0) == &event, 1);
-        assert!(event::was_event_emitted(eventhandle, &event), 2);
+        assert!(event::was_event_emitted_by_handle(eventhandle, &event), 2);
 
         let event = CoinRegisterEvent { type_info: type_info::type_of<SadFakeCoin>() };
-        assert!(!event::was_event_emitted(eventhandle, &event), 3);
+        assert!(!event::was_event_emitted_by_handle(eventhandle, &event), 3);
     }
 }

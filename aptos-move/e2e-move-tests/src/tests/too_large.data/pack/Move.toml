@@ -1,0 +1,8 @@
+[package]
+name = "too_large_test"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../../../framework/aptos-framework" }
+AptosStdlib = { local = "../../../../../framework/aptos-stdlib" }
+MoveStdlib = { local = "../../../../../framework/move-stdlib" }

@@ -43,6 +43,16 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "governance", "generate-upgrade-proposal", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "governance", "propose", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "governance", "vote", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "governance", "delegation_pool", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "governance", "delegation_pool", "vote", "--help"]).await;
+    assert_cmd_not_panic(&[
+        "aptos",
+        "governance",
+        "delegation_pool",
+        "propose",
+        "--help",
+    ])
+    .await;
 
     assert_cmd_not_panic(&["aptos", "info"]).await;
 

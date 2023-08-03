@@ -69,7 +69,7 @@ fn ark_msm_window_size(num_entries: usize) -> usize {
     }
 }
 
-/// The approximate cost model of https://github.com/arkworks-rs/algebra/blob/v0.4.0/ec/src/scalar_mul/variable_base/mod.rs#L89.
+/// The approximate cost model of <https://github.com/arkworks-rs/algebra/blob/v0.4.0/ec/src/scalar_mul/variable_base/mod.rs#L89>.
 macro_rules! ark_msm_bigint_wnaf_cost {
     ($cost_add:expr, $cost_double:expr, $num_entries:expr $(,)?) => {{
         let num_entries: usize = $num_entries;

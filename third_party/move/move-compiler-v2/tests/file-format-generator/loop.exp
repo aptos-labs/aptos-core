@@ -1,0 +1,259 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun loops::nested_loop($t0: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: label L0
+  1: $t3 := 0
+  2: $t2 := >($t0, $t3)
+  3: if ($t2) goto 4 else goto 25
+  4: label L2
+  5: label L5
+  6: $t5 := 10
+  7: $t4 := >($t0, $t5)
+  8: if ($t4) goto 9 else goto 15
+  9: label L7
+ 10: $t7 := 1
+ 11: $t6 := -($t0, $t7)
+ 12: $t0 := move($t6)
+ 13: goto 19
+ 14: goto 17
+ 15: label L8
+ 16: goto 19
+ 17: label L9
+ 18: goto 5
+ 19: label L6
+ 20: $t9 := 1
+ 21: $t8 := -($t0, $t9)
+ 22: $t0 := move($t8)
+ 23: goto 0
+ 24: goto 27
+ 25: label L3
+ 26: goto 29
+ 27: label L4
+ 28: goto 0
+ 29: label L1
+ 30: $t1 := move($t0)
+ 31: return $t1
+}
+
+
+[variant baseline]
+fun loops::while_loop($t0: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: label L0
+  1: $t3 := 0
+  2: $t2 := >($t0, $t3)
+  3: if ($t2) goto 4 else goto 9
+  4: label L2
+  5: $t5 := 1
+  6: $t4 := -($t0, $t5)
+  7: $t0 := move($t4)
+  8: goto 11
+  9: label L3
+ 10: goto 13
+ 11: label L4
+ 12: goto 0
+ 13: label L1
+ 14: $t1 := move($t0)
+ 15: return $t1
+}
+
+
+[variant baseline]
+fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: label L0
+  1: $t3 := 0
+  2: $t2 := >($t0, $t3)
+  3: if ($t2) goto 4 else goto 25
+  4: label L2
+  5: $t5 := 42
+  6: $t4 := ==($t0, $t5)
+  7: if ($t4) goto 8 else goto 11
+  8: label L5
+  9: goto 29
+ 10: goto 12
+ 11: label L6
+ 12: label L7
+ 13: $t7 := 21
+ 14: $t6 := ==($t0, $t7)
+ 15: if ($t6) goto 16 else goto 19
+ 16: label L8
+ 17: goto 0
+ 18: goto 20
+ 19: label L9
+ 20: label L10
+ 21: $t9 := 1
+ 22: $t8 := -($t0, $t9)
+ 23: $t0 := move($t8)
+ 24: goto 27
+ 25: label L3
+ 26: goto 29
+ 27: label L4
+ 28: goto 0
+ 29: label L1
+ 30: $t1 := move($t0)
+ 31: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v6
+module 42.loops {
+
+
+nested_loop(Arg0: u64): u64 {
+L0:	loc1: u64
+L1:	loc2: u64
+L2:	loc3: u64
+L3:	loc4: u64
+B0:
+	0: LdConst[0](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[1](loc0: u64)
+	2: CopyLoc[0](Arg0: u64)
+	3: CopyLoc[1](loc0: u64)
+	4: Gt
+	5: BrFalse(30)
+B1:
+	6: LdConst[1](U64: [10, 0, 0, 0, 0, 0, 0, 0])
+	7: StLoc[2](loc1: u64)
+	8: CopyLoc[0](Arg0: u64)
+	9: CopyLoc[2](loc1: u64)
+	10: Gt
+	11: BrFalse(20)
+B2:
+	12: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	13: StLoc[3](loc2: u64)
+	14: CopyLoc[0](Arg0: u64)
+	15: CopyLoc[3](loc2: u64)
+	16: Sub
+	17: StLoc[0](Arg0: u64)
+	18: Branch(22)
+B3:
+	19: Branch(21)
+B4:
+	20: Branch(22)
+B5:
+	21: Branch(6)
+B6:
+	22: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	23: StLoc[4](loc3: u64)
+	24: CopyLoc[0](Arg0: u64)
+	25: CopyLoc[4](loc3: u64)
+	26: Sub
+	27: StLoc[0](Arg0: u64)
+	28: Branch(0)
+B7:
+	29: Branch(31)
+B8:
+	30: Branch(32)
+B9:
+	31: Branch(0)
+B10:
+	32: CopyLoc[0](Arg0: u64)
+	33: StLoc[5](loc4: u64)
+	34: CopyLoc[5](loc4: u64)
+	35: Ret
+}
+while_loop(Arg0: u64): u64 {
+L0:	loc1: u64
+L1:	loc2: u64
+B0:
+	0: LdConst[0](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[1](loc0: u64)
+	2: CopyLoc[0](Arg0: u64)
+	3: CopyLoc[1](loc0: u64)
+	4: Gt
+	5: BrFalse(13)
+B1:
+	6: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	7: StLoc[2](loc1: u64)
+	8: CopyLoc[0](Arg0: u64)
+	9: CopyLoc[2](loc1: u64)
+	10: Sub
+	11: StLoc[0](Arg0: u64)
+	12: Branch(14)
+B2:
+	13: Branch(15)
+B3:
+	14: Branch(0)
+B4:
+	15: CopyLoc[0](Arg0: u64)
+	16: StLoc[3](loc2: u64)
+	17: CopyLoc[3](loc2: u64)
+	18: Ret
+}
+while_loop_with_break_and_continue(Arg0: u64): u64 {
+L0:	loc1: u64
+L1:	loc2: u64
+L2:	loc3: u64
+L3:	loc4: u64
+B0:
+	0: LdConst[0](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[1](loc0: u64)
+	2: CopyLoc[0](Arg0: u64)
+	3: CopyLoc[1](loc0: u64)
+	4: Gt
+	5: BrFalse(29)
+B1:
+	6: LdConst[3](U64: [42, 0, 0, 0, 0, 0, 0, 0])
+	7: StLoc[2](loc1: u64)
+	8: CopyLoc[0](Arg0: u64)
+	9: CopyLoc[2](loc1: u64)
+	10: Eq
+	11: BrFalse(14)
+B2:
+	12: Branch(31)
+B3:
+	13: Branch(14)
+B4:
+	14: LdConst[4](U64: [21, 0, 0, 0, 0, 0, 0, 0])
+	15: StLoc[3](loc2: u64)
+	16: CopyLoc[0](Arg0: u64)
+	17: CopyLoc[3](loc2: u64)
+	18: Eq
+	19: BrFalse(22)
+B5:
+	20: Branch(0)
+B6:
+	21: Branch(22)
+B7:
+	22: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	23: StLoc[4](loc3: u64)
+	24: CopyLoc[0](Arg0: u64)
+	25: CopyLoc[4](loc3: u64)
+	26: Sub
+	27: StLoc[0](Arg0: u64)
+	28: Branch(30)
+B8:
+	29: Branch(31)
+B9:
+	30: Branch(0)
+B10:
+	31: CopyLoc[0](Arg0: u64)
+	32: StLoc[5](loc4: u64)
+	33: CopyLoc[5](loc4: u64)
+	34: Ret
+}
+}
