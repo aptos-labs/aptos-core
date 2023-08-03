@@ -15,6 +15,9 @@ $CARGO_PATH="crates\$CRATE_NAME\Cargo.toml"
 # Get the version of the CLI from its Cargo.toml.
 $VERSION = Get-Content $CARGO_PATH | Select-String -Pattern '^\w*version = "(\d*\.\d*.\d*)"' | % {"$($_.matches.groups[1])"}
 
+# Open SSL for some reason has stopped working automatically, and needs to be manually linked to Rust
+$env:OPENSSL_DIR = 'C:\Program Files\OpenSSL-Win64\'
+
 # Build the CLI.
 echo "Building release $VERSION of $NAME for Windows"
 cargo build -p $CRATE_NAME --profile cli
