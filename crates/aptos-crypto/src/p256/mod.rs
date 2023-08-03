@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-// TODO: Fix docs
-//! This module provides an API for the PureEdDSA signature scheme over the Ed25519 twisted
-//! Edwards curve as defined in [RFC8032](https://tools.ietf.org/html/rfc8032).
+//! This module provides an API for the ECDSA signature scheme over the NIST-P256 curve as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final).
 //!
 //! Signature verification also checks and rejects non-canonical signatures.
 //!
@@ -11,7 +9,7 @@
 //! ```
 //! use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
 //! use aptos_crypto::{
-//!     ed25519::*,
+//!     p256::*,
 //!     traits::{Signature, SigningKey, Uniform},
 //!     test_utils::KeyPair
 //! };
@@ -24,17 +22,17 @@
 //! let message = TestCryptoDocTest("Test message".to_string());
 //!
 //! let mut rng = OsRng;
-//! let kp = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut rng);
+//! let kp = KeyPair::<P256PrivateKey, P256PublicKey>::generate(&mut rng);
 //!
 //! let signature = kp.private_key.sign(&message).unwrap();
 //! assert!(signature.verify(&message, &kp.public_key).is_ok());
 //! ```
 
-/// The length of the P256PrivateKey
+/// The length in bytes of the P256PrivateKey
 pub const P256_PRIVATE_KEY_LENGTH: usize = 32;
-/// The length of the P256PublicKey
+/// The length in bytes of the P256PublicKey
 pub const P256_PUBLIC_KEY_LENGTH: usize = 64;
-/// The length of the P256Signature
+/// The length in bytes of the P256Signature
 pub const P256_SIGNATURE_LENGTH: usize = 64;
 
 /// The value (q-1)/2, where q is the order of P256 as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final).

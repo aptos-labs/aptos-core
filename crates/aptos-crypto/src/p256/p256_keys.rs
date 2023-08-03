@@ -72,8 +72,8 @@ impl P256PrivateKey {
 
 impl P256PublicKey {
     /// Serialize a P256PublicKey.
-    // TODO: Better error handling here. Also should we compress?
     pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
+        // This should never return an array of the wrong length
         (*self.0.to_sec1_bytes()).try_into().unwrap()
     }
 
@@ -146,13 +146,8 @@ impl TryFrom<&[u8]> for P256PrivateKey {
     /// Deserialize a P256PrivateKey. This method will check for private key validity: i.e.,
     /// correct key length.
     fn try_from(bytes: &[u8]) -> std::result::Result<P256PrivateKey, CryptoMaterialError> {
-        // TODO: Check this comment for p256
         // Note that the only requirement is that the size of the key is 32 bytes, something that
-        // is already checked during deserialization of ed25519_dalek::SecretKey
-        //
-        // Also, the underlying ed25519_dalek implementation ensures that the derived public key
-        // is safe and it will not lie in a small-order group, thus no extra check for PublicKey
-        // validation is required.
+        // is already checked during deserialization of p256::ecdsa::SigningKey
         P256PrivateKey::from_bytes_unchecked(bytes)
     }
 }

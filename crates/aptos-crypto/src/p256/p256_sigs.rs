@@ -29,15 +29,15 @@ impl P256Signature {
 
     /// Serialize an P256Signature.
     pub fn to_bytes(&self) -> [u8; P256_SIGNATURE_LENGTH] {
-        // TODO: Better error handling
+        // The RustCrypto P256 `to_bytes` call here should never return a byte array of the wrong length
         self.0.to_bytes().try_into().unwrap()
     }
 
-    /// Deserialize an P256Signature without any validation checks (malleability)
-    /// apart from expected signature size.
-    pub(crate) fn from_bytes_unchecked(
+    /// Deserialize an P256Signature, checking for malleability
+    pub(crate) fn from_bytes(
         bytes: &[u8],
     ) -> std::result::Result<P256Signature, CryptoMaterialError> {
+        P256Signature::check_s_malleability(bytes)?;
         match p256::ecdsa::Signature::try_from(bytes) {
             Ok(p256_signature) => Ok(P256Signature(p256_signature)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
@@ -47,26 +47,20 @@ impl P256Signature {
     /// return an all-zero signature (for test only)
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy_signature() -> Self {
-        Self::from_bytes_unchecked(&[0u8; Self::LENGTH]).unwrap()
+        Self::from_bytes(&[0u8; Self::LENGTH]).unwrap()
     }
 
     /// Check for correct size and third-party based signature malleability issues.
     /// This method is required to ensure that given a valid signature for some message under some
     /// key, an attacker cannot produce another valid signature for the same message and key.
     ///
-    /// According to [RFC8032](https://tools.ietf.org/html/rfc8032), signatures comprise elements
-    /// {R, S} and we should enforce that S is of canonical form (smaller than L, where L is the
-    /// order of edwards25519 curve group) to prevent signature malleability. Without this check,
-    /// one could add a multiple of L into S and still pass signature verification, resulting in
-    /// a distinct yet valid signature.
-    ///
-    /// This method does not check the R component of the signature, because R is hashed during
-    /// signing and verification to compute h = H(ENC(R) || ENC(A) || M), which means that a
-    /// third-party cannot modify R without being detected.
-    ///
-    /// Note: It's true that malicious signers can already produce varying signatures by
-    /// choosing a different nonce, so this method protects against malleability attacks performed
-    /// by a non-signer.
+    /// We use the technique described in
+    /// [BIP146](https://github.com/bitcoin/bips/blob/master/bip-0146.mediawiki) to prevent
+    /// malleability of ECDSA signatures. Signatures comprise elements {R, S}, and S can be
+    /// enforced to be of canonical form by ensuring it is less than the order of the P256 curve
+    /// divided by 2. If this is not done, a value S > n/2 can be replaced by S' = n - S to form another distinct valid
+    /// signature, where n is the curve order. This check is not performed by the RustCrypto P256 library
+    /// we use
     pub fn check_s_malleability(bytes: &[u8]) -> std::result::Result<(), CryptoMaterialError> {
         if bytes.len() != P256_SIGNATURE_LENGTH {
             return Err(CryptoMaterialError::WrongLengthError);
@@ -86,7 +80,7 @@ impl P256Signature {
                 _ => {},
             }
         }
-        // As this stage S == L which implies a non canonical S.
+        // As this stage S == ORDER_HALF which implies a non canonical S.
         false
     }
 }
@@ -100,13 +94,7 @@ impl Signature for P256Signature {
     type VerifyingKeyMaterial = P256PublicKey;
 
     /// Verifies that the provided signature is valid for the provided message, going beyond the
-    /// [RFC8032](https://tools.ietf.org/html/rfc8032) specification, checking both scalar
-    /// malleability and point malleability (see documentation [here](https://docs.rs/ed25519-dalek/latest/ed25519_dalek/struct.PublicKey.html#on-the-multiple-sources-of-malleability-in-ed25519-signatures)).
-    ///
-    /// This _strict_ verification performs steps 1,2 and 3 from Section 5.1.7 in RFC8032, and an
-    /// additional scalar malleability check (via [Ed25519Signature::check_s_malleability][Ed25519Signature::check_s_malleability]).
-    ///
-    /// This function will ensure both the signature and the `public_key` are not in a small subgroup.
+    /// [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final) specification, to prevent scalar malleability as done in [BIP146](https://github.com/bitcoin/bips/blob/master/bip-0146.mediawiki).
     fn verify<T: CryptoHash + Serialize>(
         &self,
         message: &T,
@@ -121,19 +109,8 @@ impl Signature for P256Signature {
     ///
     /// This function will check both the signature and `public_key` for small subgroup attacks.
     fn verify_arbitrary_msg(&self, message: &[u8], public_key: &P256PublicKey) -> Result<()> {
-        // NOTE: ed25519::PublicKey::verify_strict already checks that the s-component of the signature
-        // is not mauled, but does so via an optimistic path which fails into a slower path. By doing
-        // our own (much faster) checking here, we can ensure dalek's optimistic path always succeeds
-        // and the slow path is never triggered.
         P256Signature::check_s_malleability(&self.to_bytes())?;
 
-        // NOTE: ed25519::PublicKey::verify_strict checks that the signature's R-component and
-        // the public key are *not* in a small subgroup.
-        /*public_key
-            .0
-            .verify_strict(message, &self.0)
-            .map_err(|e| anyhow!("{}", e))
-            .and(Ok(()))*/
         public_key.0.verify(message, &self.0).map_err(|e| anyhow!("{}", e)).and(Ok(()))
     }
 
@@ -165,11 +142,7 @@ impl TryFrom<&[u8]> for P256Signature {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> std::result::Result<P256Signature, CryptoMaterialError> {
-        // We leave this check here to detect mauled signatures earlier, since it does not hurt
-        // performance much. (This check is performed again in Ed25519Signature::verify_arbitrary_msg
-        // and in ed25519-dalek's verify_strict API.)
-        //Ed25519Signature::check_s_malleability(bytes)?;
-        P256Signature::from_bytes_unchecked(bytes)
+        P256Signature::from_bytes(bytes)
     }
 }
 
