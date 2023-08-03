@@ -73,13 +73,11 @@ impl P256PublicKey {
     /// Serialize a P256PublicKey.
     pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
         let bytes = self.0.public_key_to_der().expect("openssl ffi failed to serialize P256 public key"); 
-        bytes.try_into().expect("openssl serialized P256 public key incorrectly") 
+        bytes.try_into().expect("openssl ffi serialized P256 public key incorrectly") 
     }
 
     /// Deserialize a P256PublicKey without any validation checks apart from expected key size
-    /// and valid curve point, although not necessarily in the prime-order subgroup.
-    ///
-    /// This function does NOT check the public key for membership in a small subgroup.
+    /// and valid curve point.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
@@ -120,12 +118,12 @@ impl SigningKey for P256PrivateKey {
 
 impl Uniform for P256PrivateKey {
     // TODO: Remove rng
+    // This function uses the method in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final) 5.6.1.2.2 "Key Pair Generation by Testing Candidates"
     fn generate<R>(_rng: &mut R) -> Self
     where
         R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
         let group: EcGroup = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
-        // TODO: Make sure this is uniformly random
         let private_key: EcKey<Private> = EcKey::generate(&group).unwrap();
         P256PrivateKey(private_key)
     }
@@ -241,6 +239,7 @@ impl TryFrom<&[u8]> for P256PublicKey {
     /// verification implicitly checks if the public key lies in a small subgroup, so canonical
     /// uses of this library will not be susceptible to small subgroup attacks.
     fn try_from(bytes: &[u8]) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
+        // TODO: Check what openssl checks here
         P256PublicKey::from_bytes_unchecked(bytes)
     }
 }

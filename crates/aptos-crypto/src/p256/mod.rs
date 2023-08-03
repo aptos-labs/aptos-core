@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 // TODO: Fix docs
-//! This module provides an API for the PureEdDSA signature scheme over the Ed25519 twisted
-//! Edwards curve as defined in [RFC8032](https://tools.ietf.org/html/rfc8032).
+//! This module provides an API for the ECDSA signature scheme over the NIST-P256 curve as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final).
 //!
 //! Signature verification also checks and rejects non-canonical signatures.
 //!
@@ -37,12 +36,17 @@ pub const P256_PUBLIC_KEY_LENGTH: usize = 64;
 /// The length of the P256Signature
 pub const P256_SIGNATURE_LENGTH: usize = 64;
 
-/// The order of p256 as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final).
+/// The value (q-1)/2, where q is the order of P256 as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final).
+/// Computed with the following SageMath code:
+///
+/// # Curve order
+/// qq = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+/// q_half = (qq-1)/2
 // TODO: Make sure this has the correct endianness
-/*const L: [u8; 32] = [
-    0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xBC, 0xE6, 0xFA, 0xAD, 0xA7, 0x17, 0x9e, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0x51,
-];*/
+// TODO: Make sure qq-1 is the correct thing to do
+const ORDER_HALF: [u8; 32] = [
+    0x7F, 0xFF, 0xFF, 0xFF, 0x80, 0x00, 0x00, 0x00, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xDE, 0x73, 0x7D, 0x56, 0xD3, 0x8B, 0xCF, 0x42, 0x79, 0xDC, 0xE5, 0x61, 0x7E, 0x31, 0x92, 0xA8,
+];
 
 pub mod p256_keys;
 pub mod p256_sigs;
