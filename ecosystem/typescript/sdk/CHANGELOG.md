@@ -4,6 +4,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- Add support for a fee payer transaction
+
 ## 1.16.0 (2023-08-02)
 
 - Export all remaining types and functions in TS SDK
