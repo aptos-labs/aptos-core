@@ -15,10 +15,9 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 /// Establishes a connection pool to Postgres
 pub fn establish_connection_pool(database_url: String) -> Pool<ConnectionManager<PgConnection>> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
-    let pool = Pool::builder()
+    Pool::builder()
         .build(manager)
-        .expect("Failed to create pool.");
-    pool
+        .expect("Failed to create pool.")
 }
 
 /// Runs database migrations
