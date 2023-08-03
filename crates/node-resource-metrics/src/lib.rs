@@ -3,6 +3,7 @@
 
 use crate::collectors::BasicNodeInfoCollector;
 use aptos_infallible::Mutex;
+use aptos_logger::error;
 use cfg_if::cfg_if;
 use collectors::{
     CollectorLatencyCollector, CpuMetricsCollector, DiskMetricsCollector, LoadAvgCollector,
@@ -10,7 +11,6 @@ use collectors::{
 };
 use once_cell::sync::Lazy;
 use prometheus::core::Collector;
-use aptos_logger::error;
 
 mod collectors;
 
@@ -24,8 +24,6 @@ pub fn register_node_metrics_collector() {
     } else {
         *registered = true;
     }
-
-
 
     register_collector(Box::<CpuMetricsCollector>::default());
     register_collector(Box::<MemoryMetricsCollector>::default());
