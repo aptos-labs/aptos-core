@@ -1,29 +1,29 @@
 // Copyright © Aptos Foundation
 
 use std::cmp;
+use std::cmp::max;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 use std::sync::{Mutex, RwLock};
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
+use itertools::Itertools;
 use rand::{Rng, thread_rng};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator};
 use serde::{Deserialize, Serialize};
 use aptos_logger::info;
-use aptos_types::block_executor::partitioner::{CrossShardDependencies, RoundId, ShardedTxnIndex, ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies};
+use aptos_types::block_executor::partitioner::{CrossShardDependencies, CrossShardEdges, RoundId, ShardedTxnIndex, ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
 use aptos_types::transaction::Transaction;
 use move_core_types::account_address::AccountAddress;
-use crate::{BlockPartitioner, get_anchor_shard_id};
+use crate::{BlockPartitioner, get_anchor_shard_id, Sender};
 use crate::v2::counters::MISC_TIMERS_SECONDS;
 use crate::v2::storage_location_helper::StorageLocationHelper;
 use rayon::iter::ParallelIterator;
 use aptos_crypto::hash::{CryptoHash, TestOnlyHash};
 use aptos_crypto::HashValue;
 use crate::test_utils::P2pBlockGenerator;
-
-type Sender = Option<AccountAddress>;
 
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, Serialize, Deserialize)]
 pub struct TxnFatId {
@@ -56,6 +56,7 @@ pub struct V2Partitioner {
     pub num_rounds_limit: usize,
     pub avoid_pct: u64,
     dashmap_num_shards: usize,
+    add_edge_impl: usize,
 }
 
 impl V2Partitioner {
@@ -64,12 +65,14 @@ impl V2Partitioner {
         let num_rounds_limit: usize = std::env::var("APTOS_BLOCK_PARTITIONER_V2__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
         let avoid_pct: u64 = std::env::var("APTOS_BLOCK_PARTITIONER_V2__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<u64>().ok().unwrap_or(10)).unwrap_or(10);
         let dashmap_num_shards = std::env::var("APTOS_BLOCK_PARTITIONER_V2__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
-        info!("Creating OmegaPartitioner with num_threads={}, num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}", num_threads, num_rounds_limit, avoid_pct, dashmap_num_shards);
+        let add_edge_impl = std::env::var("APTOS_BLOCK_PARTITIONER_V2__ADD_EDGE_IMPL").ok().map(|v|v.parse::<usize>().unwrap_or(0)).unwrap_or(0);
+        info!("Creating V2Partitioner with num_threads={}, num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}, add_edge_impl={}", num_threads, num_rounds_limit, avoid_pct, dashmap_num_shards, add_edge_impl);
         Self {
             thread_pool: ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap(),
             num_rounds_limit,
             avoid_pct,
             dashmap_num_shards,
+            add_edge_impl,
         }
     }
     fn discarding_round(
@@ -149,6 +152,139 @@ impl V2Partitioner {
             drop(potentially_accepted);
             drop(min_discarded_seq_nums_by_sender_id);
 
+        });
+        ret
+    }
+
+    fn new_global_edge_table(&self, matrix: &Vec<Vec<Vec<usize>>>) -> Vec<Vec<Vec<DashMap<ShardedTxnIndex, DashSet<usize>>>>> {
+        let num_rounds = matrix.len();
+        let num_shards = matrix[0].len();
+        self.thread_pool.install(||{
+            (0..num_rounds).into_par_iter().map(|round_id|{
+                (0..num_shards).into_par_iter().map(|shard_id|{
+                    let sub_block_size = matrix[round_id][shard_id].len();
+                    (0..sub_block_size).into_par_iter().map(|_|DashMap::with_shard_amount(self.dashmap_num_shards)).collect()
+                }).collect()
+            }).collect()
+        })
+    }
+
+    fn add_edges_1(
+        &self,
+        txns: Vec<AnalyzedTransaction>,
+        rsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
+        wsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
+        txn_id_matrix: &Vec<Vec<Vec<usize>>>,
+        start_index_matrix: &Vec<Vec<usize>>,
+        helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
+    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges_v2__preprocess"]).start_timer();
+        let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = self.thread_pool.install(||{
+            txns.into_par_iter().map(|t|Mutex::new(Some(t))).collect()
+        });
+        let num_keys = helpers.len();
+        let num_rounds = txn_id_matrix.len();
+        let num_shards = txn_id_matrix[0].len();
+        let global_dependent_edge_table = self.new_global_edge_table(txn_id_matrix);
+        let global_required_edge_table = self.new_global_edge_table(txn_id_matrix);
+
+        let global_owners_by_loc_id: Vec<RwLock<Option<ShardedTxnIndex>>> = self.thread_pool.install(||{
+                (0..num_keys).into_par_iter().map(|_|RwLock::new(None)).collect()
+            });
+        let duration = timer.stop_and_record();
+        println!("add_edges_v2__preprocess={}", duration);
+
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges_v2__main"]).start_timer();
+        for round_id in 0..num_rounds {
+            for shard_id in 0..num_shards {
+                let sub_block_size = txn_id_matrix[round_id][shard_id].len();
+                self.thread_pool.install(||{
+
+                    // Calculate edges.
+                    (0..sub_block_size).into_par_iter().for_each(|in_block_idx|{
+                        let txn_id = txn_id_matrix[round_id][shard_id][in_block_idx];
+                        let cur_sharded_txn_idx = ShardedTxnIndex {
+                            txn_index: start_index_matrix[round_id][shard_id] + in_block_idx,
+                            shard_id,
+                            round_id,
+                        };
+                        for &loc_id in wsets_by_txn_id[txn_id].read().unwrap().iter().chain(rsets_by_txn_id[txn_id].read().unwrap().iter()) {
+                            match global_owners_by_loc_id[loc_id].read().unwrap().as_ref() {
+                                Some(owner) => {
+                                    let owner_in_block_idx = owner.txn_index - start_index_matrix[owner.round_id][owner.shard_id];
+                                    global_dependent_edge_table[owner.round_id][owner.shard_id][owner_in_block_idx].entry(cur_sharded_txn_idx).or_insert_with(DashSet::new).insert(loc_id);
+                                    global_required_edge_table[round_id][shard_id][in_block_idx].entry(*owner).or_insert_with(DashSet::new).insert(loc_id);
+                                },
+                                None => {},
+                            }
+                        }
+                    });
+
+                    // Update global owner table.
+                    (0..sub_block_size).into_par_iter().for_each(|in_block_idx|{
+                        let txn_old_id = txn_id_matrix[round_id][shard_id][in_block_idx];
+                        let cur_sharded_txn_idx = ShardedTxnIndex {
+                            txn_index: start_index_matrix[round_id][shard_id] + in_block_idx,
+                            shard_id,
+                            round_id,
+                        };
+                        for &loc_id in wsets_by_txn_id[txn_old_id].read().unwrap().iter() {
+                            let mut owner = global_owners_by_loc_id[loc_id].write().unwrap();
+                            *owner = match owner.as_ref() {
+                                Some(&existing_owner) if existing_owner >= cur_sharded_txn_idx => {
+                                    Some(existing_owner)
+                                },
+                                _ => {
+                                    Some(cur_sharded_txn_idx)
+                                },
+                            };
+                        }
+                    });
+                });
+            }
+        }
+        let duration = timer.stop_and_record();
+        println!("add_edges_v2__main={duration:?}");
+
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges_v2__build_return_obj"]).start_timer();
+        let ret = self.thread_pool.install(||{
+            (0..num_shards).into_par_iter().map(|shard_id|{
+                let sub_blocks = (0..num_rounds).into_par_iter().map(|round_id|{
+                    let sub_block_size: usize = txn_id_matrix[round_id][shard_id].len();
+                    let twds = (0..sub_block_size).into_par_iter().map(|in_sub_block_idx|{
+                        let old_tid = txn_id_matrix[round_id][shard_id][in_sub_block_idx];
+                        let txn = txns[old_tid].lock().unwrap().take().unwrap();
+                        let cross_shard_dependencies = CrossShardDependencies {
+                            required_edges: CrossShardEdges {
+                                edges: global_required_edge_table[round_id][shard_id][in_sub_block_idx].iter().map(|kv_ref|{
+                                    let src_sharded_idx = *kv_ref.key();
+                                    let locs = kv_ref.value().iter().map(|loc_id|helpers.get(loc_id.key()).unwrap().read().unwrap().storage_location.clone()).collect();
+                                    (src_sharded_idx, locs)
+                                }).collect()
+                            },
+                            dependent_edges: CrossShardEdges {
+                                edges: global_dependent_edge_table[round_id][shard_id][in_sub_block_idx].iter().map(|kv_ref|{
+                                    let dst_sharded_idx = *kv_ref.key();
+                                    let locs = kv_ref.value().iter().map(|loc_id|helpers.get(loc_id.key()).unwrap().read().unwrap().storage_location.clone()).collect();
+                                    (dst_sharded_idx, locs)
+                                }).collect()
+                            },
+                        };
+                        TransactionWithDependencies { txn, cross_shard_dependencies }
+                    }).collect();
+                    SubBlock { start_index: start_index_matrix[round_id][shard_id], transactions: twds }
+                }).collect();
+                SubBlocksForShard { shard_id, sub_blocks }
+            }).collect()
+        });
+        let duration = timer.stop_and_record();
+        println!("add_edges_v2__build_return_obj={duration:?}");
+
+        self.thread_pool.spawn(move||{
+            drop(txns);
+            drop(global_dependent_edge_table);
+            drop(global_required_edge_table);
+            drop(global_owners_by_loc_id);
         });
         ret
     }
@@ -397,7 +533,12 @@ impl BlockPartitioner for V2Partitioner {
         info!("multi_rounds={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
-        let ret = self.add_edges(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &start_index_matrix, &new_indices, &helpers_by_key_id);
+        let ret = match self.add_edge_impl {
+            0 => self.add_edges(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &start_index_matrix, &new_indices, &helpers_by_key_id),
+            1 => self.add_edges_1(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &start_index_matrix, &helpers_by_key_id),
+            _ => unreachable!()
+        };
+
         let duration = timer.stop_and_record();
         info!("add_edges={duration}");
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["drop"]).start_timer();
@@ -430,93 +571,10 @@ fn test_omega_partitioner() {
         let block = block_generator.rand_block(&mut rng, block_size);
         let block_clone = block.clone();
         let partitioned = partitioner.partition(block, num_shards);
-        assertions(&block_clone, &partitioned);
+        crate::assertions(&block_clone, &partitioned);
     }
 }
 
-pub fn assertions(before_partition: &Vec<AnalyzedTransaction>, after_partition: &Vec<SubBlocksForShard<AnalyzedTransaction>>) {
-    let old_txn_id_by_txn_hash: HashMap<HashValue, usize> = HashMap::from_iter(before_partition.iter().enumerate().map(|(tid,txn)|{
-        (txn.test_only_hash(), tid)
-    }));
-
-    let mut total_comm_cost = 0;
-    let num_txns = before_partition.len();
-    let num_rounds = after_partition.first().unwrap().sub_blocks.len();
-    let num_shards = after_partition.len();
-    let mut old_tids_by_sender: HashMap<Sender, Vec<usize>> = HashMap::new();
-    let mut old_tids_seen: HashSet<usize> = HashSet::new();
-    let mut edge_set_from_src_view: HashSet<(usize, usize, usize, HashValue, usize, usize, usize)> = HashSet::new();
-    let mut edge_set_from_dst_view: HashSet<(usize, usize, usize, HashValue, usize, usize, usize)> = HashSet::new();
-    for round_id in 0..num_rounds {
-        for (shard_id, sub_block_list) in after_partition.iter().enumerate() {
-            let sub_block = sub_block_list.get_sub_block(round_id).unwrap();
-            let mut cur_sub_block_inbound_costs_by_key_src_pair: HashMap<(RoundId, ShardId, StateKey), u64> = HashMap::new();
-            let mut cur_sub_block_connectivity_by_key_dst_pair: HashMap<(RoundId, ShardId, StateKey), u64> = HashMap::new();
-            for (local_tid, td) in sub_block.transactions.iter().enumerate() {
-                let sender = td.txn.sender();
-                let old_tid = *old_txn_id_by_txn_hash.get(&td.txn().test_only_hash()).unwrap();
-                old_tids_seen.insert(old_tid);
-                old_tids_by_sender.entry(sender).or_insert_with(Vec::new).push(old_tid);
-                let tid = sub_block.start_index + local_tid;
-                for loc in td.txn.write_hints().iter() {
-                    let key = loc.clone().into_state_key();
-                    let key_str = CryptoHash::hash(&key).to_hex();
-                    info!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, write_hint={}", round_id, shard_id, old_tid, tid, key_str);
-                }
-                for (src_tid, locs) in td.cross_shard_dependencies.required_edges().iter() {
-                    for loc in locs.iter() {
-                        let key = loc.clone().into_state_key();
-                        let key_str = CryptoHash::hash(&key).to_hex();
-                        info!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, recv key={} from round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, src_tid.round_id, src_tid.shard_id, src_tid.txn_index);
-                        if (round_id != num_rounds - 1) {
-                            assert_ne!(src_tid.round_id, round_id);
-                        }
-                        assert!((src_tid.round_id, src_tid.shard_id) < (round_id, shard_id));
-                        edge_set_from_dst_view.insert((src_tid.round_id, src_tid.shard_id, src_tid.txn_index, key.hash(), round_id, shard_id, tid));
-                        let value = cur_sub_block_inbound_costs_by_key_src_pair.entry((src_tid.round_id, src_tid.shard_id, key)).or_insert_with(||0);
-                        *value += 1;
-                    }
-                }
-                for (dst_tid, locs) in td.cross_shard_dependencies.dependent_edges().iter() {
-                    for loc in locs.iter() {
-                        let key = loc.clone().into_state_key();
-                        let key_str = CryptoHash::hash(&key).to_hex();
-                        info!("MATRIX_REPORT - round={}, shard={}, old_tid={}, new_tid={}, send key={} to round={}, shard={}, new_tid={}", round_id, shard_id, old_tid, tid, key_str, dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index);
-                        if (round_id != num_rounds - 1) {
-                            assert_ne!(dst_tid.round_id, round_id);
-                        }
-                        assert!((round_id, shard_id) < (dst_tid.round_id, dst_tid.shard_id));
-                        edge_set_from_src_view.insert((round_id, shard_id, tid, key.hash(), dst_tid.round_id, dst_tid.shard_id, dst_tid.txn_index));
-                        let value = cur_sub_block_connectivity_by_key_dst_pair.entry((dst_tid.round_id, dst_tid.shard_id, key)).or_insert_with(||0);
-                        *value += 1;
-                    }
-                }
-            }
-            let inbound_cost: u64 = cur_sub_block_inbound_costs_by_key_src_pair.iter().map(|(_,b)| *b).sum();
-            let outbound_cost: u64 = cur_sub_block_connectivity_by_key_dst_pair.iter().map(|(_,b)| *b).sum();
-            info!("MATRIX_REPORT: round={}, shard={}, sub_block_size={}, inbound_cost={}, outbound_cost={}", round_id, shard_id, sub_block.num_txns(), inbound_cost, outbound_cost);
-            if round_id == 0 {
-                assert_eq!(0, inbound_cost);
-            }
-            total_comm_cost += inbound_cost + outbound_cost;
-        }
-    }
-    assert_eq!(HashSet::from_iter(0..num_txns), old_tids_seen);
-    assert_eq!(edge_set_from_src_view, edge_set_from_dst_view);
-    for (sender, old_tids) in old_tids_by_sender {
-        assert!(is_sorted(&old_tids));
-    }
-    info!("MATRIX_REPORT: total_comm_cost={}", total_comm_cost);
-    assert_eq!(0, total_comm_cost % 2);
-}
-
-fn is_sorted(arr: &Vec<usize>) -> bool {
-    let num = arr.len();
-    for i in 1..num {
-        if arr[i-1] >= arr[i] {return false;}
-    }
-    return true;
-}
 /// Evenly divide 0..n-1. Example: uniform_partition(11,3) == [[0,1,2,3],[4,5,6,7],[8,9,10]]
 fn uniform_partition(num_items: usize, num_chunks: usize) -> Vec<Vec<usize>> {
     let num_big_chunks = num_items % num_chunks;

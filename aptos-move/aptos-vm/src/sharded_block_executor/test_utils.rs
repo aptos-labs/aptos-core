@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    AptosVM, VMExecutor,
+    AptosVM,
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor}, VMExecutor,
 };
 use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
 use aptos_crypto::hash::CryptoHash;
@@ -16,13 +16,13 @@ use aptos_types::{
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
 };
 use move_core_types::account_address::AccountAddress;
-use rand::{rngs::OsRng, Rng};
+use rand::{Rng, rngs::OsRng};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-use aptos_block_partitioner::BlockPartitioner;
-use aptos_block_partitioner::v2::{assertions, V2Partitioner};
+use aptos_block_partitioner::{assertions, BlockPartitioner};
+use aptos_block_partitioner::v2::V2Partitioner;
 
 pub fn generate_account_at(executor: &mut FakeExecutor, address: AccountAddress) -> AccountData {
     executor.new_account_data_at(address)

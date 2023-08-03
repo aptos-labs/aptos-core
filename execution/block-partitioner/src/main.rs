@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::{build_partitioner, sharded_block_partitioner::ShardedBlockPartitioner, test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount}};
+use aptos_block_partitioner::{assertions, build_partitioner, sharded_block_partitioner::ShardedBlockPartitioner, test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount}};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use clap::Parser;
 use rand::rngs::OsRng;
@@ -14,16 +14,16 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(Debug, Parser)]
 struct Args {
-    #[clap(long, default_value_t = 2000000)]
+    #[clap(long, default_value_t = 1000000)]
     pub num_accounts: usize,
 
     #[clap(long, default_value_t = 100000)]
     pub block_size: usize,
 
-    #[clap(long, default_value_t = 10)]
+    #[clap(long, default_value_t = 9)]
     pub num_blocks: usize,
 
-    #[clap(long, default_value_t = 12)]
+    #[clap(long, default_value_t = 60)]
     pub num_shards: usize,
 }
 
@@ -55,10 +55,10 @@ fn main() {
 
         info!("Starting to partition");
         let now = Instant::now();
-        let partitioned = partitioner.partition(transactions, args.num_shards);
+        let partitioned = partitioner.partition(transactions.clone(), args.num_shards);
         let elapsed = now.elapsed();
         info!("Time taken to partition: {:?}", elapsed);
-        info!("partitioned.len={}", partitioned.len());
+        assertions(&transactions, &partitioned);
     }
 }
 

@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use std::cmp::Ordering;
 use crate::transaction::{
     analyzed_transaction::{AnalyzedTransaction, StorageLocation},
     Transaction,
@@ -12,11 +13,17 @@ pub type ShardId = usize;
 pub type TxnIndex = usize;
 pub type RoundId = usize;
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct ShardedTxnIndex {
     pub txn_index: TxnIndex,
     pub shard_id: ShardId,
     pub round_id: RoundId,
+}
+
+impl PartialOrd for ShardedTxnIndex {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        (self.round_id, self.shard_id, self.txn_index).partial_cmp(&(other.round_id, other.shard_id, other.txn_index))
+    }
 }
 
 impl ShardedTxnIndex {
@@ -33,7 +40,7 @@ impl ShardedTxnIndex {
 /// Denotes a set of cross shard edges, which contains the set (required or dependent) transaction
 /// indices and the relevant storage locations that are conflicting.
 pub struct CrossShardEdges {
-    edges: HashMap<ShardedTxnIndex, Vec<StorageLocation>>,
+    pub edges: HashMap<ShardedTxnIndex, Vec<StorageLocation>>,
 }
 
 impl CrossShardEdges {
@@ -86,8 +93,8 @@ impl IntoIterator for CrossShardEdges {
 /// Dependent edge is a reverse of required edge, for example if txn 20 in shard 2 requires txn 10 in shard 1,
 /// then txn 10 in shard 1 will have a dependent edge to txn 20 in shard 2.
 pub struct CrossShardDependencies {
-    required_edges: CrossShardEdges,
-    dependent_edges: CrossShardEdges,
+    pub required_edges: CrossShardEdges,
+    pub dependent_edges: CrossShardEdges,
 }
 
 impl CrossShardDependencies {
