@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network::ApplicationNetworkInterfaces;
-use aptos_config::config::{NodeConfig, StateSyncConfig, StorageServiceConfig};
+use aptos_config::config::{NodeConfig, StateSyncConfig};
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
 use aptos_data_streaming_service::{
@@ -117,7 +117,7 @@ pub fn start_state_sync_and_get_notification_handles(
 
     // Start the state sync storage service
     let storage_service_runtime = setup_state_sync_storage_service(
-        node_config.state_sync.storage_service,
+        node_config.state_sync,
         peers_and_metadata,
         network_service_events,
         &db_rw,
@@ -202,7 +202,7 @@ fn setup_aptos_data_client(
 
 /// Sets up the state sync storage service runtime
 fn setup_state_sync_storage_service(
-    config: StorageServiceConfig,
+    config: StateSyncConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
     network_service_events: NetworkServiceEvents<StorageServiceMessage>,
     db_rw: &DbReaderWriter,
@@ -212,7 +212,7 @@ fn setup_state_sync_storage_service(
     let storage_service_runtime = aptos_runtimes::spawn_named_runtime("stor-server".into(), None);
 
     // Spawn the state sync storage service servers on the runtime
-    let storage_reader = StorageReader::new(config, Arc::clone(&db_rw.reader));
+    let storage_reader = StorageReader::new(config.storage_service, Arc::clone(&db_rw.reader));
     let service = StorageServiceServer::new(
         config,
         storage_service_runtime.handle().clone(),

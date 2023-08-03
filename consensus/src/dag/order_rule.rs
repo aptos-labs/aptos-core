@@ -135,13 +135,14 @@ impl OrderRule {
         self.lowest_unordered_anchor_round = anchor.round() + 1;
 
         let mut dag_writer = self.dag.write();
-        let ordered_nodes: Vec<_> = dag_writer
+        let mut ordered_nodes: Vec<_> = dag_writer
             .reachable_mut(&anchor, None)
             .map(|node_status| {
                 node_status.mark_as_ordered();
                 node_status.as_node().clone()
             })
             .collect();
+        ordered_nodes.reverse();
         if let Err(e) = self.ordered_nodes_sender.unbounded_send(ordered_nodes) {
             error!("Failed to send ordered nodes {:?}", e);
         }

@@ -487,6 +487,49 @@ fn add_accounts_impl<V>(
     );
 }
 
+struct GasMesurement {
+    start_gas: f64,
+    start_gas_count: u64,
+}
+
+impl GasMesurement {
+    pub fn sequential_gas_counter() -> Histogram {
+        block_executor_counters::TXN_GAS.with_label_values(&[
+            block_executor_counters::Mode::SEQUENTIAL,
+            block_executor_counters::GasType::NON_STORAGE_GAS,
+        ])
+    }
+
+    pub fn parallel_gas_counter() -> Histogram {
+        block_executor_counters::TXN_GAS.with_label_values(&[
+            block_executor_counters::Mode::PARALLEL,
+            block_executor_counters::GasType::NON_STORAGE_GAS,
+        ])
+    }
+
+    pub fn start() -> Self {
+        let start_gas = Self::sequential_gas_counter().get_sample_sum()
+            + Self::parallel_gas_counter().get_sample_sum();
+        let start_gas_count = Self::sequential_gas_counter().get_sample_count()
+            + Self::parallel_gas_counter().get_sample_count();
+
+        Self {
+            start_gas,
+            start_gas_count,
+        }
+    }
+
+    pub fn end(self) -> (f64, u64) {
+        let delta_gas = (Self::sequential_gas_counter().get_sample_sum()
+            + Self::parallel_gas_counter().get_sample_sum())
+            - self.start_gas;
+        let delta_gas_count = (Self::sequential_gas_counter().get_sample_count()
+            + Self::parallel_gas_counter().get_sample_count())
+            - self.start_gas_count;
+        (delta_gas, delta_gas_count)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{native_executor::NativeExecutor, pipeline::PipelineConfig};
@@ -573,48 +616,5 @@ mod tests {
     fn test_native_benchmark() {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<NativeExecutor>(None, false);
-    }
-}
-
-struct GasMesurement {
-    start_gas: f64,
-    start_gas_count: u64,
-}
-
-impl GasMesurement {
-    pub fn sequential_gas_counter() -> Histogram {
-        block_executor_counters::TXN_GAS.with_label_values(&[
-            block_executor_counters::Mode::SEQUENTIAL,
-            block_executor_counters::GasType::NON_STORAGE_GAS,
-        ])
-    }
-
-    pub fn parallel_gas_counter() -> Histogram {
-        block_executor_counters::TXN_GAS.with_label_values(&[
-            block_executor_counters::Mode::PARALLEL,
-            block_executor_counters::GasType::NON_STORAGE_GAS,
-        ])
-    }
-
-    pub fn start() -> Self {
-        let start_gas = Self::sequential_gas_counter().get_sample_sum()
-            + Self::parallel_gas_counter().get_sample_sum();
-        let start_gas_count = Self::sequential_gas_counter().get_sample_count()
-            + Self::parallel_gas_counter().get_sample_count();
-
-        Self {
-            start_gas,
-            start_gas_count,
-        }
-    }
-
-    pub fn end(self) -> (f64, u64) {
-        let delta_gas = (Self::sequential_gas_counter().get_sample_sum()
-            + Self::parallel_gas_counter().get_sample_sum())
-            - self.start_gas;
-        let delta_gas_count = (Self::sequential_gas_counter().get_sample_count()
-            + Self::parallel_gas_counter().get_sample_count())
-            - self.start_gas_count;
-        (delta_gas, delta_gas_count)
     }
 }

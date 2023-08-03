@@ -6,7 +6,7 @@ use crate::function_target::FunctionTarget;
 use ethnum::U256;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
-use move_core_types::u256;
+use move_core_types::{u256, value::MoveValue};
 use move_model::{
     ast,
     ast::{Address, Exp, ExpData, MemoryLabel, TempIndex, TraceKind},
@@ -103,6 +103,34 @@ pub enum Constant {
 impl From<&u256::U256> for Constant {
     fn from(n: &u256::U256) -> Constant {
         Constant::U256(U256::from(n))
+    }
+}
+
+impl Constant {
+    /// Converts a constant into a `MoveValue` in the core types which also the runtime shares.
+    /// TODO: we should use MoveValue right away in the bytecode
+    pub fn to_move_value(&self) -> MoveValue {
+        match self {
+            Constant::Bool(x) => MoveValue::Bool(*x),
+            Constant::U8(x) => MoveValue::U8(*x),
+            Constant::U16(x) => MoveValue::U16(*x),
+            Constant::U32(x) => MoveValue::U32(*x),
+            Constant::U64(x) => MoveValue::U64(*x),
+            Constant::U128(x) => MoveValue::U128(*x),
+            Constant::U256(x) => {
+                MoveValue::U256(move_core_types::u256::U256::from_le_bytes(&x.to_le_bytes()))
+            },
+            Constant::Address(a) => MoveValue::Address(a.expect_numerical()),
+            Constant::ByteArray(v) => {
+                MoveValue::Vector(v.iter().map(|x| MoveValue::U8(*x)).collect())
+            },
+            Constant::AddressArray(v) => MoveValue::Vector(
+                v.iter()
+                    .map(|x| MoveValue::Address(x.expect_numerical()))
+                    .collect(),
+            ),
+            Constant::Vector(v) => MoveValue::Vector(v.iter().map(|x| x.to_move_value()).collect()),
+        }
     }
 }
 

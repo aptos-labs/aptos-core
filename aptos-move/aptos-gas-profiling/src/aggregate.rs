@@ -5,7 +5,7 @@ use crate::{
     log::{ExecutionAndIOCosts, ExecutionGasEvent},
     render::{Render, TableKey},
 };
-use aptos_gas::{GasQuantity, GasScalingFactor, InternalGas};
+use aptos_gas_algebra::{GasQuantity, GasScalingFactor, InternalGas};
 use aptos_types::state_store::state_key::StateKeyInner;
 use std::{
     collections::{btree_map, BTreeMap},

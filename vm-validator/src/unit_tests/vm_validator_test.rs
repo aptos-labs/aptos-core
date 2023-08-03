@@ -6,7 +6,7 @@ use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VM
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_db::AptosDB;
-use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
+use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_types::{
     account_address, account_config,
@@ -16,7 +16,7 @@ use aptos_types::{
     vm_status::StatusCode,
 };
 use aptos_vm::AptosVM;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, gas_algebra::GasQuantity};
 use rand::SeedableRng;
 
 const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
@@ -175,9 +175,10 @@ fn test_validate_max_gas_units_below_min() {
     // external gas units.
     let txn_gas_params = TransactionGasParameters::initial();
     let txn_bytes = txn_gas_params.large_transaction_cutoff
-        + (u64::from(txn_gas_params.gas_unit_scaling_factor)
-            / u64::from(txn_gas_params.intrinsic_gas_per_byte))
-        .into();
+        + GasQuantity::from(
+            u64::from(txn_gas_params.gas_unit_scaling_factor)
+                / u64::from(txn_gas_params.intrinsic_gas_per_byte),
+        );
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,

@@ -65,6 +65,8 @@
 //! [`new`]: struct.JellyfishMerkleTree.html#method.new
 //! [`put_value_sets`]: struct.JellyfishMerkleTree.html#method.put_value_sets
 //! [`put_value_set`]: struct.JellyfishMerkleTree.html#method.put_value_set
+//! [`batch_put_value_set_for_shard`]: struct.JellyfishMerkleTree.html#method.batch_put_value_set_for_shard
+//! [`get_shard_persisted_versions`]: struct.JellyfishMerkleTree.html#method.get_shard_persisted_versions
 //! [`get_with_proof`]: struct.JellyfishMerkleTree.html#method.get_with_proof
 //! [`TreeUpdateBatch`]: struct.TreeUpdateBatch.html
 //! [`InternalNode`]: node_type/struct.InternalNode.html

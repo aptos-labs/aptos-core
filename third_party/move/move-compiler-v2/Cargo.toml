@@ -10,12 +10,13 @@ publish = false
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.62"
 move-binary-format = { path = "../move-binary-format" }
 move-core-types = { path = "../move-core/types" }
 move-model = { path = "../move-model" }
 move-stackless-bytecode = { path = "../move-prover/bytecode" }
 
-anyhow = "1.0.62"
+bcs = { workspace = true }
 clap = { version = "3.2.23", features = ["derive", "env"] }
 codespan = "0.11.1"
 codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
@@ -32,6 +33,9 @@ serde = { version = "1.0.124", features = ["derive"] }
 [dev-dependencies]
 anyhow = "1.0.52"
 datatest-stable = "0.1.1"
+move-command-line-common = { path = "../move-command-line-common" }
+move-disassembler = { path = "../tools/move-disassembler" }
+move-ir-types = { path = "../move-ir/types" }
 move-prover-test-utils = { path = "../move-prover/test-utils" }
 move-stdlib = { path = "../move-stdlib" }
 

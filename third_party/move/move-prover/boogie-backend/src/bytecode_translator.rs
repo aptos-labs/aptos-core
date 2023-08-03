@@ -94,7 +94,11 @@ impl<'env> BoogieTranslator<'env> {
         let estimate_timeout_opt = fun_target
             .func_env
             .get_num_pragma(VERIFY_DURATION_ESTIMATE_PRAGMA);
-        let default_timeout = estimate_timeout_opt.unwrap_or(options.vc_timeout);
+        let default_timeout = if options.global_timeout_overwrite {
+            estimate_timeout_opt.unwrap_or(options.vc_timeout)
+        } else {
+            options.vc_timeout
+        };
         fun_target
             .func_env
             .get_num_pragma(TIMEOUT_PRAGMA)
