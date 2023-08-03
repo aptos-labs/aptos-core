@@ -129,17 +129,15 @@ impl History {
     }
 
     fn record_overflow_positive(&mut self, value: u128) {
-        self.min_overflow_positive = match self.min_overflow_positive {
-            Some(min) => Some(u128::min(min, value)),
-            None => Some(value),
-        }
+        self.min_overflow_positive = self
+            .min_overflow_positive
+            .map_or(Some(value), |min| Some(u128::min(min, value)));
     }
 
     fn record_underflow_negative(&mut self, value: u128) {
-        self.max_underflow_negative = match self.max_underflow_negative {
-            Some(min) => Some(u128::min(min, value)),
-            None => Some(value),
-        }
+        self.max_underflow_negative = self
+            .max_underflow_negative
+            .map_or(Some(value), |min| Some(u128::min(min, value)));
     }
 }
 
@@ -249,10 +247,12 @@ impl Aggregator {
                             EADD_OVERFLOW,
                         ));
                     }
-                    self.value = subtraction(value, self.value)?;
+                    self.value = subtraction(value, self.value)
+                        .expect("Subtraction of smaller value from larger value must succeed");
                     self.state = AggregatorState::PositiveDelta;
                 } else {
-                    self.value = subtraction(self.value, value)?;
+                    self.value = subtraction(self.value, value)
+                        .expect("Subtraction of smaller value from larger value must succeed");
                 }
             },
         }
@@ -293,7 +293,7 @@ impl Aggregator {
                         ));
                     }
                     self.value = subtraction(value, self.value)
-                        .expect("The subtraction cannot fail as value > self.value");
+                        .expect("Subtraction of smaller value from larger value must succeed");
                     self.state = AggregatorState::NegativeDelta;
                 }
             },
