@@ -489,10 +489,62 @@ test(
   },
   longTestTimeout,
 );
-/*
-TODO(xinding): Skip test for now, as it's blocking CI
+
 test(
-  "submits multiagent transaction with fee payer",
+  "submits fee payer transaction with no secondary signers",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+
+    const alice = new AptosAccount();
+    const bob = new AptosAccount();
+    const feePayer = new AptosAccount();
+
+    // Fund Alice's and feePayer's Accounts
+    await faucetClient.fundAccount(alice.address(), 100000000);
+    await faucetClient.fundAccount(feePayer.address(), 100000000);
+
+    const getBalance = async (account: AptosAccount) => {
+      const resources = await client.getAccountResources(account.address().hex());
+      let accountResource = resources.find((r) => r.type === aptosCoin);
+      return BigInt((accountResource!.data as any).coin.value);
+    };
+
+    const aliceBefore = await getBalance(alice);
+    const feePayerBefore = await getBalance(feePayer);
+
+    // Alice transfers 100000 coins to Bob's Account with feePayer paying the fee
+
+    const payload: Gen.EntryFunctionPayload = {
+      function: "0x1::aptos_account::transfer",
+      type_arguments: [],
+      arguments: [bob.address().hex(), 100000],
+    };
+
+    // Create a fee payer transaction with the sender, transaction payload, and fee payer account
+    const feePayerTxn = await client.generateFeePayerTransaction(alice.address().hex(), payload, feePayer.address());
+
+    // sender and fee payer need to sign the transaction
+    const senderAuthenticator = await client.signMultiTransaction(alice, feePayerTxn);
+    const feePayerAuthenticator = await client.signMultiTransaction(feePayer, feePayerTxn);
+
+    // submit gas fee payer transaction
+    const txn = await client.submitFeePayerTransaction(feePayerTxn, senderAuthenticator, feePayerAuthenticator);
+    await client.waitForTransaction(txn.hash, { checkSuccess: true });
+
+    // Check that Alice and Bob did not pay the fee
+    // Alice final balance is -100000 coins transfered to Bob
+    expect(await getBalance(alice)).toBe(aliceBefore - BigInt(100000));
+    // Bob final balance is 100000 coins transfered from Alice
+    expect(await getBalance(bob)).toBe(BigInt(100000));
+    // Check that feePayer paid the fee
+    expect(await getBalance(feePayer)).toBeLessThan(feePayerBefore);
+  },
+  longTestTimeout,
+);
+
+test(
+  "submits fee payer transaction with secondary signers",
   async () => {
     const client = new AptosClient(NODE_URL);
     const faucetClient = getFaucetClient();
@@ -500,10 +552,12 @@ test(
 
     const alice = new AptosAccount();
     const bob = new AptosAccount();
+    const feePayer = new AptosAccount();
 
     // Fund both Alice's and Bob's Account
     await faucetClient.fundAccount(alice.address(), 100000000);
     await faucetClient.fundAccount(bob.address(), 100000000);
+    await faucetClient.fundAccount(feePayer.address(), 100000000);
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
@@ -560,35 +614,40 @@ test(
 
     const aliceBefore = await getBalance(alice);
     const bobBefore = await getBalance(bob);
+    const feePayerBefore = await getBalance(feePayer);
 
-    const txnHash = await tokenClient.directTransferTokenWithFeePayer(
-      alice,
-      bob,
-      alice.address(),
-      collectionName,
-      tokenName,
-      1,
-      bob,
-      propertyVersion,
-      undefined,
-    );
+    const payload: Gen.EntryFunctionPayload = {
+      function: "0x3::token::direct_transfer_script",
+      type_arguments: [],
+      arguments: [alice.address(), collectionName, tokenName, propertyVersion, 1],
+    };
 
-    await client.waitForTransaction(txnHash, { checkSuccess: true });
+    // Create a fee payer transaction with the sender, transaction payload, fee payer account and secondary signers
+    const feePayerTxn = await client.generateFeePayerTransaction(alice.address().hex(), payload, feePayer.address(), [
+      bob.address(),
+    ]);
 
-    aliceBalance = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
-    expect(aliceBalance.amount).toBe("0");
+    // sender and fee payer need to sign the transaction
+    const senderAuthenticator = await client.signMultiTransaction(alice, feePayerTxn);
+    const seconderySignerAuthenticator = await client.signMultiTransaction(bob, feePayerTxn);
+    const feePayerAuthenticator = await client.signMultiTransaction(feePayer, feePayerTxn);
 
-    const bobBalance = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
-    expect(bobBalance.amount).toBe("1");
+    // submit gas fee payer transaction
+    const txn = await client.submitFeePayerTransaction(feePayerTxn, senderAuthenticator, feePayerAuthenticator, [
+      seconderySignerAuthenticator,
+    ]);
+    await client.waitForTransaction(txn.hash, { checkSuccess: true });
 
-    // Check that Alice did not pay the fee
+    // Check that Alice and Bob did not pay the fee
+    // Alice final balance is -100000 coins transfered to Bob
     expect(await getBalance(alice)).toBe(aliceBefore);
-    // Check that Bob paid the fee
-    expect(await getBalance(bob)).toBeLessThan(bobBefore);
+    // Bob final balance is 100000 coins transfered from Alice
+    expect(await getBalance(bob)).toBe(bobBefore);
+    // Check that feePayer paid the fee
+    expect(await getBalance(feePayer)).toBeLessThan(feePayerBefore);
   },
   longTestTimeout,
 );
- */
 
 test(
   "publishes a package",
