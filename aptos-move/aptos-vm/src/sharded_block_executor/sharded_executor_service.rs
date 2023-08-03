@@ -145,8 +145,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
                 .start_timer();
             SHARDED_BLOCK_EXECUTOR_TXN_COUNT
-                .with_label_values(&[&self.shard_id.to_string()])
-                .inc_by(sub_block.transactions.len() as u64);
+                .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
+                .observe(sub_block.transactions.len() as f64);
             info!(
                 "executing sub block for shard {} and round {}, number of txns {}",
                 self.shard_id,

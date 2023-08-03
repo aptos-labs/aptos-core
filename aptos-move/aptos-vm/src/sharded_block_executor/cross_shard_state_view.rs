@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::sharded_block_executor::counters::{
-    CROSS_SHARD_STATE_VALUE_GET_SECONDS, CROSS_SHARD_STATE_VALUE_WAIT_SECONDS,
-};
+use crate::sharded_block_executor::counters::CROSS_SHARD_STATE_VALUE_GET_SECONDS;
 use anyhow::Result;
 use aptos_logger::trace;
 use aptos_state_view::{StateView, TStateView};
@@ -124,11 +122,19 @@ impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         let _timer = CROSS_SHARD_STATE_VALUE_GET_SECONDS
-            .with_label_values(&[&self.shard_id.to_string(), &self.round_id.to_string()])
+            .with_label_values(&[
+                &self.shard_id.to_string(),
+                &self.round_id.to_string(),
+                "get",
+            ])
             .start_timer();
         if let Some(value) = self.cross_shard_data.get(state_key) {
-            let _timer = CROSS_SHARD_STATE_VALUE_WAIT_SECONDS
-                .with_label_values(&[&self.shard_id.to_string(), &self.round_id.to_string()])
+            let _timer = CROSS_SHARD_STATE_VALUE_GET_SECONDS
+                .with_label_values(&[
+                    &self.shard_id.to_string(),
+                    &self.round_id.to_string(),
+                    "wait_for_remote",
+                ])
                 .start_timer();
             return Ok(value.get_value());
         }
