@@ -9,6 +9,8 @@ use collectors::{
     MemoryMetricsCollector, NetworkMetricsCollector, ProcessMetricsCollector,
 };
 use once_cell::sync::Lazy;
+use prometheus::core::Collector;
+use aptos_logger::error;
 
 mod collectors;
 
@@ -23,18 +25,27 @@ pub fn register_node_metrics_collector() {
         *registered = true;
     }
 
-    prometheus::register(Box::<CpuMetricsCollector>::default()).unwrap();
-    prometheus::register(Box::<MemoryMetricsCollector>::default()).unwrap();
-    prometheus::register(Box::<DiskMetricsCollector>::default()).unwrap();
-    prometheus::register(Box::<NetworkMetricsCollector>::default()).unwrap();
-    prometheus::register(Box::<LoadAvgCollector>::default()).unwrap();
-    prometheus::register(Box::<ProcessMetricsCollector>::default()).unwrap();
-    prometheus::register(Box::<BasicNodeInfoCollector>::default()).unwrap();
+
+
+    register_collector(Box::<CpuMetricsCollector>::default());
+    register_collector(Box::<MemoryMetricsCollector>::default());
+    register_collector(Box::<DiskMetricsCollector>::default());
+    register_collector(Box::<NetworkMetricsCollector>::default());
+    register_collector(Box::<LoadAvgCollector>::default());
+    register_collector(Box::<ProcessMetricsCollector>::default());
+    register_collector(Box::<BasicNodeInfoCollector>::default());
     cfg_if! {
         if #[cfg(all(target_os="linux"))] {
-            prometheus::register(Box::<collectors::LinuxCpuMetricsCollector>::default()).unwrap();
-            prometheus::register(Box::<collectors::LinuxDiskMetricsCollector>::default()).unwrap();
+            register_collector(Box::<collectors::LinuxCpuMetricsCollector>::default());
+            register_collector(Box::<collectors::LinuxDiskMetricsCollector>::default());
         }
     }
-    prometheus::register(Box::<CollectorLatencyCollector>::default()).unwrap();
+    register_collector(Box::<CollectorLatencyCollector>::default());
+}
+
+pub fn register_collector(c: Box<dyn Collector>) {
+    // If not okay, then log the error and continue.
+    prometheus::register(c).unwrap_or_else(|e| {
+        error!("Failed to register collector: {}", e);
+    });
 }
