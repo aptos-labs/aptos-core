@@ -49,6 +49,7 @@ pub struct ParserConfig {
     pub num_parsers: usize,
     pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
+    pub release: Option<bool>,
 }
 
 /// Subscribes to PubSub and sends URIs to Channel
@@ -92,6 +93,7 @@ async fn spawn_parser(
     semaphore: Arc<Semaphore>,
     receiver: Arc<Mutex<Receiver<(Worker, String)>>>,
     subscription: Subscription,
+    release: bool,
 ) -> anyhow::Result<()> {
     loop {
         let _ = semaphore.acquire().await?;
@@ -100,8 +102,10 @@ async fn spawn_parser(
         let (mut parser, ack) = receiver.lock().await.recv()?;
         parser.parse().await?;
 
-        // Sends ack to PubSub
-        subscription.ack(vec![ack]).await?;
+        // Sends ack to PubSub only if running on release mode
+        if release {
+            subscription.ack(vec![ack]).await?;
+        }
 
         sleep(Duration::from_millis(500)).await;
     }
@@ -111,6 +115,11 @@ async fn spawn_parser(
 impl RunnableConfig for ParserConfig {
     /// Main driver function that establishes a connection to Pubsub and parses the Pubsub entries in parallel
     async fn run(&self) -> anyhow::Result<()> {
+        info!(
+            "[NFT Metadata Crawler] Starting parser with config: {:?}",
+            self
+        );
+
         info!("[NFT Metadata Crawler] Connecting to database");
         let pool = establish_connection_pool(self.database_url.clone());
         info!("[NFT Metadata Crawler] Database connection successful");
@@ -149,6 +158,7 @@ impl RunnableConfig for ParserConfig {
                 Arc::clone(&semaphore),
                 Arc::clone(&receiver),
                 subscription.clone(),
+                self.release.unwrap_or(false),
             ));
 
             workers.push(worker);
@@ -212,7 +222,7 @@ impl Worker {
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         info!(
             last_transaction_version = self.last_transaction_version,
-            "[NFT Metadata Crawler] Starting parser"
+            "[NFT Metadata Crawler] Starting worker"
         );
 
         // Deduplicate token_uri
