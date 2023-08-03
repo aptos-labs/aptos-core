@@ -21,6 +21,8 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+use aptos_block_partitioner::BlockPartitioner;
+use aptos_block_partitioner::v2::{assertions, V2Partitioner};
 
 pub fn generate_account_at(executor: &mut FakeExecutor, address: AccountAddress) -> AccountData {
     executor.new_account_data_at(address)
@@ -103,6 +105,7 @@ pub fn compare_txn_outputs(
 }
 
 pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>(
+    partitioner: Box<dyn BlockPartitioner>,
     sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
 ) {
     let num_txns = 400;
@@ -112,8 +115,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
     for _ in 0..num_txns {
         transactions.push(generate_non_conflicting_p2p(&mut executor).0)
     }
-    let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 2, 0.9);
+    let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
@@ -132,6 +134,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
 }
 
 pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
+    partitioner: Box<dyn BlockPartitioner>,
     sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
     concurrency: usize,
 ) {
@@ -158,8 +161,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
         }
     }
 
-    let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
+    let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
 
     let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone())
         .into_iter()
@@ -180,6 +182,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
 }
 
 pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataStore>>(
+    partitioner: Box<dyn BlockPartitioner>,
     sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
     concurrency: usize,
 ) {
@@ -209,8 +212,8 @@ pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataSt
         transactions.push(txn)
     }
 
-    let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 8, 0.9);
+    // let partitioner = ShardedBlockPartitioner::new(num_shards);
+    let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
 
     let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone())
         .into_iter()

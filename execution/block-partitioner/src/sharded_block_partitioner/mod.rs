@@ -114,6 +114,8 @@ pub struct ShardedBlockPartitioner {
     control_txs: Vec<Sender<ControlMsg>>,
     result_rxs: Vec<Receiver<PartitioningResp>>,
     shard_threads: Vec<thread::JoinHandle<()>>,
+    pub max_rounds: Option<usize>,
+    pub xshard_dep_avoid_threshold: Option<f32>,
 }
 
 impl ShardedBlockPartitioner {
@@ -158,6 +160,8 @@ impl ShardedBlockPartitioner {
             control_txs,
             result_rxs,
             shard_threads: shard_join_handles,
+            max_rounds: None,
+            xshard_dep_avoid_threshold: None,
         }
     }
 
@@ -428,7 +432,7 @@ impl Drop for ShardedBlockPartitioner {
 impl BlockPartitioner for ShardedBlockPartitioner {
     fn partition(&self, transactions: Vec<AnalyzedTransaction>, num_shards: usize) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         assert_eq!(self.num_shards, num_shards);
-        ShardedBlockPartitioner::partition(self, transactions, 4, 0.9)
+        ShardedBlockPartitioner::partition(self, transactions, self.max_rounds.unwrap_or(4), self.xshard_dep_avoid_threshold.unwrap_or(0.9))
     }
 }
 

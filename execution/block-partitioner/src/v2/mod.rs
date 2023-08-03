@@ -53,8 +53,8 @@ mod storage_location_helper;
 
 pub struct V2Partitioner {
     thread_pool: ThreadPool,
-    num_rounds_limit: usize,
-    avoid_pct: u64,
+    pub num_rounds_limit: usize,
+    pub avoid_pct: u64,
     dashmap_num_shards: usize,
 }
 
