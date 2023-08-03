@@ -1,7 +1,7 @@
 module 0x1::aggregator_v2_test {
     use std::signer;
 
-    use aptos_framework::aggregator_v2::{Self, Aggregator};
+    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot};
     use aptos_std::table::{Self, Table};
 
     /// When checking the value of aggregator fails.
@@ -11,12 +11,14 @@ module 0x1::aggregator_v2_test {
     /// determinictic integer value, for testing purposes.
     struct AggregatorStore has key, store {
         aggregators: Table<u64, Aggregator>,
+        aggregator_snapshots: Table<u64, AggregatorSnapshot>,
     }
 
     /// Initializes a fake resource which holds aggregators.
     public entry fun initialize(account: &signer) {
         let aggregators = table::new();
-        let store = AggregatorStore { aggregators };
+        let aggregator_snapshots = table::new();
+        let store = AggregatorStore { aggregators, aggregator_snapshots };
         move_to(account, store);
     }
 
@@ -100,5 +102,30 @@ module 0x1::aggregator_v2_test {
         let aggregator = table::borrow_mut(aggregators, i);
         aggregator_v2::try_sub(aggregator, value);
         aggregator_v2::read(aggregator);
+    }
+
+    public entry fun snapshot(account: &signer, i: u64) acquires AggregatorStore {
+        let addr = signer::address_of(account);
+        let aggregators = &borrow_global<AggregatorStore>(addr).aggregators;
+        let aggregator = table::borrow(aggregators, i);
+        let aggregator_snapshots = &mut borrow_global_mut<AggregatorStore>(addr).aggregator_snapshots;
+        let aggregator_snapshot = aggregator_v2::snapshot(aggregator);
+        table::add(aggregator_snapshots, i, aggregator_snapshot);
+    }
+
+    public entry fun snapshot_with_u64_limit(account: &signer, i: u64) acquires AggregatorStore {
+        let addr = signer::address_of(account);
+        let aggregators = &borrow_global<AggregatorStore>(addr).aggregators;
+        let aggregator = table::borrow(aggregators, i);
+        let aggregator_snapshots = &mut borrow_global_mut<AggregatorStore>(addr).aggregator_snapshots;
+        let aggregator_snapshot = aggregator_v2::snapshot_with_u64_limit(aggregator);
+        table::add(aggregator_snapshots, i, aggregator_snapshot);
+    }
+
+    public entry fun read_snapshot(account: &signer, i: u64) acquires AggregatorStore {
+        let addr = signer::address_of(account);
+        let aggregator_snapshots = &borrow_global<AggregatorStore>(addr).aggregator_snapshots;
+        let aggregator_snapshot = table::borrow(aggregator_snapshots, i);
+        aggregator_v2::read_snapshot(aggregator_snapshot);
     }
 }
