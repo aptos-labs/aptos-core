@@ -123,21 +123,11 @@ impl SessionId {
     pub fn as_uuid(&self) -> HashValue {
         self.hash()
     }
-
-    pub fn sender(&self) -> Option<AccountAddress> {
-        match self {
-            SessionId::Txn { sender, .. }
-            | SessionId::Prologue { sender, .. }
-            | SessionId::Epilogue { sender, .. } => Some(*sender),
-            SessionId::BlockMeta { .. } | SessionId::Genesis { .. } | SessionId::Void => None,
-        }
-    }
 }
 
 pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
     remote: &'r dyn MoveResolverExt,
-    new_slot_payer: Option<AccountAddress>,
     features: Arc<Features>,
 }
 
@@ -145,13 +135,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     pub fn new(
         inner: Session<'r, 'l>,
         remote: &'r dyn MoveResolverExt,
-        new_slot_payer: Option<AccountAddress>,
         features: Arc<Features>,
     ) -> Self {
         Self {
             inner,
             remote,
-            new_slot_payer,
             features,
         }
     }
@@ -178,7 +166,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let change_set = Self::convert_change_set(
             self.remote,
-            self.new_slot_payer,
             self.features.is_storage_slot_metadata_enabled(),
             current_time.as_ref(),
             change_set,
@@ -306,7 +293,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
     pub fn convert_change_set<C: AccessPathCache>(
         remote: &dyn MoveResolverExt,
-        new_slot_payer: Option<AccountAddress>,
         is_storage_slot_metadata_enabled: bool,
         current_time: Option<&CurrentTimeMicroseconds>,
         change_set: MoveChangeSet,
@@ -319,10 +305,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ) -> Result<VMChangeSet, VMStatus> {
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
         if is_storage_slot_metadata_enabled {
-            if let Some(payer) = new_slot_payer {
-                if let Some(current_time) = current_time {
-                    new_slot_metadata = Some(StateValueMetadata::new(payer, 0, current_time));
-                }
+            if let Some(current_time) = current_time {
+                new_slot_metadata = Some(StateValueMetadata::new(0, current_time));
             }
         }
         let woc = WriteOpConverter {
