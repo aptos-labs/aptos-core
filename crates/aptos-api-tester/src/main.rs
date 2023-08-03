@@ -130,6 +130,7 @@ async fn main() -> Result<()> {
     let _mp = MetricsPusher::start_for_local_run("api-tester");
 
     // test flows
+    let _ = test_flows(NetworkName::Testnet).await;
     let _ = test_flows(NetworkName::Devnet).await;
 
     Ok(())
