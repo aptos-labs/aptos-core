@@ -16,5 +16,5 @@ mod storage;
 mod tests;
 mod types;
 
-pub use dag_network::RpcHandler;
-pub use types::{CertifiedNode, DAGNetworkMessage, Node, NodeId, Vote};
+pub use dag_network::{RpcHandler, DAGNetworkSender, RpcWithFallback};
+pub use types::{CertifiedNode, DAGNetworkMessage, Node, NodeId, Vote, DAGMessage};
