@@ -3,11 +3,30 @@
 use crate::{models::nft_metadata_crawler_uris::NFTMetadataCrawlerURIs, schema};
 use anyhow::Context;
 use diesel::{
-    r2d2::{ConnectionManager, PooledConnection},
+    r2d2::{ConnectionManager, Pool, PooledConnection},
     upsert::excluded,
     ExpressionMethods, PgConnection, RunQueryDsl,
 };
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use tracing::debug;
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
+/// Establishes a connection pool to Postgres
+pub fn establish_connection_pool(database_url: String) -> Pool<ConnectionManager<PgConnection>> {
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    Pool::builder()
+        .build(manager)
+        .expect("Failed to create pool.")
+}
+
+/// Runs database migrations
+pub fn run_migrations(pool: &Pool<ConnectionManager<PgConnection>>) {
+    pool.get()
+        .expect("[NFT Metadata Crawler] Could not get connection for migrations")
+        .run_pending_migrations(MIGRATIONS)
+        .expect("[NFT Metadata Crawler] migrations failed!");
+}
 
 /// Upserts URIs into database
 pub fn upsert_uris(
