@@ -22,10 +22,8 @@ pub fn add_gas_formula_to_coefficient_matrix(
     formula: &[f64],
     coefficient_matrix: &mut DMatrix<f64>,
 ) {
-    let mut j = 0;
-    while j < ncols {
+    for j in 0..ncols {
         coefficient_matrix[(idx, j)] = formula[j];
-        j += 1;
     }
 }
 
@@ -57,24 +55,16 @@ fn create_augmented_matrix(
     coefficient_matrix: &mut DMatrix<f64>,
     constant_matrix: &mut DMatrix<f64>,
 ) {
-    let mut i = 0;
-    let mut j = 0;
-
     let nrows = augmented_matrix.nrows();
     let ncols = coefficient_matrix.ncols();
-    while i < nrows {
-        while j < ncols {
+    for i in 0..nrows {
+        for j in 0..ncols {
             augmented_matrix[(i, j)] = coefficient_matrix[(i, j)];
-            j += 1;
         }
-        i += 1;
-        j = 0;
     }
 
-    i = 0;
-    while i < nrows {
+    for i in 0..nrows {
         augmented_matrix[(i, ncols)] = constant_matrix[(i, 0)];
-        i += 1;
     }
 }
 
@@ -118,11 +108,6 @@ pub fn find_linearly_dependent_variables(
     create_augmented_matrix(&mut aug_matrix, A, b);
     rref(&mut aug_matrix);
 
-    /*let is_ones = validate_rref_rows_are_one(&mut aug_matrix);
-    if is_ones {
-        return Err(find_pivot_columns(&mut aug_matrix));
-    }*/
-
     let linearly_independent = find_linear_independent_variables(&mut aug_matrix);
     let mut linearly_dependent = Vec::new();
     for (idx, gas_param) in gas_params.into_iter().enumerate() {
@@ -147,31 +132,23 @@ pub fn get_computed_time_and_outliers(
     coefficient_matrix: &mut DMatrix<f64>,
     constant_matrix: &mut DMatrix<f64>,
 ) -> Result<Vec<(usize, f64, f64, f64, bool)>, String> {
-    let mut i = 0;
-    let mut j = 0;
-
     // get computed running time
     let mut computed_running_time: Vec<f64> = Vec::new();
     let coeff_row = coefficient_matrix.nrows();
     let coeff_col = coefficient_matrix.ncols();
-    while i < coeff_row {
+    for i in 0..coeff_row {
         let mut total_time: f64 = 0.0;
-        while j < coeff_col {
+        for j in 0..coeff_col {
             let a_ij = coefficient_matrix[(i, j)];
             total_time += a_ij * x_hat[(j, 0)];
-            j += 1;
         }
         computed_running_time.push(total_time);
-        i += 1;
-        j = 0;
     }
-
-    i = 0;
 
     // compare w/ margin of error
     let mut outliers: Vec<(usize, f64, f64, f64, bool)> = Vec::new();
     let const_row = constant_matrix.nrows();
-    while i < const_row {
+    for i in 0..const_row {
         let a_ij = constant_matrix[(i, 0)];
 
         let numerator = (a_ij - computed_running_time[i]).abs();
@@ -189,7 +166,6 @@ pub fn get_computed_time_and_outliers(
                 outliers.push((i, computed_running_time[i], a_ij, diff, false));
             }
         }
-        i += 1;
     }
 
     Ok(outliers)
@@ -257,38 +233,30 @@ fn rref(matrix: &mut DMatrix<f64>) {
 ///
 /// * `matrix` - Augmented matrix that has been RREF'd
 fn find_linear_independent_variables(matrix: &mut DMatrix<f64>) -> Vec<usize> {
-    let mut i = 0;
-
     let mut linear_combos = Vec::new();
-    while i < matrix.nrows() {
-        let mut j = 0;
 
+    for i in 0..matrix.nrows() {
         let mut max_val: f64 = 0.0;
-        let mut k = 0;
-        while k < matrix.ncols() - 1 {
+        for k in 0..(matrix.ncols() - 1) {
             let a_ik = matrix[(i, k)];
             if a_ik > max_val {
                 max_val = a_ik;
             }
-            k += 1;
         }
 
         if approx_eq!(f64, max_val, 0.0, ulps = 2) {
             // ignore this row
-            i += 1;
             continue;
         }
 
         let mut independent_vars = Vec::new();
-        while j < matrix.ncols() - 1 {
+        for j in 0..(matrix.ncols() - 1) {
             let a_ij = matrix[(i, j)];
             let ratio = a_ij / max_val;
             // if each element / max_val is approximately not 0
             if !approx_eq!(f64, ratio, 0.0, ulps = 2) {
                 independent_vars.push((i, j));
             }
-
-            j += 1;
         }
 
         if independent_vars.len() == 1 {
@@ -297,8 +265,6 @@ fn find_linear_independent_variables(matrix: &mut DMatrix<f64>) -> Vec<usize> {
                 linear_combos.push(gas_param);
             }
         }
-
-        i += 1;
     }
 
     linear_combos

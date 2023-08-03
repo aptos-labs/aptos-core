@@ -64,16 +64,11 @@ pub fn least_squares(
 
         let nrows = x_hat.nrows();
         let ncols = x_hat.ncols();
-        let mut i = 0;
-        let mut j = 0;
         println!("where the gas parameter values are (microsecond per instruction):\n");
-        while i < nrows {
-            while j < ncols {
+        for i in 0..nrows {
+            for j in 0..ncols {
                 println!("{} {}", x_hat[(i, j)], keys[i]);
-                j += 1;
             }
-            i += 1;
-            j = 0;
         }
 
         // TODO: error handling with division zero that bubbles up
@@ -157,18 +152,19 @@ fn report_undetermined_gas_params(
     let keys: Vec<String> = map.keys().map(|key| key.to_string()).collect();
 
     let result = find_linearly_dependent_variables(coeff_matrix, const_matrix, keys.clone());
-    if let Err(pivot_columns) = &result {
-        println!("free variables are:\n");
-        for col in pivot_columns {
-            let gas_param = &keys[*col];
-            println!("- gas parameter: {}\n", gas_param);
-        }
-    }
-
-    if let Ok(linear_combos) = &result {
-        println!("linearly dependent variables are:\n");
-        for gas_param in linear_combos {
-            println!("- gas parameter: {}\n", gas_param);
-        }
+    match result {
+        Ok(linear_combos) => {
+            println!("linearly dependent variables are:\n");
+            for gas_param in linear_combos {
+                println!("- gas parameter: {}\n", gas_param);
+            }
+        },
+        Err(pivot_columns) => {
+            println!("free variables are:\n");
+            for col in pivot_columns {
+                let gas_param = &keys[col];
+                println!("- gas parameter: {}\n", gas_param);
+            }
+        },
     }
 }

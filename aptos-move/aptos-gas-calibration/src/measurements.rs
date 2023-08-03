@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::gas_meter_helpers::{get_dir_paths, list_entrypoints, record_gas_meter};
+use crate::measurements_helpers::{get_dir_paths, list_entrypoints, record_gas_usage};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas_algebra::DynamicExpression;
 use aptos_language_e2e_tests::executor::FakeExecutor;
@@ -64,7 +64,7 @@ pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeasurem
                 "Failed: entry function probably has >1 parameter that's not a Signer type",
             );
 
-            let measurement_results = record_gas_meter(
+            let measurement_results = record_gas_usage(
                 &package,
                 &mut executor,
                 func_identifiers,
@@ -154,7 +154,7 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasu
                             .equation_names
                             .push(format!("{}::{}", &identifier, func_identifier.0));
 
-                        let elapsed = executor.exec_module_record_running_time(
+                        let elapsed = executor.exec_func_record_running_time(
                             &module_id,
                             &func_identifier.0,
                             vec![],

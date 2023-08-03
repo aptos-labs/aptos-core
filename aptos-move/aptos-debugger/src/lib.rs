@@ -233,7 +233,6 @@ impl AptosDebugger {
             ChainId::test().id(),
             features,
             TimedFeatures::enable_all(),
-            None,
         )
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);

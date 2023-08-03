@@ -69,6 +69,111 @@ module 0xcafe.BrTrue {
         return;
     }
 
+	public entry calibrate_br_true_x100() {
+	label b0: jump_if (true) b1;
+	label b1: jump_if (true) b2;
+	label b2: jump_if (true) b3;
+	label b3: jump_if (true) b4;
+	label b4: jump_if (true) b5;
+	label b5: jump_if (true) b6;
+	label b6: jump_if (true) b7;
+	label b7: jump_if (true) b8;
+	label b8: jump_if (true) b9;
+	label b9: jump_if (true) b10;
+	label b10: jump_if (true) b11;
+	label b11: jump_if (true) b12;
+	label b12: jump_if (true) b13;
+	label b13: jump_if (true) b14;
+	label b14: jump_if (true) b15;
+	label b15: jump_if (true) b16;
+	label b16: jump_if (true) b17;
+	label b17: jump_if (true) b18;
+	label b18: jump_if (true) b19;
+	label b19: jump_if (true) b20;
+	label b20: jump_if (true) b21;
+	label b21: jump_if (true) b22;
+	label b22: jump_if (true) b23;
+	label b23: jump_if (true) b24;
+	label b24: jump_if (true) b25;
+	label b25: jump_if (true) b26;
+	label b26: jump_if (true) b27;
+	label b27: jump_if (true) b28;
+	label b28: jump_if (true) b29;
+	label b29: jump_if (true) b30;
+	label b30: jump_if (true) b31;
+	label b31: jump_if (true) b32;
+	label b32: jump_if (true) b33;
+	label b33: jump_if (true) b34;
+	label b34: jump_if (true) b35;
+	label b35: jump_if (true) b36;
+	label b36: jump_if (true) b37;
+	label b37: jump_if (true) b38;
+	label b38: jump_if (true) b39;
+	label b39: jump_if (true) b40;
+	label b40: jump_if (true) b41;
+	label b41: jump_if (true) b42;
+	label b42: jump_if (true) b43;
+	label b43: jump_if (true) b44;
+	label b44: jump_if (true) b45;
+	label b45: jump_if (true) b46;
+	label b46: jump_if (true) b47;
+	label b47: jump_if (true) b48;
+	label b48: jump_if (true) b49;
+	label b49: jump_if (true) b50;
+	label b50: jump_if (true) b51;
+	label b51: jump_if (true) b52;
+	label b52: jump_if (true) b53;
+	label b53: jump_if (true) b54;
+	label b54: jump_if (true) b55;
+	label b55: jump_if (true) b56;
+	label b56: jump_if (true) b57;
+	label b57: jump_if (true) b58;
+	label b58: jump_if (true) b59;
+	label b59: jump_if (true) b60;
+	label b60: jump_if (true) b61;
+	label b61: jump_if (true) b62;
+	label b62: jump_if (true) b63;
+	label b63: jump_if (true) b64;
+	label b64: jump_if (true) b65;
+	label b65: jump_if (true) b66;
+	label b66: jump_if (true) b67;
+	label b67: jump_if (true) b68;
+	label b68: jump_if (true) b69;
+	label b69: jump_if (true) b70;
+	label b70: jump_if (true) b71;
+	label b71: jump_if (true) b72;
+	label b72: jump_if (true) b73;
+	label b73: jump_if (true) b74;
+	label b74: jump_if (true) b75;
+	label b75: jump_if (true) b76;
+	label b76: jump_if (true) b77;
+	label b77: jump_if (true) b78;
+	label b78: jump_if (true) b79;
+	label b79: jump_if (true) b80;
+	label b80: jump_if (true) b81;
+	label b81: jump_if (true) b82;
+	label b82: jump_if (true) b83;
+	label b83: jump_if (true) b84;
+	label b84: jump_if (true) b85;
+	label b85: jump_if (true) b86;
+	label b86: jump_if (true) b87;
+	label b87: jump_if (true) b88;
+	label b88: jump_if (true) b89;
+	label b89: jump_if (true) b90;
+	label b90: jump_if (true) b91;
+	label b91: jump_if (true) b92;
+	label b92: jump_if (true) b93;
+	label b93: jump_if (true) b94;
+	label b94: jump_if (true) b95;
+	label b95: jump_if (true) b96;
+	label b96: jump_if (true) b97;
+	label b97: jump_if (true) b98;
+	label b98: jump_if (true) b99;
+	label b99: jump_if (true) b100;
+	label b100:
+		return;
+	}    
+
     public entry calibrate_br_true_x500() {
     label b0: jump_if (true) b1;
     label b1: jump_if (true) b2;
@@ -1577,5 +1682,6 @@ module 0xcafe.BrTrue {
     label b999: jump_if (true) b1000;
     label b1000:
         return;
-    }             
+    }  
+                        
 }

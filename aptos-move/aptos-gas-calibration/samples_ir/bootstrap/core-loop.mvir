@@ -4563,5 +4563,5 @@ module 0xcafe.BootstrapCoreLoop {
         _, _, _, _, _, _, _, _, _, _ = (copy(v), copy(v), copy(v), copy(v), copy(v), copy(v), copy(v), copy(v), copy(v), copy(v));
 
         return;
-    }
+    }    
 }

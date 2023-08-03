@@ -8,7 +8,7 @@ use std::collections::{
     BTreeMap,
 };
 
-/// expand out the AST and collect only terms
+/// expand out the AST and collect only additive terms
 ///
 /// ### Arguments
 ///

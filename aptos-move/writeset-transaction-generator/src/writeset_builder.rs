@@ -116,7 +116,6 @@ where
         chain_id,
         Features::default(),
         TimedFeatures::enable_all(),
-        None,
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);

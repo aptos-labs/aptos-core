@@ -1,16 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod gas_meter;
-mod gas_meter_helpers;
 mod math;
 mod math_interface;
+mod measurements;
+mod measurements_helpers;
 mod solve;
 use aptos_abstract_gas_usage::{aggregate_terms, expand_terms};
 use aptos_gas_algebra::DynamicExpression;
 use clap::Parser;
-use gas_meter::{compile_and_run_samples, compile_and_run_samples_ir};
 use math_interface::{convert_to_matrix_format, total_num_of_cols, total_num_rows};
+use measurements::{compile_and_run_samples, compile_and_run_samples_ir};
 use solve::{build_coefficient_matrix, build_constant_matrix, least_squares};
 use std::collections::BTreeMap;
 
