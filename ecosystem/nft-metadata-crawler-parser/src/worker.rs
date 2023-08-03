@@ -67,7 +67,7 @@ async fn consume_pubsub_entries_to_channel_loop(
         let ack = msg.ack_id();
         let entry_string = String::from_utf8(msg.message.clone().data)?;
         let parts: Vec<&str> = entry_string.split(',').collect();
-        let entry = Worker::new(
+        let worker = Worker::new(
             parser_config.clone(),
             pool.get()?,
             parts[0].to_string(),
@@ -80,8 +80,11 @@ async fn consume_pubsub_entries_to_channel_loop(
         );
 
         // Send worker to channel
-        sender.send((entry, ack.to_string())).unwrap_or_else(|e| {
-            error!("Failed to send entry to channel: {:?}", e);
+        sender.send((worker, ack.to_string())).unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to send PubSub entry to channel"
+            );
         });
     }
 
@@ -99,11 +102,18 @@ async fn spawn_parser(
         let _ = semaphore.acquire().await?;
 
         // Pulls worker from Channel
-        let (mut parser, ack) = receiver.lock().await.recv()?;
-        parser.parse().await?;
+        let (mut worker, ack) = receiver.lock().await.recv()?;
+        worker.parse().await?;
 
         // Sends ack to PubSub only if running on release mode
         if release {
+            info!(
+                token_data_id = worker.token_data_id,
+                token_uri = worker.token_uri,
+                last_transaction_version = worker.last_transaction_version,
+                force = worker.force,
+                "[NFT Metadata Crawler] Acking message"
+            );
             subscription.ack(vec![ack]).await?;
         }
 
