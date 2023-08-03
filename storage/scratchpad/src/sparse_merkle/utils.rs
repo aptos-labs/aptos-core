@@ -4,6 +4,11 @@
 
 use aptos_crypto::HashValue;
 
+/// Returns the shard id of the hashed key.
+pub fn get_state_shard_id(key: HashValue) -> u8 {
+    key.nibble(0)
+}
+
 /// Swap template-type values if 'cond'=true - useful to determine left/right parameters.
 pub(crate) fn swap_if<T>(first: T, second: T, cond: bool) -> (T, T) {
     if cond {

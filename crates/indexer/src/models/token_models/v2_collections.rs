@@ -6,6 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
+    collection_datas::{CollectionData, QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     token_utils::{CollectionDataIdType, TokenWriteSet},
     tokens::TableHandleToOwner,
     v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenResource},
@@ -25,9 +26,6 @@ use serde::{Deserialize, Serialize};
 
 // PK of current_collections_v2, i.e. collection_id
 pub type CurrentCollectionV2PK = String;
-
-const QUERY_RETRIES: u32 = 5;
-const QUERY_RETRY_DELAY_MS: u64 = 500;
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, write_set_change_index))]
@@ -210,10 +208,26 @@ impl CollectionV2 {
             let mut creator_address = match maybe_creator_address {
                 Some(ca) => ca,
                 None => {
-                    Self::get_collection_creator_for_v1(conn, &table_handle).context(format!(
+                    match Self::get_collection_creator_for_v1(conn, &table_handle).context(format!(
                         "Failed to get collection creator for table handle {}, txn version {}",
                         table_handle, txn_version
-                    ))?
+                    )) {
+                        Ok(ca) => ca,
+                        Err(_) => {
+                            // Try our best by getting from the older collection data
+                            match CollectionData::get_collection_creator(conn, &table_handle) {
+                                Ok(creator) => creator,
+                                Err(_) => {
+                                    aptos_logger::error!(
+                                        transaction_version = txn_version,
+                                        lookup_key = &table_handle,
+                                        "Failed to get collection v2 creator for table handle. You probably should backfill db."
+                                    );
+                                    return Ok(None);
+                                },
+                            }
+                        },
+                    }
                 },
             };
             creator_address = standardize_address(&creator_address);
@@ -266,7 +280,7 @@ impl CollectionV2 {
     /// If collection data is not in resources of the same transaction, then try looking for it in the database. Since collection owner
     /// cannot change, we can just look in the current_collection_datas table.
     /// Retrying a few times since this collection could've been written in a separate thread.
-    pub fn get_collection_creator_for_v1(
+    fn get_collection_creator_for_v1(
         conn: &mut PgPoolConnection,
         table_handle: &str,
     ) -> anyhow::Result<String> {
@@ -284,7 +298,7 @@ impl CollectionV2 {
     }
 
     /// TODO: Change this to a KV store
-    pub fn get_by_table_handle(
+    fn get_by_table_handle(
         conn: &mut PgPoolConnection,
         table_handle: &str,
     ) -> anyhow::Result<String> {

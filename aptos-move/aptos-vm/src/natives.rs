@@ -4,7 +4,8 @@
 
 #[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
+use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
 use aptos_types::{
@@ -12,7 +13,6 @@ use aptos_types::{
     on_chain_config::{Features, TimedFeatures},
 };
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use std::sync::Arc;
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{
@@ -29,26 +29,31 @@ use {
 static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
 
 pub fn aptos_natives(
-    gas_params: NativeGasParameters,
-    abs_val_size_gas_params: AbstractValueSizeGasParameters,
     gas_feature_version: u64,
+    native_gas_params: NativeGasParameters,
+    misc_gas_params: MiscGasParameters,
     timed_features: TimedFeatures,
-    features: Arc<Features>,
+    features: Features,
 ) -> NativeFunctionTable {
-    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib.clone())
+    let mut builder = SafeNativeBuilder::new(
+        gas_feature_version,
+        native_gas_params,
+        misc_gas_params,
+        timed_features,
+        features,
+    );
+
+    #[allow(unreachable_code)]
+    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, &mut builder)
         .into_iter()
         .filter(|(_, name, _, _)| name.as_str() != "vector")
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
-            gas_params.move_stdlib,
-            gas_params.aptos_framework,
-            timed_features,
-            features,
-            move |val| abs_val_size_gas_params.abstract_value_size(val, gas_feature_version),
+            &builder,
         ))
-        .chain(move_table_extension::table_natives(
+        .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,
-            gas_params.table,
+            &mut builder,
         ))
         .collect()
 }
@@ -56,11 +61,11 @@ pub fn aptos_natives(
 pub fn assert_no_test_natives(err_msg: &str) {
     assert!(
         aptos_natives(
-            NativeGasParameters::zeros(),
-            AbstractValueSizeGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
+            NativeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
             TimedFeatures::enable_all(),
-            Arc::new(Features::default())
+            Features::default()
         )
         .into_iter()
         .all(|(_, module_name, func_name, _)| {
@@ -76,7 +81,9 @@ pub fn assert_no_test_natives(err_msg: &str) {
                     && func_name.as_str() == "generate_keys_internal"
                 || module_name.as_str() == "bls12381" && func_name.as_str() == "sign_internal"
                 || module_name.as_str() == "bls12381"
-                    && func_name.as_str() == "generate_proof_of_possession_internal")
+                    && func_name.as_str() == "generate_proof_of_possession_internal"
+                || module_name.as_str() == "event"
+                    && func_name.as_str() == "emitted_events_internal")
         }),
         "{}",
         err_msg
@@ -90,17 +97,16 @@ pub fn configure_for_unit_test() {
 
 #[cfg(feature = "testing")]
 fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
+    use aptos_table_natives::NativeTableContext;
+
+    exts.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
     exts.add(NativeCodeContext::default());
     exts.add(NativeTransactionContext::new(
         vec![1],
         vec![1],
         ChainId::test().id(),
     )); // We use the testing environment chain ID here
-    exts.add(NativeAggregatorContext::new(
-        [0; 32],
-        &*DUMMY_RESOLVER,
-        true,
-    ));
+    exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
 }

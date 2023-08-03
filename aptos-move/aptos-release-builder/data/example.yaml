@@ -9,7 +9,7 @@ proposals:
       discussion_url: ""
     execution_mode: SingleStep
     update_sequence:
-      - RawScript: data/proposals/empty.move
+      - RawScript: data/example_proposals/empty.move
   - name: framework
     metadata:
       title: ""
@@ -75,4 +75,4 @@ proposals:
       - Execution:
           V1:
             transaction_shuffler_type: no_shuffling
-      - RawScript: data/proposals/empty_multi_step.move
+      - RawScript: data/example_proposals/empty_multi_step.move

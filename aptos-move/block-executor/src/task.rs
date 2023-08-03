@@ -80,7 +80,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
         <Self::Txn as Transaction>::Value,
     )>;
 
-    /// Get the deltas of a transaction from its output.
+    /// Get the aggregator deltas of a transaction from its output.
     fn get_deltas(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
 
     /// Execution output for transactions that comes after SkipRest signal.
@@ -93,9 +93,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
         &self,
         delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
     );
-
-    /// Return the amount of gas consumed by the transaction.
-    fn gas_used(&self) -> u64;
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;

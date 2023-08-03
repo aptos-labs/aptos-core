@@ -880,6 +880,138 @@
           ],
           "title": "Average request latencies (per type)",
           "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "The 0.99 quantile of all ping latencies",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "continuous-GrYlRd" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "scheme",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "smooth",
+                "lineWidth": 3,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": { "mode": "exclude", "names": ["Value"], "prefix": "All except:", "readOnly": true }
+                },
+                "properties": [{ "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } }]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
+          "id": 105,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "v1.0",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, sum(rate(peer_monitoring_client_request_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",request_type=\"latency_ping\"}[$__rate_interval])) by (le))",
+              "legendFormat": "P99",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.70, sum(rate(peer_monitoring_client_request_latencies_bucket{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\",role=~\"$role\",request_type=\"latency_ping\"}[$__rate_interval])) by (le))",
+              "hide": false,
+              "legendFormat": "P70",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Ping latencies (quantiles)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "description": "The average request latencies for ping requests.",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
+          "id": 104,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "v1.0",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+              "editorMode": "code",
+              "expr": "peer_monitoring_client_request_latencies_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/peer_monitoring_client_request_latencies_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\",request_type=\"latency_ping\"}",
+              "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network_id}}-{{request_type}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Average ping latencies",
+          "type": "timeseries"
         }
       ],
       "targets": [
@@ -920,13 +1052,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -975,13 +1101,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -1030,13 +1150,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1096,13 +1210,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "s"
             },
             "overrides": []
@@ -1153,13 +1261,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -1208,13 +1310,7 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "red", "value": 80 }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
             },
             "overrides": []
           },
@@ -1286,11 +1382,53 @@
         "type": "query"
       },
       {
+        "current": { "selected": false, "text": "devnet", "value": "devnet" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"},chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"},chain_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "current": { "selected": false, "text": "gcp-forge-0", "value": "gcp-forge-0" },
+        "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"},cluster)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"},cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
         "current": { "selected": false, "text": "All", "value": "All" },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\"},namespace)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "",
         "multi": false,
         "name": "namespace",
@@ -1309,38 +1447,18 @@
         "useTags": false
       },
       {
-        "current": { "selected": false, "text": "devnet", "value": "devnet" },
-        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(chain_name)",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": false,
-        "name": "chain_name",
-        "options": [],
-        "query": { "query": "label_values(chain_name)", "refId": "Prometheus-chain-name-Variable-Query" },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
-      },
-      {
         "allValue": ".*",
         "current": { "selected": false, "text": ["All"], "value": ["$__all"] },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(kubernetes_pod_name)",
+        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"},kubernetes_pod_name)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
         "name": "kubernetes_pod_name",
         "options": [],
         "query": {
-          "query": "label_values(kubernetes_pod_name)",
-          "refId": "Prometheus-kubernetes_pod_name-Variable-Query"
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"},kubernetes_pod_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
@@ -1354,13 +1472,16 @@
       {
         "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
         "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-        "definition": "label_values(role)",
+        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"},role)",
         "hide": 0,
         "includeAll": true,
         "multi": true,
         "name": "role",
         "options": [],
-        "query": { "query": "label_values(role)", "refId": "Prometheus-role-Variable-Query" },
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", namespace=~\"$namespace\"},role)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -1407,6 +1528,6 @@
   "timezone": "",
   "title": "peer-monitoring-service",
   "uid": "peer_monitoring_service",
-  "version": 24,
+  "version": 26,
   "weekStart": ""
 }

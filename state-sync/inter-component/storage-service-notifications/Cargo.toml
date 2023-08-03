@@ -1,0 +1,25 @@
+[package]
+name = "aptos-storage-service-notifications"
+description = "The notification interface between state sync and the storage service"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-channels = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+aptos-crypto = { workspace = true }
+claims = { workspace = true }
+tokio = { workspace = true }

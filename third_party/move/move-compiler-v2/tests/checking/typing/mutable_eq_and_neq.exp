@@ -1,0 +1,45 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct B {
+        f: bool,
+    }
+    struct P {
+        b1: M::B,
+        b2: M::B,
+    }
+    struct S {
+        f: u64,
+        g: u64,
+    }
+    private fun t(r1: &mut u64,r2: &mut u64,s: &mut M::S) {
+        Eq<u64>(r1, r1);
+        Eq<u64>(r1, r2);
+        Eq<u64>(r2, r2);
+        Eq<u64>(r2, r2);
+        Neq<u64>(r1, r1);
+        Neq<u64>(r1, r2);
+        Neq<u64>(r2, r2);
+        Neq<u64>(r2, r2);
+        Eq<u64>(Borrow(Mutable)(select M::S.f(s)), Borrow(Mutable)(select M::S.f(s)));
+        Eq<u64>(Borrow(Mutable)(select M::S.f(s)), Borrow(Mutable)(select M::S.g(s)));
+        Eq<u64>(Borrow(Mutable)(select M::S.g(s)), Borrow(Mutable)(select M::S.f(s)));
+        Eq<u64>(Borrow(Mutable)(select M::S.g(s)), Borrow(Mutable)(select M::S.g(s)));
+        Neq<u64>(Borrow(Mutable)(select M::S.f(s)), Borrow(Mutable)(select M::S.f(s)));
+        Neq<u64>(Borrow(Mutable)(select M::S.f(s)), Borrow(Mutable)(select M::S.g(s)));
+        Neq<u64>(Borrow(Mutable)(select M::S.g(s)), Borrow(Mutable)(select M::S.f(s)));
+        Neq<u64>(Borrow(Mutable)(select M::S.g(s)), Borrow(Mutable)(select M::S.g(s)));
+        Tuple()
+    }
+    private fun t1(p: &mut M::P) {
+        {
+          let comp: bool = Eq<M::B>(Borrow(Mutable)(select M::P.b1(p)), Borrow(Mutable)(select M::P.b2(p)));
+          select M::B.f(select M::P.b1(p)) = comp
+        }
+    }
+    private fun t2(p: &mut M::P) {
+        {
+          let comp: bool = Neq<M::B>(Borrow(Mutable)(select M::P.b1(p)), Borrow(Mutable)(select M::P.b2(p)));
+          select M::B.f(select M::P.b1(p)) = comp
+        }
+    }
+} // end 0x8675309::M

@@ -37,6 +37,8 @@ spec aptos_framework::aptos_account {
         include WithdrawAbortsIf<AptosCoin>{from: source};
 
         aborts_if exists<coin::CoinStore<AptosCoin>>(to) && global<coin::CoinStore<AptosCoin>>(to).frozen;
+        ensures exists<aptos_framework::account::Account>(to);
+        ensures exists<coin::CoinStore<AptosCoin>>(to);
     }
 
     spec assert_account_exists(addr: address) {
@@ -161,6 +163,8 @@ spec aptos_framework::aptos_account {
         include RegistCoinAbortsIf<CoinType>;
 
         aborts_if exists<coin::CoinStore<CoinType>>(to) && global<coin::CoinStore<CoinType>>(to).frozen;
+        ensures exists<aptos_framework::account::Account>(to);
+        ensures exists<aptos_framework::coin::CoinStore<CoinType>>(to);
     }
 
     spec transfer_coins<CoinType>(from: &signer, to: address, amount: u64) {
@@ -176,6 +180,8 @@ spec aptos_framework::aptos_account {
         include RegistCoinAbortsIf<CoinType>;
 
         aborts_if exists<coin::CoinStore<CoinType>>(to) && global<coin::CoinStore<CoinType>>(to).frozen;
+        ensures exists<aptos_framework::account::Account>(to);
+        ensures exists<aptos_framework::coin::CoinStore<CoinType>>(to);
     }
 
     spec schema CreateAccountTransferAbortsIf {

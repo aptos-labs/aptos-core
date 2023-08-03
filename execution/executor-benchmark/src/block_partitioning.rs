@@ -41,13 +41,13 @@ impl BlockPartitioningStage {
             txns.len()
         );
         let block_id = HashValue::random();
-        let block: ExecutableBlock<Transaction> = match &self.maybe_partitioner {
+        let block: ExecutableBlock = match &self.maybe_partitioner {
             None => (block_id, txns).into(),
             Some(partitioner) => {
                 let last_txn = txns.pop().unwrap();
                 assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
-                let mut sub_blocks = partitioner.partition(analyzed_transactions, 2);
+                let mut sub_blocks = partitioner.partition(analyzed_transactions, 4, 0.95);
                 sub_blocks
                     .last_mut()
                     .unwrap()
@@ -56,7 +56,7 @@ impl BlockPartitioningStage {
                     .unwrap()
                     .transactions
                     .push(TransactionWithDependencies::new(
-                        last_txn,
+                        last_txn.into(),
                         CrossShardDependencies::default(),
                     ));
                 ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))

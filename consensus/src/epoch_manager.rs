@@ -69,8 +69,8 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        ExecutionConfigV1, LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig,
-        OnChainExecutionConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
+        LeaderReputationType, OnChainConfigPayload, OnChainConsensusConfig, OnChainExecutionConfig,
+        ProposerElectionType, ValidatorSet,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -807,16 +807,17 @@ impl EpochManager {
             error!("Failed to read on-chain consensus config {}", error);
         }
 
+        if let Err(error) = &onchain_execution_config {
+            error!("Failed to read on-chain execution config {}", error);
+        }
+
         self.epoch_state = Some(Arc::new(epoch_state.clone()));
 
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 let consensus_config = onchain_consensus_config.unwrap_or_default();
-                let execution_config = onchain_execution_config.unwrap_or(
-                    OnChainExecutionConfig::V1(ExecutionConfigV1 {
-                        transaction_shuffler_type: TransactionShufflerType::NoShuffling,
-                    }),
-                );
+                let execution_config = onchain_execution_config
+                    .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
                 self.quorum_store_enabled = self.enable_quorum_store(&consensus_config);
                 self.recovery_mode = false;
                 self.start_round_manager(
@@ -1043,7 +1044,7 @@ impl EpochManager {
     }
 
     fn process_rpc_request(
-        &self,
+        &mut self,
         peer_id: Author,
         request: IncomingRpcRequest,
     ) -> anyhow::Result<()> {
@@ -1063,6 +1064,19 @@ impl EpochManager {
                     tx.push(peer_id, request)
                 } else {
                     Err(anyhow::anyhow!("Quorum store not started"))
+                }
+            },
+            IncomingRpcRequest::DAGRequest(request) => {
+                let dag_message = request.req;
+
+                if dag_message.epoch == self.epoch() {
+                    // TODO: send message to DAG handler
+                    Ok(())
+                } else {
+                    monitor!(
+                        "process_different_epoch_dag_rpc",
+                        self.process_different_epoch(dag_message.epoch, peer_id)
+                    )
                 }
             },
         }

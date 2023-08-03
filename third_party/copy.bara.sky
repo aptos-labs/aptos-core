@@ -24,7 +24,7 @@ core.workflow(
     ],
 )
 
-# Workflow to push from Aptos to Move. This directly pushes without PR.
+# Workflow to push from Aptos to Move. This creates a PR.
 core.workflow(
     name = "push_move",
     origin = git.github_origin(

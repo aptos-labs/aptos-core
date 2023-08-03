@@ -1,0 +1,6 @@
+// ---- Model Dump
+module 0x8675309::M {
+    private fun specs_in_fun(_x: u64) {
+        NoOp()
+    }
+} // end 0x8675309::M

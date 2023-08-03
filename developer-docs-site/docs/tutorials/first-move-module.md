@@ -18,7 +18,7 @@ This tutorial details how to compile, test, publish and interact with Move modul
 
 ## Step 1: Install the CLI
 
-[Install the precompiled binary for the Aptos CLI](../tools/install-cli/index.md).
+[Install the precompiled binary for the Aptos CLI](../tools/aptos-cli/install-cli/index.md).
 
 ---
 
@@ -44,7 +44,7 @@ Press **return** to accept the default devnet network or specify the network of 
 No network given, using devnet...
 ```
 
-See and respond to the prompt for your private key by accepting the default to create anew or by entering an existing key:
+See and respond to the prompt for your private key by accepting the default to create a new or by entering an existing key:
 
 ```text
 Enter your private key as a hex literal (0x...) [Current: None | No input: Generate new key (or keep one if present)]

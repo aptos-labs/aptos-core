@@ -12,6 +12,7 @@ use crate::{
         signatures::Signature,
         transactions::{TransactionDetail, TransactionModel},
         user_transactions::UserTransactionModel,
+        v2_objects::{CurrentObject, Object},
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     schema,
@@ -20,7 +21,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_protos::transaction::v1::Transaction;
+use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -52,24 +53,22 @@ impl Debug for DefaultTransactionProcessor {
 fn insert_to_db_impl(
     conn: &mut PgConnection,
     txns: &[TransactionModel],
-    txn_details: (
+    (user_transactions, signatures, block_metadata_transactions): (
         &[UserTransactionModel],
         &[Signature],
         &[BlockMetadataTransactionModel],
     ),
     events: &[EventModel],
     wscs: &[WriteSetChangeModel],
-    wsc_details: (
+    (move_modules, move_resources, table_items, current_table_items, table_metadata): (
         &[MoveModule],
         &[MoveResource],
         &[TableItem],
         &[CurrentTableItem],
         &[TableMetadata],
     ),
+    (objects, current_objects): (&[Object], &[CurrentObject]),
 ) -> Result<(), diesel::result::Error> {
-    let (user_transactions, signatures, block_metadata_transactions) = txn_details;
-    let (move_modules, move_resources, table_items, current_table_items, table_metadata) =
-        wsc_details;
     insert_transactions(conn, txns)?;
     insert_user_transactions(conn, user_transactions)?;
     insert_signatures(conn, signatures)?;
@@ -81,6 +80,8 @@ fn insert_to_db_impl(
     insert_table_items(conn, table_items)?;
     insert_current_table_items(conn, current_table_items)?;
     insert_table_metadata(conn, table_metadata)?;
+    insert_objects(conn, objects)?;
+    insert_current_objects(conn, current_objects)?;
     Ok(())
 }
 
@@ -90,20 +91,21 @@ fn insert_to_db(
     start_version: u64,
     end_version: u64,
     txns: Vec<TransactionModel>,
-    txn_details: (
+    (user_transactions, signatures, block_metadata_transactions): (
         Vec<UserTransactionModel>,
         Vec<Signature>,
         Vec<BlockMetadataTransactionModel>,
     ),
     events: Vec<EventModel>,
     wscs: Vec<WriteSetChangeModel>,
-    wsc_details: (
+    (move_modules, move_resources, table_items, current_table_items, table_metadata): (
         Vec<MoveModule>,
         Vec<MoveResource>,
         Vec<TableItem>,
         Vec<CurrentTableItem>,
         Vec<TableMetadata>,
     ),
+    (objects, current_objects): (Vec<Object>, Vec<CurrentObject>),
 ) -> Result<(), diesel::result::Error> {
     tracing::trace!(
         name = name,
@@ -111,9 +113,6 @@ fn insert_to_db(
         end_version = end_version,
         "Inserting to db",
     );
-    let (user_transactions, signatures, block_metadata_transactions) = txn_details;
-    let (move_modules, move_resources, table_items, current_table_items, table_metadata) =
-        wsc_details;
     match conn
         .build_transaction()
         .read_write()
@@ -135,6 +134,7 @@ fn insert_to_db(
                     &current_table_items,
                     &table_metadata,
                 ),
+                (&objects, &current_objects),
             )
         }) {
         Ok(_) => Ok(()),
@@ -150,6 +150,8 @@ fn insert_to_db(
             let table_items = clean_data_for_db(table_items, true);
             let current_table_items = clean_data_for_db(current_table_items, true);
             let table_metadata = clean_data_for_db(table_metadata, true);
+            let objects = clean_data_for_db(objects, true);
+            let current_objects = clean_data_for_db(current_objects, true);
 
             conn.build_transaction()
                 .read_write()
@@ -171,6 +173,7 @@ fn insert_to_db(
                             &current_table_items,
                             &table_metadata,
                         ),
+                        (&objects, &current_objects),
                     )
                 })
         },
@@ -189,7 +192,11 @@ fn insert_transactions(
             diesel::insert_into(schema::transactions::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict(version)
-                .do_nothing(),
+                .do_update()
+                .set((
+                    num_events.eq(excluded(num_events)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -273,11 +280,7 @@ fn insert_events(
             diesel::insert_into(schema::events::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((account_address, creation_number, sequence_number))
-                .do_update()
-                .set((
-                    inserted_at.eq(excluded(inserted_at)),
-                    event_index.eq(excluded(event_index)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -334,7 +337,11 @@ fn insert_move_resources(
             diesel::insert_into(schema::move_resources::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    state_key_hash.eq(excluded(state_key_hash)),
+                )),
             None,
         )?;
     }
@@ -406,6 +413,53 @@ fn insert_table_metadata(
     Ok(())
 }
 
+fn insert_objects(
+    conn: &mut PgConnection,
+    items_to_insert: &[Object],
+) -> Result<(), diesel::result::Error> {
+    use schema::objects::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), Object::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::objects::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+fn insert_current_objects(
+    conn: &mut PgConnection,
+    items_to_insert: &[CurrentObject],
+) -> Result<(), diesel::result::Error> {
+    use schema::current_objects::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), CurrentObject::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::current_objects::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict(object_address)
+                .do_update()
+                .set((
+                    owner_address.eq(excluded(owner_address)),
+                    state_key_hash.eq(excluded(state_key_hash)),
+                    allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
+                    last_guid_creation_num.eq(excluded(last_guid_creation_num)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+                Some(" WHERE current_objects.last_transaction_version <= excluded.last_transaction_version "),
+        )?;
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl ProcessorTrait for DefaultTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -418,6 +472,7 @@ impl ProcessorTrait for DefaultTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> anyhow::Result<ProcessingResult> {
+        let mut conn = self.get_conn();
         let (txns, txn_details, events, write_set_changes, wsc_details) =
             TransactionModel::from_transactions(&transactions);
 
@@ -459,17 +514,71 @@ impl ProcessorTrait for DefaultTransactionProcessor {
                 },
             }
         }
+
+        // TODO, merge this loop with above
+        // Moving object handling here because we need a single object
+        // map through transactions for lookups
+        let mut all_objects = vec![];
+        let mut all_current_objects = HashMap::new();
+        for txn in &transactions {
+            let txn_version = txn.version as i64;
+            let changes = &txn
+                .info
+                .as_ref()
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Transaction info doesn't exist! Transaction {}",
+                        txn_version
+                    )
+                })
+                .changes;
+            for (index, wsc) in changes.iter().enumerate() {
+                let index: i64 = index as i64;
+                match wsc.change.as_ref().unwrap() {
+                    Change::WriteResource(inner) => {
+                        if let Some((object, current_object)) =
+                            &Object::from_write_resource(inner, txn_version, index).unwrap()
+                        {
+                            all_objects.push(object.clone());
+                            all_current_objects
+                                .insert(object.object_address.clone(), current_object.clone());
+                        }
+                    },
+                    Change::DeleteResource(inner) => {
+                        // Passing all_current_objects into the function so that we can get the owner of the deleted
+                        // resource if it was handled in the same batch
+                        if let Some((object, current_object)) = Object::from_delete_resource(
+                            inner,
+                            txn_version,
+                            index,
+                            &all_current_objects,
+                            &mut conn,
+                        )
+                        .unwrap()
+                        {
+                            all_objects.push(object.clone());
+                            all_current_objects
+                                .insert(object.object_address.clone(), current_object.clone());
+                        }
+                    },
+                    _ => {},
+                };
+            }
+        }
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
         let mut current_table_items = current_table_items
             .into_values()
             .collect::<Vec<CurrentTableItem>>();
         let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
         // Sort by PK
+        let mut all_current_objects = all_current_objects
+            .into_values()
+            .collect::<Vec<CurrentObject>>();
         current_table_items
             .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
         table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+        all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
 
-        let mut conn = self.get_conn();
         let tx_result = insert_to_db(
             &mut conn,
             self.name(),
@@ -486,6 +595,7 @@ impl ProcessorTrait for DefaultTransactionProcessor {
                 current_table_items,
                 table_metadata,
             ),
+            (all_objects, all_current_objects),
         );
         match tx_result {
             Ok(_) => Ok((start_version, end_version)),
