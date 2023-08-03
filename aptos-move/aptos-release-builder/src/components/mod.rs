@@ -10,8 +10,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{
-        ExecutionConfigV1, GasScheduleV2, OnChainConfig, OnChainConsensusConfig,
-        OnChainExecutionConfig, TransactionShufflerType, Version,
+        GasScheduleV2, OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig, Version,
     },
 };
 use futures::executor::block_on;
@@ -508,10 +507,7 @@ impl Default for ReleaseConfig {
                             disabled: vec![],
                         }),
                         ReleaseEntry::Consensus(OnChainConsensusConfig::default()),
-                        ReleaseEntry::Execution(OnChainExecutionConfig::V1(ExecutionConfigV1 {
-                            transaction_shuffler_type:
-                                TransactionShufflerType::DeprecatedSenderAwareV1(32),
-                        })),
+                        ReleaseEntry::Execution(OnChainExecutionConfig::default_for_genesis()),
                         ReleaseEntry::RawScript(PathBuf::from(
                             "data/proposals/empty_multi_step.move",
                         )),

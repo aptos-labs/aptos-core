@@ -26,9 +26,9 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     network_address::DnsName,
     on_chain_config::{
-        ConsensusConfigV1, ExecutionConfigV1, LeaderReputationType, OnChainConsensusConfig,
-        OnChainExecutionConfig, ProposerAndVoterConfig, ProposerElectionType,
-        TransactionShufflerType, ValidatorSet,
+        ConsensusConfigV1, DeprecatedExecutionConfigV1, LeaderReputationType,
+        OnChainConsensusConfig, OnChainExecutionConfig, ProposerAndVoterConfig,
+        ProposerElectionType, TransactionShufflerType, ValidatorSet,
     },
     PeerId,
 };
@@ -382,14 +382,15 @@ async fn test_onchain_shuffling_change() {
 
     assert_eq!(
         current_execution_config.transaction_shuffler_type(),
-        TransactionShufflerType::SenderAwareV2(32),
+        TransactionShufflerType::SenderAwareV1(32),
     );
 
     assert_reordering(&mut swarm, true).await;
 
-    let execution_config_with_shuffling = OnChainExecutionConfig::V1(ExecutionConfigV1 {
-        transaction_shuffler_type: TransactionShufflerType::NoShuffling,
-    });
+    let execution_config_with_shuffling =
+        OnChainExecutionConfig::DeprecatedV1(DeprecatedExecutionConfigV1 {
+            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
+        });
 
     let update_execution_config_script = format!(
         r#"
