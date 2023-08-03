@@ -26,7 +26,6 @@ use aptos_gas_schedule::{
 };
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_native_interface::SafeNativeBuilder;
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -666,9 +665,9 @@ impl FakeExecutor {
         self.block_time / 1_000_000
     }
 
-    /// exec_module_record_running_time is like exec(), however, we can run a Module published under
+    /// exec_func_record_running_time is like exec(), however, we can run a Module published under
     /// the creator address instead of 0x1, as what is currently done in exec.
-    pub fn exec_module_record_running_time(
+    pub fn exec_func_record_running_time(
         &mut self,
         module: &ModuleId,
         function_name: &str,
@@ -687,7 +686,6 @@ impl FakeExecutor {
             self.chain_id,
             self.features.clone(),
             timed_features,
-            None,
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
@@ -751,27 +749,17 @@ impl FakeExecutor {
             let timed_features =
                 TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
 
-            let mut builder = SafeNativeBuilder::new(
-                LATEST_GAS_FEATURE_VERSION,
-                NativeGasParameters::zeros(),
-                MiscGasParameters::zeros(),
-                timed_features.clone(),
-                self.features.clone(),
-            );
-
-            builder.set_gas_hook(move |expression| {
-                a2.lock().unwrap().push(expression);
-            });
-
             // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new(
+            let vm = MoveVmExt::new_with_gas_hook(
                 NativeGasParameters::zeros(),
                 MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
-                Some(&mut builder),
+                Some(move |expression| {
+                    a2.lock().unwrap().push(expression);
+                }),
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -844,7 +832,6 @@ impl FakeExecutor {
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
-                None,
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
@@ -896,7 +883,6 @@ impl FakeExecutor {
             self.features.clone(),
             // FIXME: should probably read the timestamp from storage.
             TimedFeatures::enable_all(),
-            None,
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);

@@ -43,22 +43,10 @@ pub fn aptos_natives(
         features,
     );
 
-    #[allow(unreachable_code)]
-    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, &mut builder)
-        .into_iter()
-        .filter(|(_, name, _, _)| name.as_str() != "vector")
-        .chain(aptos_framework::natives::all_natives(
-            CORE_CODE_ADDRESS,
-            &builder,
-        ))
-        .chain(aptos_table_natives::table_natives(
-            CORE_CODE_ADDRESS,
-            &mut builder,
-        ))
-        .collect()
+    aptos_natives_with_builder(&mut builder)
 }
 
-pub fn aptos_natives_abstract_usage(builder: &mut SafeNativeBuilder) -> NativeFunctionTable {
+pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunctionTable {
     #[allow(unreachable_code)]
     aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, builder)
         .into_iter()

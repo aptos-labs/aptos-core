@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::gas_meter::GasMeasurements;
+use crate::measurements::GasMeasurements;
 use anyhow::{anyhow, Result};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
@@ -46,7 +46,7 @@ pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
 /// * `account` - Account to publish module under
 /// * `payload` - Info relating to the module
 /// * `sequence_number` - Nonce
-pub fn sign_module_txn(
+pub fn execute_module_txn(
     executor: &mut FakeExecutor,
     account: &Account,
     payload: TransactionPayload,
@@ -91,7 +91,7 @@ pub fn execute_user_txn(
     iterations: u64,
     args: Vec<Vec<u8>>,
 ) -> u128 {
-    let elapsed = executor.exec_module_record_running_time(
+    let elapsed = executor.exec_func_record_running_time(
         module_name,
         function_name,
         vec![],
@@ -112,7 +112,7 @@ pub fn execute_user_txn(
 /// * `func_identifiers` - All function names
 /// * `address` - Address associated to an account
 /// * `identifier` - Name of module
-pub fn record_gas_meter(
+pub fn record_gas_usage(
     package: &BuiltPackage,
     executor: &mut FakeExecutor,
     func_identifiers: Vec<(String, Vec<Vec<u8>>)>,
@@ -145,7 +145,7 @@ pub fn record_gas_meter(
         println!("Signing txn for module... ");
         let module_payload = generate_module_payload(package);
         let counter = sequence_num_counter.try_into().unwrap();
-        sign_module_txn(executor, &creator, module_payload, counter);
+        execute_module_txn(executor, &creator, module_payload, counter);
 
         // send a txn that invokes the entry function 0x{address}::{name}::benchmark
         println!("Signing and running user txn for Regular Meter... ");
