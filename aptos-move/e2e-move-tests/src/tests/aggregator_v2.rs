@@ -166,7 +166,7 @@ fn test_aggregator_snapshot() {
     let txn2 = snapshot(&mut h, &acc, 0);
     let txn3 = snapshot_with_u64_limit(&mut h, &acc, 0);
     let txn4 = read_snapshot_u128(&mut h, &acc, 0);
-    let txn5 = read_snapshot_u64(&mut h, &acc, 1);
+    let txn5 = read_snapshot_u64(&mut h, &acc, 0);
     let txn6 = try_add_and_read_snapshot_u128(&mut h, &acc, 0, 100);
 
     assert_success!(h.run(txn1));
