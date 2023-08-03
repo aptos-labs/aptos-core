@@ -94,7 +94,7 @@ jobs:
     permissions:
       contents: "write"
       pull-requests: "read"
-    if: ${{ github.event.inputs.dry_run }} == 'true'
+    if: ${{ inputs.dry_run }} == 'true'
     steps:
       - name: Download prebuilt binaries
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # pin@v3
@@ -104,8 +104,8 @@ jobs:
         uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0 # pin@v1.2.1
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "${{ format('aptos-cli-v{0}', github.event.inputs.release_version) }}"
+          automatic_release_tag: "${{ format('aptos-cli-v{0}', inputs.release_version) }}"
           prerelease: false
-          title: "${{ format('Aptos CLI Release v{0}', github.event.inputs.release_version) }}"
+          title: "${{ format('Aptos CLI Release v{0}', inputs.release_version) }}"
           files: |
             aptos-cli-*.zip
