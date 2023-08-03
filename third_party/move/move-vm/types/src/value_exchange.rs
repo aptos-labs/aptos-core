@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::values::Value;
+use crate::values::{AnnotatedValue, SeedWrapper, Value};
 use move_core_types::value::MoveTypeLayout;
 use std::fmt::{Display, Formatter};
 
@@ -24,41 +24,35 @@ impl Display for ExchangeError {
 pub type ExchangeResult<T> = Result<T, ExchangeError>;
 
 /// Trait which allows to swap values at (de)-serialization time.
+/// **WARNING:** it is the responsibility of trait implementation to ensure
+/// layouts of exchanged values are the same.
 pub trait ValueExchange {
-    /// Returns a unique identifier which can be transformed into a Move value.
-    /// If transformed, the value has exactly the same layout as the recorded value.
-    ///
-    /// The mapping between an identifier and a swapped value is recorded for later
-    /// reuse. For example, clients can serialize the value back and replace
-    /// identifiers with values. Returns an error if a mapping already exists.
-    fn record_value(&self, value_to_swap: Value) -> ExchangeResult<Identifier>;
+    fn try_exchange(&self, value_to_exchange: Value) -> ExchangeResult<Value>;
 
-    /// Returns the previously swapped value based on the identifier. If a
-    /// value has not been swapped, returns an error.
-    fn claim_value(&self, id: Identifier) -> ExchangeResult<Value>;
+    fn try_claim_back(&self, value_to_exchange: Value) -> ExchangeResult<Value>;
 }
 
-/// A unique (at least per-block) identifier which can be used to identify
-/// swapped values.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Identifier(pub u64);
-
-impl Identifier {
-    /// Given a type layout, tries to embed the identifier into a Move value
-    /// which the caller can embed at the right place.
-    pub fn try_into_value(self, layout: &MoveTypeLayout) -> ExchangeResult<Value> {
-        match layout {
-            MoveTypeLayout::U64 => Ok(Value::u64(self.0)),
-            MoveTypeLayout::U128 => Ok(Value::u128(self.0 as u128)),
-            _ => Err(ExchangeError::new(&format!(
-                "converting identifier into {} is not supported",
-                layout
-            ))),
-        }
-    }
+pub fn deserialize_and_exchange(
+    bytes: &[u8],
+    layout: &MoveTypeLayout,
+    exchange: &dyn ValueExchange,
+) -> Option<Value> {
+    let seed = SeedWrapper {
+        exchange: Some(exchange),
+        layout,
+    };
+    bcs::from_bytes_seed(seed, bytes).ok()
 }
 
-/// Trait (similar to TryInto<>) to reinterpret values as identifiers.
-pub trait TryAsIdentifier {
-    fn try_as_identifier(&self) -> ExchangeResult<Identifier>;
+pub fn serialize_and_exchange(
+    value: &Value,
+    layout: &MoveTypeLayout,
+    exchange: &dyn ValueExchange,
+) -> Option<Vec<u8>> {
+    let value = AnnotatedValue {
+        exchange: Some(exchange),
+        layout,
+        val: &value.0,
+    };
+    bcs::to_bytes(&value).ok()
 }

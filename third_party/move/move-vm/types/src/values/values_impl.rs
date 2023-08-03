@@ -37,7 +37,7 @@ use std::{
 
 /// Runtime representation of a Move value.
 #[derive(Debug)]
-enum ValueImpl {
+pub(crate) enum ValueImpl {
     Invalid,
 
     U8(u8),
@@ -65,7 +65,7 @@ enum ValueImpl {
 /// Except when not owned by the VM stack, a container always lives inside an Rc<RefCell<>>,
 /// making it possible to be shared by references.
 #[derive(Debug, Clone)]
-enum Container {
+pub(crate) enum Container {
     Locals(Rc<RefCell<Vec<ValueImpl>>>),
     Vec(Rc<RefCell<Vec<ValueImpl>>>),
     Struct(Rc<RefCell<Vec<ValueImpl>>>),
@@ -83,7 +83,7 @@ enum Container {
 /// or in global storage. In the latter case, it also keeps a status flag indicating whether
 /// the container has been possibly modified.
 #[derive(Debug)]
-enum ContainerRef {
+pub(crate) enum ContainerRef {
     Local(Container),
     Global {
         status: Rc<RefCell<GlobalDataStatus>>,
@@ -95,14 +95,14 @@ enum ContainerRef {
 /// Clean - the data was only read.
 /// Dirty - the data was possibly modified.
 #[derive(Debug, Clone, Copy)]
-enum GlobalDataStatus {
+pub(crate) enum GlobalDataStatus {
     Clean,
     Dirty,
 }
 
 /// A Move reference pointing to an element in a container.
 #[derive(Debug)]
-struct IndexedRef {
+pub(crate) struct IndexedRef {
     idx: usize,
     container_ref: ContainerRef,
 }
@@ -133,7 +133,7 @@ enum ReferenceImpl {
 /// A Move value -- a wrapper around `ValueImpl` which can be created only through valid
 /// means.
 #[derive(Debug)]
-pub struct Value(ValueImpl);
+pub struct Value(pub(crate) ValueImpl);
 
 /// An integer value in Move.
 #[derive(Debug)]
@@ -2913,45 +2913,6 @@ pub mod debug {
 }
 
 /***************************************************************************************
-*
-* Identifiers
-*
-*   Implementation of conversion between 64-bit identifiers and values.
-*   Used for value exchange.
-*
-**************************************************************************************/
-
-use crate::values::value_exchange::{ExchangeError, ExchangeResult, Identifier, TryAsIdentifier};
-
-impl TryAsIdentifier for Value {
-    fn try_as_identifier(&self) -> ExchangeResult<Identifier> {
-        self.0.try_as_identifier()
-    }
-}
-
-impl TryAsIdentifier for ValueImpl {
-    fn try_as_identifier(&self) -> ExchangeResult<Identifier> {
-        match self {
-            ValueImpl::U64(x) => Ok(Identifier(*x)),
-            ValueImpl::U128(x) => {
-                if *x > u64::MAX as u128 {
-                    Err(ExchangeError::new(&format!(
-                        "cannot have {} as identifier, the value is too big",
-                        self
-                    )))
-                } else {
-                    Ok(Identifier(*x as u64))
-                }
-            },
-            _ => Err(ExchangeError::new(&format!(
-                "interpreting {} as identifier is not supported",
-                self
-            ))),
-        }
-    }
-}
-
-/***************************************************************************************
  *
  * Serialization & Deserialization
  *
@@ -2970,7 +2931,7 @@ impl TryAsIdentifier for ValueImpl {
  *   is to involve an explicit representation of the type layout.
  *
  **************************************************************************************/
-use crate::values::ValueExchange;
+use crate::value_exchange::ValueExchange;
 use serde::{
     de::Error as DeError,
     ser::{Error as SerError, SerializeSeq, SerializeTuple},
@@ -2978,7 +2939,6 @@ use serde::{
 };
 
 impl Value {
-    /// Deserializes bytes into a Move value as is.
     pub fn simple_deserialize(blob: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
         bcs::from_bytes_seed(
             SeedWrapper {
@@ -2990,7 +2950,6 @@ impl Value {
         .ok()
     }
 
-    /// Serializes a Move value into bytes as is.
     pub fn simple_serialize(&self, layout: &MoveTypeLayout) -> Option<Vec<u8>> {
         bcs::to_bytes(&AnnotatedValue {
             exchange: None,
@@ -2998,35 +2957,6 @@ impl Value {
             val: &self.0,
         })
         .ok()
-    }
-
-    /// Deserializes bytes into a Move value, swapping marked values with
-    /// identifiers based an the `exchange`.
-    pub fn deserialize_with_exchange(
-        bytes: &[u8],
-        layout: &MoveTypeLayout,
-        exchange: &dyn ValueExchange,
-    ) -> Option<Value> {
-        let seed = SeedWrapper {
-            exchange: Some(exchange),
-            layout,
-        };
-        bcs::from_bytes_seed(seed, bytes).ok()
-    }
-
-    /// Serializes a Move value into bytes, also swapping marked identifiers
-    /// back.
-    pub fn serialize_with_exchange(
-        &self,
-        layout: &MoveTypeLayout,
-        exchange: &dyn ValueExchange,
-    ) -> Option<Vec<u8>> {
-        let value = AnnotatedValue {
-            exchange: Some(exchange),
-            layout,
-            val: &self.0,
-        };
-        bcs::to_bytes(&value).ok()
     }
 }
 
@@ -3052,14 +2982,13 @@ impl Struct {
     }
 }
 
-struct AnnotatedValue<'e, 'l, 'v, L, V> {
-    // Optional exchange so that values which are identifiers can be
-    // swapped back.
-    exchange: Option<&'e dyn ValueExchange>,
+pub(crate) struct AnnotatedValue<'e, 'l, 'v, L, V> {
+    // Optional exchange so that values can be swapped back.
+    pub(crate) exchange: Option<&'e dyn ValueExchange>,
     // Layout for guiding serialization.
-    layout: &'l L,
+    pub(crate) layout: &'l L,
     // Value to serialize.
-    val: &'v V,
+    pub(crate) val: &'v V,
 }
 
 fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
@@ -3145,31 +3074,34 @@ impl<'e, 'l, 'v> serde::Serialize for AnnotatedValue<'e, 'l, 'v, MoveTypeLayout,
                 .serialize(serializer)
             },
 
-            // Special case: aggregatable values.
-            (MoveTypeLayout::Tagged(tag, layout), val) => match tag {
+            (MoveTypeLayout::Tagged(tag, layout), value_impl) => match tag {
+                // Special case: aggregatable values are identifiers at runtime, and we may
+                // need to swap them with actual offloaded values.
                 LayoutTag::AggregatorLifting => {
                     match self.exchange {
                         Some(exchange) => {
-                            // If values are supposed to be exchanged, first re-interpret
-                            // the current value as ID and then get the actual value.
+                            // If values are supposed to be exchanged, first clone
+                            // ValueImpl to construct a Value.
+                            // TODO(aggregator): Clone is cheap for current use cases, revisit if needed.
                             // Then continue with serialization on a new value.
-                            let id = val.try_as_identifier().map_err(serde::ser::Error::custom)?;
-                            let value = exchange
-                                .claim_value(id)
+                            let value_to_exchange =
+                                Value(value_impl.copy_value().map_err(serde::ser::Error::custom)?);
+                            let claimed_value = exchange
+                                .try_claim_back(value_to_exchange)
                                 .map_err(serde::ser::Error::custom)?;
                             AnnotatedValue {
                                 exchange: self.exchange,
                                 layout: layout.as_ref(),
-                                val: &value.0,
+                                val: &claimed_value.0,
                             }
                             .serialize(serializer)
                         },
                         None => {
-                            // If did not exchange values, simply continue with serialization.
+                            // If do not exchange values, simply continue with serialization.
                             AnnotatedValue {
                                 exchange: self.exchange,
                                 layout: layout.as_ref(),
-                                val,
+                                val: value_impl,
                             }
                             .serialize(serializer)
                         },
@@ -3208,11 +3140,11 @@ impl<'e, 'l, 'v> serde::Serialize for AnnotatedValue<'e, 'l, 'v, MoveStructLayou
 }
 
 #[derive(Clone)]
-struct SeedWrapper<'e, L> {
-    // Exchange to swap values with identifiers during deserialization.
-    exchange: Option<&'e dyn ValueExchange>,
+pub(crate) struct SeedWrapper<'e, L> {
+    // Exchange to swap values during deserialization.
+    pub(crate) exchange: Option<&'e dyn ValueExchange>,
     // Layout to guide deserialization.
-    layout: L,
+    pub(crate) layout: L,
 }
 
 impl<'d, 'e> serde::de::DeserializeSeed<'d> for SeedWrapper<'e, &MoveTypeLayout> {
@@ -3262,24 +3194,20 @@ impl<'d, 'e> serde::de::DeserializeSeed<'d> for SeedWrapper<'e, &MoveTypeLayout>
                 },
             }),
 
-            // Special case: aggregatable values.
             L::Tagged(tag, layout) => match tag {
+                // Special case: aggregatable values may need to be swapped with identifiers.
                 LayoutTag::AggregatorLifting => {
-                    // First, deserialize the marked value. This can be
-                    // done by inspecting the marked layout.
                     let value = SeedWrapper {
                         exchange: self.exchange,
                         layout: layout.as_ref(),
                     }
                     .deserialize(deserializer)?;
 
-                    // Then check if value needs to be exchanged.
                     Ok(match self.exchange {
                         Some(exchange) => {
-                            let id = exchange
-                                .record_value(value)
-                                .map_err(serde::de::Error::custom)?;
-                            id.try_into_value(layout.as_ref())
+                            // Value needs to be exchanged!
+                            exchange
+                                .try_exchange(value)
                                 .map_err(serde::de::Error::custom)?
                         },
                         None => value,

@@ -1,7 +1,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::values::{ExchangeError, ExchangeResult, Identifier, Struct, Value, ValueExchange};
+use crate::{
+    value_exchange::{
+        deserialize_and_exchange, serialize_and_exchange, ExchangeError, ExchangeResult,
+        ValueExchange,
+    },
+    values::{Struct, Value, ValueImpl},
+};
 use move_core_types::value::{LayoutTag, MoveStructLayout::Runtime, MoveTypeLayout};
 use std::{cell::RefCell, collections::BTreeMap};
 
@@ -9,31 +15,62 @@ use std::{cell::RefCell, collections::BTreeMap};
 #[derive(Debug, Default)]
 struct TestExchange {
     // For testing purposes, all swapped data is stored in a map.
-    data: RefCell<BTreeMap<Identifier, Value>>,
+    data: RefCell<BTreeMap<u64, u128>>,
 }
 
 #[cfg(test)]
 impl ValueExchange for TestExchange {
-    fn record_value(&self, value: Value) -> ExchangeResult<Identifier> {
-        let mut data = self.data.borrow_mut();
-        // Identifiers can be generated using the number of entries stored
+    fn try_exchange(&self, value_to_exchange: Value) -> ExchangeResult<Value> {
+        // Identifiers are generated using the number of entries stored
         // so far.
-        let id = Identifier(data.len() as u64);
-        data.insert(id, value);
-        Ok(id)
+        let mut data = self.data.borrow_mut();
+        let id = data.len() as u64;
+
+        match value_to_exchange.0 {
+            ValueImpl::U64(x) => {
+                data.insert(id, x as u128);
+                Ok(Value(ValueImpl::U64(id)))
+            },
+            ValueImpl::U128(x) => {
+                data.insert(id, x);
+                Ok(Value(ValueImpl::U128(id as u128)))
+            },
+            _ => {
+                Err(ExchangeError(format!(
+                    "Cannot exchange value {:?}",
+                    value_to_exchange
+                )))
+            },
+        }
     }
 
-    fn claim_value(&self, id: Identifier) -> ExchangeResult<Value> {
-        self.data
-            .borrow()
-            .get(&id)
-            .ok_or_else(|| ExchangeError(format!("Value for id {:?} does not exist", id)))
-            .map(|v| {
-                // Because we only have a reference to a value, we need to copy
-                // it out. In general, should not be a big problem.
-                v.copy_value()
-                    .map_err(|_| ExchangeError("Error while copying a value".to_string()))
-            })?
+    fn try_claim_back(&self, value_to_exchange: Value) -> ExchangeResult<Value> {
+        match value_to_exchange.0 {
+            ValueImpl::U64(x) => {
+                let v = *self
+                    .data
+                    .borrow()
+                    .get(&x)
+                    .expect("Claimed value should always exist");
+                // SAFETY: we previously upcasted u64 to u128.
+                Ok(Value(ValueImpl::U64(v as u64)))
+            },
+            ValueImpl::U128(x) => {
+                // SAFETY: x is an identifier and is a u64.
+                let v = *self
+                    .data
+                    .borrow()
+                    .get(&(x as u64))
+                    .expect("Claimed value should always exist");
+                Ok(Value(ValueImpl::U128(v)))
+            },
+            _ => {
+                Err(ExchangeError(format!(
+                    "Cannot claim back with value {:?}",
+                    value_to_exchange
+                )))
+            },
+        }
     }
 }
 
@@ -41,6 +78,7 @@ impl ValueExchange for TestExchange {
 fn test() {
     let exchange = TestExchange::default();
 
+    // We should swap 2nd and 3rd fields.
     let value = Value::struct_(Struct::pack(vec![
         Value::u64(100),
         Value::u128(101),
@@ -54,9 +92,9 @@ fn test() {
     ]));
 
     // Construct a blob, and then deserialize it, at the same time replacing
-    // marked values with identifiers.
+    // tagged values with identifiers.
     let blob = value.simple_serialize(&layout).unwrap();
-    let patched_value = Value::deserialize_with_exchange(&blob, &layout, &exchange).unwrap();
+    let patched_value = deserialize_and_exchange(&blob, &layout, &exchange).unwrap();
 
     let expected_patched_value = Value::struct_(Struct::pack(vec![
         Value::u64(100),
@@ -67,9 +105,7 @@ fn test() {
 
     // Then patch the value back while serializing, and reconstruct the
     // original one.
-    let blob = patched_value
-        .serialize_with_exchange(&layout, &exchange)
-        .unwrap();
+    let blob = serialize_and_exchange(&patched_value, &layout, &exchange).unwrap();
     let final_value = Value::simple_deserialize(&blob, &layout).unwrap();
     assert!(value.equals(&final_value).unwrap());
 }
