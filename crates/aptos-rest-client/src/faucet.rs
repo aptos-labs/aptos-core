@@ -12,6 +12,7 @@ pub struct FaucetClient {
     faucet_url: Url,
     inner: ReqwestClient,
     rest_client: Client,
+    token: Option<String>,
 }
 
 impl FaucetClient {
@@ -23,6 +24,7 @@ impl FaucetClient {
                 .build()
                 .unwrap(),
             rest_client: Client::new(rest_url),
+            token: None,
         }
     }
 
@@ -39,7 +41,14 @@ impl FaucetClient {
                 // versioned API however, so we just set it to `/`.
                 .version_path_base("/".to_string())
                 .unwrap(),
+            token: None,
         }
+    }
+
+    // Set auth token.
+    pub fn with_token (mut self, token: String) -> Self {
+        self.token = Some(token);
+        self
     }
 
     /// Create an account with zero balance.
@@ -49,10 +58,15 @@ impl FaucetClient {
         let query = format!("auth_key={}&amount=0&return_txns=true", address);
         url.set_query(Some(&query));
 
-        let response = self
+        let mut request = self
             .inner
             .post(url)
-            .header("content-length", 0)
+            .header("content-length", 0);
+        if let Some(token) = &self.token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = request
             .send()
             .await
             .map_err(FaucetClientError::request)?;
@@ -83,10 +97,15 @@ impl FaucetClient {
 
         // Faucet returns the transaction that creates the account and needs to be waited on before
         // returning.
-        let response = self
+        let mut request = self
             .inner
             .post(url)
-            .header("content-length", 0)
+            .header("content-length", 0);
+        if let Some(token) = &self.token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = request
             .send()
             .await
             .map_err(FaucetClientError::request)?;
