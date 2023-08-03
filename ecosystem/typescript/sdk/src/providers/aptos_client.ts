@@ -322,27 +322,21 @@ export class AptosClient {
    * @param sender the sender's account address
    * @param payload the transaction payload
    * @param fee_payer the fee payer account
-   * @param secondary_signer_accounts an optional array of the secondary signers accounts
+   * @param secondarySignerAccounts an optional array of the secondary signers accounts
    * @returns a fee payer raw transaction that can be signed and submitted to chain
    */
   async generateFeePayerTransaction(
     sender: MaybeHexString,
     payload: Gen.EntryFunctionPayload,
-    fee_payer: AptosAccount,
-    secondary_signer_accounts: Array<AptosAccount> = [],
+    feePayer: MaybeHexString,
+    secondarySignerAccounts: Array<MaybeHexString> = [],
     options?: Partial<Gen.SubmitTransactionRequest>,
   ): Promise<TxnBuilderTypes.FeePayerRawTransaction> {
     const rawTxn = await this.generateTransaction(sender, payload, options);
 
-    const signers: Array<AccountAddress> = secondary_signer_accounts.map((account) =>
-      AccountAddress.fromHex(account.address()),
-    );
+    const signers: Array<AccountAddress> = secondarySignerAccounts.map((signer) => AccountAddress.fromHex(signer));
 
-    const feePayerTxn = new TxnBuilderTypes.FeePayerRawTransaction(
-      rawTxn,
-      signers,
-      AccountAddress.fromHex(fee_payer.address()),
-    );
+    const feePayerTxn = new TxnBuilderTypes.FeePayerRawTransaction(rawTxn, signers, AccountAddress.fromHex(feePayer));
     return feePayerTxn;
   }
 
@@ -359,12 +353,12 @@ export class AptosClient {
     feePayerTransaction: TxnBuilderTypes.FeePayerRawTransaction,
     senderAuthenticator: TxnBuilderTypes.AccountAuthenticatorEd25519,
     feePayerAuthenticator: TxnBuilderTypes.AccountAuthenticatorEd25519,
-    signersAuthenticators: Array<TxnBuilderTypes.AccountAuthenticatorEd25519> = [],
+    additionalSignersAuthenticators: Array<TxnBuilderTypes.AccountAuthenticatorEd25519> = [],
   ): Promise<Gen.PendingTransaction> {
     const txAuthenticatorFeePayer = new TxnBuilderTypes.TransactionAuthenticatorFeePayer(
       senderAuthenticator,
       feePayerTransaction.secondary_signer_addresses,
-      signersAuthenticators,
+      additionalSignersAuthenticators,
       { address: feePayerTransaction.fee_payer_address, authenticator: feePayerAuthenticator },
     );
 

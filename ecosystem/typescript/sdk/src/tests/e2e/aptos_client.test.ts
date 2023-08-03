@@ -522,7 +522,7 @@ test(
     };
 
     // Create a fee payer transaction with the sender, transaction payload, and fee payer account
-    const feePayerTxn = await client.generateFeePayerTransaction(alice.address().hex(), payload, feePayer);
+    const feePayerTxn = await client.generateFeePayerTransaction(alice.address().hex(), payload, feePayer.address());
 
     // sender and fee payer need to sign the transaction
     const senderAuthenticator = await client.signMultiTransaction(alice, feePayerTxn);
@@ -622,8 +622,10 @@ test(
       arguments: [alice.address(), collectionName, tokenName, propertyVersion, 1],
     };
 
-    // Create a fee payer transaction with the sender, transaction payload, and fee payer account
-    const feePayerTxn = await client.generateFeePayerTransaction(alice.address().hex(), payload, feePayer, [bob]);
+    // Create a fee payer transaction with the sender, transaction payload, fee payer account and secondary signers
+    const feePayerTxn = await client.generateFeePayerTransaction(alice.address().hex(), payload, feePayer.address(), [
+      bob.address(),
+    ]);
 
     // sender and fee payer need to sign the transaction
     const senderAuthenticator = await client.signMultiTransaction(alice, feePayerTxn);
