@@ -151,8 +151,12 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
     let name_string = name.to_string();
+    let (impl_generics, ty_generics, where_clause) = &ast.generics.split_for_impl();
+
     let gen = quote! {
-        impl<'de> ::serde::Deserialize<'de> for #name {
+        impl<'de, #impl_generics> ::serde::Deserialize<'de> for #name #ty_generics
+        #where_clause
+        {
             fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
             where
                 D: ::serde::Deserializer<'de>,
@@ -170,7 +174,7 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
                     struct Value<'a>(&'a [u8]);
 
                     let value = Value::deserialize(deserializer)?;
-                    #name::try_from(value.0).map_err(|s| {
+                    #name #ty_generics::try_from(value.0).map_err(|s| {
                         <D::Error as ::serde::de::Error>::custom(format!("{} with {}", s, #name_string))
                     })
                 }
@@ -185,9 +189,11 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
 pub fn serialize_key(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
+    let (impl_generics, ty_generics, where_clause) = &ast.generics.split_for_impl();
     let name_string = name.to_string();
+
     let gen = quote! {
-        impl ::serde::Serialize for #name {
+        impl #impl_generics ::serde::Serialize for #name #ty_generics #where_clause {
             fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
             where
                 S: ::serde::Serializer,
