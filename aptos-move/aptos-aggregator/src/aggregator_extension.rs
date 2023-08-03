@@ -222,6 +222,12 @@ impl Aggregator {
             AggregatorState::PositiveDelta => {
                 // If positive delta, add directly but also record the state.
                 self.value = addition(self.value, value, self.limit).map_err(|err| {
+                    // If self.value + value exceeds u128::MAX, we do not have to record the overflow.
+                    // We record the delta that result in overflows/underflows so that when we compute the actual value
+                    // of aggregator, we can figure out if the output of try_add/try_sub changes.
+                    // When self.value + value exceeds u128::MAX, we know that no matter what the starting value of the
+                    // aggregator is, it always results in an overflow. So, we are 100% sure the output of the
+                    // transaction is an overflow.
                     if self.value < u128::MAX - value {
                         self.record_overflow(self.value + value);
                     }
@@ -237,7 +243,7 @@ impl Aggregator {
                 //     2. X  > Y: then the result is -(X-Y)
                 if self.value <= value {
                     if value - self.value > self.limit {
-                        self.record_overflow(self.value);
+                        self.record_overflow(value - self.value);
                         return Err(abort_error(
                             format!("overflow occurred when adding {} to -{}", value, self.value),
                             EADD_OVERFLOW,
@@ -276,15 +282,6 @@ impl Aggregator {
                     // So we are not calling record_underflow here.
                     self.value = subtraction(self.value, value)?;
                 } else {
-                    // Check that we can subtract in general: we don't want to
-                    // allow -10000 when limit is 10.
-                    // TODO: maybe `subtraction` should also know about the limit?
-                    subtraction(self.limit, value).map_err(|err| {
-                        // TODO: The underflow value may not be correct here.
-                        self.record_underflow(value);
-                        err
-                    })?;
-
                     if value - self.value > self.limit {
                         self.record_underflow(value - self.value);
                         return Err(abort_error(
@@ -295,7 +292,8 @@ impl Aggregator {
                             ESUB_UNDERFLOW,
                         ));
                     }
-                    self.value = subtraction(value, self.value)?;
+                    self.value = subtraction(value, self.value)
+                        .expect("The subtraction cannot fail as value > self.value");
                     self.state = AggregatorState::NegativeDelta;
                 }
             },
@@ -305,6 +303,12 @@ impl Aggregator {
                 // is some X, then we cannot subtract more than X, and so
                 // we should return an error there.
                 self.value = addition(self.value, value, self.limit).map_err(|err| {
+                    // If self.value + value exceeds u128::MAX, we do not have to record the underflow.
+                    // We record the delta that result in overflows/underflows so that when we compute the actual value
+                    // of aggregator, we can figure out if the output of try_add/try_sub changes.
+                    // When self.value + value exceeds u128::MAX, we know that no matter what the starting value of the
+                    // aggregator is, the transaction always results in an underflow. So, we are 100% sure the output of the
+                    // transaction is an underflow.
                     if self.value < u128::MAX - value {
                         self.record_underflow(self.value + value);
                     }
@@ -603,7 +607,7 @@ mod test {
             Some(800)
         );
 
-        // +300 + 400 > 600!x
+        // +300 + 400 > 600!
         assert_err!(aggregator.try_add(400));
         assert_eq!(
             aggregator.history.as_ref().unwrap().max_achieved_positive,
