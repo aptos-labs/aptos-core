@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::counters::{test_error, test_fail, test_latency, test_success};
+use crate::counters::{test_error, test_fail, test_latency, test_step_latency, test_success};
 use anyhow::Result;
 use aptos_rest_client::{error::RestError, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
@@ -154,4 +154,44 @@ pub async fn create_and_fund_account(faucet_client: &FaucetClient) -> Result<Loc
     faucet_client.fund(account.address(), 100_000_000).await?;
 
     Ok(account)
+}
+
+pub fn emit_step_metrics<T>(
+    output: (Result<T, TestFailure>, f64),
+    test_name: TestName,
+    step_name: &str,
+    network_name: NetworkName,
+    run_id: &str,
+) -> Result<T, TestFailure> {
+    let (result, time) = output;
+    match &result {
+        Ok(_) => test_step_latency(
+            &test_name.to_string(),
+            step_name,
+            &network_name.to_string(),
+            run_id,
+            "success",
+        )
+        .observe(time),
+        Err(e) => match e {
+            TestFailure::Fail(_) => test_step_latency(
+                &test_name.to_string(),
+                step_name,
+                &network_name.to_string(),
+                run_id,
+                "fail",
+            )
+            .observe(time),
+            TestFailure::Error(_) => test_step_latency(
+                &test_name.to_string(),
+                step_name,
+                &network_name.to_string(),
+                run_id,
+                "error",
+            )
+            .observe(time),
+        },
+    }
+
+    result
 }

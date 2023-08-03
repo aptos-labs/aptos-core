@@ -8,6 +8,8 @@ mod fail_message;
 mod persistent_check;
 mod tests;
 mod utils;
+#[macro_use]
+mod timers;
 
 use crate::{
     tests::{coin_transfer, new_account, nft_transfer, publish_module},
@@ -70,47 +72,51 @@ async fn test_flows(network_name: NetworkName) -> Result<()> {
 
     // Test new account creation and funding
     let test_time = run_id.clone();
+    let test_time2 = run_id.clone();
     let handle_newaccount = tokio::spawn(async move {
         process_result(
             TestName::NewAccount,
             network_name,
             &test_time,
-            new_account::test(network_name),
+            new_account::test(network_name, &test_time2),
         )
         .await;
     });
 
     // Flow 1: Coin transfer
     let test_time = run_id.clone();
+    let test_time2 = run_id.clone();
     let handle_cointransfer = tokio::spawn(async move {
         process_result(
             TestName::CoinTransfer,
             network_name,
             &test_time,
-            coin_transfer::test(network_name),
+            coin_transfer::test(network_name, &test_time2),
         )
         .await;
     });
 
     // Flow 2: NFT transfer
     let test_time = run_id.clone();
+    let test_time2 = run_id.clone();
     let handle_nfttransfer = tokio::spawn(async move {
         process_result(
             TestName::NftTransfer,
             network_name,
             &test_time,
-            nft_transfer::test(network_name),
+            nft_transfer::test(network_name, &test_time2),
         )
         .await;
     });
 
     // Flow 3: Publishing module
     let test_time = run_id.clone();
+    let test_time2 = run_id.clone();
     process_result(
         TestName::PublishModule,
         network_name,
         &test_time,
-        publish_module::test(network_name),
+        publish_module::test(network_name, &test_time2),
     )
     .await;
 

@@ -5,8 +5,11 @@ use crate::{
         ERROR_COULD_NOT_CREATE_ACCOUNT, ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_ACCOUNT_DATA,
         ERROR_NO_BALANCE, FAIL_WRONG_ACCOUNT_DATA, FAIL_WRONG_BALANCE,
     },
-    persistent_check,
-    utils::{create_account, get_client, get_faucet_client, NetworkName, TestFailure},
+    persistent_check, time_fn,
+    utils::{
+        create_account, emit_step_metrics, get_client, get_faucet_client, NetworkName, TestFailure,
+        TestName,
+    },
 };
 use aptos_api_types::U64;
 use aptos_logger::info;
@@ -19,24 +22,54 @@ static FUND_AMOUNT: u64 = 1_000_000;
 /// Tests new account creation. Checks that:
 ///   - account data exists
 ///   - account balance reflects funded amount
-pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFailure> {
     // setup
-    let (client, faucet_client, account) = setup(network_name).await?;
+    let (client, faucet_client, account) = emit_step_metrics(
+        time_fn!(setup, network_name),
+        TestName::NewAccount,
+        "setup",
+        network_name,
+        run_id,
+    )?;
 
     // check account data persistently
-    persistent_check::account("check_account_data", check_account_data, &client, &account).await?;
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::account,
+            "check_account_data",
+            check_account_data,
+            &client,
+            &account
+        ),
+        TestName::NewAccount,
+        "check_account_data",
+        network_name,
+        run_id,
+    )?;
 
     // fund account
-    fund(&faucet_client, account.address()).await?;
+    emit_step_metrics(
+        time_fn!(fund, &faucet_client, account.address()),
+        TestName::NewAccount,
+        "fund",
+        network_name,
+        run_id,
+    )?;
 
     // check account balance persistently
-    persistent_check::address(
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address,
+            "check_account_balance",
+            check_account_balance,
+            &client,
+            account.address()
+        ),
+        TestName::NewAccount,
         "check_account_balance",
-        check_account_balance,
-        &client,
-        account.address(),
-    )
-    .await?;
+        network_name,
+        run_id,
+    )?;
 
     Ok(())
 }

@@ -7,8 +7,11 @@ use crate::{
         ERROR_NO_TOKEN_DATA, FAIL_WRONG_COLLECTION_DATA, FAIL_WRONG_TOKEN_BALANCE,
         FAIL_WRONG_TOKEN_DATA,
     },
-    persistent_check,
-    utils::{create_and_fund_account, get_client, get_faucet_client, NetworkName, TestFailure},
+    persistent_check, time_fn,
+    utils::{
+        create_and_fund_account, emit_step_metrics, get_client, get_faucet_client, NetworkName,
+        TestFailure, TestName,
+    },
 };
 use aptos_api_types::U64;
 use aptos_logger::info;
@@ -31,59 +34,125 @@ static OFFER_AMOUNT: u64 = 2;
 ///   - collection data exists
 ///   - token data exists
 ///   - token balance reflects transferred amount
-pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFailure> {
     // setup
-    let (client, mut account, mut receiver) = setup(network_name).await?;
+    let (client, mut account, mut receiver) = emit_step_metrics(
+        time_fn!(setup, network_name),
+        TestName::NftTransfer,
+        "setup",
+        network_name,
+        run_id,
+    )?;
     let token_client = TokenClient::new(&client);
 
     // create collection
-    create_collection(&client, &token_client, &mut account).await?;
+    emit_step_metrics(
+        time_fn!(create_collection, &client, &token_client, &mut account),
+        TestName::NftTransfer,
+        "create_collection",
+        network_name,
+        run_id,
+    )?;
 
     // check collection metadata persistently
-    persistent_check::token_address(
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::token_address,
+            "check_collection_metadata",
+            check_collection_metadata,
+            &token_client,
+            account.address()
+        ),
+        TestName::NftTransfer,
         "check_collection_metadata",
-        check_collection_metadata,
-        &token_client,
-        account.address(),
-    )
-    .await?;
+        network_name,
+        run_id,
+    )?;
 
     // create token
-    create_token(&client, &token_client, &mut account).await?;
+    emit_step_metrics(
+        time_fn!(create_token, &client, &token_client, &mut account),
+        TestName::NftTransfer,
+        "create_token",
+        network_name,
+        run_id,
+    )?;
 
     // check token metadata persistently
-    persistent_check::token_address(
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::token_address,
+            "check_token_address",
+            check_token_metadata,
+            &token_client,
+            account.address()
+        ),
+        TestName::NftTransfer,
         "check_token_metadata",
-        check_token_metadata,
-        &token_client,
-        account.address(),
-    )
-    .await?;
+        network_name,
+        run_id,
+    )?;
 
     // offer token
-    offer_token(&client, &token_client, &mut account, receiver.address()).await?;
+    emit_step_metrics(
+        time_fn!(
+            offer_token,
+            &client,
+            &token_client,
+            &mut account,
+            receiver.address()
+        ),
+        TestName::NftTransfer,
+        "offer_token",
+        network_name,
+        run_id,
+    )?;
 
     // check senders balance persistently
-    persistent_check::token_address(
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::token_address,
+            "check_sender_balance",
+            check_sender_balance,
+            &token_client,
+            account.address()
+        ),
+        TestName::NftTransfer,
         "check_sender_balance",
-        check_sender_balance,
-        &token_client,
-        account.address(),
-    )
-    .await?;
+        network_name,
+        run_id,
+    )?;
 
     // claim token
-    claim_token(&client, &token_client, &mut receiver, account.address()).await?;
+    emit_step_metrics(
+        time_fn!(
+            claim_token,
+            &client,
+            &token_client,
+            &mut receiver,
+            account.address()
+        ),
+        TestName::NftTransfer,
+        "claim_token",
+        network_name,
+        run_id,
+    )?;
 
     // check receivers balance persistently
-    persistent_check::token_address_address(
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::token_address_address,
+            "check_receiver_balance",
+            check_receiver_balance,
+            &token_client,
+            receiver.address(),
+            account.address()
+        ),
+        TestName::NftTransfer,
         "check_receiver_balance",
-        check_receiver_balance,
-        &token_client,
-        receiver.address(),
-        account.address(),
-    )
-    .await?;
+        network_name,
+        run_id,
+    )?;
 
     Ok(())
 }
