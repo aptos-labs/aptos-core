@@ -22,16 +22,19 @@ pub struct Argument {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    /// Generate sets of governance proposals based on the release_config file passed in
     GenerateProposals {
         #[clap(short, long)]
         release_config: PathBuf,
         #[clap(short, long)]
         output_dir: PathBuf,
     },
+    /// Generate sets of governance proposals with default release config.
     WriteDefault {
         #[clap(short, long)]
         output_path: PathBuf,
     },
+    /// Execute governance proposals generated from a given release config.
     ValidateProposals {
         /// Path to the config to be released.
         #[clap(short, long)]
@@ -49,7 +52,9 @@ pub enum Commands {
         #[clap(long)]
         mint_to_validator: bool,
     },
+    /// Print out current values of on chain configs.
     PrintConfigs {
+        /// Url endpoint for the desired network. e.g: https://fullnode.mainnet.aptoslabs.com/v1.
         #[clap(short, long)]
         endpoint: url::Url,
     },
