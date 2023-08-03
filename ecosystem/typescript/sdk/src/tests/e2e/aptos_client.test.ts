@@ -66,7 +66,11 @@ test(
       await aptosToken.createCollection(alice, "Alice's simple collection", "AliceCollection", "https://aptos.dev"),
       { checkSuccess: true },
     );
-    const objectAddress = ((txn as Gen.UserTransaction).changes[0] as WriteSetChange_WriteResource).address; // should be the new object address
+
+    const objectCore = (txn as Gen.UserTransaction).changes.find(
+      (change) => (change as Gen.WriteResource).data.type === "0x1::object::ObjectCore",
+    );
+    const objectAddress = (objectCore as WriteSetChange_WriteResource).address;
 
     const object = await provider.getAccountResource(objectAddress, "0x4::aptos_token::AptosCollection");
 
