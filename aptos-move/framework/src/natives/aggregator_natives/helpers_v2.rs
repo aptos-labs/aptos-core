@@ -4,7 +4,6 @@
 use aptos_aggregator::aggregator_extension::AggregatorID;
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::values::{Reference, StructRef, Value};
-    
 
 /// Indices of `value` and `limit` fields in the `Aggregator` Move
 /// struct.
@@ -28,13 +27,17 @@ pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(Aggreg
 }
 
 /// Returns ID of aggrgegator snapshot based on a reference to `AggregatorSnapshot` Move struct.
-pub(crate) fn aggregator_snapshot_u128_info(aggregator_snapshot: &StructRef) -> PartialVMResult<u128> {
+pub(crate) fn aggregator_snapshot_u128_info(
+    aggregator_snapshot: &StructRef,
+) -> PartialVMResult<u128> {
     let value = get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<u128>()?;
     Ok(value)
 }
 
 /// Returns ID of aggrgegator snapshot based on a reference to `AggregatorSnapshot` Move struct.
-pub(crate) fn aggregator_snapshot_u64_info(aggregator_snapshot: &StructRef) -> PartialVMResult<u64> {
+pub(crate) fn aggregator_snapshot_u64_info(
+    aggregator_snapshot: &StructRef,
+) -> PartialVMResult<u64> {
     let value = get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<u64>()?;
     Ok(value)
 }

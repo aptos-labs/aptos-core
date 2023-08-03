@@ -67,11 +67,12 @@ impl AggregatorID {
 /// Uniquely identifies each aggregator snapshot instance during the block execution.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorSnapshotID {
-    id: u64
+    pub id: u64,
 }
 
 /// Internal AggregatorSnapshot data structure.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct AggregatorSnapshot {
     // Describes a value of an aggregator.
     value: u128,
@@ -87,9 +88,8 @@ pub struct AggregatorSnapshot {
     // its value, then storing history doesn't make sense.
     history: Option<History>,
     // The AggregatorID of the aggregator from which the snapshot is taken.
-    base_aggregator: AggregatorID
+    base_aggregator: AggregatorID,
 }
-
 
 /// Tracks values seen by aggregator. In particular, stores information about
 /// the biggest and the smallest deltas seen during execution in the VM. This
@@ -470,42 +470,28 @@ impl AggregatorData {
         }
     }
 
-    pub fn snapshot(&mut self,
-        id: &AggregatorID,
-    ) -> AggregatorSnapshotID {
+    pub fn snapshot(&mut self, id: &AggregatorID) -> AggregatorSnapshotID {
         let snapshot_id = AggregatorSnapshotID {
-            id: self.generate_id()
+            id: self.generate_id(),
         };
         let aggregator = self.aggregators.get(id).expect("Aggregator doesn't exist");
-        self.aggregator_snapshots.insert(snapshot_id,
-            AggregatorSnapshot {
+        self.aggregator_snapshots
+            .insert(snapshot_id, AggregatorSnapshot {
                 value: aggregator.value,
                 state: aggregator.state,
                 limit: aggregator.limit,
                 history: aggregator.history.clone(),
-                base_aggregator: *id
-            }
-        );
+                base_aggregator: *id,
+            });
         snapshot_id
     }
 
-    pub fn snapshot_with_u64_limit(&mut self,
-        id: &AggregatorID
-    ) -> AggregatorSnapshotID {
-        let snapshot_id = AggregatorSnapshotID {
-            id: self.generate_id()
-        };
-        let aggregator = self.aggregators.get(id).expect("Aggregator doesn't exist");
-        self.aggregator_snapshots.insert(snapshot_id,
-            AggregatorSnapshot {
-                value: aggregator.value,
-                state: aggregator.state,
-                limit: u128::min(aggregator.limit, u64::MAX as u128),
-                history: aggregator.history.clone(),
-                base_aggregator: *id
-            }
-        );
-        snapshot_id
+    pub fn read_snapshot(&self, id: AggregatorSnapshotID) -> u128 {
+        let snapshot = self
+            .aggregator_snapshots
+            .get(&id)
+            .expect("AggregatorSnapshot doesn't exist");
+        snapshot.value
     }
 
     pub fn generate_id(&mut self) -> u64 {
