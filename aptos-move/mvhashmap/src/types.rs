@@ -4,11 +4,13 @@
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_crypto::hash::HashValue;
 use aptos_types::executable::ExecutableDescriptor;
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU32, Arc};
 
+pub type AtomicTxnIndex = AtomicU32;
 pub type TxnIndex = u32;
 pub type Incarnation = u32;
 pub type Version = (TxnIndex, Incarnation);
+pub type AggregatorID = u64;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum Flag {
@@ -60,4 +62,22 @@ pub enum MVModulesOutput<M, X> {
     /// The Option can be None if HashValue can't be computed, currently may happen
     /// if the latest entry corresponded to the module deletion.
     Module((Arc<M>, HashValue)),
+}
+
+// TODO: once VersionedAggregators is separated from the MVHashMap, seems that
+// MVDataError and MVModulesError can be unified and simplified.
+#[derive(Debug, PartialEq, Eq)]
+pub enum MVAggregatorsError {
+    /// No prior entry is found. This can happen if the aggregator was created
+    /// by an earlier transaction which aborted, re-executed, and did not re-create
+    /// the aggregator (o.w. the ID of the aggregator provided to the reading API
+    /// could not have been obtained). NOTE: We could record & return some additional
+    /// information and save validations in the caller.
+    NotFound,
+    /// A dependency on another transaction (index returned) was found during the read.
+    Dependency(TxnIndex),
+    /// While reading, delta application failed at the returned transaction index
+    /// (either it violated the limits when not supposed to, or vice versa).
+    /// Note: we can return affected indices to optimize invalidations by the caller.
+    DeltaApplicationFailure,
 }

@@ -19,11 +19,12 @@ aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+claims = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
 
 [dev-dependencies]
-claims = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rayon = { workspace = true }
+test-case = { workspace = true }
