@@ -118,7 +118,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::default();
-    let execution_config = OnChainExecutionConfig::default();
+    let execution_config = OnChainExecutionConfig::default_for_genesis();
     let gas_schedule = default_gas_schedule();
     initialize(
         &mut session,
@@ -798,7 +798,7 @@ pub fn generate_test_genesis(
             employee_vesting_period_duration: 5 * 60, // 5 minutes
         },
         &OnChainConsensusConfig::default(),
-        &OnChainExecutionConfig::default(),
+        &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );
     (genesis, test_validators)
@@ -820,7 +820,7 @@ pub fn generate_mainnet_genesis(
         ChainId::test(),
         &mainnet_genesis_config(),
         &OnChainConsensusConfig::default(),
-        &OnChainExecutionConfig::default(),
+        &OnChainExecutionConfig::default_for_genesis(),
         &default_gas_schedule(),
     );
     (genesis, test_validators)
