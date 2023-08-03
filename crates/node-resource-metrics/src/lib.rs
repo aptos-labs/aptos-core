@@ -3,7 +3,7 @@
 
 use crate::collectors::BasicNodeInfoCollector;
 use aptos_infallible::Mutex;
-use aptos_logger::error;
+use aptos_logger::{warn};
 use cfg_if::cfg_if;
 use collectors::{
     CollectorLatencyCollector, CpuMetricsCollector, DiskMetricsCollector, LoadAvgCollector,
@@ -44,6 +44,6 @@ pub fn register_node_metrics_collector() {
 pub fn register_collector(c: Box<dyn Collector>) {
     // If not okay, then log the error and continue.
     prometheus::register(c).unwrap_or_else(|e| {
-        error!("Failed to register collector: {}", e);
+        warn!("Failed to register collector: {}", e);
     });
 }
