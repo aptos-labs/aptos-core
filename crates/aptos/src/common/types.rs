@@ -742,8 +742,8 @@ pub trait ParsePrivateKey {
 pub struct HardwareWalletOptions {
     /// Derivation Path of your account in hardware wallet
     ///
-    /// e.g format - [m/44'/637'/0'/0'/0]
-    /// Make sure your wallet is unblocked and have Aptos opened
+    /// e.g format - m/44\'/637\'/0\'/0\'/0\'
+    /// Make sure your wallet is unlocked and have Aptos opened
     #[clap(long)]
     pub derivation_path: Option<String>,
 
