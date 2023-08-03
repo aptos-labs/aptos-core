@@ -676,75 +676,61 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
         iterations: u64,
     ) -> u128 {
-        let running_time: u128;
-        let write_set = {
-            // FIXME: should probably read the timestamp from storage.
-            let timed_features =
-                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
-            // TODO(Gas): we probably want to switch to non-zero costs in the future
-            let vm = MoveVmExt::new(
-                NativeGasParameters::zeros(),
-                MiscGasParameters::zeros(),
-                LATEST_GAS_FEATURE_VERSION,
-                self.chain_id,
-                self.features.clone(),
-                timed_features,
-                None,
-            )
-            .unwrap();
-            let remote_view = StorageAdapter::new(&self.data_store);
+        // FIXME: should probably read the timestamp from storage.
+        let timed_features =
+            TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+        // TODO(Gas): we probably want to switch to non-zero costs in the future
+        let vm = MoveVmExt::new(
+            NativeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
+            LATEST_GAS_FEATURE_VERSION,
+            self.chain_id,
+            self.features.clone(),
+            timed_features,
+            None,
+        )
+        .unwrap();
+        let remote_view = StorageAdapter::new(&self.data_store);
+
+        // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
+        let mut i = 0;
+        let mut times = Vec::new();
+        while i < iterations {
             let mut session = vm.new_session(&remote_view, SessionId::void());
 
             // load function name into cache to ensure cache is hot
             let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
 
-            // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
-            let mut i = 0;
-            let mut times = Vec::new();
-            while i < iterations {
-                let fun_name = Self::name(function_name);
-                let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
-                let ty = type_params.clone();
-                let arg = args.clone();
-                // TODO: consider using StandardGasMeter
-                let gas_meter = &mut UnmeteredGasMeter;
+            let fun_name = Self::name(function_name);
+            let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
+            let ty = type_params.clone();
+            let arg = args.clone();
+            // TODO: consider using StandardGasMeter
+            let gas_meter = &mut UnmeteredGasMeter;
 
-                let start = Instant::now();
-                let result = session
-                    .execute_function_bypass_visibility(module, &fun_name, ty, arg, gas_meter);
-                let elapsed = start.elapsed();
-                if let Err(err) = result {
-                    if !should_error {
-                        println!("Should error, but ignoring for now... {}", err);
-                    }
+            let start = Instant::now();
+            let result =
+                session.execute_function_bypass_visibility(module, &fun_name, ty, arg, gas_meter);
+            let elapsed = start.elapsed();
+            if let Err(err) = result {
+                if !should_error {
+                    println!("Should error, but ignoring for now... {}", err);
                 }
-                times.push(elapsed.as_micros());
-                i += 1;
             }
+            times.push(elapsed.as_micros());
+            i += 1;
+        }
 
-            // take median of all running time iterations as a more robust measurement
-            times.sort();
-            let length = times.len();
-            let mid = length / 2;
-            if length % 2 == 0 {
-                running_time = (times[mid - 1] + times[mid]) / 2;
-            } else {
-                running_time = times[mid];
-            }
+        // take median of all running time iterations as a more robust measurement
+        times.sort();
+        let length = times.len();
+        let mid = length / 2;
+        let mut running_time = times[mid];
 
-            let change_set = session
-                .finish(
-                    &mut (),
-                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-                )
-                .expect("Failed to generate txn effects");
-            let (write_set, _events) = change_set
-                .try_into_storage_change_set()
-                .expect("Failed to convert to ChangeSet")
-                .into_inner();
-            write_set
-        };
-        self.data_store.add_write_set(&write_set);
+        if length % 2 == 0 {
+            running_time = (times[mid - 1] + times[mid]) / 2;
+        }
+
         running_time
     }
 
@@ -823,7 +809,10 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            let (write_set, _events) = change_set
+                .try_into_storage_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);

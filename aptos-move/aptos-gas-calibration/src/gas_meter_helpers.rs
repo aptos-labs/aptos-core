@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::gas_meter::GasMeasurements;
+use anyhow::{anyhow, Result};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::transaction::TransactionPayload;
-use move_binary_format::CompiledModule;
+use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::ModuleId,
+    value::{serialize_values, MoveValue},
 };
 use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
 
@@ -85,12 +89,13 @@ pub fn execute_user_txn(
     module_name: &ModuleId,
     function_name: &str,
     iterations: u64,
+    args: Vec<Vec<u8>>,
 ) -> u128 {
     let elapsed = executor.exec_module_record_running_time(
         module_name,
         function_name,
         vec![],
-        vec![],
+        args,
         iterations,
     );
     println!("running time (microseconds): {}", elapsed);
@@ -110,7 +115,7 @@ pub fn execute_user_txn(
 pub fn record_gas_meter(
     package: &BuiltPackage,
     executor: &mut FakeExecutor,
-    func_identifiers: Vec<String>,
+    func_identifiers: Vec<(String, Vec<Vec<u8>>)>,
     address: AccountAddress,
     identifier: &String,
     iterations: u64,
@@ -130,11 +135,11 @@ pub fn record_gas_meter(
             "Executing {}::{}::{}",
             address,
             identifier,
-            func_identifier.clone(),
+            func_identifier.0.clone(),
         );
         gas_meter
             .equation_names
-            .push(format!("{}::{}", &identifier, &func_identifier));
+            .push(format!("{}::{}", &identifier, &func_identifier.0));
 
         // publish package similar to create_publish_package in harness.rs
         println!("Signing txn for module... ");
@@ -144,13 +149,23 @@ pub fn record_gas_meter(
 
         // send a txn that invokes the entry function 0x{address}::{name}::benchmark
         println!("Signing and running user txn for Regular Meter... ");
-        let module_name = get_module_name(address, identifier, &func_identifier);
-        let duration = execute_user_txn(executor, &module_name, &func_identifier, iterations);
+        let module_name = get_module_name(address, identifier, &func_identifier.0);
+        let duration = execute_user_txn(
+            executor,
+            &module_name,
+            &func_identifier.0,
+            iterations,
+            func_identifier.1.clone(),
+        );
         gas_meter.regular_meter.push(duration);
 
         println!("Signing and running user txn for Abstract Meter... ");
-        let gas_formula =
-            executor.exec_abstract_usage(&module_name, &func_identifier, vec![], vec![]);
+        let gas_formula = executor.exec_abstract_usage(
+            &module_name,
+            &func_identifier.0,
+            vec![],
+            func_identifier.1,
+        );
         gas_meter.abstract_meter.push(gas_formula);
     }
 
@@ -203,7 +218,10 @@ pub fn get_dir_paths(dirs: ReadDir) -> Vec<PathBuf> {
 /// * `identifier` - Name of module
 /// * `address` - Account address for the module
 /// * `pattern` - Certain functions to run based on pattern
-pub fn list_entrypoints(cm: &CompiledModule, pattern: String) -> Vec<String> {
+pub fn list_entrypoints(
+    cm: &CompiledModule,
+    pattern: String,
+) -> Result<Vec<(String, Vec<Vec<u8>>)>> {
     // find non-entry functions and ignore them
     // keep entry function names in func_identifiers vector
     let funcs = &cm.function_defs;
@@ -217,7 +235,7 @@ pub fn list_entrypoints(cm: &CompiledModule, pattern: String) -> Vec<String> {
     // find # of params in each func if it is entry function
     let signature_pool = &cm.signatures;
 
-    let mut func_identifiers: Vec<String> = Vec::new();
+    let mut func_identifiers: Vec<(String, Vec<Vec<u8>>)> = Vec::new();
     for func in funcs {
         // check if function is marked as entry, if not skip it
         let is_entry = func.is_entry;
@@ -247,17 +265,22 @@ pub fn list_entrypoints(cm: &CompiledModule, pattern: String) -> Vec<String> {
         let signature_idx: usize = handle.parameters.0.into();
         let func_params = &signature_pool[signature_idx];
         if !func_params.is_empty() {
-            eprintln!(
-                "\n[WARNING] benchmark function should not have parameters: {}\n",
-                func_name,
-            );
-            // TODO: should we exit instead of continuing with the benchmark
-            continue;
+            let first_arg_signature_token = &func_params.0.to_vec()[0];
+            match first_arg_signature_token {
+                SignatureToken::Signer => {
+                    let args = serialize_values(&vec![MoveValue::Signer(*address)]);
+                    func_identifiers.push((func_name, args));
+                },
+                _ => {
+                    return Err(anyhow!(
+                        "Failed: only supports 1 parameter that is a signer type at the moment."
+                    ));
+                },
+            }
+        } else {
+            func_identifiers.push((func_name, vec![]));
         }
-
-        // save function to later run benchmark for it
-        func_identifiers.push(func_name);
     }
 
-    func_identifiers
+    Ok(func_identifiers)
 }
