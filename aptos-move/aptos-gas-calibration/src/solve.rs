@@ -85,7 +85,7 @@ pub fn least_squares(
 
         report_outliers(&equation_names, &computed_time_and_outliers);
     } else {
-        report_undetermined_gas_params(input, coeff_matrix, const_matrix, equation_names);
+        report_undetermined_gas_params(input, coeff_matrix, const_matrix);
     }
 }
 
@@ -152,7 +152,6 @@ fn report_undetermined_gas_params(
     input: Vec<BTreeMap<String, u64>>,
     coeff_matrix: &mut DMatrix<f64>,
     const_matrix: &mut DMatrix<f64>,
-    equation_names: Vec<String>,
 ) {
     let map = generic_map(input);
     let keys: Vec<String> = map.keys().map(|key| key.to_string()).collect();
@@ -168,11 +167,6 @@ fn report_undetermined_gas_params(
 
     if let Ok(linear_combos) = &result {
         println!("linearly dependent variables are:\n");
-        /*for (eq, gas_param) in linear_combos {
-            let eq_name = &equation_names[*eq];
-            let gas_param_name = &keys[*gas_param];
-            println!("- {} | gas parameter: {}\n", eq_name, gas_param_name);
-        }*/
         for gas_param in linear_combos {
             println!("- gas parameter: {}\n", gas_param);
         }

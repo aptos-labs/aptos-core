@@ -60,7 +60,9 @@ pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeasurem
             let address = module_id.address();
 
             // get all benchmark tagged functions
-            let func_identifiers = list_entrypoints(&compiled_module, pattern.to_string());
+            let func_identifiers = list_entrypoints(&compiled_module, pattern.to_string()).expect(
+                "Failed: entry function probably has >1 parameter that's not a Signer type",
+            );
 
             let measurement_results = record_gas_meter(
                 &package,
@@ -132,7 +134,9 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasu
                     // get relevant module metadata
                     let module_id = module.self_id();
                     let identifier = &module_id.name().to_string();
-                    let func_identifiers = list_entrypoints(&module, pattern.to_string());
+                    let func_identifiers = list_entrypoints(&module, pattern.to_string()).expect(
+                        "Failed: entry function probably has >1 parameter that's not a Signer type",
+                    );
 
                     // build .mv of module
                     let mut module_blob: Vec<u8> = vec![];
@@ -144,17 +148,17 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasu
                     executor.add_module(&module_id, module_blob);
 
                     for func_identifier in func_identifiers {
-                        println!("Benchmarking {}::{}\n", &identifier, func_identifier);
+                        println!("Benchmarking {}::{}\n", &identifier, func_identifier.0);
 
                         gas_meter
                             .equation_names
-                            .push(format!("{}::{}", &identifier, func_identifier));
+                            .push(format!("{}::{}", &identifier, func_identifier.0));
 
                         let elapsed = executor.exec_module_record_running_time(
                             &module_id,
-                            &func_identifier,
+                            &func_identifier.0,
                             vec![],
-                            vec![],
+                            func_identifier.1.clone(),
                             iterations,
                         );
                         gas_meter.regular_meter.push(elapsed);
@@ -162,9 +166,9 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasu
                         // record with abstract gas meter
                         let gas_formula = executor.exec_abstract_usage(
                             &module_id,
-                            &func_identifier,
+                            &func_identifier.0,
                             vec![],
-                            vec![],
+                            func_identifier.1,
                         );
                         gas_meter.abstract_meter.push(gas_formula);
                     }
