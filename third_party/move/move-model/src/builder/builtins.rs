@@ -73,7 +73,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder<'_>) {
         // Binary operators.
         let mut declare_bin = |op: PA::BinOp_,
                                oper: Operation,
-                               param_type: &Type,
+                               param_type1: &Type,
+                               param_type2: &Type,
                                result_type: &Type,
                                visibility: EntryVisibility| {
             trans.define_spec_or_builtin_fun(trans.bin_op_symbol(&op), SpecOrBuiltinFunEntry {
@@ -81,8 +82,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder<'_>) {
                 oper,
                 type_params: vec![],
                 params: vec![
-                    mk_param(trans, 1, param_type.clone()),
-                    mk_param(trans, 2, param_type.clone()),
+                    mk_param(trans, 1, param_type1.clone()),
+                    mk_param(trans, 2, param_type2.clone()),
                 ],
                 result_type: result_type.clone(),
                 visibility,
@@ -93,6 +94,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder<'_>) {
         // The spec language uses the unified arbitrary precision num type instead.
         use EntryVisibility::{Impl, Spec, SpecAndImpl};
         use PA::BinOp_::*;
+        let u8_ty = Type::Primitive(PrimitiveType::U8);
         for prim_ty in [
             PrimitiveType::U8,
             PrimitiveType::U16,
@@ -108,28 +110,28 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder<'_>) {
                 Impl
             };
             let ty = Type::new_prim(prim_ty);
-            declare_bin(Add, Operation::Add, &ty, &ty, visibility);
-            declare_bin(Sub, Operation::Sub, &ty, &ty, visibility);
-            declare_bin(Mul, Operation::Mul, &ty, &ty, visibility);
-            declare_bin(Mod, Operation::Mod, &ty, &ty, visibility);
-            declare_bin(Div, Operation::Div, &ty, &ty, visibility);
-            declare_bin(BitOr, Operation::BitOr, &ty, &ty, visibility);
-            declare_bin(BitAnd, Operation::BitAnd, &ty, &ty, visibility);
-            declare_bin(Xor, Operation::Xor, &ty, &ty, visibility);
-            declare_bin(Shl, Operation::Shl, &ty, &ty, visibility);
-            declare_bin(Shr, Operation::Shr, &ty, &ty, visibility);
-            declare_bin(Lt, Operation::Lt, &ty, bool_t, visibility);
-            declare_bin(Le, Operation::Le, &ty, bool_t, visibility);
-            declare_bin(Gt, Operation::Gt, &ty, bool_t, visibility);
-            declare_bin(Ge, Operation::Ge, &ty, bool_t, visibility);
+            declare_bin(Add, Operation::Add, &ty, &ty, &ty, visibility);
+            declare_bin(Sub, Operation::Sub, &ty, &ty, &ty, visibility);
+            declare_bin(Mul, Operation::Mul, &ty, &ty, &ty, visibility);
+            declare_bin(Mod, Operation::Mod, &ty, &ty, &ty, visibility);
+            declare_bin(Div, Operation::Div, &ty, &ty, &ty, visibility);
+            declare_bin(BitOr, Operation::BitOr, &ty, &ty, &ty, visibility);
+            declare_bin(BitAnd, Operation::BitAnd, &ty, &ty, &ty, visibility);
+            declare_bin(Xor, Operation::Xor, &ty, &ty, &ty, visibility);
+            declare_bin(Shl, Operation::Shl, &ty, &u8_ty, &ty, visibility);
+            declare_bin(Shr, Operation::Shr, &ty, &u8_ty, &ty, visibility);
+            declare_bin(Lt, Operation::Lt, &ty, &ty, bool_t, visibility);
+            declare_bin(Le, Operation::Le, &ty, &ty, bool_t, visibility);
+            declare_bin(Gt, Operation::Gt, &ty, &ty, bool_t, visibility);
+            declare_bin(Ge, Operation::Ge, &ty, &ty, bool_t, visibility);
         }
 
-        declare_bin(Range, Operation::Range, num_t, range_t, Spec);
+        declare_bin(Range, Operation::Range, num_t, num_t, range_t, Spec);
 
-        declare_bin(Implies, Operation::Implies, bool_t, bool_t, Spec);
-        declare_bin(Iff, Operation::Iff, bool_t, bool_t, Spec);
-        declare_bin(And, Operation::And, bool_t, bool_t, SpecAndImpl);
-        declare_bin(Or, Operation::Or, bool_t, bool_t, SpecAndImpl);
+        declare_bin(Implies, Operation::Implies, bool_t, bool_t, bool_t, Spec);
+        declare_bin(Iff, Operation::Iff, bool_t, bool_t, bool_t, Spec);
+        declare_bin(And, Operation::And, bool_t, bool_t, bool_t, SpecAndImpl);
+        declare_bin(Or, Operation::Or, bool_t, bool_t, bool_t, SpecAndImpl);
 
         // Eq and Neq have special treatment because they are generic.
         trans.define_spec_or_builtin_fun(

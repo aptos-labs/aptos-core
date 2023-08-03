@@ -4,17 +4,17 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::helpers::make_module_natives;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
+use aptos_gas_schedule::gas_params::natives::move_stdlib::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
+use move_core_types::gas_algebra::NumBytes;
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use sha2::{Digest, Sha256};
 use sha3::Sha3_256;
-use smallvec::smallvec;
-use std::{collections::VecDeque, sync::Arc};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
 
 /***************************************************************************************************
  * native fun sha2_256
@@ -22,44 +22,23 @@ use std::{collections::VecDeque, sync::Arc};
  *   gas cost: base_cost + unit_cost * max(input_length_in_bytes, legacy_min_input_len)
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Sha2_256GasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGasPerByte,
-    pub legacy_min_input_len: NumBytes,
-}
-
 #[inline]
 fn native_sha2_256(
-    gas_params: &Sha2_256GasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let hash_arg = pop_arg!(arguments, Vec<u8>);
+    let hash_arg = safely_pop_arg!(arguments, Vec<u8>);
 
-    let cost = gas_params.base
-        + gas_params.per_byte
-            * std::cmp::max(
-                NumBytes::new(hash_arg.len() as u64),
-                gas_params.legacy_min_input_len,
-            );
+    context.charge(
+        HASH_SHA2_256_BASE + HASH_SHA2_256_PER_BYTE * NumBytes::new(hash_arg.len() as u64),
+    )?;
 
     let hash_vec = Sha256::digest(hash_arg.as_slice()).to_vec();
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
-        hash_vec
-    )]))
-}
-
-pub fn make_native_sha2_256(gas_params: Sha2_256GasParameters) -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_sha2_256(&gas_params, context, ty_args, args)
-        },
-    )
+    Ok(smallvec![Value::vector_u8(hash_vec)])
 }
 
 /***************************************************************************************************
@@ -68,60 +47,35 @@ pub fn make_native_sha2_256(gas_params: Sha2_256GasParameters) -> NativeFunction
  *   gas cost: base_cost + unit_cost * max(input_length_in_bytes, legacy_min_input_len)
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Sha3_256GasParameters {
-    pub base: InternalGas,
-    pub per_byte: InternalGasPerByte,
-    pub legacy_min_input_len: NumBytes,
-}
-
 #[inline]
 fn native_sha3_256(
-    gas_params: &Sha3_256GasParameters,
-    _context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let hash_arg = pop_arg!(arguments, Vec<u8>);
+    let hash_arg = safely_pop_arg!(arguments, Vec<u8>);
 
-    let cost = gas_params.base
-        + gas_params.per_byte
-            * std::cmp::max(
-                NumBytes::new(hash_arg.len() as u64),
-                gas_params.legacy_min_input_len,
-            );
+    context.charge(
+        HASH_SHA3_256_BASE + HASH_SHA3_256_PER_BYTE * NumBytes::new(hash_arg.len() as u64),
+    )?;
 
     let hash_vec = Sha3_256::digest(hash_arg.as_slice()).to_vec();
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
-        hash_vec
-    )]))
-}
-
-pub fn make_native_sha3_256(gas_params: Sha3_256GasParameters) -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_sha3_256(&gas_params, context, ty_args, args)
-        },
-    )
+    Ok(smallvec![Value::vector_u8(hash_vec)])
 }
 
 /***************************************************************************************************
  * module
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub sha2_256: Sha2_256GasParameters,
-    pub sha3_256: Sha3_256GasParameters,
-}
-
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
-        ("sha2_256", make_native_sha2_256(gas_params.sha2_256)),
-        ("sha3_256", make_native_sha3_256(gas_params.sha3_256)),
+        ("sha2_256", native_sha2_256 as RawSafeNative),
+        ("sha3_256", native_sha3_256),
     ];
 
-    make_module_natives(natives)
+    builder.make_named_natives(natives)
 }

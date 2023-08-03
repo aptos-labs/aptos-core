@@ -1,19 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    errors::Error,
-    task::{ExecutionStatus, TransactionOutput},
-};
+use crate::task::TransactionOutput;
 use aptos_mvhashmap::types::TxnIndex;
 use std::fmt::Debug;
 
 /// An interface for listening to transaction commit events. The listener is called only once
 /// for each transaction commit.
 pub trait TransactionCommitHook: Send + Sync {
-    type ExecutionStatus;
+    type Output;
 
-    fn on_transaction_committed(&self, txn_idx: TxnIndex, execution_status: &Self::ExecutionStatus);
+    fn on_transaction_committed(&self, txn_idx: TxnIndex, output: &Self::Output);
+
+    fn on_execution_aborted(&self, txn_idx: TxnIndex);
 }
 
 pub struct NoOpTransactionCommitHook<T, E> {
@@ -37,13 +36,13 @@ impl<T: TransactionOutput, E: Debug + Sync + Send> NoOpTransactionCommitHook<T, 
 impl<T: TransactionOutput, E: Debug + Sync + Send> TransactionCommitHook
     for NoOpTransactionCommitHook<T, E>
 {
-    type ExecutionStatus = ExecutionStatus<T, Error<E>>;
+    type Output = T;
 
-    fn on_transaction_committed(
-        &self,
-        _txn_idx: TxnIndex,
-        _execution_status: &Self::ExecutionStatus,
-    ) {
+    fn on_transaction_committed(&self, _txn_idx: TxnIndex, _output: &Self::Output) {
+        // no-op
+    }
+
+    fn on_execution_aborted(&self, _txn_idx: TxnIndex) {
         // no-op
     }
 }

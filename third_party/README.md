@@ -34,7 +34,7 @@ Pushing to [the `aptos-main` branch in the Move repo](https://github.com/move-la
 Currently, pushing has to be done manually. Below, substitute `/Users/wrwg/move` by your path to a local git repo of the Move language:
 
 ```shell
-copybara copy.bara.sky pull_move --output-root=/tmp --git-destination-url=file:///Users/wrwg/move
+copybara copy.bara.sky push_move --output-root=/tmp --git-destination-url=file:///Users/wrwg/move
 ```
 
 This will create a branch `to_move` which can then be submitted to the upstream Move.
@@ -61,7 +61,7 @@ For this reason, pulling is a bit more complex right now and requires some extra
    ```
 2. Run the following command, where `/Users/wrwg/aptos-core` is replaced by our path to the aptos-core repo:
    ```shell
-   copybara copy.bara.sky push_move --output-root=/tmp --git-destination-url=file:///Users/wrwg/aptos-core
+   copybara copy.bara.sky pull_move --output-root=/tmp --git-destination-url=file:///Users/wrwg/aptos-core
    ```
    This will add a series of commits to the branch `from_move`
 3. Rebase `from_move` onto the current `main branch`

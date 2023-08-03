@@ -6,10 +6,7 @@
 #![allow(clippy::unused_unit)]
 
 use super::coin_utils::{CoinInfoType, CoinResource};
-use crate::{
-    schema::coin_infos,
-    utils::{database::PgPoolConnection, util::standardize_address},
-};
+use crate::{schema::coin_infos, utils::database::PgPoolConnection};
 use aptos_protos::transaction::v1::WriteResource;
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use field_count::FieldCount;
@@ -59,7 +56,7 @@ impl CoinInfo {
             Some(CoinResource::CoinInfoResource(inner)) => {
                 let coin_info_type = &CoinInfoType::from_move_type(
                     &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
-                    write_resource.r#type.as_ref().unwrap().address.as_str(),
+                    write_resource.type_str.as_ref(),
                     txn_version,
                 );
                 let (supply_aggregator_table_handle, supply_aggregator_table_key) = inner
@@ -71,7 +68,7 @@ impl CoinInfo {
                     coin_type_hash: coin_info_type.to_hash(),
                     coin_type: coin_info_type.get_coin_type_trunc(),
                     transaction_version_created: txn_version,
-                    creator_address: standardize_address(coin_info_type.creator_address.as_str()),
+                    creator_address: coin_info_type.get_creator_address(),
                     name: inner.get_name_trunc(),
                     symbol: inner.get_symbol_trunc(),
                     decimals: inner.decimals,

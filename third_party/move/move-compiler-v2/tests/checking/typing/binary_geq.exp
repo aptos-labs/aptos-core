@@ -1,0 +1,23 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        f: u64,
+    }
+    private fun t0(x: u64,r: M::R) {
+        Ge(0, 0);
+        Ge(1, 0);
+        Ge(0, 1);
+        Ge(0, 1);
+        Ge(0, 1);
+        Ge(0, 1);
+        Ge(0, 1);
+        Ge(0, 1);
+        Ge(x, x);
+        Ge(select M::R.f(r), select M::R.f(r));
+        And(Ge(1, select M::R.f(r)), Ge(select M::R.f(r), 0));
+        {
+          let M::R{ f: _ } = r;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M

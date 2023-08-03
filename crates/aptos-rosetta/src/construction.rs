@@ -553,6 +553,9 @@ async fn construction_parse(
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, RESET_LOCKUP_FUNCTION) => {
                     parse_reset_lockup_operation(sender, &type_args, &args)?
                 },
+                (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UPDATE_COMMISSION_FUNCTION) => {
+                    parse_update_commission_operation(sender, &type_args, &args)?
+                },
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, UNLOCK_STAKE_FUNCTION) => {
                     parse_unlock_stake_operation(sender, &type_args, &args)?
                 },
@@ -874,6 +877,30 @@ pub fn parse_unlock_stake_operation(
     )])
 }
 
+pub fn parse_update_commission_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Unlock stake should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    let operator: AccountAddress = parse_function_arg("update_commision", args, 0)?;
+    let new_commission_percentage: u64 = parse_function_arg("update_commision", args, 1)?;
+
+    Ok(vec![Operation::update_commission(
+        0,
+        None,
+        sender,
+        Some(AccountIdentifier::base_account(operator)),
+        Some(new_commission_percentage),
+    )])
+}
+
 pub fn parse_distribute_staking_rewards_operation(
     sender: AccountAddress,
     type_args: &[TypeTag],
@@ -1082,6 +1109,23 @@ async fn construction_payloads(
             } else {
                 return Err(ApiError::InvalidInput(Some(format!(
                     "Unlock stake operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        },
+        InternalOperation::UpdateCommission(inner) => {
+            if let InternalOperation::UpdateCommission(ref metadata_op) =
+                metadata.internal_operation
+            {
+                if inner.owner != metadata_op.owner || inner.operator != metadata_op.operator {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Update commission operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Update commission operation doesn't match metadata {:?} vs {:?}",
                     inner, metadata.internal_operation
                 ))));
             }

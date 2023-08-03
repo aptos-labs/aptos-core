@@ -162,12 +162,12 @@ error: no matching declaration of `>`
 19 │         (0, 1) > (0, 1, 2);
    │         ^^^^^^^^^^^^^^^^^^
    │
-   = outruled candidate `>(u8, u8): bool` (expected `u8` but found `(?49, ?50)` for argument 1)
-   = outruled candidate `>(u16, u16): bool` (expected `u16` but found `(?49, ?50)` for argument 1)
-   = outruled candidate `>(u32, u32): bool` (expected `u32` but found `(?49, ?50)` for argument 1)
-   = outruled candidate `>(u64, u64): bool` (expected `u64` but found `(?49, ?50)` for argument 1)
-   = outruled candidate `>(u128, u128): bool` (expected `u128` but found `(?49, ?50)` for argument 1)
-   = outruled candidate `>(u256, u256): bool` (expected `u256` but found `(?49, ?50)` for argument 1)
+   = outruled candidate `>(u8, u8): bool` (expected `u8` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u16, u16): bool` (expected `u16` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u32, u32): bool` (expected `u32` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u64, u64): bool` (expected `u64` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u128, u128): bool` (expected `u128` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u256, u256): bool` (expected `u256` but found `(integer, integer)` for argument 1)
 
 error: no matching declaration of `>`
    ┌─ tests/checking/typing/binary_gt_invalid.move:20:9
@@ -175,9 +175,9 @@ error: no matching declaration of `>`
 20 │         (1, 2) > (0, 1);
    │         ^^^^^^^^^^^^^^^
    │
-   = outruled candidate `>(u8, u8): bool` (expected `u8` but found `(?62, ?63)` for argument 1)
-   = outruled candidate `>(u16, u16): bool` (expected `u16` but found `(?62, ?63)` for argument 1)
-   = outruled candidate `>(u32, u32): bool` (expected `u32` but found `(?62, ?63)` for argument 1)
-   = outruled candidate `>(u64, u64): bool` (expected `u64` but found `(?62, ?63)` for argument 1)
-   = outruled candidate `>(u128, u128): bool` (expected `u128` but found `(?62, ?63)` for argument 1)
-   = outruled candidate `>(u256, u256): bool` (expected `u256` but found `(?62, ?63)` for argument 1)
+   = outruled candidate `>(u8, u8): bool` (expected `u8` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u16, u16): bool` (expected `u16` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u32, u32): bool` (expected `u32` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u64, u64): bool` (expected `u64` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u128, u128): bool` (expected `u128` but found `(integer, integer)` for argument 1)
+   = outruled candidate `>(u256, u256): bool` (expected `u256` but found `(integer, integer)` for argument 1)

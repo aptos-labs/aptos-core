@@ -330,10 +330,39 @@ impl PartialVMError {
     }
 
     pub fn new(major_status: StatusCode) -> Self {
+        debug_assert!(major_status != StatusCode::EXECUTED);
+        let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+            let mut len = 5;
+            let mut trace: String = "Unknown invariant violation generated:\n".to_string();
+            backtrace::trace(|frame| {
+                backtrace::resolve_frame(frame, |symbol| {
+                    let mut function_name = backtrace::SymbolName::new("<unknown>".as_bytes());
+                    if let Some(name) = symbol.name() {
+                        function_name = name;
+                    }
+                    let mut file_name = "<unknown>";
+                    if let Some(filename) = symbol.filename() {
+                        if let Some(filename) = filename.to_str() {
+                            file_name = filename;
+                        }
+                    }
+                    let lineno = symbol.lineno().unwrap_or(0);
+                    trace.push_str(&format!(
+                        "In function {} at {}:{}\n",
+                        function_name, file_name, lineno
+                    ));
+                });
+                len -= 1;
+                len > 0
+            });
+            Some(trace)
+        } else {
+            None
+        };
         Self(Box::new(PartialVMError_ {
             major_status,
             sub_status: None,
-            message: None,
+            message,
             exec_state: None,
             indices: vec![],
             offsets: vec![],
@@ -350,7 +379,12 @@ impl PartialVMError {
         self
     }
 
-    pub fn with_message(mut self, message: String) -> Self {
+    pub fn with_message(mut self, mut message: String) -> Self {
+        if self.0.major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+            if let Some(stacktrace) = self.0.message.take() {
+                message = format!("{} @{}", message, stacktrace);
+            }
+        }
         debug_assert!(self.0.message.is_none());
         self.0.message = Some(message);
         self

@@ -68,13 +68,12 @@ impl CurrentDelegatorBalance {
         if let Some(pool_balance) = active_pool_to_staking_pool.get(&table_handle) {
             let pool_address = pool_balance.staking_pool_address.clone();
             let delegator_address = standardize_address(&write_table_item.key.to_string());
-            let data: &aptos_api_types::transaction::DecodedTableData =
-                write_table_item.data.as_ref().unwrap_or_else(|| {
-                    panic!(
+            let data = write_table_item.data.as_ref().unwrap_or_else(|| {
+                panic!(
                     "This table item should be an active share item, table_item {:?}, version {}",
                     write_table_item, txn_version
                 )
-                });
+            });
             let shares = data
                 .value
                 .as_str()
@@ -130,13 +129,12 @@ impl CurrentDelegatorBalance {
                 },
             };
             let delegator_address = standardize_address(&write_table_item.key.to_string());
-            let data: &aptos_api_types::transaction::DecodedTableData =
-                write_table_item.data.as_ref().unwrap_or_else(|| {
-                    panic!(
-                        "This table item should be an active share item, table_item {:?}, version {}",
-                        write_table_item, txn_version
-                    )
-                });
+            let data = write_table_item.data.as_ref().unwrap_or_else(|| {
+                panic!(
+                    "This table item should be an active share item, table_item {:?}, version {}",
+                    write_table_item, txn_version
+                )
+            });
             let shares = data
                 .value
                 .as_str()
@@ -208,10 +206,20 @@ impl CurrentDelegatorBalance {
             {
                 Some(pool_address) => pool_address,
                 None => {
-                    Self::get_staking_pool_from_inactive_share_handle(conn, &inactive_pool_handle)
-                        .context(format!("Failed to get staking pool address from inactive share handle {}, txn version {}",
-                        inactive_pool_handle, txn_version
-                    ))?
+                    match Self::get_staking_pool_from_inactive_share_handle(
+                        conn,
+                        &inactive_pool_handle,
+                    ) {
+                        Ok(pool) => pool,
+                        Err(_) => {
+                            aptos_logger::error!(
+                                transaction_version = txn_version,
+                                lookup_key = &inactive_pool_handle,
+                                "Failed to get staking pool address from inactive share handle. You probably should backfill db.",
+                            );
+                            return Ok(None);
+                        },
+                    }
                 },
             };
             let delegator_address = standardize_address(&delete_table_item.key.to_string());

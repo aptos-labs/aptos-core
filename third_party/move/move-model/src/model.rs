@@ -20,6 +20,8 @@ use crate::{
         Address, Attribute, ConditionKind, Exp, ExpData, GlobalInvariant, ModuleName, PropertyBag,
         PropertyValue, Spec, SpecBlockInfo, SpecFunDecl, SpecVarDecl, Value,
     },
+    code_writer::CodeWriter,
+    emit, emitln,
     intrinsics::IntrinsicsAnnotation,
     pragmas::{
         DELEGATE_INVARIANTS_TO_CALLER_PRAGMA, DISABLE_INVARIANTS_IN_BODY_PRAGMA, FRIEND_PRAGMA,
@@ -66,7 +68,7 @@ use std::{
     cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
-    fmt::{self, Formatter},
+    fmt::{self, Formatter, Write},
     rc::Rc,
 };
 
@@ -90,6 +92,12 @@ pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 pub struct Loc {
     file_id: FileId,
     span: Span,
+}
+
+impl AsRef<Loc> for Loc {
+    fn as_ref(&self) -> &Loc {
+        self
+    }
 }
 
 impl Loc {
@@ -1071,6 +1079,49 @@ impl GlobalEnv {
         }
     }
 
+    /// Computes the abilities associated with the given type.
+    pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
+        match ty {
+            Type::Primitive(p) => match p {
+                PrimitiveType::Bool
+                | PrimitiveType::U8
+                | PrimitiveType::U16
+                | PrimitiveType::U32
+                | PrimitiveType::U64
+                | PrimitiveType::U128
+                | PrimitiveType::U256
+                | PrimitiveType::Num
+                | PrimitiveType::Range
+                | PrimitiveType::EventStore
+                | PrimitiveType::Address => AbilitySet::PRIMITIVES,
+                PrimitiveType::Signer => AbilitySet::SIGNER,
+            },
+            Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities(et, ty_params)),
+            Type::Struct(mid, sid, inst) => {
+                let struct_env = self.get_struct(mid.qualified(*sid));
+                let mut abilities = struct_env.get_abilities();
+                for inst_ty in inst {
+                    abilities = abilities.intersect(self.type_abilities(inst_ty, ty_params))
+                }
+                abilities
+            },
+            Type::TypeParameter(i) => {
+                if let Some(tp) = ty_params.get(*i as usize) {
+                    tp.1.abilities
+                } else {
+                    AbilitySet::EMPTY
+                }
+            },
+            Type::Reference(_, _) => AbilitySet::REFERENCES,
+            Type::Fun(_, _)
+            | Type::Tuple(_)
+            | Type::TypeDomain(_)
+            | Type::ResourceDomain(_, _, _)
+            | Type::Error
+            | Type::Var(_) => AbilitySet::EMPTY,
+        }
+    }
+
     /// Returns associated intrinsics.
     pub fn get_intrinsics(&self) -> &IntrinsicsAnnotation {
         &self.intrinsics
@@ -1160,7 +1211,7 @@ impl GlobalEnv {
             let view = StructHandleView::new(&module, handle);
             let struct_id = StructId(self.symbol_pool.make(view.name().as_str()));
             let mod_data = &mut self.module_data[module_id.0 as usize];
-            if let Some(mut struct_data) = mod_data.struct_data.get_mut(&struct_id) {
+            if let Some(struct_data) = mod_data.struct_data.get_mut(&struct_id) {
                 struct_data.def_idx = Some(def_idx);
                 mod_data.struct_idx_to_id.insert(def_idx, struct_id);
             } else {
@@ -1199,7 +1250,7 @@ impl GlobalEnv {
             };
 
             let mod_data = &mut self.module_data[module_id.0 as usize];
-            if let Some(mut fun_data) = mod_data.function_data.get_mut(&fun_id) {
+            if let Some(fun_data) = mod_data.function_data.get_mut(&fun_id) {
                 fun_data.def_idx = Some(def_idx);
                 fun_data.handle_idx = Some(handle_idx);
                 mod_data.function_idx_to_id.insert(def_idx, fun_id);
@@ -1213,7 +1264,7 @@ impl GlobalEnv {
 
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
-        let mut mod_data = &mut self.module_data[module_id.0 as usize];
+        let mod_data = &mut self.module_data[module_id.0 as usize];
         mod_data.used_modules = used_modules;
         mod_data.friend_modules = friend_modules;
         mod_data.compiled_module = Some(module);
@@ -1747,6 +1798,50 @@ impl GlobalEnv {
 impl Default for GlobalEnv {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GlobalEnv {
+    pub fn dump_env(&self) -> String {
+        let spool = self.symbol_pool();
+        let tctx = &self.get_type_display_ctx();
+        let writer = CodeWriter::new(self.internal_loc());
+        for module in self.get_modules() {
+            if !module.is_target() {
+                continue;
+            }
+            emitln!(writer, "module {} {{", module.get_full_name_str());
+            writer.indent();
+            for str in module.get_structs() {
+                emitln!(writer, "struct {} {{", str.get_name().display(spool));
+                writer.indent();
+                for fld in str.get_fields() {
+                    emitln!(
+                        writer,
+                        "{}: {},",
+                        fld.get_name().display(spool),
+                        fld.get_type().display(tctx)
+                    );
+                }
+                writer.unindent();
+                emitln!(writer, "}");
+            }
+            for fun in module.get_functions() {
+                emit!(writer, "{}", fun.get_header());
+                if let Some(exp) = fun.get_def() {
+                    emitln!(writer, " {");
+                    writer.indent();
+                    emitln!(writer, "{}", exp.display_for_fun(fun.clone()));
+                    writer.unindent();
+                    emitln!(writer, "}");
+                } else {
+                    emitln!(writer, ";");
+                }
+            }
+            writer.unindent();
+            emitln!(writer, "}} // end {}", module.get_full_name_str())
+        }
+        writer.extract_result()
     }
 }
 
@@ -3506,6 +3601,53 @@ impl<'env> FunctionEnv<'env> {
         self.symbol_pool().string(self.get_name())
     }
 
+    /// Returns a string representation of the functions 'header', as it is declared in Move.
+    pub fn get_header(&self) -> String {
+        let mut s = String::new();
+        s.push_str(match self.data.visibility {
+            Visibility::Private => "private",
+            Visibility::Public => "public",
+            Visibility::Friend => "friend",
+        });
+        s.push_str(match self.data.kind {
+            FunctionKind::Regular => "",
+            FunctionKind::Inline => " inline",
+            FunctionKind::Entry => " entry",
+        });
+        if self.is_native() {
+            s.push_str(" native")
+        }
+        let spool = self.symbol_pool();
+        let tctx = &self.get_type_display_ctx();
+        let generics = if !self.data.type_params.is_empty() {
+            format!(
+                "<{}>",
+                self.data
+                    .type_params
+                    .iter()
+                    .map(|p| p.0.display(spool).to_string())
+                    .join(",")
+            )
+        } else {
+            "".to_owned()
+        };
+        let args = self
+            .data
+            .params
+            .iter()
+            .map(|p| format!("{}: {}", p.0.display(spool), p.1.display(tctx)))
+            .join(",");
+        write!(
+            s,
+            " fun {}{}({})",
+            self.get_name().display(spool),
+            generics,
+            args
+        )
+        .unwrap();
+        s
+    }
+
     /// Returns the function name with the module name excluding the address
     pub fn get_name_string(&self) -> Rc<str> {
         if self.module_env.is_script_module() {
@@ -3533,7 +3675,7 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
         let type_param_names = self
             .get_type_parameters()
             .iter()

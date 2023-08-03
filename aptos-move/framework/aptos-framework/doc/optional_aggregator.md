@@ -33,6 +33,9 @@ aggregator (parallelizable) or via normal integers.
     -  [Function `new_integer`](#@Specification_1_new_integer)
     -  [Function `add_integer`](#@Specification_1_add_integer)
     -  [Function `sub_integer`](#@Specification_1_sub_integer)
+    -  [Function `limit`](#@Specification_1_limit)
+    -  [Function `read_integer`](#@Specification_1_read_integer)
+    -  [Function `destroy_integer`](#@Specification_1_destroy_integer)
     -  [Function `new`](#@Specification_1_new)
     -  [Function `switch`](#@Specification_1_switch)
     -  [Function `switch_and_zero_out`](#@Specification_1_switch_and_zero_out)
@@ -771,6 +774,54 @@ Check for overflow.
 
 
 
+<a name="@Specification_1_limit"></a>
+
+### Function `limit`
+
+
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_limit">limit</a>(integer: &<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>): u128
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_read_integer"></a>
+
+### Function `read_integer`
+
+
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_read_integer">read_integer</a>(integer: &<a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>): u128
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_destroy_integer"></a>
+
+### Function `destroy_integer`
+
+
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_destroy_integer">destroy_integer</a>(integer: <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_new"></a>
 
 ### Function `new`
@@ -1028,4 +1079,4 @@ The integer exists and the aggregator does not exist when destroy the integer.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

@@ -23,6 +23,7 @@ to synchronize configuration changes for the validators.
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `disable_reconfiguration`](#@Specification_1_disable_reconfiguration)
     -  [Function `enable_reconfiguration`](#@Specification_1_enable_reconfiguration)
+    -  [Function `reconfiguration_enabled`](#@Specification_1_reconfiguration_enabled)
     -  [Function `reconfigure`](#@Specification_1_reconfigure)
     -  [Function `last_reconfiguration_time`](#@Specification_1_last_reconfiguration_time)
     -  [Function `current_epoch`](#@Specification_1_current_epoch)
@@ -523,9 +524,12 @@ Guid_creation_num should be 2 according to logic.
 
 <pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>let</b> <b>post</b> config = <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework);
 <b>requires</b> <b>exists</b>&lt;Account&gt;(addr);
 <b>aborts_if</b> !(<b>global</b>&lt;Account&gt;(addr).guid_creation_num == 2);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework);
+<b>ensures</b> config.epoch == 0 && config.last_reconfiguration_time == 0;
 </code></pre>
 
 
@@ -565,6 +569,22 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
 
+<a name="@Specification_1_reconfiguration_enabled"></a>
+
+### Function `reconfiguration_enabled`
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
 <a name="@Specification_1_reconfigure"></a>
 
 ### Function `reconfigure`
@@ -578,10 +598,14 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
-<b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
-<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
+<b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>() ==&gt; <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">staking_config::StakingRewardsConfigEnabledRequirement</a>;
+<b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_collect_and_distribute_gas_fees_enabled">features::spec_collect_and_distribute_gas_fees_enabled</a>() ==&gt; <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">aptos_coin::ExistsAptosCoin</a>;
 <b>aborts_if</b> <b>false</b>;
+<b>let</b> success = !(<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>())
+    && <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() != <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).last_reconfiguration_time;
+<b>ensures</b> success ==&gt; <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch == <b>old</b>(<b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch) + 1;
+<b>ensures</b> !success ==&gt; <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch == <b>old</b>(<b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch);
 </code></pre>
 
 
@@ -637,4 +661,4 @@ Should equal to 0
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

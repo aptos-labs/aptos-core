@@ -262,6 +262,7 @@ class ForgeContext:
     upgrade_image_tag: str
     forge_cluster: ForgeCluster
     forge_test_suite: str
+    forge_username: str
     forge_blocking: bool
 
     github_actions: str
@@ -722,6 +723,8 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_NAMESPACE=context.forge_namespace,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
+            FORGE_TEST_SUITE=sanitize_k8s_resource_name(context.forge_test_suite),
+            FORGE_USERNAME=sanitize_k8s_resource_name(context.forge_username),
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
@@ -986,6 +989,24 @@ def image_exists(
         raise Exception(f"Unknown cloud repo type: {cloud}")
 
 
+def sanitize_k8s_resource_name(resource: str, max_length: int = 63) -> str:
+    sanitized_resource = ""
+    for i, c in enumerate(resource):
+        if i >= max_length:
+            break
+        if c.isalnum():
+            sanitized_resource += c
+        else:
+            sanitized_resource += "-"  # Replace the invalid character with a '-'
+
+    if sanitized_resource.endswith("-"):
+        sanitized_resource = (
+            sanitized_resource[:-1] + "0"
+        )  # Set the last character to '0'
+
+    return sanitized_resource
+
+
 def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> str:
     """
     Sanitize the intended forge resource name to be a valid k8s resource name.
@@ -996,21 +1017,7 @@ def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> s
     if not forge_resource.startswith("forge-"):
         raise Exception("Forge resource name must start with 'forge-'")
 
-    sanitized_namespace = ""
-    for i, c in enumerate(forge_resource):
-        if i >= max_length:
-            break
-        if c.isalnum():
-            sanitized_namespace += c
-        else:
-            sanitized_namespace += "-"  # Replace the invalid character with a '-'
-
-    if sanitized_namespace.endswith("-"):
-        sanitized_namespace = (
-            sanitized_namespace[:-1] + "0"
-        )  # Set the last character to '0'
-
-    return sanitized_namespace
+    return sanitize_k8s_resource_name(forge_resource, max_length=max_length)
 
 
 def create_forge_command(
@@ -1473,6 +1480,8 @@ def test(
 
     log.debug("forge_args: %s", forge_args)
 
+    # use the github actor username if possible
+    forge_username = os.getenv("GITHUB_ACTOR") or "unknown-username"
     forge_context = ForgeContext(
         shell=shell,
         filesystem=filesystem,
@@ -1489,6 +1498,7 @@ def test(
         forge_namespace=forge_namespace,
         forge_cluster=forge_cluster,
         forge_test_suite=forge_test_suite,
+        forge_username=forge_username,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
         github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}"
