@@ -35,12 +35,12 @@ fn native_add(
 
     // Get aggregator information and a value to add.
     let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
 
     aggregator.try_add(value)?;
 
@@ -63,12 +63,12 @@ fn native_read(
     context.charge(AGGREGATOR_READ_BASE)?;
 
     // Extract information from aggregator struct reference.
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
 
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
 
@@ -93,12 +93,12 @@ fn native_sub(
 
     // Get aggregator information and a value to subtract.
     let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
 
     aggregator.try_sub(value)?;
 

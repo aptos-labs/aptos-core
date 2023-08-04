@@ -18,7 +18,7 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 /***************************************************************************************************
- * native fun create_aggregator(limit: u128): Aggregator;
+ * native fun create_aggregator(max_value: u128): Aggregator;
  **************************************************************************************************/
 
 fn native_create_aggregator(
@@ -29,18 +29,18 @@ fn native_create_aggregator(
     debug_assert_eq!(args.len(), 1);
 
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
-    let limit = safely_pop_arg!(args, u128);
+    let max_value = safely_pop_arg!(args, u128);
 
     // Get the current aggregator data.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
 
     let id = AggregatorID::ephemeral(aggregator_data.generate_id());
-    aggregator_data.create_new_aggregator(id, limit);
+    aggregator_data.create_new_aggregator(id, max_value);
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
         Value::u128(0),
-        Value::u128(limit),
+        Value::u128(max_value),
     ]))])
 }
 
@@ -58,12 +58,12 @@ fn native_try_add(
 
     // Get aggregator information and a value to add.
     let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
 
     Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
 }
@@ -82,12 +82,12 @@ fn native_try_sub(
 
     // Get aggregator information and a value to subtract.
     let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
     Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
 }
 
@@ -105,12 +105,12 @@ fn native_read(
     context.charge(AGGREGATOR_V2_READ_BASE)?;
 
     // Extract information from aggregator struct reference.
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
 
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
 

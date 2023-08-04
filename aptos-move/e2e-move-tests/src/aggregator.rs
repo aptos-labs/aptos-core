@@ -40,7 +40,7 @@ pub fn new(
     harness: &mut MoveHarness,
     account: &Account,
     index: u64,
-    limit: u128,
+    max_value: u128,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
@@ -48,7 +48,7 @@ pub fn new(
         vec![],
         vec![
             bcs::to_bytes(&index).unwrap(),
-            bcs::to_bytes(&limit).unwrap(),
+            bcs::to_bytes(&max_value).unwrap(),
         ],
     )
 }

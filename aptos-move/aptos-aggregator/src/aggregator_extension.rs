@@ -153,7 +153,7 @@ pub struct Aggregator {
     // TODO: Currently this is a single u128 value since we use 0 as a trivial
     // lower bound. If we want to support custom lower bounds, or have more
     // complex postconditions, we should factor this out in its own struct.
-    limit: u128,
+    max_value: u128,
     // Describes values seen by this aggregator. Note that if aggregator knows
     // its value, then storing history doesn't make sense.
     history: Option<History>,
@@ -192,7 +192,7 @@ impl Aggregator {
 
     /// Validates if aggregator's history is correct when applied to
     /// the `base_value`. For example, if history observed a delta of
-    /// +100, and the aggregator limit is 150, then the base value of
+    /// +100, and the aggregator max_value is 150, then the base value of
     /// 60 will not pass validation (60 + 100 > 150), but the base value
     /// of 30 will (30 + 100 < 150).
     fn validate_history(&self, base_value: u128) -> PartialVMResult<()> {
@@ -204,7 +204,7 @@ impl Aggregator {
         // To validate the history of an aggregator, we want to ensure
         // that there was no violation of postcondition (i.e. overflows or
         // underflows). We can do it by emulating addition and subtraction.
-        addition(base_value, history.max_achieved_positive, self.limit)?;
+        addition(base_value, history.max_achieved_positive, self.max_value)?;
         subtraction(base_value, history.min_achieved_negative)?;
         Ok(())
     }
@@ -214,12 +214,12 @@ impl Aggregator {
         match self.state {
             AggregatorState::Data => {
                 // If aggregator knows the value, add directly and keep the state.
-                self.value = addition(self.value, value, self.limit)?;
+                self.value = addition(self.value, value, self.max_value)?;
                 return Ok(());
             },
             AggregatorState::PositiveDelta => {
                 // If positive delta, add directly but also record the state.
-                self.value = addition(self.value, value, self.limit).map_err(|err| {
+                self.value = addition(self.value, value, self.max_value).map_err(|err| {
                     // If self.value + value exceeds u128::MAX, we do not have to record the overflow.
                     // We record the delta that result in overflows/underflows so that when we compute the actual value
                     // of aggregator, we can figure out if the output of try_add/try_sub changes.
@@ -240,7 +240,7 @@ impl Aggregator {
                 //     1. X <= Y: then the result is +(Y-X)
                 //     2. X  > Y: then the result is -(X-Y)
                 if self.value <= value {
-                    if value - self.value > self.limit {
+                    if value - self.value > self.max_value {
                         self.record_overflow(value - self.value);
                         return Err(abort_error(
                             format!("overflow occurred when adding {} to -{}", value, self.value),
@@ -282,7 +282,7 @@ impl Aggregator {
                     // So we are not calling record_underflow here.
                     self.value = subtraction(self.value, value)?;
                 } else {
-                    if value - self.value > self.limit {
+                    if value - self.value > self.max_value {
                         self.record_underflow(value - self.value);
                         return Err(abort_error(
                             format!(
@@ -299,10 +299,10 @@ impl Aggregator {
             },
             AggregatorState::NegativeDelta => {
                 // Since we operate on unsigned integers, we have to add
-                // when subtracting from negative delta. Note that if limit
+                // when subtracting from negative delta. Note that if max_value
                 // is some X, then we cannot subtract more than X, and so
                 // we should return an error there.
-                self.value = addition(self.value, value, self.limit).map_err(|err| {
+                self.value = addition(self.value, value, self.max_value).map_err(|err| {
                     // If self.value + value exceeds u128::MAX, we do not have to record the underflow.
                     // We record the delta that result in overflows/underflows so that when we compute the actual value
                     // of aggregator, we can figure out if the output of try_add/try_sub changes.
@@ -345,7 +345,7 @@ impl Aggregator {
         self.validate_history(value_from_storage)?;
         match self.state {
             AggregatorState::PositiveDelta => {
-                self.value = addition(value_from_storage, self.value, self.limit)?;
+                self.value = addition(value_from_storage, self.value, self.max_value)?;
             },
             AggregatorState::NegativeDelta => {
                 self.value = subtraction(value_from_storage, self.value)?;
@@ -364,7 +364,7 @@ impl Aggregator {
 
     /// Unpacks aggregator into its fields.
     pub fn into(self) -> (u128, AggregatorState, u128, Option<History>) {
-        (self.value, self.state, self.limit, self.history)
+        (self.value, self.state, self.max_value, self.history)
     }
 }
 
@@ -392,19 +392,19 @@ impl AggregatorData {
         }
     }
 
-    /// Returns a mutable reference to an aggregator with `id` and a `limit`.
+    /// Returns a mutable reference to an aggregator with `id` and a `max_value`.
     /// If transaction that is currently executing did not initialize it, a new aggregator instance is created.
     /// Note: when we say "aggregator instance" here we refer to Rust struct and
     /// not to the Move aggregator.
     pub fn get_aggregator(
         &mut self,
         id: AggregatorID,
-        limit: u128,
+        max_value: u128,
     ) -> PartialVMResult<&mut Aggregator> {
         let aggregator = self.aggregators.entry(id).or_insert(Aggregator {
             value: 0,
             state: AggregatorState::PositiveDelta,
-            limit,
+            max_value,
             history: Some(History::new()),
         });
         Ok(aggregator)
@@ -415,14 +415,14 @@ impl AggregatorData {
         self.aggregators.len() as u128
     }
 
-    /// Creates and a new Aggregator with a given `id` and a `limit`. The value
+    /// Creates and a new Aggregator with a given `id` and a `max_value`. The value
     /// of a new aggregator is always known, therefore it is created in a data
     /// state, with a zero-initialized value.
-    pub fn create_new_aggregator(&mut self, id: AggregatorID, limit: u128) {
+    pub fn create_new_aggregator(&mut self, id: AggregatorID, max_value: u128) {
         let aggregator = Aggregator {
             value: 0,
             state: AggregatorState::Data,
-            limit,
+            max_value,
             history: None,
         };
         self.aggregators.insert(id, aggregator);
@@ -876,7 +876,7 @@ mod test {
     fn test_history_validation_in_delta_state() {
         let mut aggregator_data = AggregatorData::default();
 
-        // Some aggregator with a limit of 100 in a delta state.
+        // Some aggregator with a max_value of 100 in a delta state.
         let id = aggregator_id_for_test(100);
         let aggregator = aggregator_data
             .get_aggregator(id, 100)
