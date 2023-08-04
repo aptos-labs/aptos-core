@@ -25,6 +25,7 @@ use aptos_mvhashmap::{
 use aptos_state_view::TStateView;
 use aptos_types::{executable::Executable, fee_statement::FeeStatement, write_set::WriteOp};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
+use concurrent_queue::ConcurrentQueue;
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -35,31 +36,6 @@ use std::{
         Arc,
     },
 };
-
-struct CommitGuard<'a> {
-    post_commit_txs: &'a Vec<Sender<u32>>,
-    worker_idx: usize,
-    txn_idx: u32,
-}
-
-impl<'a> CommitGuard<'a> {
-    fn new(post_commit_txs: &'a Vec<Sender<u32>>, worker_idx: usize, txn_idx: u32) -> Self {
-        Self {
-            post_commit_txs,
-            worker_idx,
-            txn_idx,
-        }
-    }
-}
-
-impl<'a> Drop for CommitGuard<'a> {
-    fn drop(&mut self) {
-        // Send the committed txn to the Worker thread.
-        self.post_commit_txs[self.worker_idx]
-            .send(self.txn_idx)
-            .expect("Worker must be available");
-    }
-}
 
 #[derive(Debug)]
 enum CommitRole {
@@ -252,19 +228,20 @@ where
         &self,
         maybe_block_gas_limit: Option<u64>,
         scheduler: &Scheduler,
-        post_commit_txs: &Vec<Sender<u32>>,
-        worker_idx: &mut usize,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         accumulated_fee_statement: &mut FeeStatement,
         txn_fee_statements: &mut Vec<FeeStatement>,
+        commit_queue: &ConcurrentQueue<u32>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
-            let _commit_guard: CommitGuard =
-                CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
-            // Iterate round robin over workers to do commit_hook.
-            *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
+
+            // let _commit_guard: CommitGuard =
+            // CommitGuard::new(post_commit_txs, commit_queue, *worker_idx, txn_idx);
+            defer! {
+                commit_queue.push(txn_idx).expect("XXX");
+            }
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 // For committed txns with Success status, calculate the accumulated gas costs.
@@ -327,6 +304,7 @@ where
                     accumulated_non_storage_gas,
                     maybe_block_gas_limit,
                 );
+
                 break;
             }
 
@@ -405,37 +383,49 @@ where
         scheduler: &Scheduler,
         base_view: &S,
         role: CommitRole,
+        commit_queue: &ConcurrentQueue<u32>,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
-        let committing = matches!(role, CommitRole::Coordinator(_));
+        // let committing = false; // matches!(role, CommitRole::Coordinator(_));
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
-        let mut worker_idx = 0;
 
         let mut accumulated_fee_statement = FeeStatement::zero();
         let mut txn_fee_statements = Vec::with_capacity(block.len());
         loop {
             // Only one thread does try_commit to avoid contention.
             match &role {
-                CommitRole::Coordinator(post_commit_txs) => {
+                CommitRole::Coordinator(_) => {
                     self.coordinator_commit_hook(
                         self.maybe_block_gas_limit,
                         scheduler,
-                        post_commit_txs,
-                        &mut worker_idx,
                         &mut scheduler_task,
                         last_input_output,
                         &mut accumulated_fee_statement,
                         &mut txn_fee_statements,
+                        commit_queue,
                     );
+
+                    // while let Ok(txn_idx) = commit_queue.pop() {
+                    //     print!("committing {}\n", txn_idx);
+                    //     self.worker_commit_hook(
+                    //         txn_idx,
+                    //         versioned_cache,
+                    //         last_input_output,
+                    //         base_view,
+                    //     );
+                    // }
                 },
                 CommitRole::Worker(rx) => {
-                    while let Ok(txn_idx) = rx.try_recv() {
+                    //while let Ok(txn_idx) = rx.try_recv() {
+                    // commit_queue.pop();
+                    while let Ok(txn_idx) = commit_queue.pop() {
+                        // print!("committing {}\n", txn_idx);
                         self.worker_commit_hook(
                             txn_idx,
                             versioned_cache,
@@ -474,20 +464,27 @@ where
 
                     SchedulerTask::NoTask
                 },
-                SchedulerTask::NoTask => scheduler.next_task(committing),
+                SchedulerTask::NoTask => scheduler.next_task(),
                 SchedulerTask::Done => {
                     // Make sure to drain any remaining commit tasks assigned by the coordinator.
-                    if let CommitRole::Worker(rx) = &role {
-                        // Until the sender drops the tx, an index for commit_hook might be sent.
-                        while let Ok(txn_idx) = rx.recv() {
-                            self.worker_commit_hook(
-                                txn_idx,
-                                versioned_cache,
-                                last_input_output,
-                                base_view,
-                            );
-                        }
+                    // if let CommitRole::Worker(rx) = &role {
+                    // Until the sender drops the tx, an index for commit_hook might be sent.
+                    // while let Ok(txn_idx) = rx.recv() {
+
+                    // Some threads might leave early leaving fewer
+                    // threads to finish up the queue.
+                    while let Ok(txn_idx) = commit_queue.pop() {
+                        //commit_queue.pop();
+                        // print!("committing {}\n", txn_idx);
+
+                        self.worker_commit_hook(
+                            txn_idx,
+                            versioned_cache,
+                            last_input_output,
+                            base_view,
+                        );
                     }
+                    // }
                     break;
                 },
             }
@@ -531,6 +528,8 @@ where
         // executors are running concurrently, they will all have active coordinator.
         roles.push(CommitRole::Coordinator(senders));
 
+        let commit_queue = ConcurrentQueue::<u32>::bounded(num_txns as usize);
+
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
             for _ in 0..self.concurrency_level {
@@ -544,6 +543,7 @@ where
                         &scheduler,
                         base_view,
                         role,
+                        &commit_queue,
                     );
                 });
             }

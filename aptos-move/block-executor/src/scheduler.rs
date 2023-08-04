@@ -9,7 +9,6 @@ use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     cmp::{max, min},
-    hint,
     ops::DerefMut,
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
@@ -238,6 +237,8 @@ pub struct Scheduler {
 
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: CachePadded<AtomicBool>,
+
+    coordinating_commits_flag: CachePadded<AtomicBool>,
 }
 
 /// Public Interfaces for the Scheduler
@@ -263,11 +264,23 @@ impl Scheduler {
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
+            coordinating_commits_flag: CachePadded::new(AtomicBool::new(false)),
         }
     }
 
     pub fn num_txns(&self) -> TxnIndex {
         self.num_txns
+    }
+
+    pub fn coordinating_commits_mark_done(&self) {
+        self.coordinating_commits_flag
+            .store(false, Ordering::SeqCst);
+    }
+
+    pub fn should_coordinate_commits(&self) -> bool {
+        self.coordinating_commits_flag
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
@@ -342,7 +355,7 @@ impl Scheduler {
     }
 
     /// Return the next task for the thread.
-    pub fn next_task(&self, committing: bool) -> SchedulerTask {
+    pub fn next_task(&self) -> SchedulerTask {
         let _timer = GET_NEXT_TASK_SECONDS.start_timer();
         loop {
             if self.done() {
@@ -358,20 +371,7 @@ impl Scheduler {
                 && !self.never_executed(idx_to_validate);
 
             if !prefer_validate && idx_to_execute >= self.num_txns {
-                return if self.done() {
-                    // Check again to avoid commit delay due to a race.
-                    SchedulerTask::Done
-                } else {
-                    if !committing {
-                        // Avoid pointlessly spinning, and give priority to other threads
-                        // that may be working to finish the remaining tasks.
-                        // We don't want to hint on the thread that is committing
-                        // because it may have work to do (to commit) even if there
-                        // is no more conventional (validation and execution tasks) work.
-                        hint::spin_loop();
-                    }
-                    SchedulerTask::NoTask
-                };
+                return SchedulerTask::NoTask;
             }
 
             if prefer_validate {
