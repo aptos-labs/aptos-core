@@ -118,7 +118,7 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Charges the storage fees for writes, events & txn storage in a lump sum, minimizing the
     /// loss of precision.
     ///
-    /// The contract requires that this function behaviors in a way that is consistent to
+    /// The contract requires that this function behaves in a way that is consistent to
     /// the ones defining the costs.
     /// Due to this reason, you should normally not override the default implementation,
     /// unless you are doing something special, such as injecting additional logging logic.

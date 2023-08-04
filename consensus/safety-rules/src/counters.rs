@@ -52,7 +52,7 @@ pub fn set_state(field: &str, value: i64) {
     STATE_GAUGE.with_label_values(&[field]).set(value);
 }
 
-#[cfg(any(test))]
+#[cfg(test)]
 pub fn get_state(field: &str) -> i64 {
     STATE_GAUGE.with_label_values(&[field]).get()
 }

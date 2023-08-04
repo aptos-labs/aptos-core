@@ -16,7 +16,7 @@ module 0x2::M {
     private fun t1() {
         loop {
           {
-            let x: () = 0;
+            let x: u64 = 0;
             x;
             Tuple()
           }

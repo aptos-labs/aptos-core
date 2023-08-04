@@ -6,7 +6,7 @@ use crate::{
     error::{QuorumStoreError, StateSyncError},
     payload_manager::PayloadManager,
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    transaction_shuffler::TransactionShuffler, dkg::dkg_manager::DKGManagerWrapper,
 };
 use anyhow::Result;
 use aptos_consensus_types::{
@@ -16,7 +16,9 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error as ExecutionError, StateComputeResult};
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
+};
 use futures::future::BoxFuture;
 use std::{sync::Arc, time::Duration};
 
@@ -56,6 +58,7 @@ pub trait StateComputer: Send + Sync {
         block: &Block,
         // The parent block root hash.
         parent_block_id: HashValue,
+        maybe_randomness: Option<Randomness>,
     ) -> Result<StateComputeResult, ExecutionError>;
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.
@@ -77,6 +80,7 @@ pub trait StateComputer: Send + Sync {
         &self,
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
+        dkg_manager: Arc<DKGManagerWrapper>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_gas_limit: Option<u64>,
         transaction_deduper: Arc<dyn TransactionDeduper>,

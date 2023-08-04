@@ -468,7 +468,7 @@ impl ParkingLotIndex {
     pub(crate) fn get_poppable(&self) -> Option<TxnPointer> {
         let mut rng = rand::thread_rng();
         self.data.choose(&mut rng).and_then(|(sender, txns)| {
-            txns.iter().rev().next().map(|seq_num| TxnPointer {
+            txns.iter().next_back().map(|seq_num| TxnPointer {
                 sender: *sender,
                 sequence_number: *seq_num,
             })

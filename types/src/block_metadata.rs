@@ -2,10 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_dkg::pvss::scrape::Transcript;
+use crate::randomness::Randomness;
 use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use serde::{Deserialize, Serialize};
-
 /// Struct that will be persisted on chain to store the information of the current block.
 ///
 /// The flow will look like following:
@@ -27,6 +28,13 @@ pub struct BlockMetadata {
     previous_block_votes_bitvec: Vec<u8>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
+    // dkg todo
+    dkg_transcripts: Vec<Transcript>,
+    maybe_randomness: Option<Randomness>,
+}
+
+fn serialize_transcript(ts: &Transcript) -> Vec<u8> {
+    vec![3,3,3] //TODO: use something from aptos-dkg.
 }
 
 impl BlockMetadata {
@@ -38,6 +46,8 @@ impl BlockMetadata {
         previous_block_votes_bitvec: Vec<u8>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
+        dkg_transcripts: Vec<Transcript>,
+        maybe_randomness: Option<Randomness>,
     ) -> Self {
         Self {
             id,
@@ -47,6 +57,8 @@ impl BlockMetadata {
             previous_block_votes_bitvec,
             failed_proposer_indices,
             timestamp_usecs,
+            dkg_transcripts,
+            maybe_randomness,
         }
     }
 
@@ -76,6 +88,11 @@ impl BlockMetadata {
             ),
             MoveValue::U64(self.timestamp_usecs),
         ];
+
+        //TODO: currently assuming the first transcript is valid.
+        ret.push(MoveValue::Bool(!self.dkg_transcripts.is_empty()));
+        ret.push(MoveValue::Vector(self.dkg_transcripts.first().map(|ts|serialize_transcript(ts)).unwrap_or(vec![]).into_iter().map(MoveValue::U8).collect()));
+        // dkg todo: pass in randomness
         ret
     }
 
@@ -101,5 +118,13 @@ impl BlockMetadata {
 
     pub fn round(&self) -> u64 {
         self.round
+    }
+
+    pub fn dkg_transcripts(&self) -> &Vec<Transcript> {
+        &self.dkg_transcripts
+    }
+
+    pub fn maybe_randomness(&self) -> &Option<Randomness> {
+        &self.maybe_randomness
     }
 }

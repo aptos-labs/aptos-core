@@ -14,6 +14,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
+    randomness::Randomness,
     transaction::{SignedTransaction, Transaction, TransactionStatus},
 };
 use std::fmt::{Debug, Display, Formatter};
@@ -29,6 +30,7 @@ pub struct ExecutedBlock {
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
     state_compute_result: StateComputeResult,
+    maybe_randomness: Option<Randomness>,
 }
 
 impl Debug for ExecutedBlock {
@@ -44,15 +46,24 @@ impl Display for ExecutedBlock {
 }
 
 impl ExecutedBlock {
-    pub fn new(block: Block, state_compute_result: StateComputeResult) -> Self {
+    pub fn new(
+        block: Block,
+        state_compute_result: StateComputeResult,
+        maybe_randomness: Option<Randomness>,
+    ) -> Self {
         Self {
             block,
             state_compute_result,
+            maybe_randomness,
         }
     }
 
     pub fn block(&self) -> &Block {
         &self.block
+    }
+
+    pub fn maybe_randomness(&self) -> Option<Randomness> {
+        self.maybe_randomness.clone()
     }
 
     pub fn id(&self) -> HashValue {
@@ -109,6 +120,8 @@ impl ExecutedBlock {
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
+        dkg_transcripts: Vec<aptos_dkg::pvss::scrape::Transcript>,
+        maybe_randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
 
@@ -116,9 +129,13 @@ impl ExecutedBlock {
             return vec![];
         }
 
-        let mut txns_with_state_checkpoint =
-            self.block
-                .transactions_to_execute(validators, txns, block_gas_limit);
+        let mut txns_with_state_checkpoint = self.block.transactions_to_execute(
+            validators,
+            txns,
+            block_gas_limit,
+            dkg_transcripts,
+            maybe_randomness,
+        );
         if block_gas_limit.is_some() && !self.state_compute_result.has_reconfiguration() {
             // After the per-block gas limit change,
             // insert state checkpoint at the position
@@ -153,6 +170,10 @@ impl ExecutedBlock {
             return vec![];
         }
         self.state_compute_result.reconfig_events().to_vec()
+    }
+
+    pub fn dkg_events(&self) -> Vec<ContractEvent> {
+        self.state_compute_result.dkg_events().to_vec()
     }
 
     /// The block is suffix of a reconfiguration block if the state result carries over the epoch state

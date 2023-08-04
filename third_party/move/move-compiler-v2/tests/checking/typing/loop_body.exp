@@ -18,7 +18,7 @@ module 0x8675309::M {
     private fun t3() {
         loop {
           {
-            let x: () = 0;
+            let x: u64 = 0;
             x;
             Tuple()
           }

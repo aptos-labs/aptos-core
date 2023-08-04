@@ -6,23 +6,25 @@
 mod consensusdb_test;
 mod schema;
 
-use crate::{
-    dag::{CertifiedNode, Node, NodeId, Vote},
-    error::DbError,
-};
+use crate::error::DbError;
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
-use schema::{
-    block::BlockSchema,
-    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema},
-    quorum_certificate::QCSchema,
-    single_entry::{SingleEntryKey, SingleEntrySchema},
-    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, NODE_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME,
+use aptos_schemadb::{
+    schema::Schema, Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME,
 };
-use std::{collections::HashMap, iter::Iterator, path::Path, time::Instant};
+pub use schema::{
+    block::BlockSchema,
+    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema, OrderedAnchorIdSchema},
+    quorum_certificate::QCSchema,
+};
+use schema::{
+    single_entry::{SingleEntryKey, SingleEntrySchema},
+    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME,
+    ORDERED_ANCHOR_ID_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME,
+};
+use std::{iter::Iterator, path::Path, time::Instant};
 
 /// The name of the consensus db file
 pub const CONSENSUS_DB_NAME: &str = "consensus_db";
@@ -56,6 +58,8 @@ impl ConsensusDB {
             SINGLE_ENTRY_CF_NAME,
             NODE_CF_NAME,
             CERTIFIED_NODE_CF_NAME,
+            DAG_VOTE_CF_NAME,
+            ORDERED_ANCHOR_ID_CF_NAME,
         ];
 
         let path = db_root_path.as_ref().join(CONSENSUS_DB_NAME);
@@ -85,11 +89,16 @@ impl ConsensusDB {
     )> {
         let last_vote = self.get_last_vote()?;
         let highest_2chain_timeout_certificate = self.get_highest_2chain_timeout_certificate()?;
-        let consensus_blocks = self.get_blocks()?.into_values().collect::<Vec<_>>();
+        let consensus_blocks = self
+            .get_all_data::<BlockSchema>()?
+            .into_iter()
+            .map(|(_, block)| block)
+            .collect();
         let consensus_qcs = self
-            .get_quorum_certificates()?
-            .into_values()
-            .collect::<Vec<_>>();
+            .get_all_data::<QCSchema>()?
+            .into_iter()
+            .map(|(_, qc)| qc)
+            .collect();
         Ok((
             last_vote,
             highest_2chain_timeout_certificate,
@@ -178,73 +187,22 @@ impl ConsensusDB {
         Ok(())
     }
 
-    /// Get all consensus blocks.
-    fn get_blocks(&self) -> Result<HashMap<HashValue, Block>, DbError> {
-        let mut iter = self.db.iter::<BlockSchema>(ReadOptions::default())?;
-        iter.seek_to_first();
-        Ok(iter.collect::<Result<HashMap<HashValue, Block>>>()?)
-    }
-
-    /// Get all consensus QCs.
-    fn get_quorum_certificates(&self) -> Result<HashMap<HashValue, QuorumCert>, DbError> {
-        let mut iter = self.db.iter::<QCSchema>(ReadOptions::default())?;
-        iter.seek_to_first();
-        Ok(iter.collect::<Result<HashMap<HashValue, QuorumCert>>>()?)
-    }
-
-    pub fn save_node(&self, node: &Node) -> Result<(), DbError> {
+    pub fn save_data<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<(), DbError> {
         let batch = SchemaBatch::new();
-        batch.put::<NodeSchema>(&node.digest(), node)?;
+        batch.put::<S>(key, value)?;
         self.commit(batch)?;
         Ok(())
     }
 
-    pub fn delete_node(&self, digest: HashValue) -> Result<(), DbError> {
+    pub fn delete_data<S: Schema>(&self, keys: Vec<S::Key>) -> Result<(), DbError> {
         let batch = SchemaBatch::new();
-        batch.delete::<NodeSchema>(&digest)?;
+        keys.iter().try_for_each(|key| batch.delete::<S>(key))?;
         self.commit(batch)
     }
 
-    pub fn save_dag_vote(&self, node_id: &NodeId, vote: &Vote) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
-        batch.put::<DagVoteSchema>(node_id, vote)?;
-        self.commit(batch)
-    }
-
-    pub fn get_dag_votes(&self) -> Result<HashMap<NodeId, Vote>, DbError> {
-        let mut iter = self.db.iter::<DagVoteSchema>(ReadOptions::default())?;
+    pub fn get_all_data<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
+        let mut iter = self.db.iter::<S>(ReadOptions::default())?;
         iter.seek_to_first();
-        Ok(iter.collect::<Result<HashMap<NodeId, Vote>>>()?)
-    }
-
-    pub fn delete_dag_votes(&self, node_ids: Vec<NodeId>) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
-        node_ids
-            .iter()
-            .try_for_each(|node_id| batch.delete::<DagVoteSchema>(node_id))?;
-        self.commit(batch)
-    }
-
-    pub fn save_certified_node(&self, node: &CertifiedNode) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
-        batch.put::<CertifiedNodeSchema>(&node.digest(), node)?;
-        self.commit(batch)?;
-        Ok(())
-    }
-
-    pub fn get_certified_nodes(&self) -> Result<HashMap<HashValue, CertifiedNode>, DbError> {
-        let mut iter = self
-            .db
-            .iter::<CertifiedNodeSchema>(ReadOptions::default())?;
-        iter.seek_to_first();
-        Ok(iter.collect::<Result<HashMap<HashValue, CertifiedNode>>>()?)
-    }
-
-    pub fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
-        digests
-            .iter()
-            .try_for_each(|hash| batch.delete::<CertifiedNodeSchema>(hash))?;
-        self.commit(batch)
+        Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>>>()?)
     }
 }

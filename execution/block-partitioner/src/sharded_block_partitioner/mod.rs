@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_partitioner::{
+    counters::BLOCK_PARTITIONING_MISC_TIMERS_SECONDS,
     cross_shard_messages::CrossShardMsg,
     dependency_analysis::WriteSetWithTxnIndex,
     messages::{
@@ -324,7 +325,15 @@ impl ShardedBlockPartitioner {
         }
 
         // First round, we filter all transactions with cross-shard dependencies
+        let timer = BLOCK_PARTITIONING_MISC_TIMERS_SECONDS
+            .with_label_values(&["partition_by_senders"])
+            .start_timer();
         let mut txns_to_partition = self.partition_by_senders(transactions);
+        let _duration = timer.stop_and_record();
+
+        let timer = BLOCK_PARTITIONING_MISC_TIMERS_SECONDS
+            .with_label_values(&["flatten_to_rounds"])
+            .start_timer();
         let mut frozen_write_set_with_index = Arc::new(Vec::new());
         let mut current_round_start_index = 0;
         let mut frozen_sub_blocks: Vec<SubBlocksForShard<AnalyzedTransaction>> = vec![];
@@ -332,7 +341,10 @@ impl ShardedBlockPartitioner {
             frozen_sub_blocks.push(SubBlocksForShard::empty(shard_id))
         }
         let mut current_round = 0;
-        for _ in 0..max_partitioning_rounds - 1 {
+        for round_id in 0..max_partitioning_rounds - 1 {
+            let _timer = BLOCK_PARTITIONING_MISC_TIMERS_SECONDS
+                .with_label_values(&[format!("round_{round_id}").as_str()])
+                .start_timer();
             let (
                 updated_frozen_sub_blocks,
                 current_frozen_rw_set_with_index_vec,
@@ -371,7 +383,11 @@ impl ShardedBlockPartitioner {
                 break;
             }
         }
+        let _duration = timer.stop_and_record();
 
+        let timer = BLOCK_PARTITIONING_MISC_TIMERS_SECONDS
+            .with_label_values(&["last_round"])
+            .start_timer();
         // We just add cross shard dependencies for remaining transactions.
         let (frozen_sub_blocks, _, rejected_txns) = self.add_cross_shard_dependencies(
             current_round_start_index,
@@ -383,6 +399,8 @@ impl ShardedBlockPartitioner {
 
         // Assert rejected transactions are empty
         assert!(rejected_txns.iter().all(|txns| txns.is_empty()));
+        let _duration = timer.stop_and_record();
+
         frozen_sub_blocks
     }
 }

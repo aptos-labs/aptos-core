@@ -10,11 +10,11 @@
 //! | block_hash |    block    |
 //! ```
 
+use crate::define_schema;
 use anyhow::Result;
 use aptos_consensus_types::block::Block;
 use aptos_crypto::HashValue;
 use aptos_schemadb::{
-    define_schema,
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName,
 };

@@ -66,7 +66,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.0.3-cloud.4.aed62623",
       "repeatDirection": "h",
       "targets": [
         {
@@ -81,7 +81,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_db_backup_coordinator_heartbeat_timestamp_s[7d]) * 1000",
+          "expr": "last_over_time(aptos_db_backup_coordinator_heartbeat_timestamp_s{cluster=~ \".*testnet.*\"}[7d]) * 1000",
           "interval": "",
           "legendFormat": " {{cluster}} {{kubernetes_pod_name}}",
           "range": true,
@@ -99,7 +99,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": []
@@ -166,13 +166,7 @@
           },
           "links": [],
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "none"
         },
         "overrides": [
@@ -240,7 +234,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": []
@@ -308,7 +302,7 @@
           },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": [
@@ -438,7 +432,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": []
@@ -506,7 +500,7 @@
           },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
           "unit": "none"
         },
         "overrides": [
@@ -664,13 +658,7 @@
           },
           "links": [],
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
-            ]
-          },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
           "unit": "none"
         },
         "overrides": [
@@ -2199,7 +2187,7 @@
       "yaxis": { "align": false }
     }
   ],
-  "refresh": false,
+  "refresh": "10s",
   "revision": 1,
   "schemaVersion": 38,
   "style": "dark",
@@ -2389,6 +2377,6 @@
   "timezone": "",
   "title": "storage-backup-and-restore",
   "uid": "9oXpx4n4z",
-  "version": 19,
+  "version": 20,
   "weekStart": ""
 }

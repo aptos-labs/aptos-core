@@ -183,7 +183,7 @@ impl Dag {
                             .any(|cert| cert.metadata() == metadata)
                     })
                     .map(|node_status| node_status.as_node().author());
-                validator_verifier.check_voting_power(votes).is_ok()
+                validator_verifier.check_voting_power(votes, false).is_ok()
             })
             .unwrap_or(false)
     }
@@ -251,6 +251,7 @@ impl Dag {
             .check_voting_power(
                 self.get_round_iter(round)?
                     .map(|node_status| node_status.as_node().metadata().author()),
+                true,
             )
             .is_ok()
         {

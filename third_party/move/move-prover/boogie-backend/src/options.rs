@@ -120,6 +120,8 @@ pub struct BoogieOptions {
     pub proc_cores: usize,
     /// A (soft) timeout for the solver, per verification condition, in seconds.
     pub vc_timeout: usize,
+    /// Whether allow local timeout overwrites the global one
+    pub global_timeout_overwrite: bool,
     /// Whether Boogie output and log should be saved.
     pub keep_artifacts: bool,
     /// Eager threshold for quantifier instantiation.
@@ -170,6 +172,7 @@ impl Default for BoogieOptions {
             random_seed: 1,
             proc_cores: 4,
             vc_timeout: 40,
+            global_timeout_overwrite: true,
             keep_artifacts: false,
             eager_threshold: 100,
             lazy_threshold: 100,

@@ -38,7 +38,7 @@ impl<Framework: TestFramework<Node>, Node: TestNode> TestFrameworkBuilder<Framew
             owners,
             nodes: HashMap::new(),
             rng: StdRng::from_seed([0u8; 32]),
-            _framework_marker: PhantomData::default(),
+            _framework_marker: PhantomData,
         }
     }
 

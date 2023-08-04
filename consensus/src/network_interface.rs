@@ -6,7 +6,7 @@
 
 use crate::{
     dag::DAGNetworkMessage,
-    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    quorum_store::types::{Batch, BatchMsg, BatchRequest}, dkg::DKGNetworkMessage,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
@@ -66,6 +66,8 @@ pub enum ConsensusMsg {
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
     /// DAG protocol message
     DAGMessage(DAGNetworkMessage),
+    /// DKG protocol message
+    DKGMessage(Box<DKGNetworkMessage>),
 }
 
 /// Network type for consensus
@@ -89,6 +91,7 @@ impl ConsensusMsg {
             ConsensusMsg::SignedBatchInfo(_) => "SignedBatchInfo",
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
             ConsensusMsg::DAGMessage(_) => "DAGMessage",
+            ConsensusMsg::DKGMessage(_) => "DKGMessage",
         }
     }
 }

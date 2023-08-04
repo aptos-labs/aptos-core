@@ -34,8 +34,8 @@ impl<'env> ModelBuilder<'env> {
         let abort_code = args.value[1].clone();
         EA::Exp_::IfElse(
             Box::new(cond),
-            Box::new(sp(loc, EA::Exp_::Abort(Box::new(abort_code)))),
             Box::new(sp(loc, EA::Exp_::Unit { trailing: false })),
+            Box::new(sp(loc, EA::Exp_::Abort(Box::new(abort_code)))),
         )
     }
 }

@@ -11,14 +11,16 @@ use crate::{
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    transaction_shuffler::TransactionShuffler, dkg::dkg_manager::DKGManagerWrapper,
 };
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error as ExecutionError, StateComputeResult};
 use aptos_logger::prelude::*;
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
+};
 use fail::fail_point;
 use futures::{
     channel::{mpsc::UnboundedSender, oneshot},
@@ -59,6 +61,7 @@ impl StateComputer for OrderingStateComputer {
         _block: &Block,
         // The parent block id.
         _parent_block_id: HashValue,
+        _maybe_randomness: Option<Randomness>,
     ) -> Result<StateComputeResult, ExecutionError> {
         // Return dummy block and bypass the execution phase.
         // This will break the e2e smoke test (for now because
@@ -76,6 +79,9 @@ impl StateComputer for OrderingStateComputer {
         callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError> {
         assert!(!blocks.is_empty());
+
+        // dkg todo: generate randomness (from the DAG proposals) and insert to the blocks for the optimistic case
+        // I think this interface may change after the DAG
 
         if self
             .executor_channel
@@ -125,6 +131,7 @@ impl StateComputer for OrderingStateComputer {
         &self,
         _: &EpochState,
         _payload_manager: Arc<PayloadManager>,
+        _dkg_manager_wrapper: Arc<DKGManagerWrapper>,
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
         _: Arc<dyn TransactionDeduper>,

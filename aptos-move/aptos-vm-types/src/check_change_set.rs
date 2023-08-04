@@ -4,9 +4,8 @@
 use crate::change_set::VMChangeSet;
 use move_core_types::vm_status::VMStatus;
 
-/// Useful trait for checking the contents of a change set. For example, the
-/// total number of bytes ber write op or event can be checked.
+/// Trait to check the contents of a change set, e.g. the total number of
+/// bytes per write op or event.
 pub trait CheckChangeSet {
-    /// Returns an error if the change set does not pass the check.
     fn check_change_set(&self, change_set: &VMChangeSet) -> anyhow::Result<(), VMStatus>;
 }

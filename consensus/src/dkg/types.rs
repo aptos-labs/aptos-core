@@ -1,0 +1,325 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use anyhow::bail;
+pub use aptos_consensus_types::{common::Author, dkg_types::DKGAggNode};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_enum_conversion_derive::EnumConversion;
+use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
+use aptos_types::validator_verifier::ValidatorVerifier;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use aptos_dkg::pvss::scrape::Transcript;
+
+use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
+
+pub trait TDKGMessage: Into<DKGMessage> + TryFrom<DKGMessage> {
+    // dkg todo: pass in public keys for verification
+    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
+}
+
+impl TDKGMessage for DKGNodeAck {
+    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+impl TDKGMessage for DKGAggNodeAck {
+    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+/// Represents the metadata about the node, without payload and parents from Node
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, CryptoHasher, BCSCryptoHash)]
+pub struct DKGNodeMetadata {
+    epoch: u64,
+    author: Author,
+}
+
+impl DKGNodeMetadata {
+    #[cfg(test)]
+    pub fn new_for_test(
+        epoch: u64,
+        author: Author,
+    ) -> Self {
+        Self {
+            epoch,
+            author,
+        }
+    }
+
+    pub fn author(&self) -> &Author {
+        &self.author
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
+pub struct DKGNode {
+    metadata: DKGNodeMetadata,
+    trx: Transcript,
+}
+
+impl DKGNode {
+    pub fn new(
+        epoch: u64,
+        author: Author,
+        trx: Transcript,
+    ) -> Self {
+        Self {
+            metadata: DKGNodeMetadata {
+                epoch,
+                author,
+            },
+            trx,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_for_test(
+        metadata: DKGNodeMetadata,
+        trx: Transcript,
+    ) -> Self {
+        Self {
+            metadata,
+            trx,
+        }
+    }
+
+    pub fn metadata(&self) -> &DKGNodeMetadata {
+        &self.metadata
+    }
+
+    pub fn author(&self) -> &Author {
+        self.metadata.author()
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.metadata.epoch
+    }
+
+    pub fn transcript(&self) -> &Transcript {
+        &self.trx
+    }
+}
+
+impl TDKGMessage for DKGNode {
+    // dkg todo: verification requires public keys
+    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        // dkg todo: verify pvss transcript
+
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct DKGNodeAck {
+    epoch: u64,
+}
+
+impl DKGNodeAck {
+    pub fn new(epoch: u64) -> Self {
+        Self { epoch }
+    }
+}
+
+pub struct DKGNodeAckState {
+    num_validators: usize,
+    received: HashSet<Author>,
+}
+
+impl DKGNodeAckState {
+    pub fn new(num_validators: usize) -> Self {
+        Self {
+            num_validators,
+            received: HashSet::new(),
+        }
+    }
+}
+
+impl<M> BroadcastStatus<M> for DKGNodeAckState
+where
+    M: RBMessage,
+    DKGNodeAck: TryFrom<M> + Into<M>,
+    DKGNode: TryFrom<M> + Into<M>,
+{
+    type Ack = DKGNodeAck;
+    type Aggregated = ();
+    type Message = DKGNode;
+
+    fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+        self.received.insert(peer);
+        if self.received.len() == self.num_validators {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl TDKGMessage for DKGAggNode {
+    // dkg todo: verification requires public keys
+    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        // TODO: move this check to rpc process logic to delay it as much as possible for performance
+
+        // dkg todo: verify aggregated pvss transcript
+
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct DKGAggNodeAck {
+    epoch: u64,
+}
+
+impl DKGAggNodeAck {
+    pub fn new(epoch: u64) -> Self {
+        Self { epoch }
+    }
+}
+
+pub struct DKGAggNodeAckState {
+    num_validators: usize,
+    received: HashSet<Author>,
+}
+
+impl DKGAggNodeAckState {
+    pub fn new(num_validators: usize) -> Self {
+        Self {
+            num_validators,
+            received: HashSet::new(),
+        }
+    }
+}
+
+impl<M> BroadcastStatus<M> for DKGAggNodeAckState
+where
+    M: RBMessage,
+    DKGAggNodeAck: TryFrom<M> + Into<M>,
+    DKGAggNode: TryFrom<M> + Into<M>,
+{
+    type Ack = DKGAggNodeAck;
+    type Aggregated = ();
+    type Message = DKGAggNode;
+
+    fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+        self.received.insert(peer);
+        if self.received.len() == self.num_validators {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DKGNetworkMessage {
+    pub epoch: u64,
+    #[serde(with = "serde_bytes")]
+    pub data: Vec<u8>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, EnumConversion)]
+pub enum DKGMessage {
+    DKGNodeMsg(DKGNode),
+    DKGNodeAckMsg(DKGNodeAck),
+    DKGAggNodeMsg(DKGAggNode),
+    DKGAggNodeAckMsg(DKGAggNodeAck),
+    // dkg todo: If the on-chain verification of aggregated pvss transcript is too expensive, we can move it to off-chain.
+    // We can let validators verify and sign the aggregated transcript off-chain, and only verify the multi-signature on-chain.
+
+    #[cfg(test)]
+    DKGTestMessage(DKGTestMessage),
+    #[cfg(test)]
+    DKGTestAck(DKGTestAck),
+}
+
+impl DKGMessage {
+    pub fn name(&self) -> &str {
+        match self {
+            DKGMessage::DKGNodeMsg(_) => "DKGNodeMsg",
+            DKGMessage::DKGNodeAckMsg(_) => "DKGNodeAckMsg",
+            DKGMessage::DKGAggNodeMsg(_) => "DKGAggNodeMsg",
+            DKGMessage::DKGAggNodeAckMsg(_) => "DKGAggNodeAckMsg",
+            #[cfg(test)]
+            DKGMessage::DKGTestMessage(_) => "DKGTestMessage",
+            #[cfg(test)]
+            DKGMessage::DKGTestAck(_) => "DKGTestAck",
+        }
+    }
+
+    pub fn author(&self) -> anyhow::Result<Author> {
+        match self {
+            DKGMessage::DKGNodeMsg(node) => Ok(node.metadata.author),
+            DKGMessage::DKGAggNodeMsg(node) => Ok(node.metadata.author),
+            _ => bail!("message does not support author field"),
+        }
+    }
+}
+
+impl RBMessage for DKGMessage {}
+
+impl TConsensusMsg for DKGMessage {
+    fn epoch(&self) -> u64 {
+        match self {
+            DKGMessage::DKGNodeMsg(node) => node.metadata.epoch,
+            DKGMessage::DKGNodeAckMsg(ack) => ack.epoch,
+            DKGMessage::DKGAggNodeMsg(node) => node.metadata.epoch,
+            DKGMessage::DKGAggNodeAckMsg(ack) => ack.epoch,
+            #[cfg(test)]
+            DKGMessage::DKGTestMessage(_) => 1,
+            #[cfg(test)]
+            DKGMessage::DKGTestAck(_) => 1,
+        }
+    }
+
+    fn into_network_message(self) -> ConsensusMsg {
+        ConsensusMsg::DKGMessage(Box::new(DKGNetworkMessage {
+            epoch: self.epoch(),
+            data: bcs::to_bytes(&self).unwrap(),
+        }))
+    }
+}
+
+impl TryFrom<DKGNetworkMessage> for DKGMessage {
+    type Error = anyhow::Error;
+
+    fn try_from(msg: DKGNetworkMessage) -> Result<Self, Self::Error> {
+        Ok(bcs::from_bytes(&msg.data)?)
+    }
+}
+
+impl TryFrom<ConsensusMsg> for DKGMessage {
+    type Error = anyhow::Error;
+
+    fn try_from(msg: ConsensusMsg) -> Result<Self, Self::Error> {
+        TConsensusMsg::from_network_message(msg)
+    }
+}
+
+#[cfg(test)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct DKGTestMessage(pub Vec<u8>);
+
+#[cfg(test)]
+impl TDKGMessage for DKGTestMessage {
+    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        todo!()
+    }
+}
+
+#[cfg(test)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DKGTestAck(pub Vec<u8>);
+
+#[cfg(test)]
+impl TDKGMessage for DKGTestAck {
+    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        todo!()
+    }
+}

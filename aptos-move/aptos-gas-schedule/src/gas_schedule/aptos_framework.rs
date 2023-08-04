@@ -166,16 +166,16 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [type_info_chain_id_base: InternalGas, { 4.. => "type_info.chain_id.base" }, 3000],
 
         // Reusing SHA2-512's cost from Ristretto
-        [hash_sha2_512_base: InternalGas, { 4.. => "hash.sha2_512.base" }, 3_240],
-        [hash_sha2_512_per_byte: InternalGasPerByte, { 4.. => "hash.sha2_512.per_byte" }, 60],
-        // Back-of-the-envelop approximation from SHA3-256's (4000 base, 45 per-byte) costs
-        [hash_sha3_512_base: InternalGas, { 4.. => "hash.sha3_512.base" }, 4_500],
-        [hash_sha3_512_per_byte: InternalGasPerByte, { 4.. => "hash.sha3_512.per_byte" }, 50],
+        [hash_sha2_512_base: InternalGas, { 4.. => "hash.sha2_512.base" }, 64_800],  // 3_240 * 20
+        [hash_sha2_512_per_byte: InternalGasPerByte, { 4.. => "hash.sha2_512.per_byte" }, 1_200], // 60 * 20
+        // Back-of-the-envelope approximation from SHA3-256's costs (4000 base, 45 per-byte)
+        [hash_sha3_512_base: InternalGas, { 4.. => "hash.sha3_512.base" }, 90_000], // 4_500 * 20
+        [hash_sha3_512_per_byte: InternalGasPerByte, { 4.. => "hash.sha3_512.per_byte" }, 1_000], // 50 * 20
         // Using SHA2-256's cost
-        [hash_ripemd160_base: InternalGas, { 4.. => "hash.ripemd160.base" }, 3000],
-        [hash_ripemd160_per_byte: InternalGasPerByte, { 4.. => "hash.ripemd160.per_byte" }, 50],
-        [hash_blake2b_256_base: InternalGas, { 6.. => "hash.blake2b_256.base" }, 1750],
-        [hash_blake2b_256_per_byte: InternalGasPerByte, { 6.. => "hash.blake2b_256.per_byte" }, 15],
+        [hash_ripemd160_base: InternalGas, { 4.. => "hash.ripemd160.base" }, 60_000], // 3000 * 20
+        [hash_ripemd160_per_byte: InternalGasPerByte, { 4.. => "hash.ripemd160.per_byte" }, 1_000], // 50 * 20
+        [hash_blake2b_256_base: InternalGas, { 6.. => "hash.blake2b_256.base" }, 35_000], // 1750 * 20
+        [hash_blake2b_256_per_byte: InternalGasPerByte, { 6.. => "hash.blake2b_256.per_byte" }, 300], // 15 * 20
 
         [util_from_bytes_base: InternalGas, "util.from_bytes.base", 6000],
         [util_from_bytes_per_byte: InternalGasPerByte, "util.from_bytes.per_byte", 100],

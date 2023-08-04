@@ -10,8 +10,11 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_config::{
+    config::{StateSyncConfig, StorageServiceConfig},
+    network_id::PeerNetworkId,
+};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_notifications::StorageServiceNotificationListener;
@@ -20,13 +23,15 @@ use aptos_storage_service_types::{
     responses::{ProtocolMetadata, StorageServerSummary, StorageServiceResponse},
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use error::Error;
 use futures::stream::StreamExt;
 use handler::Handler;
 use lru::LruCache;
 use moderator::RequestModerator;
 use optimistic_fetch::OptimisticFetchRequest;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{ops::Deref, sync::Arc, time::Duration};
 use storage::StorageReaderInterface;
 use thiserror::Error;
 use tokio::runtime::Handle;
@@ -39,6 +44,7 @@ mod moderator;
 pub mod network;
 mod optimistic_fetch;
 pub mod storage;
+mod utils;
 
 #[cfg(test)]
 mod tests;
@@ -53,14 +59,14 @@ const CACHED_SUMMARY_UPDATE_CHANNEL_SIZE: usize = 1;
 /// service requests from clients.
 pub struct StorageServiceServer<T> {
     bounded_executor: BoundedExecutor,
-    config: StorageServiceConfig,
     network_requests: StorageServiceNetworkEvents,
     storage: T,
+    storage_service_config: StorageServiceConfig,
     time_service: TimeService,
 
     // A cached storage server summary to avoid hitting the DB for every
     // request. This is refreshed periodically.
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
 
     // An LRU cache for commonly requested data items.
     // Note: This is not just a database cache because it contains
@@ -68,7 +74,7 @@ pub struct StorageServiceServer<T> {
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
 
     // A set of active optimistic fetches for peers waiting for new data
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
 
     // A moderator for incoming peer requests
     request_moderator: Arc<RequestModerator>,
@@ -77,9 +83,9 @@ pub struct StorageServiceServer<T> {
     storage_service_listener: Option<StorageServiceNotificationListener>,
 }
 
-impl<T: StorageReaderInterface> StorageServiceServer<T> {
+impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
     pub fn new(
-        config: StorageServiceConfig,
+        config: StateSyncConfig,
         executor: Handle,
         storage: T,
         time_service: TimeService,
@@ -87,26 +93,35 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         network_requests: StorageServiceNetworkEvents,
         storage_service_listener: StorageServiceNotificationListener,
     ) -> Self {
-        let bounded_executor =
-            BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
-        let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
-        let optimistic_fetches = Arc::new(Mutex::new(HashMap::new()));
+        // Extract the individual component configs
+        let aptos_data_client_config = config.aptos_data_client;
+        let storage_service_config = config.storage_service;
+
+        // Create the required components
+        let bounded_executor = BoundedExecutor::new(
+            storage_service_config.max_concurrent_requests as usize,
+            executor,
+        );
+        let cached_storage_server_summary =
+            Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
+        let optimistic_fetches = Arc::new(DashMap::new());
         let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
-            config.max_lru_cache_size as usize,
+            storage_service_config.max_lru_cache_size as usize,
         )));
         let request_moderator = Arc::new(RequestModerator::new(
+            aptos_data_client_config,
             cached_storage_server_summary.clone(),
             peers_and_metadata,
-            config,
+            storage_service_config,
             time_service.clone(),
         ));
         let storage_service_listener = Some(storage_service_listener);
 
         Self {
-            config,
             bounded_executor,
-            storage,
             network_requests,
+            storage,
+            storage_service_config,
             time_service,
             cached_storage_server_summary,
             lru_response_cache,
@@ -142,7 +157,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     ) {
         // Clone all required components for the task
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
-        let config = self.config;
+        let config = self.storage_service_config;
         let storage = self.storage.clone();
         let time_service = self.time_service.clone();
 
@@ -205,8 +220,9 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         >,
     ) {
         // Clone all required components for the task
+        let bounded_executor = self.bounded_executor.clone();
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
-        let config = self.config;
+        let config = self.storage_service_config;
         let optimistic_fetches = self.optimistic_fetches.clone();
         let lru_response_cache = self.lru_response_cache.clone();
         let request_moderator = self.request_moderator.clone();
@@ -229,6 +245,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                         _ = ticker.select_next_some() => {
                             // Handle the optimistic fetches periodically
                             handle_active_optimistic_fetches(
+                                bounded_executor.clone(),
                                 cached_storage_server_summary.clone(),
                                 config,
                                 optimistic_fetches.clone(),
@@ -236,7 +253,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                                 request_moderator.clone(),
                                 storage.clone(),
                                 time_service.clone(),
-                            )
+                            ).await;
                         },
                         notification = cached_summary_update_listener.select_next_some() => {
                             trace!(LogSchema::new(LogEntry::ReceivedCacheUpdateNotification)
@@ -245,6 +262,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
                             // Handle the optimistic fetches because of a cache update
                             handle_active_optimistic_fetches(
+                                bounded_executor.clone(),
                                 cached_storage_server_summary.clone(),
                                 config,
                                 optimistic_fetches.clone(),
@@ -252,7 +270,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                                 request_moderator.clone(),
                                 storage.clone(),
                                 time_service.clone(),
-                            )
+                            ).await;
                         },
                     }
                 }
@@ -264,7 +282,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     /// peer states in the request moderator.
     async fn spawn_moderator_peer_refresher(&mut self) {
         // Clone all required components for the task
-        let config = self.config;
+        let config = self.storage_service_config;
         let request_moderator = self.request_moderator.clone();
         let time_service = self.time_service.clone();
 
@@ -348,23 +366,25 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     /// Returns a copy of the active optimistic fetches for test purposes
     pub(crate) fn get_optimistic_fetches(
         &self,
-    ) -> Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>> {
+    ) -> Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>> {
         self.optimistic_fetches.clone()
     }
 }
 
 /// Handles the active optimistic fetches and logs any
 /// errors that were encountered.
-fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
+    bounded_exector: BoundedExecutor,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
-    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
+    optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     time_service: TimeService,
 ) {
     if let Err(error) = optimistic_fetch::handle_active_optimistic_fetches(
+        bounded_exector,
         cached_storage_server_summary,
         config,
         optimistic_fetches,
@@ -372,7 +392,9 @@ fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
         request_moderator,
         storage,
         time_service,
-    ) {
+    )
+    .await
+    {
         error!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
             .error(&error)
             .message("Failed to handle active optimistic fetches!"));
@@ -383,14 +405,11 @@ fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
 /// a notification via the given channel. If an error
 /// occurs, it is logged.
 pub(crate) fn refresh_cached_storage_summary<T: StorageReaderInterface>(
-    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     storage: T,
     storage_config: StorageServiceConfig,
     cached_summary_update_notifier: aptos_channel::Sender<(), CachedSummaryUpdateNotification>,
 ) {
-    // Read the currently cached storage server summary
-    let existing_storage_server_summary = cached_storage_server_summary.read().clone();
-
     // Fetch the new data summary from storage
     let new_data_summary = match storage.get_data_summary() {
         Ok(data_summary) => data_summary,
@@ -418,9 +437,10 @@ pub(crate) fn refresh_cached_storage_summary<T: StorageReaderInterface>(
 
     // If the new storage server summary is different to the existing one,
     // update the cache and send a notification via the notifier channel.
-    if existing_storage_server_summary != new_storage_server_summary {
+    let existing_storage_server_summary = cached_storage_server_summary.load().clone();
+    if existing_storage_server_summary.deref().clone() != new_storage_server_summary {
         // Update the storage server summary cache
-        *cached_storage_server_summary.write() = new_storage_server_summary.clone();
+        cached_storage_server_summary.store(Arc::new(new_storage_server_summary.clone()));
 
         // Create an update notification
         let highest_synced_version = new_storage_server_summary

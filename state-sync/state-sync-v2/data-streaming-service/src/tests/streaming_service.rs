@@ -755,7 +755,7 @@ async fn test_notifications_epoch_ending_multiple_streams() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_notifications_subscribe_outputs() {
+async fn test_notifications_optimistic_fetch_outputs() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service_with_data_delay();
 
@@ -806,7 +806,7 @@ async fn test_notifications_subscribe_outputs() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_notifications_subscribe_transactions() {
+async fn test_notifications_optimistic_fetch_transactions() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service_with_data_delay();
 

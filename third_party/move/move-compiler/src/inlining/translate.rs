@@ -107,7 +107,7 @@ impl<'l> Inliner<'l> {
         );
 
         // Now remove all inline functions from the program.
-        for (_, _, mut mdef) in prog.modules.iter_mut() {
+        for (_, _, mdef) in prog.modules.iter_mut() {
             mdef.functions =
                 std::mem::replace(&mut mdef.functions, UniqueMap::new()).filter_map(|_, fdef| {
                     if fdef.inline {

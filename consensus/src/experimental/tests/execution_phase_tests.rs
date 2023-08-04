@@ -48,7 +48,11 @@ fn add_execution_phase_test_cases(
     // happy path
     phase_tester.add_test_case(
         ExecutionRequest {
-            ordered_blocks: vec![ExecutedBlock::new(block, StateComputeResult::new_dummy())],
+            ordered_blocks: vec![ExecutedBlock::new(
+                block,
+                StateComputeResult::new_dummy(),
+                None,
+            )],
         },
         Box::new(move |resp| {
             assert_eq!(
@@ -78,6 +82,7 @@ fn add_execution_phase_test_cases(
             ordered_blocks: vec![ExecutedBlock::new(
                 bad_block,
                 StateComputeResult::new_dummy(),
+                None,
             )],
         },
         Box::new(move |resp| assert!(matches!(resp.inner, Err(Error::BlockNotFound(_))))),

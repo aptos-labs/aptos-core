@@ -16,6 +16,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
+    randomness::Randomness,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -108,6 +109,7 @@ impl Block {
             Some(payload) => match payload {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
                 Payload::DirectMempool(txns) => txns.len(),
+                Payload::DKG(dkg_payload) => dkg_payload.len(),
             },
         }
     }
@@ -347,28 +349,39 @@ impl Block {
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
+        dkg_transcripts: Vec<aptos_dkg::pvss::scrape::Transcript>,
+        maybe_randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         if block_gas_limit.is_some() {
             // After the per-block gas limit change, StateCheckpoint txn
             // is inserted after block execution
-            once(Transaction::BlockMetadata(
-                self.new_block_metadata(validators),
-            ))
+            once(Transaction::BlockMetadata(self.new_block_metadata(
+                validators,
+                dkg_transcripts,
+                maybe_randomness,
+            )))
             .chain(txns.into_iter().map(Transaction::UserTransaction))
             .collect()
         } else {
             // Before the per-block gas limit change, StateCheckpoint txn
             // is inserted here for compatibility.
-            once(Transaction::BlockMetadata(
-                self.new_block_metadata(validators),
-            ))
+            once(Transaction::BlockMetadata(self.new_block_metadata(
+                validators,
+                dkg_transcripts,
+                maybe_randomness,
+            )))
             .chain(txns.into_iter().map(Transaction::UserTransaction))
             .chain(once(Transaction::StateCheckpoint(self.id)))
             .collect()
         }
     }
 
-    fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
+    fn new_block_metadata(
+        &self,
+        validators: &[AccountAddress],
+        dkg_transcripts: Vec<aptos_dkg::pvss::scrape::Transcript>,
+        maybe_randomness: Option<Randomness>,
+    ) -> BlockMetadata {
         BlockMetadata::new(
             self.id(),
             self.epoch(),
@@ -387,6 +400,8 @@ impl Block {
                     Self::failed_authors_to_indices(validators, failed_authors)
                 }),
             self.timestamp_usecs(),
+            dkg_transcripts,
+            maybe_randomness,
         )
     }
 

@@ -16,19 +16,19 @@ use std::{
 ///
 /// It carries a type parameter `E`, indicating an environment in which the expression can be
 /// evaluated/materialized.
-pub trait GasExpression<E> {
+pub trait GasExpression<Env> {
     type Unit;
 
     /// Evaluates the expression within the given environment to a concrete number.
-    fn evaluate(&self, feature_version: u64, env: &E) -> GasQuantity<Self::Unit>;
+    fn evaluate(&self, feature_version: u64, env: &Env) -> GasQuantity<Self::Unit>;
 
     /// Traverse the expression in post-order using the given visitor.
     /// See [`GasExpressionVisitor`] for details.
     fn visit(&self, visitor: &mut impl GasExpressionVisitor);
 
-    /// Performs a division on the unit of the expression.
+    /// Divides the original unit of the expression by another unit.
     ///
-    /// This is sometimes required if you want to multiply an amount by a certain count.
+    /// This is sometimes required if you want to multiply this expression by a certain count.
     fn per<U>(self) -> GasPerUnit<Self, U>
     where
         Self: Sized,

@@ -2693,7 +2693,7 @@ struct FieldInstantiation {
 //
 
 struct StructInfo {
-    struct_tag: Option<StructTag>,
+    struct_tag: Option<(StructTag, u64)>,
     struct_layout: Option<MoveStructLayout>,
     annotated_struct_layout: Option<MoveStructLayout>,
     node_count: Option<u64>,
@@ -2735,23 +2735,46 @@ const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
 /// field types of structs.
 const MAX_TYPE_INSTANTIATION_NODES: u64 = 128;
 
+struct PseudoGasContext {
+    max_cost: u64,
+    cost: u64,
+    cost_base: u64,
+    cost_per_byte: u64,
+}
+
+impl PseudoGasContext {
+    fn charge(&mut self, amount: u64) -> PartialVMResult<()> {
+        self.cost += amount;
+        if self.cost > self.max_cost {
+            Err(PartialVMError::new(StatusCode::TYPE_TAG_LIMIT_EXCEEDED)
+                .with_message(format!("Max type limit {} exceeded", self.max_cost)))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl Loader {
     fn struct_gidx_to_type_tag(
         &self,
         gidx: CachedStructIndex,
         ty_args: &[Type],
+        gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
         if let Some(struct_map) = self.type_cache.read().structs.get(&gidx) {
             if let Some(struct_info) = struct_map.get(ty_args) {
-                if let Some(struct_tag) = &struct_info.struct_tag {
+                if let Some((struct_tag, gas)) = &struct_info.struct_tag {
+                    gas_context.charge(*gas)?;
                     return Ok(struct_tag.clone());
                 }
             }
         }
 
+        let cur_cost = gas_context.cost;
+
         let ty_arg_tags = ty_args
             .iter()
-            .map(|ty| self.type_to_type_tag(ty))
+            .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let struct_type = self.module_cache.read().struct_at(gidx);
         let struct_tag = StructTag {
@@ -2761,6 +2784,9 @@ impl Loader {
             type_params: ty_arg_tags,
         };
 
+        let size =
+            (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
+        gas_context.charge(size * gas_context.cost_per_byte)?;
         self.type_cache
             .write()
             .structs
@@ -2768,12 +2794,17 @@ impl Loader {
             .or_insert_with(HashMap::new)
             .entry(ty_args.to_vec())
             .or_insert_with(StructInfo::new)
-            .struct_tag = Some(struct_tag.clone());
+            .struct_tag = Some((struct_tag.clone(), gas_context.cost - cur_cost));
 
         Ok(struct_tag)
     }
 
-    fn type_to_type_tag_impl(&self, ty: &Type) -> PartialVMResult<TypeTag> {
+    fn type_to_type_tag_impl(
+        &self,
+        ty: &Type,
+        gas_context: &mut PseudoGasContext,
+    ) -> PartialVMResult<TypeTag> {
+        gas_context.charge(gas_context.cost_base)?;
         Ok(match ty {
             Type::Bool => TypeTag::Bool,
             Type::U8 => TypeTag::U8,
@@ -2784,13 +2815,17 @@ impl Loader {
             Type::U256 => TypeTag::U256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
-            Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
-            Type::Struct(gidx) => {
-                TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(*gidx, &[])?))
+            Type::Vector(ty) => {
+                TypeTag::Vector(Box::new(self.type_to_type_tag_impl(ty, gas_context)?))
             },
-            Type::StructInstantiation(gidx, ty_args) => {
-                TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(*gidx, ty_args)?))
-            },
+            Type::Struct(gidx) => TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(
+                *gidx,
+                &[],
+                gas_context,
+            )?)),
+            Type::StructInstantiation(gidx, ty_args) => TypeTag::Struct(Box::new(
+                self.struct_gidx_to_type_tag(*gidx, ty_args, gas_context)?,
+            )),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -2970,8 +3005,15 @@ impl Loader {
                 ),
             );
         }
+
         let count_before = *count;
-        let struct_tag = self.struct_gidx_to_type_tag(gidx, ty_args)?;
+        let mut gas_context = PseudoGasContext {
+            cost: 0,
+            max_cost: self.vm_config.type_max_cost,
+            cost_base: self.vm_config.type_base_cost,
+            cost_per_byte: self.vm_config.type_byte_cost,
+        };
+        let struct_tag = self.struct_gidx_to_type_tag(gidx, ty_args, &mut gas_context)?;
         let field_layouts = struct_type
             .field_names
             .iter()
@@ -3039,7 +3081,13 @@ impl Loader {
     }
 
     pub(crate) fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
-        self.type_to_type_tag_impl(ty)
+        let mut gas_context = PseudoGasContext {
+            cost: 0,
+            max_cost: self.vm_config.type_max_cost,
+            cost_base: self.vm_config.type_base_cost,
+            cost_per_byte: self.vm_config.type_byte_cost,
+        };
+        self.type_to_type_tag_impl(ty, &mut gas_context)
     }
 
     pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {

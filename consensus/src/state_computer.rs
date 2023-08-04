@@ -11,7 +11,7 @@ use crate::{
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
-    txn_notifier::TxnNotifier,
+    txn_notifier::TxnNotifier, dkg::dkg_manager::DKGManagerWrapper,
 };
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
@@ -22,7 +22,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    ledger_info::LedgerInfoWithSignatures, randomness::Randomness, transaction::Transaction,
 };
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
@@ -57,6 +57,7 @@ pub struct ExecutionProxy {
     validators: Mutex<Vec<AccountAddress>>,
     write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
+    dkg_manager_wrapper: Mutex<Option<Arc<DKGManagerWrapper>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
     maybe_block_gas_limit: Mutex<Option<u64>>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
@@ -92,6 +93,7 @@ impl ExecutionProxy {
             validators: Mutex::new(vec![]),
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             payload_manager: Mutex::new(None),
+            dkg_manager_wrapper: Mutex::new(None),
             transaction_shuffler: Mutex::new(None),
             maybe_block_gas_limit: Mutex::new(None),
             transaction_deduper: Mutex::new(None),
@@ -108,6 +110,7 @@ impl StateComputer for ExecutionProxy {
         block: &Block,
         // The parent block id.
         parent_block_id: HashValue,
+        maybe_randomness: Option<Randomness>,
     ) -> Result<StateComputeResult, ExecutionError> {
         fail_point!("consensus::compute", |_| {
             Err(ExecutionError::InternalError {
@@ -124,7 +127,11 @@ impl StateComputer for ExecutionProxy {
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
-        let txns = payload_manager.get_transactions(block).await?;
+        let (txns, dkg_agg_nodes) = payload_manager.get_transactions(block).await?;
+        println!("a={}", aptos_dkg::G1_PROJ_NUM_BYTES);
+
+        // dkg todo: support multiple transcripts
+        let dkg_transcripts = dkg_agg_nodes.into_iter().map(|node| node.agg_trx().clone()).collect();
 
         let deduped_txns = txn_deduper.dedup(txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
@@ -138,6 +145,8 @@ impl StateComputer for ExecutionProxy {
             &self.validators.lock(),
             shuffled_txns.clone(),
             block_gas_limit,
+            dkg_transcripts,
+            maybe_randomness,
         );
 
         let compute_result = monitor!(
@@ -180,6 +189,7 @@ impl StateComputer for ExecutionProxy {
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut reconfig_events = Vec::new();
+        let mut dkg_events = Vec::new();
         let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
             finality_proof.ledger_info().epoch(),
@@ -200,16 +210,23 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            let signed_txns = payload_manager.get_transactions(block.block()).await?;
+            let (signed_txns, dkg_agg_nodes) = payload_manager.get_transactions(block.block()).await?;
             let deduped_txns = txn_deduper.dedup(signed_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
+
+            // dkg todo: support multiple transcripts
+            let dkg_transcripts = dkg_agg_nodes.into_iter().map(|node| node.agg_trx().clone()).collect();
+            let maybe_randomness = block.maybe_randomness();
 
             txns.extend(block.transactions_to_commit(
                 &self.validators.lock(),
                 shuffled_txns,
                 block_gas_limit,
+                dkg_transcripts,
+                maybe_randomness,
             ));
             reconfig_events.extend(block.reconfig_event());
+            dkg_events.extend(block.dkg_events());
         }
 
         let executor = self.executor.clone();
@@ -234,6 +251,13 @@ impl StateComputer for ExecutionProxy {
             .send((Box::new(wrapped_callback), txns, reconfig_events))
             .await
             .expect("Failed to send async state sync notification");
+
+        let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
+        // trigger the start of dkg
+        if !dkg_events.is_empty() {
+            // dkg todo: get the stake distribution of the new epoch validators from dkg_events
+            dkg_manager_wrapper.start_dkg(None).await;
+        }
 
         *latest_logical_time = logical_time;
         payload_manager
@@ -300,6 +324,7 @@ impl StateComputer for ExecutionProxy {
         &self,
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
+        dkg_manager_wrapper: Arc<DKGManagerWrapper>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_gas_limit: Option<u64>,
         transaction_deduper: Arc<dyn TransactionDeduper>,
@@ -309,6 +334,8 @@ impl StateComputer for ExecutionProxy {
             .get_ordered_account_addresses_iter()
             .collect();
         self.payload_manager.lock().replace(payload_manager);
+        self.dkg_manager_wrapper.lock().replace(dkg_manager_wrapper);
+
         self.transaction_shuffler
             .lock()
             .replace(transaction_shuffler);
@@ -321,6 +348,7 @@ impl StateComputer for ExecutionProxy {
     fn end_epoch(&self) {
         *self.validators.lock() = vec![];
         self.payload_manager.lock().take();
+        self.dkg_manager_wrapper.lock().take();
     }
 }
 
@@ -437,6 +465,7 @@ async fn test_commit_sync_race() {
     executor.new_epoch(
         &EpochState::empty(),
         Arc::new(PayloadManager::DirectMempool),
+        Arc::new(DKGManagerWrapper::NoDKG),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         None,
         create_transaction_deduper(TransactionDeduperType::NoDedup),

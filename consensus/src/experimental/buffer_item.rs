@@ -187,7 +187,7 @@ impl BufferItem {
 
                     let verified_signatures =
                         verify_signatures(unverified_signatures, validator, &commit_ledger_info);
-                    if (validator.check_voting_power(verified_signatures.signatures().keys()))
+                    if (validator.check_voting_power(verified_signatures.signatures().keys(), true))
                         .is_ok()
                     {
                         let commit_proof = aggregate_commit_proof(
@@ -321,7 +321,7 @@ impl BufferItem {
         match self {
             Self::Signed(signed_item) => {
                 if validator
-                    .check_voting_power(signed_item.partial_commit_proof.signatures().keys())
+                    .check_voting_power(signed_item.partial_commit_proof.signatures().keys(), true)
                     .is_ok()
                 {
                     Self::Aggregated(Box::new(AggregatedItem {
@@ -339,7 +339,10 @@ impl BufferItem {
             },
             Self::Executed(executed_item) => {
                 if validator
-                    .check_voting_power(executed_item.partial_commit_proof.signatures().keys())
+                    .check_voting_power(
+                        executed_item.partial_commit_proof.signatures().keys(),
+                        true,
+                    )
                     .is_ok()
                 {
                     Self::Aggregated(Box::new(AggregatedItem {

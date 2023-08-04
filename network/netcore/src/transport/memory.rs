@@ -112,7 +112,7 @@ mod test {
 
     #[test]
     fn simple_listen_and_dial() -> Result<(), ::std::io::Error> {
-        let t = MemoryTransport::default();
+        let t = MemoryTransport;
 
         let (listener, addr) = t.listen_on("/memory/0".parse().unwrap())?;
 
@@ -140,7 +140,7 @@ mod test {
 
     #[test]
     fn unsupported_multiaddrs() {
-        let t = MemoryTransport::default();
+        let t = MemoryTransport;
 
         let result = t.listen_on("/ip4/127.0.0.1/tcp/0".parse().unwrap());
         assert!(result.is_err());

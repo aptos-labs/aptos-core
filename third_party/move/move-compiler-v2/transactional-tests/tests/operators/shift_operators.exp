@@ -1,0 +1,21 @@
+processed 8 tasks
+
+task 0 'run'. lines 1-8:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: redacted,
+    offsets: redacted,
+}
+
+task 1 'run'. lines 10-18:
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: redacted,
+    offsets: redacted,
+}
+
+==> Compiler v2 delivered same results!

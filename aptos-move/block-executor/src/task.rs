@@ -80,7 +80,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
         <Self::Txn as Transaction>::Value,
     )>;
 
-    /// Get the deltas of a transaction from its output.
+    /// Get the aggregator deltas of a transaction from its output.
     fn get_deltas(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
 
     /// Execution output for transactions that comes after SkipRest signal.

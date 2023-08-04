@@ -148,10 +148,11 @@ impl PeerStates {
             return true;
         }
 
+        // Check if the peer can service the request
         self.peer_to_state
             .get(peer)
             .and_then(PeerState::storage_summary_if_not_ignored)
-            .map(|summary| summary.can_service(request))
+            .map(|summary| summary.can_service(&self.data_client_config, request))
             .unwrap_or(false)
     }
 

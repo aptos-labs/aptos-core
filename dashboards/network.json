@@ -424,7 +424,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.2-cloud.1.94a6f396",
+          "pluginVersion": "10.0.3-cloud.4.aed62623",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -517,7 +517,13 @@
                 "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 80 }
+                ]
+              },
               "unit": "Bps"
             },
             "overrides": []
@@ -616,7 +622,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.2-cloud.1.94a6f396",
+          "pluginVersion": "10.0.3-cloud.4.aed62623",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -680,7 +686,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.2-cloud.1.94a6f396",
+          "pluginVersion": "10.0.3-cloud.4.aed62623",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -744,7 +750,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.2-cloud.1.94a6f396",
+          "pluginVersion": "10.0.3-cloud.4.aed62623",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -809,7 +815,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.2-cloud.1.94a6f396",
+          "pluginVersion": "10.0.3-cloud.4.aed62623",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -874,7 +880,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.2-cloud.1.94a6f396",
+          "pluginVersion": "10.0.3-cloud.4.aed62623",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -939,7 +945,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.2-cloud.1.94a6f396",
+          "pluginVersion": "10.0.3-cloud.4.aed62623",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1003,7 +1009,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.2-cloud.1.94a6f396",
+          "pluginVersion": "10.0.3-cloud.4.aed62623",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1067,7 +1073,7 @@
           "nullPointMode": "null",
           "options": { "alertThreshold": true },
           "percentage": false,
-          "pluginVersion": "10.0.2-cloud.1.94a6f396",
+          "pluginVersion": "10.0.3-cloud.4.aed62623",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1705,7 +1711,7 @@
           "type": "timeseries"
         }
       ],
-      "title": "Network Compression",
+      "title": "Network Serialization & Compression",
       "type": "row"
     },
     {
@@ -5160,6 +5166,6 @@
   "timezone": "",
   "title": "network",
   "uid": "network",
-  "version": 5,
+  "version": 6,
   "weekStart": ""
 }

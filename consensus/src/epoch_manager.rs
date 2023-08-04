@@ -32,8 +32,8 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{
-        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingRpcRequest,
-        NetworkReceivers, NetworkSender,
+        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingRpcRequest, IncomingDKGRequest,
+        NetworkReceivers, NetworkSender, NetworkSenderWrapper,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
@@ -48,8 +48,10 @@ use crate::{
     state_replication::StateComputer,
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
-    util::time_service::TimeService,
+    util::time_service::TimeService, dkg::{DKGMessage, dkg_handler::DKGNetworkHandler, dkg_manager::{DKGManager, DKGManagerWrapper}},
 };
+use aptos_time_service;
+
 use anyhow::{bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -63,6 +65,7 @@ use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_safety_rules::SafetyRulesManager;
 use aptos_types::{
     account_address::AccountAddress,
@@ -84,6 +87,7 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
+use tokio_retry::strategy::ExponentialBackoff;
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -137,6 +141,8 @@ pub struct EpochManager {
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     batch_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
+    dkg_handler_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingDKGRequest>>,
     bounded_executor: BoundedExecutor,
     // recovery_mode is set to true when the recovery manager is spawned
     recovery_mode: bool,
@@ -184,6 +190,7 @@ impl EpochManager {
             quorum_store_coordinator_tx: None,
             quorum_store_storage,
             batch_retrieval_tx: None,
+            dkg_handler_tx: None,
             bounded_executor,
             recovery_mode: false,
         }
@@ -557,6 +564,7 @@ impl EpochManager {
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
         self.batch_retrieval_tx = None;
+        self.dkg_handler_tx = None;
 
         if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -692,9 +700,29 @@ impl EpochManager {
             self.config.wait_for_full_blocks_above_recent_fill_threshold,
             self.config.wait_for_full_blocks_above_pending_blocks,
         );
+
+
+        // dkg stuff
+        // dkg todo: connect the dkg_handler channel
+        let (dkg_handler_tx, dkg_handler_rx) = aptos_channel::new(
+            QueueStyle::FIFO,
+            100,
+            None,   // dkg todo: add counters
+        );
+        self.dkg_handler_tx = Some(dkg_handler_tx.clone());
+        let dkg_network_sender = NetworkSenderWrapper::<DKGMessage>::new(network_sender.clone());
+        let dkg_reliable_broadcast = Arc::new(ReliableBroadcast::new(epoch_state.verifier.get_ordered_account_addresses(), Arc::new(dkg_network_sender), ExponentialBackoff::from_millis(5), aptos_time_service::TimeService::real()));
+        let dkg_manager = DKGManager::new(self.author, Arc::new(epoch_state.clone()), dkg_reliable_broadcast);
+        let dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
+        let dkg_handler: DKGNetworkHandler = DKGNetworkHandler::new(self.author, dkg_handler_rx, Arc::new(epoch_state.clone()), dkg_manager);
+        // start the dkg handler
+        tokio::spawn(dkg_handler.start());
+
+
         self.commit_state_computer.new_epoch(
             &epoch_state,
             payload_manager.clone(),
+            dkg_manager_wrapper.clone(),
             transaction_shuffler,
             block_gas_limit,
             transaction_deduper,
@@ -743,6 +771,7 @@ impl EpochManager {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
+            dkg_manager_wrapper,
         );
 
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
@@ -793,6 +822,7 @@ impl EpochManager {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
+        // dkg todo: the new epoch validators read and decrypt their private keys from DKG
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
@@ -1075,6 +1105,23 @@ impl EpochManager {
                     monitor!(
                         "process_different_epoch_dag_rpc",
                         self.process_different_epoch(dag_message.epoch, peer_id)
+                    )
+                }
+            },
+            IncomingRpcRequest::DKGRequest(request) => {
+                let dkg_message = request.req.clone();
+
+                if dkg_message.epoch == self.epoch() {
+                    // Send message to dkg manager
+                    if let Some(tx) = &self.dkg_handler_tx {
+                        tx.push(peer_id, request)
+                    } else {
+                        Err(anyhow::anyhow!("DKG manager not started"))
+                    }
+                } else {
+                    monitor!(
+                        "process_different_epoch_dkg_rpc",
+                        self.process_different_epoch(dkg_message.epoch, peer_id)
                     )
                 }
             },

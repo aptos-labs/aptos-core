@@ -130,7 +130,7 @@ export class AptosToken {
         options?.tokensBurnableByCreator ?? true,
         options?.tokensFreezableByCreator ?? true,
         options?.royaltyNumerator ?? 0,
-        options?.royaltyDenominator ?? 0,
+        options?.royaltyDenominator ?? 1,
       ],
       extraArgs,
     );

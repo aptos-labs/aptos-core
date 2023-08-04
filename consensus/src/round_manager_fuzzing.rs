@@ -18,7 +18,7 @@ use crate::{
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     round_manager::RoundManager,
     test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
-    util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
+    util::{mock_time_service::SimulatedTimeService, time_service::TimeService}, dkg::dkg_manager::DKGManagerWrapper,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
@@ -170,6 +170,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
+        Arc::new(DKGManagerWrapper::NoDKG),
     );
 
     //

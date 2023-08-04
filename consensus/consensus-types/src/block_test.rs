@@ -193,7 +193,7 @@ fn test_block_metadata_bitvec() {
         Vec::new(),
     )
     .unwrap();
-    let block_metadata_1 = block_1.new_block_metadata(&validators);
+    let block_metadata_1 = block_1.new_block_metadata(&validators, vec![], None);
     assert_eq!(signers[0].author(), block_metadata_1.proposer());
     assert_eq!(
         BitVec::required_buckets(num_validators as u16),
@@ -233,7 +233,7 @@ fn test_block_metadata_bitvec() {
         Vec::new(),
     )
     .unwrap();
-    let block_metadata_2 = block_2.new_block_metadata(&validators);
+    let block_metadata_2 = block_2.new_block_metadata(&validators, vec![], None);
     assert_eq!(signers[1].author(), block_metadata_2.proposer());
     let raw_bytes: Vec<u8> = BitVec::from(votes_1).into();
     assert_eq!(&raw_bytes, block_metadata_2.previous_block_votes_bitvec());
@@ -243,7 +243,7 @@ fn test_block_metadata_bitvec() {
 fn test_nil_block_metadata_bitvec() {
     let quorum_cert = certificate_for_genesis();
     let nil_block = Block::new_nil(1, quorum_cert, vec![]);
-    let nil_block_metadata = nil_block.new_block_metadata(&Vec::new());
+    let nil_block_metadata = nil_block.new_block_metadata(&Vec::new(), vec![], None);
     assert_eq!(AccountAddress::ZERO, nil_block_metadata.proposer());
     assert_eq!(0, nil_block_metadata.previous_block_votes_bitvec().len());
 }

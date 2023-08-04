@@ -27,7 +27,8 @@ You can use the following CLI commands to obtain the delegation pool address dep
 - Before you create the delegation pool:  
     ```bash
     aptos account derive-resource-account-address --address <owner_address> --seed "aptos_framework::delegation_pool<SEED>" --seed-encoding utf8
-    ```  
+    ```
+  - The `<SEED>` is a number chosen by you to create the resource account address to host the delegation pool resource.  Once you choose a seed, you should use the same value for all following usages.
 - After you create the delegation pool: 
     ```bash
     aptos account derive-resource-account-address

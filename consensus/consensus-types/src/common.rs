@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use crate::{proof_of_store::{BatchInfo, ProofOfStore}, dkg_types::DKGAggNode};
 use aptos_crypto::HashValue;
 use aptos_executor_types::Error;
 use aptos_infallible::Mutex;
@@ -92,11 +92,28 @@ impl ProofWithData {
     }
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct DKGPayload {
+    pub dkg_agg_node: DKGAggNode,
+}
+
+impl DKGPayload {
+    pub fn new(dkg_agg_node: DKGAggNode) -> Self { DKGPayload { dkg_agg_node: dkg_agg_node } }
+
+    pub fn dkg_agg_node(&self) -> &DKGAggNode { &self.dkg_agg_node }
+
+    pub fn num_bytes(&self) -> usize { self.dkg_agg_node.num_bytes() }
+
+    pub fn len(&self) -> usize { 1 }
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
+    // dkg todo: add a new payload type for dkg
+    DKG(DKGPayload),
 }
 
 impl Payload {
@@ -116,6 +133,7 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_txns() as usize)
                 .sum(),
+            Payload::DKG(_) => 1,
         }
     }
 
@@ -123,6 +141,7 @@ impl Payload {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
+            Payload::DKG(_) => false,
         }
     }
 
@@ -143,6 +162,7 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_bytes() as usize)
                 .sum(),
+            Payload::DKG(dkg_payload) => dkg_payload.num_bytes(),
         }
     }
 
@@ -176,6 +196,9 @@ impl fmt::Display for Payload {
             },
             Payload::InQuorumStore(proof_with_status) => {
                 write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
+            },
+            Payload::DKG(_) => {
+                write!(f, "DKG Aggregated Node")
             },
         }
     }

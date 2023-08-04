@@ -217,12 +217,14 @@ impl BlockStore {
             vec![],                   /* compute_status */
             vec![],                   /* txn_infos */
             vec![],                   /* reconfig_events */
+            vec![],                   /* dkg_events */
         );
 
         let executed_root_block = ExecutedBlock::new(
             *root_block,
             // Create a dummy state_compute_result with necessary fields filled in.
             result,
+            None,
         );
 
         let tree = BlockTree::new(
@@ -411,10 +413,10 @@ impl BlockStore {
         // because we may inject a block prologue transaction.
         let state_compute_result = self
             .state_computer
-            .compute(&block, block.parent_id())
+            .compute(&block, block.parent_id(), None)
             .await?;
 
-        Ok(ExecutedBlock::new(block, state_compute_result))
+        Ok(ExecutedBlock::new(block, state_compute_result, None))
     }
 
     /// Validates quorum certificates and inserts it into block tree assuming dependencies exist.

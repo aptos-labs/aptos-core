@@ -232,6 +232,12 @@ def wipe(context: SystemContext) -> None:
 
 
 def main() -> None:
+    # Change to the root of aptos-core.
+    abspath = os.path.abspath(__file__)
+    dname = os.path.dirname(abspath)
+    os.chdir(dname)
+    os.chdir("..")
+
     # set envs based on platform, if it's not already overriden
     if not os.environ.get("REDIS_IMAGE_REPO"):
         if platform.system() == "Darwin":
