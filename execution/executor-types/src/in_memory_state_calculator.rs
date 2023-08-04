@@ -26,6 +26,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
 pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
+pub static START_DKG_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::start_dkg_event_key);
 
 /// Helper class for calculating `InMemState` after a chunk or block of transactions are executed.
 ///

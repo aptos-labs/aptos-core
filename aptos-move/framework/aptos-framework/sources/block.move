@@ -241,7 +241,10 @@ module aptos_framework::block {
             } else {
                 abort(1);
             };
-            debug::print(&std::string::utf8(b"on_expire() finished."));
+        } else {
+            if (dkg_transcript_available) {
+                debug::print(&std::string::utf8(b"Probably a too late transcript."));
+            }
         };
     }
 

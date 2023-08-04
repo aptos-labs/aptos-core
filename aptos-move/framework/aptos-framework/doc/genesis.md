@@ -359,7 +359,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="block.md#0x1_block_initialize">block::initialize</a>(&aptos_framework_account, epoch_interval_microsecs);
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
     <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
-    <a href="dkg.md#0x1_dkg_initialize">dkg::initialize</a>(&aptos_framework_account); //TODO: not possible on mainnet...
+    <a href="dkg.md#0x1_dkg_initialize">dkg::initialize</a>(&aptos_framework_account);
     <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"genesis::initialization() finished."));
 }
 </code></pre>

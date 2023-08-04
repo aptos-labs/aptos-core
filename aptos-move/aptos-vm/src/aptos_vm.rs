@@ -1324,17 +1324,14 @@ impl AptosVM {
         // dkg todo: verify the validity of the dkg transcript if there is one in block metadata
         // only pass in the first valid dkg transcript to the prologue as args
 
-        let mut args = block_metadata.get_prologue_move_args(txn_data.sender);
+        let mut args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         if self.0.get_features().is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
-            let transcript_ready = false; //TODO: edit it in debugging sessions for now...
-            args.push(MoveValue::Bool(transcript_ready));
-            args.push(MoveValue::Vector(vec![]));
             session
                 .execute_function_bypass_visibility(
                     &BLOCK_MODULE,
                     BLOCK_PROLOGUE_V2,
                     vec![],
-                    serialize_values(&args),
+                    args,
                     &mut gas_meter,
                 )
                 .map(|_return_vals| ())
@@ -1347,7 +1344,7 @@ impl AptosVM {
                     &BLOCK_MODULE,
                     BLOCK_PROLOGUE,
                     vec![],
-                    serialize_values(&args),
+                    args,
                     &mut gas_meter,
                 )
                 .map(|_return_vals| ())

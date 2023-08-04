@@ -130,7 +130,7 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
-        dkg::initialize(&aptos_framework_account); //TODO: not possible on mainnet...
+        dkg::initialize(&aptos_framework_account);
         debug::print(&std::string::utf8(b"genesis::initialization() finished."));
     }
 

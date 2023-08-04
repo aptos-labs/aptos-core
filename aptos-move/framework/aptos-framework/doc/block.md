@@ -414,9 +414,9 @@ The runtime always runs this before executing the transactions in a block.
     <a href="stake.md#0x1_stake_update_performance_statistics">stake::update_performance_statistics</a>(proposer_index, failed_proposer_indices);
     <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(<a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>());
 
-    // dkg todo: <b>move</b> dkg transcript <b>to</b> on-chain state
+    // <a href="dkg.md#0x1_dkg">dkg</a> todo: <b>move</b> <a href="dkg.md#0x1_dkg">dkg</a> transcript <b>to</b> on-chain state
 
-    // dkg todo: trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> only <b>if</b> dkg transcript is ready
+    // <a href="dkg.md#0x1_dkg">dkg</a> todo: trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> only <b>if</b> <a href="dkg.md#0x1_dkg">dkg</a> transcript is ready
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= block_metadata_ref.epoch_interval) {
         <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
     };
@@ -520,7 +520,10 @@ The runtime always runs this before executing the transactions in a block.
         } <b>else</b> {
             <b>abort</b>(1);
         };
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"on_expire() finished."));
+    } <b>else</b> {
+        <b>if</b> (dkg_transcript_available) {
+            <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"Probably a too late transcript."));
+        }
     };
 }
 </code></pre>

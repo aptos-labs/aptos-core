@@ -354,6 +354,7 @@ fn initialize(
     execution_config: &OnChainExecutionConfig,
     gas_schedule: &GasScheduleV2,
 ) {
+    println!("epoch_duration_secs={}", genesis_config.epoch_duration_secs);
     let gas_schedule_blob =
         bcs::to_bytes(gas_schedule).expect("Failure serializing genesis gas schedule");
 
