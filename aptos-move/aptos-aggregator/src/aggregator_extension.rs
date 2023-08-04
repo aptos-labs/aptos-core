@@ -83,7 +83,7 @@ pub struct AggregatorSnapshot {
     // TODO: Currently this is a single u128 value since we use 0 as a trivial
     // lower bound. If we want to support custom lower bounds, or have more
     // complex postconditions, we should factor this out in its own struct.
-    limit: u128,
+    max_value: u128,
     // Describes values seen by this aggregator. Note that if aggregator knows
     // its value, then storing history doesn't make sense.
     history: Option<History>,
@@ -483,7 +483,7 @@ impl AggregatorData {
             .insert(snapshot_id, AggregatorSnapshot {
                 value: aggregator.value,
                 state: aggregator.state,
-                limit: aggregator.limit,
+                max_value: aggregator.max_value,
                 history: aggregator.history.clone(),
                 base_aggregator: *id,
             });
