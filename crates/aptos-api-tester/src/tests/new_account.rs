@@ -24,13 +24,19 @@ pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
     let (client, faucet_client, account) = setup(network_name).await?;
 
     // check account data persistently
-    persistent_check::account(check_account_data, &client, &account).await?;
+    persistent_check::account("check_account_data", check_account_data, &client, &account).await?;
 
     // fund account
     fund(&faucet_client, account.address()).await?;
 
     // check account balance persistently
-    persistent_check::address(check_account_balance, &client, account.address()).await?;
+    persistent_check::address(
+        "check_account_balance",
+        check_account_balance,
+        &client,
+        account.address(),
+    )
+    .await?;
 
     Ok(())
 }

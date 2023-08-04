@@ -7,6 +7,7 @@ use crate::{
         ERROR_COULD_NOT_SERIALIZE, ERROR_NO_BYTECODE, ERROR_NO_MESSAGE, ERROR_NO_METADATA,
         ERROR_NO_MODULE, FAIL_WRONG_MESSAGE, FAIL_WRONG_MODULE,
     },
+    persistent_check,
     utils::{create_and_fund_account, get_client, get_faucet_client, NetworkName, TestFailure},
 };
 use anyhow::{anyhow, Result};
@@ -41,13 +42,20 @@ pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
     let blob = publish_module(&client, &mut account, package).await?;
 
     // check module data persistently
-    check_module_data(&client, account.address(), blob).await?;
+    persistent_check::address_bytes(
+        "check_module_data",
+        check_module_data,
+        &client,
+        account.address(),
+        &blob,
+    )
+    .await?;
 
     // set message
     set_message(&client, &mut account).await?;
 
     // check message persistently
-    check_message(&client, account.address()).await?;
+    persistent_check::address("check_message", check_message, &client, account.address()).await?;
 
     Ok(())
 }
@@ -185,11 +193,11 @@ async fn publish_module(
 async fn check_module_data(
     client: &Client,
     address: AccountAddress,
-    expected: HexEncodedBytes,
+    expected: &HexEncodedBytes,
 ) -> Result<(), TestFailure> {
     // actual
-    let actual = match client.get_account_module(address, MODULE_NAME).await {
-        Ok(response) => response.inner().to_owned().bytecode,
+    let response = match client.get_account_module(address, MODULE_NAME).await {
+        Ok(response) => response,
         Err(e) => {
             info!(
                 "test: publish_module part: check_module_data ERROR: {}, with error {:?}",
@@ -198,6 +206,7 @@ async fn check_module_data(
             return Err(e.into());
         },
     };
+    let actual = &response.inner().bytecode;
 
     // compare
     if expected != actual {

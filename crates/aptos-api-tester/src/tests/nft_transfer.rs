@@ -40,26 +40,44 @@ pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
     create_collection(&client, &token_client, &mut account).await?;
 
     // check collection metadata persistently
-    persistent_check::token_address(check_collection_metadata, &token_client, account.address())
-        .await?;
+    persistent_check::token_address(
+        "check_collection_metadata",
+        check_collection_metadata,
+        &token_client,
+        account.address(),
+    )
+    .await?;
 
     // create token
     create_token(&client, &token_client, &mut account).await?;
 
     // check token metadata persistently
-    persistent_check::token_address(check_token_metadata, &token_client, account.address()).await?;
+    persistent_check::token_address(
+        "check_token_metadata",
+        check_token_metadata,
+        &token_client,
+        account.address(),
+    )
+    .await?;
 
     // offer token
     offer_token(&client, &token_client, &mut account, receiver.address()).await?;
 
     // check senders balance persistently
-    persistent_check::token_address(check_sender_balance, &token_client, account.address()).await?;
+    persistent_check::token_address(
+        "check_sender_balance",
+        check_sender_balance,
+        &token_client,
+        account.address(),
+    )
+    .await?;
 
     // claim token
     claim_token(&client, &token_client, &mut receiver, account.address()).await?;
 
     // check receivers balance persistently
     persistent_check::token_address_address(
+        "check_receiver_balance",
         check_receiver_balance,
         &token_client,
         receiver.address(),

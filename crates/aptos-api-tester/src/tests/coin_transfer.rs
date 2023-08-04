@@ -33,11 +33,23 @@ pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
     let version = transfer_coins(&client, &coin_client, &mut account, receiver).await?;
 
     // check receiver balance persistently
-    persistent_check::address(check_account_balance, &client, receiver).await?;
+    persistent_check::address(
+        "check_account_balance",
+        check_account_balance,
+        &client,
+        receiver,
+    )
+    .await?;
 
     // check receiver balance at previous version persistently
-    persistent_check::address_version(check_account_balance_at_version, &client, receiver, version)
-        .await?;
+    persistent_check::address_version(
+        "check_account_balance_at_version",
+        check_account_balance_at_version,
+        &client,
+        receiver,
+        version,
+    )
+    .await?;
 
     Ok(())
 }
