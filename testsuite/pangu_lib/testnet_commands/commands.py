@@ -5,6 +5,7 @@ from .get_testnet import get_testnet_main
 from .healthcheck import healthcheck_main
 from .update_nodes import update_nodes_main
 from .restart_nodes import restart_nodes_main
+from .transaction_emitter import transaction_emitter_main
 from test_framework.shell import LocalShell
 from test_framework.filesystem import LocalFilesystem
 from test_framework.kubernetes import LiveKubernetes
@@ -190,5 +191,19 @@ def update(testnet_name: str, pangu_node_configs_path: str):
     update_nodes_main(
         testnet_name,
         pangu_node_configs_path,
+        SystemContext(LocalShell(), LocalFilesystem(), LiveKubernetes()),
+    )
+
+
+@click.command(help="Create a transaction emitter for a testnet by name.")
+@click.argument("testnet_name")
+def transaction_emitter(testnet_name: str):
+    """Create a transaction emitter for a testnet by name.
+
+    Args:
+        testnet_name (str): the testnet to add a transaction emitter to
+    """
+    transaction_emitter_main(
+        testnet_name,
         SystemContext(LocalShell(), LocalFilesystem(), LiveKubernetes()),
     )

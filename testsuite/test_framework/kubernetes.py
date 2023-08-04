@@ -111,6 +111,10 @@ class LiveKubernetes(Kubernetes):
             return core_v1_api.create_namespaced_persistent_volume_claim(
                 namespace=namespace, body=kubernetes_object
             )
+        elif isinstance(kubernetes_object, client.V1Pod):  # type: ignore
+            return core_v1_api.create_namespaced_pod(
+                namespace=namespace, body=kubernetes_object
+            )
         else:
             raise NotImplemented("This resource type is not implemented!")
 
