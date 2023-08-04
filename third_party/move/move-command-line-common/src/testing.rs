@@ -63,3 +63,29 @@ pub fn format_diff(expected: impl AsRef<str>, actual: impl AsRef<str>) -> String
     }
     ret
 }
+
+pub fn format_diff_no_color(expected: impl AsRef<str>, actual: impl AsRef<str>) -> String {
+    use difference::*;
+
+    let changeset = Changeset::new(expected.as_ref(), actual.as_ref(), "\n");
+
+    let mut ret = String::new();
+
+    for seq in changeset.diffs {
+        match &seq {
+            Difference::Same(x) => {
+                ret.push_str(&format!("= {}", x.replace('\n', "\n= ")));
+                ret.push('\n');
+            },
+            Difference::Add(x) => {
+                ret.push_str(&format!("+ {}", x.replace('\n', "\n+ ")));
+                ret.push('\n');
+            },
+            Difference::Rem(x) => {
+                ret.push_str(&format!("- {}", x.replace('\n', "\n- ")));
+                ret.push('\n');
+            },
+        }
+    }
+    ret
+}

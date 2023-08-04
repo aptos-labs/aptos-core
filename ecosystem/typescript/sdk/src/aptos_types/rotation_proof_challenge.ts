@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AccountAddress } from "./account_address";
-import { Serializer } from "../bcs";
+import { AnyNumber, Serializer } from "../bcs";
 
 export class RotationProofChallenge {
   constructor(
     public readonly accountAddress: AccountAddress,
     public readonly moduleName: string,
     public readonly structName: string,
-    public readonly sequenceNumber: number | bigint,
+    public readonly sequenceNumber: AnyNumber,
     public readonly originator: AccountAddress,
     public readonly currentAuthKey: AccountAddress,
     public readonly newPublicKey: Uint8Array,

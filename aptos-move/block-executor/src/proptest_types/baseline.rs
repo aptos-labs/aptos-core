@@ -16,7 +16,7 @@ use crate::{
     proptest_types::types::{MockOutput, MockTransaction, STORAGE_AGGREGATOR_VALUE},
 };
 use aptos_aggregator::{delta_change_set::serialize, transaction::AggregatorValue};
-use aptos_types::write_set::TransactionWrite;
+use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
 use claims::{assert_matches, assert_none, assert_some_eq};
 use itertools::izip;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
@@ -87,8 +87,8 @@ pub(crate) struct BaselineOutput<V> {
 impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
     /// Must be invoked after parallel execution to have incarnation information set and
     /// work with dynamic read/writes.
-    pub(crate) fn generate<K: Hash + Clone + Eq>(
-        txns: &[MockTransaction<K, V>],
+    pub(crate) fn generate<K: Hash + Clone + Eq, E: Debug + Clone + ReadWriteEvent>(
+        txns: &[MockTransaction<K, V, E>],
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         let mut current_world = HashMap::<K, BaselineValue<_>>::new();
@@ -207,9 +207,9 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
 
     // Used for testing, hence the function asserts the correctness conditions within
     // itself to be easily traceable in case of an error.
-    pub(crate) fn assert_output<K: Debug>(
+    pub(crate) fn assert_output<K: Debug, E: Debug>(
         &self,
-        results: &BlockExecutorResult<Vec<MockOutput<K, V>>, usize>,
+        results: &BlockExecutorResult<Vec<MockOutput<K, V, E>>, usize>,
     ) {
         match results {
             Ok(results) => {
@@ -227,7 +227,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                         .as_ref()
                         .expect("Aggregator failures not yet tested")
                         .iter()
-                        .zip(output.2.iter())
+                        .zip(output.read_results.iter())
                         .for_each(|(baseline_read, result_read)| {
                             baseline_read.assert_read_result(result_read)
                         });
@@ -236,7 +236,13 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
                         .as_ref()
                         .expect("Aggregator failures not yet tested")
                         .iter()
-                        .zip(output.3.get().expect("Delta writes must be set").iter())
+                        .zip(
+                            output
+                                .materialized_delta_writes
+                                .get()
+                                .expect("Delta writes must be set")
+                                .iter(),
+                        )
                         .for_each(|(baseline_delta_write, (_, result_delta_write))| {
                             assert_eq!(
                                 *baseline_delta_write,
@@ -249,14 +255,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineOutput<V> {
 
                 results.iter().skip(committed).for_each(|output| {
                     // Ensure the transaction is skipped based on the output.
-                    assert_eq!(output.0.len(), 0);
-                    assert_eq!(output.1.len(), 0);
-                    assert_eq!(output.2.len(), 0);
-                    assert_eq!(output.4, 0);
+                    assert!(output.writes.is_empty());
+                    assert!(output.deltas.is_empty());
+                    assert!(output.read_results.is_empty());
+                    assert_eq!(output.total_gas, 0);
 
                     // Implies that materialize_delta_writes was never called, as should
                     // be for skipped transactions.
-                    assert_none!(output.3.get());
+                    assert_none!(output.materialized_delta_writes.get());
                 });
             },
             Err(BlockExecutorError::UserError(idx)) => {

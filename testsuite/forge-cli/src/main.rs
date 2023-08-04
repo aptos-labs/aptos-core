@@ -6,8 +6,11 @@ use anyhow::{format_err, Context, Result};
 use aptos_config::config::{ChainHealthBackoffValues, ConsensusConfig, PipelineBackpressureValues};
 use aptos_forge::{
     args::TransactionTypeArg,
-    success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
-    system_metrics::{MetricsThreshold, SystemMetricsThreshold},
+    prometheus_metrics::LatencyBreakdownSlice,
+    success_criteria::{
+        LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
+        SuccessCriteria, SystemMetricsThreshold,
+    },
     ForgeConfig, Options, *,
 };
 use aptos_logger::{info, Level};
@@ -41,7 +44,7 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, __derive_refs::once_cell::sync::Lazy};
 use futures::stream::{FuturesUnordered, StreamExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
@@ -215,6 +218,24 @@ struct Resize {
     #[clap(long, help = "If set, enables HAProxy for each of the validators")]
     enable_haproxy: bool,
 }
+
+// common metrics thresholds:
+static SYSTEM_12_CORES_5GB_THRESHOLD: Lazy<SystemMetricsThreshold> = Lazy::new(|| {
+    SystemMetricsThreshold::new(
+        // Check that we don't use more than 12 CPU cores for 30% of the time.
+        MetricsThreshold::new(12.0, 30),
+        // Check that we don't use more than 5 GB of memory for 30% of the time.
+        MetricsThreshold::new_gb(5.0, 30),
+    )
+});
+static SYSTEM_12_CORES_10GB_THRESHOLD: Lazy<SystemMetricsThreshold> = Lazy::new(|| {
+    SystemMetricsThreshold::new(
+        // Check that we don't use more than 12 CPU cores for 30% of the time.
+        MetricsThreshold::new(12.0, 30),
+        // Check that we don't use more than 10 GB of memory for 30% of the time.
+        MetricsThreshold::new_gb(10.0, 30),
+    )
+});
 
 /// Make an easy to remember random namespace for your testnet
 fn random_namespace<R: Rng>(dictionary: Vec<String>, rng: &mut R) -> Result<String> {
@@ -679,12 +700,7 @@ fn twin_validator_test() -> ForgeConfig {
             SuccessCriteria::new(5500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
-                ))
+                .add_system_metrics_threshold(SYSTEM_12_CORES_5GB_THRESHOLD.clone())
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -958,9 +974,9 @@ fn graceful_overload() -> ForgeConfig {
                 .add_wait_for_catchup_s(120)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 40),
+                    MetricsThreshold::new(12.0, 40),
                     // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                    MetricsThreshold::new_gb(5.0, 30),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -1009,9 +1025,9 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
                     // overload test uses more CPUs than others, so increase the limit
                     // Check that we don't use more than 18 CPU cores for 30% of the time.
-                    MetricsThreshold::new(18, 40),
+                    MetricsThreshold::new(18.0, 40),
                     // Check that we don't use more than 5 GB of memory for 30% of the time.
-                    MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
+                    MetricsThreshold::new_gb(5.0, 30),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -1417,12 +1433,7 @@ fn validators_join_and_leave() -> ForgeConfig {
             SuccessCriteria::new(5000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-                ))
+                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -1452,12 +1463,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
                 // Give at least 60s for catchup, give 10% of the run for longer durations.
                 (duration.as_secs() / 10).max(60),
             )
-            .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                // Check that we don't use more than 12 CPU cores for 30% of the time.
-                MetricsThreshold::new(12, 30),
-                // Check that we don't use more than 10 GB of memory for 30% of the time.
-                MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-            ))
+            .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
             .add_chain_progress(StateProgressThreshold {
                 max_no_progress_secs: 10.0,
                 max_round_gap: 4,
@@ -1518,13 +1524,19 @@ fn realistic_env_max_load_test(
                     (duration.as_secs() / 10).max(60),
                 )
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(14, max_cpu_threshold),
+                    // Check that we don't use more than 14 CPU cores for 30% of the time.
+                    MetricsThreshold::new(14.0, max_cpu_threshold),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                    MetricsThreshold::new_gb(10.0, 30),
                 ))
-                .add_latency_threshold(3.0, LatencyType::P50)
-                .add_latency_threshold(5.0, LatencyType::P90)
+                .add_latency_threshold(3.4, LatencyType::P50)
+                .add_latency_threshold(4.5, LatencyType::P90)
+                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
+                    (LatencyBreakdownSlice::QsBatchToPos, 0.3),
+                    (LatencyBreakdownSlice::QsPosToProposal, 0.25),
+                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.8),
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.6),
+                ]))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -1580,9 +1592,9 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     // Tuned for throughput uses more cores than regular tests,
                     // as it achieves higher throughput.
                     // Check that we don't use more than 14 CPU cores for 30% of the time.
-                    MetricsThreshold::new(14, 30),
+                    MetricsThreshold::new(14.0, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                    MetricsThreshold::new_gb(10.0, 30),
                 ))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
@@ -1612,12 +1624,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig {
                 },
             )
             .add_no_restarts()
-            .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                // Check that we don't use more than 12 CPU cores for 30% of the time.
-                MetricsThreshold::new(12, 30),
-                // Check that we don't use more than 5 GB of memory for 30% of the time.
-                MetricsThreshold::new(5 * 1024 * 1024 * 1024, 30),
-            )),
+            .add_system_metrics_threshold(SYSTEM_12_CORES_5GB_THRESHOLD.clone()),
         )
 }
 
@@ -1791,12 +1798,7 @@ fn quorum_store_reconfig_enable_test() -> ForgeConfig {
             SuccessCriteria::new(5000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-                ))
+                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
@@ -1863,12 +1865,7 @@ fn multiregion_benchmark_test() -> ForgeConfig {
                     // Give at least 60s for catchup, give 10% of the run for longer durations.
                     180,
                 )
-                .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 12 CPU cores for 30% of the time.
-                    MetricsThreshold::new(12, 30),
-                    // Check that we don't use more than 10 GB of memory for 30% of the time.
-                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-                ))
+                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
