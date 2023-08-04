@@ -9,7 +9,7 @@ from .transaction_emitter import transaction_emitter_main
 from test_framework.shell import LocalShell
 from test_framework.filesystem import LocalFilesystem
 from test_framework.kubernetes import LiveKubernetes
-from typing import Optional
+from typing import Optional, List
 import random
 import string
 import os
@@ -195,15 +195,21 @@ def update(testnet_name: str, pangu_node_configs_path: str):
     )
 
 
-@click.command(help="Create a transaction emitter for a testnet by name.")
+@click.command(
+    help="Create a transaction emitter for a testnet by name.",
+    context_settings=dict(ignore_unknown_options=True),
+)
 @click.argument("testnet_name")
-def transaction_emitter(testnet_name: str):
+@click.argument("args", nargs=-1, required=True)
+def transaction_emitter(testnet_name: str, args: List[str]):
     """Create a transaction emitter for a testnet by name.
 
     Args:
         testnet_name (str): the testnet to add a transaction emitter to
     """
+
     transaction_emitter_main(
         testnet_name,
-        SystemContext(LocalShell(), LocalFilesystem(), LiveKubernetes()),
+        args,
+        system_context=SystemContext(LocalShell(), LocalFilesystem(), LiveKubernetes()),
     )
