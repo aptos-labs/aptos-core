@@ -41,6 +41,16 @@ pub fn resource_size(resource: &Option<Vec<u8>>) -> usize {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ResourceResolver {
+    // Note:
+    //
+    // This methods takes an optional layout argument in order to pass it to
+    // the adapter so that aggregator liftings can be handled.
+    // If it is None:
+    //   - The method simply returns resource bytes.
+    // If it is Some(..):
+    //   - Every location which is tagged as aggregator lifting is replaced with unique identifiers.
+    //   - The returned resource bytes do not have real values at these locations anymore, only
+    //     identifiers.
     fn get_resource_with_metadata_and_layout(
         &self,
         address: &AccountAddress,

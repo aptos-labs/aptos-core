@@ -88,6 +88,14 @@ pub struct TableChange {
 /// A table resolver which needs to be provided by the environment. This allows to lookup
 /// data in remote storage, as well as retrieve cost of table operations.
 pub trait TableResolver {
+    // Note:
+    //
+    // This methods takes an optional layout argument to handle aggregator liftings.
+    // If it is None:
+    //   - The method simply returns bytes of a table item.
+    // If it is Some(..):
+    //   - Every location which is tagged as aggregator lifting is replaced with unique identifiers.
+    //   - The returned table item bytes do not have real values at these locations anymore.
     fn resolve_table_entry_with_layout(
         &self,
         handle: &TableHandle,
