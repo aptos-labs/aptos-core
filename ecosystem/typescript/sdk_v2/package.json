@@ -1,0 +1,66 @@
+{
+  "name": "aptos",
+  "description": "Aptos SDK",
+  "packageManager": "pnpm@8.3.1",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=11.0.0"
+  },
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.mjs",
+  "exports": {
+    "node": {
+      "types": "./dist/src/index.d.ts",
+      "require": "./dist/cjs/index.js",
+      "import": "./dist/cjs/index.js"
+    },
+    "types": "./dist/types/index.d.ts",
+    "default": "./dist/esm/index.mjs"
+  },
+  "scripts": {
+    "build:clean": "rm -rf dist",
+    "build": "pnpm build:clean && pnpm run _build:types && pnpm _build:esm && pnpm _build:cjs && pnpm _build:browser",
+    "_build:browser": "tsup src/index.ts --platform browser --format iife --global-name aptosSDK --minify --out-dir dist/browser",
+    "_build:esm": "tsup src/index.ts --format esm --dts --out-dir dist/esm",
+    "_build:cjs": "tsup src/index.ts --format cjs --dts --out-dir dist/cjs",
+    "_build:types": "tsup src/types/index.ts --dts --out-dir dist/types",
+    "generate-openapi-response-types": "openapi -i ../../../../api/doc/spec.yaml -o ./src/types/generated --exportCore=false --exportServices=false",
+    "lint": "eslint \"**/*.ts\""
+  },
+  "dependencies": {
+    "@aptos-labs/aptos-client": "^0.0.2",
+    "@noble/hashes": "1.1.3",
+    "@scure/bip39": "1.1.0",
+    "form-data": "4.0.0",
+    "tweetnacl": "1.0.3"
+  },
+  "devDependencies": {
+    "@graphql-codegen/cli": "^2.13.5",
+    "@graphql-codegen/import-types-preset": "^2.2.3",
+    "@graphql-codegen/typescript": "^2.7.3",
+    "@graphql-codegen/typescript-graphql-request": "^4.5.8",
+    "@graphql-codegen/typescript-operations": "^2.5.3",
+    "@types/jest": "28.1.8",
+    "@types/node": "18.6.2",
+    "@typescript-eslint/eslint-plugin": "5.36.2",
+    "@typescript-eslint/parser": "5.36.2",
+    "dotenv": "16.0.2",
+    "eslint": "8.23.0",
+    "eslint-config-airbnb-base": "15.0.0",
+    "eslint-config-airbnb-typescript": "17.0.0",
+    "eslint-config-prettier": "8.5.0",
+    "eslint-plugin-import": "2.26.0",
+    "graphql": "^16.5.0",
+    "graphql-request": "5.1.0",
+    "jest": "28.1.3",
+    "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.24.0-p1/openapi-typescript-codegen-v0.24.0-p1.tgz",
+    "prettier": "2.6.2",
+    "ts-jest": "28.0.8",
+    "ts-loader": "9.3.1",
+    "ts-node": "10.9.1",
+    "tsup": "6.2.3",
+    "typedoc": "^0.23.20",
+    "typescript": "4.8.2"
+  },
+  "version": "2.0.0"
+}
