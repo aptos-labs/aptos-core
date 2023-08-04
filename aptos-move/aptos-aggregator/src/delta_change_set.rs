@@ -15,7 +15,7 @@ use aptos_types::{
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 use std::collections::{btree_map::Entry, BTreeMap};
 
-/// When `Addition` operation overflows the `limit`.
+/// When `Addition` operation overflows the `max_value`.
 pub(crate) const EADD_OVERFLOW: u64 = 0x02_0001;
 
 /// When `Subtraction` operation goes below zero.
@@ -32,9 +32,9 @@ pub struct DeltaOp {
     min_overflow_positive: Option<u128>,
     /// Maximum negative delta observed during execution that result in an underflow.
     max_underflow_negative: Option<u128>,
-    /// Postcondition: delta overflows on exceeding this limit or going below
+    /// Postcondition: delta overflows on exceeding this max_value or going below
     /// zero.
-    limit: u128,
+    max_value: u128,
     /// Delta which is the result of the execution.
     update: DeltaUpdate,
 }
@@ -50,7 +50,7 @@ impl DeltaOp {
     /// Creates a new delta op.
     pub fn new(
         update: DeltaUpdate,
-        limit: u128,
+        max_value: u128,
         max_achieved_positive: u128,
         min_achieved_negative: u128,
         min_overflow_positive: Option<u128>,
@@ -61,7 +61,7 @@ impl DeltaOp {
             min_achieved_negative,
             min_overflow_positive,
             max_underflow_negative,
-            limit,
+            max_value,
             update,
         }
     }
@@ -78,12 +78,12 @@ impl DeltaOp {
         // this is possible if the values observed during execution didn't
         // overflow or dropped below zero. The check can be emulated by actually
         // doing addition and subtraction.
-        addition(base, self.max_achieved_positive, self.limit)?;
+        addition(base, self.max_achieved_positive, self.max_value)?;
         subtraction(base, self.min_achieved_negative)?;
 
         // If delta has been successfully validated, apply the update.
         match self.update {
-            DeltaUpdate::Plus(value) => addition(base, value, self.limit),
+            DeltaUpdate::Plus(value) => addition(base, value, self.max_value),
             DeltaUpdate::Minus(value) => subtraction(base, value),
         }
     }
@@ -93,7 +93,7 @@ impl DeltaOp {
         match delta.update {
             // Suppose that maximum value seen is +M and we shift by +V. Then the
             // new maximum value is M+V provided addition do no overflow.
-            DeltaUpdate::Plus(value) => addition(value, self.max_achieved_positive, self.limit),
+            DeltaUpdate::Plus(value) => addition(value, self.max_achieved_positive, self.max_value),
             // Suppose that maximum value seen is +M and we shift by -V this time.
             // If M >= V, the result is +(M-V). Otherwise, `self` should have never
             // reached any positive value. By convention, we use 0 for the latter
@@ -118,7 +118,7 @@ impl DeltaOp {
             // Otherwise, given  the minimum value of -M and the shift of -V the new
             // minimum value becomes -(M+V), which of course can overflow on addition,
             // implying that we subtracted too much and there was an underflow.
-            DeltaUpdate::Minus(value) => addition(value, self.min_achieved_negative, self.limit),
+            DeltaUpdate::Minus(value) => addition(value, self.min_achieved_negative, self.max_value),
         }
     }
 
@@ -129,14 +129,14 @@ impl DeltaOp {
         use DeltaUpdate::*;
 
         assert_eq!(
-            self.limit, previous_delta.limit,
-            "Cannot merge deltas with different limits",
+            self.max_value, previous_delta.max_value,
+            "Cannot merge deltas with different max_values",
         );
 
         // First, update the history values of this delta given that it starts from
         // +value or -value instead of 0. We should do this check to avoid cases like this:
         //
-        // Suppose we have deltas with limit of 100, and we have some `d2` which is +3 but it
+        // Suppose we have deltas with max_value of 100, and we have some `d2` which is +3 but it
         // was +99 at some point. Now, if we merge some `d1` which is +2 with `d2`, we get
         // the result is +5. However, it should not have happened because `d2` should hit
         // +2+99 > 100 at some point in history and fail.
@@ -150,7 +150,7 @@ impl DeltaOp {
         // or minus sign accordingly.
         macro_rules! update_same_sign {
             ($sign:ident, $a:ident, $b:ident) => {
-                self.update = $sign(addition($a, $b, self.limit)?)
+                self.update = $sign(addition($a, $b, self.max_value)?)
             };
         }
 
@@ -241,8 +241,8 @@ impl DeltaOp {
 }
 
 /// Implements application of `Addition` to `base`.
-pub fn addition(base: u128, value: u128, limit: u128) -> PartialVMResult<u128> {
-    if limit < base || value > (limit - base) {
+pub fn addition(base: u128, value: u128, max_value: u128) -> PartialVMResult<u128> {
+    if max_value < base || value > (max_value - base) {
         Err(abort_error(
             format!("overflow when adding {} to {}", value, base),
             EADD_OVERFLOW,
@@ -279,14 +279,14 @@ impl std::fmt::Debug for DeltaOp {
                 write!(
                     f,
                     "+{} ensures 0 <= result <= {}, range [-{}, {}]",
-                    value, self.limit, self.min_achieved_negative, self.max_achieved_positive
+                    value, self.max_value, self.min_achieved_negative, self.max_achieved_positive
                 )
             },
             DeltaUpdate::Minus(value) => {
                 write!(
                     f,
                     "-{} ensures 0 <= result <= {}, range [-{}, {}]",
-                    value, self.limit, self.min_achieved_negative, self.max_achieved_positive
+                    value, self.max_value, self.min_achieved_negative, self.max_achieved_positive
                 )
             },
         }
@@ -304,13 +304,13 @@ pub fn deserialize(value_bytes: &[u8]) -> u128 {
 }
 
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
-pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v, None, None)
+pub fn delta_sub(v: u128, max_value: u128) -> DeltaOp {
+    DeltaOp::new(DeltaUpdate::Minus(v), max_value, 0, v, None, None)
 }
 
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
-pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0, None, None)
+pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
+    DeltaOp::new(DeltaUpdate::Plus(v), max_value, v, 0, None, None)
 }
 
 /// `DeltaChangeSet` contains all access paths that one transaction wants to update with deltas.
@@ -433,15 +433,15 @@ mod test {
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
     use once_cell::sync::Lazy;
 
-    fn delta_add_with_history(v: u128, limit: u128, max: u128, min: u128) -> DeltaOp {
-        let mut delta = delta_add(v, limit);
+    fn delta_add_with_history(v: u128, max_value: u128, max: u128, min: u128) -> DeltaOp {
+        let mut delta = delta_add(v, max_value);
         delta.max_achieved_positive = max;
         delta.min_achieved_negative = min;
         delta
     }
 
-    fn delta_sub_with_history(v: u128, limit: u128, max: u128, min: u128) -> DeltaOp {
-        let mut delta = delta_sub(v, limit);
+    fn delta_sub_with_history(v: u128, max_value: u128, max: u128, min: u128) -> DeltaOp {
+        let mut delta = delta_sub(v, max_value);
         delta.max_achieved_positive = max;
         delta.min_achieved_negative = min;
         delta

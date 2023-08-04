@@ -79,7 +79,7 @@ impl<'a> NativeAggregatorContext<'a> {
 
         // First, process all writes and deltas.
         for (id, aggregator) in aggregators {
-            let (value, state, limit, history) = aggregator.into();
+            let (value, state, max_value, history) = aggregator.into();
 
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
@@ -88,7 +88,7 @@ impl<'a> NativeAggregatorContext<'a> {
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op = DeltaOp::new(
                         plus,
-                        limit,
+                        max_value,
                         history.max_achieved_positive,
                         history.min_achieved_negative,
                         history.min_overflow_positive,
@@ -101,7 +101,7 @@ impl<'a> NativeAggregatorContext<'a> {
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op = DeltaOp::new(
                         minus,
-                        limit,
+                        max_value,
                         history.max_achieved_positive,
                         history.min_achieved_negative,
                         history.min_overflow_positive,

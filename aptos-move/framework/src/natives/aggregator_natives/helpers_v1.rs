@@ -14,7 +14,7 @@ const PHANTOM_TABLE_FIELD_INDEX: usize = 0;
 /// The index of the `handle` field in the `Table` Move struct.
 const TABLE_HANDLE_FIELD_INDEX: usize = 0;
 
-/// Indices of `handle`, `key` and `limit` fields in the `Aggregator` Move
+/// Indices of `handle`, `key` and `max_value` fields in the `Aggregator` Move
 /// struct.
 const HANDLE_FIELD_INDEX: usize = 0;
 const KEY_FIELD_INDEX: usize = 1;
@@ -40,25 +40,25 @@ pub(crate) fn get_aggregator_field(aggregator: &StructRef, index: usize) -> Part
     field_ref.read_ref()
 }
 
-/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
+/// Returns ID and a max_value of aggrgegator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u128)> {
-    let (handle, key, limit) = get_aggregator_fields(aggregator)?;
-    Ok((AggregatorID::legacy(handle, key), limit))
+    let (handle, key, max_value) = get_aggregator_fields(aggregator)?;
+    Ok((AggregatorID::legacy(handle, key), max_value))
 }
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its
-/// fields: (`handle`, `key`, `limit`).
+/// fields: (`handle`, `key`, `max_value`).
 pub fn get_aggregator_fields(
     aggregator: &StructRef,
 ) -> PartialVMResult<(TableHandle, AggregatorHandle, u128)> {
     let handle =
         get_aggregator_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<AccountAddress>()?;
     let key = get_aggregator_field(aggregator, KEY_FIELD_INDEX)?.value_as::<AccountAddress>()?;
-    let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
-    Ok((TableHandle(handle), AggregatorHandle(key), limit))
+    let max_value = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
+    Ok((TableHandle(handle), AggregatorHandle(key), max_value))
 }
 
-/// Given an `Aggregator` Move struct, unpacks it into fields: (`handle`, `key`, `limit`).
+/// Given an `Aggregator` Move struct, unpacks it into fields: (`handle`, `key`, `max_value`).
 pub(crate) fn unpack_aggregator_struct(
     aggregator_struct: Struct,
 ) -> PartialVMResult<(TableHandle, AggregatorHandle, u128)> {
@@ -70,7 +70,7 @@ pub(crate) fn unpack_aggregator_struct(
             .map_or(Err(extension_error(msg)), |v| v.value_as::<u128>())
     };
 
-    let limit = pop_with_err(&mut fields, "unable to pop 'limit' field")?;
+    let max_value = pop_with_err(&mut fields, "unable to pop 'max_value' field")?;
     let key = fields
         .pop()
         .map_or(Err(extension_error("unable to pop `handle` field")), |v| {
@@ -81,5 +81,5 @@ pub(crate) fn unpack_aggregator_struct(
         .map_or(Err(extension_error("unable to pop `handle` field")), |v| {
             v.value_as::<AccountAddress>()
         })?;
-    Ok((TableHandle(handle), AggregatorHandle(key), limit))
+    Ok((TableHandle(handle), AggregatorHandle(key), max_value))
 }

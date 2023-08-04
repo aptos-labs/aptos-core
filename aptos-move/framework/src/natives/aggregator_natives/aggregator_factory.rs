@@ -18,7 +18,7 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 /***************************************************************************************************
- * native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
+ * native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, max_value: u128): Aggregator;
  *
  *   gas cost: base_cost
  *
@@ -32,9 +32,9 @@ fn native_new_aggregator(
 
     context.charge(AGGREGATOR_FACTORY_NEW_AGGREGATOR_BASE)?;
 
-    // Extract fields: `limit` of the new aggregator and a `phantom_handle` of
+    // Extract fields: `max_value` of the new aggregator and a `phantom_handle` of
     // the parent factory.
-    let limit = safely_pop_arg!(args, u128);
+    let max_value = safely_pop_arg!(args, u128);
     let handle = get_handle(&safely_pop_arg!(args, StructRef))?;
 
     // Get the current aggregator data.
@@ -56,12 +56,12 @@ fn native_new_aggregator(
     );
 
     let id = AggregatorID::legacy(handle, key);
-    aggregator_data.create_new_aggregator(id, limit);
+    aggregator_data.create_new_aggregator(id, max_value);
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
         Value::address(handle.0),
         Value::address(key.0),
-        Value::u128(limit),
+        Value::u128(max_value),
     ]))])
 }
 
