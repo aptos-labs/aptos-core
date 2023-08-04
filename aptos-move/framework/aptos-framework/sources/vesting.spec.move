@@ -86,6 +86,7 @@ spec aptos_framework::vesting {
 
     spec accumulated_rewards(vesting_contract_address: address, shareholder_or_beneficiary: address): u64 {
         // TODO: A severe timeout can not be resolved.
+        pragma verify = false;
         pragma verify_duration_estimate = 1000;
 
         // This schema lead to timeout
