@@ -1935,7 +1935,7 @@ fn pfn_performance(
         // Because of the long state sync time, we need more backlog to saturate. If perfectly
         // balanced, 70K should be enough (7K TPS * 10s RTT).
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 150000,
+            mempool_backlog: 70000,
         }))
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
