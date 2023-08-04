@@ -5,6 +5,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 ## Unreleased
 
 - Add support for a fee payer transaction
+- Return transaction message error when transaction has failed when `checkSuccess` is set to true
 
 ## 1.16.0 (2023-08-02)
 
