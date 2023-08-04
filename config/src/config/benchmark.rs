@@ -20,15 +20,22 @@ pub struct BenchmarkConfig {
     pub rpc_in_flight: usize,
 }
 
+impl BenchmarkConfig {
+    // for hacking NodeConfig serde(default="")
+    pub fn default_some() -> Option<Self> {
+        Some(Self::default())
+    }
+}
+
 impl Default for BenchmarkConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             max_network_channel_size: 1000,
             benchmark_service_threads: Some(2),
 
-            enable_direct_send_testing: false,
-            direct_send_data_size: 100 * 1024, // 100 KB
+            enable_direct_send_testing: true,
+            direct_send_data_size: 100_000,
             direct_send_per_second: 1_000,
 
             enable_rpc_testing: false,
