@@ -3,7 +3,7 @@
 
 use crate::collectors::BasicNodeInfoCollector;
 use aptos_infallible::Mutex;
-use aptos_logger::{warn};
+use aptos_logger::warn;
 use cfg_if::cfg_if;
 use collectors::{
     CollectorLatencyCollector, CpuMetricsCollector, DiskMetricsCollector, LoadAvgCollector,
