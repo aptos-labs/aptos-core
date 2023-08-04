@@ -362,6 +362,59 @@ test(
 );
 
 test(
+  "it returns succeed transaction data",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+    const sender = new AptosAccount();
+    const receiver = new AptosAccount();
+    await faucetClient.fundAccount(sender.address(), 100_000_000);
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x1::aptos_account",
+        "transfer",
+        [],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver.address())), bcsSerializeUint64(1000)],
+      ),
+    );
+    const txn = await client.generateSignSubmitWaitForTransaction(sender, entryFunctionPayload, { checkSuccess: true });
+    expect((txn as any).success).toBeTruthy();
+    expect(txn as any).toHaveProperty("changes");
+    expect((txn as any).vm_status).toEqual("Executed successfully");
+  },
+  longTestTimeout,
+);
+
+test(
+  "it returns failed transaction reason",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = getFaucetClient();
+    const sender = new AptosAccount();
+    const receiver = new AptosAccount();
+    await faucetClient.fundAccount(sender.address(), 100_000_000);
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x1::aptos_account",
+        "transfer",
+        [],
+        [bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver.address()))],
+      ),
+    );
+
+    const rawTxn = await client.generateRawTransaction(sender.address(), entryFunctionPayload);
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTxn);
+    const txn = await client.submitSignedBCSTransaction(bcsTxn);
+    expect(async () => {
+      await client.waitForTransactionWithResult(txn.hash, { checkSuccess: true });
+    }).rejects.toThrow(
+      `Transaction ${txn.hash} failed with an error: Transaction Executed and Committed with Error NUMBER_OF_ARGUMENTS_MISMATCH`,
+    );
+  },
+  longTestTimeout,
+);
+
+test(
   "submits bcs transaction simulation",
   async () => {
     const client = new AptosClient(NODE_URL);
