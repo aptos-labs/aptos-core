@@ -13,7 +13,7 @@ Validator nodes and fullnodes form a hierarchical structure with validator nodes
 
 Aptos operates with these node types:
 
-* [Validator nodes (VNs)](../nodes/validator-node/index.md) - participates in consensus and drives [transaction processing](../concepts/staking.md).
+* [Validator nodes (VNs)](../nodes/validator-node/index.md) - participates in consensus and drives [transaction processing](../concepts/txns-states.md).
 * Validator fullnodes (VFNs) - captures and keeps up-to-date on the state of the blockchain; run by the validator operator, so it can connect directly to the validator node and therefore serve requests from public fullnodes. Otherwise, it works like a public fullnode.
 * [Public fullnodes (PFNs)](../nodes/full-node/index.md) -  run by someone who is not a validator operator, PFNs cannot connect directly to a validator node and therefore rely upon VFNs for synchronization.
 * [Archival nodes (ANs)](../guides/state-sync.md#running-archival-nodes) - is a fullnode that contains all blockchain data since the start of the blockchain's history.

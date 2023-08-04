@@ -21,3 +21,22 @@ pub static SHARDED_BLOCK_EXECUTION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Count of the committed transactions since last restart.
+pub static SHARDED_BLOCK_EXECUTOR_TXN_COUNT: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "sharded_block_executor_txn_count",
+        "Count of number of transactions per shard per round in sharded execution",
+        &["shard_id", "round_id"]
+    )
+    .unwrap()
+});
+
+pub static CROSS_SHARD_STATE_VALUE_TIMER_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "cross_shard_state_value_timer_seconds",
+        "Timer for various operations on the cross shard state view in seconds",
+        &["shard_id", "round_id", "op"]
+    )
+    .unwrap()
+});

@@ -12,11 +12,11 @@ use aptos_framework::natives::{
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
-use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
+use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
-use move_table_extension::NativeTableContext;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
@@ -39,7 +39,7 @@ pub fn get_max_binary_format_version(features: &Features, gas_feature_version: u
 impl MoveVmExt {
     pub fn new(
         native_gas_params: NativeGasParameters,
-        abs_val_size_gas_params: AbstractValueSizeGasParameters,
+        misc_gas_params: MiscGasParameters,
         gas_feature_version: u64,
         chain_id: u8,
         features: Features,
@@ -56,14 +56,23 @@ impl MoveVmExt {
         let type_size_limit = true;
 
         let verifier_config = verifier_config(&features, &timed_features);
-        let features = Arc::new(features);
+
+        let mut type_max_cost = 0;
+        let mut type_base_cost = 0;
+        let mut type_byte_cost = 0;
+        if timed_features.is_enabled(TimedFeatureFlag::LimitTypeTagSize) {
+            // 5000 limits type tag total size < 5000 bytes and < 50 nodes
+            type_max_cost = 5000;
+            type_base_cost = 100;
+            type_byte_cost = 1;
+        }
 
         Ok(Self {
             inner: MoveVM::new_with_config(
                 aptos_natives(
-                    native_gas_params,
-                    abs_val_size_gas_params,
                     gas_feature_version,
+                    native_gas_params,
+                    misc_gas_params,
                     timed_features,
                     features.clone(),
                 ),
@@ -74,10 +83,13 @@ impl MoveVmExt {
                     enable_invariant_violation_check_in_swap_loc,
                     type_size_limit,
                     max_value_nest_depth: Some(128),
+                    type_max_cost,
+                    type_base_cost,
+                    type_byte_cost,
                 },
             )?,
             chain_id,
-            features,
+            features: Arc::new(features),
         })
     }
 
@@ -85,7 +97,6 @@ impl MoveVmExt {
         &self,
         remote: &'r S,
         session_id: SessionId,
-        aggregator_enabled: bool,
     ) -> SessionExt<'r, '_> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
@@ -97,11 +108,7 @@ impl MoveVmExt {
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(
-            txn_hash,
-            remote,
-            aggregator_enabled,
-        ));
+        extensions.add(NativeAggregatorContext::new(txn_hash, remote));
 
         let sender_opt = session_id.sender();
         let script_hash = match session_id {

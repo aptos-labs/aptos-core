@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod delegation_pool;
+pub mod utils;
+
 #[cfg(feature = "no-upload-proposal")]
 use crate::common::utils::read_from_file;
 use crate::{
@@ -11,9 +14,11 @@ use crate::{
         },
         utils::prompt_yes_with_override,
     },
+    governance::utils::*,
     move_tool::{FrameworkPackageArgs, IncludedArtifacts},
     CliCommand, CliResult,
 };
+use aptos_api_types::ViewRequest;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
 use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
@@ -59,6 +64,8 @@ pub enum GovernanceTool {
     ExecuteProposal(ExecuteProposal),
     GenerateUpgradeProposal(GenerateUpgradeProposal),
     ApproveExecutionHash(ApproveExecutionHash),
+    #[clap(subcommand)]
+    DelegationPool(delegation_pool::DelegationPoolTool),
 }
 
 impl GovernanceTool {
@@ -73,6 +80,7 @@ impl GovernanceTool {
             ListProposals(tool) => tool.execute_serialized().await,
             VerifyProposal(tool) => tool.execute_serialized().await,
             ApproveExecutionHash(tool) => tool.execute_serialized().await,
+            DelegationPool(tool) => tool.execute().await,
         }
     }
 }
@@ -273,6 +281,14 @@ async fn get_proposal(
 /// Submit a governance proposal
 #[derive(Parser)]
 pub struct SubmitProposal {
+    #[clap(flatten)]
+    pub(crate) pool_address_args: PoolAddressArgs,
+    #[clap(flatten)]
+    pub(crate) args: SubmitProposalArgs,
+}
+
+#[derive(Parser)]
+pub struct SubmitProposalArgs {
     /// Location of the JSON metadata of the proposal
     ///
     /// If this location does not keep the metadata in the exact format, it will be less likely
@@ -294,18 +310,12 @@ pub struct SubmitProposal {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
-    pub(crate) pool_address_args: PoolAddressArgs,
-    #[clap(flatten)]
     pub(crate) compile_proposal_args: CompileScriptFunction,
 }
 
-#[async_trait]
-impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
-    fn command_name(&self) -> &'static str {
-        "SubmitProposal"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<ProposalSubmissionSummary> {
+impl SubmitProposalArgs {
+    /// Compile the proposal and return the script hash and metadata hash.
+    pub async fn compile_proposals(&self) -> CliTypedResult<(HashValue, HashValue)> {
         let (_bytecode, script_hash) = self
             .compile_proposal_args
             .compile("SubmitProposal", self.txn_options.prompt_options)?;
@@ -317,61 +327,9 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
             "{}\n\tMetadata Hash: {}\n\tScript Hash: {}",
             metadata, metadata_hash, script_hash
         );
-        prompt_yes_with_override(
-            "Do you want to submit this proposal?",
-            self.txn_options.prompt_options,
-        )?;
-
-        let txn: Transaction = if self.is_multi_step {
-            self.txn_options
-                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal_v2(
-                    self.pool_address_args.pool_address,
-                    script_hash.to_vec(),
-                    self.metadata_url.to_string().as_bytes().to_vec(),
-                    metadata_hash.to_hex().as_bytes().to_vec(),
-                    true,
-                ))
-                .await?
-        } else {
-            self.txn_options
-                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
-                    self.pool_address_args.pool_address,
-                    script_hash.to_vec(),
-                    self.metadata_url.to_string().as_bytes().to_vec(),
-                    metadata_hash.to_hex().as_bytes().to_vec(),
-                ))
-                .await?
-        };
-        let txn_summary = TransactionSummary::from(&txn);
-        if let Transaction::UserTransaction(inner) = txn {
-            // Find event with proposal id
-            let proposal_id = if let Some(event) = inner.events.into_iter().find(|event| {
-                event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
-            }) {
-                let data: CreateProposalEvent =
-                    serde_json::from_value(event.data).map_err(|_| {
-                        CliError::UnexpectedError(
-                            "Failed to parse Proposal event to get ProposalId".to_string(),
-                        )
-                    })?;
-                Some(data.proposal_id.0)
-            } else {
-                warn!("No proposal event found to find proposal id");
-                None
-            };
-
-            return Ok(ProposalSubmissionSummary {
-                proposal_id,
-                transaction: txn_summary,
-            });
-        }
-        Err(CliError::UnexpectedError(
-            "Unable to find parse proposal transaction output".to_string(),
-        ))
+        Ok((script_hash, metadata_hash))
     }
-}
 
-impl SubmitProposal {
     /// Retrieve metadata and validate it
     async fn get_metadata(&self) -> CliTypedResult<(ProposalMetadata, HashValue)> {
         #[cfg(feature = "no-upload-proposal")]
@@ -406,6 +364,51 @@ impl SubmitProposal {
     }
 }
 
+#[async_trait]
+impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
+    fn command_name(&self) -> &'static str {
+        "SubmitProposal"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<ProposalSubmissionSummary> {
+        // Validate the proposal metadata
+        let (script_hash, metadata_hash) = self.args.compile_proposals().await?;
+        prompt_yes_with_override(
+            "Do you want to submit this proposal?",
+            self.args.txn_options.prompt_options,
+        )?;
+
+        let txn: Transaction = if self.args.is_multi_step {
+            self.args
+                .txn_options
+                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal_v2(
+                    self.pool_address_args.pool_address,
+                    script_hash.to_vec(),
+                    self.args.metadata_url.to_string().as_bytes().to_vec(),
+                    metadata_hash.to_hex().as_bytes().to_vec(),
+                    true,
+                ))
+                .await?
+        } else {
+            self.args
+                .txn_options
+                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
+                    self.pool_address_args.pool_address,
+                    script_hash.to_vec(),
+                    self.args.metadata_url.to_string().as_bytes().to_vec(),
+                    metadata_hash.to_hex().as_bytes().to_vec(),
+                ))
+                .await?
+        };
+        let txn_summary = TransactionSummary::from(&txn);
+        let proposal_id = extract_proposal_id(&txn)?;
+        Ok(ProposalSubmissionSummary {
+            proposal_id,
+            transaction: txn_summary,
+        })
+    }
+}
+
 /// Retrieve the Metadata from the given URL
 async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
     let client = reqwest::ClientBuilder::default()
@@ -433,6 +436,32 @@ async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
         })
 }
 
+/// Extract the proposal id from the events of a proposal creation transaction.
+fn extract_proposal_id(txn: &Transaction) -> CliTypedResult<Option<u64>> {
+    if let Transaction::UserTransaction(inner) = txn {
+        // Find event with proposal id
+        let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
+            event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
+        }) {
+            let data: CreateProposalEvent =
+                serde_json::from_value(event.data.clone()).map_err(|_| {
+                    CliError::UnexpectedError(
+                        "Failed to parse Proposal event to get ProposalId".to_string(),
+                    )
+                })?;
+            Some(data.proposal_id.0)
+        } else {
+            warn!("No proposal event found to find proposal id");
+            None
+        };
+
+        return Ok(proposal_id);
+    }
+    Err(CliError::UnexpectedError(
+        "Unable to find parse proposal transaction output".to_string(),
+    ))
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct CreateProposalEvent {
     proposal_id: U64,
@@ -447,10 +476,21 @@ pub struct ProposalSubmissionSummary {
 
 /// Submit a vote on a proposal
 ///
-/// Votes can only be given on proposals that are currently open for voting.  You can vote
+/// Votes can only be given on proposals that are currently open for voting. You can vote
 /// with `--yes` for a yes vote, and `--no` for a no vote.
 #[derive(Parser)]
 pub struct SubmitVote {
+    /// Space separated list of pool addresses.
+    #[clap(long, num_args = 0.., value_parser = crate::common::types::load_account_arg)]
+    pub(crate) pool_addresses: Vec<AccountAddress>,
+
+    #[clap(flatten)]
+    pub(crate) args: SubmitVoteArgs,
+}
+
+#[derive(Parser)]
+#[group(id = "vote", required = true, multiple = false)]
+pub struct SubmitVoteArgs {
     /// Id of the proposal to vote on
     #[clap(long)]
     pub(crate) proposal_id: u64,
@@ -463,36 +503,29 @@ pub struct SubmitVote {
     #[clap(long, group = "vote")]
     pub(crate) no: bool,
 
-    /// Space separated list of pool addresses.
-    #[clap(long, num_args = 0.., value_parser = crate::common::types::load_account_arg)]
-    pub(crate) pool_addresses: Vec<AccountAddress>,
+    /// Voting power to use for the vote.  If not specified, all the voting power will be used.
+    #[clap(long)]
+    pub(crate) voting_power: Option<u64>,
 
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
 
-#[async_trait]
-impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
-    fn command_name(&self) -> &'static str {
-        "SubmitVote"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<Vec<TransactionSummary>> {
-        let (vote_str, vote) = match (self.yes, self.no) {
-            (true, false) => ("Yes", true),
-            (false, true) => ("No", false),
-            (_, _) => {
-                return Err(CliError::CommandArgumentError(
-                    "Must choose only either --yes or --no".to_string(),
-                ));
-            },
+impl SubmitVote {
+    // Partial governance voting is controlled by a feature flag. If the feature flag is on, the way
+    // to check voting power will be different.
+    async fn vote_before_partial_governance_voting(
+        &self,
+        client: &Client,
+        vote: bool,
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
+        if self.args.voting_power.is_some() {
+            return Err(CliError::CommandArgumentError(
+                "Specifying voting power is not supported before partial governance voting feature flag is enabled".to_string(),
+            ));
         };
 
-        let client: &Client = &self
-            .txn_options
-            .rest_options
-            .client(&self.txn_options.profile_options)?;
-        let proposal_id = self.proposal_id;
+        let proposal_id = self.args.proposal_id;
         let voting_records = client
             .get_account_resource_bcs::<VotingRecords>(
                 CORE_CODE_ADDRESS,
@@ -504,7 +537,7 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
             .votes;
 
         let mut summaries: Vec<TransactionSummary> = vec![];
-        for pool_address in self.pool_addresses {
+        for pool_address in &self.pool_addresses {
             let voting_record = client
                 .get_table_item(
                     voting_records,
@@ -512,7 +545,7 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
                     "bool",
                     VotingRecord {
                         proposal_id: proposal_id.to_string(),
-                        stake_pool: pool_address,
+                        stake_pool: *pool_address,
                     },
                 )
                 .await;
@@ -522,12 +555,12 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
                 false
             };
             if voted {
-                println!("Stake pool {} already voted", pool_address);
+                println!("Stake pool {} already voted", *pool_address);
                 continue;
             }
 
             let stake_pool = client
-                .get_account_resource_bcs::<StakePool>(pool_address, "0x1::stake::StakePool")
+                .get_account_resource_bcs::<StakePool>(*pool_address, "0x1::stake::StakePool")
                 .await?
                 .into_inner();
             let voting_power = stake_pool.get_governance_voting_power();
@@ -535,15 +568,18 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
             prompt_yes_with_override(
                 &format!(
                     "Vote {} with voting power = {} from stake pool {}?",
-                    vote_str, voting_power, pool_address
+                    vote_to_string(vote),
+                    voting_power,
+                    pool_address
                 ),
-                self.txn_options.prompt_options,
+                self.args.txn_options.prompt_options,
             )?;
 
             summaries.push(
-                self.txn_options
+                self.args
+                    .txn_options
                     .submit_transaction(aptos_stdlib::aptos_governance_vote(
-                        pool_address,
+                        *pool_address,
                         proposal_id,
                         vote,
                     ))
@@ -552,6 +588,125 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
             );
         }
         Ok(summaries)
+    }
+
+    // Partial governance voting is controlled by a feature flag. If the feature flag is on, the way
+    // to check voting power will be different.
+    async fn vote_after_partial_governance_voting(
+        &self,
+        vote: bool,
+    ) -> CliTypedResult<Vec<TransactionSummary>> {
+        if self.args.voting_power.is_some() && self.pool_addresses.len() > 1 {
+            return Err(CliError::CommandArgumentError(
+                "Only 1 pool address can be provided when voting power is specified".to_string(),
+            ));
+        };
+        let proposal_id = self.args.proposal_id;
+        let is_proposal_closed = self
+            .args
+            .txn_options
+            .view(ViewRequest {
+                function: "0x1::voting::is_voting_closed".parse().unwrap(),
+                type_arguments: vec!["0x1::governance_proposal::GovernanceProposal"
+                    .parse()
+                    .unwrap()],
+                arguments: vec![
+                    serde_json::Value::String("0x1".to_string()),
+                    serde_json::Value::String(proposal_id.to_string()),
+                ],
+            })
+            .await?[0]
+            .as_bool()
+            .unwrap();
+        if is_proposal_closed {
+            return Err(CliError::CommandArgumentError(format!(
+                "Proposal {} is closed.",
+                proposal_id
+            )));
+        };
+
+        let mut summaries: Vec<TransactionSummary> = vec![];
+        for pool_address in &self.pool_addresses {
+            let remaining_voting_power = self
+                .args
+                .txn_options
+                .view(ViewRequest {
+                    function: "0x1::aptos_governance::get_remaining_voting_power"
+                        .parse()
+                        .unwrap(),
+                    type_arguments: vec![],
+                    arguments: vec![
+                        serde_json::Value::String(pool_address.to_string()),
+                        serde_json::Value::String(proposal_id.to_string()),
+                    ],
+                })
+                .await?[0]
+                .as_str()
+                .unwrap()
+                .parse()
+                .unwrap();
+            if remaining_voting_power == 0 {
+                println!(
+                    "Stake pool {} has no voting power on proposal {}. This is because the \
+                    stake pool has already voted before enabling partial governance voting, or the \
+                    stake pool has already used all its voting power.",
+                    *pool_address, proposal_id
+                );
+                continue;
+            }
+            let voting_power =
+                check_remaining_voting_power(remaining_voting_power, self.args.voting_power);
+
+            prompt_yes_with_override(
+                &format!(
+                    "Vote {} with voting power = {} from stake pool {}?",
+                    vote_to_string(vote),
+                    voting_power,
+                    pool_address
+                ),
+                self.args.txn_options.prompt_options,
+            )?;
+
+            summaries.push(
+                self.args
+                    .txn_options
+                    .submit_transaction(aptos_stdlib::aptos_governance_partial_vote(
+                        *pool_address,
+                        proposal_id,
+                        voting_power,
+                        vote,
+                    ))
+                    .await
+                    .map(TransactionSummary::from)?,
+            );
+        }
+        Ok(summaries)
+    }
+}
+
+#[async_trait]
+impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
+    fn command_name(&self) -> &'static str {
+        "SubmitVote"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<Vec<TransactionSummary>> {
+        // The vote option is a group, so only one of yes and no must be true.
+        let vote = self.args.yes;
+
+        let client: &Client = &self
+            .args
+            .txn_options
+            .rest_options
+            .client(&self.args.txn_options.profile_options)?;
+
+        if is_partial_governance_voting_enabled(client).await? {
+            self.vote_after_partial_governance_voting(vote).await
+        } else {
+            return self
+                .vote_before_partial_governance_voting(client, vote)
+                .await;
+        }
     }
 }
 

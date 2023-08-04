@@ -10,93 +10,14 @@ pub mod signer;
 pub mod string;
 #[cfg(feature = "testing")]
 pub mod unit_test;
-pub mod vector;
 
-mod helpers;
-
+use aptos_native_interface::SafeNativeBuilder;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub bcs: bcs::GasParameters,
-    pub hash: hash::GasParameters,
-    pub signer: signer::GasParameters,
-    pub string: string::GasParameters,
-    pub vector: vector::GasParameters,
-
-    #[cfg(feature = "testing")]
-    pub unit_test: unit_test::GasParameters,
-}
-
-impl GasParameters {
-    pub fn zeros() -> Self {
-        Self {
-            bcs: bcs::GasParameters {
-                to_bytes: bcs::ToBytesGasParameters {
-                    per_byte_serialized: 0.into(),
-                    legacy_min_output_size: 0.into(),
-                    failure: 0.into(),
-                },
-            },
-
-            hash: hash::GasParameters {
-                sha2_256: hash::Sha2_256GasParameters {
-                    base: 0.into(),
-                    per_byte: 0.into(),
-                    legacy_min_input_len: 0.into(),
-                },
-                sha3_256: hash::Sha3_256GasParameters {
-                    base: 0.into(),
-                    per_byte: 0.into(),
-                    legacy_min_input_len: 0.into(),
-                },
-            },
-            signer: signer::GasParameters {
-                borrow_address: signer::BorrowAddressGasParameters { base: 0.into() },
-            },
-            string: string::GasParameters {
-                check_utf8: string::CheckUtf8GasParameters {
-                    base: 0.into(),
-                    per_byte: 0.into(),
-                },
-                is_char_boundary: string::IsCharBoundaryGasParameters { base: 0.into() },
-                sub_string: string::SubStringGasParameters {
-                    base: 0.into(),
-                    per_byte: 0.into(),
-                },
-                index_of: string::IndexOfGasParameters {
-                    base: 0.into(),
-                    per_byte_pattern: 0.into(),
-                    per_byte_searched: 0.into(),
-                },
-            },
-            vector: vector::GasParameters {
-                empty: vector::EmptyGasParameters { base: 0.into() },
-                length: vector::LengthGasParameters { base: 0.into() },
-                push_back: vector::PushBackGasParameters {
-                    base: 0.into(),
-                    legacy_per_abstract_memory_unit: 0.into(),
-                },
-                borrow: vector::BorrowGasParameters { base: 0.into() },
-                pop_back: vector::PopBackGasParameters { base: 0.into() },
-                destroy_empty: vector::DestroyEmptyGasParameters { base: 0.into() },
-                swap: vector::SwapGasParameters { base: 0.into() },
-            },
-            #[cfg(feature = "testing")]
-            unit_test: unit_test::GasParameters {
-                create_signers_for_testing: unit_test::CreateSignersForTestingGasParameters {
-                    base_cost: 0.into(),
-                    unit_cost: 0.into(),
-                },
-            },
-        }
-    }
-}
-
 pub fn all_natives(
     move_std_addr: AccountAddress,
-    gas_params: GasParameters,
+    builder: &mut SafeNativeBuilder,
 ) -> NativeFunctionTable {
     let mut natives = vec![];
 
@@ -108,15 +29,16 @@ pub fn all_natives(
         };
     }
 
-    add_natives!("bcs", bcs::make_all(gas_params.bcs));
-    add_natives!("hash", hash::make_all(gas_params.hash));
-    add_natives!("signer", signer::make_all(gas_params.signer));
-    add_natives!("string", string::make_all(gas_params.string));
-    add_natives!("vector", vector::make_all(gas_params.vector));
-    #[cfg(feature = "testing")]
-    {
-        add_natives!("unit_test", unit_test::make_all(gas_params.unit_test));
-    }
+    builder.with_incremental_gas_charging(false, |builder| {
+        add_natives!("bcs", bcs::make_all(builder));
+        add_natives!("hash", hash::make_all(builder));
+        add_natives!("signer", signer::make_all(builder));
+        add_natives!("string", string::make_all(builder));
+        #[cfg(feature = "testing")]
+        {
+            add_natives!("unit_test", unit_test::make_all(builder));
+        }
+    });
 
     make_table_from_iter(move_std_addr, natives)
 }

@@ -58,7 +58,7 @@ struct ParamSweepOpt {
 
 #[derive(Debug, Parser)]
 struct ExecuteOpt {
-    #[clap(long, default_value_t = 200000)]
+    #[clap(long, default_value_t = 10000)]
     pub num_accounts: usize,
 
     #[clap(long, default_value_t = 5)]

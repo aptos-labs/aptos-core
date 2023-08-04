@@ -3,10 +3,7 @@ import { hmac } from "@noble/hashes/hmac";
 import { sha512 } from "@noble/hashes/sha512";
 import { hexToBytes } from "@noble/hashes/utils";
 
-type Hex = string;
-type Path = string;
-
-type Keys = {
+export type Keys = {
   key: Uint8Array;
   chainCode: Uint8Array;
 };
@@ -18,7 +15,7 @@ const replaceDerive = (val: string): string => val.replace("'", "");
 const HMAC_KEY = "ed25519 seed";
 const HARDENED_OFFSET = 0x80000000;
 
-export const getMasterKeyFromSeed = (seed: Hex): Keys => {
+export const getMasterKeyFromSeed = (seed: string): Keys => {
   const h = hmac.create(sha512, HMAC_KEY);
   const I = h.update(hexToBytes(seed)).digest();
   const IL = I.slice(0, 32);
@@ -63,7 +60,7 @@ export const isValidPath = (path: string): boolean => {
     .some(Number.isNaN as any);
 };
 
-export const derivePath = (path: Path, seed: Hex, offset = HARDENED_OFFSET): Keys => {
+export const derivePath = (path: string, seed: string, offset = HARDENED_OFFSET): Keys => {
   if (!isValidPath(path)) {
     throw new Error("Invalid derivation path");
   }

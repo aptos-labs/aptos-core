@@ -52,7 +52,6 @@ impl CoinBalance {
     ) -> anyhow::Result<Option<(Self, CurrentCoinBalance, EventToCoinType)>> {
         match &CoinResource::from_write_resource(write_resource, txn_version)? {
             Some(CoinResource::CoinStoreResource(inner)) => {
-                tracing::info!("CoinStoreResource found: {:?}", write_resource);
                 let coin_info_type = &CoinInfoType::from_move_type(
                     &write_resource.r#type.as_ref().unwrap().generic_type_params[0],
                     write_resource.type_str.as_ref(),

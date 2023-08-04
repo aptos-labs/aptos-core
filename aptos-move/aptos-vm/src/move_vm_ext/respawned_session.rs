@@ -7,7 +7,6 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
-use aptos_gas::ChangeSetConfigs;
 use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_types::{
     state_store::{
@@ -15,7 +14,7 @@ use aptos_types::{
     },
     write_set::TransactionWrite,
 };
-use aptos_vm_types::change_set::VMChangeSet;
+use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
 /// We finish the session after the user transaction is done running to get the change set and
@@ -51,7 +50,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
                     vm.get_features(),
                 )
             },
-            session_builder: |resolver| Some(vm.new_session(resolver, session_id, true)),
+            session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
         }
         .build())
     }
@@ -64,18 +63,19 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         mut self,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let new_change_set = self.with_session_mut(|session| {
+        let additional_change_set = self.with_session_mut(|session| {
             session.take().unwrap().finish(&mut (), change_set_configs)
         })?;
-        let change_set = self.into_heads().state_view.change_set;
+        let mut change_set = self.into_heads().state_view.change_set;
         change_set
-            .squash(new_change_set, change_set_configs)
+            .squash_additional_change_set(additional_change_set, change_set_configs)
             .map_err(|_err| {
                 VMStatus::error(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                     err_msg("Failed to squash VMChangeSet"),
                 )
-            })
+            })?;
+        Ok(change_set)
     }
 }
 
@@ -99,13 +99,21 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
     }
 
     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
-        match self.change_set.delta_change_set().get(state_key) {
+        // TODO: `get_state_value` should differentiate between different write types.
+        match self.change_set.aggregator_delta_set().get(state_key) {
             Some(delta_op) => Ok(delta_op
                 .try_into_write_op(self.base, state_key)?
                 .as_state_value()),
-            None => match self.change_set.write_set().get(state_key) {
-                Some(write_op) => Ok(write_op.as_state_value()),
-                None => self.base.get_state_value(state_key),
+            None => {
+                let cached_value = self
+                    .change_set
+                    .write_set_iter()
+                    .find(|(k, _)| *k == state_key)
+                    .map(|(_, v)| v);
+                match cached_value {
+                    Some(write_op) => Ok(write_op.as_state_value()),
+                    None => self.base.get_state_value(state_key),
+                }
             },
         }
     }
@@ -122,14 +130,11 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet};
+    use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::{
-        state_store::table::TableHandle,
-        write_set::{WriteOp, WriteSetMut},
-    };
+    use aptos_types::write_set::WriteOp;
     use aptos_vm_types::check_change_set::CheckChangeSet;
-    use move_core_types::account_address::AccountAddress;
+    use std::collections::BTreeMap;
 
     /// A mock for testing. Always succeeds on checking a change set.
     struct NoOpChangeSetChecker;
@@ -140,64 +145,72 @@ mod test {
         }
     }
 
+    fn key(s: impl ToString) -> StateKey {
+        StateKey::raw(s.to_string().into_bytes())
+    }
+
+    fn write(v: u128) -> WriteOp {
+        WriteOp::Modification(serialize(&v))
+    }
+
+    fn read(view: &ChangeSetStateView, s: impl ToString) -> u128 {
+        let bytes = view.get_state_value(&key(s)).unwrap().unwrap().into_bytes();
+        deserialize(&bytes)
+    }
+
     #[test]
     fn test_change_set_state_view() {
-        let key1 = StateKey::table_item(
-            TableHandle(AccountAddress::ZERO),
-            String::from("test-key1").into_bytes(),
-        );
-        let key2 = StateKey::table_item(
-            TableHandle(AccountAddress::ZERO),
-            String::from("test-key2").into_bytes(),
-        );
-        let key3 = StateKey::raw(String::from("test-key3").into_bytes());
-
         let mut base_view = FakeDataStore::default();
-        base_view.set_legacy(key1.clone(), serialize(&150));
-        base_view.set_legacy(key2.clone(), serialize(&300));
-        base_view.set_legacy(key3.clone(), serialize(&500));
+        base_view.set_legacy(key("module_base"), serialize(&10));
+        base_view.set_legacy(key("module_both"), serialize(&20));
 
-        let delta_op = delta_add(5, 500);
-        let mut delta_change_set = DeltaChangeSet::empty();
-        delta_change_set.insert((key1.clone(), delta_op));
+        base_view.set_legacy(key("resource_base"), serialize(&30));
+        base_view.set_legacy(key("resource_both"), serialize(&40));
 
-        let write_set_ops = [(key2.clone(), WriteOp::Modification(serialize(&400)))];
-        let write_set = WriteSetMut::new(write_set_ops.into_iter())
-            .freeze()
-            .unwrap();
-        let change_set =
-            VMChangeSet::new(write_set, delta_change_set, vec![], &NoOpChangeSetChecker).unwrap();
-        let change_set_state_view = ChangeSetStateView::new(&base_view, change_set).unwrap();
+        base_view.set_legacy(key("aggregator_base"), serialize(&50));
+        base_view.set_legacy(key("aggregator_both"), serialize(&60));
+        base_view.set_legacy(key("aggregator_delta_set"), serialize(&70));
 
-        assert_eq!(
-            deserialize(
-                change_set_state_view
-                    .get_state_value(&key1)
-                    .unwrap()
-                    .unwrap()
-                    .bytes()
-            ),
-            155
-        );
-        assert_eq!(
-            deserialize(
-                change_set_state_view
-                    .get_state_value(&key2)
-                    .unwrap()
-                    .unwrap()
-                    .bytes()
-            ),
-            400
-        );
-        assert_eq!(
-            deserialize(
-                change_set_state_view
-                    .get_state_value(&key3)
-                    .unwrap()
-                    .unwrap()
-                    .bytes()
-            ),
-            500
-        );
+        let resource_write_set = BTreeMap::from([
+            (key("resource_both"), write(80)),
+            (key("resource_write_set"), write(90)),
+        ]);
+
+        let module_write_set = BTreeMap::from([
+            (key("module_both"), write(100)),
+            (key("module_write_set"), write(110)),
+        ]);
+
+        let aggregator_write_set = BTreeMap::from([
+            (key("aggregator_both"), write(120)),
+            (key("aggregator_write_set"), write(130)),
+        ]);
+
+        let aggregator_delta_set =
+            BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
+
+        let change_set = VMChangeSet::new(
+            resource_write_set,
+            module_write_set,
+            aggregator_write_set,
+            aggregator_delta_set,
+            vec![],
+            &NoOpChangeSetChecker,
+        )
+        .unwrap();
+        let view = ChangeSetStateView::new(&base_view, change_set).unwrap();
+
+        assert_eq!(read(&view, "module_base"), 10);
+        assert_eq!(read(&view, "module_both"), 100);
+        assert_eq!(read(&view, "module_write_set"), 110);
+
+        assert_eq!(read(&view, "resource_base"), 30);
+        assert_eq!(read(&view, "resource_both"), 80);
+        assert_eq!(read(&view, "resource_write_set"), 90);
+
+        assert_eq!(read(&view, "aggregator_base"), 50);
+        assert_eq!(read(&view, "aggregator_both"), 120);
+        assert_eq!(read(&view, "aggregator_write_set"), 130);
+        assert_eq!(read(&view, "aggregator_delta_set"), 71);
     }
 }

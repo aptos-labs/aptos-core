@@ -13,7 +13,6 @@ use crate::{
     schema::{collection_datas, current_collection_datas},
     utils::{database::PgPoolConnection, util::standardize_address},
 };
-use anyhow::Context;
 use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use diesel::{prelude::*, ExpressionMethods};
@@ -106,10 +105,17 @@ impl CollectionData {
                 .map(|table_metadata| table_metadata.get_owner_address());
             let mut creator_address = match maybe_creator_address {
                 Some(ca) => ca,
-                None => Self::get_collection_creator(conn, &table_handle).context(format!(
-                    "Failed to get collection creator for table handle {}, txn version {}",
-                    table_handle, txn_version
-                ))?,
+                None => match Self::get_collection_creator(conn, &table_handle) {
+                    Ok(creator) => creator,
+                    Err(_) => {
+                        tracing::error!(
+                            transaction_version = txn_version,
+                            lookup_key = &table_handle,
+                            "Failed to get collection creator for table handle. You probably should backfill db."
+                        );
+                        return Ok(None);
+                    },
+                },
             };
             creator_address = standardize_address(&creator_address);
             let collection_data_id =
