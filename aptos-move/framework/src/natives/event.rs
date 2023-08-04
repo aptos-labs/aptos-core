@@ -45,7 +45,7 @@ impl NativeEventContext {
     }
 
     #[cfg(feature = "testing")]
-    fn emitted_v0_events(
+    fn emitted_v1_events(
         &self,
         event_key: &EventKey,
         ty_tag: &TypeTag,
@@ -54,6 +54,19 @@ impl NativeEventContext {
         for event in self.events.iter() {
             if let ContractEvent::V1(e) = event {
                 if e.key() == event_key && e.type_tag() == ty_tag {
+                    events.push(e.event_data());
+                }
+            }
+        }
+        Ok(events)
+    }
+
+    #[cfg(feature = "testing")]
+    fn emitted_v2_events(&self, ty_tag: &TypeTag) -> PartialVMResult<Vec<&[u8]>> {
+        let mut events = vec![];
+        for event in self.events.iter() {
+            if let ContractEvent::V2(e) = event {
+                if e.type_tag() == ty_tag {
                     events.push(e.event_data());
                 }
             }
@@ -145,7 +158,35 @@ fn native_emitted_events_by_handle(
     let ty_layout = context.type_to_type_layout(&ty)?;
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
     let events = ctx
-        .emitted_v0_events(&key, &ty_tag)?
+        .emitted_v1_events(&key, &ty_tag)?
+        .into_iter()
+        .map(|blob| {
+            Value::simple_deserialize(blob, &ty_layout).ok_or_else(|| {
+                SafeNativeError::InvariantViolation(PartialVMError::new(
+                    StatusCode::VALUE_DESERIALIZATION_ERROR,
+                ))
+            })
+        })
+        .collect::<SafeNativeResult<Vec<Value>>>()?;
+    Ok(smallvec![Value::vector_for_testing_only(events)])
+}
+
+#[cfg(feature = "testing")]
+fn native_emitted_events(
+    context: &mut SafeNativeContext,
+    mut ty_args: Vec<Type>,
+    arguments: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.is_empty());
+
+    let ty = ty_args.pop().unwrap();
+
+    let ty_tag = context.type_to_type_tag(&ty)?;
+    let ty_layout = context.type_to_type_layout(&ty)?;
+    let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
+    let events = ctx
+        .emitted_v2_events(&ty_tag)?
         .into_iter()
         .map(|blob| {
             Value::simple_deserialize(blob, &ty_layout).ok_or_else(|| {
@@ -212,6 +253,9 @@ pub fn make_all(
         "emitted_events_by_handle",
         native_emitted_events_by_handle as RawSafeNative,
     )]);
+
+    #[cfg(feature = "testing")]
+    natives.extend([("emitted_events", native_emitted_events as RawSafeNative)]);
 
     natives.extend([(
         "write_to_event_store",
