@@ -348,7 +348,7 @@ impl Default for ForgeConfig {
             aptos_tests: vec![],
             admin_tests: vec![],
             network_tests: vec![],
-            initial_validator_count: NonZeroUsize::new(1).unwrap(),
+            initial_validator_count: NonZeroUsize::new(4).unwrap(),
             initial_fullnode_count: 0,
             initial_version: InitialVersion::Oldest,
             genesis_config: None,
