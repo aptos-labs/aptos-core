@@ -521,7 +521,7 @@ fn single_test_suite(
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "realistic_env_max_load" => pfn_performance(duration, true, true),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         // Rest of the tests:
@@ -1931,6 +1931,12 @@ fn pfn_performance(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
+        // TODO: we should also make this a two-traffics test, or just fold into the regular test
+        // Because of the long state sync time, we need more backlog to saturate. If perfectly
+        // balanced, 70K should be enough (7K TPS * 10s RTT).
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 150000,
+        }))
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
