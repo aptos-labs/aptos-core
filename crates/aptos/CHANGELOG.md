@@ -2,7 +2,7 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [2.0.3] - 2023/08/02
+## [2.0.3] - 2023/08/04
 ### Fixed
 - Fixed the following input arguments issue when running `aptos move view`
   - #8513: Fixed issue where CLI does not work with big numbers
