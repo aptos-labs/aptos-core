@@ -24,6 +24,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
+    value::MoveTypeLayout,
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
@@ -393,11 +394,12 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
 }
 
 impl<'a> ResourceResolver for HarnessProxy<'a> {
-    fn get_resource_with_metadata(
+    fn get_resource_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
+        _layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
         let res = self
             .harness

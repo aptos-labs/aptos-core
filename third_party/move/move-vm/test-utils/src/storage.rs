@@ -10,6 +10,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, MoveResolver, ResourceResolver},
+    value::MoveTypeLayout,
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
@@ -39,11 +40,12 @@ impl ModuleResolver for BlankStorage {
 }
 
 impl ResourceResolver for BlankStorage {
-    fn get_resource_with_metadata(
+    fn get_resource_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
+        _layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Vec<u8>>, usize)> {
         Ok((None, 0))
     }
@@ -85,11 +87,12 @@ impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
 }
 
 impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
-    fn get_resource_with_metadata(
+    fn get_resource_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         metadata: &[Metadata],
+        layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Vec<u8>>, usize)> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
@@ -100,7 +103,8 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         }
 
         // TODO
-        self.base.get_resource_with_metadata(address, tag, metadata)
+        self.base
+            .get_resource_with_metadata_and_layout(address, tag, metadata, layout)
     }
 }
 
@@ -296,11 +300,12 @@ impl ModuleResolver for InMemoryStorage {
 }
 
 impl ResourceResolver for InMemoryStorage {
-    fn get_resource_with_metadata(
+    fn get_resource_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         _metadata: &[Metadata],
+        _layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Vec<u8>>, usize)> {
         if let Some(account_storage) = self.accounts.get(address) {
             let buf = account_storage.resources.get(tag).cloned();

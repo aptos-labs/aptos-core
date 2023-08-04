@@ -35,12 +35,10 @@ impl ValueExchange for TestExchange {
                 data.insert(id, x);
                 Ok(Value(ValueImpl::U128(id as u128)))
             },
-            _ => {
-                Err(ExchangeError(format!(
-                    "Cannot exchange value {:?}",
-                    value_to_exchange
-                )))
-            },
+            _ => Err(ExchangeError(format!(
+                "Cannot exchange value {:?}",
+                value_to_exchange
+            ))),
         }
     }
 
@@ -64,12 +62,10 @@ impl ValueExchange for TestExchange {
                     .expect("Claimed value should always exist");
                 Ok(Value(ValueImpl::U128(v)))
             },
-            _ => {
-                Err(ExchangeError(format!(
-                    "Cannot claim back with value {:?}",
-                    value_to_exchange
-                )))
-            },
+            _ => Err(ExchangeError(format!(
+                "Cannot claim back with value {:?}",
+                value_to_exchange
+            ))),
         }
     }
 }

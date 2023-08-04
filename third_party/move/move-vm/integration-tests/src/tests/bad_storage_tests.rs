@@ -11,7 +11,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
-    value::{serialize_values, MoveValue},
+    value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::move_vm::MoveVM;
@@ -521,11 +521,12 @@ impl ModuleResolver for BogusStorage {
 }
 
 impl ResourceResolver for BogusStorage {
-    fn get_resource_with_metadata(
+    fn get_resource_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
+        _layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)

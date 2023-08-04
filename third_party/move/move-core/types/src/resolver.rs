@@ -6,6 +6,7 @@ use crate::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
+    value::MoveTypeLayout,
 };
 use anyhow::Error;
 
@@ -40,12 +41,13 @@ pub fn resource_size(resource: &Option<Vec<u8>>) -> usize {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ResourceResolver {
-    fn get_resource_with_metadata(
+    fn get_resource_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<(Option<Vec<u8>>, usize), Error>;
+        layout: Option<&MoveTypeLayout>,
+    ) -> anyhow::Result<(Option<Vec<u8>>, usize), Error>;
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
@@ -59,18 +61,28 @@ pub trait MoveResolver: ModuleResolver + ResourceResolver {
             .get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))?
             .0)
     }
+
+    fn get_resource_with_metadata(
+        &self,
+        address: &AccountAddress,
+        typ: &StructTag,
+        metadata: &[Metadata],
+    ) -> Result<(Option<Vec<u8>>, usize), Error> {
+        self.get_resource_with_metadata_and_layout(address, typ, metadata, None)
+    }
 }
 
 impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}
 
 impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
-    fn get_resource_with_metadata(
+    fn get_resource_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         metadata: &[Metadata],
+        layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Vec<u8>>, usize), Error> {
-        (**self).get_resource_with_metadata(address, tag, metadata)
+        (**self).get_resource_with_metadata_and_layout(address, tag, metadata, layout)
     }
 }
 

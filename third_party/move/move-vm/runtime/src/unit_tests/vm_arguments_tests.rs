@@ -21,7 +21,7 @@ use move_core_types::{
     metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
     u256::U256,
-    value::{serialize_values, MoveValue},
+    value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -260,11 +260,12 @@ impl ModuleResolver for RemoteStore {
 }
 
 impl ResourceResolver for RemoteStore {
-    fn get_resource_with_metadata(
+    fn get_resource_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
+        _layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
         Ok((None, 0))
     }

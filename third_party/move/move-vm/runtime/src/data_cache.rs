@@ -190,27 +190,25 @@ impl<'r> TransactionDataCache<'r> {
                 None => &[],
             };
 
-            // TODO: Next step.
-            // If marked, get_resource_with_metadata should propagate type layout
-            // for materialization, and we should use resolve differently.
-
-            let (data, bytes_loaded) = if has_aggregator_lifting {
-                self.remote
-                    .get_resource_with_metadata(&addr, &ty_tag, metadata)
-                    .map_err(|err| {
-                        let msg = format!("Unexpected storage error: {:?}", err);
-                        PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
-                    })?
-                // At this point all IDs are replaced.
+            // If we need to process aggregator lifting, we pass type layout to remote.
+            // Remote, in turn ensures that all aggregator values are lifted if the resolved
+            // resource comes from storage.
+            let resolved_result = if has_aggregator_lifting {
+                self.remote.get_resource_with_metadata_and_layout(
+                    &addr,
+                    &ty_tag,
+                    metadata,
+                    Some(&ty_layout),
+                )
             } else {
                 self.remote
                     .get_resource_with_metadata(&addr, &ty_tag, metadata)
-                    .map_err(|err| {
-                        let msg = format!("Unexpected storage error: {:?}", err);
-                        PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
-                    })?
             };
 
+            let (data, bytes_loaded) = resolved_result.map_err(|err| {
+                let msg = format!("Unexpected storage error: {:?}", err);
+                PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
+            })?;
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
             let gv = match data {
