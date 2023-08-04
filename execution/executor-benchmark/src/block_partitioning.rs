@@ -24,6 +24,7 @@ impl BlockPartitioningStage {
         let maybe_partitioner = if num_executor_shards <= 1 {
             None
         } else {
+            //TODO: build partitioner from configuration.
             Some(build_partitioner_from_envvar(Some(num_executor_shards)))
         };
 
