@@ -12,7 +12,7 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::time::Instant;
-use aptos_block_partitioner::{BlockPartitioner, build_partitioner};
+use aptos_block_partitioner::{BlockPartitioner, build_partitioner_from_envvar};
 use crate::metrics::TIMER;
 
 pub(crate) struct BlockPartitioningStage {
@@ -26,7 +26,7 @@ impl BlockPartitioningStage {
         let maybe_partitioner = if num_executor_shards <= 1 {
             None
         } else {
-            Some(build_partitioner(Some(num_executor_shards)))
+            Some(build_partitioner_from_envvar(Some(num_executor_shards)))
         };
 
         Self {

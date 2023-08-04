@@ -4,7 +4,7 @@ use std::cmp;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use dashmap::{DashMap, DashSet};
 use itertools::Itertools;
 use rand::{Rng, thread_rng};
@@ -17,13 +17,13 @@ use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
 use aptos_types::transaction::Transaction;
 use move_core_types::account_address::AccountAddress;
-use crate::{BlockPartitioner, get_anchor_shard_id, Sender};
+use crate::{assert_deterministic_result, BlockPartitioner, get_anchor_shard_id, Sender};
 use crate::v2::counters::MISC_TIMERS_SECONDS;
 use crate::v2::storage_location_helper::StorageLocationHelper;
 use rayon::iter::ParallelIterator;
 use aptos_crypto::hash::{CryptoHash, TestOnlyHash};
 use aptos_crypto::HashValue;
-use crate::test_utils::P2pBlockGenerator;
+use crate::test_utils::P2PBlockGenerator;
 
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, Serialize, Deserialize)]
 pub struct TxnFatId {
@@ -51,28 +51,23 @@ impl TxnFatId {
 mod counters;
 mod storage_location_helper;
 
-pub struct V2Partitioner {
+/// Basically `ShardedBlockPartitioner` but:
+/// - Not pre-partitioned by txn sender.
+/// - implemented more efficiently.
+pub struct PartitionerV2 {
     thread_pool: ThreadPool,
     pub num_rounds_limit: usize,
     pub avoid_pct: u64,
     dashmap_num_shards: usize,
-    add_edge_impl: usize,
 }
 
-impl V2Partitioner {
-    pub fn new() -> Self {
-        let num_threads = std::env::var("APTOS_BLOCK_PARTITIONER_V2__NUM_THREADS").ok().map(|s|s.parse::<usize>().ok().unwrap_or(8)).unwrap_or(8);
-        let num_rounds_limit: usize = std::env::var("APTOS_BLOCK_PARTITIONER_V2__NUM_ROUNDS_LIMIT").ok().map(|s|s.parse::<usize>().ok().unwrap_or(4)).unwrap_or(4);
-        let avoid_pct: u64 = std::env::var("APTOS_BLOCK_PARTITIONER_V2__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN").ok().map(|s|s.parse::<u64>().ok().unwrap_or(10)).unwrap_or(10);
-        let dashmap_num_shards = std::env::var("APTOS_BLOCK_PARTITIONER_V2__DASHMAP_NUM_SHARDS").ok().map(|v|v.parse::<usize>().unwrap_or(256)).unwrap_or(256);
-        let add_edge_impl = std::env::var("APTOS_BLOCK_PARTITIONER_V2__ADD_EDGE_IMPL").ok().map(|v|v.parse::<usize>().unwrap_or(0)).unwrap_or(0);
-        info!("Creating V2Partitioner with num_threads={}, num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}, add_edge_impl={}", num_threads, num_rounds_limit, avoid_pct, dashmap_num_shards, add_edge_impl);
+impl PartitionerV2 {
+    pub fn new(num_threads: usize, num_rounds_limit: usize, avoid_pct: u64, dashmap_num_shards: usize) -> Self {
         Self {
             thread_pool: ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap(),
             num_rounds_limit,
             avoid_pct,
             dashmap_num_shards,
-            add_edge_impl,
         }
     }
     fn discarding_round(
@@ -151,7 +146,6 @@ impl V2Partitioner {
         self.thread_pool.spawn(move||{
             drop(potentially_accepted);
             drop(min_discarded_seq_nums_by_sender_id);
-
         });
         ret
     }
@@ -167,126 +161,6 @@ impl V2Partitioner {
                 }).collect()
             }).collect()
         })
-    }
-
-    fn add_edges_1(
-        &self,
-        txns: Vec<AnalyzedTransaction>,
-        rsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
-        wsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
-        txn_id_matrix: &Vec<Vec<Vec<usize>>>,
-        start_index_matrix: &Vec<Vec<usize>>,
-        helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
-    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
-        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges_v2__preprocess"]).start_timer();
-        let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = self.thread_pool.install(||{
-            txns.into_par_iter().map(|t|Mutex::new(Some(t))).collect()
-        });
-        let num_keys = helpers.len();
-        let num_rounds = txn_id_matrix.len();
-        let num_shards = txn_id_matrix[0].len();
-        let global_dependent_edge_table = self.new_global_edge_table(txn_id_matrix);
-        let global_required_edge_table = self.new_global_edge_table(txn_id_matrix);
-
-        let global_owners_by_loc_id: Vec<RwLock<Option<ShardedTxnIndex>>> = self.thread_pool.install(||{
-                (0..num_keys).into_par_iter().map(|_|RwLock::new(None)).collect()
-            });
-        let duration = timer.stop_and_record();
-        info!("add_edges_v2__preprocess={}", duration);
-
-        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges_v2__main"]).start_timer();
-        for round_id in 0..num_rounds {
-            for shard_id in 0..num_shards {
-                let sub_block_size = txn_id_matrix[round_id][shard_id].len();
-                self.thread_pool.install(||{
-
-                    // Calculate edges.
-                    (0..sub_block_size).into_par_iter().for_each(|in_block_idx|{
-                        let txn_id = txn_id_matrix[round_id][shard_id][in_block_idx];
-                        let cur_sharded_txn_idx = ShardedTxnIndex {
-                            txn_index: start_index_matrix[round_id][shard_id] + in_block_idx,
-                            shard_id,
-                            round_id,
-                        };
-                        for &loc_id in wsets_by_txn_id[txn_id].read().unwrap().iter().chain(rsets_by_txn_id[txn_id].read().unwrap().iter()) {
-                            match global_owners_by_loc_id[loc_id].read().unwrap().as_ref() {
-                                Some(owner) => {
-                                    let owner_in_block_idx = owner.txn_index - start_index_matrix[owner.round_id][owner.shard_id];
-                                    global_dependent_edge_table[owner.round_id][owner.shard_id][owner_in_block_idx].entry(cur_sharded_txn_idx).or_insert_with(DashSet::new).insert(loc_id);
-                                    global_required_edge_table[round_id][shard_id][in_block_idx].entry(*owner).or_insert_with(DashSet::new).insert(loc_id);
-                                },
-                                None => {},
-                            }
-                        }
-                    });
-
-                    // Update global owner table.
-                    (0..sub_block_size).into_par_iter().for_each(|in_block_idx|{
-                        let txn_old_id = txn_id_matrix[round_id][shard_id][in_block_idx];
-                        let cur_sharded_txn_idx = ShardedTxnIndex {
-                            txn_index: start_index_matrix[round_id][shard_id] + in_block_idx,
-                            shard_id,
-                            round_id,
-                        };
-                        for &loc_id in wsets_by_txn_id[txn_old_id].read().unwrap().iter() {
-                            let mut owner = global_owners_by_loc_id[loc_id].write().unwrap();
-                            *owner = match owner.as_ref() {
-                                Some(&existing_owner) if existing_owner >= cur_sharded_txn_idx => {
-                                    Some(existing_owner)
-                                },
-                                _ => {
-                                    Some(cur_sharded_txn_idx)
-                                },
-                            };
-                        }
-                    });
-                });
-            }
-        }
-        let duration = timer.stop_and_record();
-        info!("add_edges_v2__main={duration:?}");
-
-        let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges_v2__build_return_obj"]).start_timer();
-        let ret = self.thread_pool.install(||{
-            (0..num_shards).into_par_iter().map(|shard_id|{
-                let sub_blocks = (0..num_rounds).into_par_iter().map(|round_id|{
-                    let sub_block_size: usize = txn_id_matrix[round_id][shard_id].len();
-                    let twds = (0..sub_block_size).into_par_iter().map(|in_sub_block_idx|{
-                        let old_tid = txn_id_matrix[round_id][shard_id][in_sub_block_idx];
-                        let txn = txns[old_tid].lock().unwrap().take().unwrap();
-                        let cross_shard_dependencies = CrossShardDependencies {
-                            required_edges: CrossShardEdges {
-                                edges: global_required_edge_table[round_id][shard_id][in_sub_block_idx].iter().map(|kv_ref|{
-                                    let src_sharded_idx = *kv_ref.key();
-                                    let locs = kv_ref.value().iter().map(|loc_id|helpers.get(loc_id.key()).unwrap().read().unwrap().storage_location.clone()).collect();
-                                    (src_sharded_idx, locs)
-                                }).collect()
-                            },
-                            dependent_edges: CrossShardEdges {
-                                edges: global_dependent_edge_table[round_id][shard_id][in_sub_block_idx].iter().map(|kv_ref|{
-                                    let dst_sharded_idx = *kv_ref.key();
-                                    let locs = kv_ref.value().iter().map(|loc_id|helpers.get(loc_id.key()).unwrap().read().unwrap().storage_location.clone()).collect();
-                                    (dst_sharded_idx, locs)
-                                }).collect()
-                            },
-                        };
-                        TransactionWithDependencies { txn, cross_shard_dependencies }
-                    }).collect();
-                    SubBlock { start_index: start_index_matrix[round_id][shard_id], transactions: twds }
-                }).collect();
-                SubBlocksForShard { shard_id, sub_blocks }
-            }).collect()
-        });
-        let duration = timer.stop_and_record();
-        info!("add_edges_v2__build_return_obj={duration:?}");
-
-        self.thread_pool.spawn(move||{
-            drop(txns);
-            drop(global_dependent_edge_table);
-            drop(global_required_edge_table);
-            drop(global_owners_by_loc_id);
-        });
-        ret
     }
 
     fn add_edges(
@@ -466,7 +340,7 @@ impl V2Partitioner {
     }
 }
 
-impl BlockPartitioner for V2Partitioner {
+impl BlockPartitioner for PartitionerV2 {
     fn partition(&self, txns: Vec<AnalyzedTransaction>, num_executor_shards: usize) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["preprocess"]).start_timer();
         let num_txns = txns.len();
@@ -508,7 +382,6 @@ impl BlockPartitioner for V2Partitioner {
                         let anchor_shard_id = get_anchor_shard_id(storage_location, num_executor_shards);
                         RwLock::new(StorageLocationHelper::new(storage_location.clone(), anchor_shard_id))
                     }).write().unwrap().add_candidate(txn_id, is_write);
-
                 }
             });
         });
@@ -516,7 +389,6 @@ impl BlockPartitioner for V2Partitioner {
         info!("preprocess__main={duration_1}");
         let duration = timer.stop_and_record();
         info!("preprocess={duration}");
-
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["pre_partition_uniform"]).start_timer();
         let remaining_txn_ids = uniform_partition(num_txns, num_executor_shards);
@@ -533,12 +405,7 @@ impl BlockPartitioner for V2Partitioner {
         info!("multi_rounds={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
-        let ret = match self.add_edge_impl {
-            0 => self.add_edges(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &start_index_matrix, &new_indices, &helpers_by_key_id),
-            1 => self.add_edges_1(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &start_index_matrix, &helpers_by_key_id),
-            _ => unreachable!()
-        };
-
+        let ret = self.add_edges(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &start_index_matrix, &new_indices, &helpers_by_key_id);
         let duration = timer.stop_and_record();
         info!("add_edges={duration}");
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["drop"]).start_timer();
@@ -561,9 +428,9 @@ impl BlockPartitioner for V2Partitioner {
 }
 
 #[test]
-fn test_omega_partitioner() {
-    let block_generator = P2pBlockGenerator::new(100);
-    let partitioner = V2Partitioner::new();
+fn test_partitioner_v2_correctness() {
+    let block_generator = P2PBlockGenerator::new(100);
+    let partitioner = PartitionerV2::new(8, 4, 10, 64, 0);
     let mut rng = thread_rng();
     for run_id in 0..100 {
         let block_size = 10_u64.pow(rng.gen_range(0, 4)) as usize;
@@ -571,8 +438,14 @@ fn test_omega_partitioner() {
         let block = block_generator.rand_block(&mut rng, block_size);
         let block_clone = block.clone();
         let partitioned = partitioner.partition(block, num_shards);
-        crate::assertions(&block_clone, &partitioned);
+        crate::verify_partitioner_output(&block_clone, &partitioned);
     }
+}
+
+#[test]
+fn test_partitioner_v2_determinism() {
+    let partitioner = Arc::new(PartitionerV2::new(4, 4, 10, 64, 0));
+    assert_deterministic_result(partitioner);
 }
 
 /// Evenly divide 0..n-1. Example: uniform_partition(11,3) == [[0,1,2,3],[4,5,6,7],[8,9,10]]

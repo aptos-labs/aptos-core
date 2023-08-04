@@ -7,7 +7,7 @@ use crate::transaction::{
 };
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
@@ -42,6 +42,26 @@ impl ShardedTxnIndex {
 pub struct CrossShardEdges {
     pub edges: HashMap<ShardedTxnIndex, Vec<StorageLocation>>,
 }
+
+impl PartialEq for CrossShardEdges {
+    fn eq(&self, other: &Self) -> bool {
+        let my_key_set = self.edges.keys().map(|k|*k).into_iter().collect::<HashSet<_>>();
+        let other_key_set = other.edges.keys().map(|k|*k).into_iter().collect::<HashSet<_>>();
+        if my_key_set != other_key_set {
+            return false;
+        }
+        for key in my_key_set {
+            let my_value = self.edges.get(&key).unwrap().clone().into_iter().collect::<HashSet<_>>();
+            let other_value = other.edges.get(&key).unwrap().clone().into_iter().collect::<HashSet<_>>();
+            if my_value != other_value {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+impl Eq for CrossShardEdges {}
 
 impl CrossShardEdges {
     pub fn new(txn_idx: ShardedTxnIndex, storage_locations: Vec<StorageLocation>) -> Self {
@@ -83,7 +103,7 @@ impl IntoIterator for CrossShardEdges {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 /// Represents the dependencies of a transaction on other transactions across shards. Two types
 /// of dependencies are supported:
 /// 1. `required_edges`: The transaction depends on the execution of the transactions in the set. In this
@@ -170,7 +190,7 @@ impl CrossShardDependencies {
 ///  | Transaction 3  | Transaction 6    | Transaction 9    |
 ///  +----------------+------------------+------------------+
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct SubBlock<T> {
     // This is the index of first transaction relative to the block.
     pub start_index: TxnIndex,
@@ -256,7 +276,7 @@ impl<T: Clone> IntoIterator for SubBlock<T> {
 }
 
 // A set of sub blocks assigned to a shard.
-#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct SubBlocksForShard<T> {
     pub shard_id: ShardId,
     pub sub_blocks: Vec<SubBlock<T>>,
@@ -346,7 +366,7 @@ impl<T: Clone> SubBlocksForShard<T> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TransactionWithDependencies<T> {
     pub txn: T,
     pub cross_shard_dependencies: CrossShardDependencies,

@@ -21,8 +21,8 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-use aptos_block_partitioner::{assertions, BlockPartitioner};
-use aptos_block_partitioner::v2::V2Partitioner;
+use aptos_block_partitioner::{verify_partitioner_output, BlockPartitioner};
+use aptos_block_partitioner::v2::PartitionerV2;
 
 pub fn generate_account_at(executor: &mut FakeExecutor, address: AccountAddress) -> AccountData {
     executor.new_account_data_at(address)

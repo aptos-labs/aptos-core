@@ -84,11 +84,11 @@ pub fn create_signed_p2p_transaction(
     transactions
 }
 
-pub struct P2pBlockGenerator {
+pub struct P2PBlockGenerator {
     accounts: Arc<Vec<Mutex<TestAccount>>>,
 }
 
-impl P2pBlockGenerator {
+impl P2PBlockGenerator {
     pub fn new(num_accounts: usize) -> Self {
         let accounts = (0..num_accounts)
             .into_par_iter()
