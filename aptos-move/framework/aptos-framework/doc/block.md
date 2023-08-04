@@ -14,6 +14,7 @@ This module defines a struct storing the metadata of the block and new block eve
 -  [Function `update_epoch_interval_microsecs`](#0x1_block_update_epoch_interval_microsecs)
 -  [Function `get_epoch_interval_secs`](#0x1_block_get_epoch_interval_secs)
 -  [Function `block_prologue`](#0x1_block_block_prologue)
+-  [Function `block_prologue_v2`](#0x1_block_block_prologue_v2)
 -  [Function `get_current_block_height`](#0x1_block_get_current_block_height)
 -  [Function `emit_new_block_event`](#0x1_block_emit_new_block_event)
 -  [Function `emit_genesis_block_event`](#0x1_block_emit_genesis_block_event)
@@ -31,6 +32,7 @@ This module defines a struct storing the metadata of the block and new block eve
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
 <b>use</b> <a href="dkg.md#0x1_dkg">0x1::dkg</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
@@ -39,6 +41,7 @@ This module defines a struct storing the metadata of the block and new block eve
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="state_storage.md#0x1_state_storage">0x1::state_storage</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="transaction_fee.md#0x1_transaction_fee">0x1::transaction_fee</a>;
@@ -412,23 +415,109 @@ The runtime always runs this before executing the transactions in a block.
     <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(<a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>());
 
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= block_metadata_ref.epoch_interval) {
-        <b>if</b> (dkg_enabled()) {
-            <b>let</b> dkg_state = <a href="dkg.md#0x1_dkg_get_state">dkg::get_state</a>();
-            <b>if</b> (dkg_state == <a href="dkg.md#0x1_dkg_state_not_started">dkg::state_not_started</a>()) {
-                <b>let</b> validator_set_and_stake_dist = <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfiguration::reconfigure_a</a>();
-                <a href="dkg.md#0x1_dkg_start">dkg::start</a>(validator_set_and_stake_dist);
-            } <b>else</b> <b>if</b> (dkg_state == <a href="dkg.md#0x1_dkg_state_started">dkg::state_started</a>()) {
-                <b>let</b> valid_aggregated_pvss_transcript_is_available = <b>true</b>; //TODO...
-                <b>if</b> (valid_aggregated_pvss_transcript_is_available) {
-                    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfiguration::reconfigure_b</a>();
-                    <a href="dkg.md#0x1_dkg_finish">dkg::finish</a>();
-                }
+        <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_block_block_prologue_v2"></a>
+
+## Function `block_prologue_v2`
+
+Set the metadata for the current block.
+The runtime always runs this before executing the transactions in a block.
+
+
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue_v2">block_prologue_v2</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64, dkg_transcript_available: bool, serialized_dkg_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue_v2">block_prologue_v2</a>(
+    vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>,
+    epoch: u64,
+    round: u64,
+    proposer: <b>address</b>,
+    failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64,
+    dkg_transcript_available: bool,
+    serialized_dkg_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
+    // Operational constraint: can only be invoked by the VM.
+    <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(&vm);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>(), 1);
+
+    // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
+    <b>assert</b>!(
+        proposer == @vm_reserved || <a href="stake.md#0x1_stake_is_current_epoch_validator">stake::is_current_epoch_validator</a>(proposer),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="block.md#0x1_block_EINVALID_PROPOSER">EINVALID_PROPOSER</a>),
+    );
+
+    <b>let</b> proposer_index = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    <b>if</b> (proposer != @vm_reserved) {
+        proposer_index = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="stake.md#0x1_stake_get_validator_index">stake::get_validator_index</a>(proposer));
+    };
+
+    <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+    block_metadata_ref.height = <a href="event.md#0x1_event_counter">event::counter</a>(&block_metadata_ref.new_block_events);
+
+    <b>let</b> new_block_event = <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>,
+        epoch,
+        round,
+        height: block_metadata_ref.height,
+        previous_block_votes_bitvec,
+        proposer,
+        failed_proposer_indices,
+        time_microseconds: <a href="timestamp.md#0x1_timestamp">timestamp</a>,
+    };
+    <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(&vm, &<b>mut</b> block_metadata_ref.new_block_events, new_block_event);
+
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
+        // Assign the fees collected from the previous <a href="block.md#0x1_block">block</a> <b>to</b> the previous <a href="block.md#0x1_block">block</a> proposer.
+        // If for <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> reason the fees cannot be assigned, this function burns the collected coins.
+        <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">transaction_fee::process_collected_fees</a>();
+        // Set the proposer of this <a href="block.md#0x1_block">block</a> <b>as</b> the receiver of the fees, so that the fees for this
+        // <a href="block.md#0x1_block">block</a> are assigned <b>to</b> the right <a href="account.md#0x1_account">account</a>.
+        <a href="transaction_fee.md#0x1_transaction_fee_register_proposer_for_fee_collection">transaction_fee::register_proposer_for_fee_collection</a>(proposer);
+    };
+
+    // Performance scores have <b>to</b> be updated before the epoch transition <b>as</b> the transaction that triggers the
+    // transition is the last <a href="block.md#0x1_block">block</a> in the previous epoch.
+    <a href="stake.md#0x1_stake_update_performance_statistics">stake::update_performance_statistics</a>(proposer_index, failed_proposer_indices);
+    <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(<a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>());
+
+    <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= block_metadata_ref.epoch_interval) {
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"on_expire() started."));
+        <b>let</b> dkg_state = <a href="dkg.md#0x1_dkg_get_state">dkg::get_state</a>();
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&dkg_state);
+        <b>if</b> (dkg_state == <a href="dkg.md#0x1_dkg_state_inactive">dkg::state_inactive</a>()) {
+            <b>let</b> validator_set_and_stake_dist = <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfiguration::reconfigure_a</a>();
+            <a href="dkg.md#0x1_dkg_start">dkg::start</a>(validator_set_and_stake_dist);
+        } <b>else</b> <b>if</b> (dkg_state == <a href="dkg.md#0x1_dkg_state_active">dkg::state_active</a>()) {
+            <b>let</b> maybe_transcript = <b>if</b> (dkg_transcript_available) {
+                some(serialized_dkg_transcript)
             } <b>else</b> {
-                <b>abort</b>(1);
-            }
+                none()
+            };
+            <b>let</b> proceed_to_new_epoch = <a href="dkg.md#0x1_dkg_on_potential_transcript">dkg::on_potential_transcript</a>(maybe_transcript);
+            <b>if</b> (proceed_to_new_epoch) {
+                <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfiguration::reconfigure_b</a>();
+            };
         } <b>else</b> {
-            <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
-        }
+            <b>abort</b>(1);
+        };
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"on_expire() finished."));
     };
 }
 </code></pre>

@@ -12,6 +12,7 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
+    use aptos_framework::stake::ValidatorInfo;
     use aptos_framework::storage_gas;
     use aptos_framework::transaction_fee;
 
@@ -154,14 +155,16 @@ module aptos_framework::reconfiguration {
         );
     }
 
-    public(friend) fun reconfigure_a(): vector<u8> {
+    /// Calculate new valicator set and lock it.
+    public(friend) fun reconfigure_a(): vector<ValidatorInfo> {
         debug::print(&std::string::utf8(b"reconfiguration::reconfigure_a() started."));
         if (features::collect_and_distribute_gas_fees()) {
             transaction_fee::process_collected_fees();
         };
         stake::on_new_epoch();
+        let ret = stake::get_active_validator_set();
         debug::print(&std::string::utf8(b"reconfiguration::reconfigure_a() finished."));
-        b"dummy_validator_set_and_stake_dist" //TODO...
+        ret
     }
 
     public(friend) fun reconfigure_b()acquires Configuration {
