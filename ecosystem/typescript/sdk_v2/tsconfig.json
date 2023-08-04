@@ -18,15 +18,3 @@
   },
   "include": ["src", "tests"]
 }
-
-/**
-    "forceConsistentCasingInFileNames": true,
-    "downlevelIteration": true,
-    "importHelpers": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-     "stripInternal": true,
-     "typeRoots": ["node_modules/@types"]
-**/

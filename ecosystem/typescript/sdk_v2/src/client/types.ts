@@ -1,5 +1,3 @@
-import { AnyNumber } from "../bcs";
-
 /**
  * A configuration object we can pass with the request to the server.
  *
@@ -32,7 +30,7 @@ export type AptosRequest = {
   endpoint?: string;
   body?: any;
   contentType?: string;
-  params?: Record<string, string | AnyNumber | boolean | undefined>;
+  params?: Record<string, string | bigint | number | boolean | undefined>;
   originMethod?: string;
   overrides?: ClientConfig;
 };
@@ -92,6 +90,6 @@ export class AptosApiError extends Error {
 }
 
 export interface PaginationArgs {
-  start?: AnyNumber;
+  start?: bigint | number;
   limit?: number;
 }
