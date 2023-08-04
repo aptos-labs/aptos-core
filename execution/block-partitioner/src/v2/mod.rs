@@ -12,44 +12,55 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator};
 use serde::{Deserialize, Serialize};
 use aptos_logger::info;
-use aptos_types::block_executor::partitioner::{CrossShardDependencies, CrossShardEdges, RoundId, ShardedTxnIndex, ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies};
+use aptos_types::block_executor::partitioner::{CrossShardDependencies, CrossShardEdges, RoundId, ShardedTxnIndex, ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies, TxnIndex};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
 use aptos_types::transaction::Transaction;
 use move_core_types::account_address::AccountAddress;
 use crate::{assert_deterministic_result, BlockPartitioner, get_anchor_shard_id, Sender};
 use crate::v2::counters::MISC_TIMERS_SECONDS;
-use crate::v2::storage_location_helper::StorageLocationHelper;
+use crate::v2::conflicting_txn_tracker::ConflictingTxnTracker;
 use rayon::iter::ParallelIterator;
 use aptos_crypto::hash::{CryptoHash, TestOnlyHash};
 use aptos_crypto::HashValue;
 use crate::test_utils::P2PBlockGenerator;
 
+/// The position of a txn in the block *before partitioning*.
+type OriginalTxnIdx = usize;
+
+/// Represent a specific storage location in a partitioning session.
+type StorageKeyIdx = usize;
+
+/// Represent a sender in a partitioning session.
+type SenderIdx = usize;
+
+/// Represent a txn after its position is finalized.
+/// Different from `aptos_types::block_executor::partitioner::ShardedTxnIndex`,
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, Serialize, Deserialize)]
-pub struct TxnFatId {
-    pub round_id: usize,
-    pub shard_id: usize,
-    pub old_txn_idx: usize,
+pub struct ShardedTxnIndex2 {
+    pub round_id: RoundId,
+    pub shard_id: ShardId,
+    pub ori_txn_idx: OriginalTxnIdx,
 }
 
-impl PartialOrd for TxnFatId {
+impl PartialOrd for ShardedTxnIndex2 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        (self.round_id, self.shard_id, self.old_txn_idx).partial_cmp(&(other.round_id, other.shard_id, other.old_txn_idx))
+        (self.round_id, self.shard_id, self.ori_txn_idx).partial_cmp(&(other.round_id, other.shard_id, other.ori_txn_idx))
     }
 }
 
-impl TxnFatId {
-    pub fn new(round_id: usize, shard_id: usize, old_txn_idx: usize) -> Self {
+impl ShardedTxnIndex2 {
+    pub fn new(round_id: RoundId, shard_id: ShardId, pre_par_tid: OriginalTxnIdx) -> Self {
         Self {
             round_id,
             shard_id,
-            old_txn_idx,
+            ori_txn_idx: pre_par_tid,
         }
     }
 }
 
 mod counters;
-mod storage_location_helper;
+mod conflicting_txn_tracker;
 
 /// Basically `ShardedBlockPartitioner` but:
 /// - Not pre-partitioned by txn sender.
@@ -70,74 +81,75 @@ impl PartitionerV2 {
             dashmap_num_shards,
         }
     }
+
+    /// Given some pre-partitioned txns, pull some off from each shard to avoid cross-shard conflict.
+    /// The pulled off txns become the pre-partitioned txns for the next round.
     fn discarding_round(
         &self,
-        round_id: usize,
-        rsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
-        wsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
-        sender_ids_by_txn_id: &Vec<RwLock<Option<usize>>>,
-        loc_helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
-        start_txn_id_by_shard_id: &Vec<usize>,
-        txn_id_vecs: Vec<Vec<usize>>,
-    ) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
+        round_id: RoundId,
+        rsets: &Vec<RwLock<HashSet<StorageKeyIdx>>>,
+        wsets: &Vec<RwLock<HashSet<StorageKeyIdx>>>,
+        senders: &Vec<RwLock<Option<SenderIdx>>>,
+        trackers: &DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
+        start_txns: &Vec<OriginalTxnIdx>,
+        remaining_txnx: Vec<Vec<OriginalTxnIdx>>,
+    ) -> (Vec<Vec<OriginalTxnIdx>>, Vec<Vec<OriginalTxnIdx>>) {
         let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__init").as_str()]).start_timer();
-        let num_shards = txn_id_vecs.len();
-        let mut discarded: Vec<RwLock<Vec<usize>>> = Vec::with_capacity(num_shards);
-        let mut potentially_accepted: Vec<RwLock<Vec<usize>>> = Vec::with_capacity(num_shards);
-        let mut finally_accepted: Vec<RwLock<Vec<usize>>> = Vec::with_capacity(num_shards);
+        let num_shards = remaining_txnx.len();
+        let mut discarded: Vec<RwLock<Vec<OriginalTxnIdx>>> = Vec::with_capacity(num_shards);
+        let mut potentially_accepted: Vec<RwLock<Vec<OriginalTxnIdx>>> = Vec::with_capacity(num_shards);
+        let mut finally_accepted: Vec<RwLock<Vec<OriginalTxnIdx>>> = Vec::with_capacity(num_shards);
         for shard_id in 0..num_shards {
-            potentially_accepted.push(RwLock::new(Vec::with_capacity(txn_id_vecs[shard_id].len())));
-            finally_accepted.push(RwLock::new(Vec::with_capacity(txn_id_vecs[shard_id].len())));
-            discarded.push(RwLock::new(Vec::with_capacity(txn_id_vecs[shard_id].len())));
+            potentially_accepted.push(RwLock::new(Vec::with_capacity(remaining_txnx[shard_id].len())));
+            finally_accepted.push(RwLock::new(Vec::with_capacity(remaining_txnx[shard_id].len())));
+            discarded.push(RwLock::new(Vec::with_capacity(remaining_txnx[shard_id].len())));
         }
 
-        let min_discarded_seq_nums_by_sender_id: DashMap<usize, AtomicUsize> = DashMap::new();
-        let shard_id_and_txn_id_vec_pairs: Vec<(usize, Vec<usize>)> = txn_id_vecs.into_iter().enumerate().collect();
+        let min_discarded_by_sender: DashMap<SenderIdx, AtomicUsize> = DashMap::new();
         let duration = timer.stop_and_record();
         info!("round_{}__init={}", round_id, duration);
 
-        let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_key").as_str()]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__resolve_conflict").as_str()]).start_timer();
         self.thread_pool.install(|| {
-            shard_id_and_txn_id_vec_pairs.into_par_iter().for_each(|(my_shard_id, txn_ids)| {
-                txn_ids.into_par_iter().for_each(|txn_id| {
-                    let in_round_conflict_detected = wsets_by_txn_id[txn_id].read().unwrap().iter().chain(rsets_by_txn_id[txn_id].read().unwrap().iter()).any(|&loc_id| {
-                        let loc_helper = loc_helpers.get(&loc_id).unwrap();
-                        let loc_helper_read = loc_helper.read().unwrap();
-                        let anchor_shard_id = loc_helper_read.anchor_shard_id;
-                        loc_helper_read.has_write_in_range(start_txn_id_by_shard_id[anchor_shard_id], start_txn_id_by_shard_id[my_shard_id])
+            remaining_txnx.into_iter().enumerate().collect::<Vec<_>>().into_par_iter().for_each(|(shard_id, txn_idxs)| {
+                txn_idxs.into_par_iter().for_each(|txn_idx| {
+                    let in_round_conflict_detected = wsets[txn_idx].read().unwrap().iter().chain(rsets[txn_idx].read().unwrap().iter()).any(|&key_idx| {
+                        let tracker_ref = trackers.get(&key_idx).unwrap();
+                        let tracker = tracker_ref.read().unwrap();
+                        tracker.has_write_in_range(start_txns[tracker.anchor_shard_id], start_txns[shard_id])
                     });
                     if in_round_conflict_detected {
-                        let sender_id = *sender_ids_by_txn_id[txn_id].read().unwrap().as_ref().unwrap();
-                        min_discarded_seq_nums_by_sender_id.entry(sender_id).or_insert_with(|| AtomicUsize::new(usize::MAX)).value().fetch_min(txn_id, Ordering::SeqCst);
-                        discarded[my_shard_id].write().unwrap().push(txn_id);
+                        let sender = *senders[txn_idx].read().unwrap().as_ref().unwrap();
+                        min_discarded_by_sender.entry(sender).or_insert_with(|| AtomicUsize::new(usize::MAX)).value().fetch_min(txn_idx, Ordering::SeqCst);
+                        discarded[shard_id].write().unwrap().push(txn_idx);
                     } else {
-                        potentially_accepted[my_shard_id].write().unwrap().push(txn_id);
+                        potentially_accepted[shard_id].write().unwrap().push(txn_idx);
                     }
                 });
             });
         });
         let duration = timer.stop_and_record();
-        info!("round_{}__discard_by_key={}", round_id, duration);
+        info!("round_{}__resolve_conflict={}", round_id, duration);
 
-        let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__discard_by_sender").as_str()]).start_timer();
+        let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__keep_relative_order").as_str()]).start_timer();
         self.thread_pool.install(||{
             (0..num_shards).into_par_iter().for_each(|shard_id|{
-                potentially_accepted[shard_id].read().unwrap().par_iter().for_each(|&txn_id|{
-                    let sender_id = *sender_ids_by_txn_id[txn_id].read().unwrap().as_ref().unwrap();
-                    let min_discarded_txn_id = min_discarded_seq_nums_by_sender_id.entry(sender_id).or_insert_with(|| AtomicUsize::new(usize::MAX)).load(Ordering::SeqCst);
-                    if txn_id < min_discarded_txn_id {
-                        for &loc_id in wsets_by_txn_id[txn_id].read().unwrap().iter().chain(rsets_by_txn_id[txn_id].read().unwrap().iter()) {
-                            loc_helpers.get(&loc_id).unwrap().write().unwrap().promote_txn_id(txn_id, round_id, shard_id);
+                potentially_accepted[shard_id].read().unwrap().par_iter().for_each(|&ori_txn_idx|{
+                    let sender_id = *senders[ori_txn_idx].read().unwrap().as_ref().unwrap();
+                    let min_discarded_txn_idx = min_discarded_by_sender.entry(sender_id).or_insert_with(|| AtomicUsize::new(usize::MAX)).load(Ordering::SeqCst);
+                    if ori_txn_idx < min_discarded_txn_idx {
+                        for &key_idx in wsets[ori_txn_idx].read().unwrap().iter().chain(rsets[ori_txn_idx].read().unwrap().iter()) {
+                            trackers.get(&key_idx).unwrap().write().unwrap().mark_txn_ordered(ori_txn_idx, round_id, shard_id);
                         }
-                        finally_accepted[shard_id].write().unwrap().push(txn_id);
+                        finally_accepted[shard_id].write().unwrap().push(ori_txn_idx);
                     } else {
-                        discarded[shard_id].write().unwrap().push(txn_id);
+                        discarded[shard_id].write().unwrap().push(ori_txn_idx);
                     }
                 });
             });
         });
         let duration = timer.stop_and_record();
-        info!("round_{}__discard_by_sender={}", round_id, duration);
+        info!("round_{}__keep_relative_order={}", round_id, duration);
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}__return_obj").as_str()]).start_timer();
         let ret = (extract_and_sort(finally_accepted), extract_and_sort(discarded));
@@ -145,33 +157,20 @@ impl PartitionerV2 {
         info!("round_{}__return_obj={}", round_id, duration);
         self.thread_pool.spawn(move||{
             drop(potentially_accepted);
-            drop(min_discarded_seq_nums_by_sender_id);
+            drop(min_discarded_by_sender);
         });
         ret
-    }
-
-    fn new_global_edge_table(&self, matrix: &Vec<Vec<Vec<usize>>>) -> Vec<Vec<Vec<DashMap<ShardedTxnIndex, DashSet<usize>>>>> {
-        let num_rounds = matrix.len();
-        let num_shards = matrix[0].len();
-        self.thread_pool.install(||{
-            (0..num_rounds).into_par_iter().map(|round_id|{
-                (0..num_shards).into_par_iter().map(|shard_id|{
-                    let sub_block_size = matrix[round_id][shard_id].len();
-                    (0..sub_block_size).into_par_iter().map(|_|DashMap::with_shard_amount(self.dashmap_num_shards)).collect()
-                }).collect()
-            }).collect()
-        })
     }
 
     fn add_edges(
         &self,
         txns: Vec<AnalyzedTransaction>,
-        rsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
-        wsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
-        txn_id_matrix: &Vec<Vec<Vec<usize>>>,
-        start_index_matrix: &Vec<Vec<usize>>,
-        new_indices: &Vec<RwLock<usize>>,
-        helpers: &DashMap<usize, RwLock<StorageLocationHelper>>,
+        rsets: &Vec<RwLock<HashSet<StorageKeyIdx>>>,
+        wsets: &Vec<RwLock<HashSet<StorageKeyIdx>>>,
+        txn_id_matrix: &Vec<Vec<Vec<OriginalTxnIdx>>>,
+        start_index_matrix: &Vec<Vec<OriginalTxnIdx>>,
+        new_indices: &Vec<RwLock<TxnIndex>>,
+        trackers: &DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
     ) -> Vec<SubBlocksForShard<AnalyzedTransaction>>{
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges__init"]).start_timer();
         let txns: Vec<Mutex<Option<AnalyzedTransaction>>> = self.thread_pool.install(||{
@@ -196,39 +195,39 @@ impl PartitionerV2 {
                     let cur_sub_block_size = txn_id_matrix[round_id][shard_id].len();
                     let mut twds: Vec<TransactionWithDependencies<AnalyzedTransaction>> = Vec::with_capacity(cur_sub_block_size);
                     (0..cur_sub_block_size).into_iter().for_each(|pos_in_sub_block|{
-                        let txn_id = txn_id_matrix[round_id][shard_id][pos_in_sub_block];
-                        let txn = txns[txn_id].lock().unwrap().take().unwrap();
+                        let ori_txn_idx = txn_id_matrix[round_id][shard_id][pos_in_sub_block];
+                        let txn = txns[ori_txn_idx].lock().unwrap().take().unwrap();
                         let mut deps = CrossShardDependencies::default();
-                        for &loc_id in wsets_by_txn_id[txn_id].read().unwrap().iter().chain(rsets_by_txn_id[txn_id].read().unwrap().iter()) {
-                            let helper_ref = helpers.get(&loc_id).unwrap();
-                            let helper = helper_ref.read().unwrap();
-                            if let Some(fat_id) = helper.promoted_writer_ids.range(..TxnFatId::new(round_id, shard_id, 0)).last() {
-                                let src_txn_idx_fat = ShardedTxnIndex {
-                                    txn_index: *new_indices[fat_id.old_txn_idx].read().unwrap(),
-                                    shard_id: fat_id.shard_id,
-                                    round_id: fat_id.round_id,
+                        for &key_idx in wsets[ori_txn_idx].read().unwrap().iter().chain(rsets[ori_txn_idx].read().unwrap().iter()) {
+                            let tracker_ref = trackers.get(&key_idx).unwrap();
+                            let tracker = tracker_ref.read().unwrap();
+                            if let Some(txn_idx) = tracker.finalized_writes.range(..ShardedTxnIndex2::new(round_id, shard_id, 0)).last() {
+                                let src_txn_idx = ShardedTxnIndex {
+                                    txn_index: *new_indices[txn_idx.ori_txn_idx].read().unwrap(),
+                                    shard_id: txn_idx.shard_id,
+                                    round_id: txn_idx.round_id,
                                 };
-                                deps.add_required_edge(src_txn_idx_fat, helper.storage_location.clone());
+                                deps.add_required_edge(src_txn_idx, tracker.storage_location.clone());
                             }
                         }
-                        for &loc_id in wsets_by_txn_id[txn_id].read().unwrap().iter() {
-                            let helper_ref = helpers.get(&loc_id).unwrap();
-                            let helper = helper_ref.read().unwrap();
-                            let is_last_writer_in_cur_sub_block = helper.promoted_writer_ids.range(TxnFatId::new(round_id, shard_id, txn_id + 1)..TxnFatId::new(round_id, shard_id + 1, 0)).next().is_none();
+                        for &key_idx in wsets[ori_txn_idx].read().unwrap().iter() {
+                            let tracker_ref = trackers.get(&key_idx).unwrap();
+                            let tracker = tracker_ref.read().unwrap();
+                            let is_last_writer_in_cur_sub_block = tracker.finalized_writes.range(ShardedTxnIndex2::new(round_id, shard_id, ori_txn_idx + 1)..ShardedTxnIndex2::new(round_id, shard_id + 1, 0)).next().is_none();
                             if is_last_writer_in_cur_sub_block {
-                                let mut end_id = TxnFatId::new(num_rounds, num_shards, 0); // Guaranteed to be invalid.
-                                for follower_id in helper.promoted_txn_ids.range(TxnFatId::new(round_id, shard_id + 1, 0)..) {
-                                    if *follower_id > end_id {
+                                let mut end_idx = ShardedTxnIndex2::new(num_rounds, num_shards, 0); // Guaranteed to be invalid.
+                                for follower_txn_idx in tracker.finalized_all.range(ShardedTxnIndex2::new(round_id, shard_id + 1, 0)..) {
+                                    if *follower_txn_idx > end_idx {
                                         break;
                                     }
-                                    let dst_txn_idx_fat = ShardedTxnIndex {
-                                        txn_index: *new_indices[follower_id.old_txn_idx].read().unwrap(),
-                                        shard_id: follower_id.shard_id,
-                                        round_id: follower_id.round_id,
+                                    let dst_txn_idx = ShardedTxnIndex {
+                                        txn_index: *new_indices[follower_txn_idx.ori_txn_idx].read().unwrap(),
+                                        shard_id: follower_txn_idx.shard_id,
+                                        round_id: follower_txn_idx.round_id,
                                     };
-                                    deps.add_dependent_edge(dst_txn_idx_fat, vec![helper.storage_location.clone()]);
-                                    if helper.writer_set.contains(&follower_id.old_txn_idx) {
-                                        end_id = TxnFatId::new(follower_id.round_id, follower_id.shard_id + 1, 0);
+                                    deps.add_dependent_edge(dst_txn_idx, vec![tracker.storage_location.clone()]);
+                                    if tracker.writer_set.contains(&follower_txn_idx.ori_txn_idx) {
+                                        end_idx = ShardedTxnIndex2::new(follower_txn_idx.round_id, follower_txn_idx.shard_id + 1, 0);
                                     }
                                 }
                             }
@@ -265,22 +264,22 @@ impl PartitionerV2 {
         &self,
         num_txns: usize,
         num_executor_shards: usize,
-        rsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
-        wsets_by_txn_id: &Vec<RwLock<HashSet<usize>>>,
-        sender_ids_by_txn_id: &Vec<RwLock<Option<usize>>>,
-        helpers_by_key_id: &DashMap<usize, RwLock<StorageLocationHelper>>,
-        start_txn_ids_by_shard_id: &Vec<usize>,
-        mut remaining_txn_ids: Vec<Vec<usize>>
-    ) -> (Vec<Vec<Vec<usize>>>, Vec<Vec<usize>>, Vec<RwLock<usize>>) {
-        let new_indices: Vec<RwLock<usize>>= (0..num_txns).map(|_tid|RwLock::new(0)).collect();
-        let mut txn_id_matrix: Vec<Vec<Vec<usize>>> = Vec::new();
+        rsets: &Vec<RwLock<HashSet<StorageKeyIdx>>>,
+        wsets: &Vec<RwLock<HashSet<StorageKeyIdx>>>,
+        senders: &Vec<RwLock<Option<SenderIdx>>>,
+        trackers: &DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
+        start_txns: &Vec<OriginalTxnIdx>,
+        mut remaining_txns: Vec<Vec<OriginalTxnIdx>>
+    ) -> (Vec<Vec<Vec<OriginalTxnIdx>>>, Vec<Vec<OriginalTxnIdx>>, Vec<RwLock<TxnIndex>>) {
+        let finalized_indexs: Vec<RwLock<TxnIndex>>= (0..num_txns).map(|_tid|RwLock::new(0)).collect();
+        let mut txn_idx_matrix: Vec<Vec<Vec<OriginalTxnIdx>>> = Vec::new();
         let mut num_remaining_txns = usize::MAX;
         for round_id in 0..(self.num_rounds_limit - 1) {
             let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("round_{round_id}").as_str()]).start_timer();
-            let (accepted, discarded) = self.discarding_round(round_id, &rsets_by_txn_id, &wsets_by_txn_id, &sender_ids_by_txn_id, &helpers_by_key_id, &start_txn_ids_by_shard_id, remaining_txn_ids);
-            txn_id_matrix.push(accepted);
-            remaining_txn_ids = discarded;
-            num_remaining_txns = remaining_txn_ids.iter().map(|ts|ts.len()).sum();
+            let (accepted, discarded) = self.discarding_round(round_id, &rsets, &wsets, &senders, &trackers, &start_txns, remaining_txns);
+            txn_idx_matrix.push(accepted);
+            remaining_txns = discarded;
+            num_remaining_txns = remaining_txns.iter().map(|ts|ts.len()).sum();
             let duration = timer.stop_and_record();
             info!("round_{round_id}={duration}");
 
@@ -290,53 +289,53 @@ impl PartitionerV2 {
         }
 
         if num_remaining_txns >= 1 {
-            let last_round_id = txn_id_matrix.len();
+            let last_round_id = txn_idx_matrix.len();
             let timer = MISC_TIMERS_SECONDS.with_label_values(&["last_round"]).start_timer();
-            let last_round_txns: Vec<usize> = remaining_txn_ids.into_iter().flatten().collect();
+            let last_round_txns: Vec<OriginalTxnIdx> = remaining_txns.into_iter().flatten().collect();
             self.thread_pool.install(||{
-                last_round_txns.par_iter().for_each(|txn_id_ref|{
-                    let txn_id = *txn_id_ref;
-                    for loc_id_ref in rsets_by_txn_id[txn_id].read().unwrap().iter().chain(wsets_by_txn_id[txn_id].read().unwrap().iter()) {
-                        let loc_id = *loc_id_ref;
-                        let helper = helpers_by_key_id.get(&loc_id).unwrap();
-                        helper.write().unwrap().promote_txn_id(txn_id, last_round_id, num_executor_shards - 1);
+                last_round_txns.par_iter().for_each(|txn_idx_ref|{
+                    let txn_idx = *txn_idx_ref;
+                    for key_idx_ref in rsets[txn_idx].read().unwrap().iter().chain(wsets[txn_idx].read().unwrap().iter()) {
+                        let key_idx = *key_idx_ref;
+                        let tracker = trackers.get(&key_idx).unwrap();
+                        tracker.write().unwrap().mark_txn_ordered(txn_idx, last_round_id, num_executor_shards - 1);
                     }
                 });
             });
 
-            remaining_txn_ids = vec![vec![]; num_executor_shards];
-            remaining_txn_ids[num_executor_shards - 1] = last_round_txns;
-            txn_id_matrix.push(remaining_txn_ids);
+            remaining_txns = vec![vec![]; num_executor_shards];
+            remaining_txns[num_executor_shards - 1] = last_round_txns;
+            txn_idx_matrix.push(remaining_txns);
             let duration = timer.stop_and_record();
             info!("last_round={duration}");
         }
 
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["new_tid_table"]).start_timer();
-        let num_rounds = txn_id_matrix.len();
-        let mut start_index_matrix: Vec<Vec<usize>> = vec![vec![0; num_executor_shards]; num_rounds];
-        let mut global_counter: usize = 0;
-        for (round_id, row) in txn_id_matrix.iter().enumerate() {
+        let num_rounds = txn_idx_matrix.len();
+        let mut start_index_matrix: Vec<Vec<TxnIndex>> = vec![vec![0; num_executor_shards]; num_rounds];
+        let mut global_counter: TxnIndex = 0;
+        for (round_id, row) in txn_idx_matrix.iter().enumerate() {
             for (shard_id, txns) in row.iter().enumerate() {
                 start_index_matrix[round_id][shard_id] = global_counter;
-                global_counter += txn_id_matrix[round_id][shard_id].len();
+                global_counter += txn_idx_matrix[round_id][shard_id].len();
             }
         }
 
         self.thread_pool.install(||{
             (0..num_rounds).into_par_iter().for_each(|round_id| {
                 (0..num_executor_shards).into_par_iter().for_each(|shard_id| {
-                    let sub_block_size = txn_id_matrix[round_id][shard_id].len();
-                    (0..sub_block_size).into_par_iter().for_each(|new_id_in_sub_block|{
-                        let txn_id = txn_id_matrix[round_id][shard_id][new_id_in_sub_block];
-                        *new_indices[txn_id].write().unwrap() = start_index_matrix[round_id][shard_id] + new_id_in_sub_block;
+                    let sub_block_size = txn_idx_matrix[round_id][shard_id].len();
+                    (0..sub_block_size).into_par_iter().for_each(|pos_in_sub_block|{
+                        let txn_idx = txn_idx_matrix[round_id][shard_id][pos_in_sub_block];
+                        *finalized_indexs[txn_idx].write().unwrap() = start_index_matrix[round_id][shard_id] + pos_in_sub_block;
                     });
                 });
             });
         });
         let duration = timer.stop_and_record();
         info!("new_tid_table={duration}");
-        (txn_id_matrix, start_index_matrix, new_indices)
+        (txn_idx_matrix, start_index_matrix, finalized_indexs)
     }
 }
 
@@ -346,42 +345,42 @@ impl BlockPartitioner for PartitionerV2 {
         let num_txns = txns.len();
         let mut num_senders = AtomicUsize::new(0);
         let mut num_keys = AtomicUsize::new(0);
-        let mut sender_ids_by_txn_id: Vec<RwLock<Option<usize>>> = Vec::with_capacity(num_txns);
-        let mut wsets_by_txn_id: Vec<RwLock<HashSet<usize>>> = Vec::with_capacity(num_txns);
-        let mut rsets_by_txn_id: Vec<RwLock<HashSet<usize>>> = Vec::with_capacity(num_txns);
-        let mut sender_ids_by_sender: DashMap<Sender, usize> = DashMap::with_shard_amount(self.dashmap_num_shards);
-        let mut key_ids_by_key: DashMap<StateKey, usize> = DashMap::with_shard_amount(self.dashmap_num_shards);
-        let mut helpers_by_key_id: DashMap<usize, RwLock<StorageLocationHelper>> = DashMap::with_shard_amount(self.dashmap_num_shards);
+        let mut senders: Vec<RwLock<Option<SenderIdx>>> = Vec::with_capacity(num_txns);
+        let mut wsets: Vec<RwLock<HashSet<StorageKeyIdx>>> = Vec::with_capacity(num_txns);
+        let mut rsets: Vec<RwLock<HashSet<StorageKeyIdx>>> = Vec::with_capacity(num_txns);
+        let mut sender_idx_table: DashMap<Sender, SenderIdx> = DashMap::with_shard_amount(self.dashmap_num_shards);
+        let mut key_idx_table: DashMap<StateKey, StorageKeyIdx> = DashMap::with_shard_amount(self.dashmap_num_shards);
+        let mut trackers: DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>> = DashMap::with_shard_amount(self.dashmap_num_shards);
         for txn in txns.iter() {
-            sender_ids_by_txn_id.push(RwLock::new(None));
-            wsets_by_txn_id.push(RwLock::new(HashSet::with_capacity(txn.write_hints().len())));
-            rsets_by_txn_id.push(RwLock::new(HashSet::with_capacity(txn.read_hints().len())));
+            senders.push(RwLock::new(None));
+            wsets.push(RwLock::new(HashSet::with_capacity(txn.write_hints().len())));
+            rsets.push(RwLock::new(HashSet::with_capacity(txn.read_hints().len())));
         }
         let timer_1 = MISC_TIMERS_SECONDS.with_label_values(&["preprocess__main"]).start_timer();
         self.thread_pool.install(||{
-            (0..num_txns).into_par_iter().for_each(|txn_id| {
-                let txn = &txns[txn_id];
+            (0..num_txns).into_par_iter().for_each(|txn_idx: OriginalTxnIdx| {
+                let txn = &txns[txn_idx];
                 let sender = txn.sender();
-                let sender_id = *sender_ids_by_sender.entry(sender).or_insert_with(||{
+                let sender_idx = *sender_idx_table.entry(sender).or_insert_with(||{
                     num_senders.fetch_add(1, Ordering::SeqCst)
                 });
-                *sender_ids_by_txn_id[txn_id].write().unwrap() = Some(sender_id);
+                *senders[txn_idx].write().unwrap() = Some(sender_idx);
                 let num_writes = txn.write_hints().len();
                 for (i, storage_location) in txn.write_hints().iter().chain(txn.read_hints().iter()).enumerate() {
                     let key = storage_location.state_key().clone();
-                    let key_id = *key_ids_by_key.entry(key).or_insert_with(|| {
+                    let key_idx = *key_idx_table.entry(key).or_insert_with(|| {
                         num_keys.fetch_add(1, Ordering::SeqCst)
                     });
                     let is_write = i < num_writes;
                     if is_write {
-                        wsets_by_txn_id[txn_id].write().unwrap().insert(key_id);
+                        wsets[txn_idx].write().unwrap().insert(key_idx);
                     } else {
-                        rsets_by_txn_id[txn_id].write().unwrap().insert(key_id);
+                        rsets[txn_idx].write().unwrap().insert(key_idx);
                     }
-                    helpers_by_key_id.entry(key_id).or_insert_with(|| {
+                    trackers.entry(key_idx).or_insert_with(|| {
                         let anchor_shard_id = get_anchor_shard_id(storage_location, num_executor_shards);
-                        RwLock::new(StorageLocationHelper::new(storage_location.clone(), anchor_shard_id))
-                    }).write().unwrap().add_candidate(txn_id, is_write);
+                        RwLock::new(ConflictingTxnTracker::new(storage_location.clone(), anchor_shard_id))
+                    }).write().unwrap().add_candidate(txn_idx, is_write);
                 }
             });
         });
@@ -391,35 +390,35 @@ impl BlockPartitioner for PartitionerV2 {
         info!("preprocess={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["pre_partition_uniform"]).start_timer();
-        let remaining_txn_ids = uniform_partition(num_txns, num_executor_shards);
-        let mut start_txn_ids_by_shard_id = vec![0; num_executor_shards];
+        let remaining_txn_idxs = uniform_partition(num_txns, num_executor_shards);
+        let mut start_txns: Vec<OriginalTxnIdx> = vec![0; num_executor_shards];
         for shard_id in 1..num_executor_shards {
-            start_txn_ids_by_shard_id[shard_id] = start_txn_ids_by_shard_id[shard_id - 1] + remaining_txn_ids[shard_id - 1].len();
+            start_txns[shard_id] = start_txns[shard_id - 1] + remaining_txn_idxs[shard_id - 1].len();
         }
         let duration = timer.stop_and_record();
         info!("pre_partition_uniform={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&[format!("multi_rounds").as_str()]).start_timer();
-        let (txn_id_matrix, start_index_matrix, new_indices) = self.multi_rounds(num_txns, num_executor_shards, &rsets_by_txn_id, &wsets_by_txn_id, &sender_ids_by_txn_id, &helpers_by_key_id, &start_txn_ids_by_shard_id, remaining_txn_ids);
+        let (finalized_txn_matrix, start_index_matrix, new_idxs) = self.multi_rounds(num_txns, num_executor_shards, &rsets, &wsets, &senders, &trackers, &start_txns, remaining_txn_idxs);
         let duration = timer.stop_and_record();
         info!("multi_rounds={duration}");
 
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["add_edges"]).start_timer();
-        let ret = self.add_edges(txns, &rsets_by_txn_id, &wsets_by_txn_id, &txn_id_matrix, &start_index_matrix, &new_indices, &helpers_by_key_id);
+        let ret = self.add_edges(txns, &rsets, &wsets, &finalized_txn_matrix, &start_index_matrix, &new_idxs, &trackers);
         let duration = timer.stop_and_record();
         info!("add_edges={duration}");
         let timer = MISC_TIMERS_SECONDS.with_label_values(&["drop"]).start_timer();
         self.thread_pool.spawn(move||{
-            drop(sender_ids_by_sender);
-            drop(sender_ids_by_txn_id);
-            drop(wsets_by_txn_id);
-            drop(rsets_by_txn_id);
-            drop(helpers_by_key_id);
-            drop(key_ids_by_key);
-            drop(start_txn_ids_by_shard_id);
-            drop(txn_id_matrix);
+            drop(sender_idx_table);
+            drop(senders);
+            drop(wsets);
+            drop(rsets);
+            drop(trackers);
+            drop(key_idx_table);
+            drop(start_txns);
+            drop(finalized_txn_matrix);
             drop(start_index_matrix);
-            drop(new_indices);
+            drop(new_idxs);
         });
         let duration = timer.stop_and_record();
         info!("drop={duration}");
@@ -430,7 +429,7 @@ impl BlockPartitioner for PartitionerV2 {
 #[test]
 fn test_partitioner_v2_correctness() {
     let block_generator = P2PBlockGenerator::new(100);
-    let partitioner = PartitionerV2::new(8, 4, 10, 64, 0);
+    let partitioner = PartitionerV2::new(8, 4, 10, 64);
     let mut rng = thread_rng();
     for run_id in 0..100 {
         let block_size = 10_u64.pow(rng.gen_range(0, 4)) as usize;
@@ -444,12 +443,12 @@ fn test_partitioner_v2_correctness() {
 
 #[test]
 fn test_partitioner_v2_determinism() {
-    let partitioner = Arc::new(PartitionerV2::new(4, 4, 10, 64, 0));
+    let partitioner = Arc::new(PartitionerV2::new(4, 4, 10, 64));
     assert_deterministic_result(partitioner);
 }
 
 /// Evenly divide 0..n-1. Example: uniform_partition(11,3) == [[0,1,2,3],[4,5,6,7],[8,9,10]]
-fn uniform_partition(num_items: usize, num_chunks: usize) -> Vec<Vec<usize>> {
+fn uniform_partition(num_items: usize, num_chunks: usize) -> Vec<Vec<OriginalTxnIdx>> {
     let num_big_chunks = num_items % num_chunks;
     let small_chunk_size = num_items / num_chunks;
     let mut ret = Vec::with_capacity(num_chunks);
