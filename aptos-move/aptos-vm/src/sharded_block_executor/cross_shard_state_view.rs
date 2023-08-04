@@ -121,13 +121,6 @@ impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        let _timer = CROSS_SHARD_STATE_VALUE_TIMER_SECONDS
-            .with_label_values(&[
-                &self.shard_id.to_string(),
-                &self.round_id.to_string(),
-                "get",
-            ])
-            .start_timer();
         if let Some(value) = self.cross_shard_data.get(state_key) {
             let _timer = CROSS_SHARD_STATE_VALUE_TIMER_SECONDS
                 .with_label_values(&[
