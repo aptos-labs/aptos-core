@@ -47,11 +47,11 @@ const createAndFundAliceAndBob = async (
   // Offer Alice's rotation capability to Bob
   {
     // Construct the RotationCapabilityOfferProofChallengeV2 struct
-    const rotationCapabilityOffer: CapabilityOfferProofChallengeV2 = {
+    const rotationCapProof: CapabilityOfferProofChallengeV2 = {
       accountAddress: moduleAddress,
       moduleName: "account",
       structName: "RotationCapabilityOfferProofChallengeV2",
-      sequenceNumber: Number((await provider.getAccount(alice.address())).sequence_number),
+      sequenceNumber: Number((await provider.getAccount(alice.address())).sequence_number), // Get latest sequence number
       sourceAddress: aliceAccountAddress,
       recipientAddress: bobAccountAddress,
       chainId,
@@ -60,12 +60,7 @@ const createAndFundAliceAndBob = async (
     console.log(`\n---------------  RotationCapabilityOfferProofChallengeV2 --------------\n`);
 
     // Sign the BCS-serialized struct, submit the transaction, and wait for the result.
-    const res = await signStructAndSubmitTransaction(
-      provider,
-      alice,
-      "offer_rotation_capability",
-      rotationCapabilityOffer,
-    );
+    const res = await signStructAndSubmitTransaction(provider, alice, "offer_rotation_capability", rotationCapProof);
 
     // Print the relevant transaction submission info
     const { hash, version, success, payload } = res;
@@ -85,11 +80,11 @@ const createAndFundAliceAndBob = async (
   // Offer Alice's signer capability to Bob
   {
     // Construct the SignerCapabilityOfferProofChallengeV2 struct
-    const signerCapabilityOffer: CapabilityOfferProofChallengeV2 = {
+    const signerCapProof: CapabilityOfferProofChallengeV2 = {
       accountAddress: moduleAddress,
       moduleName: "account",
       structName: "SignerCapabilityOfferProofChallengeV2",
-      sequenceNumber: Number((await provider.getAccount(alice.address())).sequence_number),
+      sequenceNumber: Number((await provider.getAccount(alice.address())).sequence_number), // Get latest sequence number
       sourceAddress: aliceAccountAddress,
       recipientAddress: bobAccountAddress,
       // Note no chainId, the signer capability offer doesn't require it. We leave it undefined
@@ -98,7 +93,7 @@ const createAndFundAliceAndBob = async (
     console.log(`\n---------------  SignerCapabilityOfferProofChallengeV2 ---------------\n`);
 
     // Sign the BCS-serialized struct, submit the transaction, and wait for the result.
-    const res = await signStructAndSubmitTransaction(provider, alice, "offer_signer_capability", signerCapabilityOffer);
+    const res = await signStructAndSubmitTransaction(provider, alice, "offer_signer_capability", signerCapProof);
 
     // Print the relevant transaction submission info
     const { hash, version, success, payload } = res;
