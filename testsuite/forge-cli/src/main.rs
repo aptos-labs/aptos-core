@@ -1235,7 +1235,7 @@ fn network_bandwidth() -> ForgeConfig {
 fn gather_metrics() -> ForgeConfig {
     ForgeConfig::default()
         .add_network_test(GatherMetrics)
-        .add_network_test(Delay::new(60))
+        .add_network_test(Delay::new(180))
         .add_network_test(GatherMetrics)
 }
 
