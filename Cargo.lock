@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.0.2"
+version = "2.0.3"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -526,6 +526,7 @@ dependencies = [
  "dashmap",
  "itertools",
  "move-binary-format",
+ "move-core-types",
  "num_cpus",
  "once_cell",
  "parking_lot 0.12.1",
@@ -1146,13 +1147,10 @@ dependencies = [
  "aptos-executor",
  "aptos-executor-types",
  "aptos-genesis",
- "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-push-metrics",
- "aptos-schemadb",
- "aptos-scratchpad",
  "aptos-sdk",
  "aptos-state-view",
  "aptos-storage-interface",
@@ -1164,7 +1162,6 @@ dependencies = [
  "bcs 0.1.4",
  "chrono",
  "clap 4.3.5",
- "criterion",
  "indicatif 0.15.0",
  "itertools",
  "jemallocator",
@@ -2463,6 +2460,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-nft-metadata-crawler-parser"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "async-trait",
+ "backoff",
+ "base64 0.13.0",
+ "chrono",
+ "clap 4.3.5",
+ "crossbeam-channel",
+ "csv",
+ "diesel",
+ "diesel_migrations",
+ "field_count",
+ "futures",
+ "google-cloud-pubsub",
+ "google-cloud-storage",
+ "image",
+ "regex",
+ "reqwest",
+ "serde 1.0.149",
+ "serde_json",
+ "time 0.3.24",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "aptos-node"
 version = "1.6.0"
 dependencies = [
@@ -3448,9 +3475,7 @@ dependencies = [
  "aptos-transaction-emitter-lib",
  "clap 4.3.5",
  "futures",
- "itertools",
  "rand 0.7.3",
- "rand_core 0.5.1",
  "tokio",
 ]
 
@@ -3463,7 +3488,6 @@ dependencies = [
  "aptos",
  "aptos-config",
  "aptos-crypto",
- "aptos-framework",
  "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
@@ -3474,7 +3498,6 @@ dependencies = [
  "clap 4.3.5",
  "futures",
  "itertools",
- "move-binary-format",
  "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -3488,29 +3511,18 @@ dependencies = [
 name = "aptos-transaction-generator-lib"
 version = "0.0.0"
 dependencies = [
- "again",
  "anyhow",
- "aptos",
- "aptos-config",
- "aptos-crypto",
  "aptos-framework",
- "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
- "aptos-rest-client",
  "aptos-sdk",
  "async-trait",
  "clap 4.3.5",
- "futures",
- "itertools",
  "move-binary-format",
  "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
- "reqwest",
  "serde 1.0.149",
- "tokio",
- "url",
 ]
 
 [[package]]
@@ -9549,35 +9561,6 @@ name = "new_debug_unreachable"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
-
-[[package]]
-name = "nft-metadata-crawler-parser"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-indexer-grpc-server-framework",
- "async-trait",
- "backoff",
- "base64 0.13.0",
- "chrono",
- "clap 4.3.5",
- "crossbeam-channel",
- "csv",
- "diesel",
- "field_count",
- "futures",
- "google-cloud-pubsub",
- "google-cloud-storage",
- "image",
- "regex",
- "reqwest",
- "serde 1.0.149",
- "serde_json",
- "time 0.3.24",
- "tokio",
- "tracing",
- "url",
-]
 
 [[package]]
 name = "no-std-compat"

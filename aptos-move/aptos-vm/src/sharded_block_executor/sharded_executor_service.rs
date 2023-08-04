@@ -4,7 +4,7 @@ use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
         coordinator_client::CoordinatorClient,
-        counters::SHARDED_BLOCK_EXECUTION_SECONDS,
+        counters::{SHARDED_BLOCK_EXECUTION_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT},
         cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
         messages::CrossShardMsg,
@@ -58,6 +58,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         &self,
         base_view: &'a S,
         sub_block: &SubBlock<AnalyzedTransaction>,
+        round_id: usize,
     ) -> CrossShardStateView<'a, S> {
         let mut cross_shard_state_key = HashSet::new();
         for txn in &sub_block.transactions {
@@ -67,7 +68,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 }
             }
         }
-        CrossShardStateView::new(self.shard_id, cross_shard_state_key, base_view)
+        CrossShardStateView::new(self.shard_id, round_id, cross_shard_state_key, base_view)
     }
 
     fn execute_sub_block(
@@ -89,7 +90,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         let (callback, callback_receiver) = oneshot::channel();
 
         let cross_shard_state_view =
-            Arc::new(self.create_cross_shard_state_view(state_view, &sub_block));
+            Arc::new(self.create_cross_shard_state_view(state_view, &sub_block, round));
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
         let cross_shard_client = self.cross_shard_client.clone();
         let cross_shard_client_clone = cross_shard_client.clone();
@@ -143,6 +144,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             let _timer = SHARDED_BLOCK_EXECUTION_SECONDS
                 .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
                 .start_timer();
+            SHARDED_BLOCK_EXECUTOR_TXN_COUNT
+                .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
+                .observe(sub_block.transactions.len() as f64);
             info!(
                 "executing sub block for shard {} and round {}, number of txns {}",
                 self.shard_id,

@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    establish_connection_pool,
     models::{
         nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
-        database::upsert_uris,
+        database::{establish_connection_pool, run_migrations, upsert_uris},
         gcs::{write_image_to_gcs, write_json_to_gcs},
         image_optimizer::ImageOptimizer,
         json_parser::JSONParser,
@@ -112,7 +111,13 @@ async fn spawn_parser(
 impl RunnableConfig for ParserConfig {
     /// Main driver function that establishes a connection to Pubsub and parses the Pubsub entries in parallel
     async fn run(&self) -> anyhow::Result<()> {
+        info!("[NFT Metadata Crawler] Connecting to database");
         let pool = establish_connection_pool(self.database_url.clone());
+        info!("[NFT Metadata Crawler] Database connection successful");
+
+        info!("[NFT Metadata Crawler] Running migrations");
+        run_migrations(&pool);
+        info!("[NFT Metadata Crawler] Finished migrations");
 
         std::env::set_var(
             "GOOGLE_APPLICATION_CREDENTIALS",
@@ -248,6 +253,7 @@ impl Worker {
                 let cdn_json_uri =
                     write_json_to_gcs(self.config.bucket.clone(), self.token_data_id.clone(), json)
                         .await
+                        .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                         .ok();
                 self.model.set_cdn_json_uri(cdn_json_uri);
             }
@@ -305,6 +311,7 @@ impl Worker {
                     image,
                 )
                 .await
+                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                 .ok();
                 self.model.set_cdn_image_uri(cdn_image_uri);
             }
@@ -365,6 +372,7 @@ impl Worker {
                     animation,
                 )
                 .await
+                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                 .ok();
                 self.model.set_cdn_animation_uri(cdn_animation_uri);
             }

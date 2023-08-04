@@ -1,12 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{system_metrics::SystemMetricsThreshold, Swarm, SwarmExt, TestReport};
+use crate::{
+    prometheus_metrics::{
+        fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice, SystemMetrics,
+    },
+    Swarm, SwarmExt, TestReport,
+};
 use anyhow::{bail, Context};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
-use std::time::Duration;
+use prometheus_http_query::response::Sample;
+use std::{collections::BTreeMap, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct StateProgressThreshold {
@@ -23,9 +29,105 @@ pub enum LatencyType {
 }
 
 #[derive(Default, Clone, Debug)]
+pub struct MetricsThreshold {
+    max: f64,
+    // % of the data point that can breach the max threshold
+    max_breach_pct: usize,
+}
+
+impl MetricsThreshold {
+    pub fn new(max: f64, max_breach_pct: usize) -> Self {
+        Self {
+            max,
+            max_breach_pct,
+        }
+    }
+
+    pub fn new_gb(max: f64, max_breach_pct: usize) -> Self {
+        Self {
+            max: max * 1024.0 * 1024.0 * 1024.0,
+            max_breach_pct,
+        }
+    }
+
+    pub fn ensure_metrics_threshold(
+        &self,
+        metrics_name: &str,
+        metrics: &Vec<Sample>,
+    ) -> anyhow::Result<()> {
+        if metrics.is_empty() {
+            bail!("Empty metrics provided");
+        }
+        let breach_count = metrics
+            .iter()
+            .filter(|sample| sample.value() > self.max)
+            .count();
+        let breach_pct = (breach_count * 100) / metrics.len();
+        if breach_pct > self.max_breach_pct {
+            bail!(
+                "{:?} metric violated threshold of {:?}, max_breach_pct: {:?}, breach_pct: {:?} ",
+                metrics_name,
+                self.max,
+                self.max_breach_pct,
+                breach_pct
+            );
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct SystemMetricsThreshold {
+    cpu_threshold: MetricsThreshold,
+    memory_threshold: MetricsThreshold,
+}
+
+impl SystemMetricsThreshold {
+    pub fn ensure_threshold(&self, metrics: &SystemMetrics) -> anyhow::Result<()> {
+        self.cpu_threshold
+            .ensure_metrics_threshold("cpu", metrics.cpu_core_metrics.get())?;
+        self.memory_threshold
+            .ensure_metrics_threshold("memory", metrics.memory_bytes_metrics.get())?;
+        Ok(())
+    }
+
+    pub fn new(cpu_threshold: MetricsThreshold, memory_threshold: MetricsThreshold) -> Self {
+        Self {
+            cpu_threshold,
+            memory_threshold,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LatencyBreakdownThreshold {
+    pub thresholds: BTreeMap<LatencyBreakdownSlice, MetricsThreshold>,
+}
+
+impl LatencyBreakdownThreshold {
+    pub fn new_strict(thresholds: Vec<(LatencyBreakdownSlice, f64)>) -> Self {
+        Self {
+            thresholds: thresholds
+                .into_iter()
+                .map(|(k, v)| (k, MetricsThreshold::new(v, 0)))
+                .collect(),
+        }
+    }
+
+    pub fn ensure_threshold(&self, metrics: &LatencyBreakdown) -> anyhow::Result<()> {
+        for (slice, threshold) in &self.thresholds {
+            let samples = metrics.get_samples(slice);
+            threshold.ensure_metrics_threshold(&format!("{:?}", slice), samples.get())?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default, Clone, Debug)]
 pub struct SuccessCriteria {
     pub min_avg_tps: usize,
     latency_thresholds: Vec<(Duration, LatencyType)>,
+    latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
     max_expired_tps: Option<usize>,
     max_failed_submission_tps: Option<usize>,
@@ -40,6 +142,7 @@ impl SuccessCriteria {
         Self {
             min_avg_tps,
             latency_thresholds: Vec::new(),
+            latency_breakdown_thresholds: None,
             check_no_restarts: false,
             max_expired_tps: None,
             max_failed_submission_tps: None,
@@ -84,6 +187,11 @@ impl SuccessCriteria {
             .push((Duration::from_secs_f32(threshold_s), latency_type));
         self
     }
+
+    pub fn add_latency_breakdown_threshold(mut self, threshold: LatencyBreakdownThreshold) -> Self {
+        self.latency_breakdown_thresholds = Some(threshold);
+        self
+    }
 }
 
 pub struct SuccessCriteriaChecker {}
@@ -93,6 +201,7 @@ impl SuccessCriteriaChecker {
         success_criteria: &SuccessCriteria,
         _report: &mut TestReport,
         stats_rate: &TxnStatsRate,
+        latency_breakdown: Option<&LatencyBreakdown>,
         traffic_name: Option<String>,
     ) -> anyhow::Result<()> {
         let traffic_name_addition = traffic_name
@@ -110,6 +219,9 @@ impl SuccessCriteriaChecker {
             stats_rate,
             &traffic_name_addition,
         )?;
+        if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
+            latency_breakdown_thresholds.ensure_threshold(latency_breakdown.unwrap())?;
+        }
         Ok(())
     }
 
@@ -119,6 +231,7 @@ impl SuccessCriteriaChecker {
         report: &mut TestReport,
         stats: &TxnStats,
         window: Duration,
+        latency_breakdown: &LatencyBreakdown,
         start_time: i64,
         end_time: i64,
         start_version: u64,
@@ -139,6 +252,16 @@ impl SuccessCriteriaChecker {
             &"".to_string(),
         )?;
 
+        Self::check_latency(
+            &success_criteria.latency_thresholds,
+            &stats_rate,
+            &"".to_string(),
+        )?;
+
+        if let Some(latency_breakdown_thresholds) = &success_criteria.latency_breakdown_thresholds {
+            latency_breakdown_thresholds.ensure_threshold(latency_breakdown)?;
+        }
+
         if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
             swarm
                 .wait_for_all_nodes_to_catchup_to_next(timeout)
@@ -157,12 +280,8 @@ impl SuccessCriteriaChecker {
                 .context("Failed ensuring no fullnode restarted")?;
         }
 
-        // TODO(skedia) Add end-to-end latency from counters after we have support for querying prometheus
-        // latency (in addition to checking latency from txn-emitter)
-
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
-            swarm
-                .ensure_healthy_system_metrics(start_time, end_time, system_metrics_threshold)
+            Self::check_system_metrics(swarm, start_time, end_time, system_metrics_threshold)
                 .await?;
         }
 
@@ -396,5 +515,29 @@ impl SuccessCriteriaChecker {
         } else {
             Ok(())
         }
+    }
+
+    async fn check_system_metrics(
+        swarm: &mut dyn Swarm,
+        start_time: i64,
+        end_time: i64,
+        threshold: SystemMetricsThreshold,
+    ) -> anyhow::Result<()> {
+        let system_metrics = fetch_system_metrics(swarm, start_time, end_time).await?;
+        threshold.ensure_threshold(&system_metrics)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    #[tokio::test]
+    async fn test_empty_metrics_threshold() {
+        let cpu_threshold = MetricsThreshold::new(10.0, 30);
+        let memory_threshold = MetricsThreshold::new(100.0, 40);
+        let threshold = SystemMetricsThreshold::new(cpu_threshold, memory_threshold);
+        let metrics = SystemMetrics::new(vec![], vec![]);
+        threshold.ensure_threshold(&metrics).unwrap_err();
     }
 }

@@ -816,7 +816,8 @@ impl EpochManager {
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 let consensus_config = onchain_consensus_config.unwrap_or_default();
-                let execution_config = onchain_execution_config.unwrap_or_default();
+                let execution_config = onchain_execution_config
+                    .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
                 self.quorum_store_enabled = self.enable_quorum_store(&consensus_config);
                 self.recovery_mode = false;
                 self.start_round_manager(

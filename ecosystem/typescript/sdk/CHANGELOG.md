@@ -4,6 +4,11 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- Add support for a fee payer transaction
+- Return transaction message error when transaction has failed when `checkSuccess` is set to true
+
+## 1.16.0 (2023-08-02)
+
 - Export all remaining types and functions in TS SDK
 - Add improvements for `IndexerClient`
   - Export indexer types - `export * from "/indexer/generated/types"`
@@ -11,6 +16,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
   - Aggregate query suports token v2 activities - `getTokenActivitiesCount`
   - Support for sorting indexer queries - `orderBy` optional argument in `extraArgs` arguments
   - Support for get owned tokens by token address or token data id - `getOwnedTokensByTokenData`
+- Add support for local/custom networks without an indexer client
 
 ## 1.15.0 (2023-07-28)
 
