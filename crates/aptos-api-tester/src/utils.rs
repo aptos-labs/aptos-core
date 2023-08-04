@@ -2,10 +2,10 @@
 
 use crate::counters::{test_error, test_fail, test_latency, test_success};
 use anyhow::Result;
-use aptos_logger::info;
 use aptos_rest_client::{error::RestError, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
 use once_cell::sync::Lazy;
+use std::env;
 use url::Url;
 
 // network urls
@@ -127,7 +127,12 @@ pub fn get_client(network_name: NetworkName) -> Client {
 pub fn get_faucet_client(network_name: NetworkName) -> FaucetClient {
     match network_name {
         NetworkName::Testnet => {
-            FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone())
+            let faucet_client =
+                FaucetClient::new(TESTNET_FAUCET_URL.clone(), TESTNET_NODE_URL.clone());
+            match env::var("TESTNET_FAUCET_CLIENT_TOKEN") {
+                Ok(token) => faucet_client.with_auth_token(token),
+                Err(_) => faucet_client,
+            }
         },
         NetworkName::Devnet => {
             FaucetClient::new(DEVNET_FAUCET_URL.clone(), DEVNET_NODE_URL.clone())
@@ -139,7 +144,6 @@ pub fn get_faucet_client(network_name: NetworkName) -> FaucetClient {
 pub async fn create_account(faucet_client: &FaucetClient) -> Result<LocalAccount> {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.create_account(account.address()).await?;
-    info!("{:?}", account.address());
 
     Ok(account)
 }
@@ -148,7 +152,6 @@ pub async fn create_account(faucet_client: &FaucetClient) -> Result<LocalAccount
 pub async fn create_and_fund_account(faucet_client: &FaucetClient) -> Result<LocalAccount> {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(account.address(), 100_000_000).await?;
-    info!("{:?}", account.address());
 
     Ok(account)
 }
