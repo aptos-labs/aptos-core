@@ -17,21 +17,37 @@ spec aptos_framework::stake {
         // property 1: The validator set resource stores consensus information for each validator. The consensus scheme remains consistent across all validators within the set.
         invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> global<ValidatorSet>(@aptos_framework).consensus_scheme == 0;
         // property 2: The owner of a validator remains immutable.
-        apply ValidatorNoChange to *<ValidatorSet>;
+        // We only focus on validators with a status of non-inactive, as inactive validators do not participate in reward distribution.
+        apply ValidatorOwnerNoChange to *<ValidatorSet>;
         // property 3: The total staked value in the stake pool should be constant (excluding adding and withdrawing operations).
         apply TotalStakedValueNoChange to *<ValidatorSet> except add_stake, add_stake_with_cap, withdraw, withdraw_with_cap, on_new_epoch;
     }
 
-    spec schema ValidatorNoChange {
+    spec schema ValidatorOwnerNoChange {
         let active_validators = global<ValidatorSet>(@aptos_framework).active_validators;
         let pending_inactive = global<ValidatorSet>(@aptos_framework).pending_inactive;
         let pending_active = global<ValidatorSet>(@aptos_framework).pending_active;
         let post post_active_validators = global<ValidatorSet>(@aptos_framework).active_validators;
         let post post_pending_inactive = global<ValidatorSet>(@aptos_framework).pending_inactive;
         let post post_pending_active = global<ValidatorSet>(@aptos_framework).pending_active;
-        ensures forall i in 0..len(active_validators): active_validators[i] == post_active_validators[i];
-        ensures forall i in 0..len(pending_inactive): pending_inactive[i] == post_pending_inactive[i];
-        ensures forall i in 0..len(pending_active): pending_active[i] == post_pending_active[i];
+        ensures forall i in 0..len(active_validators): {
+            let addr = active_validators[i].addr;
+            let owner_pool = old(global<OwnerCapability>(addr)).pool_address;
+            let post_owner_pool = global<OwnerCapability>(addr).pool_address;
+            owner_pool == addr && owner_pool == post_owner_pool
+        };
+        ensures forall i in 0..len(pending_inactive): {
+            let addr = pending_inactive[i].addr;
+            let owner_pool = old(global<OwnerCapability>(addr)).pool_address;
+            let post_owner_pool = global<OwnerCapability>(addr).pool_address;
+            owner_pool == addr && owner_pool == post_owner_pool
+        };
+        ensures forall i in 0..len(pending_active): {
+            let addr = pending_active[i].addr;
+            let owner_pool = old(global<OwnerCapability>(addr)).pool_address;
+            let post_owner_pool = global<OwnerCapability>(addr).pool_address;
+            owner_pool == addr && owner_pool == post_owner_pool
+        };
     }
 
     spec schema TotalStakedValueNoChange {
