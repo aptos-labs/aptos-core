@@ -106,7 +106,7 @@ jobs:
   rust-cryptohasher-domain-separation-check:
     needs: file_change_determinator
     runs-on: high-perf-docker
-    if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
@@ -231,7 +231,7 @@ jobs:
   # Run the rust network performance unit tests
   rust-network-perf-unit-test:
     runs-on: high-perf-docker
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
       - uses: actions/checkout@v3
         with:
@@ -308,7 +308,7 @@ jobs:
   # Run the network performance smoke test
   rust-network-perf-smoke-test:
     runs-on: high-perf-docker
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image')
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
@@ -336,6 +336,7 @@ jobs:
   # TODO: remove this once the new jobs land
   check-vm-features:
     runs-on: high-perf-docker
+    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
