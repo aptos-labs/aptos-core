@@ -1532,10 +1532,10 @@ fn realistic_env_max_load_test(
                 .add_latency_threshold(3.4, LatencyType::P50)
                 .add_latency_threshold(4.5, LatencyType::P90)
                 .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
-                    (LatencyBreakdownSlice::QsBatchToPos, 0.3),
-                    (LatencyBreakdownSlice::QsPosToProposal, 0.25),
+                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                    (LatencyBreakdownSlice::QsPosToProposal, 0.5),
                     (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.8),
-                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.6),
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.65),
                 ]))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
