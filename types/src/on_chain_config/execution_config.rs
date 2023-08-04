@@ -154,8 +154,10 @@ mod test {
 
     #[test]
     fn test_config_serialization() {
-        let config = OnChainExecutionConfig::DeprecatedV1(DeprecatedExecutionConfigV1 {
+        let config = OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            block_gas_limit: None,
+            transaction_deduper_type: TransactionDeduperType::NoDedup,
         });
 
         let s = serde_yaml::to_string(&config).unwrap();
@@ -165,11 +167,12 @@ mod test {
             TransactionShufflerType::SenderAwareV1(32)
         ));
 
-        // V2 test with random per-block gas limit
+        // random per-block gas limit
         let rand_gas_limit = rand::thread_rng().gen_range(0, 1000000) as u64;
-        let config = OnChainExecutionConfig::DeprecatedV2(DeprecatedExecutionConfigV2 {
+        let config = OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
             block_gas_limit: Some(rand_gas_limit),
+            transaction_deduper_type: TransactionDeduperType::NoDedup,
         });
 
         let s = serde_yaml::to_string(&config).unwrap();
@@ -180,10 +183,11 @@ mod test {
         ));
         assert!(result.block_gas_limit() == Some(rand_gas_limit));
 
-        // V2 test with no per-block gas limit
-        let config = OnChainExecutionConfig::DeprecatedV2(DeprecatedExecutionConfigV2 {
+        // no per-block gas limit
+        let config = OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
             block_gas_limit: None,
+            transaction_deduper_type: TransactionDeduperType::NoDedup,
         });
 
         let s = serde_yaml::to_string(&config).unwrap();
@@ -197,8 +201,10 @@ mod test {
 
     #[test]
     fn test_config_onchain_payload() {
-        let execution_config = OnChainExecutionConfig::DeprecatedV1(DeprecatedExecutionConfigV1 {
+        let execution_config = OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            block_gas_limit: None,
+            transaction_deduper_type: TransactionDeduperType::NoDedup,
         });
 
         let mut configs = HashMap::new();
@@ -216,11 +222,12 @@ mod test {
             TransactionShufflerType::SenderAwareV1(32)
         ));
 
-        // V2 test with random per-block gas limit
+        // random per-block gas limit
         let rand_gas_limit = rand::thread_rng().gen_range(0, 1000000) as u64;
-        let execution_config = OnChainExecutionConfig::DeprecatedV2(DeprecatedExecutionConfigV2 {
+        let execution_config = OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
             block_gas_limit: Some(rand_gas_limit),
+            transaction_deduper_type: TransactionDeduperType::NoDedup,
         });
 
         let mut configs = HashMap::new();
@@ -239,10 +246,11 @@ mod test {
         ));
         assert!(result.block_gas_limit() == Some(rand_gas_limit));
 
-        // V2 test with no per-block gas limit
-        let execution_config = OnChainExecutionConfig::DeprecatedV2(DeprecatedExecutionConfigV2 {
+        // no per-block gas limit
+        let execution_config = OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
             block_gas_limit: None,
+            transaction_deduper_type: TransactionDeduperType::NoDedup,
         });
 
         let mut configs = HashMap::new();
