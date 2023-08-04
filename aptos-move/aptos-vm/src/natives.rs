@@ -18,6 +18,8 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures},
 };
+#[cfg(feature = "testing")]
+use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use {
@@ -35,7 +37,7 @@ struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
 impl AggregatorResolver for AptosBlankStorage {
-    fn resolve_aggregator_value(&self, _id: &AggregatorID) -> Result<u128, anyhow::Error> {
+    fn resolve_aggregator_value(&self, _id: &AggregatorID) -> Result<u128, Error> {
         // All Move tests have aggregator in Data state, and so the resolver should
         // not be called.
         unreachable!("Aggregator cannot be resolved for blank storage.")
@@ -44,10 +46,11 @@ impl AggregatorResolver for AptosBlankStorage {
 
 #[cfg(feature = "testing")]
 impl TableResolver for AptosBlankStorage {
-    fn resolve_table_entry(
+    fn resolve_table_entry_with_layout(
         &self,
         _handle: &TableHandle,
         _key: &[u8],
+        _layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Vec<u8>>, Error> {
         Ok(None)
     }

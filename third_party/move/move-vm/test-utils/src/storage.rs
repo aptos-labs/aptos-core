@@ -53,10 +53,11 @@ impl ResourceResolver for BlankStorage {
 
 #[cfg(feature = "table-extension")]
 impl TableResolver for BlankStorage {
-    fn resolve_table_entry(
+    fn resolve_table_entry_with_layout(
         &self,
         _handle: &TableHandle,
         _key: &[u8],
+        _layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Vec<u8>>, Error> {
         Ok(None)
     }
@@ -110,13 +111,15 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
 
 #[cfg(feature = "table-extension")]
 impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
-    fn resolve_table_entry(
+    fn resolve_table_entry_with_layout(
         &self,
         handle: &TableHandle,
         key: &[u8],
+        layout: Option<&MoveTypeLayout>,
     ) -> std::result::Result<Option<Vec<u8>>, Error> {
         // TODO: No support for table deltas
-        self.base.resolve_table_entry(handle, key)
+        self.base
+            .resolve_table_entry_with_layout(handle, key, layout)
     }
 }
 
@@ -318,10 +321,11 @@ impl ResourceResolver for InMemoryStorage {
 
 #[cfg(feature = "table-extension")]
 impl TableResolver for InMemoryStorage {
-    fn resolve_table_entry(
+    fn resolve_table_entry_with_layout(
         &self,
         handle: &TableHandle,
         key: &[u8],
+        _layout: Option<&MoveTypeLayout>,
     ) -> std::result::Result<Option<Vec<u8>>, Error> {
         Ok(self.tables.get(handle).and_then(|t| t.get(key).cloned()))
     }

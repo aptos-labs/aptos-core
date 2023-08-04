@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::values::{AnnotatedValue, SeedWrapper, Value};
+use crate::values::{AnnotatedValue, SeedWrapper, Value, ValueImpl};
 use move_core_types::value::MoveTypeLayout;
 use std::fmt::{Display, Formatter};
 
@@ -55,4 +55,58 @@ pub fn serialize_and_exchange(
         val: &value.0,
     };
     bcs::to_bytes(&value).ok()
+}
+
+/// Types which implement this trait can be interpreted as 64-bit identifiers.
+pub trait AsIdentifier {
+    fn as_identifier(&self) -> Option<u64>;
+}
+
+impl AsIdentifier for Value {
+    fn as_identifier(&self) -> Option<u64> {
+        self.0.as_identifier()
+    }
+}
+
+impl AsIdentifier for ValueImpl {
+    fn as_identifier(&self) -> Option<u64> {
+        match self {
+            ValueImpl::U64(x) => Some(*x),
+            // SAFETY: If the value is identifier, it has been previously set
+            // from u64.
+            ValueImpl::U128(x) => Some(*x as u64),
+            // Do not support anything else for now.
+            _ => None,
+        }
+    }
+}
+
+/// Types which implement this trait can convert 64-bit identifiers
+/// into specified targets.
+pub trait IdentifierBuilder {
+    type Target: AsIdentifier;
+
+    fn build_identifier(&self, identifier: u64) -> Option<Self::Target>;
+}
+
+impl IdentifierBuilder for Value {
+    type Target = Value;
+
+    fn build_identifier(&self, identifier: u64) -> Option<Self::Target> {
+        self.0.build_identifier(identifier).map(Value)
+    }
+}
+
+impl IdentifierBuilder for ValueImpl {
+    type Target = ValueImpl;
+
+    fn build_identifier(&self, identifier: u64) -> Option<Self::Target> {
+        match self {
+            // TODO(aggregator): maybe we should fo it with type layout?
+            ValueImpl::U64(_) => Some(ValueImpl::U64(identifier)),
+            ValueImpl::U128(_) => Some(ValueImpl::U128(identifier as u128)),
+            // Do not support anything else for now.
+            _ => None,
+        }
+    }
 }

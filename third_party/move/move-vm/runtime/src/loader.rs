@@ -1934,6 +1934,13 @@ impl<'a> Resolver<'a> {
         self.loader.type_to_type_layout(ty)
     }
 
+    pub(crate) fn type_to_type_layout_with_aggregator_lifting(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        self.loader.type_to_type_layout_with_aggregator_lifting(ty)
+    }
+
     pub(crate) fn type_to_fully_annotated_layout(
         &self,
         ty: &Type,

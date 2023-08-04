@@ -88,11 +88,20 @@ pub struct TableChange {
 /// A table resolver which needs to be provided by the environment. This allows to lookup
 /// data in remote storage, as well as retrieve cost of table operations.
 pub trait TableResolver {
+    fn resolve_table_entry_with_layout(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+        layout: Option<&MoveTypeLayout>,
+    ) -> Result<Option<Vec<u8>>, anyhow::Error>;
+
     fn resolve_table_entry(
         &self,
         handle: &TableHandle,
         key: &[u8],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error>;
+    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+        self.resolve_table_entry_with_layout(handle, key, None)
+    }
 }
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions

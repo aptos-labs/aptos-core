@@ -3,10 +3,10 @@
 
 use crate::{
     value_exchange::{
-        deserialize_and_exchange, serialize_and_exchange, ExchangeError, ExchangeResult,
-        ValueExchange,
+        deserialize_and_exchange, serialize_and_exchange, AsIdentifier, ExchangeResult,
+        IdentifierBuilder, ValueExchange,
     },
-    values::{Struct, Value, ValueImpl},
+    values::{Struct, Value},
 };
 use move_core_types::value::{LayoutTag, MoveStructLayout::Runtime, MoveTypeLayout};
 use std::{cell::RefCell, collections::BTreeMap};
@@ -15,7 +15,7 @@ use std::{cell::RefCell, collections::BTreeMap};
 #[derive(Debug, Default)]
 struct TestExchange {
     // For testing purposes, all swapped data is stored in a map.
-    data: RefCell<BTreeMap<u64, u128>>,
+    liftings: RefCell<BTreeMap<u64, Value>>,
 }
 
 #[cfg(test)]
@@ -23,50 +23,19 @@ impl ValueExchange for TestExchange {
     fn try_exchange(&self, value_to_exchange: Value) -> ExchangeResult<Value> {
         // Identifiers are generated using the number of entries stored
         // so far.
-        let mut data = self.data.borrow_mut();
-        let id = data.len() as u64;
+        let mut liftings = self.liftings.borrow_mut();
+        let identifier = liftings.len() as u64;
 
-        match value_to_exchange.0 {
-            ValueImpl::U64(x) => {
-                data.insert(id, x as u128);
-                Ok(Value(ValueImpl::U64(id)))
-            },
-            ValueImpl::U128(x) => {
-                data.insert(id, x);
-                Ok(Value(ValueImpl::U128(id as u128)))
-            },
-            _ => Err(ExchangeError(format!(
-                "Cannot exchange value {:?}",
-                value_to_exchange
-            ))),
-        }
+        let identifier_value = value_to_exchange.build_identifier(identifier).unwrap();
+        liftings.insert(identifier, value_to_exchange);
+        Ok(identifier_value)
     }
 
     fn try_claim_back(&self, value_to_exchange: Value) -> ExchangeResult<Value> {
-        match value_to_exchange.0 {
-            ValueImpl::U64(x) => {
-                let v = *self
-                    .data
-                    .borrow()
-                    .get(&x)
-                    .expect("Claimed value should always exist");
-                // SAFETY: we previously upcasted u64 to u128.
-                Ok(Value(ValueImpl::U64(v as u64)))
-            },
-            ValueImpl::U128(x) => {
-                // SAFETY: x is an identifier and is a u64.
-                let v = *self
-                    .data
-                    .borrow()
-                    .get(&(x as u64))
-                    .expect("Claimed value should always exist");
-                Ok(Value(ValueImpl::U128(v)))
-            },
-            _ => Err(ExchangeError(format!(
-                "Cannot claim back with value {:?}",
-                value_to_exchange
-            ))),
-        }
+        let liftings = self.liftings.borrow();
+
+        let identifier = value_to_exchange.as_identifier().unwrap();
+        Ok(liftings.get(&identifier).unwrap().copy_value().unwrap())
     }
 }
 
