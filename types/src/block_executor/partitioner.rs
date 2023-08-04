@@ -1,13 +1,15 @@
 // Copyright © Aptos Foundation
 
-use std::cmp::Ordering;
 use crate::transaction::{
     analyzed_transaction::{AnalyzedTransaction, StorageLocation},
     Transaction,
 };
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
@@ -22,7 +24,11 @@ pub struct ShardedTxnIndex {
 
 impl PartialOrd for ShardedTxnIndex {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        (self.round_id, self.shard_id, self.txn_index).partial_cmp(&(other.round_id, other.shard_id, other.txn_index))
+        (self.round_id, self.shard_id, self.txn_index).partial_cmp(&(
+            other.round_id,
+            other.shard_id,
+            other.txn_index,
+        ))
     }
 }
 
@@ -45,19 +51,31 @@ pub struct CrossShardEdges {
 
 impl PartialEq for CrossShardEdges {
     fn eq(&self, other: &Self) -> bool {
-        let my_key_set = self.edges.keys().map(|k|*k).into_iter().collect::<HashSet<_>>();
-        let other_key_set = other.edges.keys().map(|k|*k).into_iter().collect::<HashSet<_>>();
+        let my_key_set = self.edges.keys().copied().collect::<HashSet<_>>();
+        let other_key_set = other.edges.keys().copied().collect::<HashSet<_>>();
         if my_key_set != other_key_set {
             return false;
         }
         for key in my_key_set {
-            let my_value = self.edges.get(&key).unwrap().clone().into_iter().collect::<HashSet<_>>();
-            let other_value = other.edges.get(&key).unwrap().clone().into_iter().collect::<HashSet<_>>();
+            let my_value = self
+                .edges
+                .get(&key)
+                .unwrap()
+                .clone()
+                .into_iter()
+                .collect::<HashSet<_>>();
+            let other_value = other
+                .edges
+                .get(&key)
+                .unwrap()
+                .clone()
+                .into_iter()
+                .collect::<HashSet<_>>();
             if my_value != other_value {
                 return false;
             }
         }
-        return true;
+        true
     }
 }
 

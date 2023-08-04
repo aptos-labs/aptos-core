@@ -153,9 +153,7 @@ pub fn clear_speculative_txn_logs(txn_idx: usize) {
             };
         },
         None => {
-            speculative_alert!(
-                    "Clear all logs called on uninitialized speculative log storage"
-            );
+            speculative_alert!("Clear all logs called on uninitialized speculative log storage");
         },
     }
 }

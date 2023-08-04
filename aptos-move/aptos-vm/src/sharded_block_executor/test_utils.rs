@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    AptosVM,
-    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor}, VMExecutor,
+    sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
+    AptosVM, VMExecutor,
 };
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_block_partitioner::BlockPartitioner;
 use aptos_crypto::hash::CryptoHash;
 use aptos_language_e2e_tests::{
     account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
@@ -16,13 +16,11 @@ use aptos_types::{
     transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
 };
 use move_core_types::account_address::AccountAddress;
-use rand::{Rng, rngs::OsRng};
+use rand::{rngs::OsRng, Rng};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-use aptos_block_partitioner::{verify_partitioner_output, BlockPartitioner};
-use aptos_block_partitioner::v2::PartitionerV2;
 
 pub fn generate_account_at(executor: &mut FakeExecutor, address: AccountAddress) -> AccountData {
     executor.new_account_data_at(address)
@@ -212,7 +210,6 @@ pub fn sharded_block_executor_with_random_transfers<E: ExecutorClient<FakeDataSt
         transactions.push(txn)
     }
 
-    // let partitioner = ShardedBlockPartitioner::new(num_shards);
     let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
 
     let execution_ordered_txns = SubBlocksForShard::flatten(partitioned_txns.clone())

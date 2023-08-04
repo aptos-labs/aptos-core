@@ -1,19 +1,17 @@
 // Copyright © Aptos Foundation
 
-use crate::sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex};
+use crate::{
+    get_anchor_shard_id,
+    sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex},
+};
 use aptos_types::{
     block_executor::partitioner::{
         CrossShardDependencies, RoundId, ShardId, ShardedTxnIndex, SubBlock,
         TransactionWithDependencies, TxnIndex,
     },
-    transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+    transaction::analyzed_transaction::AnalyzedTransaction,
 };
-use std::{
-    collections::{hash_map::DefaultHasher, HashSet},
-    hash::{Hash, Hasher},
-    sync::Arc,
-};
-use crate::get_anchor_shard_id;
+use std::{collections::HashSet, sync::Arc};
 
 pub struct CrossShardConflictDetector {
     shard_id: ShardId,

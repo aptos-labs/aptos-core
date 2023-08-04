@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
-use crate::pipeline::ExecuteBlockMessage;
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use crate::{metrics::TIMER, pipeline::ExecuteBlockMessage};
+use aptos_block_partitioner::{build_partitioner_from_envvar, BlockPartitioner};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
@@ -12,8 +12,6 @@ use aptos_types::{
     transaction::Transaction,
 };
 use std::time::Instant;
-use aptos_block_partitioner::{BlockPartitioner, build_partitioner_from_envvar};
-use crate::metrics::TIMER;
 
 pub(crate) struct BlockPartitioningStage {
     num_executor_shards: usize,
@@ -51,7 +49,8 @@ impl BlockPartitioningStage {
                 assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
                 let timer = TIMER.with_label_values(&["partition"]).start_timer();
-                let mut sub_blocks = partitioner.partition(analyzed_transactions, self.num_executor_shards);
+                let mut sub_blocks =
+                    partitioner.partition(analyzed_transactions, self.num_executor_shards);
                 timer.stop_and_record();
                 sub_blocks
                     .last_mut()

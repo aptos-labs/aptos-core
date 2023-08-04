@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
+use aptos_metrics_core::{exponential_buckets, register_histogram_vec, HistogramVec};
 use once_cell::sync::Lazy;
-use aptos_metrics_core::{HistogramVec, register_histogram_vec, exponential_buckets};
 
 pub static MISC_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -12,5 +12,5 @@ pub static MISC_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         &["name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
-        .unwrap()
+    .unwrap()
 });

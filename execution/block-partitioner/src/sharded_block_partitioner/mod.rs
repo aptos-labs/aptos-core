@@ -1,16 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_partitioner::{
-    counters::BLOCK_PARTITIONING_MISC_TIMERS_SECONDS,
-    cross_shard_messages::CrossShardMsg,
-    dependency_analysis::WriteSetWithTxnIndex,
-    messages::{
-        AddWithCrossShardDep, ControlMsg,
-        ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
-        DiscardCrossShardDep, PartitioningResp,
+use crate::{
+    sharded_block_partitioner::{
+        counters::BLOCK_PARTITIONING_MISC_TIMERS_SECONDS,
+        cross_shard_messages::CrossShardMsg,
+        dependency_analysis::WriteSetWithTxnIndex,
+        messages::{
+            AddWithCrossShardDep, ControlMsg,
+            ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
+            DiscardCrossShardDep, PartitioningResp,
+        },
+        partitioning_shard::PartitioningShard,
     },
-    partitioning_shard::PartitioningShard,
+    BlockPartitioner,
 };
 use aptos_logger::{error, info};
 use aptos_types::{
@@ -27,7 +30,6 @@ use std::{
     },
     thread,
 };
-use crate::BlockPartitioner;
 
 mod conflict_detector;
 mod counters;
@@ -430,9 +432,18 @@ impl Drop for ShardedBlockPartitioner {
 }
 
 impl BlockPartitioner for ShardedBlockPartitioner {
-    fn partition(&self, transactions: Vec<AnalyzedTransaction>, num_shards: usize) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
+    fn partition(
+        &self,
+        transactions: Vec<AnalyzedTransaction>,
+        num_shards: usize,
+    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         assert_eq!(self.num_shards, num_shards);
-        ShardedBlockPartitioner::partition(self, transactions, self.max_rounds.unwrap_or(4), self.xshard_dep_avoid_threshold.unwrap_or(0.9))
+        ShardedBlockPartitioner::partition(
+            self,
+            transactions,
+            self.max_rounds.unwrap_or(4),
+            self.xshard_dep_avoid_threshold.unwrap_or(0.9),
+        )
     }
 }
 
