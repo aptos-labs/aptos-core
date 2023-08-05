@@ -12,7 +12,7 @@ module aptos_token_objects::aptos_token {
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
-    use aptos_framework::object::{Self, ConstructorRef, Object, object_from_constructor_ref};
+    use aptos_framework::object::{Self, ConstructorRef, Object};
     use aptos_token_objects::collection;
     use aptos_token_objects::property_map;
     use aptos_token_objects::royalty;
@@ -88,6 +88,44 @@ module aptos_token_objects::aptos_token {
         royalty_numerator: u64,
         royalty_denominator: u64,
     ) {
+        create_collection_object(
+            creator,
+            description,
+            max_supply,
+            name,
+            uri,
+            mutable_description,
+            mutable_royalty,
+            mutable_uri,
+            mutable_token_description,
+            mutable_token_name,
+            mutable_token_properties,
+            mutable_token_uri,
+            tokens_burnable_by_creator,
+            tokens_freezable_by_creator,
+            royalty_numerator,
+            royalty_denominator
+        );
+    }
+
+    public fun create_collection_object(
+        creator: &signer,
+        description: String,
+        max_supply: u64,
+        name: String,
+        uri: String,
+        mutable_description: bool,
+        mutable_royalty: bool,
+        mutable_uri: bool,
+        mutable_token_description: bool,
+        mutable_token_name: bool,
+        mutable_token_properties: bool,
+        mutable_token_uri: bool,
+        tokens_burnable_by_creator: bool,
+        tokens_freezable_by_creator: bool,
+        royalty_numerator: u64,
+        royalty_denominator: u64,
+    ): Object<AptosCollection> {
         let creator_addr = signer::address_of(creator);
         let royalty = royalty::create(royalty_numerator, royalty_denominator, creator_addr);
         let constructor_ref = collection::create_fixed_collection(
@@ -125,6 +163,7 @@ module aptos_token_objects::aptos_token {
             tokens_freezable_by_creator,
         };
         move_to(&object_signer, aptos_collection);
+        object::object_from_constructor_ref(&constructor_ref)
     }
 
     /// With an existing collection, directly mint a viable token into the creators account.
@@ -138,10 +177,11 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ) acquires AptosCollection, AptosToken {
-        mint_public(creator, collection, description, name, uri, property_keys, property_types, property_values);
+        mint_token_object(creator, collection, description, name, uri, property_keys, property_types, property_values);
     }
 
-    public fun mint_public(
+    /// Mint a token into an existing collection, and retrieve the object / address of the token.
+    public fun mint_token_object(
         creator: &signer,
         collection: String,
         description: String,
@@ -187,6 +227,31 @@ module aptos_token_objects::aptos_token {
         property_values: vector<vector<u8>>,
         soul_bound_to: address,
     ) acquires AptosCollection {
+        mint_soul_bound_token_object(
+            creator,
+            collection,
+            description,
+            name,
+            uri,
+            property_keys,
+            property_types,
+            property_values,
+            soul_bound_to
+        );
+    }
+
+    /// With an existing collection, directly mint a soul bound token into the recipient's account.
+    public fun mint_soul_bound_token_object(
+        creator: &signer,
+        collection: String,
+        description: String,
+        name: String,
+        uri: String,
+        property_keys: vector<String>,
+        property_types: vector<String>,
+        property_values: vector<vector<u8>>,
+        soul_bound_to: address,
+    ): Object<AptosToken> acquires AptosCollection {
         let constructor_ref = mint_internal(
             creator,
             collection,
@@ -202,6 +267,8 @@ module aptos_token_objects::aptos_token {
         let linear_transfer_ref = object::generate_linear_transfer_ref(&transfer_ref);
         object::transfer_with_ref(linear_transfer_ref, soul_bound_to);
         object::disable_ungated_transfer(&transfer_ref);
+
+        object::object_from_constructor_ref(&constructor_ref)
     }
 
     fun mint_internal(
@@ -648,9 +715,8 @@ module aptos_token_objects::aptos_token {
 
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let token_creation_num = account::get_guid_next_creation_num(creator_addr);
 
-        mint_soul_bound(
+        let token = mint_soul_bound_token_object(
             creator,
             collection_name,
             string::utf8(b""),
@@ -662,8 +728,6 @@ module aptos_token_objects::aptos_token {
             signer::address_of(bob),
         );
 
-        let token_addr = object::create_guid_object_address(creator_addr, token_creation_num);
-        let token = object::address_to_object<AptosToken>(token_addr);
         object::transfer(bob, token, @0x345);
     }
 
@@ -1055,7 +1119,7 @@ module aptos_token_objects::aptos_token {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
 
-        mint_public(
+        mint_token_object(
             creator,
             collection_name,
             string::utf8(b"description"),

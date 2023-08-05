@@ -86,7 +86,7 @@ module marketplace::test_utils {
             100,
         );
 
-        let aptos_token = aptos_token::mint_public(
+        let aptos_token = aptos_token::mint_token_object(
             seller,
             collection_name,
             string::utf8(b"description"),
@@ -102,7 +102,7 @@ module marketplace::test_utils {
     public fun mint_tokenv2_additional(seller: &signer): Object<Token> {
         let collection_name = string::utf8(b"collection_name");
 
-        let aptos_token = aptos_token::mint_public(
+        let aptos_token = aptos_token::mint_token_object(
             seller,
             collection_name,
             string::utf8(b"description"),
