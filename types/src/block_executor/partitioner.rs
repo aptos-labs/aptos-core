@@ -451,6 +451,24 @@ impl PartitionedTransactions {
             + self.global_txns.len()
     }
 
+    pub fn add_checkpoint_txn(&mut self, last_txn: Transaction) {
+        assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
+        let txn_with_deps =
+            TransactionWithDependencies::new(last_txn.into(), CrossShardDependencies::default());
+        if !self.global_txns.is_empty() {
+            self.global_txns.push(txn_with_deps);
+        } else {
+            self.sharded_txns
+                .last_mut()
+                .unwrap()
+                .sub_blocks
+                .last_mut()
+                .unwrap()
+                .transactions
+                .push(txn_with_deps)
+        }
+    }
+
     pub fn flatten(transactions: PartitionedTransactions) -> Vec<AnalyzedTransaction> {
         SubBlocksForShard::flatten(transactions.sharded_txns)
             .into_iter()
