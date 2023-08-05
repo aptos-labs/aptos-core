@@ -1088,7 +1088,7 @@ module aptos_token_objects::aptos_token {
         collection_name: String,
         flag: bool,
     ): Object<AptosCollection> {
-        create_collection(
+        create_collection_object(
             creator,
             string::utf8(b"collection description"),
             1,
@@ -1105,9 +1105,7 @@ module aptos_token_objects::aptos_token {
             flag,
             1,
             100,
-        );
-
-        collection_object(creator, &collection_name)
+        )
     }
 
     #[test_only]

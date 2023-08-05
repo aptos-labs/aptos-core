@@ -541,11 +541,11 @@ module collection_offer_tests {
     ) {
         let (marketplace_addr, seller_addr, purchaser_addr) =
             test_utils::setup(aptos_framework, marketplace, seller, purchaser);
-        let token = test_utils::mint_tokenv2(seller);
+        let (collection, token) = test_utils::mint_tokenv2_with_collection(seller);
         assert!(object::is_owner(token, seller_addr), 0);
         let collection_offer = collection_offer::init_for_tokenv2<AptosCoin>(
             purchaser,
-            tokenv2::collection_object(token),
+            collection,
             test_utils::fee_schedule(marketplace),
             500,
             2,
@@ -669,10 +669,10 @@ module collection_offer_tests {
         purchaser: &signer,
     ) {
         test_utils::setup(aptos_framework, marketplace, seller, purchaser);
-        let token = test_utils::mint_tokenv2(seller);
+        let (collection, token) = test_utils::mint_tokenv2_with_collection(seller);
         let collection_offer = collection_offer::init_for_tokenv2<AptosCoin>(
             purchaser,
-            tokenv2::collection_object(token),
+            collection,
             test_utils::fee_schedule(marketplace),
             500,
             2,
@@ -721,10 +721,10 @@ module collection_offer_tests {
         purchaser: &signer,
     ) {
         test_utils::setup(aptos_framework, marketplace, seller, purchaser);
-        let token = test_utils::mint_tokenv2(seller);
+        let (collection, token) = test_utils::mint_tokenv2_with_collection(seller);
         let collection_offer = collection_offer::init_for_tokenv2<AptosCoin>(
             purchaser,
-            tokenv2::collection_object(token),
+            collection,
             test_utils::fee_schedule(marketplace),
             500,
             2,
@@ -743,10 +743,10 @@ module collection_offer_tests {
         purchaser: &signer,
     ) {
         test_utils::setup(aptos_framework, marketplace, seller, purchaser);
-        let token = test_utils::mint_tokenv2(seller);
+        let (collection, token) = test_utils::mint_tokenv2_with_collection(seller);
         let collection_offer = collection_offer::init_for_tokenv2<AptosCoin>(
             purchaser,
-            tokenv2::collection_object(token),
+            collection,
             test_utils::fee_schedule(marketplace),
             500,
             2,
