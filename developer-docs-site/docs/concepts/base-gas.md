@@ -276,7 +276,7 @@ Hence, in terms of octas, initial mainnet gas costs can be estimated as follows 
 | Operation       | Operation | Minimum octas |
 |-----------------|-----------|---------------|
 | Per-item read   | $r_i$     | 3000          |
-| Per-item create | $c_i$     | 3000          |
+| Per-item create | $c_i$     | 50,000          |
 | Per-item write  | $w_i$     | 3000          |
 | Per-byte read   | $r_b$     | 3             |
 | Per-byte create | $c_b$     | 50            |
