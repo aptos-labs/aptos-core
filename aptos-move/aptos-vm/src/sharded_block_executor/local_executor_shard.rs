@@ -187,6 +187,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         // global transactions will be blocked for cross shard transaction results. This hopefully will help with
         // finishing the global transactions faster but we need to evaluate if this causes thread contention. If it
         // does, then we can simply move this call to the end of the function.
+        let sharded_output = self.get_output_from_shards()?;
+
         let global_output = self.global_executor.execute_global_txns(
             global_txns,
             state_view.as_ref(),
@@ -194,7 +196,6 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
             maybe_block_gas_limit,
         )?;
 
-        let sharded_output = self.get_output_from_shards()?;
         Ok(ShardedExecutionOutput::new(sharded_output, global_output))
     }
 }
