@@ -21,6 +21,10 @@ impl MetricSamples {
             .unwrap_or_default()
     }
 
+    pub fn avg_sample(&self) -> f64 {
+        self.0.iter().map(|s| s.value()).sum::<f64>() / self.0.len() as f64
+    }
+
     pub fn get(&self) -> &Vec<Sample> {
         &self.0
     }
@@ -88,6 +92,10 @@ pub struct LatencyBreakdown(BTreeMap<LatencyBreakdownSlice, MetricSamples>);
 impl LatencyBreakdown {
     pub fn new(latency: BTreeMap<LatencyBreakdownSlice, MetricSamples>) -> Self {
         Self(latency)
+    }
+
+    pub fn keys(&self) -> Vec<LatencyBreakdownSlice> {
+        self.0.keys().cloned().collect()
     }
 
     pub fn get_samples(&self, slice: &LatencyBreakdownSlice) -> &MetricSamples {
