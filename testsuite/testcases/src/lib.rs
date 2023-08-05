@@ -201,7 +201,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                     .map(|slice| {
                         let slice_samples = phase_stats.latency_breakdown.get_samples(&slice);
                         format!(
-                            "{:?}: max: {}, avg: {}",
+                            "{:?}: max: {:.3}, avg: {:.3}",
                             slice,
                             slice_samples.max_sample(),
                             slice_samples.avg_sample()
