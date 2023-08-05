@@ -11,15 +11,36 @@ use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Describes the delta of an aggregator.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DeltaValue {
+    Positive(u128),
+    Negative(u128),
+}
+
+/// Describes how the `speculative_start_value` in 
+/// `AggregatorState` is obtained. 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpeculativeValueSource {
+    // The speculative_start_value is obtained by reading
+    // the last committed value of the aggregator from MVHashmap.
+    LastCommittedValue,
+    // The speculative_start_value is obtained by aggregating all
+    // the previous deltas of the aggregator from MVHashmap.
+    AggregatedValue,
+}
+
 /// Describes the state of each aggregator instance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AggregatorState {
     // If aggregator stores a known value.
-    Data,
-    // If aggregator stores a non-negative delta.
-    PositiveDelta,
-    // If aggregator stores a negative delta.
-    NegativeDelta,
+    Data {value: u128},
+    Delta {
+        speculative_start_value: u128,
+        speculative_source: SpeculativeValueSource,
+        delta: DeltaValue,
+        history: DeltaHistory
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -70,27 +91,6 @@ pub struct AggregatorSnapshotID {
     pub id: u64,
 }
 
-/// Internal AggregatorSnapshot data structure.
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct AggregatorSnapshot {
-    // Describes a value of an aggregator.
-    value: u128,
-    // Describes a state of an aggregator.
-    state: AggregatorState,
-    // Describes an upper bound of an aggregator. If `value` exceeds it, the
-    // aggregator overflows.
-    // TODO: Currently this is a single u128 value since we use 0 as a trivial
-    // lower bound. If we want to support custom lower bounds, or have more
-    // complex postconditions, we should factor this out in its own struct.
-    max_value: u128,
-    // Describes values seen by this aggregator. Note that if aggregator knows
-    // its value, then storing history doesn't make sense.
-    history: Option<History>,
-    // The AggregatorID of the aggregator from which the snapshot is taken.
-    base_aggregator: AggregatorID,
-}
-
 /// Tracks values seen by aggregator. In particular, stores information about
 /// the biggest and the smallest deltas seen during execution in the VM. This
 /// information can be used by the executor to check if delta should have
@@ -120,7 +120,7 @@ pub struct AggregatorSnapshot {
 /// TODO: while we support tracking of the history, it is not yet fully used on
 /// executor side because we don't know how to throw errors.
 #[derive(Debug, Clone)]
-pub struct History {
+pub struct DeltaHistory {
     pub max_achieved_positive: u128,
     pub min_achieved_negative: u128,
     // `min_overflow_positive` is None in two possible cases:
@@ -137,9 +137,9 @@ pub struct History {
     pub max_underflow_negative: Option<u128>,
 }
 
-impl History {
+impl DeltaHistory {
     fn new() -> Self {
-        History {
+        DeltaHistory {
             max_achieved_positive: 0,
             min_achieved_negative: 0,
             min_overflow_positive: None,
@@ -168,22 +168,37 @@ impl History {
     }
 }
 
-/// Internal aggregator data structure.
+/// Internal AggregatorSnapshot data structure.
 #[derive(Debug)]
-pub struct Aggregator {
-    // Describes a value of an aggregator.
-    value: u128,
-    // Describes a state of an aggregator.
-    state: AggregatorState,
-    // Describes an upper bound of an aggregator. If `value` exceeds it, the
-    // aggregator overflows.
+#[allow(dead_code)]
+pub struct AggregatorSnapshot {
+    // The identifier used to identify the aggregator snapshot.
+    id: AggregatorSnapshotID,
+    // Describes an upper bound of an aggregator. If value of the aggregator
+    // exceeds it, the aggregator overflows.
     // TODO: Currently this is a single u128 value since we use 0 as a trivial
     // lower bound. If we want to support custom lower bounds, or have more
     // complex postconditions, we should factor this out in its own struct.
     max_value: u128,
-    // Describes values seen by this aggregator. Note that if aggregator knows
-    // its value, then storing history doesn't make sense.
-    history: Option<History>,
+    // Describes a state of an aggregator.
+    state: AggregatorState,
+    // The AggregatorID of the aggregator from which the snapshot is taken.
+    base_aggregator: AggregatorID,
+}
+
+/// Internal aggregator data structure.
+#[derive(Debug)]
+pub struct Aggregator {
+    // The identifier used to identify the aggregator.
+    id: AggregatorID,
+    // Describes an upper bound of an aggregator. If value of the aggregator
+    // exceeds it, the aggregator overflows.
+    // TODO: Currently this is a single u128 value since we use 0 as a trivial
+    // lower bound. If we want to support custom lower bounds, or have more
+    // complex postconditions, we should factor this out in its own struct.
+    max_value: u128,
+    // Describes a state of an aggregator.
+    state: AggregatorState,
 }
 
 impl Aggregator {
@@ -390,7 +405,7 @@ impl Aggregator {
     }
 
     /// Unpacks aggregator into its fields.
-    pub fn into(self) -> (u128, AggregatorState, u128, Option<History>) {
+    pub fn into(self) -> (u128, AggregatorState, u128, Option<DeltaHistory>) {
         (self.value, self.state, self.max_value, self.history)
     }
 }
@@ -431,10 +446,14 @@ impl AggregatorData {
         max_value: u128,
     ) -> PartialVMResult<&mut Aggregator> {
         let aggregator = self.aggregators.entry(id).or_insert(Aggregator {
-            value: 0,
-            state: AggregatorState::PositiveDelta,
+            id,
+            state: AggregatorState::Delta {
+                speculative_start_value: 0,
+                speculative_source: SpeculativeValueSource::LastCommittedValue,
+                delta: DeltaValue::Positive(0),
+                history: Some(DeltaHistory::new()),
+            },
             max_value,
-            history: Some(History::new()),
         });
         Ok(aggregator)
     }
@@ -449,10 +468,9 @@ impl AggregatorData {
     /// state, with a zero-initialized value.
     pub fn create_new_aggregator(&mut self, id: AggregatorID, max_value: u128) {
         let aggregator = Aggregator {
-            value: 0,
-            state: AggregatorState::Data,
+            id,
+            state: AggregatorState::Data {value: 0},
             max_value,
-            history: None,
         };
         self.aggregators.insert(id, aggregator);
         self.new_aggregators.insert(id);
@@ -481,10 +499,9 @@ impl AggregatorData {
         let aggregator = self.aggregators.get(id).expect("Aggregator doesn't exist");
         self.aggregator_snapshots
             .insert(snapshot_id, AggregatorSnapshot {
-                value: aggregator.value,
+                id: snapshot_id,
                 state: aggregator.state,
                 max_value: aggregator.max_value,
-                history: aggregator.history.clone(),
                 base_aggregator: *id,
             });
         snapshot_id
