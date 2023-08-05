@@ -48,12 +48,12 @@ fn main() {
         })
         .collect();
 
-    let partitioner = ShardedBlockPartitioner::new(args.num_shards);
+    let partitioner = ShardedBlockPartitioner::new(args.num_shards, 2, 0.9, true);
     for _ in 0..args.num_blocks {
         let transactions = transactions.clone();
         println!("Starting to partition");
         let now = Instant::now();
-        partitioner.partition(transactions, 2, 0.9);
+        partitioner.partition(transactions);
         let elapsed = now.elapsed();
         println!("Time taken to partition: {:?}", elapsed);
     }

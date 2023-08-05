@@ -6,7 +6,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::{
-        CrossShardDependencies, ExecutableBlock, ExecutableTransactions,
+        CrossShardDependencies, ExecutableBlock, ExecutableTransactions, PartitionedTransactions,
         TransactionWithDependencies,
     },
     transaction::Transaction,
@@ -19,11 +19,12 @@ pub(crate) struct BlockPartitioningStage {
 }
 
 impl BlockPartitioningStage {
-    pub fn new(num_shards: usize) -> Self {
+    pub fn new(num_shards: usize, partition_last_round: bool) -> Self {
         let maybe_partitioner = if num_shards <= 1 {
             None
         } else {
-            let partitioner = ShardedBlockPartitioner::new(num_shards);
+            let partitioner =
+                ShardedBlockPartitioner::new(num_shards, 4, 0.95, partition_last_round);
             Some(partitioner)
         };
 
@@ -47,7 +48,8 @@ impl BlockPartitioningStage {
                 let last_txn = txns.pop().unwrap();
                 assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
-                let mut sub_blocks = partitioner.partition(analyzed_transactions, 4, 0.95);
+                let (mut sub_blocks, global_txns) =
+                    partitioner.partition(analyzed_transactions).into();
                 sub_blocks
                     .last_mut()
                     .unwrap()
@@ -59,7 +61,13 @@ impl BlockPartitioningStage {
                         last_txn.into(),
                         CrossShardDependencies::default(),
                     ));
-                ExecutableBlock::new(block_id, ExecutableTransactions::Sharded(sub_blocks))
+                ExecutableBlock::new(
+                    block_id,
+                    ExecutableTransactions::Sharded(PartitionedTransactions::new(
+                        sub_blocks,
+                        global_txns,
+                    )),
+                )
             },
         };
         self.num_blocks_processed += 1;

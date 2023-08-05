@@ -101,8 +101,8 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
     for _ in 0..num_txns {
         transactions.push(generate_non_conflicting_p2p(&mut executor).0)
     }
-    let partitioner = ShardedBlockPartitioner::new(num_shards);
-    let partitioned_txns = partitioner.partition(transactions.clone(), 2, 0.9);
+    let partitioner = ShardedBlockPartitioner::new(num_shards, 2, 0.9, true);
+    let partitioned_txns = partitioner.partition(transactions.clone());
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),

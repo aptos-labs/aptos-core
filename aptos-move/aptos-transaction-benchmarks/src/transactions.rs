@@ -256,7 +256,12 @@ where
             let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(client));
             (
                 Some(parallel_block_executor),
-                Some(ShardedBlockPartitioner::new(num_executor_shards)),
+                Some(ShardedBlockPartitioner::new(
+                    num_executor_shards,
+                    4,
+                    0.9,
+                    true,
+                )),
             )
         };
 
@@ -372,8 +377,6 @@ where
                     .into_iter()
                     .map(|txn| txn.into())
                     .collect::<Vec<AnalyzedTransaction>>(),
-                4,
-                0.9,
             );
             parallel_block_executor
                 .execute_block(
