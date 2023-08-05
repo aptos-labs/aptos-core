@@ -12,7 +12,7 @@ module aptos_token_objects::aptos_token {
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
-    use aptos_framework::object::{Self, ConstructorRef, Object};
+    use aptos_framework::object::{Self, ConstructorRef, Object, object_from_constructor_ref};
     use aptos_token_objects::collection;
     use aptos_token_objects::property_map;
     use aptos_token_objects::royalty;
@@ -138,6 +138,19 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ) acquires AptosCollection, AptosToken {
+        mint_public(creator, collection, description, name, uri, property_keys, property_types, property_values);
+    }
+
+    public fun mint_public(
+        creator: &signer,
+        collection: String,
+        description: String,
+        name: String,
+        uri: String,
+        property_keys: vector<String>,
+        property_types: vector<String>,
+        property_values: vector<vector<u8>>,
+    ): Object<AptosToken> acquires AptosCollection, AptosToken {
         let constructor_ref = mint_internal(
             creator,
             collection,
@@ -159,6 +172,7 @@ module aptos_token_objects::aptos_token {
         let aptos_token = borrow_global_mut<AptosToken>(aptos_token_addr);
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
         option::fill(&mut aptos_token.transfer_ref, transfer_ref);
+        object::address_to_object(aptos_token_addr)
     }
 
     /// With an existing collection, directly mint a soul bound token into the recipient's account.
@@ -227,8 +241,8 @@ module aptos_token_objects::aptos_token {
 
         let mutator_ref = if (
             collection.mutable_token_description
-            || collection.mutable_token_name
-            || collection.mutable_token_uri
+                || collection.mutable_token_name
+                || collection.mutable_token_uri
         ) {
             option::some(token::generate_mutator_ref(&constructor_ref))
         } else {
@@ -341,7 +355,10 @@ module aptos_token_objects::aptos_token {
         object::disable_ungated_transfer(option::borrow(&aptos_token.transfer_ref));
     }
 
-    public entry fun unfreeze_transfer<T: key>(creator: &signer, token: Object<T>) acquires AptosCollection, AptosToken {
+    public entry fun unfreeze_transfer<T: key>(
+        creator: &signer,
+        token: Object<T>
+    ) acquires AptosCollection, AptosToken {
         let aptos_token = authorized_borrow(&token, creator);
         assert!(
             are_collection_tokens_freezable(token::collection_object(token))
@@ -1037,9 +1054,8 @@ module aptos_token_objects::aptos_token {
     ): Object<AptosToken> acquires AptosCollection, AptosToken {
         let creator_addr = signer::address_of(creator);
         account::create_account_for_test(creator_addr);
-        let token_creation_num = account::get_guid_next_creation_num(creator_addr);
 
-        mint(
+        mint_public(
             creator,
             collection_name,
             string::utf8(b"description"),
@@ -1048,7 +1064,6 @@ module aptos_token_objects::aptos_token {
             vector[string::utf8(b"bool")],
             vector[string::utf8(b"bool")],
             vector[vector[0x01]],
-        );
-        object::address_to_object<AptosToken>(object::create_guid_object_address(creator_addr, token_creation_num))
+        )
     }
 }

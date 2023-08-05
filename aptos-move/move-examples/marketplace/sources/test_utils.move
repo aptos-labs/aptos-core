@@ -66,7 +66,6 @@ module marketplace::test_utils {
     public fun mint_tokenv2(seller: &signer): Object<Token> {
         let seller_addr = signer::address_of(seller);
         let collection_name = string::utf8(b"collection_name");
-        let token_creation_num = account::get_guid_next_creation_num(seller_addr);
 
         aptos_token::create_collection(
             seller,
@@ -87,7 +86,7 @@ module marketplace::test_utils {
             100,
         );
 
-        aptos_token::mint(
+        let aptos_token = aptos_token::mint_public(
             seller,
             collection_name,
             string::utf8(b"description"),
@@ -97,17 +96,13 @@ module marketplace::test_utils {
             vector::empty(),
             vector::empty(),
         );
-
-        let obj_addr = object::create_guid_object_address(seller_addr, token_creation_num);
-        object::address_to_object(obj_addr)
+        object::convert(aptos_token)
     }
 
     public fun mint_tokenv2_additional(seller: &signer): Object<Token> {
-        let seller_addr = signer::address_of(seller);
         let collection_name = string::utf8(b"collection_name");
-        let token_creation_num = account::get_guid_next_creation_num(seller_addr);
 
-        aptos_token::mint(
+        let aptos_token = aptos_token::mint_public(
             seller,
             collection_name,
             string::utf8(b"description"),
@@ -117,9 +112,7 @@ module marketplace::test_utils {
             vector::empty(),
             vector::empty(),
         );
-
-        let obj_addr = object::create_guid_object_address(seller_addr, token_creation_num);
-        object::address_to_object(obj_addr)
+        object::convert(aptos_token)
     }
 
     public fun mint_tokenv1(seller: &signer): tokenv1::TokenId {
