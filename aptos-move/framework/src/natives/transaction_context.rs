@@ -74,7 +74,7 @@ fn native_generate_unique_address(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_GENERATE_UNIQUE_ADDRESS_BASE)?;
 
-    let mut transaction_context = context
+    let transaction_context = context
         .extensions_mut()
         .get_mut::<NativeTransactionContext>();
     transaction_context.auid_counter += 1;

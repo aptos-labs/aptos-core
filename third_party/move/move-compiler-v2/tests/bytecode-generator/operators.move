@@ -3,8 +3,8 @@ module 0x42::operators {
         x + y / (x - y) * y % x
     }
 
-    fun bits(x: u64, y: u64): u64 {
-        x << y & x | y >> x ^ y
+    fun bits(x: u64, y: u8): u64 {
+        x << y & x
     }
 
     fun bools(x: bool, y: bool): bool {

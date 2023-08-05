@@ -1,0 +1,34 @@
+[package]
+name = "aptos-reliable-broadcast"
+description = "Aptos Reliable Broadcast Implementation"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-consensus-types = { workspace = true }
+aptos-enum-conversion-derive = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-time-service = { workspace = true }
+aptos-types = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+futures-channel = { workspace = true }
+tokio = { workspace = true }
+tokio-retry = { workspace = true }
+
+[dev-dependencies]
+aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
+aptos-time-service = { workspace = true, features = ["testing"] }
+
+[features]
+default = []

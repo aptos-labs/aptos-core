@@ -27,10 +27,7 @@ use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{
-        ExecutionConfigV1, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        TransactionShufflerType,
-    },
+    on_chain_config::{GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig},
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -523,7 +520,7 @@ impl Builder {
         let name = index.to_string();
 
         let mut config = template.clone();
-        let mut genesis_stake_amount = 1;
+        let mut genesis_stake_amount = 10;
         if let Some(init_config) = &self.init_config {
             (init_config)(index, &mut config, &mut genesis_stake_amount);
         }
@@ -613,10 +610,7 @@ impl Builder {
             employee_vesting_start: None,
             employee_vesting_period_duration: None,
             consensus_config: OnChainConsensusConfig::default(),
-            // Enable transaction shuffling by default in integration tests and Forge.
-            execution_config: OnChainExecutionConfig::V1(ExecutionConfigV1 {
-                transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
-            }),
+            execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {

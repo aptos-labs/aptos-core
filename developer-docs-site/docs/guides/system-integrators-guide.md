@@ -185,7 +185,7 @@ Coins are stored within an account under the resource `CoinStore<T>`. At account
 
 ### Transferring coins between users
 
-Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist.
+Coins, including APT, can be transferred between users via the [`aptos_account::transfer_coins`](https://github.com/aptos-labs/aptos-core/blob/d1610e1bb5214689a37a9cab59cf9254e8eb2be1/aptos-move/framework/aptos-framework/sources/aptos_account.move#L92) function for all coins and [`aptos_account::transfer`](https://github.com/aptos-labs/aptos-core/blob/88c9aab3982c246f8aa75eb2caf8c8ab1dcab491/aptos-move/framework/aptos-framework/sources/aptos_account.move#L18) for Aptos coins.
 
 :::caution
 It is important to note that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.
@@ -269,10 +269,7 @@ A transfer transaction would appear as follows:
   "gas_unit_price": "1",
   "expiration_timestamp_secs": "1660616127",
   "payload": {
-    "function": "0x1::coin::transfer",
-    "type_arguments": [
-      "0x1::aptos_coin::AptosCoin"
-    ],
+    "function": "0x1::aptos_account::transfer",
     "arguments": [
       "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
       "1000"
@@ -413,7 +410,7 @@ Consider the transaction from the earlier section, but now with an arbitrary coi
   "gas_unit_price": "110",
   "expiration_timestamp_secs": "1660616127",
   "payload": {
-    "function": "0x1::coin::transfer",
+    "function": "0x1::aptos_account::transfer_coins",
     "type_arguments": [
       "0x1337::my_coin::MyCoin"
     ],

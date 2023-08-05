@@ -3,7 +3,7 @@
 
 use crate::{error::Error, logging::LogEntry, metrics, LogSchema};
 use aptos_config::{
-    config::StorageServiceConfig,
+    config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
@@ -104,6 +104,7 @@ impl UnhealthyPeerState {
 /// If a peer sends too many invalid requests, the moderator will mark the peer as
 /// "unhealthy" and will ignore requests from that peer for some time.
 pub struct RequestModerator {
+    aptos_data_client_config: AptosDataClientConfig,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     peers_and_metadata: Arc<PeersAndMetadata>,
     storage_service_config: StorageServiceConfig,
@@ -113,12 +114,14 @@ pub struct RequestModerator {
 
 impl RequestModerator {
     pub fn new(
+        aptos_data_client_config: AptosDataClientConfig,
         cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
         peers_and_metadata: Arc<PeersAndMetadata>,
         storage_service_config: StorageServiceConfig,
         time_service: TimeService,
     ) -> Self {
         Self {
+            aptos_data_client_config,
             cached_storage_server_summary,
             unhealthy_peer_states: Arc::new(RwLock::new(HashMap::new())),
             peers_and_metadata,
@@ -148,7 +151,7 @@ impl RequestModerator {
         let storage_server_summary = self.cached_storage_server_summary.load();
 
         // Verify the request is serviceable using the current storage server summary
-        if !storage_server_summary.can_service(request) {
+        if !storage_server_summary.can_service(&self.aptos_data_client_config, request) {
             // Increment the invalid request count for the peer
             let mut unhealthy_peer_states = self.unhealthy_peer_states.write();
             let unhealthy_peer_state = unhealthy_peer_states
