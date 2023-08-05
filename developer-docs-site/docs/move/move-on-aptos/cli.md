@@ -6,7 +6,7 @@ import CodeBlock from '@theme/CodeBlock';
 
 # Use the Aptos Move CLI
 
-The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To download or build the CLI, follow [Install Aptos CLI](../../tools/install-cli/index.md).
+The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To download or build the CLI, follow [Install Aptos CLI](../../tools/aptos-cli/install-cli/index.md).
 
 ## Compiling Move
 
@@ -173,7 +173,7 @@ FAILURE proving 1 modules from package `hello_prover` in 0.067s
   "Error": "Move Prover failed: No boogie executable set.  Please set BOOGIE_EXE"
 }
 ```
-In this case, see [Install the dependencies of Move Prover](../../tools/install-cli/index.md#step-3-optional-install-the-dependencies-of-move-prover).
+In this case, see [Install the dependencies of Move Prover](../../tools/aptos-cli/install-cli/index.md#step-3-optional-install-the-dependencies-of-move-prover).
 
 ## Profiling gas usage
 
@@ -255,7 +255,7 @@ Publish the package with your account address set for `HelloBlockchain`.
 
 Here, you need to change 8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71 to your account address.
 ```bash
-$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
+$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
 ```
 
 :::tip
@@ -268,7 +268,7 @@ aptos move publish --included-artifacts none
 
 You can additionally use named profiles for the addresses.  The first placeholder is `default`
 ```bash
-$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=default
+$ aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses hello_blockchain=default
 ```
 
 :::tip

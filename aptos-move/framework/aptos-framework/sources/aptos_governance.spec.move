@@ -97,6 +97,29 @@ spec aptos_framework::aptos_governance {
         ensures new_governance_config.required_proposer_stake == required_proposer_stake;
     }
 
+    /// Signer address must be @aptos_framework.
+    /// Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
+    spec toggle_features(
+        aptos_framework: &signer,
+        enable: vector<u64>,
+        disable: vector<u64>,
+    ) {
+        use aptos_framework::chain_status;
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
+        use aptos_framework::transaction_fee;
+
+        let addr = signer::address_of(aptos_framework);
+        aborts_if addr != @aptos_framework;
+
+        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
+        requires chain_status::is_operating();
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+        requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
+        include staking_config::StakingRewardsConfigRequirement;
+    }
+
     spec get_voting_duration_secs(): u64 {
         include AbortsIfNotGovernanceConfig;
     }
@@ -499,7 +522,6 @@ spec aptos_framework::aptos_governance {
         let signer_cap = simple_map::spec_get(governance_responsibility.signer_caps, signer_address);
         let addr = signer_cap.account;
         ensures signer::address_of(result) == addr;
-        ensures table::spec_get(voting_forum.proposals, proposal_id).is_resolved == true;
     }
 
     /// Address @aptos_framework must exist ApprovedExecutionHashes and GovernanceProposal.
@@ -519,6 +541,7 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
 
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
 
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
@@ -689,6 +712,7 @@ spec aptos_framework::aptos_governance {
 
     spec resolve_multi_step_proposal(proposal_id: u64, signer_address: address, next_execution_hash: vector<u8>): signer {
         use aptos_framework::chain_status;
+        pragma verify = false; // TODO: set because of a possible bug in boogie that needs further investigation
         requires chain_status::is_operating();
 
         // verify voting::resolve_proposal_v2

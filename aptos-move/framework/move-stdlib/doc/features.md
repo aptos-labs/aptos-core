@@ -64,6 +64,8 @@ return true.
 -  [Function `fee_payer_enabled`](#0x1_features_fee_payer_enabled)
 -  [Function `get_auids`](#0x1_features_get_auids)
 -  [Function `auids_enabled`](#0x1_features_auids_enabled)
+-  [Function `get_bulletproofs_feature`](#0x1_features_get_bulletproofs_feature)
+-  [Function `bulletproofs_enabled`](#0x1_features_bulletproofs_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -160,6 +162,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>: u64 = 13;
+</code></pre>
+
+
+
+<a name="0x1_features_BULLETPROOFS_NATIVES"></a>
+
+Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
+available. This is needed because of the introduction of a new native function.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a>: u64 = 24;
 </code></pre>
 
 
@@ -1128,6 +1142,52 @@ Lifetime: transient
 
 </details>
 
+<a name="0x1_features_get_bulletproofs_feature"></a>
+
+## Function `get_bulletproofs_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bulletproofs_feature">get_bulletproofs_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bulletproofs_feature">get_bulletproofs_feature</a>(): u64 { <a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_bulletproofs_enabled"></a>
+
+## Function `bulletproofs_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_enabled">bulletproofs_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bulletproofs_enabled">bulletproofs_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -1396,6 +1456,17 @@ Helper to check whether a feature flag is enabled.
 
 
 
+
+<a name="0x1_features_spec_collect_and_distribute_gas_fees_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_collect_and_distribute_gas_fees_enabled">spec_collect_and_distribute_gas_fees_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)
+}
+</code></pre>
+
+
+
 <a name="@Specification_1_set"></a>
 
 ### Function `set`
@@ -1444,4 +1515,4 @@ Helper to check whether a feature flag is enabled.
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

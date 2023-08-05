@@ -15,6 +15,8 @@
 -  [Function `borrow`](#0x1_smart_vector_borrow)
 -  [Function `borrow_mut`](#0x1_smart_vector_borrow_mut)
 -  [Function `append`](#0x1_smart_vector_append)
+-  [Function `add_all`](#0x1_smart_vector_add_all)
+-  [Function `to_vector`](#0x1_smart_vector_to_vector)
 -  [Function `push_back`](#0x1_smart_vector_push_back)
 -  [Function `pop_back`](#0x1_smart_vector_pop_back)
 -  [Function `remove`](#0x1_smart_vector_remove)
@@ -280,7 +282,7 @@ Aborts if <code>v</code> is not empty.
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_destroy_empty">destroy_empty</a>&lt;T&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;) {
     <b>assert</b>!(<a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>(&v), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="smart_vector.md#0x1_smart_vector_EVECTOR_NOT_EMPTY">EVECTOR_NOT_EMPTY</a>));
-    <b>let</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a> { inline_vec, big_vec, inline_capacity: _, bucket_size: _} = v;
+    <b>let</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a> { inline_vec, big_vec, inline_capacity: _, bucket_size: _ } = v;
     <a href="../../move-stdlib/doc/vector.md#0x1_vector_destroy_empty">vector::destroy_empty</a>(inline_vec);
     <a href="../../move-stdlib/doc/option.md#0x1_option_destroy_none">option::destroy_none</a>(big_vec);
 }
@@ -385,6 +387,63 @@ Disclaimer: This function may be costly. Use it at your own discretion.
         i = i + 1;
     };
     <a href="smart_vector.md#0x1_smart_vector_destroy_empty">destroy_empty</a>(other);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_add_all"></a>
+
+## Function `add_all`
+
+Add multiple values to the vector at once.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_add_all">add_all</a>&lt;T: store&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, vals: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_add_all">add_all</a>&lt;T: store&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;, vals: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt;) {
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(vals, |val| { <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(v, val); })
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_smart_vector_to_vector"></a>
+
+## Function `to_vector`
+
+Convert a smart vector to a native vector, which is supposed to be called mostly by view functions to get an
+atomic view of the whole vector.
+Disclaimer: This function may be costly as the smart vector may be huge in size. Use it at your own discretion.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_to_vector">to_vector</a>&lt;T: <b>copy</b>, store&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_to_vector">to_vector</a>&lt;T: store + <b>copy</b>&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt; {
+    <b>let</b> res = v.inline_vec;
+    <b>if</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&v.big_vec)) {
+        <b>let</b> big_vec = <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&v.big_vec);
+        <a href="../../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> res, <a href="big_vector.md#0x1_big_vector_to_vector">big_vector::to_vector</a>(big_vec));
+    };
+    res
 }
 </code></pre>
 
@@ -994,7 +1053,7 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> i &gt;= <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v);
 <b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec) && (
     (<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
@@ -1019,4 +1078,4 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 </code></pre>
 
 
-[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY
+[move-book]: https://aptos.dev/move/book/SUMMARY

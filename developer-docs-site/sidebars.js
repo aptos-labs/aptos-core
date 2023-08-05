@@ -257,16 +257,26 @@ const sidebars = {
       items: [
         {
           type: "category",
-          label: "Install the Aptos CLI",
-          link: { type: "doc", id: "tools/install-cli/index" },
+          label: "Aptos CLI",
           collapsible: true,
           collapsed: true,
+          link: { type: "doc", id: "tools/aptos-cli/index" },
           items: [
-            "tools/install-cli/automated-install",
-            "tools/install-cli/download-cli-binaries",
-            "tools/install-cli/install-from-brew",
-            "tools/install-cli/build-from-source",
-            "tools/install-cli/install-move-prover",
+            {
+              type: "category",
+              label: "Install the Aptos CLI",
+              link: { type: "doc", id: "tools/aptos-cli/install-cli/index" },
+              collapsible: true,
+              collapsed: true,
+              items: [
+                "tools/aptos-cli/install-cli/automated-install",
+                "tools/aptos-cli/install-cli/download-cli-binaries",
+                "tools/aptos-cli/install-cli/install-from-brew",
+                "tools/aptos-cli/install-cli/build-from-source",
+                "tools/aptos-cli/install-cli/install-move-prover",
+              ],
+            },
+            "tools/aptos-cli/use-cli/use-aptos-cli",
           ],
         },
         {
@@ -302,7 +312,6 @@ const sidebars = {
             "sdks/unity-sdk",
           ],
         },
-        "tools/aptos-cli-tool/use-aptos-cli",
         "guides/building-from-source",
       ],
     },
@@ -324,6 +333,20 @@ const sidebars = {
         "guides/nfts/mint-onchain-data",
         "guides/nfts/nft-minting-tool",
       ],
+    },
+    {
+      type: "category",
+      label: "Examples",
+      collapsible: true,
+      collapsed: true,
+      link: {
+        type: "generated-index",
+        title: "Examples",
+        description: "Examples for all the various concepts and tooling used to build on Aptos.",
+        slug: "/category/examples",
+        keywords: ["examples"],
+      },
+      items: ["guides/account-management/key-rotation"],
     },
     {
       type: "category",

@@ -17,11 +17,9 @@ use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
-use aptos_gas::{
-    AbstractValueSizeGasParameters, ChangeSetConfigs, NativeGasParameters, StandardGasMeter,
-    LATEST_GAS_FEATURE_VERSION,
-};
+use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
+use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_state_view::TStateView;
@@ -31,7 +29,6 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
-    block_executor::partitioner::BlockExecutorTransactions,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     on_chain_config::{
@@ -53,6 +50,7 @@ use aptos_vm::{
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::storage::ChangeSetConfigs;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -97,7 +95,6 @@ pub struct FakeExecutor {
     no_parallel_exec: bool,
     features: Features,
     chain_id: u8,
-    aggregator_enabled: bool,
 }
 
 impl FakeExecutor {
@@ -119,16 +116,11 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: chain_id.id(),
-            aggregator_enabled: true,
         };
         executor.apply_write_set(write_set);
         // As a set effect, also allow module bundle txns. TODO: Remove
         aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
-    }
-
-    pub fn set_aggregator_enabled(&mut self, aggregator_enabled: bool) {
-        self.aggregator_enabled = aggregator_enabled;
     }
 
     /// Configure this executor to not use parallel execution.
@@ -189,7 +181,6 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: ChainId::test().id(),
-            aggregator_enabled: true,
         }
     }
 
@@ -426,7 +417,7 @@ impl FakeExecutor {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
-            BlockExecutorTransactions::Unsharded(txn_block),
+            txn_block,
             &self.data_store,
             usize::min(4, num_cpus::get()),
             None,
@@ -512,12 +503,13 @@ impl FakeExecutor {
                 &txn,
                 &log_context,
                 |gas_feature_version, gas_params, storage_gas_params, balance| {
-                    let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(
-                        gas_feature_version,
-                        gas_params,
-                        storage_gas_params,
-                        balance,
-                    ));
+                    let gas_meter =
+                        MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+                            gas_feature_version,
+                            gas_params,
+                            storage_gas_params,
+                            balance,
+                        )));
                     let gas_profiler = match txn.payload() {
                         TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
                         TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
@@ -534,7 +526,7 @@ impl FakeExecutor {
             )?;
 
         Ok((
-            output.into_transaction_output(self.get_state_view())?,
+            output.try_into_transaction_output(self.get_state_view())?,
             gas_profiler.finish(),
         ))
     }
@@ -677,7 +669,7 @@ impl FakeExecutor {
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
-                AbstractValueSizeGasParameters::zeros(),
+                MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
@@ -685,8 +677,7 @@ impl FakeExecutor {
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session =
-                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+            let mut session = vm.new_session(&remote_view, SessionId::void());
             session
                 .execute_function_bypass_visibility(
                     module,
@@ -709,7 +700,10 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            let (write_set, _events) = change_set
+                .try_into_storage_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -729,7 +723,7 @@ impl FakeExecutor {
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
-                AbstractValueSizeGasParameters::zeros(),
+                MiscGasParameters::zeros(),
                 LATEST_GAS_FEATURE_VERSION,
                 self.chain_id,
                 self.features.clone(),
@@ -737,8 +731,7 @@ impl FakeExecutor {
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session =
-                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+            let mut session = vm.new_session(&remote_view, SessionId::void());
             session
                 .execute_function_bypass_visibility(
                     &Self::module(module_name),
@@ -761,7 +754,10 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.unpack();
+            let (write_set, _events) = change_set
+                .try_into_storage_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -777,7 +773,7 @@ impl FakeExecutor {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
-            AbstractValueSizeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             self.features.clone(),
@@ -786,7 +782,7 @@ impl FakeExecutor {
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
+        let mut session = vm.new_session(&remote_view, SessionId::void());
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),
@@ -804,7 +800,10 @@ impl FakeExecutor {
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (write_set, _delta_change_set, _events) = change_set.unpack();
+        let (write_set, _events) = change_set
+            .try_into_storage_change_set()
+            .expect("Failed to convert to ChangeSet")
+            .into_inner();
         Ok(write_set)
     }
 

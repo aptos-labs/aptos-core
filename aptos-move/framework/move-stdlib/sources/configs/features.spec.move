@@ -45,6 +45,10 @@ spec std::features {
         spec_is_enabled(FEE_PAYER_ENABLED)
     }
 
+    spec fun spec_collect_and_distribute_gas_fees_enabled(): bool {
+        spec_is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
+    }
+
     spec periodical_reward_rate_decrease_enabled {
         pragma opaque;
         aborts_if [abstract] false;

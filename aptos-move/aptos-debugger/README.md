@@ -1,6 +1,6 @@
 ---
 id: aptos-debugger
-title: Aptos SDK Builder
+title: Aptos Debugger
 custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/language/aptos-debugger/README.md
 ---
 

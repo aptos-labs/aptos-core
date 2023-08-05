@@ -263,7 +263,7 @@ If you want to configure your node with a static identity, first see the [Networ
 
 You can add upstream seed peers to allow your node state sync from a specific . This is helpful when the public fullnode is not able to connect to the network due to congestion.
 
-1. Obtain the upstream peer id information. You can either use the one listed in the [Connecting your fullnode to seed peers](./fullnode-network-connections.md#connecting-your-fullnode-to-seed-peers), or grab one from the [Aptos Discord](http://discord.gg/aptoslabs) [#advertise-full-node](https://discord.com/channels/945856774056083548/956342147546746901) channel; these are the nodes hosted by our community.
+1. Obtain the upstream peer id information. You can either use the one listed in the [Connecting your fullnode to seed peers](./fullnode-network-connections.md#connecting-your-fullnode-to-seed-peers), or grab one from the [Aptos Discord](https://discord.gg/aptosnetwork) [#advertise-full-node](https://discord.com/channels/945856774056083548/956342147546746901) channel; these are the nodes hosted by our community.
 
 2. Modify the `main.tf` to add seeds for devnet in `fullnode_helm_values`. This will configure the upstream seeds for public fullnode. For example:
 

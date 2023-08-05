@@ -4,21 +4,22 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::helpers::make_module_natives;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::{
-    gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
-    vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE,
+use aptos_gas_schedule::gas_params::natives::move_stdlib::*;
+use aptos_native_interface::{
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_core_types::{
+    gas_algebra::NumBytes, vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE,
+};
+use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
-    pop_arg,
     values::{values_impl::Reference, Value},
 };
-use smallvec::smallvec;
-use std::{collections::VecDeque, sync::Arc};
+use smallvec::{smallvec, SmallVec};
+use std::collections::VecDeque;
+
 /***************************************************************************************************
  * native fun to_bytes
  *
@@ -30,76 +31,55 @@ use std::{collections::VecDeque, sync::Arc};
  *             will be charged.
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct ToBytesGasParameters {
-    pub per_byte_serialized: InternalGasPerByte,
-    pub legacy_min_output_size: NumBytes,
-    pub failure: InternalGas,
-}
-
 /// Rust implementation of Move's `native public fun to_bytes<T>(&T): vector<u8>`
 #[inline]
 fn native_to_bytes(
-    gas_params: &ToBytesGasParameters,
-    context: &mut NativeContext,
+    context: &mut SafeNativeContext,
     mut ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    let mut cost = 0.into();
-
     // pop type and value
-    let ref_to_val = pop_arg!(args, Reference);
+    let ref_to_val = safely_pop_arg!(args, Reference);
     let arg_type = ty_args.pop().unwrap();
 
     // get type layout
-    let layout = match context.type_to_type_layout(&arg_type)? {
-        Some(layout) => layout,
-        None => {
-            cost += gas_params.failure;
-            return Ok(NativeResult::err(cost, NFE_BCS_SERIALIZATION_FAILURE));
+    let layout = match context.type_to_type_layout(&arg_type) {
+        Ok(layout) => layout,
+        Err(_) => {
+            context.charge(BCS_TO_BYTES_FAILURE)?;
+            return Err(SafeNativeError::Abort {
+                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
+            });
         },
     };
+
     // serialize value
     let val = ref_to_val.read_ref()?;
     let serialized_value = match val.simple_serialize(&layout) {
         Some(serialized_value) => serialized_value,
         None => {
-            cost += gas_params.failure;
-            return Ok(NativeResult::err(cost, NFE_BCS_SERIALIZATION_FAILURE));
+            context.charge(BCS_TO_BYTES_FAILURE)?;
+            return Err(SafeNativeError::Abort {
+                abort_code: NFE_BCS_SERIALIZATION_FAILURE,
+            });
         },
     };
-    cost += gas_params.per_byte_serialized
-        * std::cmp::max(
-            NumBytes::new(serialized_value.len() as u64),
-            gas_params.legacy_min_output_size,
-        );
+    context
+        .charge(BCS_TO_BYTES_PER_BYTE_SERIALIZED * NumBytes::new(serialized_value.len() as u64))?;
 
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(
-        serialized_value
-    )]))
-}
-
-pub fn make_native_to_bytes(gas_params: ToBytesGasParameters) -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_to_bytes(&gas_params, context, ty_args, args)
-        },
-    )
+    Ok(smallvec![Value::vector_u8(serialized_value)])
 }
 
 /***************************************************************************************************
  * module
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct GasParameters {
-    pub to_bytes: ToBytesGasParameters,
-}
+pub fn make_all(
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
+    let funcs = [("to_bytes", native_to_bytes as RawSafeNative)];
 
-pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
-    let natives = [("to_bytes", make_native_to_bytes(gas_params.to_bytes))];
-
-    make_module_natives(natives)
+    builder.make_named_natives(funcs)
 }

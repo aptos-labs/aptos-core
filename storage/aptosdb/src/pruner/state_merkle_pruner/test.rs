@@ -45,7 +45,6 @@ fn put_value_set(
     let root = state_store
         .merklize_value_set(
             jmt_update_refs(&jmt_updates),
-            None,
             version,
             version.checked_sub(1),
         )

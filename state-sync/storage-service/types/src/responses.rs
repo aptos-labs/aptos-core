@@ -13,7 +13,9 @@ use crate::{
     Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL,
 };
 use aptos_compression::{metrics::CompressionClient, CompressedData, CompressionError};
-use aptos_config::config::{StorageServiceConfig, MAX_APPLICATION_MESSAGE_SIZE};
+use aptos_config::config::{
+    AptosDataClientConfig, StorageServiceConfig, MAX_APPLICATION_MESSAGE_SIZE,
+};
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
@@ -29,11 +31,6 @@ use std::{
     fmt::{Display, Formatter},
 };
 use thiserror::Error;
-
-/// The version delta we'll tolerate when considering if a peer is eligible
-/// to handle an optimistic fetch for new data. This value is set assuming
-/// 5k TPS for a 5 second delay, which should be more than enough.
-pub const OPTIMISTIC_FETCH_VERSION_DELTA: u64 = 25000;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
@@ -359,8 +356,15 @@ pub struct StorageServerSummary {
 }
 
 impl StorageServerSummary {
-    pub fn can_service(&self, request: &StorageServiceRequest) -> bool {
-        self.protocol_metadata.can_service(request) && self.data_summary.can_service(request)
+    pub fn can_service(
+        &self,
+        aptos_data_client_config: &AptosDataClientConfig,
+        request: &StorageServiceRequest,
+    ) -> bool {
+        self.protocol_metadata.can_service(request)
+            && self
+                .data_summary
+                .can_service(aptos_data_client_config, request)
     }
 }
 
@@ -420,7 +424,11 @@ pub struct DataSummary {
 
 impl DataSummary {
     /// Returns true iff the request can be serviced
-    pub fn can_service(&self, request: &StorageServiceRequest) -> bool {
+    pub fn can_service(
+        &self,
+        aptos_data_client_config: &AptosDataClientConfig,
+        request: &StorageServiceRequest,
+    ) -> bool {
         match &request.data_request {
             GetServerProtocolVersion | GetStorageServerSummary => true,
             GetEpochEndingLedgerInfos(request) => {
@@ -434,10 +442,10 @@ impl DataSummary {
                     .unwrap_or(false)
             },
             GetNewTransactionOutputsWithProof(request) => {
-                self.can_service_optimistic_request(request.known_version)
+                self.can_service_optimistic_request(aptos_data_client_config, request.known_version)
             },
             GetNewTransactionsWithProof(request) => {
-                self.can_service_optimistic_request(request.known_version)
+                self.can_service_optimistic_request(aptos_data_client_config, request.known_version)
             },
             GetNumberOfStatesAtVersion(version) => self
                 .states
@@ -500,7 +508,7 @@ impl DataSummary {
                 can_serve_txns && can_create_proof
             },
             GetNewTransactionsOrOutputsWithProof(request) => {
-                self.can_service_optimistic_request(request.known_version)
+                self.can_service_optimistic_request(aptos_data_client_config, request.known_version)
             },
             GetTransactionsOrOutputsWithProof(request) => {
                 let desired_range =
@@ -531,10 +539,15 @@ impl DataSummary {
     }
 
     /// Returns true iff the optimistic data request can be serviced
-    fn can_service_optimistic_request(&self, known_version: u64) -> bool {
+    fn can_service_optimistic_request(
+        &self,
+        aptos_data_client_config: &AptosDataClientConfig,
+        known_version: u64,
+    ) -> bool {
+        let max_version_lag = aptos_data_client_config.max_optimistic_fetch_version_lag;
         self.synced_ledger_info
             .as_ref()
-            .map(|li| (li.ledger_info().version() + OPTIMISTIC_FETCH_VERSION_DELTA) > known_version)
+            .map(|li| (li.ledger_info().version() + max_version_lag) > known_version)
             .unwrap_or(false)
     }
 

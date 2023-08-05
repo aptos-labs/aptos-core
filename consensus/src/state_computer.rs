@@ -355,7 +355,7 @@ async fn test_commit_sync_race() {
 
         fn execute_block(
             &self,
-            _block: ExecutableBlock<Transaction>,
+            _block: ExecutableBlock,
             _parent_block_id: HashValue,
             _maybe_block_gas_limit: Option<u64>,
         ) -> Result<StateComputeResult, ExecutionError> {

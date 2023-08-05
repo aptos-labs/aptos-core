@@ -622,13 +622,7 @@ function install_solidity {
   if [[ "$(uname)" == "Linux" ]]; then
     SOLC_BIN="linux-amd64/solc-linux-amd64-${SOLC_VERSION}"
   elif [[ "$(uname)" == "Darwin" ]]; then
-    if [[ "$(uname -m)" == "arm64" ]]; then
-      # no native binary supplied, but brew can build one
-      brew install solidity
-      return
-    else
-      SOLC_BIN="macosx-amd64/solc-macosx-amd64-${SOLC_VERSION}"
-    fi
+    SOLC_BIN="macosx-amd64/solc-macosx-amd64-${SOLC_VERSION}"
   else
     echo "Solidity support not configured for this platform (uname=$(uname))"
     return

@@ -76,7 +76,7 @@ class RestClient:
     #
 
     async def account(
-        self, account_address: AccountAddress, ledger_version: int = None
+        self, account_address: AccountAddress, ledger_version: Optional[int] = None
     ) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
 
@@ -91,7 +91,7 @@ class RestClient:
         return response.json()
 
     async def account_balance(
-        self, account_address: AccountAddress, ledger_version: int = None
+        self, account_address: AccountAddress, ledger_version: Optional[int] = None
     ) -> int:
         """Returns the test coin balance associated with the account"""
         resource = await self.account_resource(
@@ -102,7 +102,7 @@ class RestClient:
         return int(resource["data"]["coin"]["value"])
 
     async def account_sequence_number(
-        self, account_address: AccountAddress, ledger_version: int = None
+        self, account_address: AccountAddress, ledger_version: Optional[int] = None
     ) -> int:
         account_res = await self.account(account_address, ledger_version)
         return int(account_res["sequence_number"])
@@ -111,7 +111,7 @@ class RestClient:
         self,
         account_address: AccountAddress,
         resource_type: str,
-        ledger_version: int = None,
+        ledger_version: Optional[int] = None,
     ) -> Dict[str, Any]:
         if not ledger_version:
             request = (
@@ -130,7 +130,7 @@ class RestClient:
     async def account_resources(
         self,
         account_address: AccountAddress,
-        ledger_version: int = None,
+        ledger_version: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         if not ledger_version:
             request = f"{self.base_url}/accounts/{account_address}/resources"
@@ -154,7 +154,7 @@ class RestClient:
         key_type: str,
         value_type: str,
         key: Any,
-        ledger_version: int = None,
+        ledger_version: Optional[int] = None,
     ) -> Any:
         if not ledger_version:
             request = f"{self.base_url}/tables/{handle}/item"
@@ -232,6 +232,7 @@ class RestClient:
         self,
         transaction: RawTransaction,
         sender: Account,
+        estimate_gas_usage: bool = False,
     ) -> Dict[str, Any]:
         # Note that simulated transactions are not signed and have all 0 signatures!
         authenticator = Authenticator(
@@ -243,8 +244,16 @@ class RestClient:
         signed_transaction = SignedTransaction(transaction, authenticator)
 
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        params = {}
+        if estimate_gas_usage:
+            params = {
+                "estimate_gas_unit_price": "true",
+                "estimate_max_gas_amount": "true",
+            }
+
         response = await self.client.post(
             f"{self.base_url}/transactions/simulate",
+            params=params,
             headers=headers,
             content=signed_transaction.bytes(),
         )
@@ -353,6 +362,14 @@ class RestClient:
             raise ApiError(response.text, response.status_code)
         data = response.json()
         return len(data) == 1 and data[0]["type"] != "pending_transaction"
+
+    async def transaction_by_hash(self, txn_hash: str) -> Dict[str, Any]:
+        response = await self.client.get(
+            f"{self.base_url}/transactions/by_hash/{txn_hash}"
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+        return response.json()
 
     #
     # Transaction helpers
@@ -478,9 +495,7 @@ class RestClient:
         signed_transaction = await self.create_bcs_signed_transaction(
             sender, TransactionPayload(payload), sequence_number=sequence_number
         )
-        return await self.submit_bcs_transaction(signed_transaction)
-
-    # <:!:bcs_transfer
+        return await self.submit_bcs_transaction(signed_transaction)  # <:!:bcs_transfer
 
     #
     # Token transaction wrappers
@@ -665,7 +680,7 @@ class RestClient:
 
         token_id = {
             "token_data_id": {
-                "creator": creator.hex(),
+                "creator": str(creator),
                 "collection": collection_name,
                 "name": token_name,
             },
@@ -712,7 +727,7 @@ class RestClient:
         token_data_handle = resource["data"]["token_data"]["handle"]
 
         token_data_id = {
-            "creator": creator.hex(),
+            "creator": str(creator),
             "collection": collection_name,
             "name": token_name,
         }
@@ -737,32 +752,6 @@ class RestClient:
             collection_name,
         )
 
-    #
-    # Package publishing
-    #
-
-    async def publish_package(
-        self, sender: Account, package_metadata: bytes, modules: List[bytes]
-    ) -> str:
-        transaction_arguments = [
-            TransactionArgument(package_metadata, Serializer.to_bytes),
-            TransactionArgument(
-                modules, Serializer.sequence_serializer(Serializer.to_bytes)
-            ),
-        ]
-
-        payload = EntryFunction.natural(
-            "0x1::code",
-            "publish_package_txn",
-            [],
-            transaction_arguments,
-        )
-
-        signed_transaction = await self.create_bcs_signed_transaction(
-            sender, TransactionPayload(payload)
-        )
-        return await self.submit_bcs_transaction(signed_transaction)
-
 
 class FaucetClient:
     """Faucet creates and funds accounts. This is a thin wrapper around that."""
@@ -777,7 +766,7 @@ class FaucetClient:
     async def close(self):
         await self.rest_client.close()
 
-    async def fund_account(self, address: str, amount: int):
+    async def fund_account(self, address: AccountAddress, amount: int):
         """This creates an account if it does not exist and mints the specified amount of
         coins into that account."""
         response = await self.rest_client.client.post(
