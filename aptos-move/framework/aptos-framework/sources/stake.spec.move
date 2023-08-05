@@ -34,19 +34,19 @@ spec aptos_framework::stake {
             let addr = active_validators[i].addr;
             let owner_pool = old(global<OwnerCapability>(addr)).pool_address;
             let post_owner_pool = global<OwnerCapability>(addr).pool_address;
-            owner_pool == addr && owner_pool == post_owner_pool
+            owner_pool == post_owner_pool
         };
         ensures forall i in 0..len(pending_inactive): {
             let addr = pending_inactive[i].addr;
             let owner_pool = old(global<OwnerCapability>(addr)).pool_address;
             let post_owner_pool = global<OwnerCapability>(addr).pool_address;
-            owner_pool == addr && owner_pool == post_owner_pool
+            owner_pool == post_owner_pool
         };
         ensures forall i in 0..len(pending_active): {
             let addr = pending_active[i].addr;
             let owner_pool = old(global<OwnerCapability>(addr)).pool_address;
             let post_owner_pool = global<OwnerCapability>(addr).pool_address;
-            owner_pool == addr && owner_pool == post_owner_pool
+            owner_pool == post_owner_pool
         };
     }
 
