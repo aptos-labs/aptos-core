@@ -98,8 +98,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         let (callback, callback_receiver) = oneshot::channel();
 
         let cross_shard_state_view = Arc::new(CrossShardStateView::create_cross_shard_state_view(
-            shard_id,
-            round,
             state_view,
             &transactions,
         ));

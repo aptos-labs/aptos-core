@@ -31,12 +31,3 @@ pub static SHARDED_BLOCK_EXECUTOR_TXN_COUNT: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-pub static CROSS_SHARD_STATE_VALUE_TIMER_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "cross_shard_state_value_timer_seconds",
-        "Timer for various operations on the cross shard state view in seconds",
-        &["shard_id", "round_id", "op"]
-    )
-    .unwrap()
-});

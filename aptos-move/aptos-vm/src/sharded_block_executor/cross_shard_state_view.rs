@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::sharded_block_executor::counters::CROSS_SHARD_STATE_VALUE_TIMER_SECONDS;
 use anyhow::Result;
 use aptos_logger::trace;
 use aptos_state_view::{StateView, TStateView};
 use aptos_types::{
-    block_executor::partitioner::{ShardId, TransactionWithDependencies},
+    block_executor::partitioner::TransactionWithDependencies,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
@@ -64,19 +63,12 @@ impl CrossShardStateValue {
 /// available in the hashmap, it will be fetched from the underlying base view.
 #[derive(Clone)]
 pub struct CrossShardStateView<'a, S> {
-    shard_id: Option<ShardId>, // None if this is global executor
-    round_id: usize,
     cross_shard_data: HashMap<StateKey, CrossShardStateValue>,
     base_view: &'a S,
 }
 
 impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
-    pub fn new(
-        shard_id: Option<ShardId>,
-        round_id: usize,
-        cross_shard_keys: HashSet<StateKey>,
-        base_view: &'a S,
-    ) -> Self {
+    pub fn new(cross_shard_keys: HashSet<StateKey>, base_view: &'a S) -> Self {
         let mut cross_shard_data = HashMap::new();
         trace!(
             "Initalizing cross shard state view with {} keys",
@@ -86,8 +78,6 @@ impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
             cross_shard_data.insert(key, CrossShardStateValue::waiting());
         }
         Self {
-            shard_id,
-            round_id,
             cross_shard_data,
             base_view,
         }
@@ -116,8 +106,6 @@ impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
     }
 
     pub fn create_cross_shard_state_view(
-        shard_id: Option<ShardId>,
-        round_id: usize,
         base_view: &'a S,
         transactions: &[TransactionWithDependencies<AnalyzedTransaction>],
     ) -> CrossShardStateView<'a, S> {
@@ -129,7 +117,7 @@ impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
                 }
             }
         }
-        CrossShardStateView::new(shard_id, round_id, cross_shard_state_key, base_view)
+        CrossShardStateView::new(cross_shard_state_key, base_view)
     }
 }
 
@@ -138,18 +126,6 @@ impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         if let Some(value) = self.cross_shard_data.get(state_key) {
-            let shard_id_label = if let Some(shard_id) = self.shard_id {
-                shard_id.to_string()
-            } else {
-                "global".to_string()
-            };
-            let _timer = CROSS_SHARD_STATE_VALUE_TIMER_SECONDS
-                .with_label_values(&[
-                    &shard_id_label,
-                    &self.round_id.to_string(),
-                    "wait_for_remote",
-                ])
-                .start_timer();
             return Ok(value.get_value());
         }
         self.base_view.get_state_value(state_key)
@@ -190,12 +166,7 @@ mod tests {
         let mut state_keys = HashSet::new();
         state_keys.insert(state_key.clone());
 
-        let cross_shard_state_view = Arc::new(CrossShardStateView::new(
-            Some(0),
-            0,
-            state_keys,
-            &EMPTY_VIEW,
-        ));
+        let cross_shard_state_view = Arc::new(CrossShardStateView::new(state_keys, &EMPTY_VIEW));
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
 
         let wait_thread = thread::spawn(move || {
