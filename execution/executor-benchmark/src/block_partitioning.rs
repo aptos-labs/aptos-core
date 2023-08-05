@@ -23,6 +23,7 @@ impl BlockPartitioningStage {
         let maybe_partitioner = if num_shards <= 1 {
             None
         } else {
+            info!("Starting a sharded block partitioner with {} shards and last round partitioning {}", num_shards, partition_last_round);
             let partitioner =
                 ShardedBlockPartitioner::new(num_shards, 4, 0.95, partition_last_round);
             Some(partitioner)
