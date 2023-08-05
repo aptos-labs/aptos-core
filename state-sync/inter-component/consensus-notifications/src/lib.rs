@@ -26,7 +26,7 @@ use tokio::time::timeout;
 pub enum Error {
     #[error("Notification failed: {0}")]
     NotificationError(String),
-    #[error("Hit the timeout waiting for state sync to respond to the notification!")]
+    #[error("Hit the timeout waiting for state sync to respond to the notification!!")]
     TimeoutWaitingForStateSync,
     #[error("Unexpected error encountered: {0}")]
     UnexpectedErrorEncountered(String),
