@@ -18,23 +18,36 @@ pub struct GasMeasurements {
     pub equation_names: Vec<String>,
 }
 
-/// Compile every Move sample and run each sample with two different measuring methods.
-/// The first is with the Regular Gas Meter (used in production) to record the running time.
-/// The second is with the Abstract Algebra Gas Meter to record abstract gas usage.
-pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeasurements {
-    // Discover all top-level packages in samples directory
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples");
-    let dirs = read_dir(path.as_path()).unwrap();
-    let dir_paths = get_dir_paths(dirs);
-
+/// Compile and run both samples and samples_ir directories
+pub fn compile_and_run(iterations: u64, pattern: &String) -> GasMeasurements {
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();
 
-    let mut gas_meter = GasMeasurements {
+    let mut gas_measurement = GasMeasurements {
         regular_meter: Vec::new(),
         abstract_meter: Vec::new(),
         equation_names: Vec::new(),
     };
+
+    compile_and_run_samples(iterations, pattern, &mut gas_measurement, &mut executor);
+    compile_and_run_samples_ir(iterations, pattern, &mut gas_measurement, &mut executor);
+
+    gas_measurement
+}
+
+/// Compile every Move sample and run each sample with two different measuring methods.
+/// The first is with the Regular Gas Meter (used in production) to record the running time.
+/// The second is with the Abstract Algebra Gas Meter to record abstract gas usage.
+fn compile_and_run_samples(
+    iterations: u64,
+    pattern: &String,
+    gas_measurement: &mut GasMeasurements,
+    executor: &mut FakeExecutor,
+) {
+    // Discover all top-level packages in samples directory
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples");
+    let dirs = read_dir(path.as_path()).unwrap();
+    let dir_paths = get_dir_paths(dirs);
 
     // Go over all Move projects
     for dir_path in dir_paths {
@@ -66,7 +79,7 @@ pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeasurem
 
             let measurement_results = record_gas_usage(
                 &package,
-                &mut executor,
+                executor,
                 func_identifiers,
                 *address,
                 identifier,
@@ -74,38 +87,33 @@ pub fn compile_and_run_samples(iterations: u64, pattern: &String) -> GasMeasurem
             );
 
             // record the equation names
-            gas_meter
+            gas_measurement
                 .equation_names
                 .extend(measurement_results.equation_names);
 
             // record with regular gas meter
-            gas_meter
+            gas_measurement
                 .regular_meter
                 .extend(measurement_results.regular_meter);
 
             // record with abstract gas meter
-            gas_meter
+            gas_measurement
                 .abstract_meter
                 .extend(measurement_results.abstract_meter);
         }
     }
-    gas_meter
 }
 
 /// Compile every MVIR and run each sample with two different measuring methods.
 /// The first is with the Regular Gas Meter (used in production) to record the running time.
 /// The second is with the Abstract Algebra Gas Meter to record abstract gas usage.
-pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasurements {
+fn compile_and_run_samples_ir(
+    iterations: u64,
+    pattern: &String,
+    gas_measurement: &mut GasMeasurements,
+    executor: &mut FakeExecutor,
+) {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples_ir");
-
-    let executor = FakeExecutor::from_head_genesis();
-    let mut executor = executor.set_not_parallel();
-
-    let mut gas_meter = GasMeasurements {
-        regular_meter: Vec::new(),
-        abstract_meter: Vec::new(),
-        equation_names: Vec::new(),
-    };
 
     // Walk through all subdirectories and files in the root directory
     for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
@@ -150,7 +158,7 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasu
                     for func_identifier in func_identifiers {
                         println!("Benchmarking {}::{}\n", &identifier, func_identifier.0);
 
-                        gas_meter
+                        gas_measurement
                             .equation_names
                             .push(format!("{}::{}", &identifier, func_identifier.0));
 
@@ -161,7 +169,7 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasu
                             func_identifier.1.clone(),
                             iterations,
                         );
-                        gas_meter.regular_meter.push(elapsed);
+                        gas_measurement.regular_meter.push(elapsed);
 
                         // record with abstract gas meter
                         let gas_formula = executor.exec_abstract_usage(
@@ -170,12 +178,10 @@ pub fn compile_and_run_samples_ir(iterations: u64, pattern: &String) -> GasMeasu
                             vec![],
                             func_identifier.1,
                         );
-                        gas_meter.abstract_meter.push(gas_formula);
+                        gas_measurement.abstract_meter.push(gas_formula);
                     }
                 }
             }
         }
     }
-
-    gas_meter
 }

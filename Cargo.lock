@@ -9598,8 +9598,8 @@ dependencies = [
  "approx",
  "matrixmultiply",
  "nalgebra-macros",
- "num-complex",
- "num-rational",
+ "num-complex 0.4.2",
+ "num-rational 0.4.1",
  "num-traits 0.2.15",
  "simba",
  "typenum",
@@ -12309,7 +12309,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "061507c94fc6ab4ba1c9a0305018408e312e17c041eb63bef8aa726fa33aceae"
 dependencies = [
  "approx",
- "num-complex",
+ "num-complex 0.4.2",
  "num-traits 0.2.15",
  "paste",
  "wide",

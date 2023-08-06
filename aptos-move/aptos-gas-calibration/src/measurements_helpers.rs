@@ -123,7 +123,7 @@ pub fn record_gas_usage(
     // publish test-package under module address
     let creator = executor.new_account_at(address);
 
-    let mut gas_meter = GasMeasurements {
+    let mut gas_measurement = GasMeasurements {
         regular_meter: Vec::new(),
         abstract_meter: Vec::new(),
         equation_names: Vec::new(),
@@ -137,7 +137,7 @@ pub fn record_gas_usage(
             identifier,
             func_identifier.0.clone(),
         );
-        gas_meter
+        gas_measurement
             .equation_names
             .push(format!("{}::{}", &identifier, &func_identifier.0));
 
@@ -157,7 +157,7 @@ pub fn record_gas_usage(
             iterations,
             func_identifier.1.clone(),
         );
-        gas_meter.regular_meter.push(duration);
+        gas_measurement.regular_meter.push(duration);
 
         println!("Signing and running user txn for Abstract Meter... ");
         let gas_formula = executor.exec_abstract_usage(
@@ -166,10 +166,10 @@ pub fn record_gas_usage(
             vec![],
             func_identifier.1,
         );
-        gas_meter.abstract_meter.push(gas_formula);
+        gas_measurement.abstract_meter.push(gas_formula);
     }
 
-    gas_meter
+    gas_measurement
 }
 
 /*

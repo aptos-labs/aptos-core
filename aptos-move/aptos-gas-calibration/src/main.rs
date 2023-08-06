@@ -10,7 +10,7 @@ use aptos_abstract_gas_usage::{aggregate_terms, expand_terms};
 use aptos_gas_algebra::DynamicExpression;
 use clap::Parser;
 use math_interface::{convert_to_matrix_format, total_num_of_cols, total_num_rows};
-use measurements::{compile_and_run_samples, compile_and_run_samples_ir};
+use measurements::compile_and_run;
 use solve::{build_coefficient_matrix, build_constant_matrix, least_squares};
 use std::collections::BTreeMap;
 
@@ -39,15 +39,10 @@ fn main() {
 
     println!("Calibrating Gas Parameters ...\n");
 
-    let samples = compile_and_run_samples(iterations, pattern);
-    let samples_ir = compile_and_run_samples_ir(iterations, pattern);
-
-    let mut equation_names: Vec<String> = Vec::new();
-    equation_names.extend(samples.equation_names);
-    equation_names.extend(samples_ir.equation_names);
+    let measurements = compile_and_run(iterations, pattern);
 
     let mut system_of_equations: Vec<Vec<DynamicExpression>> = Vec::new();
-    for formula in samples.abstract_meter {
+    for formula in measurements.abstract_meter {
         let mut terms: Vec<DynamicExpression> = Vec::new();
         for term in formula {
             let normal = expand_terms(term);
@@ -55,18 +50,6 @@ fn main() {
         }
         system_of_equations.push(terms);
     }
-    for formula in samples_ir.abstract_meter {
-        let mut terms: Vec<DynamicExpression> = Vec::new();
-        for term in formula {
-            let normal = expand_terms(term);
-            terms.extend(normal);
-        }
-        system_of_equations.push(terms);
-    }
-
-    let mut running_times = Vec::new();
-    running_times.extend(samples.regular_meter);
-    running_times.extend(samples_ir.regular_meter);
 
     // Collect like terms
     let mut mappings: Vec<BTreeMap<String, u64>> = Vec::new();
@@ -85,13 +68,13 @@ fn main() {
     let vec_col: usize = 1;
 
     let mut coeff_matrix = build_coefficient_matrix(vec_format, nrows, ncols);
-    let mut const_matrix = build_constant_matrix(running_times, nrows, vec_col);
+    let mut const_matrix = build_constant_matrix(measurements.regular_meter, nrows, vec_col);
 
     // Solve the system of linear equations
     least_squares(
         mappings,
         &mut coeff_matrix,
         &mut const_matrix,
-        equation_names,
+        measurements.equation_names,
     );
 }
