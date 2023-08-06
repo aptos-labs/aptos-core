@@ -6,7 +6,7 @@ name: "fullnode-fast-mainnet-stable"
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 2 * * *" # Once a day, at 02:30 (UTC)
+    - cron: "30 2 */3 * *" # Once every three days, at 02:30 (UTC)
 
 permissions:
   contents: read
