@@ -32,7 +32,7 @@ pub struct PipelineConfig {
     pub allow_aborts: bool,
     pub num_executor_shards: usize,
     pub async_partitioning: bool,
-    pub partition_last_round: bool,
+    pub use_global_executor: bool,
 }
 
 pub struct Pipeline<V> {
@@ -92,7 +92,7 @@ where
         let mut join_handles = vec![];
 
         let mut partitioning_stage =
-            BlockPartitioningStage::new(num_partitioner_shards, config.partition_last_round);
+            BlockPartitioningStage::new(num_partitioner_shards, !config.use_global_executor);
 
         let mut exe = TransactionExecutor::new(
             executor_1,
