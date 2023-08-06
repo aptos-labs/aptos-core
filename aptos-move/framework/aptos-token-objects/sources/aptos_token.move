@@ -166,8 +166,28 @@ module aptos_token_objects::aptos_token {
         object::object_from_constructor_ref(&constructor_ref)
     }
 
+    #[deprecated]
     /// With an existing collection, directly mint a viable token into the creators account.
+    ///
+    /// This function is deprecated in favor of `mint_token`.
     public entry fun mint(
+        creator: &signer,
+        collection: String,
+        description: String,
+        name: String,
+        uri: String,
+        property_keys: vector<String>,
+        property_types: vector<String>,
+        property_values: vector<vector<u8>>,
+    ) acquires AptosCollection, AptosToken {
+        mint_token_object_internal(creator, collection, description, name, uri, property_keys, property_types, property_values, false);
+    }
+
+    /// With an existing collection, directly mint a viable token into the creators account.
+    /// Addresses are generated from AUIDs (after AUIDs feature is enabled),
+    /// as opposed to the deprecated `mint` function.
+    /// Call mint_token_object if you need the object / address of the minted token.
+    public entry fun mint_token(
         creator: &signer,
         collection: String,
         description: String,
@@ -191,6 +211,31 @@ module aptos_token_objects::aptos_token {
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
     ): Object<AptosToken> acquires AptosCollection, AptosToken {
+        mint_token_object_internal(
+            creator,
+            collection,
+            description,
+            name,
+            uri,
+            property_keys,
+            property_types,
+            property_values,
+            features::auids_enabled(),
+        )
+    }
+
+    /// Mint a token into an existing collection, and retrieve the object / address of the token.
+    fun mint_token_object_internal(
+        creator: &signer,
+        collection: String,
+        description: String,
+        name: String,
+        uri: String,
+        property_keys: vector<String>,
+        property_types: vector<String>,
+        property_values: vector<vector<u8>>,
+        use_auids: bool,
+    ): Object<AptosToken> acquires AptosCollection, AptosToken {
         let constructor_ref = mint_internal(
             creator,
             collection,
@@ -200,6 +245,7 @@ module aptos_token_objects::aptos_token {
             property_keys,
             property_types,
             property_values,
+            use_auids,
         );
 
         let collection = collection_object(creator, &collection);
@@ -215,8 +261,40 @@ module aptos_token_objects::aptos_token {
         object::address_to_object(aptos_token_addr)
     }
 
+    #[deprecated]
     /// With an existing collection, directly mint a soul bound token into the recipient's account.
+    ///
+    /// This function is deprecated in favor of `mint_soul_bound_token`.
     public entry fun mint_soul_bound(
+        creator: &signer,
+        collection: String,
+        description: String,
+        name: String,
+        uri: String,
+        property_keys: vector<String>,
+        property_types: vector<String>,
+        property_values: vector<vector<u8>>,
+        soul_bound_to: address,
+    ) acquires AptosCollection {
+        mint_soul_bound_token_object_internal(
+            creator,
+            collection,
+            description,
+            name,
+            uri,
+            property_keys,
+            property_types,
+            property_values,
+            soul_bound_to,
+            false
+        );
+    }
+
+    /// With an existing collection, directly mint a soul bound token into the recipient's account.
+    /// Addresses are generated from AUIDs (after AUIDs feature is enabled),
+    /// as opposed to the deprecated `mint_soul_bound` function.
+    /// Call mint_soul_bound_token_object if you need the object / address of the minted token.
+    public entry fun mint_soul_bound_token(
         creator: &signer,
         collection: String,
         description: String,
@@ -240,6 +318,7 @@ module aptos_token_objects::aptos_token {
         );
     }
 
+
     /// With an existing collection, directly mint a soul bound token into the recipient's account.
     public fun mint_soul_bound_token_object(
         creator: &signer,
@@ -252,6 +331,33 @@ module aptos_token_objects::aptos_token {
         property_values: vector<vector<u8>>,
         soul_bound_to: address,
     ): Object<AptosToken> acquires AptosCollection {
+        mint_soul_bound_token_object_internal(
+            creator,
+            collection,
+            description,
+            name,
+            uri,
+            property_keys,
+            property_types,
+            property_values,
+            soul_bound_to,
+            features::auids_enabled(),
+        )
+    }
+
+    /// With an existing collection, directly mint a soul bound token into the recipient's account.
+    fun mint_soul_bound_token_object_internal(
+        creator: &signer,
+        collection: String,
+        description: String,
+        name: String,
+        uri: String,
+        property_keys: vector<String>,
+        property_types: vector<String>,
+        property_values: vector<vector<u8>>,
+        soul_bound_to: address,
+        use_auids: bool,
+    ): Object<AptosToken> acquires AptosCollection {
         let constructor_ref = mint_internal(
             creator,
             collection,
@@ -261,6 +367,7 @@ module aptos_token_objects::aptos_token {
             property_keys,
             property_types,
             property_values,
+            use_auids,
         );
 
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
@@ -280,8 +387,9 @@ module aptos_token_objects::aptos_token {
         property_keys: vector<String>,
         property_types: vector<String>,
         property_values: vector<vector<u8>>,
+        use_auids: bool,
     ): ConstructorRef acquires AptosCollection {
-        let constructor_ref = if (features::auids_enabled()) {
+        let constructor_ref = if (use_auids) {
             token::create(
                 creator,
                 collection,
