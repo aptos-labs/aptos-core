@@ -8,6 +8,9 @@ resource "google_container_cluster" "aptos" {
   initial_node_count       = 1
   logging_service          = "logging.googleapis.com/kubernetes"
   monitoring_service       = "monitoring.googleapis.com/kubernetes"
+  cost_management_config {
+    enabled = true
+  }
 
   release_channel {
     channel = "REGULAR"
