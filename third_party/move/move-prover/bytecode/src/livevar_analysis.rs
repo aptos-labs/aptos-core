@@ -37,9 +37,13 @@ pub fn run_livevar_analysis(
 
 /// Annotation which can be attached to function data.
 #[derive(Default, Clone)]
-pub struct LiveVarAnnotation(pub BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
+pub struct LiveVarAnnotation(BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
 
 impl LiveVarAnnotation {
+    pub fn from_map(m: BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>) -> Self {
+        Self(m)
+    }
+
     pub fn get_live_var_info_at(
         &self,
         code_offset: CodeOffset,

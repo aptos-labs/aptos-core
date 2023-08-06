@@ -24,7 +24,7 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
     ) -> FunctionData {
         // Call the existing live-var analysis from the move-prover.
         let target = FunctionTarget::new(fun_env, &data);
-        let offset_to_live_refs = livevar_analysis::LiveVarAnnotation(
+        let offset_to_live_refs = livevar_analysis::LiveVarAnnotation::from_map(
             livevar_analysis::run_livevar_analysis(&target, &data.code),
         );
         // Annotate the result on the function data.

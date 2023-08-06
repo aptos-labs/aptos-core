@@ -52,6 +52,13 @@ pub struct FunctionContext<'env> {
     type_parameters: Vec<TypeParameter>,
 }
 
+/// Immutable context for processing a bytecode instruction.
+#[derive(Clone)]
+struct BytecodeContext<'env> {
+    fun_ctx: &'env FunctionContext<'env>,
+    code_offset: FF::CodeOffset,
+}
+
 #[derive(Debug, Copy, Clone)]
 /// Represents the location of a temporary if it is not only on the stack.
 struct TempInfo {
@@ -135,17 +142,21 @@ impl<'a> FunctionGenerator<'a> {
         let bytecode = ctx.fun.get_bytecode();
         for i in 0..bytecode.len() {
             let code_offset = i as FF::CodeOffset;
+            let bytecode_ctx = BytecodeContext {
+                fun_ctx: ctx,
+                code_offset,
+            };
             if i + 1 < bytecode.len() {
                 let bc = &bytecode[i];
                 let next_bc = &bytecode[i + 1];
-                self.gen_bytecode(ctx, code_offset, &bytecode[i], Some(next_bc));
+                self.gen_bytecode(&bytecode_ctx, &bytecode[i], Some(next_bc));
                 if !bc.is_branch() && matches!(next_bc, Bytecode::Label(..)) {
                     // At block boundaries without a preceding branch, need to flush stack
                     // TODO: to avoid this, we should use the CFG for code generation.
-                    self.abstract_flush_stack(ctx, code_offset, 0);
+                    self.abstract_flush_stack(&bytecode_ctx, 0);
                 }
             } else {
-                self.gen_bytecode(ctx, code_offset, &bytecode[i], None)
+                self.gen_bytecode(&bytecode_ctx, &bytecode[i], None)
             }
         }
 
@@ -192,42 +203,36 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Generate file-format bytecode from a stackless bytecode and an optional next bytecode
     /// for peephole optimizations.
-    fn gen_bytecode(
-        &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
-        bc: &Bytecode,
-        next_bc: Option<&Bytecode>,
-    ) {
+    fn gen_bytecode(&mut self, ctx: &BytecodeContext, bc: &Bytecode, next_bc: Option<&Bytecode>) {
         match bc {
             Bytecode::Assign(_, dest, source, _mode) => {
-                self.abstract_push_args(ctx, code_offset, vec![*source]);
-                let local = self.temp_to_local(ctx, *dest);
+                self.abstract_push_args(ctx, vec![*source]);
+                let local = self.temp_to_local(ctx.fun_ctx, *dest);
                 self.emit(FF::Bytecode::StLoc(local));
-                self.abstract_pop(ctx, code_offset)
+                self.abstract_pop(ctx)
             },
             Bytecode::Ret(_, result) => {
-                self.balance_stack_end_of_block(ctx, code_offset, result);
+                self.balance_stack_end_of_block(ctx, result);
                 self.emit(FF::Bytecode::Ret);
-                self.abstract_pop_n(ctx, code_offset, result.len());
+                self.abstract_pop_n(ctx, result.len());
             },
             Bytecode::Call(_, dest, oper, source, None) => {
-                self.gen_operation(ctx, code_offset, dest, oper, source)
+                self.gen_operation(ctx, dest, oper, source)
             },
             Bytecode::Load(_, dest, cons) => {
                 let cons = self.gen.constant_index(
-                    &ctx.module,
-                    &ctx.loc,
+                    &ctx.fun_ctx.module,
+                    &ctx.fun_ctx.loc,
                     cons,
-                    ctx.fun.get_local_type(*dest),
+                    ctx.fun_ctx.fun.get_local_type(*dest),
                 );
                 self.emit(FF::Bytecode::LdConst(cons));
-                self.abstract_push_result(ctx, code_offset, vec![*dest]);
+                self.abstract_push_result(ctx, vec![*dest]);
             },
             Bytecode::Label(_, label) => self.define_label(*label),
             Bytecode::Branch(_, if_true, if_false, cond) => {
                 // Ensure only `cond` is on the stack before branch.
-                self.balance_stack_end_of_block(ctx, code_offset, vec![*cond]);
+                self.balance_stack_end_of_block(ctx, vec![*cond]);
                 // Attempt to detect fallthrough, such that for
                 // ```
                 //   branch l1, l2, cond
@@ -254,17 +259,17 @@ impl<'a> FunctionGenerator<'a> {
                     self.add_label_reference(*if_true);
                     self.emit(FF::Bytecode::Branch(0))
                 }
-                self.abstract_pop(ctx, code_offset);
+                self.abstract_pop(ctx);
             },
             Bytecode::Jump(_, label) => {
-                self.abstract_flush_stack(ctx, code_offset, 0);
+                self.abstract_flush_stack(ctx, 0);
                 self.add_label_reference(*label);
                 self.emit(FF::Bytecode::Branch(0));
             },
             Bytecode::Abort(_, temp) => {
-                self.balance_stack_end_of_block(ctx, code_offset, &vec![*temp]);
+                self.balance_stack_end_of_block(ctx, &vec![*temp]);
                 self.emit(FF::Bytecode::Abort);
-                self.abstract_pop(ctx, code_offset)
+                self.abstract_pop(ctx)
             },
             Bytecode::Nop(_) => {
                 // do nothing -- labels are relative
@@ -272,7 +277,9 @@ impl<'a> FunctionGenerator<'a> {
             Bytecode::SaveMem(_, _, _)
             | Bytecode::Call(_, _, _, _, Some(_))
             | Bytecode::SaveSpecVar(_, _, _)
-            | Bytecode::Prop(_, _, _) => ctx.internal_error("unexpected specification bytecode"),
+            | Bytecode::Prop(_, _, _) => ctx
+                .fun_ctx
+                .internal_error("unexpected specification bytecode"),
         }
     }
 
@@ -281,18 +288,17 @@ impl<'a> FunctionGenerator<'a> {
     /// the stack empty at end.
     fn balance_stack_end_of_block(
         &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
+        ctx: &BytecodeContext,
         result: impl AsRef<[TempIndex]>,
     ) {
         let result = result.as_ref();
         // First ensure the arguments are on the stack.
-        self.abstract_push_args(ctx, code_offset, result);
+        self.abstract_push_args(ctx, result);
         if self.stack.len() != result.len() {
             // Unfortunately, there is more on the stack than needed.
             // Need to flush and push again so the stack is empty after return.
-            self.abstract_flush_stack(ctx, code_offset, 0);
-            self.abstract_push_args(ctx, code_offset, result.as_ref());
+            self.abstract_flush_stack(ctx, 0);
+            self.abstract_push_args(ctx, result.as_ref());
             assert_eq!(self.stack.len(), result.len())
         }
     }
@@ -317,20 +323,19 @@ impl<'a> FunctionGenerator<'a> {
     /// Generates code for an operation.
     fn gen_operation(
         &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
+        ctx: &BytecodeContext,
         dest: &[TempIndex],
         oper: &Operation,
         source: &[TempIndex],
     ) {
+        let fun_ctx = ctx.fun_ctx;
         match oper {
             Operation::Function(mid, fid, inst) => {
-                self.gen_call(ctx, code_offset, dest, mid.qualified(*fid), inst, source);
+                self.gen_call(ctx, dest, mid.qualified(*fid), inst, source);
             },
             Operation::Pack(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
-                    code_offset,
                     dest,
                     mid.qualified(*sid),
                     inst,
@@ -342,7 +347,6 @@ impl<'a> FunctionGenerator<'a> {
             Operation::Unpack(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
-                    code_offset,
                     dest,
                     mid.qualified(*sid),
                     inst,
@@ -354,7 +358,6 @@ impl<'a> FunctionGenerator<'a> {
             Operation::MoveTo(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
-                    code_offset,
                     dest,
                     mid.qualified(*sid),
                     inst,
@@ -366,7 +369,6 @@ impl<'a> FunctionGenerator<'a> {
             Operation::MoveFrom(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
-                    code_offset,
                     dest,
                     mid.qualified(*sid),
                     inst,
@@ -378,7 +380,6 @@ impl<'a> FunctionGenerator<'a> {
             Operation::Exists(mid, sid, inst) => {
                 self.gen_struct_oper(
                     ctx,
-                    code_offset,
                     dest,
                     mid.qualified(*sid),
                     inst,
@@ -388,18 +389,17 @@ impl<'a> FunctionGenerator<'a> {
                 );
             },
             Operation::BorrowLoc => {
-                let local = self.temp_to_local(ctx, source[0]);
-                if ctx.fun.get_local_type(dest[0]).is_mutable_reference() {
+                let local = self.temp_to_local(fun_ctx, source[0]);
+                if fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference() {
                     self.emit(FF::Bytecode::MutBorrowLoc(local))
                 } else {
                     self.emit(FF::Bytecode::ImmBorrowLoc(local))
                 }
-                self.abstract_push_result(ctx, code_offset, dest)
+                self.abstract_push_result(ctx, dest)
             },
             Operation::BorrowField(mid, sid, inst, offset) => {
                 self.gen_borrow_field(
                     ctx,
-                    code_offset,
                     dest,
                     mid.qualified(*sid),
                     inst.clone(),
@@ -408,10 +408,9 @@ impl<'a> FunctionGenerator<'a> {
                 );
             },
             Operation::BorrowGlobal(mid, sid, inst) => {
-                let is_mut = ctx.fun.get_local_type(dest[0]).is_mutable_reference();
+                let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
                 self.gen_struct_oper(
                     ctx,
-                    code_offset,
                     dest,
                     mid.qualified(*sid),
                     inst,
@@ -429,75 +428,54 @@ impl<'a> FunctionGenerator<'a> {
                 )
             },
             Operation::Vector => {
-                let elem_type = if let Type::Vector(el) = ctx.fun.get_local_type(dest[0]) {
+                let elem_type = if let Type::Vector(el) = fun_ctx.fun.get_local_type(dest[0]) {
                     el.as_ref().clone()
                 } else {
-                    ctx.internal_error("expected vector type");
+                    fun_ctx.internal_error("expected vector type");
                     Type::new_prim(PrimitiveType::Bool)
                 };
-                let sign = self.gen.signature(&ctx.module, &ctx.loc, vec![elem_type]);
+                let sign = self
+                    .gen
+                    .signature(&fun_ctx.module, &fun_ctx.loc, vec![elem_type]);
                 self.gen_builtin(
                     ctx,
-                    code_offset,
                     dest,
                     FF::Bytecode::VecPack(sign, source.len() as u64),
                     source,
                 )
             },
-            Operation::ReadRef => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::ReadRef, source)
-            },
+            Operation::ReadRef => self.gen_builtin(ctx, dest, FF::Bytecode::ReadRef, source),
             Operation::WriteRef => {
                 // TODO: WriteRef in FF bytecode and in stackless bytecode use different operand
                 // order, perhaps we should fix this.
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::WriteRef, &[
-                    source[1], source[0],
-                ])
+                self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
             },
-            Operation::FreezeRef => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::FreezeRef, source)
-            },
-            Operation::CastU8 => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::CastU8, source)
-            },
-            Operation::CastU16 => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::CastU16, source)
-            },
-            Operation::CastU32 => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::CastU32, source)
-            },
-            Operation::CastU64 => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::CastU64, source)
-            },
-            Operation::CastU128 => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::CastU128, source)
-            },
-            Operation::CastU256 => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::CastU256, source)
-            },
-            Operation::Not => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Not, source),
-            Operation::Add => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Add, source),
-            Operation::Sub => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Sub, source),
-            Operation::Mul => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Mul, source),
-            Operation::Div => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Div, source),
-            Operation::Mod => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Mod, source),
-            Operation::BitOr => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::BitOr, source)
-            },
-            Operation::BitAnd => {
-                self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::BitAnd, source)
-            },
-            Operation::Xor => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Xor, source),
-            Operation::Shl => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Shl, source),
-            Operation::Shr => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Shr, source),
-            Operation::Lt => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Lt, source),
-            Operation::Gt => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Gt, source),
-            Operation::Le => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Le, source),
-            Operation::Ge => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Ge, source),
-            Operation::Or => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Or, source),
-            Operation::And => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::And, source),
-            Operation::Eq => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Eq, source),
-            Operation::Neq => self.gen_builtin(ctx, code_offset, dest, FF::Bytecode::Neq, source),
+            Operation::FreezeRef => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
+            Operation::CastU8 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU8, source),
+            Operation::CastU16 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU16, source),
+            Operation::CastU32 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU32, source),
+            Operation::CastU64 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU64, source),
+            Operation::CastU128 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU128, source),
+            Operation::CastU256 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU256, source),
+            Operation::Not => self.gen_builtin(ctx, dest, FF::Bytecode::Not, source),
+            Operation::Add => self.gen_builtin(ctx, dest, FF::Bytecode::Add, source),
+            Operation::Sub => self.gen_builtin(ctx, dest, FF::Bytecode::Sub, source),
+            Operation::Mul => self.gen_builtin(ctx, dest, FF::Bytecode::Mul, source),
+            Operation::Div => self.gen_builtin(ctx, dest, FF::Bytecode::Div, source),
+            Operation::Mod => self.gen_builtin(ctx, dest, FF::Bytecode::Mod, source),
+            Operation::BitOr => self.gen_builtin(ctx, dest, FF::Bytecode::BitOr, source),
+            Operation::BitAnd => self.gen_builtin(ctx, dest, FF::Bytecode::BitAnd, source),
+            Operation::Xor => self.gen_builtin(ctx, dest, FF::Bytecode::Xor, source),
+            Operation::Shl => self.gen_builtin(ctx, dest, FF::Bytecode::Shl, source),
+            Operation::Shr => self.gen_builtin(ctx, dest, FF::Bytecode::Shr, source),
+            Operation::Lt => self.gen_builtin(ctx, dest, FF::Bytecode::Lt, source),
+            Operation::Gt => self.gen_builtin(ctx, dest, FF::Bytecode::Gt, source),
+            Operation::Le => self.gen_builtin(ctx, dest, FF::Bytecode::Le, source),
+            Operation::Ge => self.gen_builtin(ctx, dest, FF::Bytecode::Ge, source),
+            Operation::Or => self.gen_builtin(ctx, dest, FF::Bytecode::Or, source),
+            Operation::And => self.gen_builtin(ctx, dest, FF::Bytecode::And, source),
+            Operation::Eq => self.gen_builtin(ctx, dest, FF::Bytecode::Eq, source),
+            Operation::Neq => self.gen_builtin(ctx, dest, FF::Bytecode::Neq, source),
 
             Operation::TraceLocal(_)
             | Operation::TraceReturn(_)
@@ -519,37 +497,39 @@ impl<'a> FunctionGenerator<'a> {
             | Operation::UnpackRef
             | Operation::PackRef
             | Operation::UnpackRefDeep
-            | Operation::PackRefDeep => ctx.internal_error("unexpected specification opcode"),
+            | Operation::PackRefDeep => fun_ctx.internal_error("unexpected specification opcode"),
         }
     }
 
     /// Generates code for a function call.
     fn gen_call(
         &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
+        ctx: &BytecodeContext,
         dest: &[TempIndex],
         id: QualifiedId<FunId>,
         inst: &[Type],
         source: &[TempIndex],
     ) {
-        self.abstract_push_args(ctx, code_offset, source);
+        let fun_ctx = ctx.fun_ctx;
+        self.abstract_push_args(ctx, source);
         if inst.is_empty() {
-            let idx =
-                self.gen
-                    .function_index(&ctx.module, &ctx.loc, &ctx.module.env.get_function(id));
+            let idx = self.gen.function_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                &fun_ctx.module.env.get_function(id),
+            );
             self.emit(FF::Bytecode::Call(idx))
         } else {
             let idx = self.gen.function_instantiation_index(
-                &ctx.module,
-                &ctx.loc,
-                ctx.fun.func_env,
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                fun_ctx.fun.func_env,
                 inst.to_vec(),
             );
             self.emit(FF::Bytecode::CallGeneric(idx))
         }
-        self.abstract_pop_n(ctx, code_offset, source.len());
-        self.abstract_push_result(ctx, code_offset, dest);
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
     }
 
     /// Generates code for an operation working on a structure. This can be a structure with or
@@ -557,8 +537,7 @@ impl<'a> FunctionGenerator<'a> {
     /// to create for each case.
     fn gen_struct_oper(
         &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
+        ctx: &BytecodeContext,
         dest: &[TempIndex],
         id: QualifiedId<StructId>,
         inst: &[Type],
@@ -566,41 +545,46 @@ impl<'a> FunctionGenerator<'a> {
         mk_simple: impl FnOnce(FF::StructDefinitionIndex) -> FF::Bytecode,
         mk_generic: impl FnOnce(FF::StructDefInstantiationIndex) -> FF::Bytecode,
     ) {
-        self.abstract_push_args(ctx, code_offset, source);
-        let struct_env = &ctx.module.env.get_struct(id);
+        let fun_ctx = ctx.fun_ctx;
+        self.abstract_push_args(ctx, source);
+        let struct_env = &fun_ctx.module.env.get_struct(id);
         if inst.is_empty() {
-            let idx = self.gen.struct_def_index(&ctx.module, &ctx.loc, struct_env);
+            let idx = self
+                .gen
+                .struct_def_index(&fun_ctx.module, &fun_ctx.loc, struct_env);
             self.emit(mk_simple(idx))
         } else {
             let idx = self.gen.struct_def_instantiation_index(
-                &ctx.module,
-                &ctx.loc,
+                &fun_ctx.module,
+                &fun_ctx.loc,
                 struct_env,
                 inst.to_vec(),
             );
             self.emit(mk_generic(idx))
         }
-        self.abstract_pop_n(ctx, code_offset, source.len());
-        self.abstract_push_result(ctx, code_offset, dest);
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
     }
 
     /// Generate code for the borrow-field instruction.
     fn gen_borrow_field(
         &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
+        ctx: &BytecodeContext,
         dest: &[TempIndex],
         id: QualifiedId<StructId>,
         inst: Vec<Type>,
         offset: usize,
         source: &[TempIndex],
     ) {
-        self.abstract_push_args(ctx, code_offset, source);
-        let struct_env = &ctx.module.env.get_struct(id);
+        let fun_ctx = ctx.fun_ctx;
+        self.abstract_push_args(ctx, source);
+        let struct_env = &fun_ctx.module.env.get_struct(id);
         let field_env = &struct_env.get_field_by_offset(offset);
-        let is_mut = ctx.fun.get_local_type(dest[0]).is_mutable_reference();
+        let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
         if inst.is_empty() {
-            let idx = self.gen.field_index(&ctx.module, &ctx.loc, field_env);
+            let idx = self
+                .gen
+                .field_index(&fun_ctx.module, &fun_ctx.loc, field_env);
             if is_mut {
                 self.emit(FF::Bytecode::MutBorrowField(idx))
             } else {
@@ -609,30 +593,29 @@ impl<'a> FunctionGenerator<'a> {
         } else {
             let idx = self
                 .gen
-                .field_inst_index(&ctx.module, &ctx.loc, field_env, inst);
+                .field_inst_index(&fun_ctx.module, &fun_ctx.loc, field_env, inst);
             if is_mut {
                 self.emit(FF::Bytecode::MutBorrowFieldGeneric(idx))
             } else {
                 self.emit(FF::Bytecode::ImmBorrowFieldGeneric(idx))
             }
         }
-        self.abstract_pop_n(ctx, code_offset, source.len());
-        self.abstract_push_result(ctx, code_offset, dest);
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
     }
 
     /// Generate code for a general builtin instruction.
     fn gen_builtin(
         &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
+        ctx: &BytecodeContext,
         dest: &[TempIndex],
         bc: FF::Bytecode,
         source: &[TempIndex],
     ) {
-        self.abstract_push_args(ctx, code_offset, source);
+        self.abstract_push_args(ctx, source);
         self.emit(bc);
-        self.abstract_pop_n(ctx, code_offset, source.len());
-        self.abstract_push_result(ctx, code_offset, dest)
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest)
     }
 
     /// Emits a file-format bytecode.
@@ -643,12 +626,8 @@ impl<'a> FunctionGenerator<'a> {
     /// Ensure that on the abstract stack of the generator, the given temporaries are ready,
     /// in order, to be consumed. Ideally those are already on the stack, but if they are not,
     /// they will be made available.
-    fn abstract_push_args(
-        &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
-        temps: impl AsRef<[TempIndex]>,
-    ) {
+    fn abstract_push_args(&mut self, ctx: &BytecodeContext, temps: impl AsRef<[TempIndex]>) {
+        let fun_ctx = ctx.fun_ctx;
         // Compute the maximal prefix of `temps` which are already on the stack.
         let temps = temps.as_ref();
         let mut temps_to_push = temps;
@@ -674,12 +653,12 @@ impl<'a> FunctionGenerator<'a> {
                 temps_to_push = temps;
             }
         }
-        self.abstract_flush_stack(ctx, code_offset, stack_to_flush);
+        self.abstract_flush_stack(ctx, stack_to_flush);
         // Finally, push `temps_to_push` onto the stack.
         for temp in temps_to_push {
-            let local = self.temp_to_local(ctx, *temp);
+            let local = self.temp_to_local(fun_ctx, *temp);
             // Copy the temporary if it is copyable or still used after this code point.
-            if ctx.is_copyable(*temp) && ctx.is_alive_after(code_offset, *temp) {
+            if fun_ctx.is_copyable(*temp) && ctx.is_alive_after(*temp) {
                 self.emit(FF::Bytecode::CopyLoc(local))
             } else {
                 self.emit(FF::Bytecode::MoveLoc(local));
@@ -690,20 +669,14 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Flush the abstract stack, ensuring that all values on the stack are stored in locals, if
     /// they are still alive.
-    fn abstract_flush_stack(
-        &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
-        top: usize,
-    ) {
+    fn abstract_flush_stack(&mut self, ctx: &BytecodeContext, top: usize) {
+        let fun_ctx = ctx.fun_ctx;
         while self.stack.len() > top {
             let temp = self.stack.pop().unwrap();
-            if ctx.is_alive_before(code_offset, temp)
-                || ctx.is_alive_after(code_offset, temp)
-                || self.pinned.contains(&temp)
+            if ctx.is_alive_before(temp) || ctx.is_alive_after(temp) || self.pinned.contains(&temp)
             {
                 // Only need to save to a local if the temp is still used afterwards
-                let local = self.temp_to_local(ctx, temp);
+                let local = self.temp_to_local(fun_ctx, temp);
                 self.emit(FF::Bytecode::StLoc(local));
             } else {
                 self.emit(FF::Bytecode::Pop)
@@ -712,12 +685,7 @@ impl<'a> FunctionGenerator<'a> {
     }
 
     /// Push the result of an operation to the abstract stack.
-    fn abstract_push_result(
-        &mut self,
-        ctx: &FunctionContext,
-        code_offset: FF::CodeOffset,
-        result: impl AsRef<[TempIndex]>,
-    ) {
+    fn abstract_push_result(&mut self, ctx: &BytecodeContext, result: impl AsRef<[TempIndex]>) {
         let mut flush_mark = usize::MAX;
         for temp in result.as_ref() {
             if self.pinned.contains(temp) {
@@ -727,21 +695,21 @@ impl<'a> FunctionGenerator<'a> {
             self.stack.push(*temp);
         }
         if flush_mark != usize::MAX {
-            self.abstract_flush_stack(ctx, code_offset, flush_mark)
+            self.abstract_flush_stack(ctx, flush_mark)
         }
     }
 
     /// Pop a value from the abstract stack.
-    fn abstract_pop(&mut self, ctx: &FunctionContext, _code_offset: FF::CodeOffset) {
+    fn abstract_pop(&mut self, ctx: &BytecodeContext) {
         if self.stack.pop().is_none() {
-            ctx.internal_error("unbalanced abstract stack")
+            ctx.fun_ctx.internal_error("unbalanced abstract stack")
         }
     }
 
     /// Pop a number of values from the abstract stack.
-    fn abstract_pop_n(&mut self, ctx: &FunctionContext, code_offset: FF::CodeOffset, cnt: usize) {
+    fn abstract_pop_n(&mut self, ctx: &BytecodeContext, cnt: usize) {
         for _ in 0..cnt {
-            self.abstract_pop(ctx, code_offset)
+            self.abstract_pop(ctx)
         }
     }
 
@@ -787,28 +755,32 @@ impl<'env> FunctionContext<'env> {
             .type_abilities(self.temp_type(temp), &self.type_parameters)
             .has_ability(FF::Ability::Copy)
     }
+}
 
+impl<'env> BytecodeContext<'env> {
     /// Determine whether the temporary is alive (used) in the reachable code after this point.
-    pub fn is_alive_after(&self, code_offset: FF::CodeOffset, temp: TempIndex) -> bool {
-        let LiveVarAnnotation(map) = self
+    pub fn is_alive_after(&self, temp: TempIndex) -> bool {
+        let an = self
+            .fun_ctx
             .fun
             .get_annotations()
             .get::<LiveVarAnnotation>()
             .expect("livevar analysis result");
-        map.get(&code_offset)
+        an.get_live_var_info_at(self.code_offset)
             .map(|a| a.after.contains(&temp))
             .unwrap_or(false)
     }
 
     /// Determine whether the temporary is alive (used) in the reachable code before and until
     /// this point.
-    pub fn is_alive_before(&self, code_offset: FF::CodeOffset, temp: TempIndex) -> bool {
-        let LiveVarAnnotation(map) = self
+    pub fn is_alive_before(&self, temp: TempIndex) -> bool {
+        let an = self
+            .fun_ctx
             .fun
             .get_annotations()
             .get::<LiveVarAnnotation>()
             .expect("livevar analysis result");
-        map.get(&code_offset)
+        an.get_live_var_info_at(self.code_offset)
             .map(|a| a.before.contains(&temp))
             .unwrap_or(false)
     }
