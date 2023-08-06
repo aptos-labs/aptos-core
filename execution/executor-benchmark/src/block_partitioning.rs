@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
 use crate::pipeline::ExecuteBlockMessage;
-use aptos_block_partitioner::sharded_block_partitioner::ShardedBlockPartitioner;
+use aptos_block_partitioner::{
+    sharded_block_partitioner::ShardedBlockPartitioner, BlockPartitionerConfig,
+};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
@@ -21,8 +23,12 @@ impl BlockPartitioningStage {
             None
         } else {
             info!("Starting a sharded block partitioner with {} shards and last round partitioning {}", num_shards, partition_last_round);
-            let partitioner =
-                ShardedBlockPartitioner::new(num_shards, 4, 0.95, partition_last_round);
+            let partitioner = BlockPartitionerConfig::default()
+                .num_shards(num_shards)
+                .max_partitioning_rounds(4)
+                .cross_shard_dep_avoid_threshold(0.95)
+                .partition_last_round(partition_last_round)
+                .build();
             Some(partitioner)
         };
 

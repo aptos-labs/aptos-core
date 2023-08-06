@@ -124,7 +124,7 @@ pub struct ShardedBlockPartitioner {
 }
 
 impl ShardedBlockPartitioner {
-    pub fn new(
+    pub(crate) fn new(
         num_shards: usize,
         max_partitioning_rounds: RoundId,
         cross_shard_dep_avoid_threshold: f32,

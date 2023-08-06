@@ -62,8 +62,8 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
             cross_shard_tx.clone(),
             cross_shard_rx,
         ));
-        // Limit the number of global executor threads to 24 as parallel execution doesn't scale well beyond that.
-        let executor_threads = num_cpus::get().min(24);
+        // Limit the number of global executor threads to 32 as parallel execution doesn't scale well beyond that.
+        let executor_threads = num_cpus::get().min(32);
         let global_executor = GlobalExecutor::new(cross_shard_client, executor_threads);
         (global_executor, cross_shard_tx)
     }
