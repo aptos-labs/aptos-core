@@ -95,8 +95,9 @@ pub const LIGHT_GRAY: RGBColor = RGBColor(0xB4, 0xB4, 0xB4);
 pub const MEDIUM_GRAY: RGBColor = RGBColor(0x90, 0x90, 0x90);
 pub const GRAY: RGBColor = RGBColor(0x63, 0x63, 0x63);
 pub const DARK_GRAY: RGBColor = RGBColor(0x49, 0x48, 0x48);
+pub const STONE_GRAY: RGBColor = RGBColor(0x92, 0x8E, 0x85);
 
-pub const GRAY_PALETTE: &[&RGBColor] = &[&LIGHT_GRAY, &MEDIUM_GRAY, &GRAY, &DARK_GRAY, &BLACK];
+pub const GRAY_PALETTE: &[&RGBColor] = &[&LIGHT_GRAY, &MEDIUM_GRAY, &GRAY, &DARK_GRAY, &STONE_GRAY, &BLACK];
 pub const COLOR_PALETTE: &[&RGBColor] = &[&GREEN, &BLUE, &RED, &CYAN, &YELLOW, &MAGENTA];
 
 /// Plot a set of benchmarks to an SVG file.
@@ -161,7 +162,7 @@ pub fn plot_benchmarks_to_file(fname: &str, benchmarks: &[Benchmark]) -> anyhow:
     // We are drawing data points as horizontal bars, therefore x-axis is max_duration
     // and y-axis datapoints.
     let real_x = 1000u32;
-    let real_y = data_points * 60u32;
+    let real_y = data_points * (20u32 + (benchmarks.len() as u32)*15);
     let root = SVGBackend::new(fname, (real_x, real_y)).into_drawing_area();
 
     let duration_percent = |p: usize| ((max_duration as f64) * (p as f64) / 100f64) as u32;
@@ -196,7 +197,7 @@ pub fn plot_benchmarks_to_file(fname: &str, benchmarks: &[Benchmark]) -> anyhow:
     // Draw samples.
     for (sample, variants) in joined {
         root.draw(&label(sample, 0, ycoord, 15.0))?;
-        ycoord += 7;
+        ycoord += 10;
         for (i, (_, result)) in variants.iter().enumerate() {
             let (weight, note, style) = match result {
                 Result::Duration(d) => (
@@ -216,7 +217,7 @@ pub fn plot_benchmarks_to_file(fname: &str, benchmarks: &[Benchmark]) -> anyhow:
             ))?;
             ycoord += 10;
         }
-        ycoord += 3;
+        ycoord += 10;
     }
     Ok(())
 }
