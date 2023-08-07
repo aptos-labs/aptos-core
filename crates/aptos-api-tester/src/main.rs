@@ -19,7 +19,7 @@ use futures::future::join_all;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::{Builder, Runtime};
 
-const STACK_SIZE: usize = 4 * 1024 * 1024;
+static STACK_SIZE: usize = 4 * 1024 * 1024;
 
 async fn test_flows(runtime: &Runtime, network_name: NetworkName) -> Result<()> {
     let run_id = SystemTime::now()

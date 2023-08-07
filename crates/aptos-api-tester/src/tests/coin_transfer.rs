@@ -9,7 +9,7 @@ use crate::{
     persistent_check, time_fn,
     utils::{
         create_account, create_and_fund_account, emit_step_metrics, get_client, get_faucet_client,
-        NetworkName, TestFailure, TestName, FUND_AMOUNT,
+        NetworkName, TestFailure, TestName, FUND_AMOUNT, check_balance,
     },
 };
 use anyhow::{anyhow, Result};
@@ -149,8 +149,8 @@ async fn check_account_data(
     account: AccountAddress,
     receiver: AccountAddress,
 ) -> Result<(), TestFailure> {
-    check_balance(client, account, U64(FUND_AMOUNT)).await?;
-    check_balance(client, receiver, U64(0)).await?;
+    check_balance(TestName::CoinTransfer, client, account, U64(FUND_AMOUNT)).await?;
+    check_balance(TestName::CoinTransfer, client, receiver, U64(0)).await?;
 
     Ok(())
 }
@@ -264,37 +264,6 @@ async fn check_account_balance_at_version(
             FAIL_WRONG_BALANCE_AT_VERSION, expected, actual
         );
         return Err(TestFailure::Fail(FAIL_WRONG_BALANCE_AT_VERSION));
-    }
-
-    Ok(())
-}
-
-// Utils
-
-async fn check_balance(
-    client: &Client,
-    address: AccountAddress,
-    expected: U64,
-) -> Result<(), TestFailure> {
-    // actual
-    let actual = match client.get_account_balance(address).await {
-        Ok(response) => response.into_inner().coin.value,
-        Err(e) => {
-            info!(
-                "test: coin_transfer part: check_account_data ERROR: {}, with error {:?}",
-                ERROR_NO_BALANCE, e
-            );
-            return Err(e.into());
-        },
-    };
-
-    // compare
-    if expected != actual {
-        info!(
-            "test: coin_transfer part: check_account_data FAIL: {}, expected {:?}, got {:?}",
-            FAIL_WRONG_BALANCE, expected, actual
-        );
-        return Err(TestFailure::Fail(FAIL_WRONG_BALANCE));
     }
 
     Ok(())

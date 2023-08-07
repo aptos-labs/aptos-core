@@ -2,13 +2,16 @@
 
 use crate::{
     counters::{test_error, test_fail, test_latency, test_step_latency, test_success},
+    fail_message::{ERROR_NO_BALANCE, FAIL_WRONG_BALANCE},
     tests::{coin_transfer, new_account, nft_transfer, publish_module},
     time_fn,
 };
 use anyhow::Result;
+use aptos_api_types::U64;
 use aptos_logger::info;
 use aptos_rest_client::{error::RestError, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
+use aptos_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
 use std::env;
 use url::Url;
@@ -137,6 +140,42 @@ pub async fn create_and_fund_account(faucet_client: &FaucetClient) -> Result<Loc
     faucet_client.fund(account.address(), FUND_AMOUNT).await?;
 
     Ok(account)
+}
+
+/// Check account balance.
+pub async fn check_balance(
+    test_name: TestName,
+    client: &Client,
+    address: AccountAddress,
+    expected: U64,
+) -> Result<(), TestFailure> {
+    // actual
+    let actual = match client.get_account_balance(address).await {
+        Ok(response) => response.into_inner().coin.value,
+        Err(e) => {
+            info!(
+                "test: {} part: check_account_data ERROR: {}, with error {:?}",
+                &test_name.to_string(),
+                ERROR_NO_BALANCE,
+                e
+            );
+            return Err(e.into());
+        },
+    };
+
+    // compare
+    if expected != actual {
+        info!(
+            "test: {} part: check_account_data FAIL: {}, expected {:?}, got {:?}",
+            &test_name.to_string(),
+            FAIL_WRONG_BALANCE,
+            expected,
+            actual
+        );
+        return Err(TestFailure::Fail(FAIL_WRONG_BALANCE));
+    }
+
+    Ok(())
 }
 
 // metrics helpers

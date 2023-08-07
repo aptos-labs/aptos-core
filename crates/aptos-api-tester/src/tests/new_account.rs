@@ -3,12 +3,12 @@
 use crate::{
     fail_message::{
         ERROR_COULD_NOT_CREATE_ACCOUNT, ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_ACCOUNT_DATA,
-        ERROR_NO_BALANCE, FAIL_WRONG_ACCOUNT_DATA, FAIL_WRONG_BALANCE,
+        FAIL_WRONG_ACCOUNT_DATA,
     },
     persistent_check, time_fn,
     utils::{
-        create_account, emit_step_metrics, get_client, get_faucet_client, NetworkName, TestFailure,
-        TestName, FUND_AMOUNT,
+        check_balance, create_account, emit_step_metrics, get_client, get_faucet_client,
+        NetworkName, TestFailure, TestName, FUND_AMOUNT,
     },
 };
 use aptos_api_types::U64;
@@ -92,7 +92,10 @@ async fn setup(
             return Err(e.into());
         },
     };
-    info!("test: new_account part: setup creating account: {}", account.address());
+    info!(
+        "test: new_account part: setup creating account: {}",
+        account.address()
+    );
 
     Ok((client, faucet_client, account))
 }
@@ -145,29 +148,5 @@ async fn check_account_balance(
     client: &Client,
     address: AccountAddress,
 ) -> Result<(), TestFailure> {
-    // expected
-    let expected = U64(FUND_AMOUNT);
-
-    // actual
-    let actual = match client.get_account_balance(address).await {
-        Ok(response) => response.into_inner().coin.value,
-        Err(e) => {
-            info!(
-                "test: new_account part: check_account_balance ERROR: {}, with error {:?}",
-                ERROR_NO_BALANCE, e
-            );
-            return Err(e.into());
-        },
-    };
-
-    // compare
-    if expected != actual {
-        info!(
-            "test: new_account part: check_account_balance FAIL: {}, expected {:?}, got {:?}",
-            FAIL_WRONG_BALANCE, expected, actual
-        );
-        return Err(TestFailure::Fail(FAIL_WRONG_BALANCE));
-    }
-
-    Ok(())
+    check_balance(TestName::NewAccount, client, address, U64(FUND_AMOUNT)).await
 }
