@@ -1,17 +1,13 @@
 // Copyright © Aptos Foundation
 
-use crate::{fail_message::ERROR_COULD_NOT_CHECK, utils::TestFailure};
+use crate::{fail_message::ERROR_COULD_NOT_CHECK, utils::TestFailure, consts::{PERSISTENCY_TIMEOUT, SLEEP_PER_CYCLE}};
 use anyhow::anyhow;
 use aptos_api_types::HexEncodedBytes;
 use aptos_rest_client::Client;
 use aptos_sdk::{token_client::TokenClient, types::LocalAccount};
 use aptos_types::account_address::AccountAddress;
 use futures::Future;
-use std::time::Duration;
 use tokio::time::{Instant, sleep};
-
-static PERSISTENCY_TIMEOUT: Duration = Duration::from_secs(30);
-static SLEEP_PER_CYCLE: Duration = Duration::from_millis(100);
 
 pub async fn account<'a, 'b, F, Fut>(
     step: &str,
@@ -28,12 +24,12 @@ where
     let timer = Instant::now();
 
     // try to get a good result
-    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
+    while Instant::now().duration_since(timer) < *PERSISTENCY_TIMEOUT {
         result = f(client, account).await;
         if result.is_ok() {
             break;
         }
-        sleep(SLEEP_PER_CYCLE).await;
+        sleep(*SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -55,12 +51,12 @@ where
     let timer = Instant::now();
 
     // try to get a good result
-    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
+    while Instant::now().duration_since(timer) < *PERSISTENCY_TIMEOUT {
         result = f(client, address).await;
         if result.is_ok() {
             break;
         }
-        sleep(SLEEP_PER_CYCLE).await;
+        sleep(*SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -83,12 +79,12 @@ where
     let timer = Instant::now();
 
     // try to get a good result
-    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
+    while Instant::now().duration_since(timer) < *PERSISTENCY_TIMEOUT {
         result = f(client, address, address2).await;
         if result.is_ok() {
             break;
         }
-        sleep(SLEEP_PER_CYCLE).await;
+        sleep(*SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -111,12 +107,12 @@ where
     let timer = Instant::now();
 
     // try to get a good result
-    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
+    while Instant::now().duration_since(timer) < *PERSISTENCY_TIMEOUT {
         result = f(client, address, bytes).await;
         if result.is_ok() {
             break;
         }
-        sleep(SLEEP_PER_CYCLE).await;
+        sleep(*SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -139,12 +135,12 @@ where
     let timer = Instant::now();
 
     // try to get a good result
-    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
+    while Instant::now().duration_since(timer) < *PERSISTENCY_TIMEOUT {
         result = f(client, address, version).await;
         if result.is_ok() {
             break;
         }
-        sleep(SLEEP_PER_CYCLE).await;
+        sleep(*SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -166,12 +162,12 @@ where
     let timer = Instant::now();
 
     // try to get a good result
-    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
+    while Instant::now().duration_since(timer) < *PERSISTENCY_TIMEOUT {
         result = f(token_client, address).await;
         if result.is_ok() {
             break;
         }
-        sleep(SLEEP_PER_CYCLE).await;
+        sleep(*SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -194,12 +190,12 @@ where
     let timer = Instant::now();
 
     // try to get a good result
-    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
+    while Instant::now().duration_since(timer) < *PERSISTENCY_TIMEOUT {
         result = f(token_client, address, address2).await;
         if result.is_ok() {
             break;
         }
-        sleep(SLEEP_PER_CYCLE).await;
+        sleep(*SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs

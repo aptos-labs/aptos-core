@@ -9,8 +9,8 @@ use crate::{
     persistent_check, time_fn,
     utils::{
         create_account, create_and_fund_account, emit_step_metrics, get_client, get_faucet_client,
-        NetworkName, TestFailure, TestName, FUND_AMOUNT, check_balance,
-    },
+        NetworkName, TestFailure, TestName, check_balance,
+    }, consts::FUND_AMOUNT,
 };
 use anyhow::{anyhow, Result};
 use aptos_api_types::U64;

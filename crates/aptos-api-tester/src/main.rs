@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+mod consts;
 mod counters;
 mod fail_message;
 mod persistent_check;
@@ -15,18 +16,21 @@ use crate::utils::{NetworkName, TestName};
 use anyhow::Result;
 use aptos_logger::{info, Level, Logger};
 use aptos_push_metrics::MetricsPusher;
+use consts::{STACK_SIZE, NUM_THREADS};
 use futures::future::join_all;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::{Builder, Runtime};
-
-static STACK_SIZE: usize = 4 * 1024 * 1024;
 
 async fn test_flows(runtime: &Runtime, network_name: NetworkName) -> Result<()> {
     let run_id = SystemTime::now()
         .duration_since(UNIX_EPOCH)?
         .as_secs()
         .to_string();
-    info!("----- STARTING TESTS FOR {} WITH RUN ID {} -----", network_name.to_string(), run_id);
+    info!(
+        "----- STARTING TESTS FOR {} WITH RUN ID {} -----",
+        network_name.to_string(),
+        run_id
+    );
 
     // Flow 1: New account
     let test_time = run_id.clone();
@@ -65,9 +69,9 @@ async fn test_flows(runtime: &Runtime, network_name: NetworkName) -> Result<()> 
 fn main() -> Result<()> {
     // create runtime
     let runtime = Builder::new_multi_thread()
-        .worker_threads(4)
+        .worker_threads(*NUM_THREADS)
         .enable_all()
-        .thread_stack_size(STACK_SIZE)
+        .thread_stack_size(*STACK_SIZE)
         .build()?;
 
     // log metrics

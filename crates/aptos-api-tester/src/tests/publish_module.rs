@@ -10,8 +10,8 @@ use crate::{
     persistent_check, time_fn,
     utils::{
         check_balance, create_and_fund_account, emit_step_metrics, get_client, get_faucet_client,
-        NetworkName, TestFailure, TestName, FUND_AMOUNT,
-    },
+        NetworkName, TestFailure, TestName,
+    }, consts::FUND_AMOUNT,
 };
 use anyhow::{anyhow, Result};
 use aptos_api_types::{HexEncodedBytes, U64};
