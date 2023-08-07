@@ -118,6 +118,10 @@ const main = async () => {
   // checked in the entry function we're using.
   const multiSigStruct = createMultiSigStructFromSignedStructs(structSignatures, bitmap);
 
+  // Create test metadata for the multisig account post-creation
+  const metadataKeys = ["key 123", "key 456", "key 789"];
+  const metadataValues = [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6]), new Uint8Array([7, 8, 9])];
+
   // Pack the signed multi-sig struct into the entry function payload with the number of signatures required + multisig account info
   const entryFunctionPayload = createWithExistingAccountAndRevokeAuthKeyPayload(
     multiSigAddress,
@@ -125,8 +129,8 @@ const main = async () => {
     multiSigStruct,
     accountAddresses,
     NUM_SIGNATURES_REQUIRED,
-    [],
-    [],
+    metadataKeys,
+    metadataValues,
   );
 
   // Step 6.
@@ -153,7 +157,7 @@ const main = async () => {
     // has been rotated and all capabilities revoked.
     const txnInfo = await provider.waitForTransactionWithResult(txn);
     printRelevantTxInfo(txnInfo as Types.UserTransaction);
-    assertAndPrintAuthKeyRotated(provider, multiSigAddress, sequenceNumber, false);
+    assertChangesAndPrint(provider, multiSigAddress, sequenceNumber, false, metadataKeys, metadataValues);
   } else {
     //////////////////////////////////////////////////////////////////////////////////////////
     //           Option 2: Submitting the transaction as the MultiEd25519 account           //
@@ -202,7 +206,7 @@ const main = async () => {
     // has been rotated and all capabilities revoked.
     const txnInfo = await provider.waitForTransactionWithResult(transactionRes.hash);
     printRelevantTxInfo(txnInfo as Types.UserTransaction);
-    assertAndPrintAuthKeyRotated(provider, multiSigAddress, sequenceNumber, true);
+    assertChangesAndPrint(provider, multiSigAddress, sequenceNumber, true, metadataKeys, metadataValues);
   }
 };
 
@@ -213,77 +217,6 @@ const main = async () => {
 //                                                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
-
-const assertAndPrintAuthKeyRotated = async (
-  provider: Provider,
-  multiEd25519Address: TxnBuilderTypes.AccountAddress,
-  sequenceNumber: number,
-  submittedAsMultiEd25519: boolean = false,
-) => {
-  // Query the account resources on-chain
-  const accountResources = await provider.getAccountResource(
-    multiEd25519Address.toHexString(),
-    "0x1::account::Account",
-  );
-  const data = accountResources?.data as any;
-
-  // Check that the authentication key of the original MultiEd25519 account was rotated
-  // Normalize the inputs and then convert them to a string for comparison
-  const authKey = TxnBuilderTypes.AccountAddress.fromHex(data.authentication_key).toHexString().toString();
-  const zeroAuthKey = TxnBuilderTypes.AccountAddress.fromHex("0x0").toHexString().toString();
-  const authKeyRotated = authKey === zeroAuthKey;
-
-  // Sequence number only increments if MultiEd was the signer
-  const expectedSequenceNumber = submittedAsMultiEd25519 ? sequenceNumber + 1 : sequenceNumber + 0;
-
-  // Check the rotation/signer capability offers. They should have been revoked if there were any outstanding offers
-  const rotationCapabilityOffer = data.rotation_capability_offer.for.vec as Array<any>;
-  const signerCapabilityOffer = data.signer_capability_offer.for.vec as Array<any>;
-
-  // Assert our expectations
-  assert(Number(data.sequence_number) === expectedSequenceNumber, "Incorrect sequence number.");
-  assert(authKeyRotated, "nAuthentication key was not rotated.");
-  assert(rotationCapabilityOffer.length == 0);
-  assert(signerCapabilityOffer.length == 0);
-
-  // Print any relevant account resource info
-  console.log(`\nAuthentication key was rotated successfully:`);
-  console.log({
-    authentication_key: data.authentication_key,
-    sequence_number: Number(data.sequence_number),
-    rotation_capability_offer: rotationCapabilityOffer,
-    signer_capability_offer: signerCapabilityOffer,
-  });
-};
-
-const printRelevantTxInfo = (txn: Types.UserTransaction): void => {
-  const signatureType = txn.signature?.type;
-  let signatureTypeMessage = "";
-  switch (signatureType) {
-    case "ed25519_signature":
-      signatureTypeMessage = "a MultiEd25519 account.";
-      break;
-    case "multi_ed_25519_signature":
-      signatureTypeMessage = "an Ed25519 account.";
-      break;
-    default:
-      signatureTypeMessage = "a different signature type.";
-  }
-  // Print the relevant transaction response information.
-  console.log(`\nSubmitted transaction response as ${signatureType}:`);
-  console.log({
-    version: txn.version,
-    hash: txn.hash,
-    success: txn.success,
-    vm_status: txn.vm_status,
-    sender: txn.sender,
-    expiration_timestamp_secs: txn.expiration_timestamp_secs,
-    payload: txn.payload,
-    signature: txn.signature,
-    events: txn.events,
-    timestamp: txn.timestamp,
-  });
-};
 
 // Funds and thus creates the derived MultiEd25519 account and prints out the derived address, authentication key, and public key.
 const initializeMultiEd25519 = async (
@@ -359,6 +292,7 @@ const createWithExistingAccountAndRevokeAuthKeyPayload = (
   metadataKeys: Array<string>,
   metadataValues: Array<Uint8Array>,
 ): TxnBuilderTypes.TransactionPayloadEntryFunction => {
+  assert(metadataKeys.length == metadataValues.length, "Metadata keys and values must be the same length.");
   return new TxnBuilderTypes.TransactionPayloadEntryFunction(
     TxnBuilderTypes.EntryFunction.natural(
       `0x1::multisig_account`,
@@ -375,7 +309,7 @@ const createWithExistingAccountAndRevokeAuthKeyPayload = (
         BCS.bcsSerializeBytes(multiSigPublicKey.toBytes()),
         BCS.bcsSerializeBytes(multiSignedStruct),
         BCS.serializeVectorWithFunc(metadataKeys, "serializeStr"),
-        BCS.serializeVectorWithFunc(metadataValues, "serializeStr"), // ? TODO: Fix for real vector later? Not sure if vec<u8> will work
+        BCS.serializeVectorWithFunc(metadataValues, "serializeBytes"),
       ],
     ),
   );
@@ -392,6 +326,112 @@ const createMultiSigStructFromSignedStructs = (signatures: Array<Uint8Array>, bi
 
   // Add the bitmap to the end of the byte array
   return new Uint8Array([...flattenedSignatures, ...bitmap]);
+};
+
+// Helper function to check all the different resources on chain that should have changed and print them out
+const assertChangesAndPrint = async (
+  provider: Provider,
+  multiEd25519Address: TxnBuilderTypes.AccountAddress,
+  sequenceNumber: number,
+  submittedAsMultiEd25519: boolean,
+  metadataKeys: Array<string>,
+  metadataValues: Array<Uint8Array>,
+) => {
+  // Query the account resources on-chain
+  const accountResource = await provider.getAccountResource(multiEd25519Address.toHexString(), "0x1::account::Account");
+  const data = accountResource?.data as any;
+
+  // Check that the authentication key of the original MultiEd25519 account was rotated
+  // Normalize the inputs and then convert them to a string for comparison
+  const authKey = TxnBuilderTypes.AccountAddress.fromHex(data.authentication_key).toHexString().toString();
+  const zeroAuthKey = TxnBuilderTypes.AccountAddress.fromHex("0x0").toHexString().toString();
+  const authKeyRotated = authKey === zeroAuthKey;
+
+  // Sequence number only increments if MultiEd was the signer
+  const expectedSequenceNumber = submittedAsMultiEd25519 ? sequenceNumber + 1 : sequenceNumber + 0;
+
+  // Check the rotation/signer capability offers. They should have been revoked if there were any outstanding offers
+  const rotationCapabilityOffer = data.rotation_capability_offer.for.vec as Array<any>;
+  const signerCapabilityOffer = data.signer_capability_offer.for.vec as Array<any>;
+
+  // Check that the metadata keys and values were correctly stored at the multisig's account address
+  const multisigAccountResource = await provider.getAccountResource(
+    multiEd25519Address.toHexString(),
+    "0x1::multisig_account::MultisigAccount",
+  );
+
+  const metadata = (multisigAccountResource?.data as any).metadata.data as Array<any>;
+  const onChainMetadataValues = metadata.map((m) => new HexString(m.value).toUint8Array());
+
+  console.log(`\nMetadata added to MultiSig Account:`);
+  console.log(metadata);
+
+  // Assert our expectations about the metadata key/value map
+  onChainMetadataValues.forEach((v, i) => {
+    assert(
+      v.length === metadataValues[i].length,
+      `Incorrect length. Input ${metadataValues[i].length} but on-chain length is ${v.length}`,
+    );
+    (v as unknown as Array<number>).forEach((vv, ii) => {
+      assert(
+        Number(vv) === Number(metadataValues[i][ii]),
+        `Incorrect value. Input ${metadataValues[i][ii]} but on-chain value is ${vv}`,
+      );
+    });
+  });
+  const onChainMetadataKeys = metadata.map((m) => m.key);
+  assert(
+    onChainMetadataKeys.length === metadataKeys.length,
+    `Incorrect length. Input ${metadataKeys.length} but on-chain length is ${onChainMetadataKeys.length}`,
+  );
+  onChainMetadataKeys.forEach((k, i) => {
+    assert(k === metadataKeys[i], `Incorrect key. Input ${metadataKeys[i]} but on-chain key is ${k}`);
+  });
+
+  // Assert our expectations about the account resources
+  assert(Number(data.sequence_number) === expectedSequenceNumber, "Incorrect sequence number.");
+  assert(authKeyRotated, "nAuthentication key was not rotated.");
+  assert(rotationCapabilityOffer.length == 0);
+  assert(signerCapabilityOffer.length == 0);
+
+  // Print any relevant account resource info
+  console.log(`\nAuthentication key was rotated successfully:`);
+  console.log({
+    authentication_key: data.authentication_key,
+    sequence_number: Number(data.sequence_number),
+    rotation_capability_offer: rotationCapabilityOffer,
+    signer_capability_offer: signerCapabilityOffer,
+  });
+};
+
+const printRelevantTxInfo = (txn: Types.UserTransaction): void => {
+  const signatureType = txn.signature?.type;
+  let signatureTypeMessage = "";
+  switch (signatureType) {
+    case "ed25519_signature":
+      signatureTypeMessage = "a MultiEd25519 account.";
+      break;
+    case "multi_ed_25519_signature":
+      signatureTypeMessage = "an Ed25519 account.";
+      break;
+    default:
+      signatureTypeMessage = "a different signature type.";
+  }
+  console.log(txn.payload);
+  // Print the relevant transaction response information.
+  console.log(`\nSubmitted transaction response as ${signatureType}:`);
+  console.log({
+    version: txn.version,
+    hash: txn.hash,
+    success: txn.success,
+    vm_status: txn.vm_status,
+    sender: txn.sender,
+    expiration_timestamp_secs: txn.expiration_timestamp_secs,
+    payload: txn.payload,
+    signature: txn.signature,
+    events: txn.events,
+    timestamp: txn.timestamp,
+  });
 };
 
 main();
