@@ -2,9 +2,9 @@ name: "Prover Daily Test"
 on:
   # Allow us to manually run this specific workflow without a PR
   workflow_dispatch:
-  # Until enabled on all PRs, run continuously at the beginning of each hour
+  # Until enabled on all PRs, run twice a week
   schedule:
-    - cron: "14 14 * * *"
+    - cron: "14 14 */3 * *"
 
 env:
   CARGO_INCREMENTAL: "0"
