@@ -11,7 +11,7 @@ for synchronizing the node to the latest blockchain state. It is required by
 both validators and fullnodes to ensure that they do not fall behind the rest
 of the network. To achieve this, state sync identifies and fetches new
 blockchain data from peers, validates the data and persists it to local
-storage.
+storage. Isn't that cool? Aah, not really. Or maybe?
 
 ## State sync modes
 
