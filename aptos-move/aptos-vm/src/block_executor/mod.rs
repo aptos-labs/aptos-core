@@ -26,6 +26,7 @@ use aptos_block_executor::{
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    contract_event::ContractEvent,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
@@ -40,6 +41,7 @@ use rayon::{prelude::*, ThreadPool};
 use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
+    type Event = ContractEvent;
     type Key = StateKey;
     type Value = WriteOp;
 }
@@ -71,7 +73,7 @@ impl AptosTransactionOutput {
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .output_with_delta_writes(vec![]),
+                .into_transaction_output_with_materialized_deltas(vec![]),
         }
     }
 }
@@ -91,8 +93,8 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output to be set to get writes")
-            .write_set()
-            .iter()
+            .change_set()
+            .write_set_iter()
             .map(|(key, op)| (key.clone(), op.clone()))
             .collect()
     }
@@ -104,10 +106,23 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .lock()
             .as_ref()
             .expect("Output to be set to get deltas")
-            .delta_change_set()
+            .change_set()
+            .aggregator_delta_set()
             .iter()
             .map(|(key, op)| (key.clone(), *op))
             .collect()
+    }
+
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
+    fn get_events(&self) -> Vec<ContractEvent> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get events")
+            .change_set()
+            .events()
+            .to_vec()
     }
 
     /// Can be called (at most) once after transaction is committed to internally
@@ -120,7 +135,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         .lock()
                         .take()
                         .expect("Output must be set to combine with deltas")
-                        .output_with_delta_writes(delta_writes),
+                        .into_transaction_output_with_materialized_deltas(delta_writes),
                 )
                 .is_ok(),
             "Could not combine VMOutput with deltas"

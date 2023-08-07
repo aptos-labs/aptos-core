@@ -70,6 +70,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-metrics = { workspace = true }
+tokio-retry = { workspace = true }
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }

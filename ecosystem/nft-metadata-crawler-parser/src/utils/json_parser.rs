@@ -1,9 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    get_uri_metadata,
-    utils::constants::{MAX_FILE_SIZE_BYTES, MAX_RETRY_TIME_SECONDS},
-};
+use crate::{get_uri_metadata, utils::constants::MAX_RETRY_TIME_SECONDS};
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
 use futures::FutureExt;
@@ -18,14 +15,22 @@ pub struct JSONParser;
 impl JSONParser {
     /// Parses JSON from input URI.
     /// Returns the underlying raw image URI, raw animation URI, and JSON.
-    pub async fn parse(uri: String) -> anyhow::Result<(Option<String>, Option<String>, Value)> {
+    pub async fn parse(
+        uri: String,
+        max_file_size_bytes: u32,
+    ) -> anyhow::Result<(Option<String>, Option<String>, Value)> {
         let (mime, size) = get_uri_metadata(uri.clone()).await?;
-        if ImageFormat::from_mime_type(mime).is_some() {
-            error!(uri = uri, "JSON parser received image URI, skipping");
-            return Err(anyhow::anyhow!("JSON parser received image URI, skipping"));
-        } else if size > MAX_FILE_SIZE_BYTES {
-            error!(uri = uri, "JSON parser received large file, skipping");
-            return Err(anyhow::anyhow!("JSON parser received large file, skipping"));
+        if ImageFormat::from_mime_type(mime.clone()).is_some() {
+            let error_msg = format!("JSON parser received image file: {}, skipping", mime);
+            error!(uri = uri, "[NFT Metadata Crawler] {}", error_msg);
+            return Err(anyhow::anyhow!(error_msg));
+        } else if size > max_file_size_bytes {
+            let error_msg = format!(
+                "JSON parser received file too large: {} bytes, skipping",
+                size
+            );
+            error!(uri = uri, "[NFT Metadata Crawler] {}", error_msg);
+            return Err(anyhow::anyhow!(error_msg));
         }
 
         let op = || {
@@ -65,7 +70,11 @@ impl JSONParser {
         match retry(backoff, op).await {
             Ok(result) => Ok(result),
             Err(e) => {
-                error!(uri = uri, "Exponential backoff timed out, skipping JSON");
+                error!(
+                    uri = uri,
+                    error = ?e,
+                    "[NFT Metadata Parser] Exponential backoff timed out, skipping JSON"
+                );
                 Err(e)
             },
         }

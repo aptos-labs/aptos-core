@@ -357,8 +357,6 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 }
 
 fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
-    // TODO: verify that the expansion AST has modules in bottom-up dependency order, since this
-    // is a requirement for the builder.
     let mut builder = ModelBuilder::new(env);
     for (module_count, (module_id, module_def)) in program
         .modules
@@ -378,6 +376,14 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
         // Assign new module id in the model.
         let module_id = ModuleId::new(module_count);
         let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
+        module_translator.translate(loc, module_def, None);
+    }
+    for (_, script_def) in program.scripts.into_iter() {
+        let loc = builder.to_loc(&script_def.loc);
+        let module_name = ModuleName::pseudo_script_name(builder.env.symbol_pool());
+        let module_id = ModuleId::new(builder.env.module_data.len());
+        let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
+        let module_def = expansion_script_to_module(script_def);
         module_translator.translate(loc, module_def, None);
     }
 
