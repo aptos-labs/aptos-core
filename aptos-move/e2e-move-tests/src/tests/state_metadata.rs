@@ -45,10 +45,22 @@ fn test_metadata_tracking() {
         &account1,
         aptos_cached_packages::aptos_stdlib::aptos_account_transfer(address3, 100),
     );
+
+    let slot_fee = harness
+        .new_vm()
+        .internals()
+        .gas_params()
+        .unwrap()
+        .vm
+        .txn
+        .storage_fee_per_state_slot_create
+        .into();
+    assert!(slot_fee > 0);
+
     // Observe that metadata is tracked for address3 resources
     assert_eq!(
         harness.read_resource_metadata(&address3, coin_store.clone()),
-        Some(Some(StateValueMetadata::new(0, &timestamp))),
+        Some(Some(StateValueMetadata::new(slot_fee, &timestamp,))),
     );
 
     // Bump the timestamp and modify the resources, observe that metadata doesn't change.
@@ -67,6 +79,6 @@ fn test_metadata_tracking() {
     );
     assert_eq!(
         harness.read_resource_metadata(&address3, coin_store),
-        Some(Some(StateValueMetadata::new(0, &timestamp))),
+        Some(Some(StateValueMetadata::new(slot_fee, &timestamp))),
     );
 }
