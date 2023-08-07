@@ -38,15 +38,13 @@ test(
     let txn2 = (await client.getTransactionByHash(txnHash2)) as Transaction_UserTransaction;
     expect((txn2.payload as EntryFunctionPayload).function).toBe(TRANSFER_COINS);
 
-    // Test that `createReceiverIfMissing` works off
-    const nick = new AptosAccount();
-    const txnHash3 = await coinClient.transfer(alice, nick, 1234, { createReceiverIfMissing: false });
+    // Test that `createReceiverIfMissing` works off (has to already be registered
+    const txnHash3 = await coinClient.transfer(alice, jemima, 1234, { createReceiverIfMissing: false });
     await client.waitForTransaction(txnHash3, {
       checkSuccess: true,
     });
 
-    // Check that using a string address instead of an account works with `checkBalance`.
-    expect(await coinClient.checkBalance(nick.address().hex())).toBe(BigInt(1234));
+    expect(await coinClient.checkBalance(jemima.address().hex())).toBe(BigInt(2468));
     let txn3 = (await client.getTransactionByHash(txnHash3)) as Transaction_UserTransaction;
     expect((txn3.payload as EntryFunctionPayload).function).toBe(COIN_TRANSFER);
   },
