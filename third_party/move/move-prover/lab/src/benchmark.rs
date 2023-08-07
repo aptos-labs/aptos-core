@@ -6,8 +6,11 @@
 // benchmark data back into memory.
 
 use anyhow::anyhow;
-use clap::ArgAction::{Append, Set};
-use clap::{Arg, Command};
+use clap::{
+    Arg,
+    ArgAction::{Append, Set},
+    Command,
+};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
 use log::LevelFilter;

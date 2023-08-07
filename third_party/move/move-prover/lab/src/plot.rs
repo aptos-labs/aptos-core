@@ -10,8 +10,7 @@ use crate::{
     benchmark::{Benchmark, BenchmarkData},
 };
 use anyhow::Context;
-use clap::ArgAction::Set;
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction::Set, Command};
 use itertools::Itertools;
 use plotters::{
     coord::types::RangedCoordu32,
