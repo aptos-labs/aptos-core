@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
+    consts::FUND_AMOUNT,
     fail_message::{
         ERROR_COULD_NOT_CREATE_ACCOUNT, ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_ACCOUNT_DATA,
         FAIL_WRONG_ACCOUNT_DATA,
@@ -9,7 +10,7 @@ use crate::{
     utils::{
         check_balance, create_account, emit_step_metrics, get_client, get_faucet_client,
         NetworkName, TestFailure, TestName,
-    }, consts::FUND_AMOUNT,
+    },
 };
 use aptos_api_types::U64;
 use aptos_logger::info;

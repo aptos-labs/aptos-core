@@ -1,10 +1,13 @@
 // Copyright © Aptos Foundation
 
 use crate::{
+    consts::{
+        DEVNET_FAUCET_URL, DEVNET_NODE_URL, FUND_AMOUNT, TESTNET_FAUCET_URL, TESTNET_NODE_URL,
+    },
     counters::{test_error, test_fail, test_latency, test_step_latency, test_success},
     fail_message::{ERROR_NO_BALANCE, FAIL_WRONG_BALANCE},
     tests::{coin_transfer, new_account, nft_transfer, publish_module},
-    time_fn, consts::{DEVNET_NODE_URL, FUND_AMOUNT, TESTNET_NODE_URL, TESTNET_FAUCET_URL, DEVNET_FAUCET_URL},
+    time_fn,
 };
 use anyhow::Result;
 use aptos_api_types::U64;
@@ -221,7 +224,8 @@ pub fn emit_test_metrics(
         &network_name.to_string(),
         run_id,
         result_label,
-    );
+    )
+    .observe(time);
 }
 
 /// Emit metrics based on  result.

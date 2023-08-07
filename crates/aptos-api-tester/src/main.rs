@@ -16,7 +16,7 @@ use crate::utils::{NetworkName, TestName};
 use anyhow::Result;
 use aptos_logger::{info, Level, Logger};
 use aptos_push_metrics::MetricsPusher;
-use consts::{STACK_SIZE, NUM_THREADS};
+use consts::{NUM_THREADS, STACK_SIZE};
 use futures::future::join_all;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::{Builder, Runtime};

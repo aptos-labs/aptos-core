@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
+    consts::FUND_AMOUNT,
     fail_message::{
         ERROR_COULD_NOT_CREATE_ACCOUNT, ERROR_COULD_NOT_CREATE_TRANSACTION,
         ERROR_COULD_NOT_FINISH_TRANSACTION, ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_BALANCE,
@@ -8,9 +9,9 @@ use crate::{
     },
     persistent_check, time_fn,
     utils::{
-        create_account, create_and_fund_account, emit_step_metrics, get_client, get_faucet_client,
-        NetworkName, TestFailure, TestName, check_balance,
-    }, consts::FUND_AMOUNT,
+        check_balance, create_account, create_and_fund_account, emit_step_metrics, get_client,
+        get_faucet_client, NetworkName, TestFailure, TestName,
+    },
 };
 use anyhow::{anyhow, Result};
 use aptos_api_types::U64;

@@ -1,13 +1,17 @@
 // Copyright © Aptos Foundation
 
-use crate::{fail_message::ERROR_COULD_NOT_CHECK, utils::TestFailure, consts::{PERSISTENCY_TIMEOUT, SLEEP_PER_CYCLE}};
+use crate::{
+    consts::{PERSISTENCY_TIMEOUT, SLEEP_PER_CYCLE},
+    fail_message::ERROR_COULD_NOT_CHECK,
+    utils::TestFailure,
+};
 use anyhow::anyhow;
 use aptos_api_types::HexEncodedBytes;
 use aptos_rest_client::Client;
 use aptos_sdk::{token_client::TokenClient, types::LocalAccount};
 use aptos_types::account_address::AccountAddress;
 use futures::Future;
-use tokio::time::{Instant, sleep};
+use tokio::time::{sleep, Instant};
 
 pub async fn account<'a, 'b, F, Fut>(
     step: &str,

@@ -6,16 +6,16 @@ use url::Url;
 
 // faucet constants
 
-pub const DEVNET_NODE_URL: Lazy<Url> =
+pub static DEVNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
 
-pub const DEVNET_FAUCET_URL: Lazy<Url> =
+pub static DEVNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
 
-pub const TESTNET_NODE_URL: Lazy<Url> =
+pub static TESTNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
 
-pub const TESTNET_FAUCET_URL: Lazy<Url> =
+pub static TESTNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
 
 pub const FUND_AMOUNT: u64 = 100_000_000;
@@ -51,5 +51,5 @@ pub static STACK_SIZE: Lazy<usize> = Lazy::new(|| {
     env::var("STACK_SIZE")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(2 * 1024 * 1024)
+        .unwrap_or(4 * 1024 * 1024)
 });
