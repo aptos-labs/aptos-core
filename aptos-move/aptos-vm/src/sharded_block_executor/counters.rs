@@ -24,6 +24,14 @@ pub static SHARDED_BLOCK_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "sharded_execution_result_aggregation_seconds",
+        "Time to aggregate the results of sharded execution in seconds",
+    )
+    .unwrap()
+});
+
 pub static SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "sharded_block_execution_by_rounds_seconds",

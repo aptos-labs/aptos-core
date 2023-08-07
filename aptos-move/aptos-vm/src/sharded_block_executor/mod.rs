@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::{
-    counters::{NUM_EXECUTOR_SHARDS, SHARDED_BLOCK_EXECUTION_SECONDS},
+    counters::{
+        NUM_EXECUTOR_SHARDS, SHARDED_BLOCK_EXECUTION_SECONDS,
+        SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS,
+    },
     executor_client::ExecutorClient,
 };
 use aptos_logger::{info, trace};
@@ -90,6 +93,7 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
             .into_inner();
         // wait for all remote executors to send the result back and append them in order by shard id
         trace!("ShardedBlockExecutor Received all results");
+        let _aggregation_timer = SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS.start_timer();
         let num_rounds = sharded_output[0].len();
         let mut aggregated_results = vec![];
         let mut ordered_results = vec![vec![]; num_executor_shards * num_rounds];
