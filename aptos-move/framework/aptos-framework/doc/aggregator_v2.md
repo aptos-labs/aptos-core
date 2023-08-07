@@ -9,7 +9,7 @@ This module provides an interface for aggregators (version 2).
 -  [Struct `Aggregator`](#0x1_aggregator_v2_Aggregator)
 -  [Struct `AggregatorSnapshot`](#0x1_aggregator_v2_AggregatorSnapshot)
 -  [Constants](#@Constants_0)
--  [Function `limit`](#0x1_aggregator_v2_limit)
+-  [Function `max_value`](#0x1_aggregator_v2_max_value)
 -  [Function `create_aggregator`](#0x1_aggregator_v2_create_aggregator)
 -  [Function `try_add`](#0x1_aggregator_v2_try_add)
 -  [Function `add`](#0x1_aggregator_v2_add)
@@ -17,7 +17,6 @@ This module provides an interface for aggregators (version 2).
 -  [Function `sub`](#0x1_aggregator_v2_sub)
 -  [Function `read`](#0x1_aggregator_v2_read)
 -  [Function `snapshot`](#0x1_aggregator_v2_snapshot)
--  [Function `snapshot_with_u64_limit`](#0x1_aggregator_v2_snapshot_with_u64_limit)
 -  [Function `read_snapshot`](#0x1_aggregator_v2_read_snapshot)
 
 
@@ -33,8 +32,10 @@ This module provides an interface for aggregators (version 2).
 Represents an integer which supports parallel additions and subtractions
 across multiple transactions. See the module description for more details.
 
+Currently supported types for Element are u64 and u128.
 
-<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a> <b>has</b> store
+
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt; <b>has</b> store
 </code></pre>
 
 
@@ -45,13 +46,13 @@ across multiple transactions. See the module description for more details.
 
 <dl>
 <dt>
-<code>value: u128</code>
+<code>value: Element</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>limit: u128</code>
+<code>max_value: Element</code>
 </dt>
 <dd>
 
@@ -105,7 +106,7 @@ The value of aggregator overflows. Raised by uncoditional add() call
 
 <a name="0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW"></a>
 
-The value of aggregator underflows (goes below zero). Raised by uncoditional sub call
+The value of aggregator underflows (goes below zero). Raised by uncoditional sub() call
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 = 2;
@@ -113,26 +114,25 @@ The value of aggregator underflows (goes below zero). Raised by uncoditional sub
 
 
 
-<a name="0x1_aggregator_v2_EAGGREGATOR_LIMIT_ABOVE_CAST_MAX"></a>
+<a name="0x1_aggregator_v2_EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED"></a>
 
-Tried casting into a narrower type (i.e. u64), but aggregator range of valid values
-cannot fit (i.e. limit exceeds type::MAX).
-Raised by native code (i.e. inside snapshot_with_u64_limit())
+Element type of the aggregator not supported. Raised by create_aggregator() call,
+if Element type is not supported (currently u64 or u128).
 
 
-<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_LIMIT_ABOVE_CAST_MAX">EAGGREGATOR_LIMIT_ABOVE_CAST_MAX</a>: u64 = 2;
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED">EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED</a>: u64 = 3;
 </code></pre>
 
 
 
-<a name="0x1_aggregator_v2_limit"></a>
+<a name="0x1_aggregator_v2_max_value"></a>
 
-## Function `limit`
+## Function `max_value`
 
-Returns <code>limit</code> exceeding which aggregator overflows.
+Returns <code>max_value</code> exceeding which aggregator overflows.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>): u128
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_max_value">max_value</a>&lt;Element: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;Element&gt;): Element
 </code></pre>
 
 
@@ -141,8 +141,8 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>): u128 {
-    <a href="aggregator.md#0x1_aggregator">aggregator</a>.limit
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_max_value">max_value</a>&lt;Element: <b>copy</b> + drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt;): Element {
+    <a href="aggregator.md#0x1_aggregator">aggregator</a>.max_value
 }
 </code></pre>
 
@@ -154,9 +154,13 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 
 ## Function `create_aggregator`
 
+Creates new aggregator, with given 'max_value'.
+
+Currently supported types for Element are u64 and u128.
+EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>(limit: u128): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;Element: <b>copy</b>, drop&gt;(max_value: Element): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;Element&gt;
 </code></pre>
 
 
@@ -165,7 +169,7 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>(limit: u128): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;Element: <b>copy</b> + drop&gt;(max_value: Element): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt;;
 </code></pre>
 
 
@@ -177,10 +181,10 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 ## Function `try_add`
 
 Adds <code>value</code> to aggregator.
-If addition would exceed the limit, <code><b>false</b></code> is returned, and aggregator value is left unchanged.
+If addition would exceed the max_value, <code><b>false</b></code> is returned, and aggregator value is left unchanged.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>, value: u128): bool
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;Element&gt;, value: Element): bool
 </code></pre>
 
 
@@ -189,7 +193,7 @@ If addition would exceed the limit, <code><b>false</b></code> is returned, and a
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>, value: u128): bool;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt;, value: Element): bool;
 </code></pre>
 
 
@@ -202,7 +206,7 @@ If addition would exceed the limit, <code><b>false</b></code> is returned, and a
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>, value: u128)
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;Element&gt;, value: Element)
 </code></pre>
 
 
@@ -211,7 +215,7 @@ If addition would exceed the limit, <code><b>false</b></code> is returned, and a
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>, value: u128) {
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt;, value: Element) {
     <b>assert</b>!(<a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>));
 }
 </code></pre>
@@ -228,7 +232,7 @@ Subtracts <code>value</code> from aggregator.
 If subtraction would result in a negative value, <code><b>false</b></code> is returned, and aggregator value is left unchanged.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>, value: u128): bool
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;Element&gt;, value: Element): bool
 </code></pre>
 
 
@@ -237,7 +241,7 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>, value: u128): bool;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt;, value: Element): bool;
 </code></pre>
 
 
@@ -250,7 +254,7 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>, value: u128)
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;Element&gt;, value: Element)
 </code></pre>
 
 
@@ -259,7 +263,7 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>, value: u128) {
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt;, value: Element) {
     <b>assert</b>!(<a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>));
 }
 </code></pre>
@@ -275,7 +279,7 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 Returns a value stored in this aggregator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>): u128
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;Element&gt;): Element
 </code></pre>
 
 
@@ -284,7 +288,7 @@ Returns a value stored in this aggregator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>): u128;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt;): Element;
 </code></pre>
 
 
@@ -297,7 +301,7 @@ Returns a value stored in this aggregator.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u128&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;Element&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;
 </code></pre>
 
 
@@ -306,29 +310,7 @@ Returns a value stored in this aggregator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;u128&gt;;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_aggregator_v2_snapshot_with_u64_limit"></a>
-
-## Function `snapshot_with_u64_limit`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot_with_u64_limit">snapshot_with_u64_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u64&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot_with_u64_limit">snapshot_with_u64_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;u64&gt;;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>&lt;Element&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;Element&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;Element&gt;;
 </code></pre>
 
 
