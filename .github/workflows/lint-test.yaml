@@ -36,7 +36,7 @@ jobs:
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
 
-  # Run all general lints (i.e., non-rust and docs lints). This will be a PR required job.
+  # Run all general lints (i.e., non-rust and docs lints). This is a PR required job.
   general-lints:
     needs: file_change_determinator
     runs-on: ubuntu-latest
@@ -50,43 +50,6 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: echo "Skipping general lints! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
-
-  # TODO: remove this once the new jobs land
-  scripts-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
-      - run: shellcheck scripts/dev_setup.sh
-
-  # TODO: remove this once the new jobs land
-  ecosystem-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version-file: .node-version
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8.2.0
-      # install packages for examples
-      - run: cd ./ecosystem/typescript/sdk/examples/typescript && pnpm install
-      - run: cd ./ecosystem/typescript/sdk/examples/javascript && pnpm install
-      # Run package build+lint + tests
-      - run: cd ./ecosystem/typescript/sdk && pnpm install
-      - run: cd ./ecosystem/typescript/sdk && pnpm lint
-      - run: cd ./ecosystem/typescript/sdk && pnpm fmt:check
-
-  # TODO: remove this once the new jobs land
-  ecosystem-python-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/python-setup
-        with:
-          pyproject_directory: ecosystem/python/sdk
-      - run: make -C ecosystem/python/sdk fmt && ./scripts/fail_if_modified_files.sh
 
   # Run the docs linter. This is a PR required job.
   docs-lint:
@@ -116,7 +79,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: python3 scripts/check-cryptohasher-symbols.py
 
-  # Run all rust lints. This will be a PR required job.
+  # Run all rust lints. This is a PR required job.
   rust-lints:
     needs: file_change_determinator
     runs-on: high-perf-docker
@@ -131,7 +94,7 @@ jobs:
       - run: echo "Skipping rust lints! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
-  # Run all rust smoke tests. This will be a PR required job.
+  # Run all rust smoke tests. This is a PR required job.
   rust-smoke-tests:
     needs: file_change_determinator
     runs-on: high-perf-docker
@@ -146,7 +109,7 @@ jobs:
       - run: echo "Skipping rust smoke tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
-  # Run all rust unit tests. This will be a PR required job.
+  # Run all rust unit tests. This is a PR required job.
   rust-unit-tests:
     needs: file_change_determinator
     runs-on: high-perf-docker
@@ -160,56 +123,6 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: echo "Skipping rust unit tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
-
-  # TODO: remove this once the new jobs land
-  rust-lint:
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@v3
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - uses: pre-commit/action@v3.0.0
-      - run: cargo install cargo-sort
-      - run: scripts/rust_lint.sh --check
-
-  # TODO: remove this once the new jobs land
-  rust-doc-test:
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: cargo test --locked --doc --workspace --exclude aptos-node-checker
-
-  # TODO: remove this once the new jobs land
-  rust-unit-test:
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - uses: taiki-e/install-action@v1.5.6
-        with:
-          tool: nextest
-      - run: scripts/dev_setup.sh -b -p -y -P -J
-      - run: cargo nextest run --profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
-        env:
-          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-          RUST_MIN_STACK: 4297152
-          MVP_TEST_ON_CI: true
-          SOLC_EXE: /home/runner/bin/solc
-          Z3_EXE: /home/runner/bin/z3
-          CVC5_EXE: /home/runner/bin/cvc5
-          DOTNET_ROOT: /home/runner/.dotnet
-          BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
 
   # Run the consensus only unit tests
   rust-consensus-only-unit-test:
@@ -246,37 +159,6 @@ jobs:
       - run: | # Test the client and server
           cargo nextest run --locked -p aptos-peer-monitoring-service-client --no-fail-fast -F network-perf-test
           cargo nextest run --locked -p aptos-peer-monitoring-service-server --no-fail-fast -F network-perf-test
-
-  # TODO: remove this once the new jobs land
-  rust-smoke-test:
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@v3
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - uses: taiki-e/install-action@v1.5.6
-        with:
-          tool: nextest
-      # prebuild aptos-node binary, so that tests don't start before node is built.
-      # also prebuild aptos-node binary as a separate step to avoid feature unification issues
-      # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      - run: cargo build --locked --package=aptos-node --features=failpoints,indexer --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
-        env:
-          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-
-      # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
-      - name: Upload smoke test logs for failed and flaky tests
-        uses: actions/upload-artifact@v3
-        if: ${{ failure() || success() }}
-        with:
-          name: failed-smoke-test-logs
-          # Retain all smoke test data except for the db (which may be large).
-          path: |
-            /tmp/.tmp*
-            !/tmp/.tmp*/**/db/
-          retention-days: 14
 
   # Run the consensus only smoke test
   rust-consensus-only-smoke-test:
@@ -333,17 +215,6 @@ jobs:
             /tmp/.tmp*
             !/tmp/.tmp*/**/db/
           retention-days: 14
-
-  # TODO: remove this once the new jobs land
-  check-vm-features:
-    runs-on: high-perf-docker
-    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
-    steps:
-      - uses: actions/checkout@v3
-      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: cargo test --locked --features check-vm-features -p aptos-node
 
   # TODO: remove this once the new jobs land
   python-lint-test:
