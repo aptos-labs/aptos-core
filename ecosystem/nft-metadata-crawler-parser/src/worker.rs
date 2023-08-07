@@ -206,7 +206,7 @@ pub struct Worker {
     token_uri: String,
     last_transaction_version: i32,
     last_transaction_timestamp: chrono::NaiveDateTime,
-    chain_id: i32,
+    chain_id: i32, // Add checks with DB in future PR
     force: bool,
 }
 
