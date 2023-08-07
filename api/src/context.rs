@@ -614,7 +614,7 @@ impl Context {
             .context("Failed to convert transaction data from storage")
             .map_err(|err| {
                 E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
-            })?;
+            })?; /g
 
         Ok(txns)
     }
