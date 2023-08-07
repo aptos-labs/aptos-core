@@ -23,6 +23,8 @@ pub static TESTNET_NODE_URL: Lazy<Url> =
 pub static TESTNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
 
+// test failure
+
 #[derive(Debug)]
 pub enum TestFailure {
     Fail(&'static str),
@@ -40,6 +42,8 @@ impl From<anyhow::Error> for TestFailure {
         TestFailure::Error(e)
     }
 }
+
+// test name
 
 #[derive(Clone, Copy)]
 pub enum TestName {
@@ -73,6 +77,8 @@ impl ToString for TestName {
     }
 }
 
+// network name
+
 #[derive(Clone, Copy)]
 pub enum NetworkName {
     Testnet,
@@ -88,7 +94,9 @@ impl ToString for NetworkName {
     }
 }
 
-// Create a REST client.
+// setup helpers
+
+/// Create a REST client.
 pub fn get_client(network_name: NetworkName) -> Client {
     match network_name {
         NetworkName::Testnet => Client::new(TESTNET_NODE_URL.clone()),
@@ -96,7 +104,7 @@ pub fn get_client(network_name: NetworkName) -> Client {
     }
 }
 
-// Create a faucet client.
+/// Create a faucet client.
 pub fn get_faucet_client(network_name: NetworkName) -> FaucetClient {
     match network_name {
         NetworkName::Testnet => {
@@ -113,7 +121,7 @@ pub fn get_faucet_client(network_name: NetworkName) -> FaucetClient {
     }
 }
 
-// Create an account with zero balance.
+/// Create an account with zero balance.
 pub async fn create_account(faucet_client: &FaucetClient) -> Result<LocalAccount> {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.create_account(account.address()).await?;
@@ -121,7 +129,7 @@ pub async fn create_account(faucet_client: &FaucetClient) -> Result<LocalAccount
     Ok(account)
 }
 
-// Create an account with 100_000_000 balance.
+/// Create an account with 100_000_000 balance.
 pub async fn create_and_fund_account(faucet_client: &FaucetClient) -> Result<LocalAccount> {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
     faucet_client.fund(account.address(), 100_000_000).await?;
@@ -129,7 +137,9 @@ pub async fn create_and_fund_account(faucet_client: &FaucetClient) -> Result<Loc
     Ok(account)
 }
 
-// Emit metrics based on test result.
+// metrics helpers
+
+/// Emit metrics based on test result.
 pub fn emit_test_metrics(
     output: (Result<(), TestFailure>, f64),
     test_name: TestName,
@@ -187,7 +197,7 @@ pub fn emit_test_metrics(
     );
 }
 
-// Emit metrics based on  result.
+/// Emit metrics based on  result.
 pub fn emit_step_metrics<T>(
     output: (Result<T, TestFailure>, f64),
     test_name: TestName,

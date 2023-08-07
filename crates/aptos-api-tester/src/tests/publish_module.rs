@@ -34,6 +34,11 @@ use std::{collections::BTreeMap, path::PathBuf};
 static MODULE_NAME: &str = "message";
 static MESSAGE: &str = "test message";
 
+/// Tests nft transfer. Checks that:
+///   - can publish module
+///   - module data exists
+///   - can interact with module
+///   - interaction is reflected correctly
 pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFailure> {
     // setup
     let (client, mut account) = emit_step_metrics(
