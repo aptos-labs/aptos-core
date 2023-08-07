@@ -37,7 +37,7 @@ pub static WAIT_FOR_SHARDED_OUTPUT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "wait_for_sharded_output_seconds",
         "Time to wait for sharded output in seconds",
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub static SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
@@ -45,6 +45,24 @@ pub static SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS: Lazy<HistogramVec> = Lazy:
         "sharded_block_execution_by_rounds_seconds",
         "Time to execute a sub block in sharded execution in seconds",
         &["shard_id", "round_id"]
+    )
+    .unwrap()
+});
+
+pub static EXECUTOR_SHARD_COMMAND_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "execute_shard_command_seconds",
+        "Time to execute a sub block in sharded execution in seconds",
+        &["shard_id"]
+    )
+    .unwrap()
+});
+
+pub static DROP_STATE_VIEW_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "drop_state_view_seconds",
+        "Time to execute a sub block in sharded execution in seconds",
+        &["shard_id"]
     )
     .unwrap()
 });

@@ -3,6 +3,7 @@
 
 use crate::sharded_block_executor::{
     coordinator_client::CoordinatorClient,
+    counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS,
     cross_shard_client::CrossShardClient,
     executor_client::{ExecutorClient, ShardedExecutionOutput},
     global_executor::GlobalExecutor,
@@ -21,7 +22,6 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
-use crate::sharded_block_executor::counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.

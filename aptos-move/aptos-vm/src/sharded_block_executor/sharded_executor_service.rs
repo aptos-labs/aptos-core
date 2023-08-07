@@ -4,7 +4,10 @@ use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
         coordinator_client::CoordinatorClient,
-        counters::{SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT},
+        counters::{
+            DROP_STATE_VIEW_SECONDS, EXECUTOR_SHARD_COMMAND_SECONDS,
+            SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT,
+        },
         cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
         messages::CrossShardMsg,
@@ -199,6 +202,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 ) => {
+                    let _timer = EXECUTOR_SHARD_COMMAND_SECONDS
+                        .with_label_values(&[&self.shard_id.to_string()])
+                        .start_timer();
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
                         self.shard_id,
@@ -210,6 +216,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         concurrency_level_per_shard,
                         maybe_block_gas_limit,
                     );
+                    let _drop_timer = DROP_STATE_VIEW_SECONDS
+                        .with_label_values(&[&self.shard_id.to_string()])
+                        .start_timer();
                     drop(state_view);
                     self.coordinator_client.send_execution_result(ret);
                 },
