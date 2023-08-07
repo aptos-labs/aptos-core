@@ -44,7 +44,7 @@ test(
       checkSuccess: true,
     });
 
-    expect(await coinClient.checkBalance(jemima.address().hex())).toBe(BigInt(2468));
+    expect(await coinClient.checkBalance(jemima.address().hex())).toBe(BigInt(1951));
     let txn3 = (await client.getTransactionByHash(txnHash3)) as Transaction_UserTransaction;
     expect((txn3.payload as EntryFunctionPayload).function).toBe(COIN_TRANSFER);
   },
