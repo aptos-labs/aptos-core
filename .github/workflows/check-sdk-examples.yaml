@@ -1,6 +1,7 @@
 name: "Check SDK examples"
 on:
   pull_request:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
       - devnet
