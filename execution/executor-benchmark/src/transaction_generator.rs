@@ -18,9 +18,13 @@ use aptos_types::{
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
-use rand::thread_rng;
+#[cfg(test)]
+use rand::SeedableRng;
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
+use std::collections::{HashMap, HashSet};
 use std::{
     fs::File,
     io::{Read, Write},
@@ -269,14 +273,14 @@ impl TransactionGenerator {
         block_size: usize,
         num_transfer_blocks: usize,
         transactions_per_sender: usize,
-        independent_tx_grps_in_a_block: usize,
+        connected_tx_grps: usize,
     ) {
         assert!(self.block_sender.is_some());
         self.gen_transfer_transactions(
             block_size,
             num_transfer_blocks,
             transactions_per_sender,
-            independent_tx_grps_in_a_block,
+            connected_tx_grps,
         );
     }
 
@@ -447,34 +451,89 @@ impl TransactionGenerator {
         }
     }
 
-    /// Generates connected groups of transactions for random pairs of accounts.
-    pub fn gen_independent_grps_of_connected_random_transfer_transactions(
-        &mut self,
+    fn get_connected_grps_transfer_indices(
+        rng: &mut StdRng,
+        num_signer_accounts: usize,
         block_size: usize,
-        num_blocks: usize,
-        independent_tx_grps_in_a_block: usize,
-    ) {
-        let num_accounts_per_grp = self.main_signer_accounts.as_ref().unwrap().accounts.len()
-            / independent_tx_grps_in_a_block;
-        // TODO: handle when block_size isn't divisible by independent_tx_grps_in_a_block; an easy
+        connected_tx_grps: usize,
+    ) -> Vec<(usize, usize)> {
+        let num_accounts_per_grp = num_signer_accounts / connected_tx_grps;
+        // TODO: handle when block_size isn't divisible by connected_tx_grps; an easy
         //       way to do this is to just generate a few more transactions in the last group
-        let num_txns_per_grp = block_size / independent_tx_grps_in_a_block;
+        let num_txns_per_grp = block_size / connected_tx_grps;
 
         if num_txns_per_grp >= num_accounts_per_grp {
             panic!("For the desired workload we want num_accounts_per_grp ({}) > num_txns_per_grp ({})", num_accounts_per_grp, num_txns_per_grp);
         }
+
+        (0..connected_tx_grps)
+            .flat_map(|grp_idx| {
+                let accounts_st_idx = grp_idx * num_accounts_per_grp;
+                let accounts_end_idx = accounts_st_idx + num_accounts_per_grp - 1;
+                let mut unused_indices: Vec<_> = (accounts_st_idx..=accounts_end_idx).collect();
+                unused_indices.shuffle(rng);
+                let mut used_indices: Vec<_> =
+                    vec![unused_indices.pop().unwrap(), unused_indices.pop().unwrap()];
+                let mut transfer_indices: Vec<(_, _)> = vec![(used_indices[0], used_indices[1])];
+
+                for _ in 1..num_txns_per_grp {
+                    // index1 is always from used_indices, so that all the txns are connected
+                    let mut index1 = used_indices[rng.gen_range(0, used_indices.len())];
+
+                    // index2 is either from used_indices or unused_indices
+                    let mut index2;
+                    let rnd = rng.gen_range(0, used_indices.len() + unused_indices.len());
+                    if rnd < used_indices.len() {
+                        index2 = used_indices[rnd];
+                    } else {
+                        // unused_indices is shuffled already, so last element is random
+                        index2 = unused_indices.pop().unwrap();
+                        used_indices.push(index2);
+                    }
+
+                    if rng.gen_range(0, 2) == 0 {
+                        // with 50% probability, swap the indices of sender and receiver
+                        (index1, index2) = (index2, index1);
+                    }
+                    transfer_indices.push((index1, index2));
+                }
+                transfer_indices
+            })
+            .collect()
+    }
+
+    /// A 'connected transaction group' is a group of transactions where all the transactions are
+    /// connected to each other, that is they cannot be executed in parallel.
+    /// Transactions across different groups can be executed in parallel.
+    pub fn gen_connected_grps_transfer_transactions(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        connected_tx_grps: usize,
+    ) {
         for _ in 0..num_blocks {
-            let mut transactions: Vec<_> = (0..independent_tx_grps_in_a_block)
-                .flat_map(|grp_idx| {
-                    self.main_signer_accounts
-                        .as_mut()
-                        .unwrap()
-                        .get_connected_random_transfers(
-                            &self.transaction_factory,
-                            num_txns_per_grp,
-                            grp_idx * num_accounts_per_grp,
-                            (grp_idx + 1) * num_accounts_per_grp - 1,
-                        )
+            let num_signer_accounts = self.main_signer_accounts.as_ref().unwrap().accounts.len();
+            let rng = &mut self.main_signer_accounts.as_mut().unwrap().rng;
+            let transfer_indices: Vec<_> =
+                TransactionGenerator::get_connected_grps_transfer_indices(
+                    rng,
+                    num_signer_accounts,
+                    block_size,
+                    connected_tx_grps,
+                );
+
+            let mut transactions: Vec<_> = transfer_indices
+                .iter()
+                .map(|transfer_idx| {
+                    let receiver = self.main_signer_accounts.as_mut().unwrap().accounts
+                        [transfer_idx.1]
+                        .address();
+                    let sender =
+                        &mut self.main_signer_accounts.as_mut().unwrap().accounts[transfer_idx.0];
+                    let txn = sender.sign_with_transaction_builder(
+                        self.transaction_factory.transfer(receiver, 1),
+                    );
+                    Transaction::UserTransaction(txn)
                 })
                 .collect();
             transactions.push(Transaction::StateCheckpoint(HashValue::random()));
@@ -491,13 +550,13 @@ impl TransactionGenerator {
         block_size: usize,
         num_blocks: usize,
         transactions_per_sender: usize,
-        independent_tx_grps_in_a_block: usize,
+        connected_tx_grps: usize,
     ) {
-        if independent_tx_grps_in_a_block > 0 {
-            self.gen_independent_grps_of_connected_random_transfer_transactions(
+        if connected_tx_grps > 0 {
+            self.gen_connected_grps_transfer_transactions(
                 block_size,
                 num_blocks,
-                independent_tx_grps_in_a_block,
+                connected_tx_grps,
             );
         } else {
             self.gen_random_transfer_transactions(block_size, num_blocks, transactions_per_sender);
@@ -544,5 +603,66 @@ impl TransactionGenerator {
     /// Drops the sender to notify the receiving end of the channel.
     pub fn drop_sender(&mut self) {
         self.block_sender.take().unwrap();
+    }
+}
+
+#[test]
+fn test_get_connected_grps_transfer_indices() {
+    let mut rng = StdRng::from_entropy();
+
+    fn dfs(node: usize, adj_list: &HashMap<usize, HashSet<usize>>, visited: &mut HashSet<usize>) {
+        visited.insert(node);
+        for &n in adj_list.get(&node).unwrap() {
+            if !visited.contains(&n) {
+                dfs(n, adj_list, visited);
+            }
+        }
+    }
+
+    fn get_num_connected_components(adj_list: &HashMap<usize, HashSet<usize>>) -> usize {
+        let mut visited = HashSet::new();
+        let mut num_connected_components = 0;
+        for node in adj_list.keys() {
+            if !visited.contains(node) {
+                dfs(*node, adj_list, &mut visited);
+                num_connected_components += 1;
+            }
+        }
+        num_connected_components
+    }
+
+    {
+        let block_size = 100;
+        let num_signer_accounts = 1000;
+        // we check for (i) block_size not divisible by connected_txn_grps (ii) when divisible
+        // (iii) when all txns in the block are independent
+        for connected_txn_grps in [3, block_size / 10, block_size] {
+            let transfer_indices = TransactionGenerator::get_connected_grps_transfer_indices(
+                &mut rng,
+                num_signer_accounts,
+                block_size,
+                connected_txn_grps,
+            );
+
+            let mut adj_list: HashMap<usize, HashSet<usize>> = HashMap::new();
+            assert_eq!(
+                transfer_indices.len(),
+                (block_size / connected_txn_grps) * connected_txn_grps
+            );
+            for (sender_idx, receiver_idx) in transfer_indices {
+                assert!(sender_idx < num_signer_accounts);
+                assert!(receiver_idx < num_signer_accounts);
+                adj_list
+                    .entry(sender_idx)
+                    .or_insert(HashSet::new())
+                    .insert(receiver_idx);
+                adj_list
+                    .entry(receiver_idx)
+                    .or_insert(HashSet::new())
+                    .insert(sender_idx);
+            }
+
+            assert_eq!(get_num_connected_components(&adj_list), connected_txn_grps);
+        }
     }
 }

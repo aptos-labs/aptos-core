@@ -100,7 +100,7 @@ pub fn run_benchmark<V>(
     num_blocks: usize,
     transaction_mix: Option<Vec<(TransactionType, usize)>>,
     mut transactions_per_sender: usize,
-    independent_tx_grps_in_a_block: usize,
+    connected_tx_grps: usize,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
@@ -251,7 +251,7 @@ pub fn run_benchmark<V>(
             block_size,
             num_blocks,
             transactions_per_sender,
-            independent_tx_grps_in_a_block,
+            connected_tx_grps,
         );
     }
     if pipeline_config.delay_execution_start {
