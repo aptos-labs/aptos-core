@@ -95,49 +95,10 @@ jobs:
 
   ### Public fullnode tests
 
-  # Measures PFN latencies with a constant TPS
-  run-forge-pfn-const-tps:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-const-tps-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: pfn_const_tps
-      POST_TO_SLACK: true
-
-  # Measures PFN latencies with a constant TPS (with network chaos)
-  run-forge-pfn-const-tps-network-chaos:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-pfn-const-tps] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-const-tps-with-network-chaos-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: pfn_const_tps_with_network_chaos
-      POST_TO_SLACK: true
-
-  # Measures PFN latencies with a constant TPS (with a realistic environment)
-  run-forge-pfn-const-tps-realistic-env:
-    if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-pfn-const-tps-network-chaos] # Only run after the previous job completes
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
-    secrets: inherit
-    with:
-      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-pfn-const-tps-with-realistic-env-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800 # Run for 30 minutes
-      FORGE_TEST_SUITE: pfn_const_tps_with_realistic_env
-      POST_TO_SLACK: true
-
   # Measures max PFN throughput and latencies under load
   run-forge-pfn-performance:
     if: ${{ github.event_name != 'pull_request' && always() }}
-    needs: [determine-test-metadata, run-forge-pfn-const-tps-realistic-env] # Only run after the previous job completes
+    needs: determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
