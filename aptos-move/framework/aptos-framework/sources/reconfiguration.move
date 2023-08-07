@@ -162,7 +162,7 @@ module aptos_framework::reconfiguration {
             transaction_fee::process_collected_fees();
         };
         stake::on_new_epoch();
-        let ret = stake::get_active_validator_set(); //TODO: still need to lock the new validator set!
+        let ret = stake::get_active_validator_set(); //dkg todo: still need to lock the new validator set! Better have a read-only function to compute the new validator set, store it somewhere, then apply during reconfigure_b().
         debug::print(&std::string::utf8(b"reconfiguration::reconfigure_a() finished."));
         ret
     }

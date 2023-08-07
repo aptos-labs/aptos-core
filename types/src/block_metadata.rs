@@ -34,7 +34,7 @@ pub struct BlockMetadata {
 }
 
 fn serialize_transcript(ts: &Transcript) -> Vec<u8> {
-    vec![3,3,3] //TODO: use something from aptos-dkg.
+    vec![3,3,3] //dkg todo: use something from aptos-dkg.
 }
 
 impl BlockMetadata {
@@ -89,7 +89,7 @@ impl BlockMetadata {
             MoveValue::U64(self.timestamp_usecs),
         ];
 
-        //TODO: currently assuming the first transcript is valid.
+        //dkg todo: currently assuming the first transcript is valid.
         ret.push(MoveValue::Bool(!self.dkg_transcripts.is_empty()));
         ret.push(MoveValue::Vector(self.dkg_transcripts.first().map(|ts|serialize_transcript(ts)).unwrap_or(vec![]).into_iter().map(MoveValue::U8).collect()));
         // dkg todo: pass in randomness
