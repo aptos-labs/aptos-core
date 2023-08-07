@@ -1,0 +1,27 @@
+name: Rust Lints
+description: Runs all Rust linters
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # Checkout the repository and setup the rust toolchain
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      with:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+    # Run the pre-commit checks
+    - uses: pre-commit/action@v3.0.0
+
+    # Run the rust linters and cargo checks
+    - name: Run cargo sort and rust lint checks
+      shell: bash
+      run: |
+        cargo install cargo-sort
+        scripts/rust_lint.sh --check

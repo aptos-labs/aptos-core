@@ -25,6 +25,7 @@ jobs:
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
   run-tests-devnet:
+    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
     needs: [permission-check]
     runs-on: high-perf-docker
     steps:
@@ -43,6 +44,7 @@ jobs:
           GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
 
   run-tests-testnet:
+    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
     needs: [permission-check]
     runs-on: high-perf-docker
     permissions:
