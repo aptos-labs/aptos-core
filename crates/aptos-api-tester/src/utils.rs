@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
 
-use crate::counters::{test_error, test_fail, test_latency, test_step_latency, test_success};
+use crate::{
+    counters::{test_error, test_fail, test_latency, test_step_latency, test_success},
+    tests::{coin_transfer, new_account, nft_transfer, publish_module},
+    time_fn,
+};
 use anyhow::Result;
+use aptos_logger::info;
 use aptos_rest_client::{error::RestError, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
 use once_cell::sync::Lazy;
@@ -17,22 +22,6 @@ pub static TESTNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
 pub static TESTNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
-
-#[derive(Debug)]
-pub enum TestResult {
-    Success,
-    Fail(&'static str),
-    Error(anyhow::Error),
-}
-
-impl From<TestFailure> for TestResult {
-    fn from(f: TestFailure) -> TestResult {
-        match f {
-            TestFailure::Fail(f) => TestResult::Fail(f),
-            TestFailure::Error(e) => TestResult::Error(e),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub enum TestFailure {
@@ -52,11 +41,25 @@ impl From<anyhow::Error> for TestFailure {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum TestName {
     NewAccount,
     CoinTransfer,
     NftTransfer,
     PublishModule,
+}
+
+impl TestName {
+    pub async fn run(&self, network_name: NetworkName, run_id: &str) {
+        let output = match &self {
+            TestName::NewAccount => time_fn!(new_account::test, network_name, run_id),
+            TestName::CoinTransfer => time_fn!(coin_transfer::test, network_name, run_id),
+            TestName::NftTransfer => time_fn!(nft_transfer::test, network_name, run_id),
+            TestName::PublishModule => time_fn!(publish_module::test, network_name, run_id),
+        };
+
+        emit_test_metrics(output, *self, network_name, run_id);
+    }
 }
 
 impl ToString for TestName {
@@ -82,36 +85,6 @@ impl ToString for NetworkName {
             NetworkName::Testnet => "testnet".to_string(),
             NetworkName::Devnet => "devnet".to_string(),
         }
-    }
-}
-
-// Set metrics based on the result.
-pub fn set_metrics(
-    output: &TestResult,
-    test_name: &str,
-    network_name: &str,
-    start_time: &str,
-    time: f64,
-) {
-    match output {
-        TestResult::Success => {
-            test_success(test_name, network_name, start_time).observe(1_f64);
-            test_fail(test_name, network_name, start_time).observe(0_f64);
-            test_error(test_name, network_name, start_time).observe(0_f64);
-            test_latency(test_name, network_name, start_time, "success").observe(time);
-        },
-        TestResult::Fail(_) => {
-            test_success(test_name, network_name, start_time).observe(0_f64);
-            test_fail(test_name, network_name, start_time).observe(1_f64);
-            test_error(test_name, network_name, start_time).observe(0_f64);
-            test_latency(test_name, network_name, start_time, "fail").observe(time);
-        },
-        TestResult::Error(_) => {
-            test_success(test_name, network_name, start_time).observe(0_f64);
-            test_fail(test_name, network_name, start_time).observe(0_f64);
-            test_error(test_name, network_name, start_time).observe(1_f64);
-            test_latency(test_name, network_name, start_time, "error").observe(time);
-        },
     }
 }
 
@@ -156,6 +129,65 @@ pub async fn create_and_fund_account(faucet_client: &FaucetClient) -> Result<Loc
     Ok(account)
 }
 
+// Emit metrics based on test result.
+pub fn emit_test_metrics(
+    output: (Result<(), TestFailure>, f64),
+    test_name: TestName,
+    network_name: NetworkName,
+    run_id: &str,
+) {
+    // deconstruct
+    let (result, time) = output;
+
+    // emit success rate and get result word
+    let result_label = match result {
+        Ok(_) => {
+            test_success(&test_name.to_string(), &network_name.to_string(), run_id).observe(1_f64);
+            test_fail(&test_name.to_string(), &network_name.to_string(), run_id).observe(0_f64);
+            test_error(&test_name.to_string(), &network_name.to_string(), run_id).observe(0_f64);
+
+            "success"
+        },
+        Err(e) => match e {
+            TestFailure::Fail(_) => {
+                test_success(&test_name.to_string(), &network_name.to_string(), run_id)
+                    .observe(0_f64);
+                test_fail(&test_name.to_string(), &network_name.to_string(), run_id).observe(1_f64);
+                test_error(&test_name.to_string(), &network_name.to_string(), run_id)
+                    .observe(0_f64);
+
+                "fail"
+            },
+            TestFailure::Error(_) => {
+                test_success(&test_name.to_string(), &network_name.to_string(), run_id)
+                    .observe(0_f64);
+                test_fail(&test_name.to_string(), &network_name.to_string(), run_id).observe(0_f64);
+                test_error(&test_name.to_string(), &network_name.to_string(), run_id)
+                    .observe(1_f64);
+
+                "error"
+            },
+        },
+    };
+
+    // log result
+    info!(
+        "----- TEST FINISHED test: {} result: {} time: {} -----",
+        test_name.to_string(),
+        result_label,
+        time,
+    );
+
+    // emit latency
+    test_latency(
+        &test_name.to_string(),
+        &network_name.to_string(),
+        run_id,
+        result_label,
+    );
+}
+
+// Emit metrics based on  result.
 pub fn emit_step_metrics<T>(
     output: (Result<T, TestFailure>, f64),
     test_name: TestName,
@@ -163,35 +195,34 @@ pub fn emit_step_metrics<T>(
     network_name: NetworkName,
     run_id: &str,
 ) -> Result<T, TestFailure> {
+    // deconstruct and get result word
     let (result, time) = output;
-    match &result {
-        Ok(_) => test_step_latency(
-            &test_name.to_string(),
-            step_name,
-            &network_name.to_string(),
-            run_id,
-            "success",
-        )
-        .observe(time),
+    let result_label = match &result {
+        Ok(_) => "success",
         Err(e) => match e {
-            TestFailure::Fail(_) => test_step_latency(
-                &test_name.to_string(),
-                step_name,
-                &network_name.to_string(),
-                run_id,
-                "fail",
-            )
-            .observe(time),
-            TestFailure::Error(_) => test_step_latency(
-                &test_name.to_string(),
-                step_name,
-                &network_name.to_string(),
-                run_id,
-                "error",
-            )
-            .observe(time),
+            TestFailure::Fail(_) => "fail",
+            TestFailure::Error(_) => "error",
         },
-    }
+    };
+
+    // log result
+    info!(
+        "STEP FINISHED test: {} step: {} result: {} time: {}",
+        test_name.to_string(),
+        step_name,
+        result_label,
+        time,
+    );
+
+    // emit latency
+    test_step_latency(
+        &test_name.to_string(),
+        step_name,
+        &network_name.to_string(),
+        run_id,
+        result_label,
+    )
+    .observe(time);
 
     result
 }
