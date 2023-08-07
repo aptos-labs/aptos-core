@@ -1,0 +1,21 @@
+<svg width="1000" height="120" viewBox="0 0 1000 120" xmlns="http://www.w3.org/2000/svg">
+<rect x="0" y="0" width="1000" height="120" opacity="1" fill="#FFFFFF" stroke="none"/>
+<rect x="0" y="2" width="44" height="14" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="54" y="4" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+= benchmark
+</text>
+<text x="0" y="40" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+test::f1
+</text>
+<rect x="0" y="56" width="909" height="14" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="918" y="58" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.634
+</text>
+<text x="0" y="80" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+test::f2
+</text>
+<rect x="0" y="96" width="850" height="14" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="859" y="98" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.593
+</text>
+</svg>
