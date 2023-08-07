@@ -34,6 +34,7 @@
             <option value="cpu">CPU Profiling</option>
             <option value="heap">Heap Profiling</option>
             <option value="thread">Thread Dump</option>
+            <option value="off-cpu">Off-CPU Profiling</option> 
         </select>
         <button id="startButton" disabled>Start Profiling</button>
         <button id="saveButton">Save Rows</button>
@@ -60,31 +61,30 @@
 
         function downloadFile(type) {
 
-            // Create a new a-element
-            let a = document.createElement('a');
+            let fl = document.createElement('a');
 
-            // Set the href to the file URL
             switch(type) {
                     case 'heap':
-                        a.href = 'http://localhost:1234/memory_txt';
-                        // Use the download attribute to prompt a file download
-                        a.download = 'memory.txt'; // Optional: you can set a custom file name
+                        fl.href = 'http://localhost:1234/memory_txt';
+                        fl.download = 'memory.txt'; 
                         break;
                     case 'cpu':
-                        a.href = 'http://localhost:1234/cpu_flamegraph';
-                        // Use the download attribute to prompt a file download
-                        a.download = 'cpu_flamegraph.svg'; // Optional: you can set a custom file name
+                        fl.href = 'http://localhost:1234/cpu_flamegraph';
+                        fl.download = 'cpu_flamegraph.svg'; 
                         break;
                     case 'thread':
-                        a.href = 'http://localhost:1234/thread_dump_results';
-                        // Use the download attribute to prompt a file download
-                        a.download = 'thread_dump.txt'; // Optional: you can set a custom file name
+                        fl.href = 'http://localhost:1234/thread_dump_results';
+                        fl.download = 'thread_dump.txt';
+                        break;
+                    case 'off-cpu':
+                        fl.href = 'http://localhost:1234/offcpu_results';
+                        fl.download = 'offcpu.svg';
                         break;
                 }
             
 
             // Trigger the download by simulating a click
-            a.click();
+            fl.click();
 }
         document.getElementById('saveButton').onclick = function() {
         var table = document.getElementById('resultsTable');
@@ -141,8 +141,12 @@
                 case 'heap':
                     endpoint = 'http://localhost:1234/memory_profiling';
                     break;
-                 case 'thread':
+                case 'thread':
                     endpoint = 'http://localhost:1234/thread_dump_start'
+                    break;
+                case 'off-cpu':
+                    endpoint = 'http://localhost:1234/offcpu_profiling';
+                    break;
             }
 
             
@@ -173,7 +177,7 @@
             viewResultsButton.textContent = 'View Graph';
             //viewResultsButton.disabled = true;
             
-            if (type == "cpu" || type == "heap") {
+            if (type == "cpu" || type == "heap" || type == "off-cpu") {
                 var resultEndpoint;
                 switch(type) {
                     case 'cpu':
@@ -182,7 +186,9 @@
                     case 'heap':
                         resultEndpoint = 'http://localhost:1234/memory_svg';
                         break;
-                    
+                    case 'off-cpu':
+                        resultEndpoint = 'http://localhost:1234/offcpu_results';
+                        break;
                 }
                 viewResultsButton.addEventListener('click', function() {
                     window.open(resultEndpoint, '_blank');

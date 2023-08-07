@@ -131,3 +131,34 @@ pub fn handle_thread_dump_result_request() -> (StatusCode, Body, String) {
         }
     }
 }
+
+pub fn handle_offcpu_request() -> (StatusCode, Body, String) {
+    let config = ProfilerConfig::new_with_defaults();
+    let handler = ProfilerHandler::new(config);
+    let offcpu_profiler = handler.get_offcpu_profiler();
+
+    match offcpu_profiler.start_profiling() {
+        Ok(_) => {
+            (StatusCode::OK, Body::from("Success"), CONTENT_TYPE_TEXT.into())
+        }
+        Err(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Body::from("Error starting offcpu profiling"), CONTENT_TYPE_TEXT.into())
+        }
+    }
+}
+
+pub fn handle_offcpu_result_request() -> (StatusCode, Body, String) {
+    let config = ProfilerConfig::new_with_defaults();
+    let handler = ProfilerHandler::new(config);
+    let offcpu_profiler = handler.get_offcpu_profiler();
+    let result = offcpu_profiler.expose_svg_results();
+
+    match result {
+        Ok(svg_data) => {
+            (StatusCode::OK, Body::from(svg_data), CONTENT_TYPE_SVG.into())
+        }
+        Err(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Body::from("Error generating offcpu profiling results"), CONTENT_TYPE_TEXT.into())
+        }
+    }
+}

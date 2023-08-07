@@ -6,15 +6,14 @@ use crate::{Profiler, ThreadProfilerConfig};
 use crate::utils::{convert_svg_to_string, create_file_with_parents};
 use std::{process::Command, fs::File, io::Write, path::PathBuf};
 
-//TODO: add other config fields
 pub struct ThreadProfiler {
-    thread_profiling_data_file: PathBuf,
+    thread_profiling_result: PathBuf,
 }
 
 impl ThreadProfiler {
     pub(crate) fn new(config: &ThreadProfilerConfig) -> Self {
         Self {
-            thread_profiling_data_file: config.thread_profiling_data_files_dir.clone(),
+            thread_profiling_result: config.thread_profiling_result.clone(),
         }
     }
 }
@@ -30,15 +29,12 @@ impl Profiler for ThreadProfiler {
         )
             .unwrap();
         
-        // Open a file for writing
-        ///***let mut file = File::create(self.thread_profiling_data_file.as_path()).unwrap();***
-        let mut file = create_file_with_parents(self.thread_profiling_data_file.as_path())?;
+        let mut file = create_file_with_parents(self.thread_profiling_result.as_path())?;
 
         // Write the trace information to the file
         write!(file, "{:#?}", trace).unwrap();
         Ok(())
     }
-
     fn end_profiling(&self) -> Result<()> {
         unimplemented!()
     }
@@ -46,7 +42,7 @@ impl Profiler for ThreadProfiler {
         unimplemented!()
     }
     fn expose_text_results(&self) -> Result<String> {
-        let content = convert_svg_to_string(self.thread_profiling_data_file.join("/thread_dump.txt").as_path());
+        let content = convert_svg_to_string(self.thread_profiling_result.as_path());
         return Ok(content.unwrap());
     }
 }

@@ -45,6 +45,8 @@ pub const MEMORY_SVG_PATH: &str = "/memory_svg";
 pub const MEMORY_TXT_PATH: &str = "/memory_txt";
 pub const THREAD_DUMP_PATH: &str = "/thread_dump_start";
 pub const THREAD_DUMP_RESULT_PATH: &str = "/thread_dump_results";
+pub const OFFCPU_PROFILING_PATH: &str = "/offcpu_profiling";
+pub const OFFCPU_PROFILING_RESULT_PATH: &str = "/offcpu_results";
 
 // Useful string constants
 pub const HEADER_CONTENT_TYPE: &str = "Content-Type";
@@ -177,7 +179,14 @@ async fn serve_requests(
             //shows thread dump
             profiling::handle_thread_dump_result_request()
         },
-
+        OFFCPU_PROFILING_PATH => {
+            //shows thread dump
+            profiling::handle_offcpu_request()
+        },
+        OFFCPU_PROFILING_RESULT_PATH => {
+            //shows thread dump
+            profiling::handle_offcpu_result_request()
+        },
         _ => {
             // Handle the invalid path
             (

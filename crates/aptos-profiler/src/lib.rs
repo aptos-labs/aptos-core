@@ -9,9 +9,11 @@ use std::{
 use anyhow::Result;
 use crate::thread_profiler::ThreadProfiler;
 use crate::cpu_profiler::CpuProfiler;
+use crate::offcpu_profiler::OffCpuProfiler;
 use crate::memory_profiler::MemProfiler;
 
 mod cpu_profiler;
+mod offcpu_profiler;
 mod memory_profiler;
 mod thread_profiler;
 mod utils;
@@ -19,6 +21,7 @@ mod utils;
 #[derive(Debug, Clone)]
 pub struct ProfilerConfig {
     cpu_profiler_config: Option<CpuProfilerConfig>,
+    offcpu_profiler_config: Option<OffCpuProfilerConfig>,
     mem_profiler_config: Option<MemProfilerConfig>,
     thread_profiler_config: Option<ThreadProfilerConfig>,
 }
@@ -29,6 +32,7 @@ impl ProfilerConfig {
             cpu_profiler_config: CpuProfilerConfig::new_with_defaults(),
             mem_profiler_config:  MemProfilerConfig::new_with_defaults(),
             thread_profiler_config: ThreadProfilerConfig::new_with_defaults(),
+            offcpu_profiler_config: OffCpuProfilerConfig::new_with_defaults(),
         }
     }
 }
@@ -70,15 +74,31 @@ impl MemProfilerConfig {
 
 #[derive(Debug, Clone)]
 struct ThreadProfilerConfig {
-    profiling_thread_name: String,
-    thread_profiling_data_files_dir: PathBuf,
+    thread_profiling_result: PathBuf,
 }
 
 impl ThreadProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
-            profiling_thread_name: "thread_profiling_thread".to_string(),
-            thread_profiling_data_files_dir: PathBuf::from("./thread_profiling_result/thead_dump.txt"),
+            thread_profiling_result: PathBuf::from("./thread_profiling_result/thead_dump.txt"),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct OffCpuProfilerConfig {
+    count: u64,
+    offcpu_profiling_txt_output: PathBuf,
+    offcpu_profiling_svg_output: PathBuf,
+
+}
+
+impl OffCpuProfilerConfig {
+    pub fn new_with_defaults() -> Option<Self> {
+        Some(Self {
+            count: 30,
+            offcpu_profiling_txt_output: PathBuf::from("./profiling_results/offcpu.txt"),
+            offcpu_profiling_svg_output: PathBuf::from("./profiling_results/offcpu.svg"),
         })
     }
 }
@@ -114,6 +134,10 @@ impl ProfilerHandler {
 
     pub fn get_thread_profiler(&self) -> Box<dyn Profiler> {
         Box::new(ThreadProfiler::new(self.config.thread_profiler_config.as_ref().expect("Thread profiler config is not set")))
+    }
+
+    pub fn get_offcpu_profiler(&self) -> Box<dyn Profiler> {
+        Box::new(OffCpuProfiler::new(self.config.offcpu_profiler_config.as_ref().expect("Off CPU profiler config is not set")))
     }
 
     pub fn get_cpu_profiler(&self) -> Box<dyn Profiler> {
