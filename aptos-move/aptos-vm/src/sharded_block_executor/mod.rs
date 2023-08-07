@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::{
-    counters::NUM_EXECUTOR_SHARDS, executor_client::ExecutorClient,
+    counters::{NUM_EXECUTOR_SHARDS, SHARDED_BLOCK_EXECUTION_SECONDS},
+    executor_client::ExecutorClient,
 };
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
@@ -69,6 +70,7 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let _timer = SHARDED_BLOCK_EXECUTION_SECONDS.start_timer();
         let num_executor_shards = self.executor_client.num_shards();
         NUM_EXECUTOR_SHARDS.set(num_executor_shards as i64);
         assert_eq!(
