@@ -4,6 +4,7 @@ module aptos_framework::reconfiguration {
     use std::error;
     use std::features;
     use std::signer;
+    use aptos_std::debug;
 
     use aptos_framework::account;
     use aptos_framework::event;
@@ -11,6 +12,7 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
+    use aptos_framework::stake::ValidatorInfo;
     use aptos_framework::storage_gas;
     use aptos_framework::transaction_fee;
 
@@ -134,6 +136,8 @@ module aptos_framework::reconfiguration {
 
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
         stake::on_new_epoch();
+
+
         storage_gas::on_reconfig();
 
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
@@ -149,6 +153,41 @@ module aptos_framework::reconfiguration {
                 epoch: config_ref.epoch,
             },
         );
+    }
+
+    /// Calculate new valicator set and lock it.
+    public(friend) fun reconfigure_a(): vector<ValidatorInfo> {
+        debug::print(&std::string::utf8(b"reconfiguration::reconfigure_a() started."));
+        if (features::collect_and_distribute_gas_fees()) {
+            transaction_fee::process_collected_fees();
+        };
+        stake::on_new_epoch();
+        let ret = stake::get_active_validator_set(); //dkg todo: still need to lock the new validator set! Better have a read-only function to compute the new validator set, store it somewhere, then apply during reconfigure_b().
+        debug::print(&std::string::utf8(b"reconfiguration::reconfigure_a() finished."));
+        ret
+    }
+
+    public(friend) fun reconfigure_b()acquires Configuration {
+        debug::print(&std::string::utf8(b"reconfiguration::reconfigure_b() started."));
+        let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
+        let current_time = timestamp::now_microseconds();
+
+        storage_gas::on_reconfig();
+
+        assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
+        config_ref.last_reconfiguration_time = current_time;
+        spec {
+            assume config_ref.epoch + 1 <= MAX_U64;
+        };
+        config_ref.epoch = config_ref.epoch + 1;
+
+        event::emit_event<NewEpochEvent>(
+            &mut config_ref.events,
+            NewEpochEvent {
+                epoch: config_ref.epoch,
+            },
+        );
+        debug::print(&std::string::utf8(b"reconfiguration::reconfigure_b() finished."));
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {

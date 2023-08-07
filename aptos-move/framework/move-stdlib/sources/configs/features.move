@@ -220,6 +220,11 @@ module std::features {
         is_enabled(BULLETPROOFS_NATIVES)
     }
 
+    const RECONFIGURE_WITH_DKG: u64 = 25;
+    public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
+    public fun reconfigure_with_dkg_enabled(): bool {
+        true //TODO
+    }
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -2,10 +2,14 @@
 module aptos_framework::block {
     use std::error;
     use std::features;
+    use std::features::reconfigure_with_dkg_enabled;
     use std::vector;
     use std::option;
+    use std::option::{some, none};
+    use aptos_std::debug;
 
     use aptos_framework::account;
+    use aptos_framework::dkg;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
@@ -156,6 +160,93 @@ module aptos_framework::block {
         // dkg todo: trigger reconfiguration only if dkg transcript is ready
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();
+        };
+    }
+
+    /// Set the metadata for the current block.
+    /// The runtime always runs this before executing the transactions in a block.
+    fun block_prologue_v2(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64,
+        dkg_transcript_available: bool,
+        serialized_dkg_transcript: vector<u8>,
+    ) acquires BlockResource {
+        // Operational constraint: can only be invoked by the VM.
+        system_addresses::assert_vm(&vm);
+        assert!(features::reconfigure_with_dkg_enabled(), 1);
+
+        // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
+        assert!(
+            proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
+            error::permission_denied(EINVALID_PROPOSER),
+        );
+
+        let proposer_index = option::none();
+        if (proposer != @vm_reserved) {
+            proposer_index = option::some(stake::get_validator_index(proposer));
+        };
+
+        let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
+        block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
+
+        let new_block_event = NewBlockEvent {
+            hash,
+            epoch,
+            round,
+            height: block_metadata_ref.height,
+            previous_block_votes_bitvec,
+            proposer,
+            failed_proposer_indices,
+            time_microseconds: timestamp,
+        };
+        emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
+
+        if (features::collect_and_distribute_gas_fees()) {
+            // Assign the fees collected from the previous block to the previous block proposer.
+            // If for any reason the fees cannot be assigned, this function burns the collected coins.
+            transaction_fee::process_collected_fees();
+            // Set the proposer of this block as the receiver of the fees, so that the fees for this
+            // block are assigned to the right account.
+            transaction_fee::register_proposer_for_fee_collection(proposer);
+        };
+
+        // Performance scores have to be updated before the epoch transition as the transaction that triggers the
+        // transition is the last block in the previous epoch.
+        stake::update_performance_statistics(proposer_index, failed_proposer_indices);
+        state_storage::on_new_block(reconfiguration::current_epoch());
+
+        if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
+            debug::print(&std::string::utf8(b"on_expire() started."));
+            let dkg_state = dkg::get_state();
+            if (dkg_state == dkg::state_inactive()) {
+                debug::print(&std::string::utf8(b"DKG state: inactive."));
+                let validator_set_and_stake_dist = reconfiguration::reconfigure_a();
+                dkg::start(validator_set_and_stake_dist);
+            } else if (dkg_state == dkg::state_active()) {
+                debug::print(&std::string::utf8(b"DKG state: active."));
+                let maybe_transcript = if (dkg_transcript_available) {
+                    some(serialized_dkg_transcript)
+                } else {
+                    none()
+                };
+                let proceed_to_new_epoch = dkg::on_potential_transcript(maybe_transcript);
+                if (proceed_to_new_epoch) {
+                    reconfiguration::reconfigure_b();
+                };
+            } else {
+                abort(1);
+            };
+            debug::print(&std::string::utf8(b"on_expire() finished."));
+        } else {
+            if (dkg_transcript_available) {
+                debug::print(&std::string::utf8(b"Probably a too late transcript."));
+            }
         };
     }
 

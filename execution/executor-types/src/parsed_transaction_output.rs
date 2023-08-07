@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::in_memory_state_calculator::NEW_EPOCH_EVENT_KEY;
+use crate::in_memory_state_calculator::{NEW_EPOCH_EVENT_KEY, START_DKG_EVENT_KEY};
 use aptos_types::{
     contract_event::ContractEvent,
     transaction::{TransactionOutput, TransactionStatus},
@@ -22,7 +22,7 @@ impl ParsedTransactionOutput {
 
     pub fn parse_dkg_events(events: &[ContractEvent]) -> impl Iterator<Item = &ContractEvent> {
         // dkg todo: using the new epoch event key for now, need to register for dkg event
-        events.iter().filter(|e: &&ContractEvent| *e.key() == *NEW_EPOCH_EVENT_KEY)
+        events.iter().filter(|e: &&ContractEvent| *e.key() == *START_DKG_EVENT_KEY)
     }
 }
 
@@ -31,7 +31,7 @@ impl From<TransactionOutput> for ParsedTransactionOutput {
         let reconfig_events = Self::parse_reconfig_events(output.events())
             .cloned()
             .collect();
-        let dkg_events = Self::parse_dkg_events(output.events())
+        let dkg_events: Vec<ContractEvent> = Self::parse_dkg_events(output.events())
             .cloned()
             .collect();
         Self {

@@ -191,6 +191,10 @@ pub fn new_epoch_event_key() -> EventKey {
     EventKey::new(2, CORE_CODE_ADDRESS)
 }
 
+pub fn start_dkg_event_key() -> EventKey {
+    EventKey::new(5, CORE_CODE_ADDRESS)
+}
+
 pub fn access_path_for_config(config_id: ConfigID) -> anyhow::Result<AccessPath> {
     let struct_tag = struct_tag_for_config(config_id);
     Ok(AccessPath::new(

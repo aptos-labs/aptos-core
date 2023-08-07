@@ -33,6 +33,10 @@ pub struct BlockMetadata {
     maybe_randomness: Option<Randomness>,
 }
 
+fn serialize_transcript(ts: &Transcript) -> Vec<u8> {
+    vec![3,3,3] //dkg todo: use something from aptos-dkg.
+}
+
 impl BlockMetadata {
     pub fn new(
         id: HashValue,
@@ -63,7 +67,7 @@ impl BlockMetadata {
     }
 
     pub fn get_prologue_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
-        vec![
+        let mut ret = vec![
             MoveValue::Signer(signer),
             MoveValue::Address(AccountAddress::from_bytes(self.id.to_vec()).unwrap()),
             MoveValue::U64(self.epoch),
@@ -83,8 +87,13 @@ impl BlockMetadata {
                     .collect(),
             ),
             MoveValue::U64(self.timestamp_usecs),
-            // dkg todo: pass in the dkg transcript and randomness
-        ]
+        ];
+
+        //dkg todo: currently assuming the first transcript is valid.
+        ret.push(MoveValue::Bool(!self.dkg_transcripts.is_empty()));
+        ret.push(MoveValue::Vector(self.dkg_transcripts.first().map(|ts|serialize_transcript(ts)).unwrap_or(vec![]).into_iter().map(MoveValue::U8).collect()));
+        // dkg todo: pass in randomness
+        ret
     }
 
     pub fn timestamp_usecs(&self) -> u64 {

@@ -12,6 +12,7 @@ pub mod block_info;
 pub mod block_metadata;
 pub mod chain_id;
 pub mod contract_event;
+pub mod dkg;
 pub mod epoch_change;
 pub mod epoch_state;
 pub mod event;

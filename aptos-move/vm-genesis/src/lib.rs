@@ -418,6 +418,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
         FeatureFlag::GAS_PAYER_ENABLED,
         FeatureFlag::BULLETPROOFS_NATIVES,
+        FeatureFlag::RECONFIGURE_WITH_DKG,
     ]
 }
 

@@ -16,6 +16,8 @@ to synchronize configuration changes for the validators.
 -  [Function `enable_reconfiguration`](#0x1_reconfiguration_enable_reconfiguration)
 -  [Function `reconfiguration_enabled`](#0x1_reconfiguration_reconfiguration_enabled)
 -  [Function `reconfigure`](#0x1_reconfiguration_reconfigure)
+-  [Function `reconfigure_a`](#0x1_reconfiguration_reconfigure_a)
+-  [Function `reconfigure_b`](#0x1_reconfiguration_reconfigure_b)
 -  [Function `last_reconfiguration_time`](#0x1_reconfiguration_last_reconfiguration_time)
 -  [Function `current_epoch`](#0x1_reconfiguration_current_epoch)
 -  [Function `emit_genesis_reconfiguration_event`](#0x1_reconfiguration_emit_genesis_reconfiguration_event)
@@ -32,12 +34,14 @@ to synchronize configuration changes for the validators.
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="storage_gas.md#0x1_storage_gas">0x1::storage_gas</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="transaction_fee.md#0x1_transaction_fee">0x1::transaction_fee</a>;
@@ -149,6 +153,16 @@ aptos_framework system address
 ## Constants
 
 
+<a name="0x1_reconfiguration_EINVALID_GUID_FOR_EVENT"></a>
+
+An invalid block time was encountered.
+
+
+<pre><code><b>const</b> <a href="reconfiguration.md#0x1_reconfiguration_EINVALID_GUID_FOR_EVENT">EINVALID_GUID_FOR_EVENT</a>: u64 = 5;
+</code></pre>
+
+
+
 <a name="0x1_reconfiguration_ECONFIG"></a>
 
 A <code>Reconfiguration</code> resource is in an invalid state
@@ -175,16 +189,6 @@ An invalid block time was encountered.
 
 
 <pre><code><b>const</b> <a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>: u64 = 4;
-</code></pre>
-
-
-
-<a name="0x1_reconfiguration_EINVALID_GUID_FOR_EVENT"></a>
-
-An invalid block time was encountered.
-
-
-<pre><code><b>const</b> <a href="reconfiguration.md#0x1_reconfiguration_EINVALID_GUID_FOR_EVENT">EINVALID_GUID_FOR_EVENT</a>: u64 = 5;
 </code></pre>
 
 
@@ -374,6 +378,8 @@ Signal validators to start using new configuration. Must be called from friend c
 
     // Call <a href="stake.md#0x1_stake">stake</a> <b>to</b> compute the new validator set and distribute rewards and transaction fees.
     <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
+
+
     <a href="storage_gas.md#0x1_storage_gas_on_reconfig">storage_gas::on_reconfig</a>();
 
     <b>assert</b>!(current_time &gt; config_ref.last_reconfiguration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>));
@@ -389,6 +395,81 @@ Signal validators to start using new configuration. Must be called from friend c
             epoch: config_ref.epoch,
         },
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_reconfiguration_reconfigure_a"></a>
+
+## Function `reconfigure_a`
+
+Calculate new valicator set and lock it.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfigure_a</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="stake.md#0x1_stake_ValidatorInfo">stake::ValidatorInfo</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfigure_a</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorInfo&gt; {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfiguration::reconfigure_a</a>() started."));
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
+        <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">transaction_fee::process_collected_fees</a>();
+    };
+    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
+    <b>let</b> ret = <a href="stake.md#0x1_stake_get_active_validator_set">stake::get_active_validator_set</a>(); //<a href="dkg.md#0x1_dkg">dkg</a> todo: still need <b>to</b> lock the new validator set! Better have a read-only function <b>to</b> compute the new validator set, store it somewhere, then <b>apply</b> during <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfigure_b</a>().
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfiguration::reconfigure_a</a>() finished."));
+    ret
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_reconfiguration_reconfigure_b"></a>
+
+## Function `reconfigure_b`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfigure_b</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfigure_b</a>()<b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a> {
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfiguration::reconfigure_b</a>() started."));
+    <b>let</b> config_ref = <b>borrow_global_mut</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework);
+    <b>let</b> current_time = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>();
+
+    <a href="storage_gas.md#0x1_storage_gas_on_reconfig">storage_gas::on_reconfig</a>();
+
+    <b>assert</b>!(current_time &gt; config_ref.last_reconfiguration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>));
+    config_ref.last_reconfiguration_time = current_time;
+    <b>spec</b> {
+        <b>assume</b> config_ref.epoch + 1 &lt;= MAX_U64;
+    };
+    config_ref.epoch = config_ref.epoch + 1;
+
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
+        &<b>mut</b> config_ref.events,
+        <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
+            epoch: config_ref.epoch,
+        },
+    );
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure_b">reconfiguration::reconfigure_b</a>() finished."));
 }
 </code></pre>
 

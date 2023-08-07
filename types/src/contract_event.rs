@@ -14,6 +14,7 @@ use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, ops::Deref};
+use crate::dkg::StartDKGEvent;
 
 /// Support versioning of the data structure.
 #[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
@@ -116,6 +117,17 @@ impl TryFrom<&ContractEvent> for NewEpochEvent {
     fn try_from(event: &ContractEvent) -> Result<Self> {
         if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
             anyhow::bail!("Expected NewEpochEvent")
+        }
+        Self::try_from_bytes(&event.event_data)
+    }
+}
+
+impl TryFrom<&ContractEvent> for StartDKGEvent {
+    type Error = Error;
+
+    fn try_from(event: &ContractEvent) -> Result<Self> {
+        if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
+            anyhow::bail!("Expected StartDKGEvent")
         }
         Self::try_from_bytes(&event.event_data)
     }

@@ -10,6 +10,7 @@ use futures::future::{AbortHandle, Abortable};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_logger::error;
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_types::dkg::StartDKGEvent;
 
 use super::{types::{DKGAggNode, DKGNodeAckState, DKGAggNodeAckState, DKGMessage}, dkg_store::DKGStore};
 
@@ -23,6 +24,15 @@ const TRANSCRIPT_AGGREGATE_TIME_MS: u64 = 21;
 #[derive(Debug)]
 pub struct StakeDis {
     pub distribution: HashMap<Author, u64>,
+}
+
+impl From<StartDKGEvent> for StakeDis {
+    fn from(value: StartDKGEvent) -> Self {
+        let distribution: HashMap<Author, u64> = value.locked_new_validator_set.into_iter().map(|vi|(vi.account_address, vi.consensus_voting_power())).collect();
+        Self {
+            distribution,
+        }
+    }
 }
 
 pub enum DKGManagerWrapper {

@@ -1324,19 +1324,34 @@ impl AptosVM {
         // dkg todo: verify the validity of the dkg transcript if there is one in block metadata
         // only pass in the first valid dkg transcript to the prologue as args
 
-        let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
-        session
-            .execute_function_bypass_visibility(
-                &BLOCK_MODULE,
-                BLOCK_PROLOGUE,
-                vec![],
-                args,
-                &mut gas_meter,
-            )
-            .map(|_return_vals| ())
-            .or_else(|e| {
-                expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
-            })?;
+        let mut args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
+        if self.0.get_features().is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
+            session
+                .execute_function_bypass_visibility(
+                    &BLOCK_MODULE,
+                    BLOCK_PROLOGUE_V2,
+                    vec![],
+                    args,
+                    &mut gas_meter,
+                )
+                .map(|_return_vals| ())
+                .or_else(|e| {
+                    expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
+                })?;
+        } else {
+            session
+                .execute_function_bypass_visibility(
+                    &BLOCK_MODULE,
+                    BLOCK_PROLOGUE,
+                    vec![],
+                    args,
+                    &mut gas_meter,
+                )
+                .map(|_return_vals| ())
+                .or_else(|e| {
+                    expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
+                })?;
+        }
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = get_transaction_output(

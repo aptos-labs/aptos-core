@@ -28,6 +28,8 @@ use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
+use aptos_types::dkg::StartDKGEvent;
+use crate::dkg::dkg_manager::StakeDis;
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -128,7 +130,6 @@ impl StateComputer for ExecutionProxy {
         let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let (txns, dkg_agg_nodes) = payload_manager.get_transactions(block).await?;
-        println!("a={}", aptos_dkg::G1_PROJ_NUM_BYTES);
 
         // dkg todo: support multiple transcripts
         let dkg_transcripts = dkg_agg_nodes.into_iter().map(|node| node.agg_trx().clone()).collect();
@@ -255,8 +256,9 @@ impl StateComputer for ExecutionProxy {
         let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
         // trigger the start of dkg
         if !dkg_events.is_empty() {
-            // dkg todo: get the stake distribution of the new epoch validators from dkg_events
-            dkg_manager_wrapper.start_dkg(None).await;
+            let maybe_dist: Option<StakeDis> = dkg_events.first().map(|e|StartDKGEvent::try_from(e).unwrap().into());
+            println!("maybe_dist={:?}", maybe_dist);
+            dkg_manager_wrapper.start_dkg(maybe_dist).await;
         }
 
         *latest_logical_time = logical_time;

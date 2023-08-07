@@ -288,6 +288,11 @@ module aptos_framework::stake {
         }
     }
 
+    public(friend) fun get_active_validator_set(): vector<ValidatorInfo> acquires ValidatorSet {
+        let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
+        validator_set.active_validators
+    }
+
     #[view]
     /// Return the lockup expiration of the stake pool at `pool_address`.
     /// This will throw an error if there's no stake pool at `pool_address`.
