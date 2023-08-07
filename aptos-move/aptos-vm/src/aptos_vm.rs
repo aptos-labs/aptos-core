@@ -491,15 +491,14 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         txn_data: &TransactionMetadata,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
-        let change_set = session.finish(&mut (), change_set_configs)?;
+        let mut change_set = session.finish(&mut (), change_set_configs)?;
 
         for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
 
-        gas_meter.charge_storage_fee_for_all(
-            change_set.write_set_iter(),
-            change_set.events(),
+        gas_meter.process_storage_fee_for_all(
+            &mut change_set,
             txn_data.transaction_size,
             txn_data.gas_unit_price,
         )?;
