@@ -4,6 +4,7 @@
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_release_builder::{
+    components::fetch_config,
     initialize_aptos_core_path,
     validate::{DEFAULT_RESOLUTION_TIME, FAST_RESOLUTION_TIME},
 };
@@ -21,16 +22,19 @@ pub struct Argument {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    /// Generate sets of governance proposals based on the release_config file passed in
     GenerateProposals {
         #[clap(short, long)]
         release_config: PathBuf,
         #[clap(short, long)]
         output_dir: PathBuf,
     },
+    /// Generate sets of governance proposals with default release config.
     WriteDefault {
         #[clap(short, long)]
         output_path: PathBuf,
     },
+    /// Execute governance proposals generated from a given release config.
     ValidateProposals {
         /// Path to the config to be released.
         #[clap(short, long)]
@@ -47,6 +51,15 @@ pub enum Commands {
         /// Mint to validator such that it has enough stake to allow fast voting resolution.
         #[clap(long)]
         mint_to_validator: bool,
+    },
+    /// Print out current values of on chain configs.
+    PrintConfigs {
+        /// Url endpoint for the desired network. e.g: https://fullnode.mainnet.aptoslabs.com/v1.
+        #[clap(short, long)]
+        endpoint: url::Url,
+        /// Whether to print out the full gas schedule.
+        #[clap(short, long)]
+        print_gas_schedule: bool,
     },
 }
 
@@ -159,6 +172,39 @@ async fn main() -> Result<()> {
             network_config
                 .set_fast_resolve(DEFAULT_RESOLUTION_TIME)
                 .await
+        },
+        Commands::PrintConfigs {
+            endpoint,
+            print_gas_schedule,
+        } => {
+            use aptos_types::on_chain_config::*;
+
+            let client = aptos_rest_client::Client::new(endpoint);
+
+            macro_rules! print_configs {
+                ($($type:ty), *) => {
+                    $(
+                        println!("{}", std::any::type_name::<$type>());
+                        println!("{}", serde_yaml::to_string(&fetch_config::<$type>(&client)?)?);
+                    )*
+                }
+            }
+
+            print_configs!(OnChainConsensusConfig, OnChainExecutionConfig, Version);
+
+            if print_gas_schedule {
+                print_configs!(GasScheduleV2, StorageGasSchedule);
+            }
+
+            // Print Activated Features
+            let features = fetch_config::<Features>(&client)?;
+            println!(
+                "Features\n{}",
+                serde_yaml::to_string(
+                    &aptos_release_builder::components::feature_flags::Features::from(&features)
+                )?
+            );
+            Ok(())
         },
     }
 }

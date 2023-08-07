@@ -47,6 +47,46 @@ impl AccountAddress {
         Self(buf)
     }
 
+    /// Represent an account address in a way that is compliant with the v1 address
+    /// standard. The standard is defined as part of AIP-40, read more here:
+    /// https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md
+    ///
+    /// In short, all special addresses MUST be represented in SHORT form, e.g.
+    ///
+    /// 0x1
+    ///
+    /// All other addresses MUST be represented in LONG form, e.g.
+    ///
+    /// 0x002098630cfad4734812fa37dc18d9b8d59242feabe49259e26318d468a99584
+    ///
+    /// For an explanation of what defines a "special" address, see `is_special`.
+    ///
+    /// All string representations of addresses MUST be prefixed with 0x.
+    pub fn to_standard_string(&self) -> String {
+        let suffix = if self.is_special() {
+            self.short_str_lossless()
+        } else {
+            self.to_canonical_string()
+        };
+        format!("0x{}", suffix)
+    }
+
+    /// Returns whether the address is a "special" address. Addresses are considered
+    /// special if the first 63 characters of the hex string are zero. In other words,
+    /// an address is special if the first 31 bytes are zero and the last byte is
+    /// smaller than than `0b10000` (16). In other words, special is defined as an address
+    /// that matches the following regex: `^0x0{63}[0-9a-f]$`. In short form this means
+    /// the addresses in the range from `0x0` to `0xf` (inclusive) are special.
+    ///
+    /// For more details see the v1 address standard defined as part of AIP-40:
+    /// https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md
+    pub fn is_special(&self) -> bool {
+        self.0[..Self::LENGTH - 1].iter().all(|x| *x == 0) && self.0[Self::LENGTH - 1] < 0b10000
+    }
+
+    /// NOTE: For the purposes of displaying an address, using it in a response, or
+    /// storing it at rest as a string, use `to_standard_string`.
+    ///
     /// Return a canonical string representation of the address
     /// Addresses are hex-encoded lowercase values of length ADDRESS_LENGTH (16, 20, or 32 depending on the Move platform)
     /// e.g., 0000000000000000000000000000000a, *not* 0x0000000000000000000000000000000a, 0xa, or 0xA
@@ -56,6 +96,8 @@ impl AccountAddress {
         hex::encode(self.0)
     }
 
+    /// NOTE: For the purposes of displaying an address, using it in a response, or
+    /// storing it at rest as a string, use `to_standard_string`.
     pub fn short_str_lossless(&self) -> String {
         let hex_str = hex::encode(self.0).trim_start_matches('0').to_string();
         if hex_str.is_empty() {
@@ -97,6 +139,8 @@ impl AccountAddress {
         }
     }
 
+    /// NOTE: For the purposes of displaying an address, using it in a response, or
+    /// storing it at rest as a string, use `to_standard_string`.
     pub fn to_hex_literal(&self) -> String {
         format!("0x{}", self.short_str_lossless())
     }
@@ -107,6 +151,8 @@ impl AccountAddress {
             .map(Self)
     }
 
+    /// NOTE: For the purposes of displaying an address, using it in a response, or
+    /// storing it at rest as a string, use `to_standard_string`.
     pub fn to_hex(&self) -> String {
         format!("{:x}", self)
     }
@@ -307,6 +353,149 @@ mod tests {
         convert::{AsRef, TryFrom},
         str::FromStr,
     };
+
+    #[test]
+    fn test_to_standard_string() {
+        // Testing the special range of 0x0 to 0xf
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000000"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x0"
+        );
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x1"
+        );
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000004"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x4"
+        );
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "000000000000000000000000000000000000000000000000000000000000000f"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0xf"
+        );
+
+        // Testing addresses outside of the special range
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000010"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x0000000000000000000000000000000000000000000000000000000000000010"
+        );
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "000000000000000000000000000000000000000000000000000000000000001f"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x000000000000000000000000000000000000000000000000000000000000001f"
+        );
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "00000000000000000000000000000000000000000000000000000000000000a0"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x00000000000000000000000000000000000000000000000000000000000000a0"
+        );
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "ca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0xca843279e3427144cead5e4d5999a3d0ca843279e3427144cead5e4d5999a3d0"
+        );
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "1000000000000000000000000000000000000000000000000000000000000000"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x1000000000000000000000000000000000000000000000000000000000000000"
+        );
+
+        // Demonstrating that neither leading nor trailing zeroes get trimmed for
+        // non-special addresses
+        assert_eq!(
+            &AccountAddress::from_hex(
+                "0f00000000000000000000000000000000000000000000000000000000000000"
+            )
+            .unwrap()
+            .to_standard_string(),
+            "0x0f00000000000000000000000000000000000000000000000000000000000000"
+        );
+
+        // This is the equivalent of 0x1
+        let mut bytes = vec![0; 31];
+        bytes.push(0b1);
+        assert_eq!(
+            &AccountAddress::from_bytes(bytes)
+                .unwrap()
+                .to_standard_string(),
+            "0x1"
+        );
+
+        // This is the equivalent of 0xf
+        let mut bytes = vec![0; 31];
+        bytes.push(0b1111);
+        assert_eq!(
+            &AccountAddress::from_bytes(bytes)
+                .unwrap()
+                .to_standard_string(),
+            "0xf"
+        );
+
+        // This is the equivalent of
+        // 0x0000000000000000000000000000000000000000000000000000000000000010
+        let mut bytes = vec![0; 31];
+        bytes.push(0b10000);
+        assert_eq!(
+            &AccountAddress::from_bytes(bytes)
+                .unwrap()
+                .to_standard_string(),
+            "0x0000000000000000000000000000000000000000000000000000000000000010"
+        );
+
+        // This is the equivalent of
+        // 0x0100000000000000000000000000000000000000000000000000000000000000
+        let mut bytes = vec![1; 1];
+        bytes.extend([0; 31].iter());
+        assert_eq!(
+            &AccountAddress::from_bytes(bytes)
+                .unwrap()
+                .to_standard_string(),
+            "0x0100000000000000000000000000000000000000000000000000000000000000"
+        );
+
+        // This is the equivalent of
+        // 0x1000000000000000000000000000000000000000000000000000000000000000
+        let mut bytes = vec![16; 1];
+        bytes.extend([0; 31].iter());
+        assert_eq!(
+            &AccountAddress::from_bytes(bytes)
+                .unwrap()
+                .to_standard_string(),
+            "0x1000000000000000000000000000000000000000000000000000000000000000"
+        );
+    }
 
     #[test]
     fn test_display_impls() {

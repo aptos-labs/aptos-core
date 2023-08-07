@@ -2,9 +2,8 @@ name: "execution-performance"
 on:
   workflow_dispatch:
   pull_request:
-  schedule: 
-    # Run every four hours
-    - cron: "0 */4 * * *"
+  schedule:
+    - cron: "0 12 * * *" # This runs every day at 12pm UTC.
 
 jobs:
   execution-performance:
@@ -13,10 +12,3 @@ jobs:
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       RUNNER_NAME: executor-benchmark-runner
-
-  spot-runner-execution-performance:
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-execution-performance.yaml@main
-    secrets: inherit
-    with:
-      GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      RUNNER_NAME: spot-runner

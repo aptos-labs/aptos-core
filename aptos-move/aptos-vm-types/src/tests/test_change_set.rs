@@ -4,23 +4,25 @@
 use crate::{
     change_set::VMChangeSet,
     tests::utils::{
-        build_change_set, contains_delta_op, contains_write_op, create, delete, get_delta_op,
-        get_write_op, key, modify, NoOpChangeSetChecker,
+        build_change_set, mock_add, mock_create, mock_delete, mock_modify, MockChangeSetChecker,
     },
 };
-use aptos_aggregator::delta_change_set::{delta_add, DeltaChangeSet};
-use aptos_types::write_set::WriteSetMut;
+use aptos_types::{
+    access_path::AccessPath,
+    state_store::state_key::StateKey,
+    transaction::ChangeSet as StorageChangeSet,
+    write_set::{WriteOp, WriteSetMut},
+};
 use claims::{assert_matches, assert_ok};
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::{ModuleId, StructTag},
+    vm_status::{StatusCode, VMStatus},
+};
+use std::collections::BTreeMap;
 
-macro_rules! add {
-    ($v:expr) => {
-        // Limit doesn't matter here, so set it to be relatively high.
-        delta_add($v, 100000)
-    };
-}
-
-/// Returns two change sets according tow specification:
+/// Testcases:
 /// ```text
 /// *--------------*----------------*----------------*-----------------*
 /// |   state key  |  change set 1  |  change set 2  |    squashed     |
@@ -54,235 +56,204 @@ macro_rules! add {
 /// |      23      |    +23         |    delete      |    delete       |
 /// *--------------*----------------*----------------*-----------------*
 /// ```
+
+macro_rules! write_set_1 {
+    ($d:ident) => {
+        vec![
+            mock_create(format!("0{}", $d), 0),
+            mock_modify(format!("1{}", $d), 1),
+            mock_delete(format!("2{}", $d)),
+            mock_create(format!("7{}", $d), 7),
+            mock_create(format!("8{}", $d), 8),
+            mock_modify(format!("10{}", $d), 10),
+            mock_modify(format!("11{}", $d), 11),
+            mock_delete(format!("12{}", $d)),
+        ]
+    };
+}
+
+macro_rules! write_set_2 {
+    ($d:ident) => {
+        vec![
+            mock_create(format!("3{}", $d), 103),
+            mock_modify(format!("4{}", $d), 104),
+            mock_delete(format!("5{}", $d)),
+            mock_modify(format!("7{}", $d), 107),
+            mock_delete(format!("8{}", $d)),
+            mock_modify(format!("10{}", $d), 110),
+            mock_delete(format!("11{}", $d)),
+            mock_create(format!("12{}", $d), 112),
+        ]
+    };
+}
+
+macro_rules! expected_write_set {
+    ($d:ident) => {
+        BTreeMap::from([
+            mock_create(format!("0{}", $d), 0),
+            mock_modify(format!("1{}", $d), 1),
+            mock_delete(format!("2{}", $d)),
+            mock_create(format!("3{}", $d), 103),
+            mock_modify(format!("4{}", $d), 104),
+            mock_delete(format!("5{}", $d)),
+            mock_create(format!("7{}", $d), 107),
+            mock_modify(format!("10{}", $d), 110),
+            mock_delete(format!("11{}", $d)),
+            mock_modify(format!("12{}", $d), 112),
+        ])
+    };
+}
+
+// Populate sets according to the spec. Skip keys which lead to
+// errors because we test them separately.
 fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
-    // Create write sets and delta change sets.
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
-    let mut delta_change_set_1 = DeltaChangeSet::empty();
-    let mut delta_change_set_2 = DeltaChangeSet::empty();
+    let mut descriptor = "r";
+    let resource_write_set_1 = write_set_1!(descriptor);
+    descriptor = "m";
+    let module_write_set_1 = write_set_1!(descriptor);
+    let aggregator_write_set_1 = vec![mock_create("18a", 18), mock_modify("19a", 19)];
+    let aggregator_delta_set_1 = vec![
+        mock_add("15a", 15),
+        mock_add("17a", 17),
+        mock_add("22a", 22),
+        mock_add("23a", 23),
+    ];
+    let change_set_1 = build_change_set(
+        resource_write_set_1,
+        module_write_set_1,
+        aggregator_write_set_1,
+        aggregator_delta_set_1,
+    );
 
-    // Populate sets according to the spec. Skip keys which lead to
-    // errors because we test them separately.
-    write_set_1.insert((key(0), create(0)));
-    write_set_1.insert((key(1), modify(1)));
-    write_set_1.insert((key(2), delete()));
-    write_set_2.insert((key(3), create(103)));
-    write_set_2.insert((key(4), modify(104)));
-    write_set_2.insert((key(5), delete()));
+    descriptor = "r";
+    let resource_write_set_2 = write_set_2!(descriptor);
+    descriptor = "m";
+    let module_write_set_2 = write_set_2!(descriptor);
+    let aggregator_write_set_2 = vec![mock_modify("22a", 122), mock_delete("23a")];
+    let aggregator_delta_set_2 = vec![
+        mock_add("16a", 116),
+        mock_add("17a", 117),
+        mock_add("18a", 118),
+        mock_add("19a", 119),
+    ];
+    let change_set_2 = build_change_set(
+        resource_write_set_2,
+        module_write_set_2,
+        aggregator_write_set_2,
+        aggregator_delta_set_2,
+    );
 
-    write_set_1.insert((key(7), create(7)));
-    write_set_2.insert((key(7), modify(107)));
-    write_set_1.insert((key(8), create(8)));
-    write_set_2.insert((key(8), delete()));
-
-    write_set_1.insert((key(10), modify(10)));
-    write_set_2.insert((key(10), modify(110)));
-    write_set_1.insert((key(11), modify(111)));
-    write_set_2.insert((key(11), delete()));
-    write_set_1.insert((key(12), delete()));
-    write_set_2.insert((key(12), create(112)));
-
-    delta_change_set_1.insert((key(15), add!(15)));
-    delta_change_set_2.insert((key(16), add!(116)));
-    delta_change_set_1.insert((key(17), add!(17)));
-    delta_change_set_2.insert((key(17), add!(117)));
-    write_set_1.insert((key(18), create(18)));
-    delta_change_set_2.insert((key(18), add!(118)));
-    write_set_1.insert((key(19), modify(19)));
-    delta_change_set_2.insert((key(19), add!(119)));
-
-    delta_change_set_1.insert((key(22), add!(22)));
-    write_set_2.insert((key(22), modify(122)));
-    delta_change_set_1.insert((key(23), add!(23)));
-    write_set_2.insert((key(23), delete()));
-
-    (
-        build_change_set(write_set_1, delta_change_set_1),
-        build_change_set(write_set_2, delta_change_set_2),
-    )
+    (change_set_1, change_set_2)
 }
 
 #[test]
 fn test_successful_squash() {
-    let (change_set_1, change_set_2) = build_change_sets_for_test();
+    let (mut change_set, additional_change_set) = build_change_sets_for_test();
+    assert_ok!(
+        change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker)
+    );
 
-    // Check squash is indeed successful.
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
-    let change_set = assert_ok!(res);
+    let mut descriptor = "r";
+    assert_eq!(
+        change_set.resource_write_set(),
+        &expected_write_set!(descriptor)
+    );
+    descriptor = "m";
+    assert_eq!(
+        change_set.module_write_set(),
+        &expected_write_set!(descriptor)
+    );
 
-    // create 0 + ___ = create 0
-    assert_eq!(get_write_op(&change_set, 0), create(0));
-    assert!(!contains_delta_op(&change_set, 0));
+    let expected_aggregator_write_set = BTreeMap::from([
+        mock_create("18a", 136),
+        mock_modify("19a", 138),
+        mock_modify("22a", 122),
+        mock_delete("23a"),
+    ]);
+    let expected_aggregator_delta_set = BTreeMap::from([
+        mock_add("15a", 15),
+        mock_add("16a", 116),
+        mock_add("17a", 134),
+    ]);
+    assert_eq!(
+        change_set.aggregator_write_set(),
+        &expected_aggregator_write_set
+    );
+    assert_eq!(
+        change_set.aggregator_delta_set(),
+        &expected_aggregator_delta_set
+    );
+}
 
-    // modify 1 + ___ = modify 1
-    assert_eq!(get_write_op(&change_set, 1), modify(1));
-    assert!(!contains_delta_op(&change_set, 1));
+macro_rules! assert_invariant_violation {
+    ($w1:ident, $w2:ident) => {
+        let check = |res: anyhow::Result<(), VMStatus>| {
+            assert_matches!(
+                res,
+                Err(VMStatus::Error {
+                    status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    sub_status: None,
+                    message: Some(_),
+                })
+            );
+        };
 
-    // delete + ___ = delete
-    assert_eq!(get_write_op(&change_set, 2), delete());
-    assert!(!contains_delta_op(&change_set, 2));
-
-    // ___ + create 103 = create 103
-    assert_eq!(get_write_op(&change_set, 3), create(103));
-    assert!(!contains_delta_op(&change_set, 3));
-
-    // ___ + modify 103 = modify 103
-    assert_eq!(get_write_op(&change_set, 4), modify(104));
-    assert!(!contains_delta_op(&change_set, 4));
-
-    // ___ + delete = delete
-    assert_eq!(get_write_op(&change_set, 5), delete());
-    assert!(!contains_delta_op(&change_set, 5));
-
-    // create 7 + modify 107 = create 107
-    assert_eq!(get_write_op(&change_set, 7), create(107));
-    assert!(!contains_delta_op(&change_set, 7));
-
-    // create 8 + delete = ___
-    assert!(!contains_write_op(&change_set, 8));
-    assert!(!contains_delta_op(&change_set, 8));
-
-    // modify 10 + modify 110 = modify 110
-    assert_eq!(get_write_op(&change_set, 10), modify(110));
-    assert!(!contains_delta_op(&change_set, 10));
-
-    // modify 10 + delete = delete
-    assert_eq!(get_write_op(&change_set, 11), delete());
-    assert!(!contains_delta_op(&change_set, 11));
-
-    // delete + create 112 = create 112
-    assert_eq!(get_write_op(&change_set, 12), modify(112));
-    assert!(!contains_delta_op(&change_set, 12));
-
-    // +15 + ___ = +15
-    assert!(!contains_write_op(&change_set, 15));
-    assert_eq!(get_delta_op(&change_set, 15), add!(15));
-
-    // ___ + +116 = +116
-    assert!(!contains_write_op(&change_set, 16));
-    assert_eq!(get_delta_op(&change_set, 16), add!(116));
-
-    // +17 + +117 = +134
-    assert!(!contains_write_op(&change_set, 17));
-    assert_eq!(get_delta_op(&change_set, 17), add!(134));
-
-    // create 18 + +118 = create 136
-    assert_eq!(get_write_op(&change_set, 18), create(136));
-    assert!(!contains_delta_op(&change_set, 18));
-
-    // modify 19 + +119 = modify 138
-    assert_eq!(get_write_op(&change_set, 19), modify(138));
-    assert!(!contains_delta_op(&change_set, 19));
-
-    // +22 + modify 122 = modify 122
-    assert_eq!(get_write_op(&change_set, 22), modify(122));
-    assert!(!contains_delta_op(&change_set, 22));
-
-    // +23 + delete = delete
-    assert_eq!(get_write_op(&change_set, 23), delete());
-    assert!(!contains_delta_op(&change_set, 23));
+        let mut cs1 = build_change_set($w1.clone(), vec![], vec![], vec![]);
+        let cs2 = build_change_set($w2.clone(), vec![], vec![], vec![]);
+        let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
+        check(res);
+        let mut cs1 = build_change_set(vec![], $w1.clone(), vec![], vec![]);
+        let cs2 = build_change_set(vec![], $w2.clone(), vec![], vec![]);
+        let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
+        check(res);
+        let mut cs1 = build_change_set(vec![], vec![], $w1.clone(), vec![]);
+        let cs2 = build_change_set(vec![], vec![], $w2.clone(), vec![]);
+        let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
+        check(res);
+    };
 }
 
 #[test]
-fn test_unsuccessful_squash_1() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
-
+fn test_unsuccessful_squash_create_create() {
     // create 6 + create 106 throws an error
-    write_set_1.insert((key(6), create(6)));
-    write_set_2.insert((key(6), create(106)));
-
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
-    assert_matches!(
-        res,
-        Err(VMStatus::Error {
-            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            sub_status: None,
-            message: Some(_),
-        })
-    );
+    let write_set_1 = vec![mock_create("6", 6)];
+    let write_set_2 = vec![mock_create("6", 106)];
+    assert_invariant_violation!(write_set_1, write_set_2);
 }
 
 #[test]
 fn test_unsuccessful_squash_modify_create() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
-
     // modify 9 + create 109 throws an error
-    write_set_1.insert((key(9), modify(9)));
-    write_set_2.insert((key(9), create(109)));
-
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
-    assert_matches!(
-        res,
-        Err(VMStatus::Error {
-            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            sub_status: None,
-            message: Some(_),
-        })
-    );
+    let write_set_1 = vec![mock_modify("9", 9)];
+    let write_set_2 = vec![mock_create("9", 109)];
+    assert_invariant_violation!(write_set_1, write_set_2);
 }
 
 #[test]
 fn test_unsuccessful_squash_delete_modify() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
-
     // delete + modify 113 throws an error
-    write_set_1.insert((key(13), delete()));
-    write_set_2.insert((key(13), modify(113)));
-
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
-    assert_matches!(
-        res,
-        Err(VMStatus::Error {
-            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            sub_status: None,
-            message: Some(_),
-        })
-    );
+    let write_set_1 = vec![mock_delete("13")];
+    let write_set_2 = vec![mock_modify("13", 113)];
+    assert_invariant_violation!(write_set_1, write_set_2);
 }
 
 #[test]
 fn test_unsuccessful_squash_delete_delete() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut write_set_2 = WriteSetMut::default();
-
     // delete + delete throws an error
-    write_set_1.insert((key(14), delete()));
-    write_set_2.insert((key(14), delete()));
-
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
-    assert_matches!(
-        res,
-        Err(VMStatus::Error {
-            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            sub_status: None,
-            message: Some(_),
-        })
-    );
+    let write_set_1 = vec![mock_delete("14")];
+    let write_set_2 = vec![mock_delete("14")];
+    assert_invariant_violation!(write_set_1, write_set_2);
 }
 
 #[test]
 fn test_unsuccessful_squash_delete_delta() {
-    let mut write_set_1 = WriteSetMut::default();
-    let mut delta_change_set_2 = DeltaChangeSet::empty();
-
     // delete + +120 throws an error
-    write_set_1.insert((key(20), delete()));
-    delta_change_set_2.insert((key(20), add!(120)));
+    let aggregator_write_set_1 = vec![mock_delete("20")];
+    let aggregator_delta_set_2 = vec![mock_add("20", 120)];
 
-    let change_set_1 = build_change_set(write_set_1, DeltaChangeSet::empty());
-    let change_set_2 = build_change_set(WriteSetMut::default(), delta_change_set_2);
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
+    let mut change_set = build_change_set(vec![], vec![], aggregator_write_set_1, vec![]);
+    let additional_change_set = build_change_set(vec![], vec![], vec![], aggregator_delta_set_2);
+    let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {
@@ -295,20 +266,68 @@ fn test_unsuccessful_squash_delete_delta() {
 
 #[test]
 fn test_unsuccessful_squash_delta_create() {
-    let mut write_set_2 = WriteSetMut::default();
-    let mut delta_change_set_1 = DeltaChangeSet::empty();
-
     // +21 + create 122 throws an error
-    delta_change_set_1.insert((key(21), add!(21)));
-    write_set_2.insert((key(21), create(121)));
+    let aggregator_delta_set_1 = vec![mock_add("21", 21)];
+    let aggregator_write_set_2 = vec![mock_create("21", 121)];
 
-    let change_set_1 = build_change_set(WriteSetMut::default(), delta_change_set_1);
-    let change_set_2 = build_change_set(write_set_2, DeltaChangeSet::empty());
-    let res = change_set_1.squash(change_set_2, &NoOpChangeSetChecker);
+    let mut change_set = build_change_set(vec![], vec![], vec![], aggregator_delta_set_1);
+    let additional_change_set = build_change_set(vec![], vec![], aggregator_write_set_2, vec![]);
+    let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
     assert_matches!(
         res,
         Err(VMStatus::Error {
             status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            sub_status: None,
+            message: Some(_),
+        })
+    );
+}
+
+#[test]
+fn test_roundtrip_to_storage_change_set() {
+    let test_struct_tag = StructTag {
+        address: AccountAddress::ONE,
+        module: ident_str!("foo").into(),
+        name: ident_str!("Foo").into(),
+        type_params: vec![],
+    };
+    let test_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("bar").into());
+
+    let resource_key = StateKey::access_path(
+        AccessPath::resource_access_path(AccountAddress::ONE, test_struct_tag).unwrap(),
+    );
+    let module_key = StateKey::access_path(AccessPath::code_access_path(test_module_id));
+    let write_set = WriteSetMut::new(vec![
+        (resource_key, WriteOp::Deletion),
+        (module_key, WriteOp::Deletion),
+    ])
+    .freeze()
+    .unwrap();
+
+    let storage_change_set_before = StorageChangeSet::new(write_set, vec![]);
+    let change_set = assert_ok!(VMChangeSet::try_from_storage_change_set(
+        storage_change_set_before.clone(),
+        &MockChangeSetChecker
+    ));
+    let storage_change_set_after = assert_ok!(change_set.try_into_storage_change_set());
+    assert_eq!(storage_change_set_before, storage_change_set_after)
+}
+
+#[test]
+fn test_failed_conversion_to_change_set() {
+    let resource_write_set = vec![mock_delete("a")];
+    let aggregator_delta_set = vec![mock_add("b", 100)];
+    let change_set = build_change_set(resource_write_set, vec![], vec![], aggregator_delta_set);
+
+    // Unchecked conversion ignores deltas.
+    let storage_change_set = change_set.clone().into_storage_change_set_unchecked();
+    assert_eq!(storage_change_set.write_set().clone().into_mut().len(), 1);
+
+    let vm_status = change_set.try_into_storage_change_set();
+    assert_matches!(
+        vm_status,
+        Err(VMStatus::Error {
+            status_code: StatusCode::DATA_FORMAT_ERROR,
             sub_status: None,
             message: Some(_),
         })
