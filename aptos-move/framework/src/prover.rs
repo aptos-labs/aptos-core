@@ -129,6 +129,7 @@ impl ProverOptions {
             named_addresses,
             self.filter.clone(),
             bytecode_version,
+            None, // compiler_version
             skip_attribute_checks,
             known_attributes.clone(),
         )?;
