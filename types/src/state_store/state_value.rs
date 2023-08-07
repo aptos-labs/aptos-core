@@ -42,6 +42,12 @@ impl StateValueMetadata {
             creation_time_usecs: creation_time_usecs.microseconds,
         }
     }
+
+    pub fn set_deposit(&mut self, amount: u64) {
+        match self {
+            StateValueMetadata::V0 { deposit, .. } => *deposit = amount,
+        }
+    }
 }
 
 #[derive(Clone, Debug, CryptoHasher)]

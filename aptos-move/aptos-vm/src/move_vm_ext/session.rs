@@ -306,6 +306,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
         if is_storage_slot_metadata_enabled {
             if let Some(current_time) = current_time {
+                // The deposit on the metadata is a placeholder (0), it will be updated later when
+                // storage fee is charged.
                 new_slot_metadata = Some(StateValueMetadata::new(0, current_time));
             }
         }
