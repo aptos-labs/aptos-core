@@ -503,11 +503,12 @@ The runtime always runs this before executing the transactions in a block.
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= block_metadata_ref.epoch_interval) {
         <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"on_expire() started."));
         <b>let</b> dkg_state = <a href="dkg.md#0x1_dkg_get_state">dkg::get_state</a>();
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&dkg_state);
         <b>if</b> (dkg_state == <a href="dkg.md#0x1_dkg_state_inactive">dkg::state_inactive</a>()) {
+            <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"DKG state: inactive."));
             <b>let</b> validator_set_and_stake_dist = <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfiguration::reconfigure_a</a>();
             <a href="dkg.md#0x1_dkg_start">dkg::start</a>(validator_set_and_stake_dist);
         } <b>else</b> <b>if</b> (dkg_state == <a href="dkg.md#0x1_dkg_state_active">dkg::state_active</a>()) {
+            <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"DKG state: active."));
             <b>let</b> maybe_transcript = <b>if</b> (dkg_transcript_available) {
                 some(serialized_dkg_transcript)
             } <b>else</b> {
@@ -520,6 +521,7 @@ The runtime always runs this before executing the transactions in a block.
         } <b>else</b> {
             <b>abort</b>(1);
         };
+        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"on_expire() finished."));
     } <b>else</b> {
         <b>if</b> (dkg_transcript_available) {
             <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"Probably a too late transcript."));

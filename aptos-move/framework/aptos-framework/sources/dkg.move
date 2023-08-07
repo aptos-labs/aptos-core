@@ -62,7 +62,7 @@ module aptos_framework::dkg {
             return;
         };
         dkg_state.state_id = 1;
-        dkg_state.countdown = 2; //TODO: for debugging
+        dkg_state.countdown = 5; //TODO: for debugging
         event::emit_event<StartDKGEvent>(
             &mut dkg_state.events,
             StartDKGEvent { locked_new_validator_set },
@@ -71,26 +71,26 @@ module aptos_framework::dkg {
     }
 
     public(friend) fun on_potential_transcript(maybe_serialized_transcript: Option<vector<u8>>): bool acquires DKGState {
-        debug::print(&std::string::utf8(b"dkg::on_potential_transcript() started."));
+        debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - Started."));
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
         assert!(state_active() == dkg_state.state_id, 1);
         let ret = if (std::option::is_some(&maybe_serialized_transcript)) {
-            debug::print(&std::string::utf8(b"dkg::on_potential_transcript() found ts."));
+            debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - A transcript is given!"));
             dkg_state.state_id = 0;
             dkg_state.countdown = 0;
             dkg_state.serialized_transcript = std::option::extract(&mut maybe_serialized_transcript);
             true
         } else if (dkg_state.countdown == 0) {
-            debug::print(&std::string::utf8(b"dkg::on_potential_transcript() timed out."));
+            debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - Current DKG is taking too long. Aborting."));
             dkg_state.state_id = 0;
             dkg_state.serialized_transcript = vector[];
             true
         } else {
-            debug::print(&std::string::utf8(b"dkg::on_potential_transcript() nothing happened."));
+            debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - No transcript is given. Hopefully next block."));
             dkg_state.countdown = dkg_state.countdown - 1;
             false
         };
-        debug::print(&std::string::utf8(b"dkg::on_potential_transcript() finished."));
+        debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - Finished."));
         ret
     }
 }

@@ -322,7 +322,6 @@ impl EventNotificationSender for EventSubscriptionService {
             return Ok(()); // No events!
         }
 
-        println!("notify_events@L325");
         // Notify event subscribers and check if a reconfiguration event was processed
         let reconfig_event_processed = self.notify_event_subscribers(version, events)?;
 

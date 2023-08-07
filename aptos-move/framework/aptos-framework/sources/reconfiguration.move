@@ -162,7 +162,7 @@ module aptos_framework::reconfiguration {
             transaction_fee::process_collected_fees();
         };
         stake::on_new_epoch();
-        let ret = stake::get_active_validator_set();
+        let ret = stake::get_active_validator_set(); //TODO: also lock it!
         debug::print(&std::string::utf8(b"reconfiguration::reconfigure_a() finished."));
         ret
     }

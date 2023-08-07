@@ -224,11 +224,12 @@ module aptos_framework::block {
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             debug::print(&std::string::utf8(b"on_expire() started."));
             let dkg_state = dkg::get_state();
-            debug::print(&dkg_state);
             if (dkg_state == dkg::state_inactive()) {
+                debug::print(&std::string::utf8(b"DKG state: inactive."));
                 let validator_set_and_stake_dist = reconfiguration::reconfigure_a();
                 dkg::start(validator_set_and_stake_dist);
             } else if (dkg_state == dkg::state_active()) {
+                debug::print(&std::string::utf8(b"DKG state: active."));
                 let maybe_transcript = if (dkg_transcript_available) {
                     some(serialized_dkg_transcript)
                 } else {
@@ -241,6 +242,7 @@ module aptos_framework::block {
             } else {
                 abort(1);
             };
+            debug::print(&std::string::utf8(b"on_expire() finished."));
         } else {
             if (dkg_transcript_available) {
                 debug::print(&std::string::utf8(b"Probably a too late transcript."));

@@ -1847,7 +1847,6 @@ dependencies = [
  "aptos-framework",
  "aptos-genesis",
  "aptos-global-constants",
- "aptos-indexer-grpc-utils",
  "aptos-logger",
  "aptos-mempool",
  "aptos-mempool-notifications",

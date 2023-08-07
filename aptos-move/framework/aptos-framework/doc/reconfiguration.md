@@ -424,7 +424,7 @@ Calculate new valicator set and lock it.
         <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">transaction_fee::process_collected_fees</a>();
     };
     <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
-    <b>let</b> ret = <a href="stake.md#0x1_stake_get_active_validator_set">stake::get_active_validator_set</a>();
+    <b>let</b> ret = <a href="stake.md#0x1_stake_get_active_validator_set">stake::get_active_validator_set</a>(); //TODO: also lock it!
     <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="reconfiguration.md#0x1_reconfiguration_reconfigure_a">reconfiguration::reconfigure_a</a>() finished."));
     ret
 }

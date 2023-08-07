@@ -34,7 +34,6 @@ impl From<TransactionOutput> for ParsedTransactionOutput {
         let dkg_events: Vec<ContractEvent> = Self::parse_dkg_events(output.events())
             .cloned()
             .collect();
-        println!("num_dkg_events={}", dkg_events.len());
         Self {
             output,
             reconfig_events,
