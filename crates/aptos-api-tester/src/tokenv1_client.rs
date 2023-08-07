@@ -1,15 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    rest_client::{Client as ApiClient, PendingTransaction},
-    transaction_builder::TransactionFactory,
-    types::{account_address::AccountAddress, chain_id::ChainId, LocalAccount},
-};
+// TODO: this should be part of the SDK
+
 use anyhow::{anyhow, Context, Result};
 use aptos_api_types::U64;
 use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
-use aptos_types::transaction::TransactionPayload;
+use aptos_sdk::{
+    rest_client::{Client as ApiClient, PendingTransaction},
+    transaction_builder::TransactionFactory,
+    types::LocalAccount,
+};
+use aptos_types::{
+    account_address::AccountAddress, chain_id::ChainId, transaction::TransactionPayload,
+};
 use serde::{Deserialize, Serialize};
 
 /// Gets chain ID for use in submitting transactions.

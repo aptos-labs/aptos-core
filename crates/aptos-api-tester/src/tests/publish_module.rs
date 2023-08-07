@@ -1,26 +1,29 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    fail_message::{
-        ERROR_COULD_NOT_BUILD_PACKAGE, ERROR_COULD_NOT_CREATE_TRANSACTION,
+    consts::FUND_AMOUNT,
+    persistent_check,
+    strings::{
+        BUILD_MODULE, CHECK_ACCOUNT_DATA, CHECK_MESSAGE, CHECK_MODULE_DATA,
+        ERROR_COULD_NOT_BUILD_PACKAGE, ERROR_COULD_NOT_CREATE_AND_SUBMIT_TRANSACTION,
         ERROR_COULD_NOT_FINISH_TRANSACTION, ERROR_COULD_NOT_FUND_ACCOUNT,
         ERROR_COULD_NOT_SERIALIZE, ERROR_NO_BYTECODE, ERROR_NO_MESSAGE, ERROR_NO_METADATA,
-        ERROR_NO_MODULE, FAIL_WRONG_MESSAGE, FAIL_WRONG_MODULE,
+        ERROR_NO_MODULE, FAIL_WRONG_MESSAGE, FAIL_WRONG_MODULE, PUBLISH_MODULE, SETUP, SET_MESSAGE,
     },
-    persistent_check,
-    utils::{create_and_fund_account, get_client, get_faucet_client, NetworkName, TestFailure},
+    time_fn,
+    tokenv1_client::{build_and_submit_transaction, TransactionOptions},
+    utils::{
+        check_balance, create_and_fund_account, emit_step_metrics, NetworkName, TestFailure,
+        TestName,
+    },
 };
 use anyhow::{anyhow, Result};
-use aptos_api_types::HexEncodedBytes;
+use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
 use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_logger::info;
+use aptos_logger::error;
 use aptos_rest_client::Client;
-use aptos_sdk::{
-    bcs,
-    token_client::{build_and_submit_transaction, TransactionOptions},
-    types::LocalAccount,
-};
+use aptos_sdk::{bcs, types::LocalAccount};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
@@ -31,31 +34,93 @@ use std::{collections::BTreeMap, path::PathBuf};
 static MODULE_NAME: &str = "message";
 static MESSAGE: &str = "test message";
 
-pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
+/// Tests module publishing and interaction. Checks that:
+///   - can publish module
+///   - module data exists
+///   - can interact with module
+///   - interaction is reflected correctly
+pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFailure> {
     // setup
-    let (client, mut account) = setup(network_name).await?;
+    let (client, mut account) = emit_step_metrics(
+        time_fn!(setup, network_name),
+        TestName::PublishModule,
+        SETUP,
+        network_name,
+        run_id,
+    )?;
+
+    // persistently check that API returns correct account data (auth key and sequence number)
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address,
+            CHECK_ACCOUNT_DATA,
+            check_account_data,
+            &client,
+            account.address()
+        ),
+        TestName::PublishModule,
+        CHECK_ACCOUNT_DATA,
+        network_name,
+        run_id,
+    )?;
 
     // build module
-    let package = build_module(account.address()).await?;
+    let package = emit_step_metrics(
+        time_fn!(build_module, account.address()),
+        TestName::PublishModule,
+        BUILD_MODULE,
+        network_name,
+        run_id,
+    )?;
 
     // publish module
-    let blob = publish_module(&client, &mut account, package).await?;
+    let blob = emit_step_metrics(
+        time_fn!(publish_module, &client, &mut account, package),
+        TestName::PublishModule,
+        PUBLISH_MODULE,
+        network_name,
+        run_id,
+    )?;
 
-    // check module data persistently
-    persistent_check::address_bytes(
-        "check_module_data",
-        check_module_data,
-        &client,
-        account.address(),
-        &blob,
-    )
-    .await?;
+    // persistently check that API returns correct module package data
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address_bytes,
+            CHECK_MODULE_DATA,
+            check_module_data,
+            &client,
+            account.address(),
+            &blob
+        ),
+        TestName::PublishModule,
+        CHECK_MODULE_DATA,
+        network_name,
+        run_id,
+    )?;
 
     // set message
-    set_message(&client, &mut account).await?;
+    emit_step_metrics(
+        time_fn!(set_message, &client, &mut account),
+        TestName::PublishModule,
+        SET_MESSAGE,
+        network_name,
+        run_id,
+    )?;
 
-    // check message persistently
-    persistent_check::address("check_message", check_message, &client, account.address()).await?;
+    // persistently check that the message is correct
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address,
+            CHECK_MESSAGE,
+            check_message,
+            &client,
+            account.address()
+        ),
+        TestName::PublishModule,
+        CHECK_MESSAGE,
+        network_name,
+        run_id,
+    )?;
 
     Ok(())
 }
@@ -64,14 +129,14 @@ pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
 
 async fn setup(network_name: NetworkName) -> Result<(Client, LocalAccount), TestFailure> {
     // spin up clients
-    let client = get_client(network_name);
-    let faucet_client = get_faucet_client(network_name);
+    let client = network_name.get_client();
+    let faucet_client = network_name.get_faucet_client();
 
     // create account
-    let account = match create_and_fund_account(&faucet_client).await {
+    let account = match create_and_fund_account(&faucet_client, TestName::PublishModule).await {
         Ok(account) => account,
         Err(e) => {
-            info!(
+            error!(
                 "test: publish_module part: setup ERROR: {}, with error {:?}",
                 ERROR_COULD_NOT_FUND_ACCOUNT, e
             );
@@ -80,6 +145,12 @@ async fn setup(network_name: NetworkName) -> Result<(Client, LocalAccount), Test
     };
 
     Ok((client, account))
+}
+
+async fn check_account_data(client: &Client, account: AccountAddress) -> Result<(), TestFailure> {
+    check_balance(TestName::PublishModule, client, account, U64(FUND_AMOUNT)).await?;
+
+    Ok(())
 }
 
 async fn build_module(address: AccountAddress) -> Result<BuiltPackage, TestFailure> {
@@ -100,7 +171,7 @@ async fn build_module(address: AccountAddress) -> Result<BuiltPackage, TestFailu
     let package = match BuiltPackage::build(move_dir, options) {
         Ok(package) => package,
         Err(e) => {
-            info!(
+            error!(
                 "test: publish_module part: publish_module ERROR: {}, with error {:?}",
                 ERROR_COULD_NOT_BUILD_PACKAGE, e
             );
@@ -123,7 +194,7 @@ async fn publish_module(
     let metadata = match package.extract_metadata() {
         Ok(data) => data,
         Err(e) => {
-            info!(
+            error!(
                 "test: publish_module part: publish_module ERROR: {}, with error {:?}",
                 ERROR_NO_METADATA, e
             );
@@ -135,7 +206,7 @@ async fn publish_module(
     let metadata_serialized = match bcs::to_bytes(&metadata) {
         Ok(data) => data,
         Err(e) => {
-            info!(
+            error!(
                 "test: publish_module part: publish_module ERROR: {}, with error {:?}",
                 ERROR_COULD_NOT_SERIALIZE, e
             );
@@ -158,9 +229,9 @@ async fn publish_module(
         {
             Ok(txn) => txn,
             Err(e) => {
-                info!(
+                error!(
                     "test: publish_module part: publish_module ERROR: {}, with error {:?}",
-                    ERROR_COULD_NOT_CREATE_TRANSACTION, e
+                    ERROR_COULD_NOT_CREATE_AND_SUBMIT_TRANSACTION, e
                 );
                 return Err(e.into());
             },
@@ -168,7 +239,7 @@ async fn publish_module(
 
     // wait for transaction to finish
     if let Err(e) = client.wait_for_transaction(&pending_txn).await {
-        info!(
+        error!(
             "test: publish_module part: publish_module ERROR: {}, with error {:?}",
             ERROR_COULD_NOT_FINISH_TRANSACTION, e
         );
@@ -179,7 +250,7 @@ async fn publish_module(
     let blob = match blobs.get(0) {
         Some(bytecode) => HexEncodedBytes::from(bytecode.clone()),
         None => {
-            info!(
+            error!(
                 "test: publish_module part: publish_module ERROR: {}",
                 ERROR_NO_BYTECODE
             );
@@ -199,7 +270,7 @@ async fn check_module_data(
     let response = match client.get_account_module(address, MODULE_NAME).await {
         Ok(response) => response,
         Err(e) => {
-            info!(
+            error!(
                 "test: publish_module part: check_module_data ERROR: {}, with error {:?}",
                 ERROR_NO_MODULE, e
             );
@@ -210,7 +281,7 @@ async fn check_module_data(
 
     // compare
     if expected != actual {
-        info!(
+        error!(
             "test: publish_module part: check_module_data FAIL: {}, expected {:?}, got {:?}",
             FAIL_WRONG_MODULE, expected, actual
         );
@@ -225,7 +296,7 @@ async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<(), 
     let message = match bcs::to_bytes(MESSAGE) {
         Ok(data) => data,
         Err(e) => {
-            info!(
+            error!(
                 "test: publish_module part: set_message ERROR: {}, with error {:?}",
                 ERROR_COULD_NOT_SERIALIZE, e
             );
@@ -248,9 +319,9 @@ async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<(), 
         {
             Ok(txn) => txn,
             Err(e) => {
-                info!(
+                error!(
                     "test: publish_module part: set_message ERROR: {}, with error {:?}",
-                    ERROR_COULD_NOT_CREATE_TRANSACTION, e
+                    ERROR_COULD_NOT_CREATE_AND_SUBMIT_TRANSACTION, e
                 );
                 return Err(e.into());
             },
@@ -258,7 +329,7 @@ async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<(), 
 
     // wait for transaction to finish
     if let Err(e) = client.wait_for_transaction(&pending_txn).await {
-        info!(
+        error!(
             "test: publish_module part: set_message ERROR: {}, with error {:?}",
             ERROR_COULD_NOT_FINISH_TRANSACTION, e
         );
@@ -276,7 +347,7 @@ async fn check_message(client: &Client, address: AccountAddress) -> Result<(), T
     let actual = match get_message(client, address).await {
         Some(message) => message,
         None => {
-            info!(
+            error!(
                 "test: publish_module part: check_message ERROR: {}",
                 ERROR_NO_MESSAGE
             );
@@ -286,7 +357,7 @@ async fn check_message(client: &Client, address: AccountAddress) -> Result<(), T
 
     // compare
     if expected != actual {
-        info!(
+        error!(
             "test: publish_module part: check_message FAIL: {}, expected {:?}, got {:?}",
             FAIL_WRONG_MESSAGE, expected, actual
         );

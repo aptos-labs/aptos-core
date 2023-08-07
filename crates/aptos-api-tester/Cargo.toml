@@ -28,5 +28,7 @@ move-core-types = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
 rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
