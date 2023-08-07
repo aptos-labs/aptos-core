@@ -6,7 +6,7 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
-    #[error("Invalid request received: {0}")]
+    #[error("Invalid request received!: {0}")]
     InvalidRequest(String),
     #[error("Storage error encountered: {0}")]
     StorageErrorEncountered(String),
