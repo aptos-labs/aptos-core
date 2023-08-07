@@ -21,6 +21,7 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
+use crate::sharded_block_executor::counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
@@ -146,6 +147,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
     }
 
     fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
+        let _timer = WAIT_FOR_SHARDED_OUTPUT_SECONDS.start_timer();
         trace!("LocalExecutorClient Waiting for results");
         let mut results = vec![];
         for (i, rx) in self.result_rxs.iter().enumerate() {
