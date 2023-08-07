@@ -8,9 +8,10 @@ use aptos_sdk::{token_client::TokenClient, types::LocalAccount};
 use aptos_types::account_address::AccountAddress;
 use futures::Future;
 use std::time::Duration;
-use tokio::time::Instant;
+use tokio::time::{Instant, sleep};
 
 static PERSISTENCY_TIMEOUT: Duration = Duration::from_secs(30);
+static SLEEP_PER_CYCLE: Duration = Duration::from_millis(100);
 
 pub async fn account<'a, 'b, F, Fut>(
     step: &str,
@@ -32,6 +33,7 @@ where
         if result.is_ok() {
             break;
         }
+        sleep(SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -58,6 +60,7 @@ where
         if result.is_ok() {
             break;
         }
+        sleep(SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -85,6 +88,7 @@ where
         if result.is_ok() {
             break;
         }
+        sleep(SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -112,6 +116,7 @@ where
         if result.is_ok() {
             break;
         }
+        sleep(SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -138,6 +143,7 @@ where
         if result.is_ok() {
             break;
         }
+        sleep(SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
@@ -165,6 +171,7 @@ where
         if result.is_ok() {
             break;
         }
+        sleep(SLEEP_PER_CYCLE).await;
     }
 
     // return last failure if no good result occurs
