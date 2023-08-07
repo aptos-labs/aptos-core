@@ -6,7 +6,7 @@ on:
     # every day at 9am PST
     - cron: "0 16 * * *"
   pull_request:
-    types: [ labeled, opened, synchronize, reopened ]
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
 
 env:
   CARGO_INCREMENTAL: "0"
