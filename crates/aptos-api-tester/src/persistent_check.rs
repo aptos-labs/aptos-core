@@ -67,6 +67,34 @@ where
     result
 }
 
+pub async fn address_address<'a, F, Fut>(
+    step: &str,
+    f: F,
+    client: &'a Client,
+    address: AccountAddress,
+    address2: AccountAddress,
+) -> Result<(), TestFailure>
+where
+    F: Fn(&'a Client, AccountAddress, AccountAddress) -> Fut,
+    Fut: Future<Output = Result<(), TestFailure>>,
+{
+    // set a default error in case checks never start
+    let mut result: Result<(), TestFailure> = Err(could_not_check(step));
+    let timer = Instant::now();
+
+    // try to get a good result
+    while Instant::now().duration_since(timer) < PERSISTENCY_TIMEOUT {
+        result = f(client, address, address2).await;
+        if result.is_ok() {
+            break;
+        }
+        sleep(SLEEP_PER_CYCLE).await;
+    }
+
+    // return last failure if no good result occurs
+    result
+}
+
 pub async fn address_bytes<'a, 'b, F, Fut>(
     step: &str,
     f: F,

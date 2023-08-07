@@ -9,7 +9,7 @@ use crate::{
     persistent_check, time_fn,
     utils::{
         create_account, create_and_fund_account, emit_step_metrics, get_client, get_faucet_client,
-        NetworkName, TestFailure, TestName,
+        NetworkName, TestFailure, TestName, FUND_AMOUNT,
     },
 };
 use anyhow::{anyhow, Result};
@@ -34,6 +34,22 @@ pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFai
         run_id,
     )?;
     let coin_client = CoinClient::new(&client);
+
+    // check account data persistently
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address_address,
+            "check_account_data",
+            check_account_data,
+            &client,
+            account.address(),
+            receiver
+        ),
+        TestName::CoinTransfer,
+        "check_account_data",
+        network_name,
+        run_id,
+    )?;
 
     // transfer coins to the receiver
     let version = emit_step_metrics(
@@ -104,6 +120,10 @@ async fn setup(
             return Err(e.into());
         },
     };
+    info!(
+        "test: coin_transfer part: setup creating account: {}",
+        account.address()
+    );
 
     // create receiver
     let receiver = match create_account(&faucet_client).await {
@@ -116,8 +136,23 @@ async fn setup(
             return Err(e.into());
         },
     };
+    info!(
+        "test: coin_transfer part: setup creating receiver: {}",
+        receiver
+    );
 
     Ok((client, account, receiver))
+}
+
+async fn check_account_data(
+    client: &Client,
+    account: AccountAddress,
+    receiver: AccountAddress,
+) -> Result<(), TestFailure> {
+    check_balance(client, account, U64(FUND_AMOUNT)).await?;
+    check_balance(client, receiver, U64(0)).await?;
+
+    Ok(())
 }
 
 async fn transfer_coins(
@@ -229,6 +264,37 @@ async fn check_account_balance_at_version(
             FAIL_WRONG_BALANCE_AT_VERSION, expected, actual
         );
         return Err(TestFailure::Fail(FAIL_WRONG_BALANCE_AT_VERSION));
+    }
+
+    Ok(())
+}
+
+// Utils
+
+async fn check_balance(
+    client: &Client,
+    address: AccountAddress,
+    expected: U64,
+) -> Result<(), TestFailure> {
+    // actual
+    let actual = match client.get_account_balance(address).await {
+        Ok(response) => response.into_inner().coin.value,
+        Err(e) => {
+            info!(
+                "test: coin_transfer part: check_account_data ERROR: {}, with error {:?}",
+                ERROR_NO_BALANCE, e
+            );
+            return Err(e.into());
+        },
+    };
+
+    // compare
+    if expected != actual {
+        info!(
+            "test: coin_transfer part: check_account_data FAIL: {}, expected {:?}, got {:?}",
+            FAIL_WRONG_BALANCE, expected, actual
+        );
+        return Err(TestFailure::Fail(FAIL_WRONG_BALANCE));
     }
 
     Ok(())

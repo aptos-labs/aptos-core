@@ -8,7 +8,7 @@ use crate::{
     persistent_check, time_fn,
     utils::{
         create_account, emit_step_metrics, get_client, get_faucet_client, NetworkName, TestFailure,
-        TestName,
+        TestName, FUND_AMOUNT,
     },
 };
 use aptos_api_types::U64;
@@ -16,8 +16,6 @@ use aptos_logger::info;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
-
-static FUND_AMOUNT: u64 = 1_000_000;
 
 /// Tests new account creation. Checks that:
 ///   - account data exists
@@ -94,6 +92,7 @@ async fn setup(
             return Err(e.into());
         },
     };
+    info!("test: new_account part: setup creating account: {}", account.address());
 
     Ok((client, faucet_client, account))
 }

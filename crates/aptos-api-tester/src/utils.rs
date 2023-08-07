@@ -13,14 +13,16 @@ use once_cell::sync::Lazy;
 use std::env;
 use url::Url;
 
+pub const FUND_AMOUNT: u64 = 100_000_000;
+
 // network urls
-pub static DEVNET_NODE_URL: Lazy<Url> =
+const DEVNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
-pub static DEVNET_FAUCET_URL: Lazy<Url> =
+const DEVNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
-pub static TESTNET_NODE_URL: Lazy<Url> =
+const TESTNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
-pub static TESTNET_FAUCET_URL: Lazy<Url> =
+const TESTNET_FAUCET_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
 
 // test failure
@@ -132,7 +134,7 @@ pub async fn create_account(faucet_client: &FaucetClient) -> Result<LocalAccount
 /// Create an account with 100_000_000 balance.
 pub async fn create_and_fund_account(faucet_client: &FaucetClient) -> Result<LocalAccount> {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
-    faucet_client.fund(account.address(), 100_000_000).await?;
+    faucet_client.fund(account.address(), FUND_AMOUNT).await?;
 
     Ok(account)
 }

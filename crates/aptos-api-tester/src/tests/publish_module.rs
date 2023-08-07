@@ -5,16 +5,16 @@ use crate::{
         ERROR_COULD_NOT_BUILD_PACKAGE, ERROR_COULD_NOT_CREATE_TRANSACTION,
         ERROR_COULD_NOT_FINISH_TRANSACTION, ERROR_COULD_NOT_FUND_ACCOUNT,
         ERROR_COULD_NOT_SERIALIZE, ERROR_NO_BYTECODE, ERROR_NO_MESSAGE, ERROR_NO_METADATA,
-        ERROR_NO_MODULE, FAIL_WRONG_MESSAGE, FAIL_WRONG_MODULE,
+        ERROR_NO_MODULE, FAIL_WRONG_MESSAGE, FAIL_WRONG_MODULE, ERROR_NO_BALANCE, FAIL_WRONG_BALANCE,
     },
     persistent_check, time_fn,
     utils::{
         create_and_fund_account, emit_step_metrics, get_client, get_faucet_client, NetworkName,
-        TestFailure, TestName,
+        TestFailure, TestName, FUND_AMOUNT,
     },
 };
 use anyhow::{anyhow, Result};
-use aptos_api_types::HexEncodedBytes;
+use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_logger::info;
@@ -45,6 +45,21 @@ pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFai
         time_fn!(setup, network_name),
         TestName::PublishModule,
         "setup",
+        network_name,
+        run_id,
+    )?;
+
+    // check account data persistently
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address,
+            "check_account_data",
+            check_account_data,
+            &client,
+            account.address()
+        ),
+        TestName::PublishModule,
+        "check_account_data",
         network_name,
         run_id,
     )?;
@@ -128,8 +143,18 @@ async fn setup(network_name: NetworkName) -> Result<(Client, LocalAccount), Test
             return Err(e.into());
         },
     };
+    info!(
+        "test: publish_module part: setup creating account: {}",
+        account.address()
+    );
 
     Ok((client, account))
+}
+
+async fn check_account_data(client: &Client, account: AccountAddress) -> Result<(), TestFailure> {
+    check_balance(client, account, U64(FUND_AMOUNT)).await?;
+
+    Ok(())
 }
 
 async fn build_module(address: AccountAddress) -> Result<BuiltPackage, TestFailure> {
@@ -347,6 +372,35 @@ async fn check_message(client: &Client, address: AccountAddress) -> Result<(), T
 }
 
 // Utils
+
+async fn check_balance(
+    client: &Client,
+    address: AccountAddress,
+    expected: U64,
+) -> Result<(), TestFailure> {
+    // actual
+    let actual = match client.get_account_balance(address).await {
+        Ok(response) => response.into_inner().coin.value,
+        Err(e) => {
+            info!(
+                "test: nft_transfer part: check_account_data ERROR: {}, with error {:?}",
+                ERROR_NO_BALANCE, e
+            );
+            return Err(e.into());
+        },
+    };
+
+    // compare
+    if expected != actual {
+        info!(
+            "test: nft_transfer part: check_account_data FAIL: {}, expected {:?}, got {:?}",
+            FAIL_WRONG_BALANCE, expected, actual
+        );
+        return Err(TestFailure::Fail(FAIL_WRONG_BALANCE));
+    }
+
+    Ok(())
+}
 
 async fn get_message(client: &Client, address: AccountAddress) -> Option<String> {
     let resource = match client
