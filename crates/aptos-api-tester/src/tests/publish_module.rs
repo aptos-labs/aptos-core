@@ -1,17 +1,21 @@
 // Copyright © Aptos Foundation
 
 use crate::{
+    consts::FUND_AMOUNT,
     fail_message::{
         ERROR_COULD_NOT_BUILD_PACKAGE, ERROR_COULD_NOT_CREATE_TRANSACTION,
         ERROR_COULD_NOT_FINISH_TRANSACTION, ERROR_COULD_NOT_FUND_ACCOUNT,
         ERROR_COULD_NOT_SERIALIZE, ERROR_NO_BYTECODE, ERROR_NO_MESSAGE, ERROR_NO_METADATA,
         ERROR_NO_MODULE, FAIL_WRONG_MESSAGE, FAIL_WRONG_MODULE,
     },
-    persistent_check,
-    utils::{create_and_fund_account, get_client, get_faucet_client, NetworkName, TestFailure},
+    persistent_check, time_fn,
+    utils::{
+        check_balance, create_and_fund_account, emit_step_metrics, get_client, get_faucet_client,
+        NetworkName, TestFailure, TestName,
+    },
 };
 use anyhow::{anyhow, Result};
-use aptos_api_types::HexEncodedBytes;
+use aptos_api_types::{HexEncodedBytes, U64};
 use aptos_cached_packages::aptos_stdlib::EntryFunctionCall;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_logger::info;
@@ -31,31 +35,93 @@ use std::{collections::BTreeMap, path::PathBuf};
 static MODULE_NAME: &str = "message";
 static MESSAGE: &str = "test message";
 
-pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
+/// Tests nft transfer. Checks that:
+///   - can publish module
+///   - module data exists
+///   - can interact with module
+///   - interaction is reflected correctly
+pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFailure> {
     // setup
-    let (client, mut account) = setup(network_name).await?;
+    let (client, mut account) = emit_step_metrics(
+        time_fn!(setup, network_name),
+        TestName::PublishModule,
+        "setup",
+        network_name,
+        run_id,
+    )?;
+
+    // check account data persistently
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address,
+            "check_account_data",
+            check_account_data,
+            &client,
+            account.address()
+        ),
+        TestName::PublishModule,
+        "check_account_data",
+        network_name,
+        run_id,
+    )?;
 
     // build module
-    let package = build_module(account.address()).await?;
+    let package = emit_step_metrics(
+        time_fn!(build_module, account.address()),
+        TestName::PublishModule,
+        "build_module",
+        network_name,
+        run_id,
+    )?;
 
     // publish module
-    let blob = publish_module(&client, &mut account, package).await?;
+    let blob = emit_step_metrics(
+        time_fn!(publish_module, &client, &mut account, package),
+        TestName::PublishModule,
+        "publish_module",
+        network_name,
+        run_id,
+    )?;
 
     // check module data persistently
-    persistent_check::address_bytes(
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address_bytes,
+            "check_module_data",
+            check_module_data,
+            &client,
+            account.address(),
+            &blob
+        ),
+        TestName::PublishModule,
         "check_module_data",
-        check_module_data,
-        &client,
-        account.address(),
-        &blob,
-    )
-    .await?;
+        network_name,
+        run_id,
+    )?;
 
     // set message
-    set_message(&client, &mut account).await?;
+    emit_step_metrics(
+        time_fn!(set_message, &client, &mut account),
+        TestName::PublishModule,
+        "set_message",
+        network_name,
+        run_id,
+    )?;
 
     // check message persistently
-    persistent_check::address("check_message", check_message, &client, account.address()).await?;
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address,
+            "check_message",
+            check_message,
+            &client,
+            account.address()
+        ),
+        TestName::PublishModule,
+        "check_message",
+        network_name,
+        run_id,
+    )?;
 
     Ok(())
 }
@@ -78,8 +144,18 @@ async fn setup(network_name: NetworkName) -> Result<(Client, LocalAccount), Test
             return Err(e.into());
         },
     };
+    info!(
+        "test: publish_module part: setup creating account: {}",
+        account.address()
+    );
 
     Ok((client, account))
+}
+
+async fn check_account_data(client: &Client, account: AccountAddress) -> Result<(), TestFailure> {
+    check_balance(TestName::PublishModule, client, account, U64(FUND_AMOUNT)).await?;
+
+    Ok(())
 }
 
 async fn build_module(address: AccountAddress) -> Result<BuiltPackage, TestFailure> {

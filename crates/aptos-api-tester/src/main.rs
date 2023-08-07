@@ -3,135 +3,86 @@
 
 #![forbid(unsafe_code)]
 
+mod consts;
 mod counters;
 mod fail_message;
 mod persistent_check;
 mod tests;
 mod utils;
+#[macro_use]
+mod macros;
 
-use crate::{
-    tests::{coin_transfer, new_account, nft_transfer, publish_module},
-    utils::{set_metrics, NetworkName, TestFailure, TestName, TestResult},
-};
+use crate::utils::{NetworkName, TestName};
 use anyhow::Result;
 use aptos_logger::{info, Level, Logger};
 use aptos_push_metrics::MetricsPusher;
+use consts::{NUM_THREADS, STACK_SIZE};
 use futures::future::join_all;
-use std::{
-    future::Future,
-    time::{Instant, SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::runtime::{Builder, Runtime};
 
-// Processes a test result.
-async fn process_result<Fut: Future<Output = Result<(), TestFailure>>>(
-    test_name: TestName,
-    network_name: NetworkName,
-    run_id: &str,
-    fut: Fut,
-) {
-    // start timer
-    let start = Instant::now();
-
-    // call the flow
-    let result = fut.await;
-
-    // end timer
-    let time = (Instant::now() - start).as_micros() as f64;
-
-    // process the result
-    let output = match result {
-        Ok(_) => TestResult::Success,
-        Err(failure) => TestResult::from(failure),
-    };
-
-    // set metrics and log
-    set_metrics(
-        &output,
-        &test_name.to_string(),
-        &network_name.to_string(),
-        run_id,
-        time,
-    );
-    info!(
-        "{} {} result:{:?} in time:{:?}",
-        network_name.to_string(),
-        test_name.to_string(),
-        output,
-        time,
-    );
-}
-
-async fn test_flows(network_name: NetworkName) -> Result<()> {
+async fn test_flows(runtime: &Runtime, network_name: NetworkName) -> Result<()> {
     let run_id = SystemTime::now()
         .duration_since(UNIX_EPOCH)?
         .as_secs()
         .to_string();
-    info!("testing {} at {}", network_name.to_string(), run_id);
+    info!(
+        "----- STARTING TESTS FOR {} WITH RUN ID {} -----",
+        network_name.to_string(),
+        run_id
+    );
 
-    // Test new account creation and funding
+    // Flow 1: New account
     let test_time = run_id.clone();
-    let handle_newaccount = tokio::spawn(async move {
-        process_result(
-            TestName::NewAccount,
-            network_name,
-            &test_time,
-            new_account::test(network_name),
-        )
-        .await;
+    let handle_newaccount = runtime.spawn(async move {
+        TestName::NewAccount.run(network_name, &test_time).await;
     });
 
-    // Flow 1: Coin transfer
+    // Flow 2: Coin transfer
     let test_time = run_id.clone();
-    let handle_cointransfer = tokio::spawn(async move {
-        process_result(
-            TestName::CoinTransfer,
-            network_name,
-            &test_time,
-            coin_transfer::test(network_name),
-        )
-        .await;
+    let handle_cointransfer = runtime.spawn(async move {
+        TestName::CoinTransfer.run(network_name, &test_time).await;
     });
 
-    // Flow 2: NFT transfer
+    // Flow 3: NFT transfer
     let test_time = run_id.clone();
-    let handle_nfttransfer = tokio::spawn(async move {
-        process_result(
-            TestName::NftTransfer,
-            network_name,
-            &test_time,
-            nft_transfer::test(network_name),
-        )
-        .await;
+    let handle_nfttransfer = runtime.spawn(async move {
+        TestName::NftTransfer.run(network_name, &test_time).await;
     });
 
-    // Flow 3: Publishing module
+    // Flow 4: Publishing module
     let test_time = run_id.clone();
-    process_result(
-        TestName::PublishModule,
-        network_name,
-        &test_time,
-        publish_module::test(network_name),
-    )
-    .await;
+    let handle_publishmodule = runtime.spawn(async move {
+        TestName::PublishModule.run(network_name, &test_time).await;
+    });
 
     join_all(vec![
         handle_newaccount,
         handle_cointransfer,
         handle_nfttransfer,
+        handle_publishmodule,
     ])
     .await;
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
+    // create runtime
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(*NUM_THREADS)
+        .enable_all()
+        .thread_stack_size(*STACK_SIZE)
+        .build()?;
+
     // log metrics
     Logger::builder().level(Level::Info).build();
     let _mp = MetricsPusher::start_for_local_run("api-tester");
 
-    // test flows
-    let _ = test_flows(NetworkName::Testnet).await;
-    let _ = test_flows(NetworkName::Devnet).await;
+    // run tests
+    runtime.block_on(async {
+        let _ = test_flows(&runtime, NetworkName::Testnet).await;
+        let _ = test_flows(&runtime, NetworkName::Devnet).await;
+    });
 
     Ok(())
 }

@@ -1,15 +1,16 @@
 // Copyright © Aptos Foundation
 
 use crate::{
+    consts::FUND_AMOUNT,
     fail_message::{
         ERROR_COULD_NOT_CREATE_ACCOUNT, ERROR_COULD_NOT_CREATE_TRANSACTION,
         ERROR_COULD_NOT_FINISH_TRANSACTION, ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_BALANCE,
         ERROR_NO_VERSION, FAIL_WRONG_BALANCE, FAIL_WRONG_BALANCE_AT_VERSION,
     },
-    persistent_check,
+    persistent_check, time_fn,
     utils::{
-        create_account, create_and_fund_account, get_client, get_faucet_client, NetworkName,
-        TestFailure,
+        check_balance, create_account, create_and_fund_account, emit_step_metrics, get_client,
+        get_faucet_client, NetworkName, TestFailure, TestName,
     },
 };
 use anyhow::{anyhow, Result};
@@ -24,32 +25,78 @@ static TRANSFER_AMOUNT: u64 = 1_000;
 /// Tests coin transfer. Checks that:
 ///   - receiver balance reflects transferred amount
 ///   - receiver balance shows correct amount at the previous version
-pub async fn test(network_name: NetworkName) -> Result<(), TestFailure> {
+pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFailure> {
     // setup
-    let (client, mut account, receiver) = setup(network_name).await?;
+    let (client, mut account, receiver) = emit_step_metrics(
+        time_fn!(setup, network_name),
+        TestName::CoinTransfer,
+        "setup",
+        network_name,
+        run_id,
+    )?;
     let coin_client = CoinClient::new(&client);
 
+    // check account data persistently
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address_address,
+            "check_account_data",
+            check_account_data,
+            &client,
+            account.address(),
+            receiver
+        ),
+        TestName::CoinTransfer,
+        "check_account_data",
+        network_name,
+        run_id,
+    )?;
+
     // transfer coins to the receiver
-    let version = transfer_coins(&client, &coin_client, &mut account, receiver).await?;
+    let version = emit_step_metrics(
+        time_fn!(
+            transfer_coins,
+            &client,
+            &coin_client,
+            &mut account,
+            receiver
+        ),
+        TestName::CoinTransfer,
+        "transfer_coins",
+        network_name,
+        run_id,
+    )?;
 
     // check receiver balance persistently
-    persistent_check::address(
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address,
+            "check_account_balance",
+            check_account_balance,
+            &client,
+            receiver
+        ),
+        TestName::CoinTransfer,
         "check_account_balance",
-        check_account_balance,
-        &client,
-        receiver,
-    )
-    .await?;
+        network_name,
+        run_id,
+    )?;
 
     // check receiver balance at previous version persistently
-    persistent_check::address_version(
+    emit_step_metrics(
+        time_fn!(
+            persistent_check::address_version,
+            "check_account_balance_at_version",
+            check_account_balance_at_version,
+            &client,
+            receiver,
+            version
+        ),
+        TestName::CoinTransfer,
         "check_account_balance_at_version",
-        check_account_balance_at_version,
-        &client,
-        receiver,
-        version,
-    )
-    .await?;
+        network_name,
+        run_id,
+    )?;
 
     Ok(())
 }
@@ -74,6 +121,10 @@ async fn setup(
             return Err(e.into());
         },
     };
+    info!(
+        "test: coin_transfer part: setup creating account: {}",
+        account.address()
+    );
 
     // create receiver
     let receiver = match create_account(&faucet_client).await {
@@ -86,8 +137,23 @@ async fn setup(
             return Err(e.into());
         },
     };
+    info!(
+        "test: coin_transfer part: setup creating receiver: {}",
+        receiver
+    );
 
     Ok((client, account, receiver))
+}
+
+async fn check_account_data(
+    client: &Client,
+    account: AccountAddress,
+    receiver: AccountAddress,
+) -> Result<(), TestFailure> {
+    check_balance(TestName::CoinTransfer, client, account, U64(FUND_AMOUNT)).await?;
+    check_balance(TestName::CoinTransfer, client, receiver, U64(0)).await?;
+
+    Ok(())
 }
 
 async fn transfer_coins(
