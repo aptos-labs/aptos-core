@@ -20,8 +20,6 @@ on:
         required: false
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
-  schedule:
-    - cron: "0 6 */3 * *" # The main branch cadence. This runs every three days at 6am UTC.
   pull_request:
     paths:
       - ".github/workflows/forge-state-sync.yaml"
@@ -43,23 +41,18 @@ jobs:
   determine-test-metadata:
     runs-on: ubuntu-latest
     outputs:
-      IMAGE_TAG: ${{ steps.determine-test-image-tag.outputs.IMAGE_TAG }}
+      IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
       BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
     steps:
       - name: Determine branch based on cadence
         id: determine-test-branch
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 6 */3 * *" ]]; then
-              echo "Branch: main"
-              echo "BRANCH=main" >> $GITHUB_OUTPUT
-            else
-              echo "Unknown schedule: ${{ github.event.schedule }}"
-              exit 1
-            fi
+            echo "Unknown schedule: ${{ github.event.schedule }}"
+            exit 1
           elif [[ "${{ github.event_name }}" == "push" ]]; then
-              echo "Branch: ${{ github.ref_name }}"
-              echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "Branch: ${{ github.ref_name }}"
+            echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
             echo "Using GIT_SHA"
             # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
@@ -67,16 +60,11 @@ jobs:
             echo "BRANCH=${{ inputs.GIT_SHA }}" >> $GITHUB_OUTPUT
           fi
 
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
-        with:
-          ref: ${{ steps.determine-test-branch.outputs.BRANCH }}
-          fetch-depth: 0
-
       - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
-      # find_latest_images.py requires docker utilities and having authenticated to internal docker image registries
+      # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
         with:
@@ -88,20 +76,15 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - uses: ./.github/actions/python-setup
+      - uses: aptos-labs/aptos-core/.github/actions/get-latest-docker-image-tag@main
+        id: get-docker-image-tag
         with:
-          pyproject_directory: testsuite
-
-      - name: Determine image tag
-        id: determine-test-image-tag
-        # Forge relies on the default and failpoints variants
-        run: ./testrun find_latest_image.py --variant failpoints --variant performance
-        shell: bash
-        working-directory: testsuite
+          branch: ${{ steps.determine-test-branch.outputs.BRANCH }}
+          variants: "failpoints performance"
 
       - name: Write summary
         run: |
-          IMAGE_TAG=${{ steps.determine-test-image-tag.outputs.IMAGE_TAG }}
+          IMAGE_TAG=${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
           BRANCH=${{ steps.determine-test-branch.outputs.BRANCH }}
           if [ -n "${BRANCH}" ]; then
             echo "BRANCH: [${BRANCH}](https://github.com/${{ github.repository }}/tree/${BRANCH})" >> $GITHUB_STEP_SUMMARY
@@ -125,8 +108,8 @@ jobs:
 
   # Measures state sync performance for validator fullnodes (execution syncing)
   run-forge-state-sync-perf-fullnode-execute-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-state-sync-perf-validator-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -138,8 +121,8 @@ jobs:
 
   # Measures state sync performance for validator fullnodes (fast syncing)
   run-forge-state-sync-perf-fullnode-fast-sync-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-state-sync-perf-fullnode-execute-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -151,8 +134,8 @@ jobs:
 
   # Measures state sync performance for validator fullnodes (output syncing)
   run-forge-state-sync-perf-fullnode-apply-test:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-state-sync-perf-fullnode-fast-sync-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:

@@ -56,12 +56,7 @@ pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
         }
     }
 
-    fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGMessage(DAGNetworkMessage {
-            epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
-        })
-    }
+    fn into_network_message(self) -> ConsensusMsg;
 }
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed

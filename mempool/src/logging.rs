@@ -116,6 +116,7 @@ pub struct LogSchema<'a> {
     #[schema(debug)]
     batch_id: Option<&'a MultiBatchId>,
     backpressure: Option<bool>,
+    num_txns: Option<usize>,
 }
 
 impl<'a> LogSchema<'a> {
@@ -143,6 +144,7 @@ impl<'a> LogSchema<'a> {
             upstream_network: None,
             batch_id: None,
             backpressure: None,
+            num_txns: None,
         }
     }
 }

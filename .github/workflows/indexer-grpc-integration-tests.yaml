@@ -12,8 +12,9 @@ permissions:
 
 # cancel redundant builds
 concurrency:
-  # cancel redundant builds on PRs (only on PR, not on branches)
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  # for push events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
+  # for pull_request events newer jobs cancel earlier jobs to save on CI etc.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'push' && github.sha || github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -22,6 +23,7 @@ jobs:
   # triggered the workflow or on 'pull_request's which have set auto_merge=true
   # or have the label "CICD:run-e2e-tests".
   permission-check:
+    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
@@ -31,6 +33,7 @@ jobs:
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
   run-tests-local-testnet:
+    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
     needs: [permission-check]
     runs-on: high-perf-docker
     env:

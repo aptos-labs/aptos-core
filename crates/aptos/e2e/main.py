@@ -45,6 +45,17 @@ from cases.move import (
     test_move_view,
 )
 from cases.node import test_node_show_validator_set
+from cases.stake import (
+    test_stake_add_stake,
+    test_stake_create_staking_contract,
+    test_stake_increase_lockup,
+    test_stake_initialize_stake_owner,
+    test_stake_set_operator,
+    test_stake_set_voter,
+    test_stake_unlock_stake,
+    test_stake_withdraw_stake_after_unlock,
+    test_stake_withdraw_stake_before_unlock,
+)
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -134,11 +145,22 @@ def run_tests(run_helper):
     test_move_run(run_helper)
     test_move_view(run_helper)
 
-    # WARNING: This has to stay at the end, else key will get rotated
-    test_account_rotate_key(run_helper)
+    # Run stake subcommand group tests.
+    test_stake_initialize_stake_owner(run_helper)
+    test_stake_add_stake(run_helper)
+    test_stake_withdraw_stake_before_unlock(run_helper)
+    test_stake_unlock_stake(run_helper)
+    test_stake_withdraw_stake_after_unlock(run_helper)
+    test_stake_increase_lockup(run_helper)
+    test_stake_set_operator(run_helper)
+    test_stake_set_voter(run_helper)
+    test_stake_create_staking_contract(run_helper)
 
     # Run node subcommand group tests.
     test_node_show_validator_set(run_helper)
+
+    # WARNING: This has to stay at the end, else key will get rotated
+    test_account_rotate_key(run_helper)
 
 
 def main():

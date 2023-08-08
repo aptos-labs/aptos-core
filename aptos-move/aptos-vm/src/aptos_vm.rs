@@ -18,7 +18,6 @@ use crate::{
     verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
-use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
@@ -36,6 +35,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
+    state_store::state_key::StateKey,
     transaction::{
         analyzed_transaction::AnalyzedTransaction, EntryFunction, ExecutionError, ExecutionStatus,
         ModuleBundle, Multisig, MultisigTransactionPayload, SignatureCheckedTransaction,
@@ -43,7 +43,7 @@ use aptos_types::{
         VMValidatorResult, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
-    write_set::WriteSet,
+    write_set::WriteOp,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -498,12 +498,12 @@ impl AptosVM {
         let txn_idx = session.txn_idx;
         let change_set = session.finish(&mut (), change_set_configs)?;
 
-        for (key, op) in change_set.write_set() {
+        for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
 
         gas_meter.charge_storage_fee_for_all(
-            change_set.write_set().iter(),
+            change_set.write_set_iter(),
             change_set.events(),
             txn_data.transaction_size,
             txn_data.gas_unit_price,
@@ -1214,14 +1214,7 @@ impl AptosVM {
 
         match writeset_payload {
             WriteSetPayload::Direct(change_set) => {
-                let write_set = change_set.write_set().clone();
-                let events = change_set.events().to_vec();
-                VMChangeSet::new(
-                    write_set,
-                    DeltaChangeSet::empty(),
-                    events,
-                    &change_set_configs,
-                )
+                VMChangeSet::try_from_storage_change_set(change_set.clone(), &change_set_configs)
             },
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(txn_idx, resolver, session_id);
@@ -1254,14 +1247,14 @@ impl AptosVM {
         }
     }
 
-    fn read_writeset(
+    fn read_writeset<'a>(
         &self,
         state_view: &impl StateView,
-        write_set: &WriteSet,
+        write_set: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for (state_key, _) in write_set.iter() {
+        for (state_key, _) in write_set.into_iter() {
             state_view
                 .get_state_value_bytes(state_key)
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
@@ -1310,7 +1303,12 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_writeset(resolver, change_set.write_set())?;
+        self.read_writeset(resolver, change_set.write_set_iter())?;
+        assert!(
+            change_set.aggregator_write_set().is_empty(),
+            "Waypoint change set should not have any aggregator writes."
+        );
+
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = VMOutput::new(change_set, FeeStatement::zero(), VMStatus::Executed.into());
@@ -1386,7 +1384,7 @@ impl AptosVM {
         (
             vm_status,
             vm_output
-                .into_transaction_output(state_view)
+                .try_into_transaction_output(state_view)
                 .expect("Simulation cannot fail"),
         )
     }
@@ -1662,6 +1660,7 @@ impl VMAdapter for AptosVM {
     fn should_restart_execution(vm_output: &VMOutput) -> bool {
         let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
         vm_output
+            .change_set()
             .events()
             .iter()
             .any(|event| *event.key() == new_epoch_event_key)

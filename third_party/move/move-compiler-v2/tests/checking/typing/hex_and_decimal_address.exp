@@ -10,3 +10,12 @@ module 0x7b::M {
         Tuple()
     }
 } // end 0x7b::M
+module <SELF> {
+    private fun main() {
+        M::take(M::s());
+        M::take(M::s());
+        M::take(M::s());
+        M::take(M::s());
+        Tuple()
+    }
+} // end <SELF>
