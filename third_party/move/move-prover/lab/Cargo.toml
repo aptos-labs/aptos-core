@@ -11,6 +11,7 @@ license = "Apache-2.0"
 move-compiler = { path = "../../move-compiler" }
 move-model = { path = "../../move-model" }
 move-prover = { path = ".." }
+move-prover-boogie-backend = { path = "../boogie-backend" }
 move-stackless-bytecode = { path = "../bytecode" }
 
 # FB external dependencies

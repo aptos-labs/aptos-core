@@ -97,7 +97,14 @@ pub const GRAY: RGBColor = RGBColor(0x63, 0x63, 0x63);
 pub const DARK_GRAY: RGBColor = RGBColor(0x49, 0x48, 0x48);
 pub const STONE_GRAY: RGBColor = RGBColor(0x92, 0x8E, 0x85);
 
-pub const GRAY_PALETTE: &[&RGBColor] = &[&LIGHT_GRAY, &MEDIUM_GRAY, &GRAY, &DARK_GRAY, &STONE_GRAY, &BLACK];
+pub const GRAY_PALETTE: &[&RGBColor] = &[
+    &LIGHT_GRAY,
+    &MEDIUM_GRAY,
+    &GRAY,
+    &DARK_GRAY,
+    &STONE_GRAY,
+    &BLACK,
+];
 pub const COLOR_PALETTE: &[&RGBColor] = &[&GREEN, &BLUE, &RED, &CYAN, &YELLOW, &MAGENTA];
 
 /// Plot a set of benchmarks to an SVG file.
@@ -162,7 +169,7 @@ pub fn plot_benchmarks_to_file(fname: &str, benchmarks: &[Benchmark]) -> anyhow:
     // We are drawing data points as horizontal bars, therefore x-axis is max_duration
     // and y-axis datapoints.
     let real_x = 1000u32;
-    let real_y = data_points * (20u32 + (benchmarks.len() as u32)*15);
+    let real_y = data_points * (20u32 + (benchmarks.len() as u32) * 15);
     let root = SVGBackend::new(fname, (real_x, real_y)).into_drawing_area();
 
     let duration_percent = |p: usize| ((max_duration as f64) * (p as f64) / 100f64) as u32;
@@ -176,7 +183,7 @@ pub fn plot_benchmarks_to_file(fname: &str, benchmarks: &[Benchmark]) -> anyhow:
 
     let root = root.apply_coord_spec(Cartesian2d::<RangedCoordu32, RangedCoordu32>::new(
         0..max_duration + duration_percent(10), // + 10% for label
-        0..(data_points + 1) * ((1 + benchmarks.len() as u32) * 10),
+        0..(data_points + 1) * ((2 + benchmarks.len() as u32) * 10),
         (0..real_x as i32, 0..real_y as i32),
     ));
     root.fill(&WHITE)?;

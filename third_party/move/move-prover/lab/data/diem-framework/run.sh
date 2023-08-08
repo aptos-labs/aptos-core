@@ -1,8 +1,6 @@
 #!/bin/bash
 
-FRAMEWORK="../../../../documentation/examples/diem-framework/move-packages/DPN/sources"
-STDLIB="../../../../move-stdlib/sources"
-NURSERY="../../../../move-stdlib/nursery/sources"
+FRAMEWORK="../../../../../../aptos-move/framework/aptos-framework/sources"
 
 # Benchmark per function
 cargo run --release -p prover-lab -- bench -f -c prover.toml $FRAMEWORK/*.move

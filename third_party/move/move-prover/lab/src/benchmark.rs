@@ -69,6 +69,14 @@ pub fn benchmark(args: &[String]) {
                 .help("whether benchmarking should happen per function; default is per module"),
         )
         .arg(
+            Arg::new("aptos-natives")
+                .short('a')
+                .long("aptos")
+                .num_args(0)
+                .action(Set)
+                .help("whether the aptos-natives should be included."),
+        )
+        .arg(
             Arg::new("dependencies")
                 .action(Append)
                 .long("dependency")
@@ -99,6 +107,7 @@ pub fn benchmark(args: &[String]) {
         vec![None]
     };
     let per_function = matches.contains_id("function");
+    let use_aptos_natives = matches.contains_id("aptos-natives");
 
     for config_spec in configs {
         let (config, out) = if let Some(config_file) = &config_spec {
@@ -111,7 +120,14 @@ pub fn benchmark(args: &[String]) {
         } else {
             (None, "benchmark.data".to_string())
         };
-        if let Err(s) = run_benchmark(&out, config.as_ref(), &sources, &deps, per_function) {
+        if let Err(s) = run_benchmark(
+            &out,
+            config.as_ref(),
+            &sources,
+            &deps,
+            per_function,
+            use_aptos_natives,
+        ) {
             println!("ERROR: execution failed: {}", s);
         } else {
             println!("results stored at `{}`", out);
@@ -125,6 +141,7 @@ fn run_benchmark(
     modules: &[String],
     dep_dirs: &[String],
     per_function: bool,
+    use_aptos_natives: bool,
 ) -> anyhow::Result<()> {
     let mut options = if let Some(config_file) = config_file_opt {
         Options::create_from_toml_file(config_file)?
@@ -148,6 +165,20 @@ fn run_benchmark(
     )?;
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
 
+    if use_aptos_natives {
+        options.backend.custom_natives =
+            Some(move_prover_boogie_backend::options::CustomNativeOptions {
+                template_bytes: include_bytes!(
+                    "../../../../../aptos-move/framework/src/aptos-natives.bpl"
+                )
+                .to_vec(),
+                module_instance_names: vec![(
+                    "0x1::object".to_string(),
+                    "object_instances".to_string(),
+                    true,
+                )],
+            });
+    }
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually
     // indicates a bug in boogie or the solver, because we already propagate soft timeouts, but
     // they are ignored.

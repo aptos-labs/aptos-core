@@ -10907,6 +10907,7 @@ dependencies = [
  "move-compiler",
  "move-model",
  "move-prover",
+ "move-prover-boogie-backend",
  "move-stackless-bytecode",
  "num 0.4.0",
  "plotters",
