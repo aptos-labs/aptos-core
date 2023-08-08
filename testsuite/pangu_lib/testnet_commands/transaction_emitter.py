@@ -11,7 +11,7 @@ import time
 
 
 def transaction_emitter_main(
-    testnet_name: str, args: List[str], system_context: SystemContext, timeout: int = 30
+    testnet_name: str, args: List[str], system_context: SystemContext, timeout: int = 30, ask_for_delete: bool = True
 ):
     #
     # Create command array
@@ -43,19 +43,22 @@ def transaction_emitter_main(
         system_context.shell.run(command, stream_output=True)
         tries += 1
         time.sleep(1)
-
+    
     #
     # Check if we timed out
     if tries == timeout:
         log.error("Failed to get logs from transaction emitter")
 
     #
-    # Delete pod
-    user_input = input(
-        '-------------------------------------------------------\n-The transaction emitter logs are complete. \n-Type "delete" to delete the transaction emitter pod\n-------------------------------------------------------\n'
-    )
-    if user_input == "delete":
-        system_context.kubernetes.delete_resource(pod, testnet_name)
+    # Ask for delete flag for running Pangu without being able to use stdin (e.g. in CI/Forge)
+    if ask_for_delete:
+        #
+        # Delete pod
+        user_input = input(
+            '-------------------------------------------------------\n-The transaction emitter logs are complete. \n-Type "delete" to delete the transaction emitter pod\n-------------------------------------------------------\n'
+        )
+        if user_input == "delete":
+            system_context.kubernetes.delete_resource(pod, testnet_name)
 
 
 def create_transaction_emitter_pod(
