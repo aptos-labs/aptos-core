@@ -125,7 +125,6 @@ struct Opt {
 
     /// 0 implies random TX generation; if non-zero, then 'transactions_per_sender is ignored
     /// 'connected_tx_grps' should be less than 'block_size'
-    /// 'connected_tx_grps' should be less than 'num_main_signer_accounts / 2'
     #[clap(long, default_value_t = 0)]
     connected_tx_grps: usize,
 

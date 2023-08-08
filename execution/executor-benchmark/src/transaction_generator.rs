@@ -451,6 +451,11 @@ impl TransactionGenerator {
         }
     }
 
+    /// To generate 'n' connected groups, we divide the signer accounts into 'n' groups, and create
+    /// 'block_size / n' transactions in each group.
+    /// To get all the transactions in a group to be connected, we pick at random at-least one of
+    /// the sender or receiver accounts from the pool of accounts already used for a transaction in
+    /// the same group.
     fn get_connected_grps_transfer_indices(
         rng: &mut StdRng,
         num_signer_accounts: usize,
@@ -463,14 +468,21 @@ impl TransactionGenerator {
         let num_txns_per_grp = block_size / connected_tx_grps;
 
         if num_txns_per_grp >= num_accounts_per_grp {
-            panic!("For the desired workload we want num_accounts_per_grp ({}) > num_txns_per_grp ({})", num_accounts_per_grp, num_txns_per_grp);
+            panic!(
+                "For the desired workload we want num_accounts_per_grp ({}) > num_txns_per_grp ({})",
+                num_accounts_per_grp, num_txns_per_grp);
+        } else if connected_tx_grps > block_size {
+            panic!(
+                "connected_tx_grps ({}) > block_size ({}) cannot guarantee at least 1 txn per grp",
+                connected_tx_grps, block_size
+            );
         }
 
         (0..connected_tx_grps)
             .flat_map(|grp_idx| {
-                let accounts_st_idx = grp_idx * num_accounts_per_grp;
-                let accounts_end_idx = accounts_st_idx + num_accounts_per_grp - 1;
-                let mut unused_indices: Vec<_> = (accounts_st_idx..=accounts_end_idx).collect();
+                let accounts_start_idx = grp_idx * num_accounts_per_grp;
+                let accounts_end_idx = accounts_start_idx + num_accounts_per_grp - 1;
+                let mut unused_indices: Vec<_> = (accounts_start_idx..=accounts_end_idx).collect();
                 unused_indices.shuffle(rng);
                 let mut used_indices: Vec<_> =
                     vec![unused_indices.pop().unwrap(), unused_indices.pop().unwrap()];
@@ -480,18 +492,17 @@ impl TransactionGenerator {
                     // index1 is always from used_indices, so that all the txns are connected
                     let mut index1 = used_indices[rng.gen_range(0, used_indices.len())];
 
-                    // index2 is either from used_indices or unused_indices
+                    // index2 is either from used_indices or unused_indices with equal probability
                     let mut index2;
-                    let rnd = rng.gen_range(0, used_indices.len() + unused_indices.len());
-                    if rnd < used_indices.len() {
-                        index2 = used_indices[rnd];
+                    if rng.gen::<bool>() {
+                        index2 = used_indices[rng.gen_range(0, used_indices.len())];
                     } else {
                         // unused_indices is shuffled already, so last element is random
                         index2 = unused_indices.pop().unwrap();
                         used_indices.push(index2);
                     }
 
-                    if rng.gen_range(0, 2) == 0 {
+                    if rng.gen::<bool>() {
                         // with 50% probability, swap the indices of sender and receiver
                         (index1, index2) = (index2, index1);
                     }
@@ -635,8 +646,8 @@ fn test_get_connected_grps_transfer_indices() {
         let block_size = 100;
         let num_signer_accounts = 1000;
         // we check for (i) block_size not divisible by connected_txn_grps (ii) when divisible
-        // (iii) when all txns in the block are independent
-        for connected_txn_grps in [3, block_size / 10, block_size] {
+        // (iii) when all txns in the block are independent (iv) all txns are dependent
+        for connected_txn_grps in [3, block_size / 10, block_size, 1] {
             let transfer_indices = TransactionGenerator::get_connected_grps_transfer_indices(
                 &mut rng,
                 num_signer_accounts,
