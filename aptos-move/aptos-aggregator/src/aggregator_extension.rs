@@ -385,7 +385,7 @@ impl Aggregator {
             },
             AggregatorState::Delta { speculative_start_value, speculative_source, delta, history } => {
                 // If we performed a "cheap read" or "expensive read" operation before, use it.
-                if speculative_source == SpeculativeValueSource::Default {
+                if speculative_source != SpeculativeValueSource::Default {
                     return match delta {
                         DeltaValue::Positive(value) => Ok(addition(speculative_start_value, value, self.max_value)?),
                         DeltaValue::Negative(value) => Ok(subtraction(speculative_start_value, value)?),
@@ -412,45 +412,47 @@ impl Aggregator {
         }
     }
     
-    /// Implements logic for reading the value of an aggregator. As a
-    /// result, the aggregator knows it value (i.e. its state changes to
-    /// `Data`).
-    pub fn read_and_materialize(
+    /// Implements logic for doing an "expensive read" of an aggregator.
+    /// This means that we query the MVHashmap for aggregator's value obtained
+    /// by aggregating all the deltas of the aggregator, and store it in the
+    /// `speculative_start_value`, with `speculative_source` as `AggregatedValue`.
+    pub fn read_most_recent_aggregator_value(
         &mut self,
         resolver: &dyn AggregatorResolver,
         id: &AggregatorID,
     ) -> PartialVMResult<u128> {
-        // If aggregator has already been read, return immediately.
-        if let AggregatorState::Data {value} = self.state {
-            return Ok(value);
-        }
-        // Otherwise, we have a delta and have to go to storage and apply it.
-        // In theory, any delta will be applied to existing value. However,
-        // something may go wrong, so we guard by throwing an error in
-        // extension.
-        let value_from_storage = resolver.resolve_aggregator_value(id).map_err(|e| {
-            extension_error(format!("Could not find the value of the aggregator: {}", e))
-        })?;
-
-        // Validate history and apply the delta.
-        self.validate_history(value_from_storage)?;
         match self.state {
-            AggregatorState::PositiveDelta => {
-                self.value = addition(value_from_storage, self.value, self.max_value)?;
+            AggregatorState::Data { value } => {
+                // If aggregator knows the value, return it.
+                return Ok(value);
             },
-            AggregatorState::NegativeDelta => {
-                self.value = subtraction(value_from_storage, self.value)?;
-            },
-            AggregatorState::Data => {
-                unreachable!("Materialization only happens in Delta state")
-            },
+            AggregatorState::Delta { speculative_start_value, speculative_source, delta, history } => {
+                // If we performed an "expensive read" operation before, use it.
+                if speculative_source == SpeculativeValueSource::AggregatedValue {
+                    return match delta {
+                        DeltaValue::Positive(value) => Ok(addition(speculative_start_value, value, self.max_value)?),
+                        DeltaValue::Negative(value) => Ok(subtraction(speculative_start_value, value)?),
+                    };
+                }
+                // Otherwise, we have to go to storage and read the value.
+                let value_from_storage = resolver.resolve_aggregator_value(id).map_err(|e| {
+                    extension_error(format!("Could not find the value of the aggregator: {}", e))
+                })?;
+        
+                // Validate history and apply the delta.
+                self.validate_history(value_from_storage)?;
+                self.state = AggregatorState::Delta {
+                    speculative_start_value: value_from_storage,
+                    speculative_source: SpeculativeValueSource::AggregatedValue,
+                    delta,
+                    history,
+                };
+                return match delta {
+                    DeltaValue::Positive(value) => Ok(addition(value_from_storage, value, self.max_value)?),
+                    DeltaValue::Negative(value) => Ok(subtraction(value_from_storage, value)?),
+                };
+            }
         }
-
-        // Change the state and return the new value. Also, make
-        // sure history is no longer tracked.
-        self.state = AggregatorState::Data;
-        self.history = None;
-        Ok(self.value)
     }
 
     /// Unpacks aggregator into its fields.
