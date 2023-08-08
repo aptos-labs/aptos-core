@@ -59,7 +59,7 @@ jobs:
   # to be land blocking for any PR on the aptos repo. This is why we run those tests
   # separate from test-sdk-confirm-client-generated-publish.
   run-indexer-tests:
-    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests'))
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
     runs-on: ubuntu-latest
     steps:
