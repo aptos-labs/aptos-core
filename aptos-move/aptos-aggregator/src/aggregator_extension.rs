@@ -232,6 +232,36 @@ impl Aggregator {
         None
     }
 
+    fn get_value(&self) -> PartialVMResult<u128> {
+        match self.state {
+            AggregatorState::Data {value} => Ok(value),
+            AggregatorState::Delta { speculative_start_value, speculative_source: _, delta, history: _ } => {
+                match delta {
+                    DeltaValue::Positive(current_delta) => {
+                        addition(speculative_start_value, current_delta, self.max_value)
+                    },
+                    DeltaValue::Negative(current_delta) => {
+                        subtraction(speculative_start_value, current_delta)
+                    }
+                }
+            }
+        }
+    }
+
+    fn get_delta(&self) -> Option<DeltaValue> {
+        match self.state {
+            AggregatorState::Data {..} => None,
+            AggregatorState::Delta { speculative_start_value: _, speculative_source: _, delta, history: _ } => Some(delta)
+        }
+    }
+
+    fn get_history(&self) -> Option<&DeltaHistory> {
+        match self.state {
+            AggregatorState::Data {..} => None,
+            AggregatorState::Delta { speculative_start_value: _, speculative_source: _, delta: _, ref history } => Some(history)
+        }
+    }
+
     /// Implements logic for adding to an aggregator.
     pub fn try_add(&mut self, input: u128) -> PartialVMResult<()> {
         if input > self.max_value {
@@ -456,8 +486,8 @@ impl Aggregator {
     }
 
     /// Unpacks aggregator into its fields.
-    pub fn into(self) -> (u128, AggregatorState, u128, Option<DeltaHistory>) {
-        (self.value, self.state, self.max_value, self.history)
+    pub fn into(self) -> (u128, AggregatorState) {
+        (self.max_value, self.state)
     }
 }
 
@@ -500,7 +530,7 @@ impl AggregatorData {
             id,
             state: AggregatorState::Delta {
                 speculative_start_value: 0,
-                speculative_source: SpeculativeValueSource::LastCommittedValue,
+                speculative_source: SpeculativeValueSource::Default,
                 delta: DeltaValue::Positive(0),
                 history: DeltaHistory::new(),
             },
@@ -563,7 +593,25 @@ impl AggregatorData {
             .aggregator_snapshots
             .get(&id)
             .expect("AggregatorSnapshot doesn't exist");
-        snapshot.value
+        match snapshot.state {
+            AggregatorState::Data { value } => value,
+            AggregatorState::Delta {
+                speculative_start_value,
+                speculative_source:_,
+                delta,
+                history:_,
+            } => {
+                let value = match delta {
+                    DeltaValue::Positive(value) => {
+                        addition(speculative_start_value, value, snapshot.max_value)
+                    }
+                    DeltaValue::Negative(value) => {
+                        subtraction(speculative_start_value, value)
+                    }
+                };
+                value.expect("AggregatorSnapshot value must be valid")
+            }
+        }
     }
 
     pub fn generate_id(&mut self) -> u64 {
@@ -611,7 +659,7 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(300), 700)
             .expect("Get aggregator failed");
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(700)));
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(700)));
     }
 
     #[test]
@@ -623,8 +671,8 @@ mod test {
             .get_aggregator(aggregator_id_for_test(200), 200)
             .expect("Get aggregator failed");
         assert_ok!(aggregator.try_add(100));
-        assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(200)));
-        assert_eq!(aggregator.value, 100);
+        assert_ok!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(200)));
+        assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Positive(100));
     }
 
     #[test]
@@ -638,14 +686,14 @@ mod test {
             .expect("Get aggregator failed");
         assert_ok!(aggregator.try_add(400));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             400
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             None
         );
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -658,14 +706,14 @@ mod test {
             .expect("Get aggregator failed");
         assert_ok!(aggregator.try_sub(400));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             400
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_underflow_negative,
+            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
             None
         );
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -678,9 +726,8 @@ mod test {
             .expect("Get aggregator failed");
         assert_ok!(aggregator.try_add(400));
         assert_ok!(aggregator.try_sub(300));
-        assert_eq!(aggregator.value, 100);
-        assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
+        assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Positive(100));
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -693,9 +740,8 @@ mod test {
             .expect("Get aggregator failed");
         assert_ok!(aggregator.try_sub(301));
         assert_ok!(aggregator.try_add(1));
-        assert_eq!(aggregator.value, 300);
-        assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
+        assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Negative(300));
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
     }
 
     #[test]
@@ -709,33 +755,33 @@ mod test {
         // +0 to +800 > 600!
         assert_err!(aggregator.try_add(800));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             0
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             Some(800)
         );
 
         // +0 + 300 < 600
         assert_ok!(aggregator.try_add(300));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             300
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             Some(800)
         );
 
         // +300 + 400 > 600!
         assert_err!(aggregator.try_add(400));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             300
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             Some(700)
         );
 
@@ -746,44 +792,44 @@ mod test {
         // 0 + 100 < 200
         assert_ok!(aggregator.try_add(100));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             None
         );
 
         // 100 + 200 > 200!
         assert_err!(aggregator.try_add(200));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             Some(300)
         );
 
         // 100 + 150 > 200!
         assert_err!(aggregator.try_add(150));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             Some(250)
         );
 
         // 100 + u128::MAX > 200!
         assert_err!(aggregator.try_add(u128::MAX));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             Some(250)
         );
 
@@ -794,33 +840,33 @@ mod test {
         // 0 + 100 < 300!
         assert_ok!(aggregator.try_add(100));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             None
         );
 
         // 100 + u128::MAX > 300!
         assert_err!(aggregator.try_add(u128::MAX));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             None
         );
 
         // 100 + 250 > 300!
         assert_err!(aggregator.try_add(250));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_overflow_positive,
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             Some(350)
         );
     }
@@ -836,11 +882,11 @@ mod test {
             .expect("Get aggregator failed");
         assert_err!(aggregator.try_sub(700));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             0
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_underflow_negative,
+            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
             Some(700)
         );
 
@@ -848,31 +894,31 @@ mod test {
 
         assert_ok!(aggregator.try_sub(300));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_underflow_negative,
+            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
             Some(700)
         );
 
         assert_err!(aggregator.try_sub(550));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_underflow_negative,
+            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
             Some(650)
         );
 
         assert_err!(aggregator.try_sub(800));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_underflow_negative,
+            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
             Some(650)
         );
 
@@ -890,37 +936,37 @@ mod test {
 
         assert_ok!(aggregator.try_sub(100));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             100
         );
 
         assert_err!(aggregator.try_sub(u128::MAX));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             100
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_underflow_negative,
+            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
             None
         );
 
         assert_ok!(aggregator.try_sub(100));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             200
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_underflow_negative,
+            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
             None
         );
 
         assert_err!(aggregator.try_sub(101));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             200
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_underflow_negative,
+            aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
             Some(301)
         );
     }
@@ -936,45 +982,42 @@ mod test {
         assert_ok!(aggregator.try_add(200));
         assert_ok!(aggregator.try_sub(300));
 
-        assert_eq!(aggregator.value, 100);
+        assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Positive(100));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             200
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             100
         );
-        assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
 
         assert_ok!(aggregator.try_add(50));
         assert_ok!(aggregator.try_add(300));
         assert_ok!(aggregator.try_sub(25));
 
-        assert_eq!(aggregator.value, 225);
+        assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Positive(225));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             250
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             100
         );
-        assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
 
         assert_ok!(aggregator.try_add(375));
         assert_ok!(aggregator.try_sub(600));
 
-        assert_eq!(aggregator.value, 0);
+        assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Positive(0));
         assert_eq!(
-            aggregator.history.as_ref().unwrap().max_achieved_positive,
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
             600
         );
         assert_eq!(
-            aggregator.history.as_ref().unwrap().min_achieved_negative,
+            aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             100
         );
-        assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
     }
 
     #[test]
