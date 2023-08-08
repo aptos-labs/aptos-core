@@ -104,7 +104,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.check_and_record_resource_group_members(module);
                 self.check_and_record_view_functions(module);
                 self.check_entry_functions(module);
-                self.check_events(module);
+                self.check_and_record_events(module);
                 self.check_init_module(module);
                 self.build_error_map(module)
             }
@@ -470,7 +470,25 @@ impl<'a> ExtendedChecker<'a> {
 // Events
 
 impl<'a> ExtendedChecker<'a> {
-    fn check_events(&mut self, module: &ModuleEnv) {
+    fn check_and_record_events(&mut self, module: &ModuleEnv) {
+        for ref struct_ in module.get_structs() {
+            if self.has_attribute_iter(struct_.get_attributes().iter(), EVENT_STRUCT_ATTRIBUTE) {
+                let module_id = self.get_runtime_module_id(module);
+                // Remember the runtime info that this is a event struct.
+                self.output
+                    .entry(module_id)
+                    .or_default()
+                    .struct_attributes
+                    .entry(
+                        self.env
+                            .symbol_pool()
+                            .string(struct_.get_name())
+                            .to_string(),
+                    )
+                    .or_default()
+                    .push(KnownAttribute::event());
+            }
+        }
         for fun in module.get_functions() {
             if fun.is_inline() || fun.is_native() {
                 continue;
@@ -484,7 +502,13 @@ impl<'a> ExtendedChecker<'a> {
                 if let Bytecode::Call(attr_id, _, Operation::Function(mid, fid, type_inst), _, _) =
                     bc
                 {
-                    self.check_emit_event_call(&target, *attr_id, mid.qualified(*fid), type_inst);
+                    self.check_emit_event_call(
+                        &module.get_id(),
+                        &target,
+                        *attr_id,
+                        mid.qualified(*fid),
+                        type_inst,
+                    );
                 }
             }
         }
@@ -492,6 +516,7 @@ impl<'a> ExtendedChecker<'a> {
 
     fn check_emit_event_call(
         &mut self,
+        module_id: &move_model::model::ModuleId,
         target: &FunctionTarget,
         attr_id: AttrId,
         callee: QualifiedId<FunId>,
@@ -506,14 +531,17 @@ impl<'a> ExtendedChecker<'a> {
         let type_ok = match event_type {
             Type::Struct(mid, sid, _) => {
                 let struct_ = self.env.get_struct(mid.qualified(*sid));
-                self.has_attribute_iter(struct_.get_attributes().iter(), "event")
+                // The struct must be defined in the current module.
+                module_id == mid
+                    && self
+                        .has_attribute_iter(struct_.get_attributes().iter(), EVENT_STRUCT_ATTRIBUTE)
             },
             _ => false,
         };
         if !type_ok {
             let loc = target.get_bytecode_loc(attr_id);
             self.env.error(&loc,
-                           &format!("`0x1::event::emit` called with type `{}` which does not have the `#[event]` attribute",
+                           &format!("`0x1::event::emit` called with type `{}` which is not a struct type defined in the same module with `#[event]` attribute",
                                     event_type.display(&self.env.get_type_display_ctx())));
         }
     }

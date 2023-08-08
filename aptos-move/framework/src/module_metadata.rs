@@ -66,6 +66,7 @@ pub enum KnownAttributeKind {
     ViewFunction = 1,
     ResourceGroup = 2,
     ResourceGroupMember = 3,
+    Event = 4,
 }
 
 impl KnownAttribute {
@@ -117,6 +118,17 @@ impl KnownAttribute {
 
     pub fn is_resource_group_member(&self) -> bool {
         self.kind == KnownAttributeKind::ResourceGroupMember as u8
+    }
+
+    pub fn event() -> Self {
+        Self {
+            kind: KnownAttributeKind::Event as u8,
+            args: vec![],
+        }
+    }
+
+    pub fn is_event(&self) -> bool {
+        self.kind == KnownAttributeKind::Event as u8
     }
 }
 
