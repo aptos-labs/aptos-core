@@ -478,12 +478,15 @@ impl TransactionGenerator {
             );
         }
 
-        (0..connected_tx_grps)
+        let mut signer_account_indices: Vec<_> = (0..num_signer_accounts).collect();
+        signer_account_indices.shuffle(rng);
+
+        let mut transfer_indices: Vec<_> = (0..connected_tx_grps)
             .flat_map(|grp_idx| {
                 let accounts_start_idx = grp_idx * num_accounts_per_grp;
                 let accounts_end_idx = accounts_start_idx + num_accounts_per_grp - 1;
-                let mut unused_indices: Vec<_> = (accounts_start_idx..=accounts_end_idx).collect();
-                unused_indices.shuffle(rng);
+                let mut unused_indices: Vec<_> =
+                    signer_account_indices[accounts_start_idx..=accounts_end_idx].to_vec();
                 let mut used_indices: Vec<_> =
                     vec![unused_indices.pop().unwrap(), unused_indices.pop().unwrap()];
                 let mut transfer_indices: Vec<(_, _)> = vec![(used_indices[0], used_indices[1])];
@@ -510,7 +513,9 @@ impl TransactionGenerator {
                 }
                 transfer_indices
             })
-            .collect()
+            .collect();
+        transfer_indices.shuffle(rng);
+        transfer_indices
     }
 
     /// A 'connected transaction group' is a group of transactions where all the transactions are
