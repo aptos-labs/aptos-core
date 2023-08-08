@@ -2,6 +2,7 @@ import { AptosConfig } from "./aptos_config";
 import { Gen } from "../types";
 import { Memoize, parseApiError } from "../utils";
 import { getBlockByHeight, getBlockByVersion, getChainId, getLedgerInfo, view } from "../internal/general";
+import { ABIRoot, ExtractReturnType, ViewFunctionName, ViewRequestPayload } from "../type_utils";
 
 export class General {
   readonly config: AptosConfig;
@@ -39,13 +40,29 @@ export class General {
   }
 
   /**
+  * Call for a move view function
+  *
+  * @param payload Transaction payload
+  * @param ledger_version (optional) Ledger version to lookup block information for
+  *
+  * @returns MoveValue[]
+  */
+  async view(payload: Gen.ViewRequest, ledger_version?: string): Promise<Gen.MoveValue[]>
+
+  /**
    * Call for a move view function
    *
    * @param payload Transaction payload
-   * @param version (optional) Ledger version to lookup block information for
+   * @param ledger_version (optional) Ledger version to lookup block information for
    *
    * @returns MoveValue[]
    */
+  async view<
+    TABI extends ABIRoot,
+    TFuncName extends ViewFunctionName<TABI>>(
+      payload: ViewRequestPayload<TABI>,
+      ledger_version?: string): Promise<ExtractReturnType<TABI, TFuncName>>
+
   @parseApiError
   async view(payload: Gen.ViewRequest, ledger_version?: string): Promise<Gen.MoveValue[]> {
     const data = await view(this.config, payload, ledger_version);
