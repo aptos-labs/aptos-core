@@ -129,6 +129,13 @@ impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
     }
 }
 
+impl<'a, S: StateView + GenID + Sync + Send> GenID for CrossShardStateView<'a, S> {
+    #[allow(dead_code)]
+    fn generate_id(&self) -> u32 {
+        self.base_view.generate_id()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::sharded_block_executor::cross_shard_state_view::CrossShardStateView;

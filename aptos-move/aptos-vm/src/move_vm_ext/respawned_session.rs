@@ -98,7 +98,7 @@ impl<'r> ChangeSetStateView<'r> {
 }
 
 impl<'r> GenID for ChangeSetStateView<'r> {
-    fn generate_id(&mut self) -> u32 {
+    fn generate_id(&self) -> u32 {
         self.base.generate_id()
     }
 }
@@ -113,7 +113,7 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
         match self.change_set.delta_change_set().get(state_key) {
             Some(delta_op) => Ok(delta_op
-                .try_into_write_op(self.base, state_key)?
+                .try_into_write_op(self.base.as_state_view(), state_key)?
                 .as_state_value()),
             None => match self.change_set.write_set().get(state_key) {
                 Some(write_op) => Ok(write_op.as_state_value()),

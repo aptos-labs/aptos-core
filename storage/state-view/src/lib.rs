@@ -57,7 +57,7 @@ pub trait TStateView {
     }
 }
 
-pub trait StateView: TStateView<Key = StateKey> {}
+pub trait StateView: TStateView<Key = StateKey> + AsStateView {}
 
 impl<T: TStateView<Key = StateKey>> StateView for T {}
 
@@ -103,5 +103,15 @@ impl<'a, S: 'a + StateView> AsAccountWithStateView<'a> for S {
         account_address: &'a AccountAddress,
     ) -> AccountWithStateView<'a> {
         AccountWithStateView::new(account_address, self)
+    }
+}
+
+pub trait AsStateView {
+    fn as_state_view(&self) -> &dyn StateView;
+}
+
+impl<T: StateView> AsStateView for T {
+    fn as_state_view(&self) -> &dyn StateView {
+        self
     }
 }

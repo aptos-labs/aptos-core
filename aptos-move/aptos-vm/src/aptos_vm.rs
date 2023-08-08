@@ -674,11 +674,11 @@ impl AptosVM {
         Ok(())
     }
 
-    fn success_multisig_payload_cleanup<'r, 'l, 't>(
+    fn success_multisig_payload_cleanup<'r, 'l>(
         &'l self,
         resolver: &'r impl MoveResolverExt,
         session: SessionExt,
-        gas_meter: &'t mut impl AptosGasMeter,
+        gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         cleanup_args: Vec<Vec<u8>>,
         change_set_configs: &ChangeSetConfigs,

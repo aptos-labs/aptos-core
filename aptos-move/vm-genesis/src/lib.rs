@@ -27,10 +27,7 @@ use aptos_types::{
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
-use aptos_vm::{
-    data_cache::AsMoveResolver,
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
-};
+use aptos_vm::move_vm_ext::{MoveVmExt, SessionExt, SessionId};
 use aptos_vm_types::storage::ChangeSetConfigs;
 use move_core_types::{
     account_address::AccountAddress,

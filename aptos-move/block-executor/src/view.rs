@@ -183,7 +183,7 @@ enum ViewMapKind<'a, T: Transaction, X: Executable> {
 }
 
 pub trait GenID {
-    fn generate_id(&mut self) -> u32;
+    fn generate_id(&self) -> u32;
 }
 
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
@@ -239,7 +239,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> GenID for LatestView<'a, T, S, X> {
     #[allow(dead_code)]
-    fn generate_id(&mut self) -> u32 {
+    fn generate_id(&self) -> u32 {
         self.id_counter.fetch_add(1, Ordering::SeqCst);
         self.id_counter.load(Ordering::SeqCst)
     }

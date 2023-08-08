@@ -7,7 +7,7 @@ use crate::{
         messages::{CrossShardMsg, CrossShardMsg::RemoteTxnWriteMsg, RemoteTxnWrite},
     },
 };
-use aptos_block_executor::txn_commit_hook::TransactionCommitHook;
+use aptos_block_executor::{txn_commit_hook::TransactionCommitHook, view::GenID};
 use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
@@ -25,7 +25,7 @@ use std::{
 pub struct CrossShardCommitReceiver {}
 
 impl CrossShardCommitReceiver {
-    pub fn start<S: StateView + Sync + Send>(
+    pub fn start<S: StateView + Sync + Send + GenID>(
         cross_shard_state_view: Arc<CrossShardStateView<S>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
         round: RoundId,

@@ -231,7 +231,7 @@ impl<'a, S: StateView + GenID> AggregatorResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S:StateView + GenID> GenID for StorageAdapter<'a, S> {
-    fn generate_id(&mut self) -> u32 {
+    fn generate_id(&self) -> u32 {
         self.state_store.generate_id()
     }
 }
