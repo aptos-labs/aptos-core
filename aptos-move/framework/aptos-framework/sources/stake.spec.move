@@ -15,83 +15,24 @@ spec aptos_framework::stake {
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorPerformance>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorSet>(@aptos_framework);
         // property 1: The validator set resource stores consensus information for each validator. The consensus scheme remains consistent across all validators within the set.
-        invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> global<ValidatorSet>(@aptos_framework).consensus_scheme == 0;
+        invariant global<ValidatorSet>(@aptos_framework).consensus_scheme == 0;
         // property 2: The owner of a validator remains immutable.
-        // We only focus on validators with a status of non-inactive, as inactive validators do not participate in reward distribution.
-        apply ValidatorOwnerNoChange to *<ValidatorSet>;
+        apply ValidatorOwnerNoChange to *;
         // property 3: The total staked value in the stake pool should be constant (excluding adding and withdrawing operations).
-        apply TotalStakedValueNoChange to *<ValidatorSet> except add_stake, add_stake_with_cap, withdraw, withdraw_with_cap, on_new_epoch;
+        apply StakedValueNochange to * except add_stake, add_stake_with_cap, withdraw, withdraw_with_cap, on_new_epoch, update_stake_pool;
     }
 
     spec schema ValidatorOwnerNoChange {
-        let active_validators = global<ValidatorSet>(@aptos_framework).active_validators;
-        let pending_inactive = global<ValidatorSet>(@aptos_framework).pending_inactive;
-        let pending_active = global<ValidatorSet>(@aptos_framework).pending_active;
-        let post post_active_validators = global<ValidatorSet>(@aptos_framework).active_validators;
-        let post post_pending_inactive = global<ValidatorSet>(@aptos_framework).pending_inactive;
-        let post post_pending_active = global<ValidatorSet>(@aptos_framework).pending_active;
-        ensures forall i in 0..len(active_validators): {
-            let addr = active_validators[i].addr;
-            let owner_pool = old(global<OwnerCapability>(addr)).pool_address;
-            let post_owner_pool = global<OwnerCapability>(addr).pool_address;
-            owner_pool == post_owner_pool
-        };
-        ensures forall i in 0..len(pending_inactive): {
-            let addr = pending_inactive[i].addr;
-            let owner_pool = old(global<OwnerCapability>(addr)).pool_address;
-            let post_owner_pool = global<OwnerCapability>(addr).pool_address;
-            owner_pool == post_owner_pool
-        };
-        ensures forall i in 0..len(pending_active): {
-            let addr = pending_active[i].addr;
-            let owner_pool = old(global<OwnerCapability>(addr)).pool_address;
-            let post_owner_pool = global<OwnerCapability>(addr).pool_address;
-            owner_pool == post_owner_pool
-        };
+        ensures forall addr: address where old(exists<OwnerCapability>(addr)):
+            old(global<OwnerCapability>(addr)).pool_address == global<OwnerCapability>(addr).pool_address;
     }
 
-    spec schema TotalStakedValueNoChange {
-        let active_validators = global<ValidatorSet>(@aptos_framework).active_validators;
-        let pending_inactive = global<ValidatorSet>(@aptos_framework).pending_inactive;
-        let pending_active = global<ValidatorSet>(@aptos_framework).pending_active;
-        let post post_active_validators = global<ValidatorSet>(@aptos_framework).active_validators;
-        let post post_pending_inactive = global<ValidatorSet>(@aptos_framework).pending_inactive;
-        let post post_pending_active = global<ValidatorSet>(@aptos_framework).pending_active;
-        ensures forall i in 0..len(active_validators): {
-            let active_value = old(global<StakePool>(active_validators[i].addr)).active.value;
-            let inactive_value = old(global<StakePool>(active_validators[i].addr)).inactive.value;
-            let pending_active_value = old(global<StakePool>(active_validators[i].addr)).pending_active.value;
-            let pending_inactive_value = old(global<StakePool>(active_validators[i].addr)).pending_inactive.value;
-            let post_active_value = global<StakePool>(post_active_validators[i].addr).active.value;
-            let post_inactive_value = global<StakePool>(post_active_validators[i].addr).inactive.value;
-            let post_pending_active_value = global<StakePool>(post_active_validators[i].addr).pending_active.value;
-            let post_pending_inactive_value = global<StakePool>(post_active_validators[i].addr).pending_inactive.value;
-            active_value + inactive_value + pending_active_value + pending_inactive_value ==
-            post_active_value + post_inactive_value + post_pending_active_value + post_pending_inactive_value
-        };
-        ensures forall i in 0..len(pending_inactive): {
-            let active_value = old(global<StakePool>(pending_inactive[i].addr)).active.value;
-            let inactive_value = old(global<StakePool>(pending_inactive[i].addr)).inactive.value;
-            let pending_active_value = old(global<StakePool>(pending_inactive[i].addr)).pending_active.value;
-            let pending_inactive_value = old(global<StakePool>(pending_inactive[i].addr)).pending_inactive.value;
-            let post_active_value = global<StakePool>(post_pending_inactive[i].addr).active.value;
-            let post_inactive_value = global<StakePool>(post_pending_inactive[i].addr).inactive.value;
-            let post_pending_active_value = global<StakePool>(post_pending_inactive[i].addr).pending_active.value;
-            let post_pending_inactive_value = global<StakePool>(post_pending_inactive[i].addr).pending_inactive.value;
-            active_value + inactive_value + pending_active_value + pending_inactive_value ==
-            post_active_value + post_inactive_value + post_pending_active_value + post_pending_inactive_value
-        };
-        ensures forall i in 0..len(pending_active): {
-            let active_value = old(global<StakePool>(pending_active[i].addr)).active.value;
-            let inactive_value = old(global<StakePool>(pending_active[i].addr)).inactive.value;
-            let pending_active_value = old(global<StakePool>(pending_active[i].addr)).pending_active.value;
-            let pending_inactive_value = old(global<StakePool>(pending_active[i].addr)).pending_inactive.value;
-            let post_active_value = global<StakePool>(post_pending_active[i].addr).active.value;
-            let post_inactive_value = global<StakePool>(post_pending_active[i].addr).inactive.value;
-            let post_pending_active_value = global<StakePool>(post_pending_active[i].addr).pending_active.value;
-            let post_pending_inactive_value = global<StakePool>(post_pending_active[i].addr).pending_inactive.value;
-            active_value + inactive_value + pending_active_value + pending_inactive_value ==
-            post_active_value + post_inactive_value + post_pending_active_value + post_pending_inactive_value
+    spec schema StakedValueNochange {
+        ensures forall addr: address where old(exists<StakePool>(addr)): {
+            let stake_pool = old(global<StakePool>(addr));
+            let post_stake_pool = global<StakePool>(addr);
+            stake_pool.active.value + stake_pool.inactive.value + stake_pool.pending_active.value + stake_pool.pending_inactive.value ==
+            post_stake_pool.active.value + post_stake_pool.inactive.value + post_stake_pool.pending_active.value + post_stake_pool.pending_inactive.value
         };
     }
 
