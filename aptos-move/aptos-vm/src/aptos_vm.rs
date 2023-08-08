@@ -509,6 +509,7 @@ impl AptosVM {
             &mut change_set,
             txn_data.transaction_size,
             txn_data.gas_unit_price,
+            self.0.get_features().is_storage_deletion_refund_enabled(),
         )?;
 
         // TODO(Gas): Charge for aggregator writes

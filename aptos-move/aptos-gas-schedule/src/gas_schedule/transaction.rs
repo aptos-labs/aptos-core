@@ -203,6 +203,19 @@ impl TransactionGasParameters {
         }
     }
 
+    pub fn storage_fee_refund_for_slot(&self, op: &WriteOp) -> Fee {
+        use WriteOp::*;
+
+        match op {
+            DeletionWithMetadata { metadata, .. } => Fee::new(metadata.deposit()),
+            Creation(..)
+            | CreationWithMetadata { .. }
+            | Modification(..)
+            | ModificationWithMetadata { .. }
+            | Deletion => 0.into(),
+        }
+    }
+
     pub fn storage_fee_for_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee {
         if let Some(data) = op.bytes() {
             let size = NumBytes::new(key.size() as u64) + NumBytes::new(data.len() as u64);

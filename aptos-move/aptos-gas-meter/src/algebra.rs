@@ -29,6 +29,7 @@ pub struct StandardGasAlgebra {
     storage_fee_in_internal_units: InternalGas,
     // The storage fee consumed by the storage operations.
     storage_fee_used: Fee,
+    storage_fee_refunded: Fee,
 }
 
 impl StandardGasAlgebra {
@@ -49,6 +50,7 @@ impl StandardGasAlgebra {
             io_gas_used: 0.into(),
             storage_fee_in_internal_units: 0.into(),
             storage_fee_used: 0.into(),
+            storage_fee_refunded: 0.into(),
         }
     }
 }
@@ -165,6 +167,16 @@ impl GasAlgebra for StandardGasAlgebra {
         {
             return Err(PartialVMError::new(StatusCode::STORAGE_LIMIT_REACHED));
         }
+
+        Ok(())
+    }
+
+    fn refund_storage_fee(
+        &mut self,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
+    ) -> PartialVMResult<()> {
+        let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
+        self.storage_fee_refunded += amount;
 
         Ok(())
     }
