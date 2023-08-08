@@ -7,10 +7,11 @@ import pangu_lib.util as util
 
 import random
 import string
+import time
 
 
 def transaction_emitter_main(
-    testnet_name: str, args: List[str], system_context: SystemContext
+    testnet_name: str, args: List[str], system_context: SystemContext, timeout: int = 30
 ):
     #
     # Create command array
@@ -34,14 +35,27 @@ def transaction_emitter_main(
     #
     # Get logs
     command = ["kubectl", "logs", "-f", pod_name, "-n", testnet_name]
-    while True:
-        system_context.shell.run(command, stream_output=True)
-        user_input = input(
-            '-------------------------------------------------------\n-Press Enter to get the newest logs,\n-Ctrl + c to end looking at the logs...\n-Type "delete" to delete the transaction emitter pod\n-------------------------------------------------------\n'
+    tries = 0
+    while tries < timeout:
+        log.info(
+            f"Attempting to get logs from transaction emitter, attempt number {tries}..."
         )
-        if user_input == "delete":
-            system_context.kubernetes.delete_resource(pod, testnet_name)
-            break
+        system_context.shell.run(command, stream_output=True)
+        tries += 1
+        time.sleep(1)
+
+    #
+    # Check if we timed out
+    if tries == timeout:
+        log.error("Failed to get logs from transaction emitter")
+
+    #
+    # Delete pod
+    user_input = input(
+        '-------------------------------------------------------\n-The transaction emitter logs are complete. \n-Type "delete" to delete the transaction emitter pod\n-------------------------------------------------------\n'
+    )
+    if user_input == "delete":
+        system_context.kubernetes.delete_resource(pod, testnet_name)
 
 
 def create_transaction_emitter_pod(

@@ -209,7 +209,9 @@ class LiveKubernetes(Kubernetes):
                 log.error(f'Failed deleting the pod "{resource_name}""!')
                 return False
         else:
-            raise NotImplemented("Delete operation on this resource type is not implemented!")
+            raise NotImplemented(
+                "Delete operation on this resource type is not implemented!"
+            )
 
         return True
 
