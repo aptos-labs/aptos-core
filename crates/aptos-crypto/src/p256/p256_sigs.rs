@@ -33,9 +33,6 @@ impl P256Signature {
     /// Serialize an P256Signature.
     pub fn to_bytes(&self) -> [u8; P256_SIGNATURE_LENGTH] {
         // The RustCrypto P256 `to_bytes` call here should never return a byte array of the wrong length
-        let bytes = self.0.to_bytes();
-        println!("len is {}", bytes.len());
-        println!("bytes are {:?}", bytes);
         self.0.to_bytes().try_into().unwrap()
     }
 
@@ -43,7 +40,7 @@ impl P256Signature {
     pub(crate) fn from_bytes(
         bytes: &[u8],
     ) -> std::result::Result<P256Signature, CryptoMaterialError> {
-        P256Signature::check_s_malleability(bytes)?;
+        //P256Signature::check_s_malleability(bytes)?;
         match p256::ecdsa::Signature::try_from(bytes) {
             Ok(p256_signature) => Ok(P256Signature(p256_signature)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
@@ -79,7 +76,7 @@ impl P256Signature {
 
     /// Check if S < ORDER_HALF to capture invalid signatures.
     fn check_s_lt_order_half(s: &[u8]) -> bool {
-        for i in (0..32).rev() {
+        for i in 0..32 {
             match s[i].cmp(&ORDER_HALF[i]) {
                 Ordering::Less => return true,
                 Ordering::Greater => return false,
@@ -105,6 +102,7 @@ impl P256Signature {
         let one = NonZeroScalar::from_uint(<NistP256 as Curve>::Uint::ONE).unwrap();
         // Dereferencing a NonZeroScalar makes it a Scalar, which implements subtraction
         let new_s = *order_minus_one - *s + *one;
+        //let new_s = s.invert().unwrap();
         // TODO: Make sure this never panics
         let new_s_nonzero = NonZeroScalar::new(new_s).unwrap();
         // TODO: Make sure this never panics

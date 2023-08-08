@@ -5,13 +5,6 @@
 
 use crate as aptos_crypto;
 use crate::{
-    ed25519::{
-        Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature, ED25519_PRIVATE_KEY_LENGTH,
-        ED25519_PUBLIC_KEY_LENGTH, ED25519_SIGNATURE_LENGTH,
-    },
-    p256::{
-        P256PrivateKey, P256PublicKey, P256Signature, P256_PRIVATE_KEY_LENGTH, P256_PUBLIC_KEY_LENGTH, P256_SIGNATURE_LENGTH,
-    },
     test_utils::{
         random_serializable_struct, small_order_pk_with_adversarial_message,
         uniform_keypair_strategy,
@@ -110,7 +103,6 @@ proptest! {
     ) {
         let signature = keypair.private_key.sign(&message).unwrap();
         let serialized: &[u8] = &(signature.to_bytes());
-        println!("serialized is {:?}", serialized);
         prop_assert_eq!(P256_SIGNATURE_LENGTH, serialized.len());
         let deserialized = P256Signature::try_from(serialized).unwrap();
         prop_assert!(deserialized.verify(&message, &keypair.public_key).is_ok());
