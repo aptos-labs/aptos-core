@@ -121,9 +121,9 @@ pub enum TransactionDeduperType {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::on_chain_config::OnChainConfigPayload;
+    use crate::on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload};
     use rand::Rng;
-    use std::{collections::HashMap, sync::Arc};
+    use std::collections::HashMap;
 
     #[test]
     fn test_config_yaml_serialization() {
@@ -197,7 +197,7 @@ mod test {
             bcs::to_bytes(&bcs::to_bytes(&execution_config).unwrap()).unwrap(),
         );
 
-        let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+        let payload = OnChainConfigPayload::new(1, InMemoryOnChainConfig::new(configs));
 
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
@@ -219,7 +219,7 @@ mod test {
             bcs::to_bytes(&bcs::to_bytes(&execution_config).unwrap()).unwrap(),
         );
 
-        let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+        let payload = OnChainConfigPayload::new(1, InMemoryOnChainConfig::new(configs));
 
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
@@ -241,7 +241,7 @@ mod test {
             bcs::to_bytes(&bcs::to_bytes(&execution_config).unwrap()).unwrap(),
         );
 
-        let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+        let payload = OnChainConfigPayload::new(1, InMemoryOnChainConfig::new(configs));
 
         let result: OnChainExecutionConfig = payload.get().unwrap();
         assert!(matches!(
