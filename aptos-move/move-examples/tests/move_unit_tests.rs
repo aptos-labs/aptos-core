@@ -117,8 +117,13 @@ fn test_hello_blockchain() {
 }
 
 #[test]
-fn test_drand_lottery() {
+fn test_drand() {
     test_common("drand");
+}
+
+#[test]
+fn test_lottery() {
+    test_resource_account_common("lottery");
 }
 
 #[test]
