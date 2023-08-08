@@ -174,9 +174,7 @@ pub struct TransactionsOrOutputsWithProofRequest {
 /// outputs with a corresponding proof.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct SubscribeTransactionOutputsWithProofRequest {
-    pub known_version: u64,             // The highest known output version
-    pub known_epoch: u64,               // The highest known epoch
-    pub subscription_stream_id: u64,    // The unique id of the subscription stream
+    pub subscription_stream_metadata: SubscriptionStreamMetadata, // The metadata for the subscription stream request
     pub subscription_stream_index: u64, // The request index of the subscription stream
 }
 
@@ -184,21 +182,24 @@ pub struct SubscribeTransactionOutputsWithProofRequest {
 /// or outputs with a corresponding proof.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct SubscribeTransactionsOrOutputsWithProofRequest {
-    pub known_version: u64,             // The highest known version
-    pub known_epoch: u64,               // The highest known epoch
+    pub subscription_stream_metadata: SubscriptionStreamMetadata, // The metadata for the subscription stream request
+    pub subscription_stream_index: u64, // The request index of the subscription stream
     pub include_events: bool,           // Whether or not to include events in the response
     pub max_num_output_reductions: u64, // The max num of output reductions before transactions are returned
-    pub subscription_stream_id: u64,    // The unique id of the subscription stream
-    pub subscription_stream_index: u64, // The request index of the subscription stream
 }
 
 /// A storage service request for subscribing to transactions
 /// with a corresponding proof.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct SubscribeTransactionsWithProofRequest {
-    pub known_version: u64,             // The highest known transaction version
-    pub known_epoch: u64,               // The highest known epoch
-    pub include_events: bool,           // Whether or not to include events in the response
-    pub subscription_stream_id: u64,    // The unique id of the subscription stream
+    pub subscription_stream_metadata: SubscriptionStreamMetadata, // The metadata for the subscription stream request
     pub subscription_stream_index: u64, // The request index of the subscription stream
+    pub include_events: bool,           // Whether or not to include events in the response
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct SubscriptionStreamMetadata {
+    pub known_version_at_stream_start: u64, // The highest known transaction version at stream start
+    pub known_epoch_at_stream_start: u64,   // The highest known epoch at stream start
+    pub subscription_stream_id: u64,        // The unique id of the subscription stream
 }

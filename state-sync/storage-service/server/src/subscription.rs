@@ -20,8 +20,9 @@ use aptos_infallible::Mutex;
 use aptos_logger::{error, warn};
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
-        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
+        DataRequest, StorageServiceRequest, SubscriptionStreamMetadata,
+        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
+        TransactionsWithProofRequest,
     },
     responses::{DataResponse, StorageServerSummary, StorageServiceResponse},
 };
@@ -128,22 +129,46 @@ impl SubscriptionRequest {
         Ok(storage_request)
     }
 
-    /// Returns the highest version known by the peer
-    fn highest_known_version(&self) -> u64 {
+    /// Returns the highest version known by the peer when the stream started
+    fn highest_known_version_at_stream_start(&self) -> u64 {
         match &self.request.data_request {
-            DataRequest::SubscribeTransactionOutputsWithProof(request) => request.known_version,
-            DataRequest::SubscribeTransactionsWithProof(request) => request.known_version,
-            DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => request.known_version,
+            DataRequest::SubscribeTransactionOutputsWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start
+            },
+            DataRequest::SubscribeTransactionsWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start
+            },
+            DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
 
-    /// Returns the highest epoch known by the peer
-    fn highest_known_epoch(&self) -> u64 {
+    /// Returns the highest epoch known by the peer when the stream started
+    fn highest_known_epoch_at_stream_start(&self) -> u64 {
         match &self.request.data_request {
-            DataRequest::SubscribeTransactionOutputsWithProof(request) => request.known_epoch,
-            DataRequest::SubscribeTransactionsWithProof(request) => request.known_epoch,
-            DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => request.known_epoch,
+            DataRequest::SubscribeTransactionOutputsWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_epoch_at_stream_start
+            },
+            DataRequest::SubscribeTransactionsWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_epoch_at_stream_start
+            },
+            DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request
+                    .subscription_stream_metadata
+                    .known_epoch_at_stream_start
+            },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
     }
@@ -167,11 +192,13 @@ impl SubscriptionRequest {
     pub fn subscription_stream_id(&self) -> u64 {
         match &self.request.data_request {
             DataRequest::SubscribeTransactionOutputsWithProof(request) => {
-                request.subscription_stream_id
+                request.subscription_stream_metadata.subscription_stream_id
             },
-            DataRequest::SubscribeTransactionsWithProof(request) => request.subscription_stream_id,
+            DataRequest::SubscribeTransactionsWithProof(request) => {
+                request.subscription_stream_metadata.subscription_stream_id
+            },
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
-                request.subscription_stream_id
+                request.subscription_stream_metadata.subscription_stream_id
             },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
@@ -188,6 +215,22 @@ impl SubscriptionRequest {
             },
             DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
                 request.subscription_stream_index
+            },
+            request => unreachable!("Unexpected subscription request: {:?}", request),
+        }
+    }
+
+    /// Returns the subscription stream metadata for the request
+    fn subscription_stream_metadata(&self) -> SubscriptionStreamMetadata {
+        match &self.request.data_request {
+            DataRequest::SubscribeTransactionOutputsWithProof(request) => {
+                request.subscription_stream_metadata
+            },
+            DataRequest::SubscribeTransactionsWithProof(request) => {
+                request.subscription_stream_metadata
+            },
+            DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request.subscription_stream_metadata
             },
             request => unreachable!("Unexpected subscription request: {:?}", request),
         }
@@ -211,12 +254,13 @@ impl Debug for SubscriptionRequest {
 
 /// A set of subscription requests that together form a stream
 pub struct SubscriptionStreamRequests {
+    subscription_stream_metadata: SubscriptionStreamMetadata, // The metadata for the subscription stream (as specified by the client)
+
     highest_known_version: u64, // The highest version known by the peer (at this point in the stream)
     highest_known_epoch: u64,   // The highest epoch known by the peer (at this point in the stream)
 
     next_index_to_serve: u64, // The next subscription stream request index to serve
     pending_subscription_requests: BTreeMap<u64, SubscriptionRequest>, // The pending subscription requests by stream index
-    subscription_stream_id: u64, // The unique stream ID (as specified by the client)
 
     last_stream_update_time: Instant, // The last time the stream was updated
     time_service: TimeService,        // The time service
@@ -225,9 +269,9 @@ pub struct SubscriptionStreamRequests {
 impl SubscriptionStreamRequests {
     pub fn new(subscription_request: SubscriptionRequest, time_service: TimeService) -> Self {
         // Extract the relevant information from the request
-        let highest_known_version = subscription_request.highest_known_version();
-        let highest_known_epoch = subscription_request.highest_known_epoch();
-        let subscription_stream_id = subscription_request.subscription_stream_id();
+        let highest_known_version = subscription_request.highest_known_version_at_stream_start();
+        let highest_known_epoch = subscription_request.highest_known_epoch_at_stream_start();
+        let subscription_stream_metadata = subscription_request.subscription_stream_metadata();
 
         // Create a new set of pending subscription requests using the first request
         let mut pending_subscription_requests = BTreeMap::new();
@@ -241,7 +285,7 @@ impl SubscriptionStreamRequests {
             highest_known_epoch,
             next_index_to_serve: 0,
             pending_subscription_requests,
-            subscription_stream_id,
+            subscription_stream_metadata,
             last_stream_update_time: time_service.now(),
             time_service,
         }
@@ -255,13 +299,13 @@ impl SubscriptionStreamRequests {
         storage_service_config: StorageServiceConfig,
         subscription_request: SubscriptionRequest,
     ) -> Result<(), (Error, SubscriptionRequest)> {
-        // Verify that the subscription request stream ID is valid
-        let subscription_stream_id = subscription_request.subscription_stream_id();
-        if subscription_stream_id != self.subscription_stream_id {
+        // Verify that the subscription metadata is valid
+        let subscription_stream_metadata = subscription_request.subscription_stream_metadata();
+        if subscription_stream_metadata != self.subscription_stream_metadata {
             return Err((
                 Error::InvalidRequest(format!(
-                    "The subscription request stream ID is invalid! Expected: {:?}, found: {:?}",
-                    self.subscription_stream_id, subscription_stream_id
+                    "The subscription request stream metadata is invalid! Expected: {:?}, found: {:?}",
+                    self.subscription_stream_metadata, subscription_stream_metadata
                 )),
                 subscription_request,
             ));
@@ -277,27 +321,6 @@ impl SubscriptionStreamRequests {
                 )),
                 subscription_request,
             ));
-        }
-
-        // Verify that the request known version and epoch are valid
-        let request_known_version = subscription_request.highest_known_version();
-        let request_known_epoch = subscription_request.highest_known_epoch();
-        if let Some(first_pending_request) = self.first_pending_request() {
-            let pending_known_version = first_pending_request.highest_known_version();
-            let pending_known_epoch = first_pending_request.highest_known_epoch();
-
-            // Verify the new and pending requests have the same known version and epoch
-            if (request_known_version != pending_known_version)
-                || (request_known_epoch != pending_known_epoch)
-            {
-                return Err((
-                    Error::InvalidRequest(format!(
-                        "The subscription request known version and epoch are invalid! Expected: ({:?}), found: ({:?})",
-                        (pending_known_version, pending_known_epoch), (request_known_version, request_known_epoch)
-                    )),
-                    subscription_request,
-                ));
-            }
         }
 
         // Verify that the number of active subscriptions respects the maximum
@@ -391,7 +414,7 @@ impl SubscriptionStreamRequests {
 
     /// Returns the unique stream id for the stream
     pub fn subscription_stream_id(&self) -> u64 {
-        self.subscription_stream_id
+        self.subscription_stream_metadata.subscription_stream_id
     }
 
     /// Updates the highest known version and epoch for the stream
@@ -458,7 +481,7 @@ impl SubscriptionStreamRequests {
     }
 }
 
-/// Handles active and ready subscription
+/// Handles active and ready subscriptions
 pub(crate) async fn handle_active_subscriptions<T: StorageReaderInterface>(
     bounded_executor: BoundedExecutor,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
@@ -470,39 +493,46 @@ pub(crate) async fn handle_active_subscriptions<T: StorageReaderInterface>(
     subscriptions: Arc<Mutex<HashMap<PeerNetworkId, SubscriptionStreamRequests>>>,
     time_service: TimeService,
 ) -> Result<(), Error> {
-    // Update the number of active subscriptions
-    update_active_subscription_metrics(subscriptions.clone());
+    // Continuously handle the subscriptions until we identify that
+    // there are no more subscriptions ready to be served now.
+    loop {
+        // Update the number of active subscriptions
+        update_active_subscription_metrics(subscriptions.clone());
 
-    // Identify the peers with ready subscriptions
-    let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
-        bounded_executor.clone(),
-        config,
-        cached_storage_server_summary.clone(),
-        optimistic_fetches.clone(),
-        lru_response_cache.clone(),
-        request_moderator.clone(),
-        storage.clone(),
-        subscriptions.clone(),
-        time_service.clone(),
-    )
-    .await?;
+        // Identify the peers with ready subscriptions
+        let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
+            bounded_executor.clone(),
+            config,
+            cached_storage_server_summary.clone(),
+            optimistic_fetches.clone(),
+            lru_response_cache.clone(),
+            request_moderator.clone(),
+            storage.clone(),
+            subscriptions.clone(),
+            time_service.clone(),
+        )
+        .await?;
 
-    // Remove and handle the ready subscriptions
-    handle_ready_subscriptions(
-        bounded_executor,
-        cached_storage_server_summary,
-        config,
-        optimistic_fetches,
-        lru_response_cache,
-        request_moderator,
-        storage,
-        subscriptions,
-        time_service,
-        peers_with_ready_subscriptions,
-    )
-    .await;
+        // If there are no peers with ready subscriptions, we're finished
+        if peers_with_ready_subscriptions.is_empty() {
+            return Ok(());
+        }
 
-    Ok(())
+        // Remove and handle the ready subscriptions
+        handle_ready_subscriptions(
+            bounded_executor.clone(),
+            cached_storage_server_summary.clone(),
+            config,
+            optimistic_fetches.clone(),
+            lru_response_cache.clone(),
+            request_moderator.clone(),
+            storage.clone(),
+            subscriptions.clone(),
+            time_service.clone(),
+            peers_with_ready_subscriptions,
+        )
+        .await;
+    }
 }
 
 /// Handles the ready subscriptions by removing them from the
@@ -519,6 +549,8 @@ async fn handle_ready_subscriptions<T: StorageReaderInterface>(
     time_service: TimeService,
     peers_with_ready_subscriptions: Vec<(PeerNetworkId, LedgerInfoWithSignatures)>,
 ) {
+    // Go through all peers with ready subscriptions
+    let mut active_tasks = vec![];
     for (peer_network_id, target_ledger_info) in peers_with_ready_subscriptions {
         // Remove the subscription from the active subscription stream
         let subscription_request_and_known_version =
@@ -545,7 +577,7 @@ async fn handle_ready_subscriptions<T: StorageReaderInterface>(
             let time_service = time_service.clone();
 
             // Spawn a blocking task to handle the subscription
-            bounded_executor
+            let active_task = bounded_executor
                 .spawn_blocking(move || {
                     // Get the subscription start time and request
                     let subscription_start_time = subscription_request.request_start_time;
@@ -614,8 +646,14 @@ async fn handle_ready_subscriptions<T: StorageReaderInterface>(
                     }
                 })
                 .await;
+
+            // Add the task to the list of active tasks
+            active_tasks.push(active_task);
         }
     }
+
+    // Wait for all the active tasks to complete
+    join_all(active_tasks).await;
 }
 
 /// Identifies the subscriptions that can be handled now.
@@ -836,6 +874,8 @@ async fn identify_ready_and_invalid_subscriptions<T: StorageReaderInterface>(
                 }
             })
             .await;
+
+        // Add the task to the list of active tasks
         active_tasks.push(active_task);
     }
 
@@ -881,7 +921,7 @@ fn remove_invalid_subscriptions(
                 ))
                 .message(&format!(
                     "Dropping invalid subscription stream with ID: {:?}!",
-                    subscription_stream_requests.subscription_stream_id
+                    subscription_stream_requests.subscription_stream_id()
                 )));
         }
     }

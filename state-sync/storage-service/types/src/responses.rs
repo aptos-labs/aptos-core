@@ -536,12 +536,24 @@ impl DataSummary {
 
                 can_serve_txns && can_serve_outputs && can_create_proof
             },
-            SubscribeTransactionOutputsWithProof(request) => self
-                .can_service_subscription_request(aptos_data_client_config, request.known_version),
-            SubscribeTransactionsOrOutputsWithProof(request) => self
-                .can_service_subscription_request(aptos_data_client_config, request.known_version),
-            SubscribeTransactionsWithProof(request) => self
-                .can_service_subscription_request(aptos_data_client_config, request.known_version),
+            SubscribeTransactionOutputsWithProof(request) => {
+                let known_version = request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start;
+                self.can_service_subscription_request(aptos_data_client_config, known_version)
+            },
+            SubscribeTransactionsOrOutputsWithProof(request) => {
+                let known_version = request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start;
+                self.can_service_subscription_request(aptos_data_client_config, known_version)
+            },
+            SubscribeTransactionsWithProof(request) => {
+                let known_version = request
+                    .subscription_stream_metadata
+                    .known_version_at_stream_start;
+                self.can_service_subscription_request(aptos_data_client_config, known_version)
+            },
         }
     }
 

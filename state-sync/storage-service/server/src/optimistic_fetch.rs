@@ -524,6 +524,8 @@ async fn identify_ready_and_invalid_optimistic_fetches<T: StorageReaderInterface
                 }
             })
             .await;
+
+        // Add the task to the list of active tasks
         active_tasks.push(active_task);
     }
 
