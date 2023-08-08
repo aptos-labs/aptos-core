@@ -57,10 +57,10 @@ pub fn upsert_uris(
     query.execute(conn).context(debug_query)
 }
 
-/// Verify the chain id from GRPC against the database.
+/// Verify the chain id from PubSub against the database.
 pub fn check_or_update_chain_id(
     conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    grpc_chain_id: i64,
+    pubsub_chain_id: i64,
 ) -> anyhow::Result<u64> {
     info!("[NFT Metadata Crawler] Checking if chain id is correct");
 
@@ -68,7 +68,7 @@ pub fn check_or_update_chain_id(
 
     match maybe_existing_chain_id {
         Some(chain_id) => {
-            anyhow::ensure!(chain_id == grpc_chain_id, "[NFT Metadata Crawler] Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", grpc_chain_id, chain_id);
+            anyhow::ensure!(chain_id == pubsub_chain_id, "[NFT Metadata Crawler] Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", pubsub_chain_id, chain_id);
             info!(
                 chain_id = chain_id,
                 "[NFT Metadata Crawler] Chain id matches! Continue to index...",
@@ -77,10 +77,10 @@ pub fn check_or_update_chain_id(
         },
         None => {
             info!(
-                chain_id = grpc_chain_id,
+                chain_id = pubsub_chain_id,
                 "[NFT Metadata Crawler] Adding chain id to db, continue to index.."
             );
-            insert_chain_id(conn, grpc_chain_id).map(|_| grpc_chain_id as u64)
+            insert_chain_id(conn, pubsub_chain_id).map(|_| pubsub_chain_id as u64)
         },
     }
 }
