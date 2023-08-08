@@ -194,6 +194,7 @@ members = [
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode",
+    "third_party/move/move-prover/lab",
     "third_party/move/move-prover/move-abigen",
     "third_party/move/move-prover/move-docgen",
     "third_party/move/move-prover/move-errmapgen",
