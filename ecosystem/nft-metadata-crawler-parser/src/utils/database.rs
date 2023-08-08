@@ -33,9 +33,9 @@ pub fn upsert_uris(
     conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     entry: NFTMetadataCrawlerURIs,
 ) -> anyhow::Result<usize> {
-    use schema::nft_metadata_crawler_uris::dsl::*;
+    use schema::nft_metadata_crawler::parsed_token_uris::dsl::*;
 
-    let query = diesel::insert_into(schema::nft_metadata_crawler_uris::table)
+    let query = diesel::insert_into(schema::nft_metadata_crawler::parsed_token_uris::table)
         .values(&entry)
         .on_conflict(token_uri)
         .do_update()
