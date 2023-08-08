@@ -521,7 +521,7 @@ fn single_test_suite(
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "realistic_env_max_load" => pfn_const_tps(duration, true, true, true),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         // Rest of the tests:
@@ -573,9 +573,9 @@ fn single_test_suite(
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
-        "pfn_const_tps" => pfn_const_tps(duration, false, false),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true),
+        "pfn_const_tps" => pfn_const_tps(duration, false, false, false),
+        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
+        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
         "pfn_performance" => pfn_performance(duration, false, false),
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
@@ -1883,12 +1883,18 @@ fn pfn_const_tps(
     duration: Duration,
     add_cpu_chaos: bool,
     add_network_emulation: bool,
+    fail_validators: bool,
 ) -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(
+            7,
+            add_cpu_chaos,
+            add_network_emulation,
+            true,
+        ))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -1937,7 +1943,12 @@ fn pfn_performance(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(
+            7,
+            add_cpu_chaos,
+            add_network_emulation,
+            false,
+        ))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Require frequent epoch changes
             helm_values["chain"]["epoch_duration_secs"] = 300.into();

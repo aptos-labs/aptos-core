@@ -31,10 +31,16 @@ pub struct PFNPerformance {
     add_cpu_chaos: bool,
     add_network_emulation: bool,
     shuffle_rng_seed: [u8; 32],
+    fail_validators: bool,
 }
 
 impl PFNPerformance {
-    pub fn new(num_pfns: u64, add_cpu_chaos: bool, add_network_emulation: bool) -> Self {
+    pub fn new(
+        num_pfns: u64,
+        add_cpu_chaos: bool,
+        add_network_emulation: bool,
+        fail_validators: bool,
+    ) -> Self {
         // Create a random seed for the shuffle RNG
         let shuffle_rng_seed: [u8; 32] = OsRng.gen();
 
@@ -43,6 +49,7 @@ impl PFNPerformance {
             add_cpu_chaos,
             add_network_emulation,
             shuffle_rng_seed,
+            fail_validators,
         }
     }
 
@@ -144,6 +151,26 @@ impl NetworkLoadTest for PFNPerformance {
         Ok(LoadDestination::Peers(pfn_peer_ids))
     }
 
+    /// If configured, fail validators
+    fn test(
+        &self,
+        swarm: &mut dyn Swarm,
+        _report: &mut aptos_forge::TestReport,
+        duration: std::time::Duration,
+    ) -> Result<()> {
+        if !self.fail_validators {
+            return Ok(());
+        }
+        // Let the test warm up before removing the validators
+        std::thread::sleep(duration / 5);
+        let validators_to_stop: Vec<_> =
+            swarm.validators().take(2).map(|vn| vn.peer_id()).collect();
+        stop_and_reset_nodes(swarm, &[], &validators_to_stop).unwrap();
+        // The rest of the test should continue (possibly with degraded performance)
+
+        Ok(())
+    }
+
     fn finish(&self, swarm: &mut dyn Swarm) -> Result<()> {
         // Remove CPU chaos from the swarm
         if self.add_cpu_chaos {
@@ -197,4 +224,42 @@ fn create_and_add_pfns(ctx: &mut NetworkContext, num_pfns: u64) -> Result<Vec<Pe
         .collect();
 
     Ok(pfn_peer_ids)
+}
+
+// TODO: this is copy-pasted from state sync
+/// Stops and resets all specified nodes
+fn stop_and_reset_nodes(
+    swarm: &mut dyn Swarm,
+    fullnodes_to_reset: &[AccountAddress],
+    validators_to_reset: &[AccountAddress],
+) -> Result<()> {
+    let runtime = Runtime::new().unwrap();
+
+    // Stop and reset all fullnodes
+    info!("Deleting all fullnode data!");
+    for fullnode_id in fullnodes_to_reset {
+        let fullnode = swarm.full_node_mut(*fullnode_id).unwrap();
+        runtime.block_on(async { fullnode.clear_storage().await })?;
+    }
+
+    // Stop and reset all validators
+    info!("Deleting all validator data!");
+    for valdiator_id in validators_to_reset {
+        let validator = swarm.validator_mut(*valdiator_id).unwrap();
+        runtime.block_on(async { validator.clear_storage().await })?;
+    }
+
+    // Restart the fullnodes so they start syncing from a fresh state
+    for fullnode_id in fullnodes_to_reset {
+        let fullnode = swarm.full_node_mut(*fullnode_id).unwrap();
+        runtime.block_on(async { fullnode.start().await })?;
+    }
+
+    // Restart the validators so they start syncing from a fresh state
+    for valdiator_id in validators_to_reset {
+        let validator = swarm.validator_mut(*valdiator_id).unwrap();
+        runtime.block_on(async { validator.start().await })?;
+    }
+
+    Ok(())
 }
