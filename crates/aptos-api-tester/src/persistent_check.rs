@@ -1,14 +1,27 @@
 // Copyright © Aptos Foundation
 
+// Persistent checking is a mechanism to increase tolerancy to eventual consistency issues. In our
+// earlier tests we have observed that parallel runs of the flows returned higher failure rates
+// than serial runs, and these extra failures displayed the following pattern: 1) the flow submits
+// a transaction to the API (such as account creation), 2) the flow reads the state from the API,
+// and gets a result that does not include the transaction. We attribute this to the second call
+// ending up on a different node which is not yet up to sync. Therefore, for state checks, we
+// repeat the whole check for a period of time until it is successful, and throw a failure only if
+// it fails to succeed. Note that every time a check fails we will still get a failure log.
+
+// TODO: The need for having a different persistent check wrapper for each function signature is
+// due to a lack of overloading in Rust. Consider using macros to reduce code duplication.
+
 use crate::{
     consts::{PERSISTENCY_TIMEOUT, SLEEP_PER_CYCLE},
-    fail_message::ERROR_COULD_NOT_CHECK,
+    strings::ERROR_COULD_NOT_CHECK,
+    tokenv1_client::TokenClient,
     utils::TestFailure,
 };
 use anyhow::anyhow;
 use aptos_api_types::HexEncodedBytes;
 use aptos_rest_client::Client;
-use aptos_sdk::{token_client::TokenClient, types::LocalAccount};
+use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 use futures::Future;
 use tokio::time::{sleep, Instant};

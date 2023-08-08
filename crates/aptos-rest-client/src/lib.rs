@@ -566,8 +566,8 @@ impl Client {
         F: Fn(HashValue) -> Fut,
         Fut: Future<Output = AptosResult<WaitForTransactionResult<T>>>,
     {
-        // note: make this configurable
-        const DEFAULT_DELAY: Duration = Duration::from_millis(100);
+        // TODO: make this configurable
+        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
         let mut reached_mempool = false;
         let start = std::time::Instant::now();
         loop {

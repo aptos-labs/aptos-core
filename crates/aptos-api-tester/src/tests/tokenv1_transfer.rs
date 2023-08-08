@@ -2,34 +2,35 @@
 
 use crate::{
     consts::FUND_AMOUNT,
-    fail_message::{
-        ERROR_COULD_NOT_CREATE_TRANSACTION, ERROR_COULD_NOT_FINISH_TRANSACTION,
+    persistent_check,
+    strings::{
+        CHECK_ACCOUNT_DATA, CHECK_COLLECTION_METADATA, CHECK_RECEIVER_BALANCE,
+        CHECK_SENDER_BALANCE, CHECK_TOKEN_METADATA, CLAIM_TOKEN, CREATE_COLLECTION, CREATE_TOKEN,
+        ERROR_COULD_NOT_CREATE_AND_SUBMIT_TRANSACTION, ERROR_COULD_NOT_FINISH_TRANSACTION,
         ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_COLLECTION_DATA, ERROR_NO_TOKEN_BALANCE,
         ERROR_NO_TOKEN_DATA, FAIL_WRONG_COLLECTION_DATA, FAIL_WRONG_TOKEN_BALANCE,
-        FAIL_WRONG_TOKEN_DATA,
+        FAIL_WRONG_TOKEN_DATA, OFFER_TOKEN, SETUP,
     },
-    persistent_check, time_fn,
-    utils::{
-        check_balance, create_and_fund_account, emit_step_metrics, get_client, get_faucet_client,
-        NetworkName, TestFailure, TestName,
-    },
-};
-use aptos_api_types::U64;
-use aptos_logger::info;
-use aptos_rest_client::Client;
-use aptos_sdk::{
-    token_client::{
+    time_fn,
+    tokenv1_client::{
         CollectionData, CollectionMutabilityConfig, RoyaltyOptions, TokenClient, TokenData,
         TokenMutabilityConfig,
     },
-    types::LocalAccount,
+    utils::{
+        check_balance, create_and_fund_account, emit_step_metrics, NetworkName, TestFailure,
+        TestName,
+    },
 };
+use aptos_api_types::U64;
+use aptos_logger::error;
+use aptos_rest_client::Client;
+use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
 
-static COLLECTION_NAME: &str = "test collection";
-static TOKEN_NAME: &str = "test token";
-static TOKEN_SUPPLY: u64 = 10;
-static OFFER_AMOUNT: u64 = 2;
+const COLLECTION_NAME: &str = "test collection";
+const TOKEN_NAME: &str = "test token";
+const TOKEN_SUPPLY: u64 = 10;
+const OFFER_AMOUNT: u64 = 2;
 
 /// Tests nft transfer. Checks that:
 ///   - collection data exists
@@ -39,25 +40,25 @@ pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFai
     // setup
     let (client, mut account, mut receiver) = emit_step_metrics(
         time_fn!(setup, network_name),
-        TestName::NftTransfer,
-        "setup",
+        TestName::TokenV1Transfer,
+        SETUP,
         network_name,
         run_id,
     )?;
     let token_client = TokenClient::new(&client);
 
-    // check account data persistently
+    // persistently check that API returns correct account data (auth key and sequence number)
     emit_step_metrics(
         time_fn!(
             persistent_check::address_address,
-            "check_account_data",
+            CHECK_ACCOUNT_DATA,
             check_account_data,
             &client,
             account.address(),
             receiver.address()
         ),
-        TestName::NftTransfer,
-        "check_account_data",
+        TestName::TokenV1Transfer,
+        CHECK_ACCOUNT_DATA,
         network_name,
         run_id,
     )?;
@@ -65,23 +66,23 @@ pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFai
     // create collection
     emit_step_metrics(
         time_fn!(create_collection, &client, &token_client, &mut account),
-        TestName::NftTransfer,
-        "create_collection",
+        TestName::TokenV1Transfer,
+        CREATE_COLLECTION,
         network_name,
         run_id,
     )?;
 
-    // check collection metadata persistently
+    // persistently check that API returns correct collection metadata
     emit_step_metrics(
         time_fn!(
             persistent_check::token_address,
-            "check_collection_metadata",
+            CHECK_COLLECTION_METADATA,
             check_collection_metadata,
             &token_client,
             account.address()
         ),
-        TestName::NftTransfer,
-        "check_collection_metadata",
+        TestName::TokenV1Transfer,
+        CHECK_COLLECTION_METADATA,
         network_name,
         run_id,
     )?;
@@ -89,23 +90,23 @@ pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFai
     // create token
     emit_step_metrics(
         time_fn!(create_token, &client, &token_client, &mut account),
-        TestName::NftTransfer,
-        "create_token",
+        TestName::TokenV1Transfer,
+        CREATE_TOKEN,
         network_name,
         run_id,
     )?;
 
-    // check token metadata persistently
+    // persistently check that API returns correct token metadata
     emit_step_metrics(
         time_fn!(
             persistent_check::token_address,
-            "check_token_address",
+            CHECK_TOKEN_METADATA,
             check_token_metadata,
             &token_client,
             account.address()
         ),
-        TestName::NftTransfer,
-        "check_token_metadata",
+        TestName::TokenV1Transfer,
+        CHECK_TOKEN_METADATA,
         network_name,
         run_id,
     )?;
@@ -119,23 +120,23 @@ pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFai
             &mut account,
             receiver.address()
         ),
-        TestName::NftTransfer,
-        "offer_token",
+        TestName::TokenV1Transfer,
+        OFFER_TOKEN,
         network_name,
         run_id,
     )?;
 
-    // check senders balance persistently
+    // persistently check that sender token balance is correct
     emit_step_metrics(
         time_fn!(
             persistent_check::token_address,
-            "check_sender_balance",
+            CHECK_SENDER_BALANCE,
             check_sender_balance,
             &token_client,
             account.address()
         ),
-        TestName::NftTransfer,
-        "check_sender_balance",
+        TestName::TokenV1Transfer,
+        CHECK_SENDER_BALANCE,
         network_name,
         run_id,
     )?;
@@ -149,24 +150,24 @@ pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFai
             &mut receiver,
             account.address()
         ),
-        TestName::NftTransfer,
-        "claim_token",
+        TestName::TokenV1Transfer,
+        CLAIM_TOKEN,
         network_name,
         run_id,
     )?;
 
-    // check receivers balance persistently
+    // persistently check that receiver token balance is correct
     emit_step_metrics(
         time_fn!(
             persistent_check::token_address_address,
-            "check_receiver_balance",
+            CHECK_RECEIVER_BALANCE,
             check_receiver_balance,
             &token_client,
             receiver.address(),
             account.address()
         ),
-        TestName::NftTransfer,
-        "check_receiver_balance",
+        TestName::TokenV1Transfer,
+        CHECK_RECEIVER_BALANCE,
         network_name,
         run_id,
     )?;
@@ -180,40 +181,32 @@ async fn setup(
     network_name: NetworkName,
 ) -> Result<(Client, LocalAccount, LocalAccount), TestFailure> {
     // spin up clients
-    let client = get_client(network_name);
-    let faucet_client = get_faucet_client(network_name);
+    let client = network_name.get_client();
+    let faucet_client = network_name.get_faucet_client();
 
     // create account
-    let account = match create_and_fund_account(&faucet_client).await {
+    let account = match create_and_fund_account(&faucet_client, TestName::TokenV1Transfer).await {
         Ok(account) => account,
         Err(e) => {
-            info!(
+            error!(
                 "test: nft_transfer part: setup ERROR: {}, with error {:?}",
                 ERROR_COULD_NOT_FUND_ACCOUNT, e
             );
             return Err(e.into());
         },
     };
-    info!(
-        "test: nft_transfer part: setup creating account: {}",
-        account.address()
-    );
 
     // create receiver
-    let receiver = match create_and_fund_account(&faucet_client).await {
+    let receiver = match create_and_fund_account(&faucet_client, TestName::TokenV1Transfer).await {
         Ok(receiver) => receiver,
         Err(e) => {
-            info!(
+            error!(
                 "test: nft_transfer part: setup ERROR: {}, with error {:?}",
                 ERROR_COULD_NOT_FUND_ACCOUNT, e
             );
             return Err(e.into());
         },
     };
-    info!(
-        "test: nft_transfer part: setup creating receiver: {}",
-        receiver.address()
-    );
 
     Ok((client, account, receiver))
 }
@@ -223,8 +216,14 @@ async fn check_account_data(
     account: AccountAddress,
     receiver: AccountAddress,
 ) -> Result<(), TestFailure> {
-    check_balance(TestName::NftTransfer, client, account, U64(FUND_AMOUNT)).await?;
-    check_balance(TestName::NftTransfer, client, receiver, U64(FUND_AMOUNT)).await?;
+    check_balance(TestName::TokenV1Transfer, client, account, U64(FUND_AMOUNT)).await?;
+    check_balance(
+        TestName::TokenV1Transfer,
+        client,
+        receiver,
+        U64(FUND_AMOUNT),
+    )
+    .await?;
 
     Ok(())
 }
@@ -251,9 +250,9 @@ async fn create_collection(
     {
         Ok(txn) => txn,
         Err(e) => {
-            info!(
+            error!(
                 "test: nft_transfer part: create_collection ERROR: {}, with error {:?}",
-                ERROR_COULD_NOT_CREATE_TRANSACTION, e
+                ERROR_COULD_NOT_CREATE_AND_SUBMIT_TRANSACTION, e
             );
             return Err(e.into());
         },
@@ -261,7 +260,7 @@ async fn create_collection(
 
     // wait for transaction to finish
     if let Err(e) = client.wait_for_transaction(&pending_txn).await {
-        info!(
+        error!(
             "test: nft_transfer part: create_collection ERROR: {}, with error {:?}",
             ERROR_COULD_NOT_FINISH_TRANSACTION, e
         );
@@ -288,7 +287,7 @@ async fn check_collection_metadata(
     {
         Ok(data) => data,
         Err(e) => {
-            info!(
+            error!(
                 "test: nft_transfer part: check_collection_metadata ERROR: {}, with error {:?}",
                 ERROR_NO_COLLECTION_DATA, e
             );
@@ -298,7 +297,7 @@ async fn check_collection_metadata(
 
     // compare
     if expected != actual {
-        info!(
+        error!(
             "test: nft_transfer part: check_collection_metadata FAIL: {}, expected {:?}, got {:?}",
             FAIL_WRONG_COLLECTION_DATA, expected, actual
         );
@@ -333,9 +332,9 @@ async fn create_token(
     {
         Ok(txn) => txn,
         Err(e) => {
-            info!(
+            error!(
                 "test: nft_transfer part: create_token ERROR: {}, with error {:?}",
-                ERROR_COULD_NOT_CREATE_TRANSACTION, e
+                ERROR_COULD_NOT_CREATE_AND_SUBMIT_TRANSACTION, e
             );
             return Err(e.into());
         },
@@ -343,7 +342,7 @@ async fn create_token(
 
     // wait for transaction to finish
     if let Err(e) = client.wait_for_transaction(&pending_txn).await {
-        info!(
+        error!(
             "test: nft_transfer part: create_token ERROR: {}, with error {:?}",
             ERROR_COULD_NOT_FINISH_TRANSACTION, e
         );
@@ -370,7 +369,7 @@ async fn check_token_metadata(
     {
         Ok(data) => data,
         Err(e) => {
-            info!(
+            error!(
                 "test: nft_transfer part: check_token_metadata ERROR: {}, with error {:?}",
                 ERROR_NO_TOKEN_DATA, e
             );
@@ -380,7 +379,7 @@ async fn check_token_metadata(
 
     // compare
     if expected != actual {
-        info!(
+        error!(
             "test: nft_transfer part: check_token_metadata FAIL: {}, expected {:?}, got {:?}",
             FAIL_WRONG_TOKEN_DATA, expected, actual
         );
@@ -412,9 +411,9 @@ async fn offer_token(
     {
         Ok(txn) => txn,
         Err(e) => {
-            info!(
+            error!(
                 "test: nft_transfer part: offer_token ERROR: {}, with error {:?}",
-                ERROR_COULD_NOT_CREATE_TRANSACTION, e
+                ERROR_COULD_NOT_CREATE_AND_SUBMIT_TRANSACTION, e
             );
             return Err(e.into());
         },
@@ -422,7 +421,7 @@ async fn offer_token(
 
     // wait for transaction to finish
     if let Err(e) = client.wait_for_transaction(&pending_txn).await {
-        info!(
+        error!(
             "test: nft_transfer part: offer_token ERROR: {}, with error {:?}",
             ERROR_COULD_NOT_FINISH_TRANSACTION, e
         );
@@ -467,9 +466,9 @@ async fn claim_token(
     {
         Ok(txn) => txn,
         Err(e) => {
-            info!(
+            error!(
                 "test: nft_transfer part: claim_token ERROR: {}, with error {:?}",
-                ERROR_COULD_NOT_CREATE_TRANSACTION, e
+                ERROR_COULD_NOT_CREATE_AND_SUBMIT_TRANSACTION, e
             );
             return Err(e.into());
         },
@@ -477,7 +476,7 @@ async fn claim_token(
 
     // wait for transaction to finish
     if let Err(e) = client.wait_for_transaction(&pending_txn).await {
-        info!(
+        error!(
             "test: nft_transfer part: claim_token ERROR: {}, with error {:?}",
             ERROR_COULD_NOT_FINISH_TRANSACTION, e
         );
@@ -556,7 +555,7 @@ async fn check_token_balance(
     {
         Ok(data) => data.amount,
         Err(e) => {
-            info!(
+            error!(
                 "test: nft_transfer part: {} ERROR: {}, with error {:?}",
                 part, ERROR_NO_TOKEN_BALANCE, e
             );
@@ -566,7 +565,7 @@ async fn check_token_balance(
 
     // compare
     if expected != actual {
-        info!(
+        error!(
             "test: nft_transfer part: {} FAIL: {}, expected {:?}, got {:?}",
             part, FAIL_WRONG_TOKEN_BALANCE, expected, actual
         );

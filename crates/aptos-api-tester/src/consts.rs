@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 use std::{env, time::Duration};
 use url::Url;
 
-// faucet constants
+// Node and faucet constants
 
 pub static DEVNET_NODE_URL: Lazy<Url> =
     Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
@@ -20,8 +20,9 @@ pub static TESTNET_FAUCET_URL: Lazy<Url> =
 
 pub const FUND_AMOUNT: u64 = 100_000_000;
 
-// persistency check constants
+// Persistency check constants
 
+// How long a persistent check runs for.
 pub static PERSISTENCY_TIMEOUT: Lazy<Duration> = Lazy::new(|| {
     env::var("PERSISTENCY_TIMEOUT")
         .ok()
@@ -30,6 +31,7 @@ pub static PERSISTENCY_TIMEOUT: Lazy<Duration> = Lazy::new(|| {
         .unwrap_or(Duration::from_secs(30))
 });
 
+// Wait time between tries during a persistent check.
 pub static SLEEP_PER_CYCLE: Lazy<Duration> = Lazy::new(|| {
     env::var("SLEEP_PER_CYCLE")
         .ok()
@@ -38,8 +40,9 @@ pub static SLEEP_PER_CYCLE: Lazy<Duration> = Lazy::new(|| {
         .unwrap_or(Duration::from_millis(100))
 });
 
-// runtime constants
+// Runtime constants
 
+// The number of threads to use for running tests.
 pub static NUM_THREADS: Lazy<usize> = Lazy::new(|| {
     env::var("NUM_THREADS")
         .ok()
@@ -47,6 +50,7 @@ pub static NUM_THREADS: Lazy<usize> = Lazy::new(|| {
         .unwrap_or(4)
 });
 
+// The size of the stack for each thread.
 pub static STACK_SIZE: Lazy<usize> = Lazy::new(|| {
     env::var("STACK_SIZE")
         .ok()

@@ -2,18 +2,16 @@
 
 use crate::{
     consts::FUND_AMOUNT,
-    fail_message::{
-        ERROR_COULD_NOT_CREATE_ACCOUNT, ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_ACCOUNT_DATA,
-        FAIL_WRONG_ACCOUNT_DATA,
+    persistent_check,
+    strings::{
+        CHECK_ACCOUNT_BALANCE, CHECK_ACCOUNT_DATA, ERROR_COULD_NOT_CREATE_ACCOUNT,
+        ERROR_COULD_NOT_FUND_ACCOUNT, ERROR_NO_ACCOUNT_DATA, FAIL_WRONG_ACCOUNT_DATA, FUND, SETUP,
     },
-    persistent_check, time_fn,
-    utils::{
-        check_balance, create_account, emit_step_metrics, get_client, get_faucet_client,
-        NetworkName, TestFailure, TestName,
-    },
+    time_fn,
+    utils::{check_balance, create_account, emit_step_metrics, NetworkName, TestFailure, TestName},
 };
 use aptos_api_types::U64;
-use aptos_logger::info;
+use aptos_logger::error;
 use aptos_rest_client::{Account, Client, FaucetClient};
 use aptos_sdk::types::LocalAccount;
 use aptos_types::account_address::AccountAddress;
@@ -26,22 +24,22 @@ pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFai
     let (client, faucet_client, account) = emit_step_metrics(
         time_fn!(setup, network_name),
         TestName::NewAccount,
-        "setup",
+        SETUP,
         network_name,
         run_id,
     )?;
 
-    // check account data persistently
+    // persistently check that API returns correct account data (auth key and sequence number)
     emit_step_metrics(
         time_fn!(
             persistent_check::account,
-            "check_account_data",
+            CHECK_ACCOUNT_DATA,
             check_account_data,
             &client,
             &account
         ),
         TestName::NewAccount,
-        "check_account_data",
+        CHECK_ACCOUNT_DATA,
         network_name,
         run_id,
     )?;
@@ -50,22 +48,22 @@ pub async fn test(network_name: NetworkName, run_id: &str) -> Result<(), TestFai
     emit_step_metrics(
         time_fn!(fund, &faucet_client, account.address()),
         TestName::NewAccount,
-        "fund",
+        FUND,
         network_name,
         run_id,
     )?;
 
-    // check account balance persistently
+    // persistently check that account balance is correct
     emit_step_metrics(
         time_fn!(
             persistent_check::address,
-            "check_account_balance",
+            CHECK_ACCOUNT_BALANCE,
             check_account_balance,
             &client,
             account.address()
         ),
         TestName::NewAccount,
-        "check_account_balance",
+        CHECK_ACCOUNT_BALANCE,
         network_name,
         run_id,
     )?;
@@ -79,24 +77,20 @@ async fn setup(
     network_name: NetworkName,
 ) -> Result<(Client, FaucetClient, LocalAccount), TestFailure> {
     // spin up clients
-    let client = get_client(network_name);
-    let faucet_client = get_faucet_client(network_name);
+    let client = network_name.get_client();
+    let faucet_client = network_name.get_faucet_client();
 
     // create account
-    let account = match create_account(&faucet_client).await {
+    let account = match create_account(&faucet_client, TestName::NewAccount).await {
         Ok(account) => account,
         Err(e) => {
-            info!(
+            error!(
                 "test: new_account part: setup ERROR: {}, with error {:?}",
                 ERROR_COULD_NOT_CREATE_ACCOUNT, e
             );
             return Err(e.into());
         },
     };
-    info!(
-        "test: new_account part: setup creating account: {}",
-        account.address()
-    );
 
     Ok((client, faucet_client, account))
 }
@@ -104,7 +98,7 @@ async fn setup(
 async fn fund(faucet_client: &FaucetClient, address: AccountAddress) -> Result<(), TestFailure> {
     // fund account
     if let Err(e) = faucet_client.fund(address, FUND_AMOUNT).await {
-        info!(
+        error!(
             "test: new_account part: fund ERROR: {}, with error {:?}",
             ERROR_COULD_NOT_FUND_ACCOUNT, e
         );
@@ -125,7 +119,7 @@ async fn check_account_data(client: &Client, account: &LocalAccount) -> Result<(
     let actual = match client.get_account(account.address()).await {
         Ok(response) => response.into_inner(),
         Err(e) => {
-            info!(
+            error!(
                 "test: new_account part: check_account_data ERROR: {}, with error {:?}",
                 ERROR_NO_ACCOUNT_DATA, e
             );
@@ -135,7 +129,7 @@ async fn check_account_data(client: &Client, account: &LocalAccount) -> Result<(
 
     // compare
     if expected != actual {
-        info!(
+        error!(
             "test: new_account part: check_account_data FAIL: {}, expected {:?}, got {:?}",
             FAIL_WRONG_ACCOUNT_DATA, expected, actual
         );

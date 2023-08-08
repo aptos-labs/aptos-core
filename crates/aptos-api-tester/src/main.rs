@@ -5,9 +5,10 @@
 
 mod consts;
 mod counters;
-mod fail_message;
 mod persistent_check;
+mod strings;
 mod tests;
+mod tokenv1_client;
 mod utils;
 #[macro_use]
 mod macros;
@@ -47,7 +48,9 @@ async fn test_flows(runtime: &Runtime, network_name: NetworkName) -> Result<()> 
     // Flow 3: NFT transfer
     let test_time = run_id.clone();
     let handle_nfttransfer = runtime.spawn(async move {
-        TestName::NftTransfer.run(network_name, &test_time).await;
+        TestName::TokenV1Transfer
+            .run(network_name, &test_time)
+            .await;
     });
 
     // Flow 4: Publishing module
@@ -79,6 +82,7 @@ fn main() -> Result<()> {
     let _mp = MetricsPusher::start_for_local_run("api-tester");
 
     // run tests
+    // TODO: separate the running of the two networks
     runtime.block_on(async {
         let _ = test_flows(&runtime, NetworkName::Testnet).await;
         let _ = test_flows(&runtime, NetworkName::Devnet).await;
