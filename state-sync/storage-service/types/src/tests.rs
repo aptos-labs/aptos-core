@@ -7,8 +7,8 @@ use crate::{
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
         StateValuesWithProofRequest, SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
-        TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
-        TransactionsWithProofRequest,
+        SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
+        TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     responses::{CompleteDataRange, DataSummary, ProtocolMetadata},
     Epoch, StorageServiceRequest,
@@ -550,35 +550,36 @@ fn create_outputs_request(
 
 /// Creates a new subscription request
 fn create_subscription_request(known_version: u64, use_compression: bool) -> StorageServiceRequest {
+    // Create a new subscription stream metadata
+    let subscription_stream_metadata = SubscriptionStreamMetadata {
+        known_version_at_stream_start: known_version,
+        known_epoch_at_stream_start: get_random_u64(),
+        subscription_stream_id: get_random_u64(),
+    };
+
     // Generate a random number
     let random_number = get_random_u64();
 
     // Determine the data request type based on the random number
     let data_request = if random_number % 3 == 0 {
         DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
-            known_version,
-            known_epoch: get_random_u64(),
+            subscription_stream_metadata,
             include_events: false,
-            subscription_stream_id: get_random_u64(),
             subscription_stream_index: get_random_u64(),
         })
     } else if random_number % 3 == 1 {
         DataRequest::SubscribeTransactionOutputsWithProof(
             SubscribeTransactionOutputsWithProofRequest {
-                known_version,
-                known_epoch: get_random_u64(),
-                subscription_stream_id: get_random_u64(),
+                subscription_stream_metadata,
                 subscription_stream_index: get_random_u64(),
             },
         )
     } else {
         DataRequest::SubscribeTransactionsOrOutputsWithProof(
             SubscribeTransactionsOrOutputsWithProofRequest {
-                known_version,
-                known_epoch: get_random_u64(),
+                subscription_stream_metadata,
                 include_events: false,
                 max_num_output_reductions: get_random_u64(),
-                subscription_stream_id: get_random_u64(),
                 subscription_stream_index: get_random_u64(),
             },
         )
