@@ -3,7 +3,7 @@
 
 use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
-    delta_change_set::{DeltaOp, DeltaUpdate},
+    delta_change_set::DeltaOp,
     resolver::AggregatorResolver,
 };
 use aptos_types::vm_status::VMStatus;
@@ -79,33 +79,18 @@ impl<'a> NativeAggregatorContext<'a> {
 
         // First, process all writes and deltas.
         for (id, aggregator) in aggregators {
-            let (value, state, max_value, history) = aggregator.into();
+            let (max_value, state) = aggregator.into();
 
             let change = match state {
-                AggregatorState::Data => AggregatorChange::Write(value),
-                AggregatorState::PositiveDelta => {
-                    let history = history.unwrap();
-                    let plus = DeltaUpdate::Plus(value);
+                AggregatorState::Data { value } => AggregatorChange::Write(value),
+                AggregatorState::Delta { speculative_start_value, speculative_source, delta, history } => {
                     let delta_op = DeltaOp::new(
-                        plus,
+                        delta,
                         max_value,
-                        history.max_achieved_positive,
-                        history.min_achieved_negative,
-                        history.min_overflow_positive,
-                        history.max_underflow_negative,
-                    );
-                    AggregatorChange::Merge(delta_op)
-                },
-                AggregatorState::NegativeDelta => {
-                    let history = history.unwrap();
-                    let minus = DeltaUpdate::Minus(value);
-                    let delta_op = DeltaOp::new(
-                        minus,
-                        max_value,
-                        history.max_achieved_positive,
-                        history.min_achieved_negative,
-                        history.min_overflow_positive,
-                        history.max_underflow_negative,
+                        history.max_achieved_positive_delta,
+                        history.min_achieved_negative_delta,
+                        history.min_overflow_positive_delta,
+                        history.max_underflow_negative_delta,
                     );
                     AggregatorChange::Merge(delta_op)
                 },

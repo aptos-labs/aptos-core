@@ -9,10 +9,10 @@ use aptos_table_natives::TableHandle;
 use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
-use std::{collections::{BTreeMap, BTreeSet}, thread::current};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Describes the delta of an aggregator.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialOrd, Ord, Debug, PartialEq, Eq)]
 pub enum DeltaValue {
     Positive(u128),
     Negative(u128),
