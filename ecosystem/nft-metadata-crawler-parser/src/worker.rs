@@ -40,7 +40,7 @@ use tracing::{error, info};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParserConfig {
-    pub google_application_credentials: String,
+    pub google_application_credentials: Option<String>,
     pub bucket: String,
     pub subscription_name: String,
     pub database_url: String,
@@ -49,7 +49,7 @@ pub struct ParserConfig {
     pub num_parsers: usize,
     pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
-    pub release: Option<bool>,
+    pub ack_parsed_uris: Option<bool>,
 }
 
 /// Subscribes to PubSub and sends URIs to Channel
@@ -76,7 +76,8 @@ async fn consume_pubsub_entries_to_channel_loop(
             NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
                 NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")?,
             ),
-            parts[4].parse::<bool>().unwrap_or(false),
+            parts[4].parse::<i32>()?,
+            parts[5].parse::<bool>().unwrap_or(false),
         );
 
         // Send worker to channel
@@ -138,10 +139,12 @@ impl RunnableConfig for ParserConfig {
         run_migrations(&pool);
         info!("[NFT Metadata Crawler] Finished migrations");
 
-        std::env::set_var(
-            "GOOGLE_APPLICATION_CREDENTIALS",
-            self.google_application_credentials.clone(),
-        );
+        if let Some(google_application_credentials) = self.google_application_credentials.clone() {
+            std::env::set_var(
+                "GOOGLE_APPLICATION_CREDENTIALS",
+                google_application_credentials,
+            );
+        }
 
         // Establish gRPC client
         let config = ClientConfig::default().with_auth().await?;
@@ -168,7 +171,7 @@ impl RunnableConfig for ParserConfig {
                 Arc::clone(&semaphore),
                 Arc::clone(&receiver),
                 subscription.clone(),
-                self.release.unwrap_or(false),
+                self.ack_parsed_uris.unwrap_or(false),
             ));
 
             workers.push(worker);
@@ -203,6 +206,7 @@ pub struct Worker {
     token_uri: String,
     last_transaction_version: i32,
     last_transaction_timestamp: chrono::NaiveDateTime,
+    chain_id: i32, // Add checks with DB in future PR
     force: bool,
 }
 
@@ -214,6 +218,7 @@ impl Worker {
         token_uri: String,
         last_transaction_version: i32,
         last_transaction_timestamp: chrono::NaiveDateTime,
+        chain_id: i32,
         force: bool,
     ) -> Self {
         Self {
@@ -224,6 +229,7 @@ impl Worker {
             token_uri,
             last_transaction_version,
             last_transaction_timestamp,
+            chain_id,
             force,
         }
     }
