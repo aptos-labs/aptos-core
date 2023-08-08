@@ -25,6 +25,7 @@ jobs:
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
   run-tests-devnet:
+    needs: [permission-check]
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
