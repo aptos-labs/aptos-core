@@ -4,9 +4,9 @@
 
 import { ABIRoot } from "../abi";
 import { OmitSigner } from "../common";
-import { ConvertArgs } from "../convertor/argsConvertor";
-import { ConvertGenerics } from "../convertor/genericConvertor";
-import { ConvertReturns } from "../convertor/returnConvertor";
+import { ConvertArgs } from "../converter/argsConverter";
+import { ConvertGenerics } from "../converter/genericConverter";
+import { ConvertReturns } from "../converter/returnConverter";
 
 /**
  * All view function names in the ABI.
