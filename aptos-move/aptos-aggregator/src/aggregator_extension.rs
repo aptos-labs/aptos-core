@@ -430,7 +430,7 @@ impl Aggregator {
         match self.state {
             AggregatorState::Data { value } => {
                 // If aggregator knows the value, return it.
-                return Ok(value);
+                Ok(value)
             },
             AggregatorState::Delta { speculative_start_value, speculative_source, delta, history } => {
                 // If we performed a "cheap read" or "expensive read" operation before, use it.
@@ -441,7 +441,7 @@ impl Aggregator {
                     };
                 }
                 // Otherwise, we have to go to storage and read the value.
-                let value_from_storage = resolver.resolve_aggregator_value(id).map_err(|e| {
+                let value_from_storage = resolver.resolve_last_committed_aggregator_value(id).map_err(|e| {
                     extension_error(format!("Could not find the value of the aggregator: {}", e))
                 })?;
         
@@ -453,10 +453,10 @@ impl Aggregator {
                     delta,
                     history,
                 };
-                return match delta {
+                match delta {
                     DeltaValue::Positive(value) => Ok(addition(value_from_storage, value, self.max_value)?),
                     DeltaValue::Negative(value) => Ok(subtraction(value_from_storage, value)?),
-                };
+                }
             }
         }
     }
@@ -473,7 +473,7 @@ impl Aggregator {
         match self.state {
             AggregatorState::Data { value } => {
                 // If aggregator knows the value, return it.
-                return Ok(value);
+                Ok(value)
             },
             AggregatorState::Delta { speculative_start_value, speculative_source, delta, history } => {
                 // If we performed an "expensive read" operation before, use it.
@@ -484,7 +484,7 @@ impl Aggregator {
                     };
                 }
                 // Otherwise, we have to go to storage and read the value.
-                let value_from_storage = resolver.resolve_aggregator_value(id).map_err(|e| {
+                let value_from_storage = resolver.resolve_most_recent_aggregator_value(id).map_err(|e| {
                     extension_error(format!("Could not find the value of the aggregator: {}", e))
                 })?;
         
@@ -496,10 +496,10 @@ impl Aggregator {
                     delta,
                     history,
                 };
-                return match delta {
+                match delta {
                     DeltaValue::Positive(value) => Ok(addition(value_from_storage, value, self.max_value)?),
                     DeltaValue::Negative(value) => Ok(subtraction(value_from_storage, value)?),
-                };
+                }
             }
         }
     }
