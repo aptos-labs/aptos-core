@@ -94,4 +94,8 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
     fn storage_fee_used(&self) -> Fee {
         self.base.storage_fee_used()
     }
+
+    fn storage_fee_refunded(&self) -> Fee {
+        self.base.storage_fee_refunded()
+    }
 }
