@@ -21,6 +21,17 @@ pub(crate) const EADD_OVERFLOW: u64 = 0x02_0001;
 /// When `Subtraction` operation goes below zero.
 pub(crate) const ESUB_UNDERFLOW: u64 = 0x02_0002;
 
+/// When updating the aggregator start value (due to read operations 
+/// or at the end of the transaction), we realize that mistakenly raised
+/// an overflow in one of the previus try_add operation.
+pub(crate) const EEXPECTED_OVERFLOW: u64 = 0x02_0003;
+
+/// When updating the aggregator start value (due to read operations
+/// or at the end of the transaction), we realize that mistakenly raised
+/// an underflow in one of the previus try_sub operation.
+pub(crate) const EEXPECTED_UNDERFLOW: u64 = 0x02_0004;
+
+
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct DeltaOp {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delta_change_set::{abort_error, addition, subtraction, EADD_OVERFLOW, ESUB_UNDERFLOW},
+    delta_change_set::{abort_error, addition, subtraction, EADD_OVERFLOW, ESUB_UNDERFLOW, EEXPECTED_OVERFLOW, EEXPECTED_UNDERFLOW},
     resolver::AggregatorResolver,
 };
 use aptos_table_natives::TableHandle;
@@ -129,13 +129,13 @@ pub struct DeltaHistory {
     // 1. No overflow occured in the try_add/try_sub functions throughout the
     // transaction execution.
     // 2. The only overflows that occured in the try_add/try_sub functions in
-    // this transaction execution are with delta that exceeds u128::MAX.
+    // this transaction execution are with delta that exceeds limit.
     pub min_overflow_positive_delta: Option<u128>,
     // `max_underflow_negative_delta` is None in two possible cases:
     // 1. No underflow occured in the try_add/try_sub functions throughout the
     // transaction execution.
     // 2. The only underflows that occured in the try_add/try_sub functions in
-    // this transaction execution are with delta that drops below -u128::MAX.
+    // this transaction execution are with delta that drops below -limit.
     pub max_underflow_negative_delta: Option<u128>,
 }
 
@@ -214,13 +214,32 @@ impl Aggregator {
     /// +100, and the aggregator max_value is 150, then the base value of
     /// 60 will not pass validation (60 + 100 > 150), but the base value
     /// of 30 will (30 + 100 < 150).
+    /// To validate the history of an aggregator, we want to ensure that if
+    /// the `base_value` is the starting value of the aggregator before the
+    /// transaction execution, all the previous calls to try_add/try_sub
+    /// functions returned the correct result.
     fn validate_history(&self, base_value: u128) -> PartialVMResult<()> {
-        if let AggregatorState::Delta {speculative_start_value, speculative_source, delta, history} = &self.state {
-            // To validate the history of an aggregator, we want to ensure
-            // that there was no violation of postcondition (i.e. overflows or
-            // underflows). We can do it by emulating addition and subtraction.
+        if let AggregatorState::Delta {speculative_start_value, speculative_source:_, delta:_, history} = &self.state {
+            // We need to make sure the following 4 conditions are satisified.
+            //     base_value + max_achieved_positive_delta < self.max_value
+            //     base_value > min_achieved_negative_delta
+            //     base_value + min_overflow_positive_delta > self.max_value
+            //     base_value < max_underflow_negative_delta
             addition(base_value, history.max_achieved_positive_delta, self.max_value)?;
             subtraction(base_value, history.min_achieved_negative_delta)?;
+        
+            if history.min_overflow_positive_delta.is_some() && base_value <= self.max_value - history.min_overflow_positive_delta.unwrap() {
+                return Err(abort_error(
+                    format!("Overflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {}, Min overflow delta = {}, Max value = {}", base_value, speculative_start_value, history.min_overflow_positive_delta.unwrap(), self.max_value),
+                    EEXPECTED_OVERFLOW,
+                ));
+            }
+            if history.max_underflow_negative_delta.is_some() && base_value >= history.max_underflow_negative_delta.unwrap() {
+                return Err(abort_error(
+                    format!("Underflow was expected when setting the aggreagator start value to {}. Previous speculative start value = {}, Max underflow delta = {}, Max value = {}", base_value, speculative_start_value, history.max_underflow_negative_delta.unwrap(), self.max_value),
+                    EEXPECTED_UNDERFLOW,
+                ));
+            }
         }
         Ok(())
     }
