@@ -16,7 +16,7 @@ def transaction_emitter_main(
     workspace: str,
     args: List[str],
     system_context: SystemContext,
-    timeout: int = 30,
+    timeout: int = 360,
     ask_for_delete: bool = True,
 ):
     #
@@ -57,20 +57,20 @@ def transaction_emitter_main(
     #
     # Get logs
     command = ["kubectl", "logs", "-f", pod_name, "-n", testnet_name]
-    tries = 0
-    while tries < timeout:
+    time_passed = 0
+    while time_passed < timeout:
         log.info(
-            f"Attempting to get logs from transaction emitter, attempt number {tries}..."
+            f"Attempting to get logs from transaction emitter, time passed: {time_passed}..."
         )
         if system_context.shell.run(command, stream_output=True).succeeded():
             log.info("Successfully got logs from transaction emitter")
             break
-        tries += 1
-        time.sleep(1)
+        time_passed += 5
+        time.sleep(5)
 
     #
     # Check if we timed out
-    if tries == timeout:
+    if time_passed == timeout:
         log.error("Failed to get logs from transaction emitter")
 
     #
@@ -79,7 +79,7 @@ def transaction_emitter_main(
         #
         # Delete pod
         user_input = input(
-            '-------------------------------------------------------\n-The transaction emitter logs are complete. \n-Type "delete" to delete the transaction emitter pod\n-------------------------------------------------------\n'
+            '-------------------------------------------------------\n- The transaction emitter logs are complete. \n- Type "delete" to delete the transaction emitter pod\n-------------------------------------------------------\n'
         )
         if user_input == "delete":
             system_context.kubernetes.delete_resource(pod, testnet_name)
