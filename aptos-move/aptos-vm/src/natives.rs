@@ -37,7 +37,7 @@ struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
 impl AggregatorResolver for AptosBlankStorage {
-    fn resolve_aggregator_value(&self, _id: &AggregatorID) -> Result<u128, Error> {
+    fn resolve_aggregator_value(&self, _id: &AggregatorID) -> Result<u128, anyhow::Error> {
         // All Move tests have aggregator in Data state, and so the resolver should
         // not be called.
         unreachable!("Aggregator cannot be resolved for blank storage.")

@@ -20,8 +20,6 @@ on:
         required: false
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
-  schedule:
-    - cron: "0 3 */2 * *" # The main branch cadence. This runs every other day at 3am UTC.
   pull_request:
     paths:
       - ".github/workflows/forge-pfn.yaml"
@@ -52,16 +50,11 @@ jobs:
         id: determine-test-branch
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 3 */2 * *" ]]; then
-              echo "Branch: main"
-              echo "BRANCH=main" >> $GITHUB_OUTPUT
-            else
-              echo "Unknown schedule: ${{ github.event.schedule }}"
-              exit 1
-            fi
+            echo "Unknown schedule: ${{ github.event.schedule }}"
+            exit 1
           elif [[ "${{ github.event_name }}" == "push" ]]; then
-              echo "Branch: ${{ github.ref_name }}"
-              echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "Branch: ${{ github.ref_name }}"
+            echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
             echo "Using GIT_SHA"
             # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)

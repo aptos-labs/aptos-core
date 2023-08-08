@@ -77,7 +77,7 @@ target "builder-base" {
   target     = "builder-base"
   context    = "."
   contexts = {
-    rust = "docker-image://rust:1.71.0-bullseye@sha256:7ec9143807d4ab7e6f9953fa405e611669a1bfd5faeb866dbacecdcc297f16ed"
+    rust = "docker-image://rust:1.71.1-bullseye@sha256:6b5a53fef2818e28548be943a622bfc52d73920fe0f8784f4296227bca30cdf1"
   }
   args = {
     PROFILE            = "${PROFILE}"

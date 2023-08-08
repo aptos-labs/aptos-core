@@ -7,7 +7,7 @@ on:
 
   # Run every day at 12pm UTC
   schedule:
-    - cron: "0 12 * * *" # The main branch cadence. This runs every day at 12pm UTC.
+    - cron: "0 12 * * 3" # This runs once a week at 12pm UTC.
 
   # Run if a pull request touches this file
   pull_request:

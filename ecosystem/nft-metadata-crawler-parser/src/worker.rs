@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    establish_connection_pool,
     models::{
         nft_metadata_crawler_uris::NFTMetadataCrawlerURIs,
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
-        database::upsert_uris,
+        database::{establish_connection_pool, run_migrations, upsert_uris},
         gcs::{write_image_to_gcs, write_json_to_gcs},
         image_optimizer::ImageOptimizer,
         json_parser::JSONParser,
@@ -50,6 +49,7 @@ pub struct ParserConfig {
     pub num_parsers: usize,
     pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
+    pub release: Option<bool>,
 }
 
 /// Subscribes to PubSub and sends URIs to Channel
@@ -67,7 +67,7 @@ async fn consume_pubsub_entries_to_channel_loop(
         let ack = msg.ack_id();
         let entry_string = String::from_utf8(msg.message.clone().data)?;
         let parts: Vec<&str> = entry_string.split(',').collect();
-        let entry = Worker::new(
+        let worker = Worker::new(
             parser_config.clone(),
             pool.get()?,
             parts[0].to_string(),
@@ -80,8 +80,11 @@ async fn consume_pubsub_entries_to_channel_loop(
         );
 
         // Send worker to channel
-        sender.send((entry, ack.to_string())).unwrap_or_else(|e| {
-            error!("Failed to send entry to channel: {:?}", e);
+        sender.send((worker, ack.to_string())).unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to send PubSub entry to channel"
+            );
         });
     }
 
@@ -93,16 +96,26 @@ async fn spawn_parser(
     semaphore: Arc<Semaphore>,
     receiver: Arc<Mutex<Receiver<(Worker, String)>>>,
     subscription: Subscription,
+    release: bool,
 ) -> anyhow::Result<()> {
     loop {
         let _ = semaphore.acquire().await?;
 
         // Pulls worker from Channel
-        let (mut parser, ack) = receiver.lock().await.recv()?;
-        parser.parse().await?;
+        let (mut worker, ack) = receiver.lock().await.recv()?;
+        worker.parse().await?;
 
-        // Sends ack to PubSub
-        subscription.ack(vec![ack]).await?;
+        // Sends ack to PubSub only if running on release mode
+        if release {
+            info!(
+                token_data_id = worker.token_data_id,
+                token_uri = worker.token_uri,
+                last_transaction_version = worker.last_transaction_version,
+                force = worker.force,
+                "[NFT Metadata Crawler] Acking message"
+            );
+            subscription.ack(vec![ack]).await?;
+        }
 
         sleep(Duration::from_millis(500)).await;
     }
@@ -112,7 +125,18 @@ async fn spawn_parser(
 impl RunnableConfig for ParserConfig {
     /// Main driver function that establishes a connection to Pubsub and parses the Pubsub entries in parallel
     async fn run(&self) -> anyhow::Result<()> {
+        info!(
+            "[NFT Metadata Crawler] Starting parser with config: {:?}",
+            self
+        );
+
+        info!("[NFT Metadata Crawler] Connecting to database");
         let pool = establish_connection_pool(self.database_url.clone());
+        info!("[NFT Metadata Crawler] Database connection successful");
+
+        info!("[NFT Metadata Crawler] Running migrations");
+        run_migrations(&pool);
+        info!("[NFT Metadata Crawler] Finished migrations");
 
         std::env::set_var(
             "GOOGLE_APPLICATION_CREDENTIALS",
@@ -144,6 +168,7 @@ impl RunnableConfig for ParserConfig {
                 Arc::clone(&semaphore),
                 Arc::clone(&receiver),
                 subscription.clone(),
+                self.release.unwrap_or(false),
             ));
 
             workers.push(worker);
@@ -207,7 +232,7 @@ impl Worker {
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         info!(
             last_transaction_version = self.last_transaction_version,
-            "[NFT Metadata Crawler] Starting parser"
+            "[NFT Metadata Crawler] Starting worker"
         );
 
         // Deduplicate token_uri
@@ -248,6 +273,7 @@ impl Worker {
                 let cdn_json_uri =
                     write_json_to_gcs(self.config.bucket.clone(), self.token_data_id.clone(), json)
                         .await
+                        .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                         .ok();
                 self.model.set_cdn_json_uri(cdn_json_uri);
             }
@@ -305,6 +331,7 @@ impl Worker {
                     image,
                 )
                 .await
+                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                 .ok();
                 self.model.set_cdn_image_uri(cdn_image_uri);
             }
@@ -365,6 +392,7 @@ impl Worker {
                     animation,
                 )
                 .await
+                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                 .ok();
                 self.model.set_cdn_animation_uri(cdn_animation_uri);
             }

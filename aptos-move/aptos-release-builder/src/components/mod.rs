@@ -310,28 +310,32 @@ fn fetch_and_equals<T: OnChainConfig + PartialEq>(
 ) -> Result<bool> {
     match client {
         Some(client) => {
-            let config = T::deserialize_into_config(
-                block_on(async {
-                    client
-                        .get_account_resource_bytes(
-                            CORE_CODE_ADDRESS,
-                            format!(
-                                "{}::{}::{}",
-                                T::ADDRESS,
-                                T::MODULE_IDENTIFIER,
-                                T::TYPE_IDENTIFIER
-                            )
-                            .as_str(),
-                        )
-                        .await
-                })?
-                .inner(),
-            )?;
+            let config = fetch_config::<T>(client)?;
 
             Ok(&config == expected)
         },
         None => Ok(false),
     }
+}
+
+pub fn fetch_config<T: OnChainConfig>(client: &Client) -> Result<T> {
+    T::deserialize_into_config(
+        block_on(async {
+            client
+                .get_account_resource_bytes(
+                    CORE_CODE_ADDRESS,
+                    format!(
+                        "{}::{}::{}",
+                        T::ADDRESS,
+                        T::MODULE_IDENTIFIER,
+                        T::TYPE_IDENTIFIER
+                    )
+                    .as_str(),
+                )
+                .await
+        })?
+        .inner(),
+    )
 }
 
 impl ReleaseConfig {
