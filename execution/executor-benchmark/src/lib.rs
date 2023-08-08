@@ -168,6 +168,7 @@ pub fn run_benchmark<V>(
                 allow_aborts: false,
                 num_executor_shards: 1,
                 async_partitioning: false,
+                use_global_executor: false,
             },
         )
     });
@@ -571,6 +572,7 @@ mod tests {
                 allow_aborts: false,
                 num_executor_shards: 1,
                 async_partitioning: false,
+                use_global_executor: false,
             },
         );
 
@@ -598,6 +600,7 @@ mod tests {
                 allow_aborts: false,
                 num_executor_shards: 1,
                 async_partitioning: false,
+                use_global_executor: false,
             },
         );
     }

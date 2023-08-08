@@ -6,11 +6,10 @@ use aptos_logger::trace;
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::SubBlocksForShard,
-    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
+    block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
     vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::executor_client::ExecutorClient;
+use aptos_vm::sharded_block_executor::executor_client::{ExecutorClient, ShardedExecutionOutput};
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     net::SocketAddr,
@@ -26,6 +25,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
     result_rxs: Vec<Receiver<Message>>,
     // Thread pool used to pre-fetch the state values for the block in parallel and create an in-memory state view.
     thread_pool: Arc<rayon::ThreadPool>,
+
     phantom: std::marker::PhantomData<S>,
 }
 
@@ -62,6 +62,17 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             phantom: std::marker::PhantomData,
         }
     }
+
+    fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
+        trace!("RemoteExecutorClient Waiting for results");
+        let mut results = vec![];
+        for rx in self.result_rxs.iter() {
+            let received_bytes = rx.recv().unwrap().to_bytes();
+            let result: RemoteExecutionResult = bcs::from_bytes(&received_bytes).unwrap();
+            results.push(result.inner?);
+        }
+        Ok(results)
+    }
 }
 
 impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorClient<S> {
@@ -72,11 +83,16 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
     fn execute_block(
         &self,
         state_view: Arc<S>,
-        block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
-    ) {
+    ) -> Result<ShardedExecutionOutput, VMStatus> {
         self.thread_pool.scope(|s| {
+            let (block, global_txns) = transactions.into();
+            assert!(
+                global_txns.is_empty(),
+                "Global transactions are not supported yet in remote execution mode."
+            );
             for (shard_id, sub_blocks) in block.into_iter().enumerate() {
                 let state_view = state_view.clone();
                 let senders = self.command_txs.clone();
@@ -99,16 +115,9 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 });
             }
         });
-    }
 
-    fn get_execution_result(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
-        trace!("RemoteExecutorClient Waiting for results");
-        let mut results = vec![];
-        for rx in self.result_rxs.iter() {
-            let received_bytes = rx.recv().unwrap().to_bytes();
-            let result: RemoteExecutionResult = bcs::from_bytes(&received_bytes).unwrap();
-            results.push(result.inner?);
-        }
-        Ok(results)
+        let execution_results = self.get_output_from_shards()?;
+
+        Ok(ShardedExecutionOutput::new(execution_results, vec![]))
     }
 }
