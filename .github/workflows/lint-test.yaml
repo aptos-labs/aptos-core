@@ -215,7 +215,3 @@ jobs:
             /tmp/.tmp*
             !/tmp/.tmp*/**/db/
           retention-days: 14
-
-  # TODO: remove this once the new jobs land
-  python-lint-test:
-    uses: ./.github/workflows/python-lint-test.yaml
