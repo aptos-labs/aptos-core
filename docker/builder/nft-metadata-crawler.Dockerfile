@@ -20,11 +20,3 @@ COPY --link --from=tools-builder /aptos/dist/aptos-nft-metadata-crawler-parser /
 
 # The health check port
 EXPOSE 8080
-
-# add build info
-ARG GIT_TAG
-ENV GIT_TAG ${GIT_TAG}
-ARG GIT_BRANCH
-ENV GIT_BRANCH ${GIT_BRANCH}
-ARG GIT_SHA
-ENV GIT_SHA ${GIT_SHA}
