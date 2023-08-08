@@ -40,7 +40,9 @@ def transaction_emitter_main(
         log.info(
             f"Attempting to get logs from transaction emitter, attempt number {tries}..."
         )
-        system_context.shell.run(command, stream_output=True)
+        if system_context.shell.run(command, stream_output=True).succeeded():
+            log.info("Successfully got logs from transaction emitter")
+            break
         tries += 1
         time.sleep(1)
     
