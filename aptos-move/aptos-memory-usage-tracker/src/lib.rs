@@ -465,6 +465,8 @@ where
 
         fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee;
 
+        fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
+
         fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
         fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
@@ -483,6 +485,11 @@ where
             &mut self,
             amount: Fee,
             gas_unit_price: FeePerGasUnit,
+        ) -> PartialVMResult<()>;
+
+        fn refund_storage_fee(
+            &mut self,
+            amount: Fee,
         ) -> PartialVMResult<()>;
 
         fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;

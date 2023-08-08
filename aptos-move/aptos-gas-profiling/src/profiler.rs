@@ -482,6 +482,8 @@ where
 
         fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee;
 
+        fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
+
         fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee;
 
         fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
@@ -498,6 +500,11 @@ where
             &mut self,
             amount: Fee,
             gas_unit_price: FeePerGasUnit,
+        ) -> PartialVMResult<()>;
+
+        fn refund_storage_fee(
+            &mut self,
+            amount: Fee,
         ) -> PartialVMResult<()>;
     }
 
@@ -537,8 +544,12 @@ where
         let mut write_set_storage = vec![];
         for (key, op) in change_set.write_set_iter_mut() {
             let slot_fee = self.storage_fee_for_state_slot(op);
+            let slot_refund = self.storage_fee_refund_for_state_slot(op);
             let bytes_fee = self.storage_fee_for_state_bytes(key, op);
+
             Self::maybe_record_storage_deposit(op, slot_fee);
+            self.refund_storage_fee(slot_refund)
+                .map_err(|err| err.finish(Location::Undefined))?;
 
             let fee = slot_fee + bytes_fee;
             write_set_storage.push(WriteStorage {
@@ -546,6 +557,7 @@ where
                 op_type: write_op_type(op),
                 cost: fee,
             });
+            // TODO(gas): track storage refund in the profiler
             write_fee += fee;
         }
 

@@ -55,6 +55,15 @@ pub trait GasAlgebra {
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()>;
 
+    /// Refunds storage fee.
+    ///
+    /// The amount refunded can be a quantity or an abstract expression containing
+    /// gas parameters.
+    fn refund_storage_fee(
+        &mut self,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
+    ) -> PartialVMResult<()>;
+
     /// Returns the amount of gas used under the execution category.
     fn execution_gas_used(&self) -> InternalGas;
 
@@ -91,6 +100,12 @@ pub trait AptosGasMeter: MoveGasMeter {
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()>;
 
+    /// Refunds storage fee.
+    ///
+    /// Amount is in APT/Octa. Refund is not deducted from the gas meter balance hence no need to
+    /// convert the amount to gas units.
+    fn refund_storage_fee(&mut self, amount: Fee) -> PartialVMResult<()>;
+
     /// Charges an intrinsic cost for executing the transaction.
     ///
     /// The cost stays constant for transactions below a certain size, but will grow proportionally
@@ -105,6 +120,9 @@ pub trait AptosGasMeter: MoveGasMeter {
 
     /// Calculates the storage fee for a state slot allocation.
     fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee;
+
+    /// Calculates the storage fee refund for a state slot deallocation.
+    fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
 
     /// Calculates the storage fee for state bytes.
     fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee;
@@ -145,15 +163,18 @@ pub trait AptosGasMeter: MoveGasMeter {
         }
 
         // Calculate the storage fees.
-        let write_fee = change_set
-            .write_set_iter_mut()
-            .fold(Fee::new(0), |acc, (key, op)| {
-                let slot_fee = self.storage_fee_for_state_slot(op);
-                let bytes_fee = self.storage_fee_for_state_bytes(key, op);
-                Self::maybe_record_storage_deposit(op, slot_fee);
+        let mut write_fee = Fee::new(0);
+        for (key, op) in change_set.write_set_iter_mut() {
+            let slot_fee = self.storage_fee_for_state_slot(op);
+            let refund = self.storage_fee_refund_for_state_slot(op);
+            let bytes_fee = self.storage_fee_for_state_bytes(key, op);
 
-                acc + slot_fee + bytes_fee
-            });
+            Self::maybe_record_storage_deposit(op, slot_fee);
+            self.refund_storage_fee(refund)
+                .map_err(|err| err.finish(Location::Undefined))?;
+
+            write_fee += slot_fee + bytes_fee
+        }
         let event_fee = change_set.events().iter().fold(Fee::new(0), |acc, event| {
             acc + self.storage_fee_per_event(event)
         });
