@@ -54,7 +54,7 @@ members = [
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
-    "crates/aptos-iuchild",
+    "crates/aptos-profiler",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
     "crates/aptos-log-derive",
@@ -336,7 +336,7 @@ aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "network/peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "network/peer-monitoring-service/server" }
 aptos-peer-monitoring-service-types = { path = "network/peer-monitoring-service/types" }
-aptos-iuchild = { path = "crates/aptos-iuchild" }
+aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "crates/aptos-protos" }
 aptos-proxy = { path = "crates/proxy" }

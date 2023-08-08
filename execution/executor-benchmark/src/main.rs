@@ -17,6 +17,10 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_profiler::{
+    ProfilerConfig,
+    ProfilerHandler,
+};
 
 #[cfg(unix)]
 #[global_allocator]
@@ -141,6 +145,12 @@ struct Opt {
 
     #[clap(long)]
     use_native_executor: bool,
+
+    #[clap(long)]
+    cpu_profiling: bool,
+
+    #[clap(long)]
+    memory_profiling: bool,
 }
 
 impl Opt {
@@ -299,7 +309,18 @@ fn main() {
     AptosVM::set_concurrency_level_once(opt.concurrency_level());
     AptosVM::set_num_shards_once(opt.num_executor_shards);
     NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
-
+    if opt.cpu_profiling {
+        let config = ProfilerConfig::new_with_defaults();
+        let handler = ProfilerHandler::new(config);
+        let cpu_profiler = handler.get_cpu_profiler();
+        cpu_profiler.start_profiling();
+    }
+    if opt.memory_profiling {
+        let config = ProfilerConfig::new_with_defaults();
+        let handler = ProfilerHandler::new(config);
+        let memory_profiler = handler.get_mem_profiler();
+        memory_profiler.start_profiling();
+    }
     if opt.use_native_executor {
         run::<NativeExecutor>(opt);
     } else {

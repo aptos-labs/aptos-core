@@ -21,10 +21,11 @@ mod index;
 mod json_encoder;
 mod metrics;
 mod peer_information;
-mod profiling;
 mod system_information;
-
 pub mod utils;
+
+#[cfg(target_os = "linux")]
+mod profiling;
 
 #[cfg(test)]
 mod tests;

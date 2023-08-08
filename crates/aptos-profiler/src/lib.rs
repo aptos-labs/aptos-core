@@ -5,6 +5,8 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use serde::{Deserialize, Serialize};
+use serde_yaml::{self};
 
 use anyhow::Result;
 use crate::thread_profiler::ThreadProfiler;
@@ -18,7 +20,7 @@ mod memory_profiler;
 mod thread_profiler;
 mod utils;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfilerConfig {
     cpu_profiler_config: Option<CpuProfilerConfig>,
     offcpu_profiler_config: Option<OffCpuProfilerConfig>,
@@ -27,6 +29,15 @@ pub struct ProfilerConfig {
 }
 
 impl ProfilerConfig {
+   // pub fn load_from_file(path: &Path) -> Result<Self> {
+    //    let path_str = path.to_str().unwrap_or_default();
+      //  let mut file = tokio::fs::File::open(path);
+       // let mut content = Vec::new();
+        //file.read_to_end(&mut content);
+
+        //Ok(serde_yaml::from_slice(&content)?)
+    //}
+    
     pub fn new_with_defaults() -> Self {
         Self {
             cpu_profiler_config: CpuProfilerConfig::new_with_defaults(),
@@ -37,7 +48,7 @@ impl ProfilerConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct CpuProfilerConfig {
     duration: u64,
     frequency: i32,
@@ -47,14 +58,14 @@ struct CpuProfilerConfig {
 impl CpuProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
-            duration: 5,
+            duration: 100,
             frequency: 100,
-            cpu_profiling_result: PathBuf::from("./cpu_flamegraph.svg"),
+            cpu_profiling_result: PathBuf::from("./profiling_results/cpu_flamegraph.svg"),
         })
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct MemProfilerConfig {
     duration: u64,
     mem_profiling_result_txt: PathBuf,
@@ -65,14 +76,14 @@ impl MemProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
             duration: 60,
-            mem_profiling_result_txt: PathBuf::from("./heap.txt"),
-            mem_profiling_result_svg: PathBuf::from("./heap.svg"),
+            mem_profiling_result_txt: PathBuf::from("./profiling_results/heap.txt"),
+            mem_profiling_result_svg: PathBuf::from("./profiling_results/heap.svg"),
 
         })
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ThreadProfilerConfig {
     thread_profiling_result: PathBuf,
 }
@@ -80,12 +91,12 @@ struct ThreadProfilerConfig {
 impl ThreadProfilerConfig {
     pub fn new_with_defaults() -> Option<Self> {
         Some(Self {
-            thread_profiling_result: PathBuf::from("./thread_profiling_result/thead_dump.txt"),
+            thread_profiling_result: PathBuf::from("./profiling_results/thead_dump.txt"),
         })
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct OffCpuProfilerConfig {
     count: u64,
     offcpu_profiling_txt_output: PathBuf,

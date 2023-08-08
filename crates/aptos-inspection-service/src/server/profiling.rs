@@ -8,6 +8,7 @@ use std::time::Duration;
 use crate::utils::{CONTENT_TYPE_JSON, CONTENT_TYPE_SVG, CONTENT_TYPE_TEXT};
 use aptos_profiler::{ProfilerHandler, ProfilerConfig};
 
+#[cfg(target_os = "linux")]
 pub fn handle_profiling_request() -> (StatusCode, Body, String) {
     let mut file = File::open("./crates/aptos-inspection-service/src/server/index.html")
         .expect("Failed to open file");
@@ -20,8 +21,10 @@ pub fn handle_profiling_request() -> (StatusCode, Body, String) {
     (StatusCode::OK, Body::from(contents), CONTENT_TYPE_HTML.into(),)
 }
 
+#[cfg(target_os = "linux")]
 pub fn handle_cpu_profiling_request() -> (StatusCode, Body, String) {
     // Call aptos-profiling cpu profiling
+    //let config = ProfilerConfig::load_from_file(PathBuf::from("./config.yml"));
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
     let cpu_profiler = handler.get_cpu_profiler();
@@ -38,6 +41,7 @@ pub fn handle_cpu_profiling_request() -> (StatusCode, Body, String) {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
@@ -53,6 +57,7 @@ pub fn handle_memory_profiling_request() -> (StatusCode, Body, String) {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn handle_cpu_flamegraph_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
@@ -69,6 +74,7 @@ pub fn handle_cpu_flamegraph_request() -> (StatusCode, Body, String) {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn handle_memory_svg_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
@@ -85,6 +91,7 @@ pub fn handle_memory_svg_request() -> (StatusCode, Body, String) {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn handle_memory_txt_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
@@ -101,6 +108,7 @@ pub fn handle_memory_txt_request() -> (StatusCode, Body, String) {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn handle_thread_dump_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
@@ -116,6 +124,7 @@ pub fn handle_thread_dump_request() -> (StatusCode, Body, String) {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn handle_thread_dump_result_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
@@ -132,6 +141,7 @@ pub fn handle_thread_dump_result_request() -> (StatusCode, Body, String) {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn handle_offcpu_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
@@ -147,6 +157,7 @@ pub fn handle_offcpu_request() -> (StatusCode, Body, String) {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn handle_offcpu_result_request() -> (StatusCode, Body, String) {
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
