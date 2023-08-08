@@ -6,7 +6,9 @@ use crate::{
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
-        database::{establish_connection_pool, run_migrations, upsert_uris},
+        database::{
+            check_or_update_chain_id, establish_connection_pool, run_migrations, upsert_uris,
+        },
         gcs::{write_image_to_gcs, write_json_to_gcs},
         image_optimizer::ImageOptimizer,
         json_parser::JSONParser,
@@ -61,22 +63,42 @@ async fn consume_pubsub_entries_to_channel_loop(
     subscription: Subscription,
     pool: Pool<ConnectionManager<PgConnection>>,
 ) -> anyhow::Result<()> {
+    let mut db_chain_id = None;
     let mut stream = subscription.subscribe(None).await?;
     while let Some(msg) = stream.next().await {
         // Parse metadata from Pubsub message and create worker
         let ack = msg.ack_id();
         let entry_string = String::from_utf8(msg.message.clone().data)?;
         let parts: Vec<&str> = entry_string.split(',').collect();
+
+        let mut conn = pool.get()?;
+        let grpc_chain_id = parts[4].parse::<u64>()?;
+
+        if let Some(existing_id) = db_chain_id {
+            if grpc_chain_id != existing_id {
+                error!(
+                    chain_id = grpc_chain_id,
+                    existing_id = existing_id,
+                    "[NFT Metadata Crawler] Stream somehow changed chain id!",
+                );
+                panic!("[NFT Metadata Crawler] Stream somehow changed chain id!");
+            }
+        } else {
+            db_chain_id = Some(
+                check_or_update_chain_id(&mut conn, grpc_chain_id as i64)
+                    .expect("Chain id should match"),
+            );
+        }
+
         let worker = Worker::new(
             parser_config.clone(),
-            pool.get()?,
+            conn,
             parts[0].to_string(),
             parts[1].to_string(),
             parts[2].to_string().parse()?,
             NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
                 NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")?,
             ),
-            parts[4].parse::<i32>()?,
             parts[5].parse::<bool>().unwrap_or(false),
         );
 
@@ -206,7 +228,6 @@ pub struct Worker {
     token_uri: String,
     last_transaction_version: i32,
     last_transaction_timestamp: chrono::NaiveDateTime,
-    chain_id: i32, // Add checks with DB in future PR
     force: bool,
 }
 
@@ -218,7 +239,6 @@ impl Worker {
         token_uri: String,
         last_transaction_version: i32,
         last_transaction_timestamp: chrono::NaiveDateTime,
-        chain_id: i32,
         force: bool,
     ) -> Self {
         Self {
@@ -229,7 +249,6 @@ impl Worker {
             token_uri,
             last_transaction_version,
             last_transaction_timestamp,
-            chain_id,
             force,
         }
     }
