@@ -115,5 +115,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
-    exts.add(NativeEventContext::new());
+    exts.add(NativeEventContext::default());
 }
