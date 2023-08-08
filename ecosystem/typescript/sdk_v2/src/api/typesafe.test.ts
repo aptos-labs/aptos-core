@@ -14,7 +14,7 @@ async () => {
     });
 
     // a view function call with type-safety
-    const [balance] = await client.view<typeof COIN_ABI, "balance">({
+    const [balance] = await client.view<COIN_ABI, "balance">({
         function: "0x1::coin::balance",
         arguments: ["0x1"],
         type_arguments: ["0x1"],
@@ -24,13 +24,13 @@ async () => {
     const _double = balance * 2;
 
     // @ts-expect-error function name not exist
-    client.view<typeof COIN_ABI, "baaaaa">({
+    client.view<COIN_ABI, "baaaaa">({
         function: "0x1::coin::balance",
         arguments: ["0x1"],
         type_arguments: ["0x1"],
     });
 
-    client.view<typeof COIN_ABI, "balance">({
+    client.view<COIN_ABI, "balance">({
         // @ts-expect-error function name is wrong
         function: "0x1::coin::baaaaaa",
         arguments: ["0x1"],
@@ -38,7 +38,7 @@ async () => {
     });
 
     // a view function call with type-safety
-    client.view<typeof COIN_ABI, "balance">({
+    client.view<COIN_ABI, "balance">({
         function: "0x1::coin::balance",
         // @ts-expect-error need a address argument
         arguments: [123],
@@ -46,7 +46,7 @@ async () => {
     });
 
     // a view function call with type-safety
-    client.view<typeof COIN_ABI, "balance">({
+    client.view<COIN_ABI, "balance">({
         function: "0x1::coin::balance",
         arguments: ["0x1"],
         // @ts-expect-error need only one type argument
@@ -56,7 +56,7 @@ async () => {
 //     });
 // });
 
-export const COIN_ABI = {
+type COIN_ABI = {
     "address": "0x1",
     "name": "coin",
     "friends": [
@@ -834,4 +834,4 @@ export const COIN_ABI = {
             ]
         }
     ]
-} as const;
+};
