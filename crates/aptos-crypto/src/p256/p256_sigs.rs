@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This file implements traits for Ed25519 signatures.
+//! This file implements traits for ECDSA signatures over NIST-P256.
 
 use crate::{
-    p256::{P256PrivateKey, P256PublicKey, ORDER_HALF},
+    p256::{P256PrivateKey, P256PublicKey, ORDER_HALF, ORDER_MINUS_ONE},
     hash::CryptoHash,
     traits::*,
 };
@@ -14,6 +14,9 @@ use core::convert::TryFrom;
 use serde::Serialize;
 use std::{cmp::Ordering, fmt};
 use signature::Verifier;
+use p256::NonZeroScalar;
+use p256::NistP256;
+use p256::elliptic_curve::Curve;
 
 use super::P256_SIGNATURE_LENGTH;
 
@@ -30,6 +33,9 @@ impl P256Signature {
     /// Serialize an P256Signature.
     pub fn to_bytes(&self) -> [u8; P256_SIGNATURE_LENGTH] {
         // The RustCrypto P256 `to_bytes` call here should never return a byte array of the wrong length
+        let bytes = self.0.to_bytes();
+        println!("len is {}", bytes.len());
+        println!("bytes are {:?}", bytes);
         self.0.to_bytes().try_into().unwrap()
     }
 
@@ -82,6 +88,28 @@ impl P256Signature {
         }
         // As this stage S == ORDER_HALF which implies a non canonical S.
         false
+    }
+
+    /// If the signature {R,S} does not have S < n/2 where n is the Ristretto255 order, return
+    /// {R,n-S} as the canonical encoding of this signature to prevent malleability attacks. See
+    /// `check_s_malleability` for more detail 
+    pub fn make_canonical(&self) -> P256Signature {
+        if P256Signature::check_s_malleability(&self.to_bytes()[..]).is_ok() {
+            return self.clone()
+        };
+        let s = self.0.s();
+        let r = self.0.r();
+        // NonZeroScalar::try_from throws an error on being passed the curve order, so we use the
+        // order minus one, then add one later to compute (n-1) - s + 1 = n-s
+        let order_minus_one = NonZeroScalar::try_from(&ORDER_MINUS_ONE[..]).unwrap();
+        let one = NonZeroScalar::from_uint(<NistP256 as Curve>::Uint::ONE).unwrap();
+        // Dereferencing a NonZeroScalar makes it a Scalar, which implements subtraction
+        let new_s = *order_minus_one - *s + *one;
+        // TODO: Make sure this never panics
+        let new_s_nonzero = NonZeroScalar::new(new_s).unwrap();
+        // TODO: Make sure this never panics
+        let new_sig = p256::ecdsa::Signature::from_scalars(&r, &new_s_nonzero).unwrap();
+        P256Signature(new_sig)
     }
 }
 

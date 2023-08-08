@@ -65,15 +65,17 @@ impl P256PrivateKey {
     /// methods of the SigningKey implementation. This should remain private.
     fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
         let secret_key: &p256::ecdsa::SigningKey = &self.0;
-        let sig = secret_key.sign(message.as_ref());
-        P256Signature(sig)
+        let sig = P256Signature(secret_key.sign(message.as_ref()));
+        let canonical_sig = P256Signature::make_canonical(&sig);
+
+        canonical_sig
     }
 }
 
 impl P256PublicKey {
     /// Serialize a P256PublicKey.
     pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
-        // This should never return an array of the wrong length
+        // The RustCrypto P256 `to_sec1_bytes` call here should never return an array of the wrong length and cause a panic
         (*self.0.to_sec1_bytes()).try_into().unwrap()
     }
 

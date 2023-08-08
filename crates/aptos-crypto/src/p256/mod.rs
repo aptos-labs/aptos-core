@@ -31,9 +31,14 @@
 /// The length in bytes of the P256PrivateKey
 pub const P256_PRIVATE_KEY_LENGTH: usize = 32;
 /// The length in bytes of the P256PublicKey
-pub const P256_PUBLIC_KEY_LENGTH: usize = 64;
+pub const P256_PUBLIC_KEY_LENGTH: usize = 65;
 /// The length in bytes of the P256Signature
 pub const P256_SIGNATURE_LENGTH: usize = 64;
+
+/// The order of P256 as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final), minus one.
+const ORDER_MINUS_ONE: [u8; 32] = [
+    0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBC, 0xE6, 0xFA, 0xAD, 0xA7, 0x17, 0x9E, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0x50,
+];
 
 /// The value (q-1)/2, where q is the order of P256 as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final).
 /// Computed with the following SageMath code:
@@ -41,7 +46,6 @@ pub const P256_SIGNATURE_LENGTH: usize = 64;
 /// # Curve order
 /// qq = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
 /// q_half = (qq-1)/2
-// TODO: Make sure this has the correct endianness
 // TODO: Make sure qq-1 is the correct thing to do
 const ORDER_HALF: [u8; 32] = [
     0x7F, 0xFF, 0xFF, 0xFF, 0x80, 0x00, 0x00, 0x00, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xDE, 0x73, 0x7D, 0x56, 0xD3, 0x8B, 0xCF, 0x42, 0x79, 0xDC, 0xE5, 0x61, 0x7E, 0x31, 0x92, 0xA8,
