@@ -196,4 +196,8 @@ impl GasAlgebra for StandardGasAlgebra {
     fn storage_fee_used(&self) -> Fee {
         self.storage_fee_used
     }
+
+    fn storage_fee_refunded(&self) -> Fee {
+        self.storage_fee_refunded
+    }
 }

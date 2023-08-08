@@ -75,6 +75,9 @@ pub trait GasAlgebra {
 
     /// Returns the amount of storage fee used.
     fn storage_fee_used(&self) -> Fee;
+
+    /// Returns the amount of storage fee refunded.
+    fn storage_fee_refunded(&self) -> Fee;
 }
 
 /// Trait representing a gas meter used inside the Aptos VM.
@@ -265,5 +268,10 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Return the total fee used for storage.
     fn storage_fee_used(&self) -> Fee {
         self.algebra().storage_fee_used()
+    }
+
+    /// Return the total storage fee refund.
+    fn storage_fee_refunded(&self) -> Fee {
+        self.algebra().storage_fee_refunded()
     }
 }
