@@ -9,6 +9,9 @@ use crate::{
 };
 #[allow(unused_imports)]
 use anyhow::Error;
+use aptos_aggregator::{
+    aggregator_extension::AggregatorID, delta_change_set::deserialize, resolver::AggregatorResolver,
+};
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_table_natives::{TableHandle, TableResolver};
@@ -203,6 +206,19 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
         self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
+    }
+}
+
+impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
+    fn resolve_aggregator_value(&self, id: &AggregatorID) -> Result<u128, Error> {
+        let AggregatorID { handle, key } = id;
+        let state_key = StateKey::table_item(*handle, key.0.to_vec());
+        match self.get_state_value_bytes(&state_key)? {
+            Some(bytes) => Ok(deserialize(&bytes)),
+            None => {
+                anyhow::bail!("Could not find the value of the aggregator")
+            },
+        }
     }
 }
 
