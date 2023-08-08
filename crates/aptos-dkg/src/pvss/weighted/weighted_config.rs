@@ -146,6 +146,9 @@ impl WeightedConfig {
         &self.tc.get_evaluation_domain()
     }
 
+    /// NOTE: RNG is passed in to maintain function signature compatibility with
+    /// `SecretSharingConfig::get_random_eligible_subset_of_players`, so as to easily benchmark
+    /// with different methods of sampling subsets.
     pub fn get_best_case_eligible_subset_of_players<R: RngCore + CryptoRng>(
         &self,
         _rng: &mut R,
@@ -155,6 +158,9 @@ impl WeightedConfig {
         self.pop_eligible_subset(&mut player_and_weights)
     }
 
+    /// NOTE: RNG is passed in to maintain function signature compatibility with
+    /// `SecretSharingConfig::get_random_eligible_subset_of_players`, so as to easily benchmark
+    /// with different methods of sampling subsets.
     pub fn get_worst_case_eligible_subset_of_players<R: RngCore + CryptoRng>(
         &self,
         _rng: &mut R,
@@ -166,27 +172,39 @@ impl WeightedConfig {
         self.pop_eligible_subset(&mut player_and_weights)
     }
 
-    fn sort_players_by_weight(&self) -> Vec<(usize, usize)> {
+    pub fn get_average_size_of_eligible_subset<R: RngCore + CryptoRng>(
+        &self,
+        sample_size: usize,
+        rng: &mut R,
+    ) -> usize {
+        let mut average = 0;
+        for _ in 0..sample_size {
+            average += self.get_random_eligible_subset_of_players(rng).len();
+        }
+        average / sample_size
+    }
+
+    fn sort_players_by_weight(&self) -> Vec<(Player, usize)> {
         // the set of remaining players that we are picking a "capable" subset from
         let mut player_and_weights = self
             .weight
             .iter()
             .enumerate()
-            .map(|(i, w)| (i, *w))
-            .collect::<Vec<(usize, usize)>>();
+            .map(|(i, w)| (self.get_player(i), *w))
+            .collect::<Vec<(Player, usize)>>();
 
         player_and_weights.sort_by(|a, b| a.1.cmp(&b.1));
         player_and_weights
     }
 
-    fn pop_eligible_subset(&self, player_and_weights: &mut Vec<(usize, usize)>) -> Vec<Player> {
+    fn pop_eligible_subset(&self, player_and_weights: &mut Vec<(Player, usize)>) -> Vec<Player> {
         let mut picked_players = vec![];
 
         let mut current_weight = 0;
         while current_weight < self.tc.t {
-            let (player_idx, weight) = player_and_weights.pop().unwrap();
+            let (player, weight) = player_and_weights.pop().unwrap();
 
-            picked_players.push(self.get_player(player_idx));
+            picked_players.push(player);
 
             // rinse and repeat until the picked players jointly have enough weight
             current_weight += weight;

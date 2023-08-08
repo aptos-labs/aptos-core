@@ -4,13 +4,14 @@ use crate::{
     algebra::lagrange::lagrange_coefficients,
     pvss,
     pvss::{Player, WeightedConfig},
-    utils::{g1_multi_exp, multi_pairing},
+    utils::{g1_multi_exp, multi_pairing, random::random_scalars, HasMultiExp},
     weighted_vuf::traits::WeightedVUF,
 };
 use anyhow::bail;
 use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
 use group::Group;
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::ops::{Mul, Neg};
 
@@ -79,12 +80,15 @@ impl WeightedVUF for BlsWUF {
         proof: &Self::ProofShare,
     ) -> anyhow::Result<()> {
         let hash = Self::hash_to_curve(msg);
+        // TODO: Use Fiat-Shamir
+        let coeffs = random_scalars(apk.len(), &mut thread_rng());
 
-        let agg_pk = apk
+        let pks = apk
             .iter()
             .map(|pk| *pk.as_group_element())
-            .sum::<G2Projective>();
-        let agg_sig = proof.iter().copied().sum::<G1Projective>();
+            .collect::<Vec<G2Projective>>();
+        let agg_pk = G2Projective::multi_exp_slice(pks.as_slice(), coeffs.as_slice());
+        let agg_sig = G1Projective::multi_exp_slice(proof.to_vec().as_slice(), coeffs.as_slice());
 
         if multi_pairing(
             [&hash, &agg_sig].into_iter(),
