@@ -11,7 +11,13 @@ import time
 
 
 def transaction_emitter_main(
-    testnet_name: str, args: List[str], system_context: SystemContext, timeout: int = 30, ask_for_delete: bool = True
+    testnet_name: str,
+    dry_run: bool,
+    workspace: str,
+    args: List[str],
+    system_context: SystemContext,
+    timeout: int = 30,
+    ask_for_delete: bool = True,
 ):
     #
     # Create command array
@@ -27,10 +33,26 @@ def transaction_emitter_main(
 
     #
     # Create Pod
-    log.info("Starting transaction emitter...")
+    log.info("Creating a transaction emitter pod...")
     pod: client.V1Pod = create_transaction_emitter_pod(pod_name, command_array)
+
+    #
+    # If dry run, dump pod yaml and return
+    if dry_run:
+        util.kubernetes_object_to_yaml(
+            f"{workspace}/{pod_name}.yaml",
+            pod,
+            system_context.filesystem,
+        )
+        log.info(
+            f'Transaction emitter pod yaml dumped to "{workspace}/{pod_name}.yaml"...'
+        )
+        return
+
+    #
+    # Apply pod
     system_context.kubernetes.create_resource(pod, testnet_name)
-    log.info("Transaction emitter started...")
+    log.info("Transaction emitter pod created...")
 
     #
     # Get logs
@@ -45,7 +67,7 @@ def transaction_emitter_main(
             break
         tries += 1
         time.sleep(1)
-    
+
     #
     # Check if we timed out
     if tries == timeout:
@@ -75,7 +97,7 @@ def create_transaction_emitter_pod(
         ],
         command=command_array,
         resources=client.V1ResourceRequirements(
-            requests={"cpu": "1", "memory": "1Gi"},  # Check if too much/not enough
+            requests={"cpu": "15", "memory": "26Gi"},  # Check if too much/not enough
             limits={"cpu": "15", "memory": "26Gi"},  # Check if too much/not enough
         ),
     )
@@ -88,7 +110,10 @@ def create_transaction_emitter_pod(
     pod: client.V1Pod = client.V1Pod(
         api_version="v1",
         kind="Pod",
-        metadata=client.V1ObjectMeta(name=pods_name),
+        metadata=client.V1ObjectMeta(
+            name=pods_name,
+            labels={"type": util.TX_EMITTER_TYPE},
+        ),
         spec=pod_spec,
     )
 
