@@ -58,7 +58,7 @@ pub struct NodeConfig {
     pub storage: StorageConfig,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
-    #[serde(default = "BenchmarkConfig::default_some")]
+    #[serde(default)]
     pub benchmark: Option<BenchmarkConfig>,
 }
 
