@@ -1,0 +1,10 @@
+[package]
+name = 'egg'
+version = '1.0.0'
+
+[addresses]
+egg = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }
