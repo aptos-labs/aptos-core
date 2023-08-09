@@ -3,7 +3,7 @@
 
 use crate::{
     delta_change_set::{abort_error, addition, subtraction, EADD_OVERFLOW, ESUB_UNDERFLOW, EEXPECTED_OVERFLOW, EEXPECTED_UNDERFLOW},
-    resolver::AggregatorResolver,
+    resolver::{AggregatorResolver, self},
 };
 use aptos_table_natives::TableHandle;
 use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
@@ -425,7 +425,6 @@ impl Aggregator {
     pub fn read_last_committed_aggregator_value(
         &mut self,
         resolver: &dyn AggregatorResolver,
-        id: &AggregatorID,
     ) -> PartialVMResult<u128> {
         match self.state {
             AggregatorState::Data { value } => {
@@ -441,7 +440,7 @@ impl Aggregator {
                     };
                 }
                 // Otherwise, we have to go to storage and read the value.
-                let value_from_storage = resolver.resolve_last_committed_aggregator_value(id).map_err(|e| {
+                let value_from_storage = resolver.resolve_last_committed_aggregator_value(&self.id).map_err(|e| {
                     extension_error(format!("Could not find the value of the aggregator: {}", e))
                 })?;
         
@@ -468,7 +467,6 @@ impl Aggregator {
     pub fn read_most_recent_aggregator_value(
         &mut self,
         resolver: &dyn AggregatorResolver,
-        id: &AggregatorID,
     ) -> PartialVMResult<u128> {
         match self.state {
             AggregatorState::Data { value } => {
@@ -484,7 +482,7 @@ impl Aggregator {
                     };
                 }
                 // Otherwise, we have to go to storage and read the value.
-                let value_from_storage = resolver.resolve_most_recent_aggregator_value(id).map_err(|e| {
+                let value_from_storage = resolver.resolve_most_recent_aggregator_value(&self.id).map_err(|e| {
                     extension_error(format!("Could not find the value of the aggregator: {}", e))
                 })?;
         
@@ -543,6 +541,7 @@ impl AggregatorData {
     pub fn get_aggregator(
         &mut self,
         id: AggregatorID,
+        resolver: &dyn AggregatorResolver,
         max_value: u128,
     ) -> PartialVMResult<&mut Aggregator> {
         let aggregator = self.aggregators.entry(id).or_insert(Aggregator {
@@ -555,6 +554,7 @@ impl AggregatorData {
             },
             max_value,
         });
+        aggregator.read_last_committed_aggregator_value(resolver);
         Ok(aggregator)
     }
 
@@ -676,9 +676,9 @@ mod test {
         let mut aggregator_data = AggregatorData::default();
 
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(300), 700)
+            .get_aggregator(aggregator_id_for_test(300), &*TEST_RESOLVER, 700)
             .expect("Get aggregator failed");
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(700)));
+        assert_ok!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
     }
 
     #[test]
@@ -687,11 +687,10 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
 
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(200), 200)
+            .get_aggregator(aggregator_id_for_test(200), &*TEST_RESOLVER, 200)
             .expect("Get aggregator failed");
         assert_ok!(aggregator.try_add(100));
-        assert_ok!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(200)));
-        assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Positive(100));
+        assert_eq!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER).unwrap(), 100);
     }
 
     #[test]
@@ -701,8 +700,10 @@ mod test {
         // +0 to +400 satisfies <= 600 and is ok, but materialization fails
         // with 300 + 400 > 600!
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), 600)
+            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
             .expect("Get aggregator failed");
+        assert_ok!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
+
         assert_ok!(aggregator.try_add(400));
         assert_eq!(
             aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
@@ -712,7 +713,7 @@ mod test {
             aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
             None
         );
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
     }
 
     #[test]
@@ -721,9 +722,12 @@ mod test {
 
         // +0 to -400 is ok, but materialization fails with 300 - 400 < 0!
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), 600)
+            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
             .expect("Get aggregator failed");
-        assert_ok!(aggregator.try_sub(400));
+        assert_ok!(aggregator.try_add(300));
+        assert_ok!(aggregator.try_sub(200));
+        assert_ok!(aggregator.try_sub(100));
+        assert_err!(aggregator.try_sub(1));
         assert_eq!(
             aggregator.get_history().as_ref().unwrap().min_achieved_negative_delta,
             400
@@ -732,7 +736,7 @@ mod test {
             aggregator.get_history().as_ref().unwrap().max_underflow_negative_delta,
             None
         );
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
     }
 
     #[test]
@@ -741,12 +745,20 @@ mod test {
 
         // +0 to +400 to +0 is ok, but materialization fails since we had 300 + 400 > 600!
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), 600)
+            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
             .expect("Get aggregator failed");
         assert_ok!(aggregator.try_add(400));
         assert_ok!(aggregator.try_sub(300));
         assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Positive(100));
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
+        assert_eq!(
+            aggregator.get_history().as_ref().unwrap().max_achieved_positive_delta,
+            400
+        );
+        assert_eq!(
+            aggregator.get_history().as_ref().unwrap().min_overflow_positive_delta,
+            None
+        );
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
     }
 
     #[test]
@@ -755,12 +767,12 @@ mod test {
 
         // +0 to -301 to -300 is ok, but materialization fails since we had 300 - 301 < 0!
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), 600)
+            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
             .expect("Get aggregator failed");
         assert_ok!(aggregator.try_sub(301));
         assert_ok!(aggregator.try_add(1));
         assert_eq!(aggregator.get_delta().unwrap(), DeltaValue::Negative(300));
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER, &aggregator_id_for_test(600)));
+        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
     }
 
     #[test]
@@ -768,7 +780,7 @@ mod test {
         let mut aggregator_data = AggregatorData::default();
 
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), 600)
+            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
             .expect("Get aggregator failed");
 
         // +0 to +800 > 600!
@@ -805,7 +817,7 @@ mod test {
         );
 
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(200), 200)
+            .get_aggregator(aggregator_id_for_test(200), &*TEST_RESOLVER, 200)
             .expect("Get aggregator failed");
 
         // 0 + 100 < 200
@@ -853,7 +865,7 @@ mod test {
         );
 
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(300), 300)
+            .get_aggregator(aggregator_id_for_test(300), &*TEST_RESOLVER,300)
             .expect("Get aggregator failed");
 
         // 0 + 100 < 300!
@@ -897,7 +909,7 @@ mod test {
 
         // +0 to -601 is impossible!
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), 600)
+            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
             .expect("Get aggregator failed");
         assert_err!(aggregator.try_sub(700));
         assert_eq!(
@@ -943,14 +955,14 @@ mod test {
 
         // Similarly, we cannot subtract anything from 0...
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(200), 200)
+            .get_aggregator(aggregator_id_for_test(200), &*TEST_RESOLVER, 200)
             .expect("Get aggregator failed");
 
         assert_err!(aggregator.try_sub(2));
 
         // Similarly, we cannot subtract anything from 0...
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(300), 300)
+            .get_aggregator(aggregator_id_for_test(300), &*TEST_RESOLVER, 300)
             .expect("Get aggregator failed");
 
         assert_ok!(aggregator.try_sub(100));
@@ -996,7 +1008,7 @@ mod test {
 
         // +200 -300 +50 +300 -25 +375 -600.
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(600), 600)
+            .get_aggregator(aggregator_id_for_test(600), &*TEST_RESOLVER, 600)
             .expect("Get aggregator failed");
         assert_ok!(aggregator.try_add(200));
         assert_ok!(aggregator.try_sub(300));
@@ -1048,7 +1060,7 @@ mod test {
         // violation and should never happen.
         aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
         let aggregator = aggregator_data
-            .get_aggregator(aggregator_id_for_test(200), 200)
+            .get_aggregator(aggregator_id_for_test(200), &*TEST_RESOLVER, 200)
             .expect("Getting an aggregator should succeed");
         aggregator
             .validate_history(0)
@@ -1062,7 +1074,7 @@ mod test {
         // Some aggregator with a max_value of 100 in a delta state.
         let id = aggregator_id_for_test(100);
         let aggregator = aggregator_data
-            .get_aggregator(id, 100)
+            .get_aggregator(id, &*TEST_RESOLVER, 100)
             .expect("Getting an aggregator should succeed");
 
         // Aggregator of +0 with minimum of -50 and maximum of +50.

@@ -63,7 +63,7 @@ fn native_try_add(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
+    let aggregator = aggregator_data.get_aggregator(id, aggregator_context.resolver, max_value)?;
 
     Ok(smallvec![Value::bool(aggregator.try_add(value).is_ok())])
 }
@@ -87,7 +87,7 @@ fn native_try_sub(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
+    let aggregator = aggregator_data.get_aggregator(id, aggregator_context.resolver, max_value)?;
     Ok(smallvec![Value::bool(aggregator.try_sub(value).is_ok())])
 }
 
@@ -110,9 +110,9 @@ fn native_read(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
+    let aggregator = aggregator_data.get_aggregator(id, aggregator_context.resolver, max_value)?;
 
-    let value = aggregator.read_most_recent_aggregator_value(aggregator_context.resolver, &id)?;
+    let value = aggregator.read_most_recent_aggregator_value(aggregator_context.resolver)?;
 
     Ok(smallvec![Value::u128(value)])
 }
