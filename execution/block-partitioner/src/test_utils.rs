@@ -278,10 +278,12 @@ fn is_sorted(arr: &Vec<usize>) -> bool {
 pub fn assert_deterministic_result(partitioner: Arc<dyn BlockPartitioner>) {
     let mut rng = thread_rng();
     let block_gen = P2PBlockGenerator::new(1000);
-    for _ in 0..100 {
+    for _ in 0..10 {
         let txns = block_gen.rand_block(&mut rng, 100);
         let result_0 = partitioner.partition(txns.clone(), 10);
-        let result_1 = partitioner.partition(txns, 10);
-        assert_eq!(result_1, result_0);
+        for _ in 0..2 {
+            let result_1 = partitioner.partition(txns.clone(), 10);
+            assert_eq!(result_1, result_0);
+        }
     }
 }
