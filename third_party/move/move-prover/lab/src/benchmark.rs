@@ -182,7 +182,9 @@ fn run_benchmark(
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually
     // indicates a bug in boogie or the solver, because we already propagate soft timeouts, but
     // they are ignored.
-    options.backend.hard_timeout_secs = 60;
+    // options.backend.hard_timeout_secs = 60;
+    options.backend.vc_timeout = 300;
+    options.backend.global_timeout_overwrite = false;
 
     options.verbosity_level = LevelFilter::Warn;
     options.backend.proc_cores = 1;
