@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 #[cfg(test)]
-use crate::assert_deterministic_result;
+use crate::test_utils::assert_deterministic_result;
 #[cfg(test)]
 use crate::test_utils::P2PBlockGenerator;
 use crate::{
@@ -694,7 +694,7 @@ fn test_partitioner_v2_correctness() {
         let block = block_generator.rand_block(&mut rng, block_size);
         let block_clone = block.clone();
         let partitioned = partitioner.partition(block, num_shards);
-        crate::verify_partitioner_output(&block_clone, &partitioned);
+        crate::test_utils::verify_partitioner_output(&block_clone, &partitioned);
     }
 }
 
