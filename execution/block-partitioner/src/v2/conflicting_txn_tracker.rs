@@ -60,17 +60,17 @@ impl ConflictingTxnTracker {
         round_id: RoundId,
         shard_id: ShardId,
     ) {
-        let txn_fat_id = ShardedTxnIndex2 {
+        let sharded_txn_idx = ShardedTxnIndex2 {
             round_id,
             shard_id,
             ori_txn_idx: txn_id,
         };
         if self.pending_writes.remove(&txn_id) {
-            self.finalized_writes.insert(txn_fat_id);
+            self.finalized_writes.insert(sharded_txn_idx);
         } else {
             assert!(self.pending_reads.remove(&txn_id));
         }
-        self.finalized_all.insert(txn_fat_id);
+        self.finalized_all.insert(sharded_txn_idx);
     }
 
     /// Check if there is a txn writing to the current storage location and its txn_id in the given range.
