@@ -789,7 +789,21 @@ impl Substitution {
         self.constraints
             .entry(var)
             .or_default()
-            .push((loc, order, c))
+            .push((loc, order, c));
+    }
+
+    /// Returns true if this is a free variable without constraints.
+    pub fn is_free_var_without_constraints(&self, ty: &Type) -> bool {
+        if let Type::Var(idx) = ty {
+            self.is_free_var(&Type::Var(*idx))
+                && self
+                    .constraints
+                    .get(idx)
+                    .map(|cs| cs.is_empty())
+                    .unwrap_or(true)
+        } else {
+            false
+        }
     }
 
     /// Returns true if the type is a free variable.

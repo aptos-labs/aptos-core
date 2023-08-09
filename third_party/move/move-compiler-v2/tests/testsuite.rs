@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_compiler_v2::Options;
+use move_binary_format::{binary_views::BinaryIndexedView, file_format as FF};
+use move_command_line_common::files::FileHash;
+use move_compiler_v2::{run_file_format_gen, Options};
+use move_disassembler::disassembler::Disassembler;
+use move_ir_types::location;
 use move_model::model::GlobalEnv;
 use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
@@ -24,6 +28,8 @@ struct TestConfig {
     dump_ast: bool,
     /// A sequence of bytecode processors to run for this test.
     pipeline: FunctionTargetPipeline,
+    /// Whether we should generate file format from resulting bytecode
+    generate_file_format: bool,
 }
 
 fn path_from_crate_root(path: &str) -> String {
@@ -65,12 +71,21 @@ impl TestConfig {
                 check_only: true,
                 dump_ast: true,
                 pipeline: FunctionTargetPipeline::default(),
+                generate_file_format: false,
             }
         } else if path.contains("/bytecode-generator/") {
             Self {
                 check_only: false,
                 dump_ast: true,
                 pipeline: FunctionTargetPipeline::default(),
+                generate_file_format: false,
+            }
+        } else if path.contains("/file-format-generator/") {
+            Self {
+                check_only: false,
+                dump_ast: false,
+                pipeline: FunctionTargetPipeline::default(),
+                generate_file_format: true,
             }
         } else {
             panic!(
@@ -134,6 +149,17 @@ impl TestConfig {
                         ));
                     },
                 );
+                let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+                if ok && self.generate_file_format {
+                    let (mods, _) = run_file_format_gen(&env, &targets);
+                    let out = &mut test_output.borrow_mut();
+                    out.push_str("\n============ disassembled file-format ==================\n");
+                    Self::check_diags(out, &env);
+                    for compiled_mod in mods {
+                        let cont = Self::disassemble(&compiled_mod)?;
+                        out.push_str(&cont)
+                    }
+                }
             }
         }
 
@@ -154,6 +180,14 @@ impl TestConfig {
         let ok = !env.has_errors();
         env.clear_diag();
         ok
+    }
+
+    fn disassemble(module: &FF::CompiledModule) -> anyhow::Result<String> {
+        let diss = Disassembler::from_view(
+            BinaryIndexedView::Module(module),
+            location::Loc::new(FileHash::empty(), 0, 0),
+        )?;
+        diss.disassemble()
     }
 }
 
