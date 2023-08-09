@@ -33,6 +33,7 @@ pub enum FeatureFlag {
     APTOS_UNIQUE_IDENTIFIERS = 23,
     BULLETPROOFS_NATIVES = 24,
     SIGNER_NATIVE_FORMAT_FIX = 25,
+    MODULE_EVENT = 26,
 }
 
 /// Representation of features on chain as a bitset.
@@ -69,6 +70,10 @@ impl Features {
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
+
+    pub fn is_module_event_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::MODULE_EVENT)
     }
 }
 
