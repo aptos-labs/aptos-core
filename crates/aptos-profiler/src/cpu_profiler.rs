@@ -60,6 +60,6 @@ impl Profiler for CpuProfiler {
     /// Expose the results as SVG
     fn expose_svg_results(&self) -> Result<String> {
         let content = convert_svg_to_string(self.svg_result_path.as_path());
-        content;
+        content
     }
 }
