@@ -42,6 +42,10 @@ use std::{
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::block_executor::partitioner::{GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, PartitionedTransactions};
 
+mod conflicting_txn_tracker;
+mod counters;
+pub mod config;
+
 /// The position of a txn in the block *before partitioning*.
 type OriginalTxnIdx = usize;
 
@@ -90,9 +94,6 @@ impl ShardedTxnIndex2 {
     }
 }
 
-mod conflicting_txn_tracker;
-mod counters;
-pub mod config;
 /// Basically `ShardedBlockPartitioner` but:
 /// - Not pre-partitioned by txn sender.
 /// - implemented more efficiently.
