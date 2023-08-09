@@ -5,6 +5,7 @@
 
 use crate as aptos_crypto;
 use crate::{
+    p256::{P256_SIGNATURE_LENGTH, P256PublicKey, P256_PUBLIC_KEY_LENGTH, P256_PRIVATE_KEY_LENGTH, P256PrivateKey, P256Signature, ORDER_HALF}, 
     test_utils::{
         random_serializable_struct, small_order_pk_with_adversarial_message,
         uniform_keypair_strategy,
@@ -12,6 +13,7 @@ use crate::{
     traits::*,
     x25519,
 };
+use signature::Verifier;
 use p256::EncodedPoint;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use core::{
@@ -135,7 +137,7 @@ proptest! {
     }
 
 
-    /*// Check for canonical S.
+    // Check for canonical S.
     #[test]
     fn test_signature_malleability(
         message in random_serializable_struct(),
@@ -156,7 +158,7 @@ proptest! {
         let s = Scalar52::from_bytes(&s_bytes);
 
         // adding L (order of the base point) so that S + L > L
-        let malleable_s = Scalar52::add(&s, &ORDER_HALF);
+        let malleable_s = Scalar52::add(&s, &Scalar52::from_bytes(&ORDER_HALF));
         let malleable_s_bytes = malleable_s.to_bytes();
         // Update the signature (the S part).
         serialized[32..].copy_from_slice(&malleable_s_bytes);
@@ -165,12 +167,12 @@ proptest! {
 
         // Check that malleable signatures will pass verification and deserialization in dalek.
         // Construct the corresponding dalek public key.
-        let _dalek_public_key = ed25519_dalek::PublicKey::from_bytes(
+        let _dalek_public_key = p256::ecdsa::VerifyingKey::from_sec1_bytes(
             &keypair.public_key.to_bytes()
         ).unwrap();
 
         // Construct the corresponding dalek Signature. This signature is malleable.
-        let dalek_sig = ed25519_dalek::Signature::from_bytes(&serialized);
+        let dalek_sig = p256::ecdsa::Signature::try_from(&serialized[..]);
 
         // ed25519_dalek will (post 2.0) deserialize the malleable
         // signature. It does not detect it.
@@ -179,26 +181,25 @@ proptest! {
         let msg_bytes = bcs::to_bytes(&message);
         prop_assert!(msg_bytes.is_ok());
 
+        let dalek_sig = dalek_sig.unwrap();
         // ed25519_dalek verify will NOT accept the mauled signature
-        prop_assert!(_dalek_public_key.verify(msg_bytes.as_ref().unwrap(), dalek_sig.as_ref().unwrap()).is_err());
-        // ...and ed25519_dalek verify_strict will NOT accept it either
-        prop_assert!(_dalek_public_key.verify_strict(msg_bytes.as_ref().unwrap(), dalek_sig.as_ref().unwrap()).is_err());
+        prop_assert!(_dalek_public_key.verify(msg_bytes.as_ref().unwrap(), &dalek_sig).is_err());
         // ...therefore, neither will our own Ed25519Signature::verify_arbitrary_msg
-        let sig = Ed25519Signature::from_bytes_unchecked(&serialized).unwrap();
+        let sig = P256Signature::from_bytes(&serialized).unwrap();
         prop_assert!(sig.verify(&message, &keypair.public_key).is_err());
 
         let serialized_malleable: &[u8] = &serialized;
         // try_from will fail on malleable signatures. We detect malleable signatures
         // early during deserialization.
         prop_assert_eq!(
-            Ed25519Signature::try_from(serialized_malleable),
+            P256Signature::try_from(serialized_malleable),
             Err(CryptoMaterialError::CanonicalRepresentationError)
         );
 
         // We expect from_bytes_unchecked deserialization to succeed, as dalek
         // does not check for signature malleability. This method is pub(crate)
         // and only used for test purposes.
-        let sig_unchecked = Ed25519Signature::from_bytes_unchecked(&serialized);
+        let sig_unchecked = P256Signature::from_bytes(&serialized);
         prop_assert!(sig_unchecked.is_ok());
 
         // Update the signature by setting S = L to make it invalid.
@@ -206,10 +207,10 @@ proptest! {
         let serialized_malleable_l: &[u8] = &serialized;
         // try_from will fail with CanonicalRepresentationError.
         prop_assert_eq!(
-            Ed25519Signature::try_from(serialized_malleable_l),
+            P256Signature::try_from(serialized_malleable_l),
             Err(CryptoMaterialError::CanonicalRepresentationError)
         );
-    }*/
+    }
 
    
 }
