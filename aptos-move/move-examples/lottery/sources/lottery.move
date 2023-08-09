@@ -15,11 +15,6 @@ module lottery::lottery {
     // We need this friend declaration so our tests can call `init_module`.
     friend lottery::lottery_test;
 
-    // We need this friend declaration for security, so that `lottery::decide_winners`
-    // cannot be wrapped around via "test-and-abort" attacks (see
-    // [AIP-41](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md)).
-    friend lottery::lottery_decider;
-
     /// Error code for when a user tries to initate the drawing but no users
     /// bought any tickets.
     const E_NO_TICKETS: u64 = 2;
@@ -121,9 +116,15 @@ module lottery::lottery {
         vector::push_back(&mut lottery.tickets, signer::address_of(user))
     }
 
+    #[test_only]
+    /// Useful for testing the private entry `decide_winners` function.
+    public(friend) fun decide_winners_for_testing(): address acquires Lottery, Credentials {
+        decide_winners()
+    }
+
     /// Allows anyone to close the lottery (if enough time has elapsed & more than
     /// 1 user bought tickets) and to draw a random winner.
-    public(friend) fun decide_winners(): address acquires Lottery, Credentials {
+    entry fun decide_winners(): address acquires Lottery, Credentials {
         let lottery = borrow_global_mut<Lottery>(@lottery);
 
         // Make sure the lottery is not being closed too early...

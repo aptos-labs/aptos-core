@@ -5,6 +5,6 @@ This is the code that was included in [AIP-41](https://github.com/aptos-foundati
 The purpose of the code is to help AIP-41 showcase two things:
 
  1. The API interface of the proposed `aptos_std::randomness` module, in `sources/randomness.move`
- 2. An example of a simple lottery based on `aptos_std::randomness`, in `sources/lottery.move` and `sources/lottery_decider.move`
+ 2. An example of a simple lottery based on `aptos_std::randomness`, in `sources/lottery.move`
 
 In addition, we make sure this code is syntactically-correct as well as semantically-correct via some tests in `sources/lottery_test.move`.

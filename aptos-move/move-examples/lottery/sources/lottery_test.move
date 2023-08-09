@@ -146,7 +146,7 @@ module lottery::lottery_test {
         //
         // Send a TXN with `drand_signed_bytes` to close the lottery and determine the winner
         //
-        let winner_addr = lottery::decide_winners();
+        let winner_addr = lottery::decide_winners_for_testing();
 
         debug::print(&string::utf8(b"The winner is: "));
         debug::print(&winner_addr);
