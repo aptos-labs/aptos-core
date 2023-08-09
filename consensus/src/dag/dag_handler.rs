@@ -2,11 +2,12 @@
 
 use super::{
     dag_driver::DagDriver,
-    dag_fetcher::{DagFetcher, FetchRequestHandler},
+    dag_fetcher::{DagFetcher, FetchRequestHandler, FetchWaiter},
     dag_network::DAGNetworkSender,
     order_rule::OrderRule,
     storage::DAGStorage,
     types::TDAGMessage,
+    CertifiedNode, Node,
 };
 use crate::{
     dag::{
@@ -28,6 +29,7 @@ use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
 use bytes::Bytes;
 use futures::StreamExt;
 use std::sync::Arc;
+use tokio::select;
 use tokio_retry::strategy::ExponentialBackoff;
 
 struct NetworkHandler {
@@ -36,6 +38,8 @@ struct NetworkHandler {
     dag_driver: DagDriver,
     fetch_receiver: FetchRequestHandler,
     epoch_state: Arc<EpochState>,
+    node_fetch_waiter: FetchWaiter<Node>,
+    certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
 }
 
 impl NetworkHandler {
@@ -57,13 +61,14 @@ impl NetworkHandler {
             ExponentialBackoff::from_millis(10),
             time_service.clone(),
         ));
-        // TODO: wire dag fetcher
-        let (_dag_fetcher, fetch_requester) = DagFetcher::new(
-            epoch_state.clone(),
-            dag_network_sender,
-            dag.clone(),
-            time_service.clone(),
-        );
+        let (_dag_fetcher, fetch_requester, node_fetch_waiter, certified_node_fetch_waiter) =
+            DagFetcher::new(
+                epoch_state.clone(),
+                dag_network_sender,
+                dag.clone(),
+                time_service.clone(),
+            );
+        let fetch_requester = Arc::new(fetch_requester);
         Self {
             dag_rpc_rx,
             node_receiver: NodeBroadcastHandler::new(
@@ -82,10 +87,12 @@ impl NetworkHandler {
                 time_service,
                 storage,
                 order_rule,
-                Arc::new(fetch_requester),
+                fetch_requester,
             ),
             epoch_state: epoch_state.clone(),
             fetch_receiver: FetchRequestHandler::new(dag, epoch_state),
+            node_fetch_waiter,
+            certified_node_fetch_waiter,
         }
     }
 
@@ -93,9 +100,23 @@ impl NetworkHandler {
         self.dag_driver.try_enter_new_round();
 
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
-        while let Some(msg) = self.dag_rpc_rx.next().await {
-            if let Err(e) = self.process_rpc(msg).await {
-                warn!(error = ?e, "error processing rpc");
+        loop {
+            select! {
+                Some(msg) = self.dag_rpc_rx.next() => {
+                    if let Err(e) = self.process_rpc(msg).await {
+                        warn!(error = ?e, "error processing rpc");
+                    }
+                },
+                Some(res) = self.node_fetch_waiter.next() => {
+                    if let Err(e) = res.map_err(|e| anyhow::anyhow!("recv error: {}", e)).and_then(|node| self.node_receiver.process(node)) {
+                        warn!(error = ?e, "error processing node fetch notification");
+                    }
+                },
+                Some(res) = self.certified_node_fetch_waiter.next() => {
+                    if let Err(e) = res.map_err(|e| anyhow::anyhow!("recv error: {}", e)).and_then(|certified_node| self.dag_driver.process(certified_node)) {
+                        warn!(error = ?e, "error processing certified node fetch notification");
+                    }
+                }
             }
         }
     }
