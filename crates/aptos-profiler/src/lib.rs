@@ -59,9 +59,9 @@ pub trait Profiler {
     // Perform profiling for duration_secs
     fn profile_for(&self, duration_secs: u64) -> Result<()>;
     // Start profiling
-    fn start_profiling(&self) -> Result<()>;
+    fn start_profiling(&mut self) -> Result<()>;
     // End profiling
-    fn end_profiling(&self) -> Result<()>;
+    fn end_profiling(&mut self) -> Result<()>;
     // Expose the results as a JSON string for visualization
     fn expose_text_results(&self) -> Result<String>;
     // Expose the results as a JSON string for visualization
