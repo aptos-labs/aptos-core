@@ -49,6 +49,7 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
+use aptos_block_partitioner::PartitionerConfig;
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -169,6 +170,7 @@ pub fn run_benchmark<V>(
                 num_executor_shards: 1,
                 async_partitioning: false,
                 use_global_executor: false,
+                partitioner_config: PartitionerConfig::default(),
             },
         )
     });

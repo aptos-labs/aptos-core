@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_block_partitioner::{test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount}, BlockPartitionerConfig, verify_partitioner_output, build_partitioner_from_envvar};
+use aptos_block_partitioner::{test_utils::{create_signed_p2p_transaction, generate_test_account, TestAccount}, PartitionerV1Config, verify_partitioner_output, build_partitioner_from_envvar};
 use aptos_logger::info;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use clap::Parser;

@@ -5,7 +5,7 @@
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::{
-    sharded_block_partitioner::ShardedBlockPartitioner, BlockPartitionerConfig,
+    sharded_block_partitioner::ShardedBlockPartitioner, PartitionerV1Config,
 };
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
@@ -259,7 +259,7 @@ where
             (
                 Some(parallel_block_executor),
                 Some(
-                    BlockPartitionerConfig::default()
+                    PartitionerV1Config::default()
                         .num_shards(num_executor_shards)
                         .max_partitioning_rounds(4)
                         .cross_shard_dep_avoid_threshold(0.9)

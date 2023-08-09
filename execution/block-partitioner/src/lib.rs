@@ -29,7 +29,10 @@ use std::{
     collections::{hash_map::DefaultHasher, HashMap, HashSet},
     hash::{Hash, Hasher},
 };
+use std::sync::RwLock;
+use once_cell::sync::Lazy;
 use aptos_types::block_executor::partitioner::{GLOBAL_ROUND_ID, GLOBAL_SHARD_ID, PartitionedTransactions, TransactionWithDependencies};
+use v2::config::PartitionerV2Config;
 
 pub trait BlockPartitioner: Send {
     fn partition(
@@ -37,47 +40,6 @@ pub trait BlockPartitioner: Send {
         transactions: Vec<AnalyzedTransaction>,
         num_shards: usize,
     ) -> PartitionedTransactions;
-}
-
-pub fn build_partitioner_from_envvar(maybe_num_shards: Option<usize>) -> Box<dyn BlockPartitioner> {
-    match std::env::var("APTOS_BLOCK_PARTITIONER_IMPL").ok() {
-        Some(v) if v.to_uppercase().as_str() == "V2" => {
-            let num_threads = std::env::var("APTOS_BLOCK_PARTITIONER_V2__NUM_THREADS")
-                .ok()
-                .map(|s| s.parse::<usize>().ok().unwrap_or(8))
-                .unwrap_or(8);
-            let num_rounds_limit: usize =
-                std::env::var("APTOS_BLOCK_PARTITIONER_V2__NUM_ROUNDS_LIMIT")
-                    .ok()
-                    .map(|s| s.parse::<usize>().ok().unwrap_or(4))
-                    .unwrap_or(4);
-            let avoid_pct: u64 = std::env::var(
-                "APTOS_BLOCK_PARTITIONER_V2__STOP_DISCARDING_IF_REMAIN_PCT_LESS_THAN",
-            )
-            .ok()
-            .map(|s| s.parse::<u64>().ok().unwrap_or(10))
-            .unwrap_or(10);
-            let dashmap_num_shards =
-                std::env::var("APTOS_BLOCK_PARTITIONER_V2__DASHMAP_NUM_SHARDS")
-                    .ok()
-                    .map(|v| v.parse::<usize>().unwrap_or(256))
-                    .unwrap_or(256);
-            info!("Creating V2Partitioner with num_threads={}, num_rounds_limit={}, avoid_pct={}, dashmap_num_shards={}", num_threads, num_rounds_limit, avoid_pct, dashmap_num_shards);
-            Box::new(PartitionerV2::new(
-                num_threads,
-                num_rounds_limit,
-                avoid_pct,
-                dashmap_num_shards,
-            ))
-        },
-        _ => {
-            let max_partitioning_rounds = std::env::var("APTOS_BLOCK_PARTITIONER_V2__MAX_PARTITIONING_ROUNDS").ok().map(|v|v.parse::<usize>().unwrap_or(4)).unwrap_or(4);
-            let cross_shard_dep_avoid_threshold = std::env::var("APTOS_BLOCK_PARTITIONER_V2__CROSS_SHARD_DEP_AVOID_THRESHOLD").ok().map(|v|v.parse::<f32>().unwrap_or(0.9)).unwrap_or(0.9);
-            let partition_last_round = std::env::var("APTOS_BLOCK_PARTITIONER_V2__PARTITION_LAST_ROUND").ok().map(|v|v.parse::<usize>().unwrap_or(0)).unwrap_or(0);
-            info!("Creating V1Partitioner with max_partitioning_rounds={}, cross_shard_dep_avoid_threshold={}, partition_last_round={}", max_partitioning_rounds, cross_shard_dep_avoid_threshold, partition_last_round);
-            Box::new(ShardedBlockPartitioner::new(maybe_num_shards.unwrap(), max_partitioning_rounds, cross_shard_dep_avoid_threshold, partition_last_round!=0))
-        },
-    }
 }
 
 pub mod uniform_partitioner;
@@ -260,16 +222,38 @@ fn assert_deterministic_result(partitioner: Arc<dyn BlockPartitioner>) {
     }
 }
 
-pub struct BlockPartitionerConfig {
-    num_shards: usize,
-    max_partitioning_rounds: RoundId,
-    cross_shard_dep_avoid_threshold: f32,
-    partition_last_round: bool,
+#[derive(Clone, Copy, Debug)]
+pub enum PartitionerConfig {
+    V1(PartitionerV1Config),
+    V2(PartitionerV2Config),
 }
 
-impl BlockPartitionerConfig {
+impl Default for PartitionerConfig {
+    fn default() -> Self {
+        PartitionerConfig::V2(PartitionerV2Config::default())
+    }
+}
+
+impl PartitionerConfig {
+    pub fn build(self) -> Box<dyn BlockPartitioner> {
+        match self {
+            PartitionerConfig::V1(c) => Box::new(c.build()),
+            PartitionerConfig::V2(c) => Box::new(c.build()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PartitionerV1Config {
+    pub num_shards: usize,
+    pub max_partitioning_rounds: RoundId,
+    pub cross_shard_dep_avoid_threshold: f32,
+    pub partition_last_round: bool,
+}
+
+impl PartitionerV1Config {
     pub fn new() -> Self {
-        BlockPartitionerConfig {
+        PartitionerV1Config {
             num_shards: 0,
             max_partitioning_rounds: 3,
             cross_shard_dep_avoid_threshold: 0.9,
@@ -307,8 +291,10 @@ impl BlockPartitionerConfig {
     }
 }
 
-impl Default for BlockPartitionerConfig {
+impl Default for PartitionerV1Config {
     fn default() -> Self {
         Self::new()
     }
 }
+
+static DEFAULT_PARTITIONER_CONFIG: Lazy<RwLock<PartitionerV1Config>> = Lazy::new(||RwLock::new(PartitionerV1Config::default()));

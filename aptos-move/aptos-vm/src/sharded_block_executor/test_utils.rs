@@ -4,7 +4,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     AptosVM, VMExecutor,
 };
-use aptos_block_partitioner::BlockPartitionerConfig;
+use aptos_block_partitioner::PartitionerV1Config;
 use aptos_block_partitioner::BlockPartitioner;
 use aptos_crypto::hash::CryptoHash;
 use aptos_language_e2e_tests::{

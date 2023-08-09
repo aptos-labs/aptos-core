@@ -91,7 +91,7 @@ impl ShardedTxnIndex2 {
 
 mod conflicting_txn_tracker;
 mod counters;
-
+pub mod config;
 /// Basically `ShardedBlockPartitioner` but:
 /// - Not pre-partitioned by txn sender.
 /// - implemented more efficiently.
@@ -100,6 +100,7 @@ pub struct PartitionerV2 {
     num_rounds_limit: usize,
     avoid_pct: u64,
     dashmap_num_shards: usize,
+    merge_discarded: bool,
 }
 
 impl PartitionerV2 {
@@ -108,7 +109,9 @@ impl PartitionerV2 {
         num_rounds_limit: usize,
         avoid_pct: u64,
         dashmap_num_shards: usize,
+        merge_discarded: bool,
     ) -> Self {
+        info!("Creating a PartitionerV2 instance with num_threads={num_threads}, num_rounds_limit={num_rounds_limit}, avoid_pct={avoid_pct}, dashmap_num_shards={dashmap_num_shards}, merge_discarded={merge_discarded}");
         Self {
             thread_pool: ThreadPoolBuilder::new()
                 .num_threads(num_threads)
@@ -117,6 +120,7 @@ impl PartitionerV2 {
             num_rounds_limit,
             avoid_pct,
             dashmap_num_shards,
+            merge_discarded,
         }
     }
 
@@ -258,7 +262,6 @@ impl PartitionerV2 {
         rsets: &[RwLock<HashSet<StorageKeyIdx>>],
         wsets: &[RwLock<HashSet<StorageKeyIdx>>],
         txn_id_matrix: &[Vec<Vec<OriginalTxnIdx>>],
-        move_last_sub_block: bool,
         start_index_matrix: &[Vec<OriginalTxnIdx>],
         new_indices: &[RwLock<TxnIndex>],
         trackers: &DashMap<StorageKeyIdx, RwLock<ConflictingTxnTracker>>,
@@ -272,7 +275,7 @@ impl PartitionerV2 {
         let num_rounds = txn_id_matrix.len();
         let num_shards = txn_id_matrix.first().unwrap().len();
         let actual_sub_block_position = |round_id: usize, shard_id: usize| -> (usize, usize) {
-            if move_last_sub_block {
+            if self.merge_discarded {
                 if round_id == num_rounds - 1 {
                     (GLOBAL_ROUND_ID, GLOBAL_SHARD_ID)
                 } else {
@@ -392,7 +395,7 @@ impl PartitionerV2 {
             .with_label_values(&["add_edges__return_obj"])
             .start_timer();
 
-        let global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>> = if move_last_sub_block {
+        let global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>> = if self.merge_discarded {
             sub_block_matrix.pop().unwrap().last().unwrap().lock().unwrap().take().unwrap().into_transactions_with_deps()
         } else {
             vec![]
@@ -438,7 +441,6 @@ impl PartitionerV2 {
         Vec<Vec<Vec<OriginalTxnIdx>>>,
         Vec<Vec<OriginalTxnIdx>>,
         Vec<RwLock<TxnIndex>>,
-        bool,
     ) {
         let finalized_indexs: Vec<RwLock<TxnIndex>> =
             (0..num_txns).map(|_tid| RwLock::new(0)).collect();
@@ -468,13 +470,12 @@ impl PartitionerV2 {
             }
         }
 
-        let mut last_round_merged = false;
-        if num_remaining_txns >= 1 {
-            last_round_merged = true;
+        let timer = MISC_TIMERS_SECONDS
+            .with_label_values(&["handle_discarded"])
+            .start_timer();
+        if self.merge_discarded {
+            info!("Merging txns after discarding stopped.");
             let last_round_id = txn_idx_matrix.len();
-            let timer = MISC_TIMERS_SECONDS
-                .with_label_values(&["last_round"])
-                .start_timer();
             let last_round_txns: Vec<OriginalTxnIdx> =
                 remaining_txns.into_iter().flatten().collect();
             self.thread_pool.install(|| {
@@ -500,9 +501,11 @@ impl PartitionerV2 {
             remaining_txns = vec![vec![]; num_executor_shards];
             remaining_txns[num_executor_shards - 1] = last_round_txns;
             txn_idx_matrix.push(remaining_txns);
-            let duration = timer.stop_and_record();
-            info!("last_round={duration}");
+        } else if num_remaining_txns > 0 {
+            txn_idx_matrix.push(remaining_txns);
         }
+        let duration = timer.stop_and_record();
+        info!("handle_discarded={duration}");
 
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["new_tid_table"])
@@ -536,7 +539,7 @@ impl PartitionerV2 {
         });
         let duration = timer.stop_and_record();
         info!("new_tid_table={duration}");
-        (txn_idx_matrix, start_index_matrix, finalized_indexs, last_round_merged)
+        (txn_idx_matrix, start_index_matrix, finalized_indexs)
     }
 }
 
@@ -632,7 +635,7 @@ impl BlockPartitioner for PartitionerV2 {
         let timer = MISC_TIMERS_SECONDS
             .with_label_values(&["multi_rounds"])
             .start_timer();
-        let (finalized_txn_matrix, start_index_matrix, new_idxs, last_round_merged) = self.multi_rounds(
+        let (finalized_txn_matrix, start_index_matrix, new_idxs) = self.multi_rounds(
             num_txns,
             num_executor_shards,
             &rsets,
@@ -653,7 +656,6 @@ impl BlockPartitioner for PartitionerV2 {
             &rsets,
             &wsets,
             &finalized_txn_matrix,
-            last_round_merged,
             &start_index_matrix,
             &new_idxs,
             &trackers,

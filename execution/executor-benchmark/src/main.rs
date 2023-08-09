@@ -17,6 +17,8 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_block_partitioner::{PartitionerConfig, PartitionerV1Config};
+use aptos_block_partitioner::v2::config::PartitionerV2Config;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -98,6 +100,16 @@ pub struct PipelineOpt {
     async_partitioning: bool,
     #[clap(long)]
     use_global_executor: bool,
+    #[clap(long, default_value = "4")]
+    max_partitioning_rounds: usize,
+    #[clap(long, default_value = "0.90")]
+    partitioner_cross_shard_dep_avoid_threshold: f32,
+    #[clap(long, default_value = "2")]
+    partitioner_version: usize,
+    #[clap(long, default_value = "8")]
+    partitioner_v2_num_threads: usize,
+    #[clap(long, default_value = "64")]
+    partitioner_v2_dashmap_num_shards: usize,
 }
 
 impl PipelineOpt {
@@ -111,6 +123,26 @@ impl PipelineOpt {
             num_executor_shards: self.num_executor_shards,
             async_partitioning: self.async_partitioning,
             use_global_executor: self.use_global_executor,
+            partitioner_config: self.partitioner_config(),
+        }
+    }
+
+    fn partitioner_config(&self) -> PartitionerConfig {
+        match self.partitioner_version {
+            1 => PartitionerConfig::V1(PartitionerV1Config {
+                num_shards: self.num_executor_shards,
+                max_partitioning_rounds: self.max_partitioning_rounds,
+                cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
+                partition_last_round: !self.use_global_executor,
+            }),
+            2 => PartitionerConfig::V2(PartitionerV2Config {
+                num_threads: self.partitioner_v2_num_threads,
+                num_rounds_limit: self.max_partitioning_rounds,
+                avoid_pct: ((1.0 - self.partitioner_cross_shard_dep_avoid_threshold) * 100.0) as u64,
+                dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
+                merge_discarded: self.use_global_executor,
+            }),
+            _ => panic!("Unknown partitioner version: {}", self.partitioner_version)
         }
     }
 }

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::pipeline::ExecuteBlockMessage;
-use aptos_block_partitioner::{sharded_block_partitioner::ShardedBlockPartitioner, BlockPartitionerConfig, BlockPartitioner, build_partitioner_from_envvar};
+use aptos_block_partitioner::{sharded_block_partitioner::ShardedBlockPartitioner, PartitionerV1Config, BlockPartitioner, PartitionerConfig};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
@@ -18,12 +18,11 @@ pub(crate) struct BlockPartitioningStage {
 }
 
 impl BlockPartitioningStage {
-    pub fn new(num_shards: usize, partition_last_round: bool) -> Self {
+    pub fn new(num_shards: usize, partitioner_config: PartitionerConfig) -> Self {
         let maybe_partitioner = if num_shards <= 1 {
             None
         } else {
-            info!("Starting a sharded block partitioner with {} shards and last round partitioning {}", num_shards, partition_last_round);
-            let partitioner = build_partitioner_from_envvar(Some(num_shards));
+            let partitioner = partitioner_config.build();
             Some(partitioner)
         };
 
