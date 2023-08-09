@@ -13,6 +13,7 @@ import {
   Memoize,
   sleep,
   APTOS_COIN,
+  MemoizeExpiring,
 } from "../utils";
 import { AptosAccount } from "../account/aptos_account";
 import * as Gen from "../generated/index";
@@ -22,6 +23,7 @@ import {
   TransactionBuilderRemoteABI,
   RemoteABIBuilderConfig,
   TransactionBuilderMultiEd25519,
+  TransactionBuilder,
 } from "../transaction_builder";
 import {
   bcsSerializeBytes,
@@ -34,16 +36,24 @@ import {
   Uint64,
   AnyNumber,
 } from "../bcs";
-import { Ed25519PublicKey, MultiEd25519PublicKey, RawTransaction } from "../aptos_types";
+import {
+  AccountAddress,
+  Ed25519PublicKey,
+  FeePayerRawTransaction,
+  MultiAgentRawTransaction,
+  MultiEd25519PublicKey,
+  RawTransaction,
+} from "../aptos_types";
 import { get, post, ClientConfig, AptosApiError } from "../client";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
   gasUnitPrice?: Uint64;
   expireTimestamp?: Uint64;
+  providedSequenceNumber?: string | bigint;
 }
 
-interface PaginationArgs {
+export interface PaginationArgs {
   start?: AnyNumber;
   limit?: number;
 }
@@ -132,9 +142,11 @@ export class AptosClient {
    * @param query.ledgerVersion Specifies ledger version of transactions. By default latest version will be used
    * @returns Account modules array for a specific ledger version.
    * Module is represented by MoveModule interface. It contains module `bytecode` and `abi`,
-   * which is JSON representation of a module
+   * which is JSON representation of a module. Account modules are cached by account address for 10 minutes
+   * to prevent unnecessary API calls when fetching the same account modules
    */
   @parseApiError
+  @MemoizeExpiring(10 * 60 * 1000)
   async getAccountModules(
     accountAddress: MaybeHexString,
     query?: { ledgerVersion?: AnyNumber },
@@ -302,6 +314,85 @@ export class AptosClient {
 
     const builder = new TransactionBuilderRemoteABI(this, config);
     return builder.build(payload.function, payload.type_arguments, payload.arguments);
+  }
+
+  /**
+   * Generates a fee payer transaction that can be signed and submitted to chain
+   *
+   * @param sender the sender's account address
+   * @param payload the transaction payload
+   * @param fee_payer the fee payer account
+   * @param secondarySignerAccounts an optional array of the secondary signers accounts
+   * @returns a fee payer raw transaction that can be signed and submitted to chain
+   */
+  async generateFeePayerTransaction(
+    sender: MaybeHexString,
+    payload: Gen.EntryFunctionPayload,
+    feePayer: MaybeHexString,
+    secondarySignerAccounts: Array<MaybeHexString> = [],
+    options?: Partial<Gen.SubmitTransactionRequest>,
+  ): Promise<TxnBuilderTypes.FeePayerRawTransaction> {
+    const rawTxn = await this.generateTransaction(sender, payload, options);
+
+    const signers: Array<AccountAddress> = secondarySignerAccounts.map((signer) => AccountAddress.fromHex(signer));
+
+    const feePayerTxn = new TxnBuilderTypes.FeePayerRawTransaction(rawTxn, signers, AccountAddress.fromHex(feePayer));
+    return feePayerTxn;
+  }
+
+  /**
+   * Submits fee payer transaction to chain
+   *
+   * @param feePayerTransaction the raw transaction to be submitted, of type FeePayerRawTransaction
+   * @param senderAuthenticator the sender account authenticator (can get from signMultiTransaction() method)
+   * @param feePayerAuthenticator the feepayer account authenticator (can get from signMultiTransaction() method)
+   * @param signersAuthenticators an optional array of the signer account authenticators
+   * @returns The pending transaction
+   */
+  async submitFeePayerTransaction(
+    feePayerTransaction: TxnBuilderTypes.FeePayerRawTransaction,
+    senderAuthenticator: TxnBuilderTypes.AccountAuthenticatorEd25519,
+    feePayerAuthenticator: TxnBuilderTypes.AccountAuthenticatorEd25519,
+    additionalSignersAuthenticators: Array<TxnBuilderTypes.AccountAuthenticatorEd25519> = [],
+  ): Promise<Gen.PendingTransaction> {
+    const txAuthenticatorFeePayer = new TxnBuilderTypes.TransactionAuthenticatorFeePayer(
+      senderAuthenticator,
+      feePayerTransaction.secondary_signer_addresses,
+      additionalSignersAuthenticators,
+      { address: feePayerTransaction.fee_payer_address, authenticator: feePayerAuthenticator },
+    );
+
+    const bcsTxn = bcsToBytes(
+      new TxnBuilderTypes.SignedTransaction(feePayerTransaction.raw_txn, txAuthenticatorFeePayer),
+    );
+    const transactionRes = await this.submitSignedBCSTransaction(bcsTxn);
+
+    return transactionRes;
+  }
+
+  /**
+   * Signs a multi transaction type (multi agent / fee payer) and returns the
+   * signer authenticator to be used to submit the transaction.
+   *
+   * @param signer the account to sign on the transaction
+   * @param rawTxn a MultiAgentRawTransaction or FeePayerRawTransaction
+   * @returns signer authenticator
+   */
+  // eslint-disable-next-line class-methods-use-this
+  async signMultiTransaction(
+    signer: AptosAccount,
+    rawTxn: MultiAgentRawTransaction | FeePayerRawTransaction,
+  ): Promise<TxnBuilderTypes.AccountAuthenticatorEd25519> {
+    const signerSignature = new TxnBuilderTypes.Ed25519Signature(
+      signer.signBuffer(TransactionBuilder.getSigningMessage(rawTxn)).toUint8Array(),
+    );
+
+    const signerAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
+      new TxnBuilderTypes.Ed25519PublicKey(signer.signingKey.publicKey),
+      signerSignature,
+    );
+
+    return Promise.resolve(signerAuthenticator);
   }
 
   /** Converts a transaction request produced by `generateTransaction` into a properly
@@ -668,7 +759,7 @@ export class AptosClient {
     }
     if (!(lastTxn as any)?.success) {
       throw new FailedTransactionError(
-        `Transaction ${txnHash} committed to the blockchain but execution failed`,
+        `Transaction ${txnHash} failed with an error: ${(lastTxn as any).vm_status}`,
         lastTxn,
       );
     }
@@ -755,7 +846,9 @@ export class AptosClient {
     extraArgs?: OptionalTransactionArgs,
   ): Promise<TxnBuilderTypes.RawTransaction> {
     const [{ sequence_number: sequenceNumber }, chainId, { gas_estimate: gasEstimate }] = await Promise.all([
-      this.getAccount(accountFrom),
+      extraArgs?.providedSequenceNumber
+        ? Promise.resolve({ sequence_number: extraArgs.providedSequenceNumber })
+        : this.getAccount(accountFrom),
       this.getChainId(),
       extraArgs?.gasUnitPrice ? Promise.resolve({ gas_estimate: extraArgs.gasUnitPrice }) : this.estimateGasPrice(),
     ]);

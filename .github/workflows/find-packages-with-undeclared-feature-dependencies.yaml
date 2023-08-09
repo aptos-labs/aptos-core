@@ -1,9 +1,6 @@
 name: "Find Packages with undeclared feature dependencies"
 on:
   workflow_dispatch:
-  schedule:
-    # every day at 3am PST
-    - cron: "0 10 * * *"
 
 jobs:
   find-packages-with-undeclared-feature-dependencies:

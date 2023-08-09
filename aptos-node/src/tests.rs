@@ -7,9 +7,7 @@ use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{DbReader, DbReaderWriter, DbWriter};
 use aptos_temppath::TempPath;
-use aptos_types::{
-    chain_id::ChainId, on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
-};
+use aptos_types::{chain_id::ChainId, waypoint::Waypoint};
 use std::{fs, sync::Arc};
 
 /// A mock database implementing DbReader and DbWriter
@@ -31,10 +29,8 @@ fn test_mutual_authentication_validators() {
     validator_network.mutual_authentication = false;
 
     // Create an event subscription service
-    let mut event_subscription_service = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(DbReaderWriter::new(MockDatabase {}))),
-    );
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(RwLock::new(DbReaderWriter::new(MockDatabase {}))));
 
     // Set up the networks and gather the application network handles. This should panic.
     let peers_and_metadata = network::create_peers_and_metadata(&node_config);

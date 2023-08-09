@@ -6,6 +6,7 @@ use crate::{
     config::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig},
     utils,
 };
+use aptos_logger::warn;
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -291,11 +292,53 @@ impl StorageConfig {
 
 impl ConfigSanitizer for StorageConfig {
     fn sanitize(
-        _node_config: &mut NodeConfig,
+        node_config: &mut NodeConfig,
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
-        Ok(()) // TODO: add validation of higher-level properties once we have variable configs
+        let sanitizer_name = Self::get_sanitizer_name();
+        let config = &node_config.storage;
+
+        let ledger_prune_window = config
+            .storage_pruner_config
+            .ledger_pruner_config
+            .prune_window;
+        let state_merkle_prune_window = config
+            .storage_pruner_config
+            .state_merkle_pruner_config
+            .prune_window;
+        let epoch_snapshot_prune_window = config
+            .storage_pruner_config
+            .epoch_snapshot_pruner_config
+            .prune_window;
+        let user_pruning_window_offset = config
+            .storage_pruner_config
+            .ledger_pruner_config
+            .user_pruning_window_offset;
+
+        if ledger_prune_window < 50_000_000 {
+            warn!("Ledger prune_window is too small, harming network data availability.");
+        }
+        if state_merkle_prune_window < 100_000 {
+            warn!("State Merkle prune_window is too small, node might stop functioning.");
+        }
+        if epoch_snapshot_prune_window < 50_000_000 {
+            warn!("Epoch snapshot prune_window is too small, harming network data availability.");
+        }
+        if user_pruning_window_offset > 1_000_000 {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "user_pruning_window_offset too large, so big a buffer is unlikely necessary. Set something < 1 million.".to_string(),
+            ));
+        }
+        if user_pruning_window_offset > ledger_prune_window {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "user_pruning_window_offset is larger than the ledger prune window, the API will refuse to return any data.".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -305,7 +348,7 @@ mod test {
 
     #[test]
     pub fn test_default_prune_window() {
-        // Not that these can't be changed, but think twice -- make them safe for mainnet
+        // These can be changed, but think twice -- make them safe for mainnet
 
         let config = PrunerConfig::default();
         assert!(config.ledger_pruner_config.prune_window >= 50_000_000);

@@ -2,9 +2,9 @@ name: "Prover Daily Test"
 on:
   # Allow us to manually run this specific workflow without a PR
   workflow_dispatch:
-  # Until enabled on all PRs, run continuously at the beginning of each hour
+  # Until enabled on all PRs, run twice a week
   schedule:
-    - cron: "14 14 * * *"
+    - cron: "14 14 */3 * *"
 
 env:
   CARGO_INCREMENTAL: "0"
@@ -38,5 +38,7 @@ jobs:
           echo "/home/runner/bin" | tee -a $GITHUB_PATH
           echo "/home/runner/.dotnet" | tee -a $GITHUB_PATH
           echo "/home/runner/.dotnet/tools" | tee -a $GITHUB_PATH
-      - run: MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-move-examples --release -- --include-ignored prover
-      - run: MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-framework --release -- --include-ignored prover
+      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=1200 cargo test -p aptos-move-examples --release -- --include-ignored prover
+      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=1200 cargo test -p aptos-framework --release -- --include-ignored prover
+      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=1200 MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-move-examples --release -- --include-ignored prover
+      - run: MVP_TEST_DISALLOW_TIMEOUT_OVERWRITE=1 MVP_TEST_VC_TIMEOUT=1200 MVP_TEST_INCONSISTENCY=1 cargo test -p aptos-framework --release -- --include-ignored prover

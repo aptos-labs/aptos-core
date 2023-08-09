@@ -19,7 +19,7 @@ use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CORE_CODE_ADDRESS},
-    on_chain_config::{ExecutionConfigV2, OnChainExecutionConfig},
+    on_chain_config::{ExecutionConfigV2, OnChainExecutionConfig, TransactionShufflerType},
     transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
 };
 use std::{convert::TryFrom, str::FromStr, sync::Arc, time::Duration};
@@ -209,8 +209,8 @@ async fn test_gas_estimation_gas_used_limit() {
     let mut swarm = SwarmBuilder::new_local(1)
         .with_init_genesis_config(Arc::new(|conf| {
             conf.execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
+                transaction_shuffler_type: TransactionShufflerType::NoShuffling,
                 block_gas_limit: Some(1),
-                ..Default::default()
             });
         }))
         .with_init_config(Arc::new(|_, conf, _| {

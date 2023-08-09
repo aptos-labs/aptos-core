@@ -6,7 +6,11 @@
 // benchmark data back into memory.
 
 use anyhow::anyhow;
-use clap::{Arg, Command};
+use clap::{
+    Arg,
+    ArgAction::{Append, Set},
+    Command,
+};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
 use log::LevelFilter;
@@ -16,7 +20,8 @@ use move_model::{
     parse_addresses_from_options, run_model_builder_with_options,
 };
 use move_prover::{
-    check_errors, cli::Options, create_and_process_bytecode, generate_boogie, verify_boogie,
+    check_errors, cli::Options, create_and_process_bytecode, create_init_num_operation_state,
+    generate_boogie, verify_boogie,
 };
 use move_stackless_bytecode::options::ProverOptions;
 use std::{
@@ -44,9 +49,10 @@ pub fn benchmark(args: &[String]) {
         .author("The Diem Core Contributors")
         .arg(
             Arg::new("config")
+                .action(Append)
                 .short('c')
                 .long("config")
-                .num_args(0..)
+                .num_args(1)
                 .value_name("CONFIG_PATH")
                 .help(
                     "path to a prover toml configuration file. The benchmark output will be \
@@ -58,13 +64,24 @@ pub fn benchmark(args: &[String]) {
             Arg::new("function")
                 .short('f')
                 .long("func")
+                .num_args(0)
+                .action(Set)
                 .help("whether benchmarking should happen per function; default is per module"),
         )
         .arg(
+            Arg::new("aptos-natives")
+                .short('a')
+                .long("aptos")
+                .num_args(0)
+                .action(Set)
+                .help("whether the aptos-natives should be included."),
+        )
+        .arg(
             Arg::new("dependencies")
+                .action(Append)
                 .long("dependency")
                 .short('d')
-                .num_args(0..)
+                .num_args(1)
                 .value_name("PATH_TO_DEPENDENCY")
                 .help(
                     "path to a Move file, or a directory which will be searched for \
@@ -79,19 +96,18 @@ pub fn benchmark(args: &[String]) {
         );
     let matches = cmd_line_parser.get_matches_from(args);
     let get_vec = |s: &str| -> Vec<String> {
-        match matches.values_of(s) {
-            Some(vs) => vs.map(|v| v.to_string()).collect(),
-            _ => vec![],
-        }
+        let vs = matches.get_many::<String>(s);
+        vs.map_or(vec![], |v| v.cloned().collect())
     };
     let sources = get_vec("sources");
     let deps = get_vec("dependencies");
-    let configs: Vec<Option<String>> = if matches.is_present("config") {
+    let configs: Vec<Option<String>> = if matches.contains_id("config") {
         get_vec("config").into_iter().map(Some).collect_vec()
     } else {
         vec![None]
     };
-    let per_function = matches.is_present("function");
+    let per_function = matches.contains_id("function");
+    let use_aptos_natives = matches.contains_id("aptos-natives");
 
     for config_spec in configs {
         let (config, out) = if let Some(config_file) = &config_spec {
@@ -104,7 +120,14 @@ pub fn benchmark(args: &[String]) {
         } else {
             (None, "benchmark.data".to_string())
         };
-        if let Err(s) = run_benchmark(&out, config.as_ref(), &sources, &deps, per_function) {
+        if let Err(s) = run_benchmark(
+            &out,
+            config.as_ref(),
+            &sources,
+            &deps,
+            per_function,
+            use_aptos_natives,
+        ) {
             println!("ERROR: execution failed: {}", s);
         } else {
             println!("results stored at `{}`", out);
@@ -118,6 +141,7 @@ fn run_benchmark(
     modules: &[String],
     dep_dirs: &[String],
     per_function: bool,
+    use_aptos_natives: bool,
 ) -> anyhow::Result<()> {
     let mut options = if let Some(config_file) = config_file_opt {
         Options::create_from_toml_file(config_file)?
@@ -125,6 +149,7 @@ fn run_benchmark(
         Options::default()
     };
     let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
+    options.move_deps.append(&mut dep_dirs.to_vec());
     let env = run_model_builder_with_options(
         vec![PackagePaths {
             name: None,
@@ -133,13 +158,27 @@ fn run_benchmark(
         }],
         vec![PackagePaths {
             name: None,
-            paths: dep_dirs.to_vec(),
+            paths: options.move_deps.clone(),
             named_address_map: addrs,
         }],
         options.model_builder.clone(),
     )?;
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
 
+    if use_aptos_natives {
+        options.backend.custom_natives =
+            Some(move_prover_boogie_backend::options::CustomNativeOptions {
+                template_bytes: include_bytes!(
+                    "../../../../../aptos-move/framework/src/aptos-natives.bpl"
+                )
+                .to_vec(),
+                module_instance_names: vec![(
+                    "0x1::object".to_string(),
+                    "object_instances".to_string(),
+                    true,
+                )],
+            });
+    }
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually
     // indicates a bug in boogie or the solver, because we already propagate soft timeouts, but
     // they are ignored.
@@ -200,6 +239,7 @@ impl Runner {
         let env = fun.module_env.env;
         self.options.prover.verify_scope = VerificationScope::Only(fun.get_full_name_str());
         ProverOptions::set(env, self.options.prover.clone());
+        create_init_num_operation_state(env);
         // Run benchmark
         let (duration, status) = self.bench_function_or_module(fun.module_env.env)?;
 
@@ -224,7 +264,7 @@ impl Runner {
         self.options.prover.verify_scope =
             VerificationScope::OnlyModule(module.get_full_name_str());
         ProverOptions::set(module.env, self.options.prover.clone());
-
+        create_init_num_operation_state(module.env);
         // Run benchmark
         let (duration, status) = self.bench_function_or_module(module.env)?;
 

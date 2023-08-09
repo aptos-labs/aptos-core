@@ -15,10 +15,40 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, ops::Deref};
 
+/// This trait is used by block executor to abstractly represent an event.
+/// Block executor uses `get_event_data` to get the event data.
+/// Block executor then checks for the occurences of aggregators and aggregatorsnapshots
+/// in the event data, processes them, and calls `update_event_data` to update the event data.
+pub trait ReadWriteEvent {
+    /// Returns the event data.
+    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]);
+    /// Updates the event data.
+    fn update_event_data(&mut self, event_data: Vec<u8>);
+}
+
 /// Support versioning of the data structure.
 #[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ContractEvent {
     V0(ContractEventV0),
+}
+
+impl ReadWriteEvent for ContractEvent {
+    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]) {
+        match self {
+            ContractEvent::V0(event) => (
+                *event.key(),
+                event.sequence_number(),
+                event.type_tag(),
+                event.event_data(),
+            ),
+        }
+    }
+
+    fn update_event_data(&mut self, event_data: Vec<u8>) {
+        match self {
+            ContractEvent::V0(event) => event.event_data = event_data,
+        }
+    }
 }
 
 impl ContractEvent {
