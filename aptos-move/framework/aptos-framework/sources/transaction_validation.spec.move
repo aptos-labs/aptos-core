@@ -295,7 +295,7 @@ spec aptos_framework::transaction_validation {
             if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES)) {
                 post_collected_fees_value == aggr_val + transaction_fee_amount
             } else {
-                option::spec_is_some(maybe_apt_supply) ==> post_apt_supply_value == apt_supply_value - transaction_fee_amount      
+                option::spec_is_some(maybe_apt_supply) ==> post_apt_supply_value == apt_supply_value - transaction_fee_amount
             };
     }
 }
